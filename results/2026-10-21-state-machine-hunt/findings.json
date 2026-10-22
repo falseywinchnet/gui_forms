@@ -632,46 +632,6 @@
   "detail": "switch (state) has no default"
  },
  {
-  "path": "demo/correspondence/correspondence_model.cpp",
-  "line": 280,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (folder) has no default; every enumerator is listed and the code after it falls back (return \"Inbox\")"
- },
- {
-  "path": "demo/correspondence/correspondence_model.cpp",
-  "line": 292,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (folder) has no default; every enumerator is listed and the code after it falls back (return \"inbox\")"
- },
- {
-  "path": "demo/seam_proximity_lab.cpp",
-  "line": 218,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (state) has no default; every enumerator is listed and the code after it falls back (return \"UNKNOWN\")"
- },
- {
-  "path": "src/controls/basic/basic_control_rendering.cpp",
-  "line": 105,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (alignment) has no default; every enumerator is listed and the code after it falls back (return false)"
- },
- {
-  "path": "src/controls/basic/basic_control_rendering.cpp",
-  "line": 120,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (relation) has no default; every enumerator is listed and the code after it falls back (return false)"
- },
- {
   "path": "src/controls/button_base/button/button.cpp",
   "line": 205,
   "rule": "F1",
@@ -704,30 +664,6 @@
   "detail": "switch (command) has no default"
  },
  {
-  "path": "src/controls/docking/dock_site/dock_site_drag.cpp",
-  "line": 46,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (zone) has no default; every enumerator is listed and the code after it falls back (return DockShapeRegion::tab_into)"
- },
- {
-  "path": "src/controls/docking/dock_site/dock_site_drag.cpp",
-  "line": 57,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (zone) has no default; every enumerator is listed and the code after it falls back (return \"center\")"
- },
- {
-  "path": "src/controls/gallery/pages/ranges-and-progress.cpp",
-  "line": 135,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (action) has no default; every enumerator is listed and the code after it falls back (return \"input\")"
- },
- {
   "path": "src/controls/gallery/pages/states-and-diagnostics.cpp",
   "line": 192,
   "rule": "F1",
@@ -752,54 +688,6 @@
   "detail": "switch (alignment) has no default"
  },
  {
-  "path": "src/controls/guidance/guidance_utilities.hpp",
-  "line": 16,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (alignment) has no default; every enumerator is listed and the code after it falls back (return false)"
- },
- {
-  "path": "src/controls/guidance/guidance_utilities.hpp",
-  "line": 29,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (style) has no default; every enumerator is listed and the code after it falls back (return false)"
- },
- {
-  "path": "src/controls/guidance/guidance_utilities.hpp",
-  "line": 39,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (value) has no default; every enumerator is listed and the code after it falls back (return false)"
- },
- {
-  "path": "src/controls/label/label.cpp",
-  "line": 155,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (text_style_role_) has no default; every enumerator is listed and the code after it falls back (return typography.field)"
- },
- {
-  "path": "src/controls/pages/navigation_pane/navigation_pane.cpp",
-  "line": 828,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (target.kind) has no default; every enumerator is listed and the code after it falls back (return {})"
- },
- {
-  "path": "src/controls/panel/card/review_card/review_card.cpp",
-  "line": 14,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (disposition) has no default; every enumerator is listed and the code after it falls back (return false)"
- },
- {
   "path": "src/controls/panel/date_time_picker/date_time_picker.cpp",
   "line": 83,
   "rule": "F1",
@@ -808,36 +696,12 @@
   "detail": "switch (format_) has no default"
  },
  {
-  "path": "src/controls/panel/font_dialog/font_dialog.cpp",
-  "line": 75,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (style) has no default; every enumerator is listed and the code after it falls back (return \"Bold Italic\")"
- },
- {
   "path": "src/controls/panel/masked_text_box/masked_text_box.cpp",
   "line": 84,
   "rule": "F1",
   "name": "switch-without-default",
   "area": "controls",
   "detail": "switch (edit.kind) has no default"
- },
- {
-  "path": "src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp",
-  "line": 72,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (hint) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp",
-  "line": 291,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (slots_[position].kind) has no default; every enumerator is listed and the code after it falls back (return MaskResultHint::invalid_input)"
  },
  {
   "path": "src/controls/panel/month_calendar/month_calendar.cpp",
@@ -864,52 +728,12 @@
   "detail": "switch (border_style_) has no default"
  },
  {
-  "path": "src/controls/panel/picture_box/picture_box.cpp",
-  "line": 156,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (size_mode_) has no default; every enumerator is listed and the code after it falls back (return {})"
- },
- {
-  "path": "src/controls/panel/property_grid/property_grid.cpp",
-  "line": 364,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (descriptor.kind) has no default; every enumerator is listed and the code after it falls back (return PropertyEditorKind::read_only)"
- },
- {
-  "path": "src/controls/panel/property_grid/property_grid.cpp",
-  "line": 393,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (kind) has no default; every enumerator is listed and the code after it falls back (return PropertyEditorKind::read_only)"
- },
- {
   "path": "src/controls/panel/property_grid/property_grid_utilities.hpp",
   "line": 90,
   "rule": "F1",
   "name": "switch-without-default",
   "area": "controls",
   "detail": "switch ((*item).role) has no default"
- },
- {
-  "path": "src/controls/panel/text_box/auto_complete/auto_complete.cpp",
-  "line": 44,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (source) has no default; every enumerator is listed and the code after it falls back (return std::nullopt)"
- },
- {
-  "path": "src/controls/range_control/scroll_bar/scroll_bar.cpp",
-  "line": 218,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (part) has no default; every enumerator is listed and the code after it falls back (return false)"
  },
  {
   "path": "src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp",
@@ -934,22 +758,6 @@
   "name": "switch-without-default",
   "area": "controls",
   "detail": "switch ((*item.control).dock()) has no default"
- },
- {
-  "path": "src/controls/scrollable_control/container_control/tab_control/tab_control.cpp",
-  "line": 393,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (alignment_) has no default; every enumerator is listed and the code after it falls back (return bounds)"
- },
- {
-  "path": "src/controls/scrollable_control/container_control/tab_control/tab_control.cpp",
-  "line": 518,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "controls",
-  "detail": "switch (alignment_) has no default; every enumerator is listed and the code after it falls back (return bounds)"
  },
  {
   "path": "src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp",
@@ -998,6 +806,198 @@
   "name": "default-hides-cases",
   "area": "controls",
   "detail": "default takes VisualPaintOperation enumerators 12 enumerators (save, restore, translate, ...) without a stated reason"
+ },
+ {
+  "path": "demo/correspondence/correspondence_model.cpp",
+  "line": 280,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (folder) lists every enumerator and falls back after it (return \"Inbox\")"
+ },
+ {
+  "path": "demo/correspondence/correspondence_model.cpp",
+  "line": 292,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (folder) lists every enumerator and falls back after it (return \"inbox\")"
+ },
+ {
+  "path": "demo/seam_proximity_lab.cpp",
+  "line": 218,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (state) lists every enumerator and falls back after it (return \"UNKNOWN\")"
+ },
+ {
+  "path": "src/controls/basic/basic_control_rendering.cpp",
+  "line": 105,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (alignment) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/controls/basic/basic_control_rendering.cpp",
+  "line": 120,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (relation) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/controls/docking/dock_site/dock_site_drag.cpp",
+  "line": 46,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (zone) lists every enumerator and falls back after it (return DockShapeRegion::tab_into)"
+ },
+ {
+  "path": "src/controls/docking/dock_site/dock_site_drag.cpp",
+  "line": 57,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (zone) lists every enumerator and falls back after it (return \"center\")"
+ },
+ {
+  "path": "src/controls/gallery/pages/ranges-and-progress.cpp",
+  "line": 135,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (action) lists every enumerator and falls back after it (return \"input\")"
+ },
+ {
+  "path": "src/controls/guidance/guidance_utilities.hpp",
+  "line": 16,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (alignment) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/controls/guidance/guidance_utilities.hpp",
+  "line": 29,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (style) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/controls/guidance/guidance_utilities.hpp",
+  "line": 39,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (value) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/controls/label/label.cpp",
+  "line": 155,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (text_style_role_) lists every enumerator and falls back after it (return typography.field)"
+ },
+ {
+  "path": "src/controls/pages/navigation_pane/navigation_pane.cpp",
+  "line": 828,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (target.kind) lists every enumerator and falls back after it (return {})"
+ },
+ {
+  "path": "src/controls/panel/card/review_card/review_card.cpp",
+  "line": 14,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (disposition) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/controls/panel/font_dialog/font_dialog.cpp",
+  "line": 75,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (style) lists every enumerator and falls back after it (return \"Bold Italic\")"
+ },
+ {
+  "path": "src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp",
+  "line": 72,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (hint) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp",
+  "line": 291,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (slots_[position].kind) lists every enumerator and falls back after it (return MaskResultHint::invalid_input)"
+ },
+ {
+  "path": "src/controls/panel/picture_box/picture_box.cpp",
+  "line": 156,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (size_mode_) lists every enumerator and falls back after it (return {})"
+ },
+ {
+  "path": "src/controls/panel/property_grid/property_grid.cpp",
+  "line": 364,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (descriptor.kind) lists every enumerator and falls back after it (return PropertyEditorKind::read_only)"
+ },
+ {
+  "path": "src/controls/panel/property_grid/property_grid.cpp",
+  "line": 393,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (kind) lists every enumerator and falls back after it (return PropertyEditorKind::read_only)"
+ },
+ {
+  "path": "src/controls/panel/text_box/auto_complete/auto_complete.cpp",
+  "line": 44,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (source) lists every enumerator and falls back after it (return std::nullopt)"
+ },
+ {
+  "path": "src/controls/range_control/scroll_bar/scroll_bar.cpp",
+  "line": 218,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (part) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/controls/scrollable_control/container_control/tab_control/tab_control.cpp",
+  "line": 393,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (alignment_) lists every enumerator and falls back after it (return bounds)"
+ },
+ {
+  "path": "src/controls/scrollable_control/container_control/tab_control/tab_control.cpp",
+  "line": 518,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "controls",
+  "detail": "switch (alignment_) lists every enumerator and falls back after it (return bounds)"
  },
  {
   "path": "src/core/animation/animation_timeline/animation_timeline.cpp",
@@ -1216,52 +1216,12 @@
   "detail": "switch (direction) has no default"
  },
  {
-  "path": "src/core/animation/animation_timeline/animation_timeline.cpp",
-  "line": 49,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (easing) has no default; every enumerator is listed and the code after it falls back (return value)"
- },
- {
-  "path": "src/core/application/window_frame_drag.cpp",
-  "line": 7,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (mode) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/binding/value/binding_value.cpp",
-  "line": 25,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (origin) has no default; every enumerator is listed and the code after it falls back (return \"computed\")"
- },
- {
-  "path": "src/core/binding/value/binding_value.cpp",
-  "line": 708,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (target_kind) has no default; every enumerator is listed and the code after it falls back (return std::nullopt)"
- },
- {
   "path": "src/core/binding/value/binding_value.cpp",
   "line": 760,
   "rule": "F1",
   "name": "switch-without-default",
   "area": "core",
   "detail": "switch (target_kind) has no default"
- },
- {
-  "path": "src/core/control/control/control.cpp",
-  "line": 1096,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (dock) has no default; every enumerator is listed and the code after it falls back (return false)"
  },
  {
   "path": "src/core/control/control/control.cpp",
@@ -1281,59 +1241,11 @@
  },
  {
   "path": "src/core/docking/dock_drop_targets/dock_drop_targets.cpp",
-  "line": 20,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (zone) has no default; every enumerator is listed and the code after it falls back (return DockSide::left)"
- },
- {
-  "path": "src/core/docking/dock_drop_targets/dock_drop_targets.cpp",
   "line": 79,
   "rule": "F1",
   "name": "switch-without-default",
   "area": "core",
   "detail": "switch (zone) has no default"
- },
- {
-  "path": "src/core/docking/dock_layout/dock_layout_edits.cpp",
-  "line": 94,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (edit.kind) has no default; every enumerator is listed and the code after it falls back (return refuse(DockRefusalReason::invariant_violated, DockRef)"
- },
- {
-  "path": "src/core/docking/dock_layout/dock_layout_model.cpp",
-  "line": 358,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (owner.kind) has no default; every enumerator is listed and the code after it falls back (return false)"
- },
- {
-  "path": "src/core/docking/dock_layout/dock_layout_persistence.cpp",
-  "line": 90,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (side) has no default; every enumerator is listed and the code after it falls back (return \"left\")"
- },
- {
-  "path": "src/core/docking/dock_layout/dock_layout_persistence.cpp",
-  "line": 119,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (placement) has no default; every enumerator is listed and the code after it falls back (return \"docked\")"
- },
- {
-  "path": "src/core/docking/dock_layout/dock_layout_persistence.cpp",
-  "line": 184,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (owner.kind) has no default; every enumerator is listed and the code after it falls back (return \"?\")"
  },
  {
   "path": "src/core/drawing/graphics_path/graphics_path.cpp",
@@ -1377,14 +1289,6 @@
  },
  {
   "path": "src/core/drawing/support/drawing_support.hpp",
-  "line": 226,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (kind) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/drawing/support/drawing_support.hpp",
   "line": 454,
   "rule": "F1",
   "name": "switch-without-default",
@@ -1401,91 +1305,11 @@
  },
  {
   "path": "src/core/engine/motion_value/motion_value.cpp",
-  "line": 56,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (easing) has no default; every enumerator is listed and the code after it falls back (return 1.0)"
- },
- {
-  "path": "src/core/engine/motion_value/motion_value.cpp",
-  "line": 126,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (easing) has no default; every enumerator is listed and the code after it falls back (return p)"
- },
- {
-  "path": "src/core/engine/motion_value/motion_value.cpp",
-  "line": 202,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (segment.curve.kind) has no default; every enumerator is listed and the code after it falls back (return sample)"
- },
- {
-  "path": "src/core/engine/motion_value/motion_value.cpp",
   "line": 379,
   "rule": "F1",
   "name": "switch-without-default",
   "area": "core",
   "detail": "switch (segment_.curve.kind) has no default"
- },
- {
-  "path": "src/core/engine/primitive_registry/primitive_registry.cpp",
-  "line": 204,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (outcome) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/engine/theme_rules/theme_rules.cpp",
-  "line": 104,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (level) has no default; every enumerator is listed and the code after it falls back (return {})"
- },
- {
-  "path": "src/core/engine/theme_rules/theme_rules.cpp",
-  "line": 138,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (kind) has no default; every enumerator is listed and the code after it falls back (return {})"
- },
- {
-  "path": "src/core/engine/types/engine_types.cpp",
-  "line": 29,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (defect) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/feedback/semantic_feedback/semantic_feedback.cpp",
-  "line": 29,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (kind) has no default; every enumerator is listed and the code after it falls back (return HostSoundCue::notification)"
- },
- {
-  "path": "src/core/feedback/semantic_feedback/semantic_feedback.cpp",
-  "line": 117,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (kind) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/host/services/host_services.cpp",
-  "line": 186,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (buttons) has no default; every enumerator is listed and the code after it falls back (return false)"
  },
  {
   "path": "src/core/host/session/host_session.cpp",
@@ -1494,118 +1318,6 @@
   "name": "switch-without-default",
   "area": "core",
   "detail": "switch (snapshot_.phase) has no default"
- },
- {
-  "path": "src/core/host/types/host_types.cpp",
-  "line": 87,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (error) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/host/types/host_types.cpp",
-  "line": 102,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (phase) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/host/types/host_types.cpp",
-  "line": 117,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (error) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/host/types/host_types.cpp",
-  "line": 132,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (cue) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/host/types/host_types.cpp",
-  "line": 143,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (action) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/host/types/host_types.cpp",
-  "line": 180,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (cursor) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/host/types/host_types.cpp",
-  "line": 196,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (effect) has no default; every enumerator is listed and the code after it falls back (return \"invalid\")"
- },
- {
-  "path": "src/core/host/types/host_types.cpp",
-  "line": 214,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (choice) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/host/windowing/host_windowing.cpp",
-  "line": 140,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (kind) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/resources/image_list/image_list/image_list.cpp",
-  "line": 79,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (state) has no default; every enumerator is listed and the code after it falls back (return false)"
- },
- {
-  "path": "src/core/resources/image_registry/image_registry.cpp",
-  "line": 131,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (error) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/semantics/snapshot/semantic_snapshot.cpp",
-  "line": 76,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (role) has no default; every enumerator is listed and the code after it falls back (return \"generic\")"
- },
- {
-  "path": "src/core/semantics/snapshot/semantic_snapshot.cpp",
-  "line": 121,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (action) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/semantics/snapshot/semantic_snapshot.cpp",
-  "line": 138,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (orientation) has no default; every enumerator is listed and the code after it falls back (return \"horizontal\")"
  },
  {
   "path": "src/core/text/prepared/prepared_storage.cpp",
@@ -1624,30 +1336,6 @@
   "detail": "switch (resource_) has no default"
  },
  {
-  "path": "src/core/text/text_store/text_store.cpp",
-  "line": 172,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (error) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/text_shaping/validation/text_shaping_validation.cpp",
-  "line": 118,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (error) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/text_shaping/validation/text_shaping_validation.cpp",
-  "line": 146,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (error) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
   "path": "src/core/theme/part_painting/part_painting.cpp",
   "line": 304,
   "rule": "F1",
@@ -1662,14 +1350,6 @@
   "name": "switch-without-default",
   "area": "core",
   "detail": "switch (part.mark) has no default"
- },
- {
-  "path": "src/core/theme/part_painting/part_painting.cpp",
-  "line": 484,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (mark) has no default; every enumerator is listed and the code after it falls back (return {})"
  },
  {
   "path": "src/core/theme/part_painting/part_painting.cpp",
@@ -1712,116 +1392,12 @@
   "detail": "switch (fill.image_mode) has no default"
  },
  {
-  "path": "src/core/theme/theme/theme.cpp",
-  "line": 765,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (role) has no default; every enumerator is listed and the code after it falls back (return {})"
- },
- {
-  "path": "src/core/typography/resolution/typography_resolution.cpp",
-  "line": 10,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (status) has no default; every enumerator is listed and the code after it falls back (return \"invalid_request\")"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 107,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (kind) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 121,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (value) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 130,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (value) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 139,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (value) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 146,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (value) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 154,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (value) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 163,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (edge) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
   "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
   "line": 413,
   "rule": "F1",
   "name": "switch-without-default",
   "area": "core",
   "detail": "switch (operation) has no default"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 447,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (plane) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 456,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (role) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 465,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (dock) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
-  "line": 477,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (status) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
  },
  {
   "path": "src/core/window/command_route/window_command_route.cpp",
@@ -1840,14 +1416,6 @@
   "detail": "switch (operation) has no default"
  },
  {
-  "path": "src/core/xml/types/xml_types.cpp",
-  "line": 6,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "core",
-  "detail": "switch (error) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
   "path": "src/core/host/cursor_interaction/cursor_interaction.cpp",
   "line": 26,
   "rule": "F2",
@@ -1862,6 +1430,438 @@
   "name": "default-hides-cases",
   "area": "core",
   "detail": "vocabulary mapping over PartRole must list every enumerator; missing: 23 enumerators (region, shadow, edge, ...)"
+ },
+ {
+  "path": "src/core/animation/animation_timeline/animation_timeline.cpp",
+  "line": 49,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (easing) lists every enumerator and falls back after it (return value)"
+ },
+ {
+  "path": "src/core/application/window_frame_drag.cpp",
+  "line": 7,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (mode) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/binding/value/binding_value.cpp",
+  "line": 25,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (origin) lists every enumerator and falls back after it (return \"computed\")"
+ },
+ {
+  "path": "src/core/binding/value/binding_value.cpp",
+  "line": 708,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (target_kind) lists every enumerator and falls back after it (return std::nullopt)"
+ },
+ {
+  "path": "src/core/control/control/control.cpp",
+  "line": 1096,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (dock) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/core/docking/dock_drop_targets/dock_drop_targets.cpp",
+  "line": 20,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (zone) lists every enumerator and falls back after it (return DockSide::left)"
+ },
+ {
+  "path": "src/core/docking/dock_layout/dock_layout_edits.cpp",
+  "line": 94,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (edit.kind) lists every enumerator and falls back after it (return refuse(DockRefusalReason::invariant_violated, DockRef)"
+ },
+ {
+  "path": "src/core/docking/dock_layout/dock_layout_model.cpp",
+  "line": 358,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (owner.kind) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/core/docking/dock_layout/dock_layout_persistence.cpp",
+  "line": 90,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (side) lists every enumerator and falls back after it (return \"left\")"
+ },
+ {
+  "path": "src/core/docking/dock_layout/dock_layout_persistence.cpp",
+  "line": 119,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (placement) lists every enumerator and falls back after it (return \"docked\")"
+ },
+ {
+  "path": "src/core/docking/dock_layout/dock_layout_persistence.cpp",
+  "line": 184,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (owner.kind) lists every enumerator and falls back after it (return \"?\")"
+ },
+ {
+  "path": "src/core/drawing/support/drawing_support.hpp",
+  "line": 226,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (kind) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/engine/motion_value/motion_value.cpp",
+  "line": 56,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (easing) lists every enumerator and falls back after it (return 1.0)"
+ },
+ {
+  "path": "src/core/engine/motion_value/motion_value.cpp",
+  "line": 126,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (easing) lists every enumerator and falls back after it (return p)"
+ },
+ {
+  "path": "src/core/engine/motion_value/motion_value.cpp",
+  "line": 202,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (segment.curve.kind) lists every enumerator and falls back after it (return sample)"
+ },
+ {
+  "path": "src/core/engine/primitive_registry/primitive_registry.cpp",
+  "line": 204,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (outcome) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/engine/theme_rules/theme_rules.cpp",
+  "line": 104,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (level) lists every enumerator and falls back after it (return {})"
+ },
+ {
+  "path": "src/core/engine/theme_rules/theme_rules.cpp",
+  "line": 138,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (kind) lists every enumerator and falls back after it (return {})"
+ },
+ {
+  "path": "src/core/engine/types/engine_types.cpp",
+  "line": 29,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (defect) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/feedback/semantic_feedback/semantic_feedback.cpp",
+  "line": 29,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (kind) lists every enumerator and falls back after it (return HostSoundCue::notification)"
+ },
+ {
+  "path": "src/core/feedback/semantic_feedback/semantic_feedback.cpp",
+  "line": 117,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (kind) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/host/services/host_services.cpp",
+  "line": 186,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (buttons) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/core/host/types/host_types.cpp",
+  "line": 87,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (error) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/host/types/host_types.cpp",
+  "line": 102,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (phase) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/host/types/host_types.cpp",
+  "line": 117,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (error) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/host/types/host_types.cpp",
+  "line": 132,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (cue) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/host/types/host_types.cpp",
+  "line": 143,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (action) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/host/types/host_types.cpp",
+  "line": 180,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (cursor) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/host/types/host_types.cpp",
+  "line": 196,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (effect) lists every enumerator and falls back after it (return \"invalid\")"
+ },
+ {
+  "path": "src/core/host/types/host_types.cpp",
+  "line": 214,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (choice) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/host/windowing/host_windowing.cpp",
+  "line": 140,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (kind) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/resources/image_list/image_list/image_list.cpp",
+  "line": 79,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (state) lists every enumerator and falls back after it (return false)"
+ },
+ {
+  "path": "src/core/resources/image_registry/image_registry.cpp",
+  "line": 131,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (error) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/semantics/snapshot/semantic_snapshot.cpp",
+  "line": 76,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (role) lists every enumerator and falls back after it (return \"generic\")"
+ },
+ {
+  "path": "src/core/semantics/snapshot/semantic_snapshot.cpp",
+  "line": 121,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (action) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/semantics/snapshot/semantic_snapshot.cpp",
+  "line": 138,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (orientation) lists every enumerator and falls back after it (return \"horizontal\")"
+ },
+ {
+  "path": "src/core/text/text_store/text_store.cpp",
+  "line": 172,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (error) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/text_shaping/validation/text_shaping_validation.cpp",
+  "line": 118,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (error) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/text_shaping/validation/text_shaping_validation.cpp",
+  "line": 146,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (error) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/theme/part_painting/part_painting.cpp",
+  "line": 484,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (mark) lists every enumerator and falls back after it (return {})"
+ },
+ {
+  "path": "src/core/theme/theme/theme.cpp",
+  "line": 765,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (role) lists every enumerator and falls back after it (return {})"
+ },
+ {
+  "path": "src/core/typography/resolution/typography_resolution.cpp",
+  "line": 10,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (status) lists every enumerator and falls back after it (return \"invalid_request\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 107,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (kind) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 121,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (value) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 130,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (value) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 139,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (value) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 146,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (value) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 154,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (value) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 163,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (edge) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 447,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (plane) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 456,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (role) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 465,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (dock) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp",
+  "line": 477,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (status) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "src/core/xml/types/xml_types.cpp",
+  "line": 6,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "core",
+  "detail": "switch (error) lists every enumerator and falls back after it (return \"unknown\")"
  },
  {
   "path": "examples/paint_contract/main.cpp",
@@ -1896,38 +1896,6 @@
   "detail": "default ignores its input (break;) without a stated reason"
  },
  {
-  "path": "src/host/windows/accessibility/windows_accessibility.cpp",
-  "line": 68,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "host-windows",
-  "detail": "switch (role) has no default; every enumerator is listed and the code after it falls back (return ROLE_SYSTEM_GROUPING)"
- },
- {
-  "path": "src/host/windows/accessibility/windows_accessibility.cpp",
-  "line": 170,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "host-windows",
-  "detail": "switch (*action) has no default; every enumerator is listed and the code after it falls back (return nullptr)"
- },
- {
-  "path": "src/host/windows/accessibility/windows_accessibility.cpp",
-  "line": 337,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "host-windows",
-  "detail": "switch (property) has no default; every enumerator is listed and the code after it falls back (return S_FALSE)"
- },
- {
-  "path": "src/host/windows/accessibility/windows_automation.cpp",
-  "line": 151,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "host-windows",
-  "detail": "switch (role) has no default; every enumerator is listed and the code after it falls back (return UIA_GroupControlTypeId)"
- },
- {
   "path": "src/host/windows/application/windows_host.cpp",
   "line": 286,
   "rule": "F1",
@@ -1944,28 +1912,60 @@
   "detail": "switch (request.icon) has no default"
  },
  {
-  "path": "src/host/windows/application/windows_host.cpp",
-  "line": 371,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "host-windows",
-  "detail": "switch (cursor) has no default; every enumerator is listed and the code after it falls back (return IDC_ARROW)"
- },
- {
-  "path": "src/host/windows/application/windows_host.cpp",
-  "line": 2029,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "host-windows",
-  "detail": "switch (spread) has no default; every enumerator is listed and the code after it falls back (return std::clamp(amount, 0.0, 1.0))"
- },
- {
   "path": "src/host/windows/services/windows_host_services.hpp",
   "line": 299,
   "rule": "F1",
   "name": "switch-without-default",
   "area": "host-windows",
   "detail": "switch (request.cue) has no default"
+ },
+ {
+  "path": "src/host/windows/accessibility/windows_accessibility.cpp",
+  "line": 68,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "host-windows",
+  "detail": "switch (role) lists every enumerator and falls back after it (return ROLE_SYSTEM_GROUPING)"
+ },
+ {
+  "path": "src/host/windows/accessibility/windows_accessibility.cpp",
+  "line": 170,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "host-windows",
+  "detail": "switch (*action) lists every enumerator and falls back after it (return nullptr)"
+ },
+ {
+  "path": "src/host/windows/accessibility/windows_accessibility.cpp",
+  "line": 337,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "host-windows",
+  "detail": "switch (property) lists every enumerator and falls back after it (return S_FALSE)"
+ },
+ {
+  "path": "src/host/windows/accessibility/windows_automation.cpp",
+  "line": 151,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "host-windows",
+  "detail": "switch (role) lists every enumerator and falls back after it (return UIA_GroupControlTypeId)"
+ },
+ {
+  "path": "src/host/windows/application/windows_host.cpp",
+  "line": 371,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "host-windows",
+  "detail": "switch (cursor) lists every enumerator and falls back after it (return IDC_ARROW)"
+ },
+ {
+  "path": "src/host/windows/application/windows_host.cpp",
+  "line": 2029,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "host-windows",
+  "detail": "switch (spread) lists every enumerator and falls back after it (return std::clamp(amount, 0.0, 1.0))"
  },
  {
   "path": "src/render/skia/executor/skia_executor.cpp",
@@ -2016,20 +2016,20 @@
   "detail": "stb_vorbis: bool length_known qualifies length; one std::optional (or an enum) cannot disagree"
  },
  {
-  "path": "stx_vorbis/src/types.cpp",
-  "line": 4,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "stx_vorbis",
-  "detail": "switch (status) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
   "path": "stx_vorbis/src/c_adapter.cpp",
   "line": 37,
   "rule": "F2",
   "name": "default-hides-cases",
   "area": "stx_vorbis",
   "detail": "default takes Status enumerators 6 enumerators (need_output, packet, invalid_argument, ...) without a stated reason"
+ },
+ {
+  "path": "stx_vorbis/src/types.cpp",
+  "line": 4,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "stx_vorbis",
+  "detail": "switch (status) lists every enumerator and falls back after it (return \"unknown\")"
  },
  {
   "path": "tests/invalidation_damage_tests.cpp",
@@ -2072,123 +2072,123 @@
   "detail": "Reminder: bool has_date qualifies date; one std::optional (or an enum) cannot disagree"
  },
  {
-  "path": "tests/abi_registry_lifetime_tests.cpp",
-  "line": 65,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (teardown) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "tests/dock_auto_hide_tests.cpp",
-  "line": 119,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (cause) has no default; every enumerator is listed and the code after it falls back (return \"?\")"
- },
- {
-  "path": "tests/gallery_pages/schema_export_tests.cpp",
-  "line": 37,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (kind) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "tests/gallery_pages/schema_export_tests.cpp",
-  "line": 59,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (visibility) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "tests/support/headless_trace.cpp",
-  "line": 12,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (action) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "tests/support/headless_trace.cpp",
-  "line": 24,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (phase) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "tests/windows_accessibility_msaa_gallery_tests.cpp",
-  "line": 204,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (role) has no default; every enumerator is listed and the code after it falls back (return ROLE_SYSTEM_GROUPING)"
- },
- {
-  "path": "tests/windows_accessibility_msaa_gallery_tests.cpp",
-  "line": 297,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (kind) has no default; every enumerator is listed and the code after it falls back (return {})"
- },
- {
-  "path": "tests/windows_accessibility_msaa_gallery_tests.cpp",
-  "line": 428,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (outcome) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "tests/windows_accessibility_uia_gallery_tests.cpp",
-  "line": 201,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (role) has no default; every enumerator is listed and the code after it falls back (return UIA_GroupControlTypeId)"
- },
- {
-  "path": "tests/windows_accessibility_uia_gallery_tests.cpp",
-  "line": 326,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (kind) has no default; every enumerator is listed and the code after it falls back (return PatternCall::set_focus)"
- },
- {
-  "path": "tests/windows_accessibility_uia_gallery_tests.cpp",
-  "line": 341,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (call) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "tests/windows_accessibility_uia_gallery_tests.cpp",
-  "line": 520,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (outcome) has no default; every enumerator is listed and the code after it falls back (return \"unknown\")"
- },
- {
-  "path": "tests/windows_accessibility_uia_gallery_tests.cpp",
-  "line": 1212,
-  "rule": "F1",
-  "name": "switch-without-default",
-  "area": "tests",
-  "detail": "switch (call) has no default; every enumerator is listed and the code after it falls back (return E_NOTIMPL)"
- },
- {
   "path": "tests/invalidation_damage_tests.cpp",
   "line": 246,
   "rule": "F2",
   "name": "default-hides-cases",
   "area": "tests",
   "detail": "default takes PointerAction enumerators up, wheel, leave without a stated reason"
+ },
+ {
+  "path": "tests/abi_registry_lifetime_tests.cpp",
+  "line": 65,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (teardown) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "tests/dock_auto_hide_tests.cpp",
+  "line": 119,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (cause) lists every enumerator and falls back after it (return \"?\")"
+ },
+ {
+  "path": "tests/gallery_pages/schema_export_tests.cpp",
+  "line": 37,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (kind) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "tests/gallery_pages/schema_export_tests.cpp",
+  "line": 59,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (visibility) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "tests/support/headless_trace.cpp",
+  "line": 12,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (action) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "tests/support/headless_trace.cpp",
+  "line": 24,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (phase) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "tests/windows_accessibility_msaa_gallery_tests.cpp",
+  "line": 204,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (role) lists every enumerator and falls back after it (return ROLE_SYSTEM_GROUPING)"
+ },
+ {
+  "path": "tests/windows_accessibility_msaa_gallery_tests.cpp",
+  "line": 297,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (kind) lists every enumerator and falls back after it (return {})"
+ },
+ {
+  "path": "tests/windows_accessibility_msaa_gallery_tests.cpp",
+  "line": 428,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (outcome) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "tests/windows_accessibility_uia_gallery_tests.cpp",
+  "line": 201,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (role) lists every enumerator and falls back after it (return UIA_GroupControlTypeId)"
+ },
+ {
+  "path": "tests/windows_accessibility_uia_gallery_tests.cpp",
+  "line": 326,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (kind) lists every enumerator and falls back after it (return PatternCall::set_focus)"
+ },
+ {
+  "path": "tests/windows_accessibility_uia_gallery_tests.cpp",
+  "line": 341,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (call) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "tests/windows_accessibility_uia_gallery_tests.cpp",
+  "line": 520,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (outcome) lists every enumerator and falls back after it (return \"unknown\")"
+ },
+ {
+  "path": "tests/windows_accessibility_uia_gallery_tests.cpp",
+  "line": 1212,
+  "rule": "OK",
+  "name": "complete-with-fallback",
+  "area": "tests",
+  "detail": "switch (call) lists every enumerator and falls back after it (return E_NOTIMPL)"
  }
 ]

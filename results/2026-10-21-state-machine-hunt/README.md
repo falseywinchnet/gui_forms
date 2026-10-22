@@ -31,7 +31,7 @@ Full output: [findings.txt](findings.txt) (grouped by area) and
 
 | Rule | Name | Source | Meaning |
 |---|---|---|---|
-| F1 | switch-without-default | compiler (`-Wswitch-default`, `-Wswitch`) | a switch has no default label |
+| F1 | switch-without-default | compiler (`-Wswitch-default`, `-Wswitch`) plus source | a switch has no default label and is not in the compliant form (below) |
 | F2 | default-hides-cases | compiler (`-Wswitch-enum`) plus source | an enum switch sends enumerators to a default that states no reason (no comment at it, no throw or failure call), or a vocabulary mapping leaves any enumerator out |
 | C1 | input-ignored | source (heuristic) | a case or default whose body is empty, or a bare `break`, `return` or `continue`, with no comment |
 | C2 | chain-without-fallback | source (heuristic) | an `if` / `else if` chain comparing one expression with two or more enumerators and no final `else` |
@@ -54,29 +54,31 @@ are anatomy declarations (one bool per state or part name), not runtime state.
 
 ## Counts
 
-| Area | F1 | F2 | C1 | C2 | C3 |
-|---|---:|---:|---:|---:|---:|
-| core | 80 | 2 | 17 | 3 | 6 |
-| controls | 42 | 5 | 21 | 44 | 4 |
-| tests | 14 | 1 | 3 | 1 | 1 |
-| host-windows | 9 | 0 | 2 | 0 | 0 |
-| c-abi | 5 | 0 | 3 | 0 | 0 |
-| stx_vorbis | 1 | 1 | 0 | 0 | 3 |
-| render | 0 | 0 | 2 | 0 | 1 |
-| host-linux | 0 | 0 | 1 | 0 | 0 |
-| audio | 0 | 0 | 0 | 1 | 0 |
-| examples | 0 | 0 | 0 | 1 | 0 |
-| **total** | **151** | **9** | **49** | **50** | **15** |
+| Area | F1 | F2 | C1 | C2 | C3 | compliant |
+|---|---:|---:|---:|---:|---:|---:|
+| core | 26 | 2 | 17 | 3 | 6 | 54 |
+| controls | 18 | 5 | 21 | 44 | 4 | 24 |
+| c-abi | 5 | 0 | 3 | 0 | 0 | 0 |
+| host-windows | 3 | 0 | 2 | 0 | 0 | 6 |
+| tests | 0 | 1 | 3 | 1 | 1 | 14 |
+| stx_vorbis | 0 | 1 | 0 | 0 | 3 | 1 |
+| render | 0 | 0 | 2 | 0 | 1 | 0 |
+| host-linux | 0 | 0 | 1 | 0 | 0 | 0 |
+| audio | 0 | 0 | 0 | 1 | 0 | 0 |
+| examples | 0 | 0 | 0 | 1 | 0 | 0 |
+| **total** | **52** | **9** | **49** | **50** | **15** | **99** |
 
-Of the 151 F1 findings, **99 list every enumerator, return or throw from
-every case, and fall back after the switch** (`return "unknown";` and
-similar; the detail says so). That is the common idiom that keeps `-Wswitch`
-able to flag a new enumerator. It breaks the letter of section 9 (no default
-label), and it does have a defined fallback. The owner should decide whether
-these are converted, or whether the rule accepts "complete, with a fallback
-directly after". The other 52 assign or act in their cases and carry on
-after the switch, so what an unexpected value does has to be read case by
-case. One F2 is a vocabulary mapping:
+**Compliant** (owner decision, 2026-10-21): an enumeration switch with no
+default that lists every enumerator (the compiler reports none unhandled),
+leaves from every case (return, throw, or a call to `abort`, `terminate`,
+`unreachable`, `exit` or `quick_exit`), and whose next statement after the
+closing brace is the one fallback, which also leaves. It keeps the compiler's
+warning for a new enumerator. These 99 switches are tallied (rule `OK` in the
+JSON) and are not findings. The F1 count is the non-compliant set: switches
+with no default that are not in that form. For example, a case that `break`s
+to code after the switch, or a fallback that is not the next statement.
+
+One F2 is a vocabulary mapping, which must list every enumerator:
 `src/core/theme/part_painting/part_painting.cpp:26`, a PartRole mapping
 missing 23 enumerators (region, shadow, edge, ...).
 
@@ -87,7 +89,7 @@ Ten findings per rule, evenly spaced through each rule's list, plus all 15 C3
 
 | Rule | Sample | Right | Notes |
 |---|---:|---:|---|
-| F1 | 10 | 10 | compiler fact; 7 of the 10 are complete-with-fallback-after |
+| F1 | 10 | 10 | compiler fact, and none of the 10 is in the compliant form (each breaks to code after the switch, or has no fallback) |
 | F2 | 9 (all) | 9 | e.g. `ContentAlignment` alignments left to a bare `default: break;` |
 | C1 | 10 | 5 | right: ignored pointer `move` in the C ABI field adapter, `count` sentinels, ignored `close_figure` path verbs; wrong: no-op is the meaning (`BorderStyle::none`, `AnimationDirection::normal`, `TextCaseTransform::none`, label style roles) |
 | C2 | 10 | 7 | right: pointer and tray handlers that drop other actions silently, zones and behaviours with no else; wrong: chains after defaults set beforehand (image list, instrument rack colours, check box) |
@@ -110,7 +112,7 @@ brace-initialised members.
 
 ## Next
 
-Route the findings to the areas above (core, controls, tests, host-windows,
-c-abi, stx_vorbis, render, host-linux, audio, examples). The owner decides
-the F1 "complete with a fallback after" question. A baseline keyed by file,
-enclosing function and rule can gate later.
+The review worker fixes the findings by area (core, controls, c-abi,
+host-windows, tests, stx_vorbis, render, host-linux, audio, examples) after
+this report merges. A baseline keyed by file, enclosing function and rule can
+gate later.

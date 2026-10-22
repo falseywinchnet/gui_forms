@@ -216,8 +216,33 @@ int b(E e) {
                                                           "'switch' missing 'default' label")
             found: list[hunt.Finding] = hunt.compiler_findings([diagnostic], root, set())
         self.assertEqual(len(found), 1)
-        self.assertEqual(found[0].rule, "F1")
-        self.assertIn("falls back (return \"unknown\")", found[0].detail.replace("  ", " "))
+        self.assertEqual(found[0].rule, "OK")
+        self.assertIn("falls back after it (return \"unknown\")", found[0].detail)
+
+    def test_a_fallback_not_directly_after_or_a_case_that_stays_is_still_f1(self) -> None:
+        later: str = """int later(Side side) {
+    switch (side) {
+    case Side::left: return 1;
+    case Side::right: return 2;
+    }
+    log_unexpected();
+    return 0;
+}
+"""
+        stays: str = """int stays(Side side) {
+    switch (side) {
+    case Side::left: return 1;
+    case Side::right: note(); break;
+    }
+    return 0;
+}
+"""
+        text: str
+        for text in (later, stays):
+            masked_text: str = hunt.masked(text)
+            self.assertFalse(hunt.complete_with_fallback(masked_text, hunt.find_switches(masked_text)[0]))
+        terminal: str = hunt.masked("void t(Side s) { switch (s) { case Side::left: std::abort(); } std::terminate(); }")
+        self.assertTrue(hunt.complete_with_fallback(terminal, hunt.find_switches(terminal)[0]))
 
     def test_assigning_cases_do_not_make_the_code_after_a_fallback(self) -> None:
         source: str = "int t(E e) { int v = 0; switch (e) { case E::a: v = 1; break; case E::b: v = 2; break; } return v; }"

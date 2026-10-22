@@ -1,15 +1,16 @@
 117 translation units compiled; 1244 files parsed
-area             C1   C2   C3   F1   F2
-audio             0    1    0    0    0
-c-abi             3    0    0    5    0
-controls         21   44    4   42    5
-core             17    3    6   80    2
-examples          0    1    0    0    0
-host-linux        1    0    0    0    0
-host-windows      2    0    0    9    0
-render            2    0    1    0    0
-stx_vorbis        0    0    3    1    1
-tests             3    1    1   14    1
+area             C1   C2   C3   F1   F2   OK
+audio             0    1    0    0    0    0
+c-abi             3    0    0    5    0    0
+controls         21   44    4   18    5   24
+core             17    3    6   26    2   54
+examples          0    1    0    0    0    0
+host-linux        1    0    0    0    0    0
+host-windows      2    0    0    3    0    6
+render            2    0    1    0    0    0
+stx_vorbis        0    0    3    0    1    1
+tests             3    1    1    0    1   14
+OK counts compliant switches (every enumerator listed, every case leaves, one fallback directly after); they are not listed below.
 
 == audio
 src/audio/loop_transport/scheduler.cpp:144: C2 chain-without-fallback: chain over item.kind (CommandKind::pause, CommandKind::resume, CommandKind::gain, CommandKind::stop, CommandKind::cancel) has no final else
@@ -95,46 +96,22 @@ include/gui_forms/controls/button_base/button_base.hpp:185: C3 contradictory-sha
 include/gui_forms/controls/panel/month_calendar/month_calendar.hpp:283: C3 contradictory-shape: MonthCalendar: bool today_set_ qualifies today_; one std::optional (or an enum) cannot disagree
 src/controls/ribbon_tool_tip/ribbon_tool_tip.cpp:42: C3 contradictory-shape: RibbonToolTip: bool has_control_content qualifies control_content; one std::optional (or an enum) cannot disagree
 demo/connected_controls_lab.cpp:63: F1 switch-without-default: switch (state) has no default
-demo/correspondence/correspondence_model.cpp:280: F1 switch-without-default: switch (folder) has no default; every enumerator is listed and the code after it falls back (return "Inbox")
-demo/correspondence/correspondence_model.cpp:292: F1 switch-without-default: switch (folder) has no default; every enumerator is listed and the code after it falls back (return "inbox")
-demo/seam_proximity_lab.cpp:218: F1 switch-without-default: switch (state) has no default; every enumerator is listed and the code after it falls back (return "UNKNOWN")
-src/controls/basic/basic_control_rendering.cpp:105: F1 switch-without-default: switch (alignment) has no default; every enumerator is listed and the code after it falls back (return false)
-src/controls/basic/basic_control_rendering.cpp:120: F1 switch-without-default: switch (relation) has no default; every enumerator is listed and the code after it falls back (return false)
 src/controls/button_base/button/button.cpp:205: F1 switch-without-default: switch (visual_style_) has no default
 src/controls/button_base/button_base.cpp:500: F1 switch-without-default: switch (text_image_relation_) has no default
 src/controls/container/master_detail_view/master_detail_view.cpp:192: F1 switch-without-default: switch (mode) has no default
 src/controls/docking/dock_site/dock_site.cpp:1884: F1 switch-without-default: switch (command) has no default
-src/controls/docking/dock_site/dock_site_drag.cpp:46: F1 switch-without-default: switch (zone) has no default; every enumerator is listed and the code after it falls back (return DockShapeRegion::tab_into)
-src/controls/docking/dock_site/dock_site_drag.cpp:57: F1 switch-without-default: switch (zone) has no default; every enumerator is listed and the code after it falls back (return "center")
-src/controls/gallery/pages/ranges-and-progress.cpp:135: F1 switch-without-default: switch (action) has no default; every enumerator is listed and the code after it falls back (return "input")
 src/controls/gallery/pages/states-and-diagnostics.cpp:192: F1 switch-without-default: switch (step) has no default
 src/controls/gallery_controls.cpp:733: F1 switch-without-default: switch ((*specification_).kind) has no default
 src/controls/guidance/error_provider/error_provider.cpp:512: F1 switch-without-default: switch (alignment) has no default
-src/controls/guidance/guidance_utilities.hpp:16: F1 switch-without-default: switch (alignment) has no default; every enumerator is listed and the code after it falls back (return false)
-src/controls/guidance/guidance_utilities.hpp:29: F1 switch-without-default: switch (style) has no default; every enumerator is listed and the code after it falls back (return false)
-src/controls/guidance/guidance_utilities.hpp:39: F1 switch-without-default: switch (value) has no default; every enumerator is listed and the code after it falls back (return false)
-src/controls/label/label.cpp:155: F1 switch-without-default: switch (text_style_role_) has no default; every enumerator is listed and the code after it falls back (return typography.field)
-src/controls/pages/navigation_pane/navigation_pane.cpp:828: F1 switch-without-default: switch (target.kind) has no default; every enumerator is listed and the code after it falls back (return {})
-src/controls/panel/card/review_card/review_card.cpp:14: F1 switch-without-default: switch (disposition) has no default; every enumerator is listed and the code after it falls back (return false)
 src/controls/panel/date_time_picker/date_time_picker.cpp:83: F1 switch-without-default: switch (format_) has no default
-src/controls/panel/font_dialog/font_dialog.cpp:75: F1 switch-without-default: switch (style) has no default; every enumerator is listed and the code after it falls back (return "Bold Italic")
 src/controls/panel/masked_text_box/masked_text_box.cpp:84: F1 switch-without-default: switch (edit.kind) has no default
-src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp:72: F1 switch-without-default: switch (hint) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp:291: F1 switch-without-default: switch (slots_[position].kind) has no default; every enumerator is listed and the code after it falls back (return MaskResultHint::invalid_input)
 src/controls/panel/month_calendar/month_calendar.cpp:1127: F1 switch-without-default: switch (reference.kind) has no default
 src/controls/panel/month_calendar/month_calendar.cpp:1151: F1 switch-without-default: switch (reference.kind) has no default
 src/controls/panel/panel.cpp:106: F1 switch-without-default: switch (border_style_) has no default
-src/controls/panel/picture_box/picture_box.cpp:156: F1 switch-without-default: switch (size_mode_) has no default; every enumerator is listed and the code after it falls back (return {})
-src/controls/panel/property_grid/property_grid.cpp:364: F1 switch-without-default: switch (descriptor.kind) has no default; every enumerator is listed and the code after it falls back (return PropertyEditorKind::read_only)
-src/controls/panel/property_grid/property_grid.cpp:393: F1 switch-without-default: switch (kind) has no default; every enumerator is listed and the code after it falls back (return PropertyEditorKind::read_only)
 src/controls/panel/property_grid/property_grid_utilities.hpp:90: F1 switch-without-default: switch ((*item).role) has no default
-src/controls/panel/text_box/auto_complete/auto_complete.cpp:44: F1 switch-without-default: switch (source) has no default; every enumerator is listed and the code after it falls back (return std::nullopt)
-src/controls/range_control/scroll_bar/scroll_bar.cpp:218: F1 switch-without-default: switch (part) has no default; every enumerator is listed and the code after it falls back (return false)
 src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp:217: F1 switch-without-default: switch (main_alignment_) has no default
 src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp:265: F1 switch-without-default: switch (cross_alignment_) has no default
 src/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.cpp:609: F1 switch-without-default: switch ((*item.control).dock()) has no default
-src/controls/scrollable_control/container_control/tab_control/tab_control.cpp:393: F1 switch-without-default: switch (alignment_) has no default; every enumerator is listed and the code after it falls back (return bounds)
-src/controls/scrollable_control/container_control/tab_control/tab_control.cpp:518: F1 switch-without-default: switch (alignment_) has no default; every enumerator is listed and the code after it falls back (return bounds)
 src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp:584: F1 switch-without-default: switch ((*item.control).dock()) has no default
 src/controls/basic/basic_control_rendering.cpp:136: F2 default-hides-cases: default takes ContentAlignment enumerators top_left, middle_left, bottom_left without a stated reason
 src/controls/basic/basic_control_rendering.cpp:149: F2 default-hides-cases: default takes ContentAlignment enumerators top_left, top_center, top_right without a stated reason
@@ -170,85 +147,31 @@ include/gui_forms/host/windowing/host_windowing.hpp:342: C3 contradictory-shape:
 include/gui_forms/host/windowing/host_windowing.hpp:354: C3 contradictory-shape: WindowRecord: bool offset_known qualifies offset; one std::optional (or an enum) cannot disagree
 src/core/image/png_decoder.cpp:63: C3 contradictory-shape: Plan: bool has_transparency qualifies transparency; one std::optional (or an enum) cannot disagree
 src/core/animation/animation_timeline/animation_timeline.cpp:29: F1 switch-without-default: switch (direction) has no default
-src/core/animation/animation_timeline/animation_timeline.cpp:49: F1 switch-without-default: switch (easing) has no default; every enumerator is listed and the code after it falls back (return value)
-src/core/application/window_frame_drag.cpp:7: F1 switch-without-default: switch (mode) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/binding/value/binding_value.cpp:25: F1 switch-without-default: switch (origin) has no default; every enumerator is listed and the code after it falls back (return "computed")
-src/core/binding/value/binding_value.cpp:708: F1 switch-without-default: switch (target_kind) has no default; every enumerator is listed and the code after it falls back (return std::nullopt)
 src/core/binding/value/binding_value.cpp:760: F1 switch-without-default: switch (target_kind) has no default
-src/core/control/control/control.cpp:1096: F1 switch-without-default: switch (dock) has no default; every enumerator is listed and the code after it falls back (return false)
 src/core/control/control/control.cpp:2249: F1 switch-without-default: switch ((*child).dock_) has no default
 src/core/display/replay/replay_display_chunk.cpp:10: F1 switch-without-default: switch (command.operation) has no default
-src/core/docking/dock_drop_targets/dock_drop_targets.cpp:20: F1 switch-without-default: switch (zone) has no default; every enumerator is listed and the code after it falls back (return DockSide::left)
 src/core/docking/dock_drop_targets/dock_drop_targets.cpp:79: F1 switch-without-default: switch (zone) has no default
-src/core/docking/dock_layout/dock_layout_edits.cpp:94: F1 switch-without-default: switch (edit.kind) has no default; every enumerator is listed and the code after it falls back (return refuse(DockRefusalReason::invariant_violated, DockRef)
-src/core/docking/dock_layout/dock_layout_model.cpp:358: F1 switch-without-default: switch (owner.kind) has no default; every enumerator is listed and the code after it falls back (return false)
-src/core/docking/dock_layout/dock_layout_persistence.cpp:90: F1 switch-without-default: switch (side) has no default; every enumerator is listed and the code after it falls back (return "left")
-src/core/docking/dock_layout/dock_layout_persistence.cpp:119: F1 switch-without-default: switch (placement) has no default; every enumerator is listed and the code after it falls back (return "docked")
-src/core/docking/dock_layout/dock_layout_persistence.cpp:184: F1 switch-without-default: switch (owner.kind) has no default; every enumerator is listed and the code after it falls back (return "?")
 src/core/drawing/graphics_path/graphics_path.cpp:233: F1 switch-without-default: switch (element.verb) has no default
 src/core/drawing/graphics_path/graphics_path.cpp:274: F1 switch-without-default: switch (element.verb) has no default
 src/core/drawing/graphics_path/graphics_path.cpp:392: F1 switch-without-default: switch (element.verb) has no default
 src/core/drawing/graphics_recorder/graphics_recorder.cpp:308: F1 switch-without-default: switch (command.kind) has no default
 src/core/drawing/region/region.cpp:60: F1 switch-without-default: switch (element.verb) has no default
-src/core/drawing/support/drawing_support.hpp:226: F1 switch-without-default: switch (kind) has no default; every enumerator is listed and the code after it falls back (return "unknown")
 src/core/drawing/support/drawing_support.hpp:454: F1 switch-without-default: switch (element.verb) has no default
 src/core/drawing/support/drawing_support.hpp:532: F1 switch-without-default: switch (element.verb) has no default
-src/core/engine/motion_value/motion_value.cpp:56: F1 switch-without-default: switch (easing) has no default; every enumerator is listed and the code after it falls back (return 1.0)
-src/core/engine/motion_value/motion_value.cpp:126: F1 switch-without-default: switch (easing) has no default; every enumerator is listed and the code after it falls back (return p)
-src/core/engine/motion_value/motion_value.cpp:202: F1 switch-without-default: switch (segment.curve.kind) has no default; every enumerator is listed and the code after it falls back (return sample)
 src/core/engine/motion_value/motion_value.cpp:379: F1 switch-without-default: switch (segment_.curve.kind) has no default
-src/core/engine/primitive_registry/primitive_registry.cpp:204: F1 switch-without-default: switch (outcome) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/engine/theme_rules/theme_rules.cpp:104: F1 switch-without-default: switch (level) has no default; every enumerator is listed and the code after it falls back (return {})
-src/core/engine/theme_rules/theme_rules.cpp:138: F1 switch-without-default: switch (kind) has no default; every enumerator is listed and the code after it falls back (return {})
-src/core/engine/types/engine_types.cpp:29: F1 switch-without-default: switch (defect) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/feedback/semantic_feedback/semantic_feedback.cpp:29: F1 switch-without-default: switch (kind) has no default; every enumerator is listed and the code after it falls back (return HostSoundCue::notification)
-src/core/feedback/semantic_feedback/semantic_feedback.cpp:117: F1 switch-without-default: switch (kind) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/host/services/host_services.cpp:186: F1 switch-without-default: switch (buttons) has no default; every enumerator is listed and the code after it falls back (return false)
 src/core/host/session/host_session.cpp:319: F1 switch-without-default: switch (snapshot_.phase) has no default
-src/core/host/types/host_types.cpp:87: F1 switch-without-default: switch (error) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/host/types/host_types.cpp:102: F1 switch-without-default: switch (phase) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/host/types/host_types.cpp:117: F1 switch-without-default: switch (error) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/host/types/host_types.cpp:132: F1 switch-without-default: switch (cue) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/host/types/host_types.cpp:143: F1 switch-without-default: switch (action) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/host/types/host_types.cpp:180: F1 switch-without-default: switch (cursor) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/host/types/host_types.cpp:196: F1 switch-without-default: switch (effect) has no default; every enumerator is listed and the code after it falls back (return "invalid")
-src/core/host/types/host_types.cpp:214: F1 switch-without-default: switch (choice) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/host/windowing/host_windowing.cpp:140: F1 switch-without-default: switch (kind) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/resources/image_list/image_list/image_list.cpp:79: F1 switch-without-default: switch (state) has no default; every enumerator is listed and the code after it falls back (return false)
-src/core/resources/image_registry/image_registry.cpp:131: F1 switch-without-default: switch (error) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/semantics/snapshot/semantic_snapshot.cpp:76: F1 switch-without-default: switch (role) has no default; every enumerator is listed and the code after it falls back (return "generic")
-src/core/semantics/snapshot/semantic_snapshot.cpp:121: F1 switch-without-default: switch (action) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/semantics/snapshot/semantic_snapshot.cpp:138: F1 switch-without-default: switch (orientation) has no default; every enumerator is listed and the code after it falls back (return "horizontal")
 src/core/text/prepared/prepared_storage.cpp:149: F1 switch-without-default: switch (resource) has no default
 src/core/text/prepared/prepared_storage.cpp:189: F1 switch-without-default: switch (resource_) has no default
-src/core/text/text_store/text_store.cpp:172: F1 switch-without-default: switch (error) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/text_shaping/validation/text_shaping_validation.cpp:118: F1 switch-without-default: switch (error) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/text_shaping/validation/text_shaping_validation.cpp:146: F1 switch-without-default: switch (error) has no default; every enumerator is listed and the code after it falls back (return "unknown")
 src/core/theme/part_painting/part_painting.cpp:304: F1 switch-without-default: switch (region) has no default
 src/core/theme/part_painting/part_painting.cpp:332: F1 switch-without-default: switch (part.mark) has no default
-src/core/theme/part_painting/part_painting.cpp:484: F1 switch-without-default: switch (mark) has no default; every enumerator is listed and the code after it falls back (return {})
 src/core/theme/part_painting/part_painting.cpp:549: F1 switch-without-default: switch (part.role) has no default
 src/core/theme/theme/theme.cpp:70: F1 switch-without-default: switch (keyline.edge) has no default
 src/core/theme/theme/theme.cpp:377: F1 switch-without-default: switch (state) has no default
 src/core/theme/theme/theme.cpp:600: F1 switch-without-default: switch (fill.kind) has no default
 src/core/theme/theme/theme.cpp:629: F1 switch-without-default: switch (fill.image_mode) has no default
-src/core/theme/theme/theme.cpp:765: F1 switch-without-default: switch (role) has no default; every enumerator is listed and the code after it falls back (return {})
-src/core/typography/resolution/typography_resolution.cpp:10: F1 switch-without-default: switch (status) has no default; every enumerator is listed and the code after it falls back (return "invalid_request")
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:107: F1 switch-without-default: switch (kind) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:121: F1 switch-without-default: switch (value) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:130: F1 switch-without-default: switch (value) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:139: F1 switch-without-default: switch (value) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:146: F1 switch-without-default: switch (value) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:154: F1 switch-without-default: switch (value) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:163: F1 switch-without-default: switch (edge) has no default; every enumerator is listed and the code after it falls back (return "unknown")
 src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:413: F1 switch-without-default: switch (operation) has no default
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:447: F1 switch-without-default: switch (plane) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:456: F1 switch-without-default: switch (role) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:465: F1 switch-without-default: switch (dock) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp:477: F1 switch-without-default: switch (status) has no default; every enumerator is listed and the code after it falls back (return "unknown")
 src/core/window/command_route/window_command_route.cpp:28: F1 switch-without-default: switch (stage) has no default
 src/core/window/inspection/window_visual_inspection.cpp:19: F1 switch-without-default: switch (operation) has no default
-src/core/xml/types/xml_types.cpp:6: F1 switch-without-default: switch (error) has no default; every enumerator is listed and the code after it falls back (return "unknown")
 src/core/host/cursor_interaction/cursor_interaction.cpp:26: F2 default-hides-cases: default takes CursorError enumerators 4 enumerators (denied, busy, revoked, ...) without a stated reason
 src/core/theme/part_painting/part_painting.cpp:26: F2 default-hides-cases: vocabulary mapping over PartRole must list every enumerator; missing: 23 enumerators (region, shadow, edge, ...)
 
@@ -261,14 +184,8 @@ src/host/linux/services/linux_services.cpp:147: C1 input-ignored: default ignore
 == host-windows
 src/host/windows/application/windows_host.cpp:298: C1 input-ignored: case HostMessageIcon::none ignores its input (break;) without a stated reason
 src/host/windows/application/windows_host.cpp:2753: C1 input-ignored: default ignores its input (break;) without a stated reason
-src/host/windows/accessibility/windows_accessibility.cpp:68: F1 switch-without-default: switch (role) has no default; every enumerator is listed and the code after it falls back (return ROLE_SYSTEM_GROUPING)
-src/host/windows/accessibility/windows_accessibility.cpp:170: F1 switch-without-default: switch (*action) has no default; every enumerator is listed and the code after it falls back (return nullptr)
-src/host/windows/accessibility/windows_accessibility.cpp:337: F1 switch-without-default: switch (property) has no default; every enumerator is listed and the code after it falls back (return S_FALSE)
-src/host/windows/accessibility/windows_automation.cpp:151: F1 switch-without-default: switch (role) has no default; every enumerator is listed and the code after it falls back (return UIA_GroupControlTypeId)
 src/host/windows/application/windows_host.cpp:286: F1 switch-without-default: switch (request.buttons) has no default
 src/host/windows/application/windows_host.cpp:293: F1 switch-without-default: switch (request.icon) has no default
-src/host/windows/application/windows_host.cpp:371: F1 switch-without-default: switch (cursor) has no default; every enumerator is listed and the code after it falls back (return IDC_ARROW)
-src/host/windows/application/windows_host.cpp:2029: F1 switch-without-default: switch (spread) has no default; every enumerator is listed and the code after it falls back (return std::clamp(amount, 0.0, 1.0))
 src/host/windows/services/windows_host_services.hpp:299: F1 switch-without-default: switch (request.cue) has no default
 
 == render
@@ -280,7 +197,6 @@ src/render/text/glyph_run/glyph_run_raster.cpp:103: C3 contradictory-shape: RunP
 stx_vorbis/include/stx_vorbis/ogg.hpp:12: C3 contradictory-shape: OggPacket: bool has_granule qualifies granule; one std::optional (or an enum) cannot disagree
 stx_vorbis/include/stx_vorbis/ogg.hpp:27: C3 contradictory-shape: OggStreamEnd: bool has_granule qualifies granule; one std::optional (or an enum) cannot disagree
 stx_vorbis/src/c_adapter.cpp:75: C3 contradictory-shape: stb_vorbis: bool length_known qualifies length; one std::optional (or an enum) cannot disagree
-stx_vorbis/src/types.cpp:4: F1 switch-without-default: switch (status) has no default; every enumerator is listed and the code after it falls back (return "unknown")
 stx_vorbis/src/c_adapter.cpp:37: F2 default-hides-cases: default takes Status enumerators 6 enumerators (need_output, packet, invalid_argument, ...) without a stated reason
 
 == tests
@@ -289,18 +205,4 @@ tests/macos_exposure_tests.mm:152: C1 input-ignored: case ExposureStage::initial
 tests/macos_message_dialog_key_tests.mm:100: C1 input-ignored: case ProbeKey::escape ignores its input (break;) without a stated reason
 tests/windows_gdi_compat_shim_tests.cpp:447: C2 chain-without-fallback: chain over source (DibOverlapSource::top_down_shim_get_dc, DibOverlapSource::top_down_abi_bridge) has no final else
 tests/doc_examples_tests.cpp:1058: C3 contradictory-shape: Reminder: bool has_date qualifies date; one std::optional (or an enum) cannot disagree
-tests/abi_registry_lifetime_tests.cpp:65: F1 switch-without-default: switch (teardown) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-tests/dock_auto_hide_tests.cpp:119: F1 switch-without-default: switch (cause) has no default; every enumerator is listed and the code after it falls back (return "?")
-tests/gallery_pages/schema_export_tests.cpp:37: F1 switch-without-default: switch (kind) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-tests/gallery_pages/schema_export_tests.cpp:59: F1 switch-without-default: switch (visibility) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-tests/support/headless_trace.cpp:12: F1 switch-without-default: switch (action) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-tests/support/headless_trace.cpp:24: F1 switch-without-default: switch (phase) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-tests/windows_accessibility_msaa_gallery_tests.cpp:204: F1 switch-without-default: switch (role) has no default; every enumerator is listed and the code after it falls back (return ROLE_SYSTEM_GROUPING)
-tests/windows_accessibility_msaa_gallery_tests.cpp:297: F1 switch-without-default: switch (kind) has no default; every enumerator is listed and the code after it falls back (return {})
-tests/windows_accessibility_msaa_gallery_tests.cpp:428: F1 switch-without-default: switch (outcome) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-tests/windows_accessibility_uia_gallery_tests.cpp:201: F1 switch-without-default: switch (role) has no default; every enumerator is listed and the code after it falls back (return UIA_GroupControlTypeId)
-tests/windows_accessibility_uia_gallery_tests.cpp:326: F1 switch-without-default: switch (kind) has no default; every enumerator is listed and the code after it falls back (return PatternCall::set_focus)
-tests/windows_accessibility_uia_gallery_tests.cpp:341: F1 switch-without-default: switch (call) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-tests/windows_accessibility_uia_gallery_tests.cpp:520: F1 switch-without-default: switch (outcome) has no default; every enumerator is listed and the code after it falls back (return "unknown")
-tests/windows_accessibility_uia_gallery_tests.cpp:1212: F1 switch-without-default: switch (call) has no default; every enumerator is listed and the code after it falls back (return E_NOTIMPL)
 tests/invalidation_damage_tests.cpp:246: F2 default-hides-cases: default takes PointerAction enumerators up, wheel, leave without a stated reason

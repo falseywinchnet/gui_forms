@@ -90,6 +90,7 @@ RULE_TEXT: dict[str, str] = {
     "C1": "input-ignored",
     "C2": "chain-without-fallback",
     "C3": "contradictory-shape",
+    "OK": "complete-with-fallback",     # compliant; tallied, not listed
 }
 DIAGNOSTIC: re.Pattern[str] = re.compile(
     r"^(?P<path>.+?):(?P<line>\d+):(?P<column>\d+): warning: (?P<message>.*) \[(?P<flag>-W[\w-]+)\]\s*$")
@@ -608,8 +609,12 @@ def missing_text(message: str) -> str:
     return names
 
 
+# A statement that leaves: return, throw, or a call that does not return.
+LEAVING: str = r"(?:\breturn\b|\bthrow\b|\b(?:std\s*::\s*)?(?:abort|terminate|unreachable|exit|quick_exit)\s*\()"
+
+
 def every_case_leaves(text: str, switch: Switch) -> bool:
-    """Whether each case group ends by returning or throwing, so control reaches past the switch only when no case matched."""
+    """Whether each case group ends with a leaving statement, so control passes the switch only when no case matched."""
     seen: bool = False
     label: Label
     for label in switch.labels:
@@ -617,9 +622,24 @@ def every_case_leaves(text: str, switch: Switch) -> bool:
         if label.kind != "case" or statements == "":
             continue
         seen = True
-        if re.search(r"\bbreak\s*;", statements) or not re.search(r"\b(?:return|throw)\b[^;]*;$", statements):
+        if re.search(r"\bbreak\s*;", statements) or not re.search(LEAVING + r"[^;]*;$", statements):
             return False
     return seen
+
+
+def fallback_after(text: str, switch: Switch) -> bool:
+    """Whether the statement directly after the switch's closing brace leaves (the one fallback)."""
+    following: int = skip_space(text, switch.body_end + 1)
+    return re.match(LEAVING, text[following:following + 40]) is not None
+
+
+def complete_with_fallback(text: str, switch: Switch) -> bool:
+    """The compliant form (owner, 2026-10-21): an enumeration switch that lists every
+    enumerator, leaves from every case, and reaches one fallback directly after its
+    closing brace, which keeps the compiler's warning for a new enumerator. The caller
+    has established that no enumerator is unhandled; a qualified case label shows the
+    condition is an enumeration."""
+    return switch_enum(switch) != "" and every_case_leaves(text, switch) and fallback_after(text, switch)
 
 
 def syntax_command(command: str) -> list[str]:
@@ -798,12 +818,13 @@ def compiler_findings(diagnostics: list[Diagnostic], root: Path, vocabulary: set
             detail: str = "switch (" + subject + ") has no default"
             if missing:
                 detail += "; also unhandled: " + ", ".join(missing)
-            elif switch is not None and every_case_leaves(entry[1], switch):
-                after: str = " ".join(entry[1][switch.body_end + 1:switch.body_end + 200].split())
-                if re.match(r"(?:return|throw)\b", after):
-                    shown: str = " ".join(entry[0][switch.body_end + 1:switch.body_end + 200].split())
-                    detail += "; every enumerator is listed and the code after it falls back ("
-                    detail += shown.split(";")[0][:60] + ")"
+            elif switch is not None and complete_with_fallback(entry[1], switch):
+                # Compliant: tallied, not a finding. Without -Wswitch, no enumerator is unhandled.
+                shown: str = " ".join(entry[0][switch.body_end + 1:switch.body_end + 200].split())
+                findings.append(Finding(path, key[1], "OK", area_of(path),
+                                        "switch (" + subject + ") lists every enumerator and falls back after it ("
+                                        + shown.split(";")[0][:60] + ")"))
+                continue
             findings.append(Finding(path, key[1], "F1", area_of(path), detail))
             continue
         if "-Wswitch-enum" not in flags or switch is None:
@@ -876,8 +897,12 @@ def render(findings: list[Finding], units: int, files: int) -> str:
         for rule in rules:
             row += str(counts[area].get(rule, 0)).rjust(5)
         lines.append(row)
+    lines.append("OK counts compliant switches (every enumerator listed, every case leaves, one "
+                 "fallback directly after); they are not listed below.")
     current: str = ""
     for finding in sorted(findings, key=finding_key):
+        if finding.rule == "OK":
+            continue
         if finding.area != current:
             current = finding.area
             lines.append("")
