@@ -824,6 +824,24 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: EngineInput
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   .. cpp:enumerator:: pointer_x
+
+   .. cpp:enumerator:: pointer_y
+
+   .. cpp:enumerator:: time_in_state
+
+   .. cpp:enumerator:: display_scale
+
+   .. cpp:enumerator:: text_scale
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: GetChildAtPointSkip
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -963,6 +981,8 @@ Functions, constants and aliases
 
 .. cpp:function:: std::string_view anatomy_state_name(AnatomyState state) noexcept
 
+.. cpp:function:: std::string_view engine_input_name(EngineInput input) noexcept
+
 .. cpp:function:: std::optional<PartRole> part_role_from_name(std::string_view name) noexcept
 
 .. cpp:function:: std::optional<AnatomyState> anatomy_state_from_name(std::string_view name) noexcept
@@ -1020,6 +1040,10 @@ Functions, constants and aliases
 .. cpp:function:: const ControlAnatomy& base_control_anatomy() noexcept
 
    The anatomy every control inherits until its type declares its own: the granted region and the focus part.
+
+.. cpp:var:: constexpr std::size_t engine_input_count
+
+   Value: ``static_cast<std::size_t>(EngineInput::count)``.
 
 .. cpp:var:: constexpr std::size_t part_role_count
 

@@ -17,7 +17,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     limits.maximum_pixels = 2048ULL * 2048ULL;
     limits.maximum_decoded_bytes_per_image = 16ULL * 1024ULL * 1024ULL;
     limits.maximum_chunks_per_image = 1024;
-    const auto* bytes = reinterpret_cast<const std::byte*>(data);
+    const std::byte* bytes = reinterpret_cast<const std::byte*>(data);
     static_cast<void>(gui_forms::validate_png(
         std::span<const std::byte>(bytes, size), limits));
     return 0;

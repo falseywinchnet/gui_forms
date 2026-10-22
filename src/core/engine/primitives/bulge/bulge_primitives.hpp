@@ -29,6 +29,8 @@ namespace gui_forms::engine_primitives {
 class BulgePrimitive final : public EnginePrimitive {
 public:
     [[nodiscard]] const PrimitiveDescriptor& descriptor() const noexcept override;
+    // At amplitude 0 the bulge is the flat plane and draws nothing.
+    [[nodiscard]] bool blank(const PrimitiveParameterBlock& parameters) const noexcept override;
 
 private:
     void derive(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
@@ -57,6 +59,8 @@ private:
 class DitheredBulgePrimitive final : public EnginePrimitive {
 public:
     [[nodiscard]] const PrimitiveDescriptor& descriptor() const noexcept override;
+    // At amplitude 0 every dot rounds to the plane: nothing is drawn.
+    [[nodiscard]] bool blank(const PrimitiveParameterBlock& parameters) const noexcept override;
 
 private:
     void derive(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,

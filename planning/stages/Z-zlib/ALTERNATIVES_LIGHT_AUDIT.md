@@ -14,7 +14,7 @@ for both PNG and deflate and rewriting it in house style. This supersedes the
 leak-qualified shortlist as a restriction on source reuse and changes the
 retained-libpng decision to an owned PNG codec. The evidence classifications
 below remain historical findings, not certification. See the
-[implementation provenance](../../../src/core/compression/PROVENANCE.md).
+[implementation provenance](../../../stx_zlib/PROVENANCE.md).
 
 ## Leak-audit filter (historical owner follow-up)
 

@@ -126,7 +126,8 @@ public:
         self.assertEqual(engine["cascade_levels"][-1], "forced_high_contrast")
         self.assertEqual(engine["budgets"]["operations_per_device_pixel"], 512)
         names = [primitive["name"] for primitive in engine["primitives"]]
-        self.assertEqual(names, ["bulge", "dithered_bulge"])
+        self.assertEqual(names, ["bulge", "dithered_bulge", "pill_plate", "gold_plate", "inset_well", "etched_divider",
+                                 "seam_line", "grip"])
         bulge = engine["primitives"][0]
         self.assertEqual(bulge["roles"], ["face"])
         amplitude = next(item for item in bulge["parameters"] if item["name"] == "amplitude")
@@ -143,6 +144,59 @@ public:
         self.assertEqual(len(findings), 2)
         self.assertIn("sparkle", findings[0])
         self.assertIn("budget", findings[1])
+        choosing = json.loads(json.dumps(engine))
+        plate = next(item for item in choosing["primitives"] if item["name"] == "pill_plate")
+        shape = next(item for item in plate["parameters"] if item["name"] == "shape")
+        self.assertEqual(shape["kind"], "choice")
+        self.assertEqual(shape["default"], "rounded_rectangle")
+        shape["choices"] = ["pill", "pill", "Oval"]
+        findings = cs.validate({"types": schema["types"], "vocabulary": schema["vocabulary"], "engine": choosing},
+                               registry, classes)
+        self.assertEqual(len(findings), 3)
+        self.assertIn("distinct", findings[0])
+        self.assertIn("'Oval'", findings[1])
+        self.assertIn("not a choice", findings[2])
+
+    def test_the_engine_inputs_are_vocabulary(self) -> None:
+        schema = cs.load_schema()
+        self.assertEqual(schema["vocabulary"]["engine_inputs"],
+                         ["pointer_x", "pointer_y", "time_in_state", "display_scale", "text_scale"])
+        self.assertEqual(schema["engine"]["published_values"]["maximum"], 32)
+        broken = json.loads(json.dumps(schema["engine"]))
+        broken["primitives"][0]["inputs_read"] = ["density"]
+        findings = cs.validate({"types": schema["types"], "vocabulary": schema["vocabulary"], "engine": broken},
+                               cr.load_registry(), cs.scan_classes())
+        self.assertEqual(len(findings), 1)
+        self.assertIn("density", findings[0])
+
+    def test_the_engine_lists_its_motion_caps(self) -> None:
+        schema = cs.load_schema()
+        engine = schema["engine"]
+        self.assertEqual(engine["transitions"]["engine_properties"], ["opacity"])
+        self.assertEqual(engine["ambient"]["maximum_frames_per_second"], 30)
+        broken = json.loads(json.dumps(engine))
+        broken["ambient"]["maximum_frames_per_second"] = 60
+        broken["ambient"]["maximum_window_fraction"] = 0.5
+        findings = cs.validate({"types": schema["types"], "vocabulary": schema["vocabulary"], "engine": broken},
+                               cr.load_registry(), cs.scan_classes())
+        self.assertEqual(len(findings), 2)
+        self.assertIn("30", findings[0])
+        self.assertIn("10 %", findings[1])
+
+    def test_the_engine_lists_its_expression_operations(self) -> None:
+        schema = cs.load_schema()
+        expressions = schema["engine"]["expressions"]
+        self.assertEqual(expressions["maximum_operations"], 64)
+        for operation in ("clamp", "mix", "smoothstep", "choose", "less"):
+            self.assertIn(operation, expressions["operations"])
+        broken = json.loads(json.dumps(schema["engine"]))
+        broken["expressions"]["maximum_stack"] = 0
+        broken["expressions"]["operations"].append("Loop")
+        findings = cs.validate({"types": schema["types"], "vocabulary": schema["vocabulary"], "engine": broken},
+                               cr.load_registry(), cs.scan_classes())
+        self.assertEqual(len(findings), 2)
+        self.assertIn("maximum_stack", findings[0])
+        self.assertIn("Loop", findings[1])
 
 
 if __name__ == "__main__":

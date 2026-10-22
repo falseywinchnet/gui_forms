@@ -197,5 +197,27 @@ class ReuseTests(unittest.TestCase):
                     ci_reuse.restore_archive(fixture_identity())
 
 
+    def test_a_cut_short_download_is_fetched_again(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            archive: Path = Path(directory) / 'gui-forms-cache-linux-x64.tar.gz'
+            whole: bytes = b'complete archive bytes'
+            archive.write_bytes(whole[:8])
+            receipt: dict[str, Any] = {'artifact_id': 9, 'archive_sha256': hashlib.sha256(whole).hexdigest()}
+            downloads: list[int] = []
+
+            def download_whole(artifact_id: int, target: Path) -> None:
+                downloads.append(artifact_id)
+                target.write_bytes(whole)
+
+            with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'owner/repo'}),                     patch.object(ci_reuse, 'download_archive', side_effect=download_whole):
+                ci_reuse.verified_archive(archive, receipt)
+            self.assertEqual(downloads, [9])
+            self.assertEqual(archive.read_bytes(), whole)
+            del receipt['artifact_id']
+            archive.write_bytes(whole[:8])
+            with self.assertRaisesRegex(ValueError, 'digest mismatch'):
+                ci_reuse.verified_archive(archive, receipt)
+
+
 if __name__ == '__main__':
     unittest.main()
