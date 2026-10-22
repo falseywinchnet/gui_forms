@@ -105,7 +105,8 @@
           {"name": "disabled_face_bottom", "kind": "colour", "default": "#b5c7deff", "animated": false},
           {"name": "disabled_border", "kind": "colour", "default": "#8fa6c464", "animated": false},
           {"name": "disabled_upper_line", "kind": "colour", "default": "#ffffff64", "animated": false},
-          {"name": "perimeter", "kind": "colour", "default": "#214b81ff", "animated": false}
+          {"name": "perimeter", "kind": "colour", "default": "#214b81ff", "animated": false},
+          {"name": "text_padding", "kind": "number", "minimum": 0, "maximum": 32, "default": 4, "animated": false}
         ]
       },
       {
@@ -126,7 +127,8 @@
           {"name": "pressed_face_bottom", "kind": "colour", "default": "#ffe297ff", "animated": false},
           {"name": "upper_line", "kind": "colour", "default": "#fffff0ff", "animated": false},
           {"name": "left_line", "kind": "colour", "default": "#fffff0b4", "animated": false},
-          {"name": "lower_line", "kind": "colour", "default": "#a06d1c23", "animated": false}
+          {"name": "lower_line", "kind": "colour", "default": "#a06d1c23", "animated": false},
+          {"name": "text_padding", "kind": "number", "minimum": 0, "maximum": 32, "default": 4, "animated": false}
         ]
       },
       {
@@ -144,7 +146,8 @@
           {"name": "face_bottom", "kind": "colour", "default": "#ffffffff", "animated": false},
           {"name": "border", "kind": "colour", "default": "#94acc8ff", "animated": false},
           {"name": "inner_shade", "kind": "colour", "default": "#6f8eb14b", "animated": false},
-          {"name": "outer_highlight", "kind": "colour", "default": "#ffffffe1", "animated": false}
+          {"name": "outer_highlight", "kind": "colour", "default": "#ffffffe1", "animated": false},
+          {"name": "text_padding", "kind": "number", "minimum": 0, "maximum": 32, "default": 2, "animated": false}
         ]
       },
       {
@@ -187,7 +190,7 @@
     ],
     "expressions": {"maximum_operations": 64, "maximum_stack": 16, "operations": ["constant", "input", "state", "parameter", "negate", "add", "subtract", "multiply", "divide", "minimum", "maximum", "less", "less_equal", "greater", "greater_equal", "equal", "not_equal", "clamp", "mix", "smoothstep", "choose"]},
     "published_values": {"maximum": 32},
-    "transitions": {"engine_properties": ["opacity"], "maximum_states": 8, "maximum_per_part": 4},
+    "transitions": {"engine_properties": ["opacity", "scale"], "maximum_states": 8, "maximum_per_part": 4},
     "ambient": {"maximum_frames_per_second": 30, "maximum_window_fraction": 0.1}
   },
   "types": [

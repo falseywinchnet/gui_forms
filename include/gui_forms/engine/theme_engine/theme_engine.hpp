@@ -102,6 +102,15 @@ public:
     // region (design language §7.4 rule 1). Test a point with part_hit.
     [[nodiscard]] PartHitRegion hit_region(const Control& control, const PartPaint& part) const noexcept;
 
+    // Where one part of `control` lays out its text (E8, T1's hand-off):
+    // the part's bounds less its primitive's content insets at the
+    // window's scale and text scale, as plan() decides it. Where the insets
+    // leave no room across or down, the slot shrinks to the bounds' centre
+    // line on that axis, so it never leaves the part. A part the built-in
+    // recipe draws has its bounds. Like the hit region, it ignores the
+    // presentational scale.
+    [[nodiscard]] Rect text_slot(const Control& control, const PartPaint& part) const noexcept;
+
 private:
     // E7: an ambient part's time_in_state for this paint, starting its
     // effect on the window's clock, or stopping it and returning the pose

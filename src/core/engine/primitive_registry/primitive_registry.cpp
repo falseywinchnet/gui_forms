@@ -231,6 +231,11 @@ PartShape EnginePrimitive::shape(const PrimitiveParameterBlock&) const noexcept 
     return rectangle;
 }
 
+Insets EnginePrimitive::content_insets(const PrimitiveParameterBlock&, Size, DeviceScale, double) const noexcept {
+    const Insets none{};
+    return none;
+}
+
 bool EnginePrimitive::blank(const PrimitiveParameterBlock&) const noexcept {
     return false;
 }

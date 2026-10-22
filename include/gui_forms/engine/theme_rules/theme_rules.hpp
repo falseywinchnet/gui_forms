@@ -151,6 +151,25 @@ struct RuleDeclaration final {
 // is opaque.
 inline constexpr std::string_view opacity_property = "opacity";
 
+// The engine's presentational scale (T2 GIVEN D5-1, E8): the part drawn at
+// this multiple of its size about its centre, within the overflow its
+// control grants (PartPaint::granted_overflow), its hit region and layout
+// unchanged. Like opacity it is no atom and no parameter; only a
+// transition sets it, and a part without one is drawn at 1. It is a
+// capability: the built-in rules never use it, and a part granted no
+// overflow never grows.
+inline constexpr std::string_view scale_property = "scale";
+inline constexpr double minimum_presentational_scale = 0.5;
+inline constexpr double maximum_presentational_scale = 2.0;
+
+// What a transition moves: a primitive parameter, or one of the engine's
+// presentational properties.
+enum class PresentationProperty : std::uint8_t {
+    parameter,
+    opacity,
+    scale,
+};
+
 // The most states one presentational state machine has, and the most
 // transitions one part runs.
 inline constexpr std::size_t maximum_presentation_states = 8;
@@ -411,9 +430,10 @@ public:
         std::optional<double> enter_from{};
     };
 
-    // A checked transition: opacity, or the parameter at `parameter`.
+    // A checked transition: an engine property, or the parameter at
+    // `parameter`.
     struct CompiledTransition final {
-        bool opacity{};
+        PresentationProperty property{PresentationProperty::parameter};
         std::size_t parameter{};
         std::vector<CompiledPresentationState> states{};
         MotionCurve curve{};
@@ -433,8 +453,9 @@ public:
         // The inputs the part reads (E6): the primitive's declared inputs
         // and every input its expressions read, as expression input bits.
         std::uint64_t inputs_read{};
-        // The part's transitions (E7): its opacity's, whatever draws it,
-        // and its primitive's parameters', when a primitive does. They
+        // The part's transitions (E7): its opacity's and its scale's,
+        // whatever draws it, and its primitive's parameters', when a
+        // primitive does. They
         // belong to the compiled rules. `transition_count` are live.
         std::array<const CompiledTransition*, maximum_part_transitions> transitions{};
         std::size_t transition_count{};

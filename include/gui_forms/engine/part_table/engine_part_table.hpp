@@ -83,12 +83,12 @@ struct CachedPartRaster final {
 
 class Window;
 
-// One property's transition on a part (E7): opacity or the parameter at
-// `parameter`, the state of its machine the part was last painted in (none
+// One property's transition on a part (E7): an engine property or the
+// parameter at `parameter`, the state of its machine the part was last painted in (none
 // when the part's states matched none), and the property's motion value,
 // made the first time the part is painted with the transition.
 struct PartTransitionChannel final {
-    bool opacity{};
+    PresentationProperty property{PresentationProperty::parameter};
     std::size_t parameter{};
     std::optional<std::size_t> state{};
     std::optional<MotionValue> value{};

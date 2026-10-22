@@ -27,7 +27,7 @@ Types
    * - :cpp:class:`CompiledThemeRules::CompiledPresentationState <gui_forms::CompiledThemeRules::CompiledPresentationState>`
      - One state of a compiled machine (see PresentationState).
    * - :cpp:class:`CompiledThemeRules::CompiledTransition <gui_forms::CompiledThemeRules::CompiledTransition>`
-     - A checked transition: opacity, or the parameter at ``parameter``.
+     - A checked transition: an engine property, or the parameter at ``parameter``.
    * - :cpp:class:`CompiledThemeRules::PartFacts <gui_forms::CompiledThemeRules::PartFacts>`
      - What a part is: the facts its selectors are matched against.
    * - :cpp:class:`CompiledThemeRules::Resolution <gui_forms::CompiledThemeRules::Resolution>`
@@ -143,7 +143,7 @@ Types
    * - :cpp:class:`PartShape <gui_forms::PartShape>`
      -  
    * - :cpp:class:`PartTransitionChannel <gui_forms::PartTransitionChannel>`
-     - One property's transition on a part (E7): opacity or the parameter at ``parameter``, the state of its machine the part was last painted in (none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
+     - One property's transition on a part (E7): an engine property or the parameter at ``parameter``, the state of its machine the part was last painted in (none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
    * - :cpp:class:`Point <gui_forms::Point>`
      - Point is a renderer-neutral logical-coordinate pair.
    * - :cpp:class:`PresentationState <gui_forms::PresentationState>`
@@ -399,9 +399,11 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   A checked transition: opacity, or the parameter at ``parameter``.
+   A checked transition: an engine property, or the parameter at ``parameter``.
 
-   .. cpp:member:: bool opacity
+   .. cpp:member:: PresentationProperty property
+
+      Default: ``{PresentationProperty::parameter}``.
 
    .. cpp:member:: std::size_t parameter
 
@@ -461,7 +463,7 @@ Types
 
    .. cpp:member:: std::array<const CompiledTransition*, maximum_part_transitions> transitions
 
-      The part's transitions (E7): its opacity's, whatever draws it, and its primitive's parameters', when a primitive does. They belong to the compiled rules. ``transition_count`` are live.
+      The part's transitions (E7): its opacity's and its scale's, whatever draws it, and its primitive's parameters', when a primitive does. They belong to the compiled rules. ``transition_count`` are live.
 
    .. cpp:member:: std::size_t transition_count
 
@@ -931,6 +933,10 @@ Types
    .. cpp:function:: virtual PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept
 
       The shape the primitive draws with ``parameters``, its radius in logical units (E8): what the part's hit region derives from (design language §7.4 rule 1). A rectangle filling the box unless the primitive says otherwise. ``parameters`` match the declarations.
+
+   .. cpp:function:: virtual Insets content_insets(const PrimitiveParameterBlock& parameters, Size logical, DeviceScale scale, double text_scale) const noexcept
+
+      How far inside a part of ``logical`` size, at display ``scale`` and the window's ``text_scale``, its text may begin (E8, T1's hand-off: text is published as a layout slot, ThemeEngine::text_slot). In logical units; the slot inside them lies within the shape the primitive draws. None unless the primitive says otherwise. ``parameters`` match the declarations; ``logical`` and ``scale`` are positive and finite.
 
 .. cpp:namespace:: gui_forms
 
@@ -1800,6 +1806,10 @@ Types
 
       The part's identity across frames (T2 GIVEN H3-1), or none. A part with a key has a record in its window's engine part table; one without is drawn statically, with no transitions and no cached raster. It is identity, not vocabulary: it changes nothing a part looks like today. Its views are borrowed for the call.
 
+   .. cpp:member:: Insets granted_overflow
+
+      How far past ``bounds`` the control lets the part be drawn when a theme scales it (T2 GIVEN D5-1, E8), in logical units. The presentational scale grows the part about its centre only as far as this allows: with none granted, the default, a part never grows. Layout and the part's hit region ignore it.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:class:: PartRaster final
@@ -1924,9 +1934,11 @@ Types
 
    ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
 
-   One property's transition on a part (E7): opacity or the parameter at ``parameter``, the state of its machine the part was last painted in (none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
+   One property's transition on a part (E7): an engine property or the parameter at ``parameter``, the state of its machine the part was last painted in (none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
 
-   .. cpp:member:: bool opacity
+   .. cpp:member:: PresentationProperty property
+
+      Default: ``{PresentationProperty::parameter}``.
 
    .. cpp:member:: std::size_t parameter
 
@@ -2518,6 +2530,10 @@ Types
    .. cpp:function:: PartHitRegion hit_region(const Control& control, const PartPaint& part) const noexcept
 
       The hit region of one part of ``control`` (E8, T1's hand-off): the part's bounds and the shape its primitive draws there, as plan() decides it. A part the built-in recipe draws, for any reason, has a rectangle. Themes choose a primitive's shape; they never set a hit region (design language §7.4 rule 1). Test a point with part_hit.
+
+   .. cpp:function:: Rect text_slot(const Control& control, const PartPaint& part) const noexcept
+
+      Where one part of ``control`` lays out its text (E8, T1's hand-off): the part's bounds less its primitive's content insets at the window's scale and text scale, as plan() decides it. Where the insets leave no room across or down, the slot shrinks to the bounds' centre line on that axis, so it never leaves the part. A part the built-in recipe draws has its bounds. Like the hit region, it ignores the presentational scale.
 
 .. cpp:namespace:: gui_forms
 
@@ -3306,6 +3322,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PresentationProperty
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: parameter
+
+   .. cpp:enumerator:: opacity
+
+   .. cpp:enumerator:: scale
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PrimitiveParameterKind
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -3748,6 +3776,18 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::string_view opacity_property
 
    The engine's presentational property (T2 GIVEN C1-1): one multiplier, from 0 to 1, on the part's whole composite. It is no vocabulary atom and no primitive parameter; only a transition sets it, and a part without one is opaque. Value: ``"opacity"``.
+
+.. cpp:var:: constexpr std::string_view scale_property
+
+   The engine's presentational scale (T2 GIVEN D5-1, E8): the part drawn at this multiple of its size about its centre, within the overflow its control grants (PartPaint::granted_overflow), its hit region and layout unchanged. Like opacity it is no atom and no parameter; only a transition sets it, and a part without one is drawn at 1. It is a capability: the built-in rules never use it, and a part granted no overflow never grows. Value: ``"scale"``.
+
+.. cpp:var:: constexpr double minimum_presentational_scale
+
+   Value: ``0.5``.
+
+.. cpp:var:: constexpr double maximum_presentational_scale
+
+   Value: ``2.0``.
 
 .. cpp:var:: constexpr std::size_t maximum_presentation_states
 
