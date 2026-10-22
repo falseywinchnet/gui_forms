@@ -621,6 +621,173 @@ double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTa
     return estimate;
 }
 
+// -- slicing (E7r) -------------------------------------------------------------------
+
+namespace {
+
+// How a material's pixels vary along one axis of its box, in device
+// pixels: how far in from the box's start and from its end they change
+// with position along the axis, and the shortest box at which every layer
+// is drawn as in a longer one (a keyline, an inset shadow's hole or the
+// border's inner edge that would vanish in a shorter box, or a radius that
+// would be clamped). `varies` when a layer changes all along the axis.
+struct AxisReach final {
+    double start{};
+    double end{};
+    double minimum_length{};
+    bool varies{};
+};
+
+// Where a blurred shadow edge changes: its shape's corner radius plus the
+// reach of Φ, which is exactly 0 or 1 from 3.5 σ' on.
+double shadow_reach(double blur, double scale, double corner) noexcept {
+    const double sigma = 1.0 / inverse_sigma_of(blur, scale);
+    const double reach = corner + 3.5 * sigma;
+    return reach;
+}
+
+void reach_at_least(AxisReach& reach, double start, double end, double minimum_length) noexcept {
+    reach.start = std::max(reach.start, start);
+    reach.end = std::max(reach.end, end);
+    reach.minimum_length = std::max(reach.minimum_length, minimum_length);
+}
+
+// A keyline's or a single edge's reach along the axis. A band on an edge
+// across the axis (top or bottom, for the across axis) spans the box less
+// its inset and changes only at its two ends; one on an edge along it (left
+// or right) lies within `inset` + `width` of that end.
+void band_reach(AxisReach& reach, MaterialEdge edge, double inset, double width, bool across) noexcept {
+    const bool at_start = across ? edge == MaterialEdge::left : edge == MaterialEdge::top;
+    const bool at_end = across ? edge == MaterialEdge::right : edge == MaterialEdge::bottom;
+    if (at_start) {
+        reach_at_least(reach, inset + width + 1.0, 0.0, inset * 2.0 + width + 1.0);
+    } else if (at_end) {
+        reach_at_least(reach, 0.0, inset + width + 1.0, inset * 2.0 + width + 1.0);
+    } else {
+        reach_at_least(reach, inset + 1.0, inset + 1.0, inset * 2.0 + 1.0);
+    }
+}
+
+AxisReach axis_reach(const SurfaceMaterial& material, const PrimitiveTarget& target, bool across) noexcept {
+    const double scale = target.scale.value;
+    const double radius = material_radius(material, target);
+    AxisReach reach{};
+    // The box's own edge, and its corners' arcs.
+    reach_at_least(reach, radius + 1.0, radius + 1.0, radius * 2.0 + 1.0);
+    const Rect box = material_box(target);
+    for (const MaterialFillLayer& layer : material.fills) {
+        if (layer.kind == MaterialFillKind::solid) continue;
+        if (layer.kind != MaterialFillKind::linear_gradient) {
+            reach.varies = true;
+            continue;
+        }
+        const ResolvedFill fill = resolve_fill(layer, box, scale);
+        const double step = across ? fill.step_x : fill.step_y;
+        if (step != 0.0) reach.varies = true;
+    }
+    for (const MaterialShadow& shadow : material.shadows) {
+        const double spread = shadow.spread * scale;
+        const double offset = (across ? shadow.offset.x : shadow.offset.y) * scale;
+        if (!shadow.inset) {
+            const double corner = std::max(0.0, radius + spread);
+            const double blurred = shadow_reach(shadow.blur_radius, scale, corner);
+            reach_at_least(reach, offset - spread + blurred + 1.0, -offset - spread + blurred + 1.0,
+                           1.0 - spread * 2.0);
+            continue;
+        }
+        const double corner = std::max(0.0, radius - spread);
+        const double blurred = shadow_reach(shadow.blur_radius, scale, corner);
+        reach_at_least(reach, offset + spread + blurred + 1.0, -offset + spread + blurred + 1.0,
+                       spread * 2.0 + 1.0);
+    }
+    if (material.border) {
+        const double width = (*material.border).width * scale;
+        const double inner = std::max(radius, width) + 1.0;
+        reach_at_least(reach, inner, inner, width * 2.0 + 1.0);
+    }
+    const MaterialBorderEdges& edges = material.border_edges;
+    if (edges.top) band_reach(reach, MaterialEdge::top, 0.0, (*edges.top).width * scale, across);
+    if (edges.right) band_reach(reach, MaterialEdge::right, 0.0, (*edges.right).width * scale, across);
+    if (edges.bottom) band_reach(reach, MaterialEdge::bottom, 0.0, (*edges.bottom).width * scale, across);
+    if (edges.left) band_reach(reach, MaterialEdge::left, 0.0, (*edges.left).width * scale, across);
+    for (const MaterialKeyline& keyline : material.keylines) {
+        band_reach(reach, keyline.edge, keyline.inset * scale, keyline.width * scale, across);
+    }
+    return reach;
+}
+
+// One axis's plan, and the reference's logical length and device extent
+// along it.
+struct AxisPlan final {
+    SliceAxis axis{};
+    double reference_length{};
+    std::uint32_t reference_extent{};
+};
+
+bool whole_number(double value) noexcept {
+    const bool whole = std::isfinite(value) && std::floor(value) == value;
+    return whole;
+}
+
+// The most reference lengths tried past the shortest, looking for one whose
+// logical length times the scale gives back exactly its device length.
+constexpr std::uint32_t reference_length_tries = 8U;
+
+AxisPlan plan_axis(const AxisReach& reach, double logical, double scale, std::uint32_t extent) noexcept {
+    AxisPlan plan{};
+    plan.reference_length = logical;
+    plan.reference_extent = extent;
+    if (reach.varies) return plan;
+    // Slices sit on device-pixel boundaries: the box must start and end on
+    // them, or the reference's far end would not have the part's phase.
+    const double outset = material_outset * scale;
+    const double length = logical * scale;
+    if (!whole_number(outset) || !whole_number(length) || static_cast<double>(extent) != outset + length + outset) {
+        plan.axis.outcome = SliceAxisOutcome::fractional;
+        return plan;
+    }
+    const double start = std::ceil(reach.start);
+    const double end = std::ceil(reach.end);
+    const double shortest = std::max(start + end + 3.0, std::ceil(reach.minimum_length));
+    if (!(length > shortest)) {
+        plan.axis.outcome = SliceAxisOutcome::too_small;
+        return plan;
+    }
+    for (std::uint32_t attempt = 0U; attempt <= reference_length_tries; ++attempt) {
+        const double device = shortest + static_cast<double>(attempt);
+        if (!(device < length)) break;
+        const double reference = device / scale;
+        const double reference_extent = std::ceil((reference + material_outset + material_outset) * scale);
+        if (reference * scale != device || reference_extent != outset + device + outset) continue;
+        plan.axis.outcome = SliceAxisOutcome::sliced;
+        plan.axis.start = static_cast<std::uint32_t>(outset + start);
+        plan.axis.end = static_cast<std::uint32_t>(outset + end);
+        plan.reference_length = reference;
+        plan.reference_extent = static_cast<std::uint32_t>(reference_extent);
+        return plan;
+    }
+    plan.axis.outcome = SliceAxisOutcome::fractional;
+    return plan;
+}
+
+} // namespace
+
+PrimitiveSlicePlan material_slice_plan(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                                       DeviceExtent extent) noexcept {
+    const double scale = target.scale.value;
+    const AxisReach across_reach = axis_reach(material, target, true);
+    const AxisReach down_reach = axis_reach(material, target, false);
+    const AxisPlan across = plan_axis(across_reach, target.logical_size.width, scale, extent.width);
+    const AxisPlan down = plan_axis(down_reach, target.logical_size.height, scale, extent.height);
+    PrimitiveSlicePlan plan{};
+    plan.slices = true;
+    plan.across = across.axis;
+    plan.down = down.axis;
+    plan.reference_size = Size{across.reference_length, down.reference_length};
+    plan.reference_extent = DeviceExtent{across.reference_extent, down.reference_extent};
+    return plan;
+}
+
 // -- MaterialPrimitive -------------------------------------------------------------
 
 const PrimitiveDescriptor& MaterialPrimitive::descriptor() const noexcept {
@@ -642,9 +809,22 @@ bool MaterialPrimitive::accepts(const PrimitiveParameterBlock&, const PrimitiveT
         if (layer.kind != MaterialFillKind::image) continue;
         if (target.images == nullptr || !material_image_available(*target.images, layer)) return false;
     }
-    const double estimate = material_bake_estimate(material, target);
+    // A part assembled from slices bakes only its reference.
+    const PrimitiveSlicePlan plan = material_slice_plan(material, target, destination_extent(target));
+    const bool sliced =
+        plan.across.outcome == SliceAxisOutcome::sliced || plan.down.outcome == SliceAxisOutcome::sliced;
+    PrimitiveTarget baked = target;
+    if (sliced) baked.logical_size = plan.reference_size;
+    const double estimate = material_bake_estimate(material, baked);
     const bool within = estimate <= maximum_material_bake_nanoseconds;
     return within;
+}
+
+PrimitiveSlicePlan MaterialPrimitive::slice_plan(const PrimitiveParameterBlock&, const PrimitiveTarget& target,
+                                                 DeviceExtent extent) const noexcept {
+    if (target.material == nullptr) return PrimitiveSlicePlan{};
+    const PrimitiveSlicePlan plan = material_slice_plan(*target.material, target, extent);
+    return plan;
 }
 
 void MaterialPrimitive::derive(const PrimitiveParameterBlock&, const PrimitiveTarget&, std::span<double>) const noexcept {}

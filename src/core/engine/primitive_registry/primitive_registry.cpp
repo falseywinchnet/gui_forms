@@ -251,6 +251,12 @@ bool EnginePrimitive::accepts(const PrimitiveParameterBlock&, const PrimitiveTar
     return true;
 }
 
+PrimitiveSlicePlan EnginePrimitive::slice_plan(const PrimitiveParameterBlock&, const PrimitiveTarget&,
+                                               DeviceExtent) const noexcept {
+    const PrimitiveSlicePlan whole{};
+    return whole;
+}
+
 PreparationOutcome EnginePrimitive::prepare(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
                                             PrimitivePreparation& preparation) const noexcept {
     const PrimitiveDescriptor& described = descriptor();

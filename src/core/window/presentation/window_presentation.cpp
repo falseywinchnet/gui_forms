@@ -318,6 +318,11 @@ PartRasterResult Window::engine_part_raster(PartRecordHandle handle, const PartR
     return result;
 }
 
+PartRasterResult Window::engine_unkeyed_raster(const PartRasterRequest& request) {
+    const PartRasterResult result = engine_parts_.raster_without_record(request, paint_leases_completed_);
+    return result;
+}
+
 std::optional<PaintReceipt> Window::paint(Painter& painter,
                                           Rect requested_damage) {
     // One rectangle: the request, or else the bounds of all damage.

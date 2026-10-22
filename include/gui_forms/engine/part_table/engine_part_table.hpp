@@ -51,6 +51,18 @@ namespace gui_forms {
 // whole table (a theme change). A raster's transparency passes through as
 // its own premultiplied alpha when it is composited. Releasing or evicting a
 // record releases its raster.
+//
+// The slice cache (E7r, owner 2026-10-22). A primitive that slices
+// (EnginePrimitive::slice_plan) bakes one reference per distinct request
+// less its sliced lengths: per material, state and scale, say, for every
+// button of a material, whatever their widths. The table owns the
+// references, shared by all its parts; a part's raster is assembled from
+// one by copying (its corners and edges as they are, its centre repeated)
+// and cached like any other. A theme change (invalidate_rasters) drops every
+// reference; invalidating one part rebakes the reference it uses. The
+// references are held within slice_cache_budget_bytes, least recently used
+// evicted first. Labels, icons and the focus ring are parts of their own,
+// drawn over the face, so they never split a face's reference.
 
 // Which record a handle names: a slot of the table and the slot's
 // generation when the record was made. Releasing a record advances its
@@ -246,10 +258,32 @@ struct RasterCacheStatistics final {
     std::uint64_t uncached{};
     // Rasters evicted to keep within the budget.
     std::uint64_t evictions{};
+    // Every time a primitive drew pixels: a whole part or a slice
+    // reference. Compositing a cached raster, or assembling one from a
+    // cached reference, is not a bake.
+    std::uint64_t bakes{};
+    // Slicing (E7r): references baked; parts assembled from a reference
+    // already held; parts of a slicing primitive baked whole because
+    // neither axis could be sliced, and axes kept whole, each counted per
+    // draw; references evicted to keep within their budget; and the
+    // references held now, with their bytes.
+    std::uint64_t slice_bakes{};
+    std::uint64_t slice_hits{};
+    std::uint64_t slice_whole_fallbacks{};
+    std::uint64_t slice_axis_fallbacks{};
+    std::uint64_t slice_evictions{};
+    std::size_t slice_references{};
+    std::size_t slice_bytes{};
 };
 
 // The most bytes of cached rasters one window keeps (GIVEN F2-1: 8 MB).
 inline constexpr std::size_t raster_cache_budget_bytes = 8U * 1024U * 1024U;
+
+// The most bytes of slice references one window keeps (E7r), apart from the
+// rasters assembled from them. A reference is a part's corners, edges and
+// one centre pixel: a few kilobytes for a button at scale 2, so 1 MB holds
+// some hundreds.
+inline constexpr std::size_t slice_cache_budget_bytes = 1U * 1024U * 1024U;
 
 // What acquire() did.
 struct PartRecordAcquisition final {
@@ -322,10 +356,19 @@ public:
     [[nodiscard]] PartRasterResult raster_for(PartRecordHandle handle, const PartRasterRequest& request,
                                               std::uint64_t paint_sequence);
 
+    // A raster for a part painted without a key, which has no record: drawn
+    // for this paint and never kept (status uncached), assembled from a
+    // slice reference when the primitive slices it, which is kept. Refused
+    // as raster_for is; allocation failure propagates as std::bad_alloc.
+    [[nodiscard]] PartRasterResult raster_without_record(const PartRasterRequest& request,
+                                                         std::uint64_t paint_sequence);
+
     // Makes one part's cached raster stale; the next raster_for draws it
-    // again. A stale handle does nothing.
+    // again, and bakes again the slice reference it is assembled from. A
+    // stale handle does nothing.
     void invalidate_raster(PartRecordHandle handle) noexcept;
-    // Makes every cached raster stale, as when the theme changes.
+    // Makes every cached raster stale and drops every slice reference, as
+    // when the theme changes.
     void invalidate_rasters() noexcept;
 
     [[nodiscard]] RasterCacheStatistics cache_statistics() const noexcept { return statistics_; }
@@ -386,6 +429,29 @@ private:
     // Whether the record's cached raster answers `request` now.
     [[nodiscard]] bool raster_current(const EnginePartRecord& record, const PartRasterRequest& request) const noexcept;
 
+    // A slice reference: the raster and what drew it (generations unused),
+    // and the paint that last used it.
+    struct SliceReference final {
+        CachedPartRaster cached{};
+        std::uint64_t last_used{};
+    };
+    // Draws `request` into `destination`: assembled from its slice
+    // reference when the primitive slices it (baking the reference when
+    // none is held, or again when `refresh`), else baked whole with
+    // `preparation`, prepared again when stale. Anything but painted or
+    // empty leaves `destination` unchanged.
+    [[nodiscard]] RasterOutcome draw(const PartRasterRequest& request, PrimitivePreparation& preparation,
+                                     const PartRasterView& destination, std::uint64_t paint_sequence, bool refresh);
+    // The held reference answering `reference`, or one baked and held
+    // now; null when the primitive refuses it.
+    [[nodiscard]] std::shared_ptr<const PartRaster> slice_reference(const PartRasterRequest& reference,
+                                                                    std::uint64_t paint_sequence, bool refresh);
+    // Evicts the least recently used references until `incoming` more
+    // bytes fit slice_cache_budget_bytes.
+    void make_slice_room(std::size_t incoming) noexcept;
+    // Drops every reference.
+    void clear_slice_references() noexcept;
+
     std::vector<RecordSlot> slots_;
     std::vector<std::uint32_t> free_slots_;
     // Lookup text to slot, one entry per live record.
@@ -402,6 +468,9 @@ private:
     // cached a raster (raster_table_generation 0) is never current.
     std::uint64_t raster_table_generation_{1U};
     RasterCacheStatistics statistics_{};
+    // The slice references, in no order; a few dozen at most, so lookups
+    // scan them.
+    std::vector<SliceReference> slice_references_;
     // Live records reading each expression input, by position.
     std::array<std::uint32_t, maximum_expression_inputs> readers_{};
 };

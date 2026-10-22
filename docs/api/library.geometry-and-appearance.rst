@@ -162,6 +162,8 @@ Types
      - What a primitive derives once from a part's geometry and fixed parameters, and reuses for every rasterization in which only animated parameters change.
    * - :cpp:class:`PrimitiveRegistry <gui_forms::PrimitiveRegistry>`
      - A fixed table of primitives, in registration order.
+   * - :cpp:class:`PrimitiveSlicePlan <gui_forms::PrimitiveSlicePlan>`
+     - How a part's raster may be assembled (EnginePrimitive::slice_plan).
    * - :cpp:class:`PrimitiveTarget <gui_forms::PrimitiveTarget>`
      - The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, its published states, and the engine inputs' values for it, by EngineInput (NaN for an input that is not published, such as the pointer of a part that is not hot).
    * - :cpp:class:`PropertyTransition <gui_forms::PropertyTransition>`
@@ -184,6 +186,8 @@ Types
      - A selector's specificity: the stable ID, the classes, the control type, the part (its name or role, one each) and the states, compared in that order (T2 plan, E4).
    * - :cpp:class:`Size <gui_forms::Size>`
      - Size is a renderer-neutral logical width and height.
+   * - :cpp:class:`SliceAxis <gui_forms::SliceAxis>`
+     - One axis of a slice plan.
    * - :cpp:class:`SurfaceMaterial <gui_forms::SurfaceMaterial>`
      - SurfaceMaterial is a bounded ordered fill stack plus optional border, bounded shadow stack, and shared corner radius.
    * - :cpp:class:`Theme <gui_forms::Theme>`
@@ -890,13 +894,17 @@ Types
 
       The part's raster for ``request``, painted on window paint ``paint_sequence`` (the record's new last_painted). - The cached raster is returned unchanged while its primitive, parameters, target, read states and extent are the request's and neither generation has advanced. - Otherwise the primitive draws the part. It draws into the cached raster's storage when the extent and scale are unchanged and no recorded command still holds that raster (a held raster is never rewritten, since a recording shows it), and into new storage otherwise. - New storage is made room for by evicting other parts' rasters, least recently painted first, until the cache fits its budget. A raster larger than the whole budget is drawn and returned but not kept. - The record's preparation is remade when the primitive refuses it as stale. If the primitive refuses, nothing is evicted and the record keeps its cached raster. Allocation failure propagates as std::bad_alloc, with the record unchanged.
 
+   .. cpp:function:: PartRasterResult raster_without_record(const PartRasterRequest& request, std::uint64_t paint_sequence)
+
+      A raster for a part painted without a key, which has no record: drawn for this paint and never kept (status uncached), assembled from a slice reference when the primitive slices it, which is kept. Refused as raster_for is; allocation failure propagates as std::bad_alloc.
+
    .. cpp:function:: void invalidate_raster(PartRecordHandle handle) noexcept
 
-      Makes one part's cached raster stale; the next raster_for draws it again. A stale handle does nothing.
+      Makes one part's cached raster stale; the next raster_for draws it again, and bakes again the slice reference it is assembled from. A stale handle does nothing.
 
    .. cpp:function:: void invalidate_rasters() noexcept
 
-      Makes every cached raster stale, as when the theme changes.
+      Makes every cached raster stale and drops every slice reference, as when the theme changes.
 
    .. cpp:function:: void note_paint(PartRecordHandle handle, std::uint64_t inputs_read, std::string_view painted_by, Rect extent)
 
@@ -953,6 +961,10 @@ Types
    .. cpp:function:: virtual bool accepts(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target) const noexcept
 
       Whether the primitive will draw this target with ``parameters``, such as a material whose bake would exceed its bound. A primitive that refuses is drawn by the built-in recipe instead, and the engine counts the refusal. True unless the primitive says otherwise. Called only with a target in range and parameters that match the declarations.
+
+   .. cpp:function:: virtual PrimitiveSlicePlan slice_plan(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target, DeviceExtent extent) const noexcept
+
+      How a raster of ``extent`` for this target may be assembled from a shorter reference bake (E7r slicing). A plan that slices an axis promises that assembling the reference gives the bytes a whole bake would. Never slices unless the primitive says otherwise. Called as accepts() is, with a target the primitive accepts.
 
 .. cpp:namespace:: gui_forms
 
@@ -2152,6 +2164,24 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PrimitiveSlicePlan final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   How a part's raster may be assembled (EnginePrimitive::slice_plan). ``slices`` is false for a primitive that never slices: its parts are baked whole and nothing is counted. Otherwise, when either axis is sliced, the reference is the target at ``reference_size`` with ``reference_extent``; when neither is, the part is baked whole and counted as a fallback.
+
+   .. cpp:member:: bool slices
+
+   .. cpp:member:: SliceAxis across
+
+   .. cpp:member:: SliceAxis down
+
+   .. cpp:member:: Size reference_size
+
+   .. cpp:member:: DeviceExtent reference_extent
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PrimitiveTarget final
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -2213,6 +2243,26 @@ Types
    .. cpp:member:: std::uint64_t evictions
 
       Rasters evicted to keep within the budget.
+
+   .. cpp:member:: std::uint64_t bakes
+
+      Every time a primitive drew pixels: a whole part or a slice reference. Compositing a cached raster, or assembling one from a cached reference, is not a bake.
+
+   .. cpp:member:: std::uint64_t slice_bakes
+
+      Slicing (E7r): references baked; parts assembled from a reference already held; parts of a slicing primitive baked whole because neither axis could be sliced, and axes kept whole, each counted per draw; references evicted to keep within their budget; and the references held now, with their bytes.
+
+   .. cpp:member:: std::uint64_t slice_hits
+
+   .. cpp:member:: std::uint64_t slice_whole_fallbacks
+
+   .. cpp:member:: std::uint64_t slice_axis_fallbacks
+
+   .. cpp:member:: std::uint64_t slice_evictions
+
+   .. cpp:member:: std::size_t slice_references
+
+   .. cpp:member:: std::size_t slice_bytes
 
 .. cpp:namespace:: gui_forms
 
@@ -2384,6 +2434,22 @@ Types
    .. cpp:member:: double width
 
    .. cpp:member:: double height
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: SliceAxis final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   One axis of a slice plan. For a sliced axis, the destination's first ``start`` and last ``end`` device pixels are the reference's own; every pixel between them is the reference's pixel ``start``.
+
+   .. cpp:member:: SliceAxisOutcome outcome
+
+      Default: ``{SliceAxisOutcome::varies}``.
+
+   .. cpp:member:: std::uint32_t start
+
+   .. cpp:member:: std::uint32_t end
 
 .. cpp:namespace:: gui_forms
 
@@ -3508,6 +3574,20 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: SliceAxisOutcome
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   .. cpp:enumerator:: sliced
+
+   .. cpp:enumerator:: varies
+
+   .. cpp:enumerator:: fractional
+
+   .. cpp:enumerator:: too_small
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: TextOrientation
 
    ``#include <gui_forms/types/paint_types/paint_types.hpp>``
@@ -3722,6 +3802,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t raster_cache_budget_bytes
 
    The most bytes of cached rasters one window keeps (GIVEN F2-1: 8 MB). Value: ``8U * 1024U * 1024U``.
+
+.. cpp:var:: constexpr std::size_t slice_cache_budget_bytes
+
+   The most bytes of slice references one window keeps (E7r), apart from the rasters assembled from them. A reference is a part's corners, edges and one centre pixel: a few kilobytes for a button at scale 2, so 1 MB holds some hundreds. Value: ``1U * 1024U * 1024U``.
 
 .. cpp:namespace:: gui_forms
 

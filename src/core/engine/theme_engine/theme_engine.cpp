@@ -603,18 +603,10 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         const PartRasterResult drawn = (*window).engine_part_raster(*record, request);
         raster = drawn.raster;
     } else {
-        // A part with no record: a raster of its own, for this paint only.
-        std::shared_ptr<PartRaster> own = PartRaster::create(request.extent, request.target.scale);
-        PrimitivePreparation preparation{};
-        const EnginePrimitive& primitive = *request.primitive;
-        bool painted = false;
-        if (own && primitive.prepare(request.parameters, request.target, preparation) ==
-                       PreparationOutcome::prepared) {
-            const RasterOutcome outcome =
-                primitive.rasterize(request.parameters, request.target, preparation, (*own).view());
-            painted = outcome == RasterOutcome::painted;
-        }
-        if (painted) raster = std::move(own);
+        // A part with no record: a raster of its own, for this paint only
+        // (assembled from the window's slice references when it slices).
+        const PartRasterResult drawn = (*window).engine_unkeyed_raster(request);
+        raster = drawn.raster;
     }
     if (!raster) {
         paint_built_in(painter, control, shown, opacity);
