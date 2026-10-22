@@ -491,17 +491,17 @@ void text_init(gpointer raw, gpointer) {
     face.get_character_extents = character_extents; face.get_offset_at_point = offset_at_point;
 }
 
+// Whether byte `index` of `bytes` continues a character (a UTF-8
+// continuation byte) rather than starting one or lying at the end.
+bool continues_character(const std::string& bytes, std::size_t index) {
+    if (index >= bytes.size()) return false;
+    const bool continuation = (static_cast<unsigned char>(bytes[index]) & 0xC0U) == 0x80U;
+    return continuation;
+}
 // Announces a text node's change from `before` to `after` (A-L3): the
 // replaced span as text-remove then text-insert (the common prefix and
 // suffix, cut at character boundaries, are kept), then text-caret-moved when
 // the caret moved and text-selection-changed when the selected span changed.
-// Whether byte `index` of `text` continues a character (a UTF-8
-// continuation byte) rather than starting one or lying at the end.
-bool continues_character(const std::string& text, std::size_t index) {
-    if (index >= text.size()) return false;
-    const bool continuation = (static_cast<unsigned char>(text[index]) & 0xC0U) == 0x80U;
-    return continuation;
-}
 void announce_text(AtkObject* object, const std::string& before, const std::optional<SemanticTextSelection>& was,
                    const std::string& after, const std::optional<SemanticTextSelection>& now) {
     if (before != after) {
@@ -848,9 +848,10 @@ gboolean set_selection(AtkText* object, gint number, gint start, gint end) {
 }
 // The span of `granularity` around byte `byte` of `value`, from the owner's
 // layout: a grapheme, a word (between consecutive word starts), a visual
-// line (with the break that ends it), or a paragraph (a logical line with
-// its break). False for a sentence (unsupported, A-T2) or a granularity ATK
-// adds later, and at the end of the text for the layout-based spans.
+// line (with the break that ends it; the last line also holds the end of
+// the text), or a paragraph (a logical line with its break). False for a
+// sentence (unsupported, A-T2), for a granularity ATK adds later, and at the
+// end of the text for a grapheme or a word.
 bool granularity_span(const SemanticTextLayout& layout, const std::string& value, std::size_t byte,
                       AtkTextGranularity granularity, std::size_t& low, std::size_t& high) {
     switch (granularity) {
@@ -893,6 +894,8 @@ bool granularity_span(const SemanticTextLayout& layout, const std::string& value
     }
     return false;
 }
+// The span's text, newly allocated; an empty string with offsets -1 when
+// there is no span (as for a sentence).
 gchar* string_at(AtkText* object, gint offset, AtkTextGranularity granularity, gint* start, gint* end) {
     if (start) { *start = -1; }
     if (end) { *end = -1; }
@@ -915,6 +918,7 @@ gchar* string_at(AtkText* object, gint offset, AtkTextGranularity granularity, g
         }
     } catch (...) { result = nullptr; }
     g_object_unref(accessible);
+    if (result == nullptr) { result = g_strdup(""); }
     return result;
 }
 // A character's box: the box of the grapheme it belongs to. All four are -1
