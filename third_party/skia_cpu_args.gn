@@ -50,14 +50,14 @@ skia_use_client_icu = false
 skia_use_bidi = false
 skia_use_libgrapheme = false
 
-# PNG is the one admitted renderer/resource codec. Use Skia's DEPS-pinned
-# libpng and zlib rather than a machine-global package.
-skia_use_libpng_decode = true
-skia_use_libpng_encode = true
+# Skia carries no codec and no zlib (Z-stage I5): every PNG decode and encode
+# is GUI.Forms' owned stx_png on stx_zlib, on every host.
+skia_use_libpng_decode = false
+skia_use_libpng_encode = false
 skia_use_rust_png_decode = false
 skia_use_rust_png_encode = false
 skia_use_system_libpng = false
-skia_use_zlib = true
+skia_use_zlib = false
 skia_use_system_zlib = false
 
 # Every other image/media decoder is outside the renderer core.

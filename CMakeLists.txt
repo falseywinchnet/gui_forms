@@ -276,6 +276,13 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     add_subdirectory("${GUI_FORMS_FREETYPE_ROOT}"
                      "${CMAKE_CURRENT_BINARY_DIR}/third_party/freetype"
                      EXCLUDE_FROM_ALL)
+    # Decision 3A: FT_DISABLE_ZLIB only stops a system zlib search; the stock
+    # options still compile FreeType's bundled inflate. This options header
+    # undefines FT_CONFIG_OPTION_USE_ZLIB for the library's own compile.
+    target_include_directories(freetype BEFORE PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/freetype")
+    target_compile_definitions(freetype PRIVATE
+        "FT_CONFIG_OPTIONS_H=<gui_forms_ftoption.h>")
 
     set(HB_HAVE_CAIRO OFF CACHE BOOL "" FORCE)
     set(HB_HAVE_CORETEXT OFF CACHE BOOL "" FORCE)
@@ -813,8 +820,6 @@ if(GUI_FORMS_ENABLE_SKIA)
     set(GUI_FORMS_SKIA_ARCHIVES
         ${GUI_FORMS_SKIA_OUT}/libskia.a
         ${GUI_FORMS_SKIA_OUT}/libskcms.a
-        ${GUI_FORMS_SKIA_OUT}/libpng.a
-        ${GUI_FORMS_SKIA_OUT}/libzlib.a
     )
 
     if(GUI_FORMS_SKIA_PREBUILT)
@@ -833,13 +838,13 @@ if(GUI_FORMS_ENABLE_SKIA)
                 ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh
                 ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_cpu_args.gn
                 ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_png_only.patch
-            COMMENT "Building pinned CPU-only, PNG-only Skia"
+            COMMENT "Building pinned CPU-only, codec-free Skia"
             VERBATIM
         )
     endif()
     add_custom_target(gui_forms_skia_dependency DEPENDS ${GUI_FORMS_SKIA_ARCHIVES})
 
-    foreach(archive IN ITEMS skia skcms png zlib)
+    foreach(archive IN ITEMS skia skcms)
         add_library(gui_forms_${archive}_archive STATIC IMPORTED GLOBAL)
         set_target_properties(gui_forms_${archive}_archive PROPERTIES
             IMPORTED_LOCATION ${GUI_FORMS_SKIA_OUT}/lib${archive}.a
@@ -862,8 +867,6 @@ if(GUI_FORMS_ENABLE_SKIA)
         PRIVATE
             gui_forms_skia_archive
             gui_forms_skcms_archive
-            gui_forms_png_archive
-            gui_forms_zlib_archive
     )
     # ADR-004: the Skia painter draws text only through the shared
     # HarfBuzz/FreeType engine; Skia itself has no font backend.
@@ -886,10 +889,6 @@ if(GUI_FORMS_ENABLE_SKIA)
         )
     endif()
     target_compile_definitions(gui_forms_skia PRIVATE
-        SK_CODEC_DECODES_PNG
-        SK_CODEC_DECODES_PNG_WITH_LIBPNG
-        SK_CODEC_ENCODES_PNG
-        SK_CODEC_ENCODES_PNG_WITH_LIBPNG
         SK_DISABLE_TRACING
     )
 
@@ -921,8 +920,6 @@ if(GUI_FORMS_ENABLE_SKIA)
             freetype
             gui_forms_skia_archive
             gui_forms_skcms_archive
-            gui_forms_png_archive
-            gui_forms_zlib_archive
     )
     if(APPLE)
         target_link_libraries(gui_drawing_skia PRIVATE
@@ -932,10 +929,6 @@ if(GUI_FORMS_ENABLE_SKIA)
         )
     endif()
     target_compile_definitions(gui_drawing_skia PRIVATE
-        SK_CODEC_DECODES_PNG
-        SK_CODEC_DECODES_PNG_WITH_LIBPNG
-        SK_CODEC_ENCODES_PNG
-        SK_CODEC_ENCODES_PNG_WITH_LIBPNG
         SK_DISABLE_TRACING
     )
 
@@ -1044,8 +1037,6 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         gui_forms_host_macos
         gui_forms_skia_archive
         gui_forms_skcms_archive
-        gui_forms_png_archive
-        gui_forms_zlib_archive
         ${GUI_FORMS_APPKIT}
         ${GUI_FORMS_QUARTZCORE}
         ${GUI_FORMS_COREGRAPHICS}
@@ -2249,6 +2240,15 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_png_malformed_sweep_tests tests/image/png_malformed_sweep_tests.cpp)
     target_link_libraries(gui_forms_png_malformed_sweep_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_malformed_sweep_tests COMMAND gui_forms_png_malformed_sweep_tests)
+
+    if(TARGET freetype)
+        # Decision 3A: FreeType refuses compressed data; plain fonts still load.
+        add_executable(gui_forms_freetype_zlib_tests tests/freetype_zlib_tests.cpp)
+        target_link_libraries(gui_forms_freetype_zlib_tests PRIVATE freetype)
+        target_compile_definitions(gui_forms_freetype_zlib_tests PRIVATE
+            GUI_FORMS_TEST_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf")
+        add_test(NAME gui_forms_freetype_zlib_tests COMMAND gui_forms_freetype_zlib_tests)
+    endif()
 
     add_executable(gui_forms_png_color_tests tests/image/png_color_tests.cpp)
     target_link_libraries(gui_forms_png_color_tests PRIVATE gui_forms_core)
@@ -3622,8 +3622,6 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
 endif()
 if(GUI_FORMS_ENABLE_SKIA)
     install(FILES "${GUI_FORMS_SKIA_ROOT}/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Skia-LICENSE.txt)
-    install(FILES "${GUI_FORMS_SKIA_ROOT}/third_party/externals/libpng/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME libpng-LICENSE.txt)
-    install(FILES "${GUI_FORMS_SKIA_ROOT}/third_party/externals/zlib/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME zlib-LICENSE.txt)
 endif()
 
 install(FILES third_party/sheenbidi/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME SheenBidi-LICENSE.txt)

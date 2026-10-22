@@ -19,8 +19,6 @@
     {"name": "HarfBuzz.txt", "source": "third_party/harfbuzz/COPYING", "component": "HarfBuzz", "optional": true},
     {"name": "FreeType-FTL.txt", "source": "third_party/freetype/docs/FTL.TXT", "component": "FreeType", "optional": true},
     {"name": "Skia.txt", "source": "third_party/skia/LICENSE", "component": "Skia", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
-    {"name": "libpng.txt", "source": "third_party/skia/third_party/externals/libpng/LICENSE", "component": "libpng (inside Skia)", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
-    {"name": "zlib.txt", "source": "third_party/skia/third_party/externals/zlib/LICENSE", "component": "zlib (inside Skia)", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
     {"name": "LLVM/libcxx-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libcxx-LICENSE.TXT", "component": "LLVM libc++ and libc++abi", "optional": true, "platforms": ["macos-arm64"]},
     {"name": "LLVM/libcxxabi-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libcxxabi-LICENSE.TXT", "component": "LLVM libc++ and libc++abi", "optional": true, "platforms": ["macos-arm64"]},
     {"name": "LLVM/libunwind-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libunwind-LICENSE.TXT", "component": "LLVM libunwind", "optional": true, "platforms": ["macos-arm64"]},

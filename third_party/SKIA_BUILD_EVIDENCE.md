@@ -1,5 +1,21 @@
 # Skia CPU proving-build evidence
 
+## 2026-10-21: codec-free Skia (Z-stage I5)
+
+`skia_cpu_args.gn` and `skia_cpu_windows_mingw_args.gn` now set
+`skia_use_libpng_decode`, `skia_use_libpng_encode` and `skia_use_zlib` to
+false. GUI.Forms decodes and encodes PNG with `stx_png` on `stx_zlib`, and
+no Skia codec is called. The build produces `libskia.a` and `libskcms.a`
+only; `libpng.a` and `libzlib.a` are gone, along with their fetches.
+`cmake/check_skia_archive.cmake` now also forbids SkPng*, libpng and
+`Cr_z_` symbols.
+
+The native CI job runs `tools/audit_link_map.py --forbid-foreign` over
+every toolkit archive and the Skia archives on all four platforms, and
+prints the Skia archive sizes. This macOS/Linux build was not reproduced
+locally (no Mac in this workspace), so its sizes come from that CI step; see
+the I5 pull request. The 2026-08-03 record below is historical.
+
 Status: **MEASURED** for the named local build only. This record does not select
 Skia as the permanent GUI.Forms renderer.
 
