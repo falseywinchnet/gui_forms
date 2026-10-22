@@ -312,7 +312,7 @@ void extended_vocabulary_snapshots_resources() {
     attributes.reset_color_matrix();
     CHECK(recorder.commands()[3].path.elements.size() == 6U);
     CHECK(recorder.commands()[5].image.stable_id == 42U);
-    CHECK(recorder.commands()[5].image_attributes.has_color_matrix);
+    CHECK(recorder.commands()[5].image_attributes.color_matrix.has_value());
     CHECK(recorder.commands()[5].image_attributes.remap_table.size() == 1U);
     recorder.close();
     const std::string trace = recorder.deterministic_trace();

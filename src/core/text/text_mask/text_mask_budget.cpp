@@ -113,10 +113,7 @@ TextMaskLimit mask_limit(const MaskResource resource) noexcept {
     case MaskResource::slots: return TextMaskLimit::request_slots;
     case MaskResource::fonts: return TextMaskLimit::font_bytes;
     case MaskResource::banks: return TextMaskLimit::font_banks;
-    case MaskResource::cache:
-        // No public limit names the cache's entry count; it is reported
-        // with the metadata it is kept in.
-        return TextMaskLimit::metadata_bytes;
+    case MaskResource::cache: return TextMaskLimit::cache_entries;
     case MaskResource::count:
         // The count sentinel is no resource.
         return TextMaskLimit::metadata_bytes;

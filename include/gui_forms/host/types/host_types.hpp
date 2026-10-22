@@ -11,6 +11,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -133,9 +134,10 @@ struct HostClipboardTextResult final {
 
 struct HostClipboardImageResult final {
     HostServiceStatus status;
-    HostImage image;
+    // The clipboard's image; absent when the clipboard holds none or the
+    // read failed.
+    std::optional<HostImage> image;
     std::uint64_t generation{};
-    bool has_image{};
 };
 
 // File-manager copies carry local file references as well as optional icon

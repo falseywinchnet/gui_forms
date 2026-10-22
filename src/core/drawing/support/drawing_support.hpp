@@ -524,11 +524,12 @@ void append_element_text(const PathElement& element, std::string& result) {
 [[nodiscard]] std::string image_attributes_text(
     const ImageAttributesSnapshot& attributes) {
     std::string result;
-    if (attributes.has_color_matrix) {
+    if (attributes.color_matrix.has_value()) {
+        const std::array<double, 25>& matrix = *attributes.color_matrix;
         result = "matrix:";
-        for (std::size_t index = 0; index < attributes.color_matrix.size(); ++index) {
+        for (std::size_t index = 0; index < matrix.size(); ++index) {
             if (index != 0U) result += ",";
-            result += number(attributes.color_matrix[index]);
+            result += number(matrix[index]);
         }
     }
     if (!attributes.remap_table.empty()) {
