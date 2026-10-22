@@ -244,6 +244,29 @@ int b(E e) {
         terminal: str = hunt.masked("void t(Side s) { switch (s) { case Side::left: std::abort(); } std::terminate(); }")
         self.assertTrue(hunt.complete_with_fallback(terminal, hunt.find_switches(terminal)[0]))
 
+    def test_preprocessor_lines_are_not_statements(self) -> None:
+        source: str = """void replay(Operation operation) {
+    switch (operation) {
+#if defined(OPTIONAL_TEXT)
+    case Operation::text: {
+        draw_text();
+        return;
+    }
+#endif
+    case Operation::save: save(); return;
+#define NOTE(x) \\
+    note(x)
+    case Operation::restore: restore(); return;
+    }
+    return;
+}
+"""
+        text: str = hunt.masked(source)
+        switch: hunt.Switch = hunt.find_switches(text)[0]
+        self.assertTrue(hunt.every_case_leaves(text, switch))
+        self.assertTrue(hunt.complete_with_fallback(text, switch))
+        self.assertEqual(hunt.body_statements(text, switch.labels[1]), "save(); return;")
+
     def test_assigning_cases_do_not_make_the_code_after_a_fallback(self) -> None:
         source: str = "int t(E e) { int v = 0; switch (e) { case E::a: v = 1; break; case E::b: v = 2; break; } return v; }"
         text: str = hunt.masked(source)

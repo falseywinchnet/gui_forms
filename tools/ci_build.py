@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 
+import change_selection
 import native_tests
 
 ROOT: Path = Path(__file__).resolve().parents[2]
@@ -62,12 +63,15 @@ def targets_for_tests(listing: dict, known_outputs: set[str], tree: Path) -> lis
     build-tree files its command names (its executable, or the libraries and
     programs an audit script inspects). The whole tree is built instead when
     a test names a build-tree file ninja does not produce, or depends on other
-    tests (fixtures, DEPENDS), whose products this reading cannot see. A test
-    naming no build-tree file needs nothing built.
+    tests (fixtures, DEPENDS), whose products this reading cannot see, or
+    has no command at all (see test_commands). A test naming no build-tree
+    file needs nothing built.
     """
     targets: set[str] = set()
     test: dict
     for test in listing.get('tests', []):
+        if 'command' not in test:
+            return None
         property_record: dict
         for property_record in test.get('properties', []):
             if property_record.get('name') in ('FIXTURES_REQUIRED', 'DEPENDS', 'REQUIRED_FILES'):
@@ -94,10 +98,72 @@ def ctest_selection(tests: str, skip_labels: str) -> list[str]:
     return selection
 
 
-def selected_test_targets(toolkit: Path, tests: str, skip_labels: str = '') -> list[str] | None:
-    """Ask ctest and ninja which outputs the selected tests need (see targets_for_tests)."""
+# One argument of a CMake command: a quoted argument (a backslash escapes the
+# next character), a bracket argument [=[...]=], or an unquoted run.
+CMAKE_ARGUMENT: re.Pattern[str] = re.compile(r'"((?:[^"\\]|\\.)*)"|\[(=*)\[(.*?)\]\2\]|([^\s()"]+)', re.DOTALL)
+CMAKE_ESCAPE: re.Pattern[str] = re.compile(r'\\(.)', re.DOTALL)
+CMAKE_CALL: re.Pattern[str] = re.compile(r'^(add_test|subdirs)\((.*)\)\s*$', re.MULTILINE)
+
+
+def cmake_arguments(text: str) -> list[str]:
+    """The arguments of one CMake command's parenthesized text, unquoted."""
+    arguments: list[str] = []
+    match: re.Match[str]
+    for match in CMAKE_ARGUMENT.finditer(text):
+        if match.group(1) is not None:
+            arguments.append(CMAKE_ESCAPE.sub(r'\1', match.group(1)))
+        elif match.group(3) is not None:
+            arguments.append(match.group(3))
+        else:
+            arguments.append(match.group(4))
+    return arguments
+
+
+def test_commands(directory: Path) -> dict[str, list[str]]:
+    """Every test's command as directory's CTestTestfile.cmake (and its subdirs) records it.
+
+    ctest --show-only=json-v1 leaves out the command of a test whose
+    executable is not built yet, which is every test of a fresh tree; the
+    generated file still names it.
+    """
+    commands: dict[str, list[str]] = {}
+    test_file: Path = directory / 'CTestTestfile.cmake'
+    if not test_file.is_file():
+        return commands
+    call: re.Match[str]
+    for call in CMAKE_CALL.finditer(test_file.read_text(encoding='utf-8', errors='replace')):
+        arguments: list[str] = cmake_arguments(call.group(2))
+        if call.group(1) == 'subdirs':
+            subdirectory: str
+            for subdirectory in arguments:
+                commands.update(test_commands(directory / subdirectory))
+        elif arguments:
+            commands[arguments[0]] = arguments[1:]
+    return commands
+
+
+def test_listing(toolkit: Path, tests: str, skip_labels: str) -> dict:
+    """ctest's --show-only=json-v1 listing of the tests ctest_selection(tests, skip_labels) chooses.
+
+    A test whose executable is not built yet gets its command from the
+    generated test files (test_commands), so that the listing names it.
+    """
     listing: dict = json.loads(captured('ctest', '--test-dir', toolkit, '--show-only=json-v1',
                                         *ctest_selection(tests, skip_labels)))
+    commands: dict[str, list[str]] | None = None
+    test: dict
+    for test in listing.get('tests', []):
+        if 'command' in test:
+            continue
+        if commands is None:
+            commands = test_commands(toolkit)
+        if test['name'] in commands:
+            test['command'] = commands[test['name']]
+    return listing
+
+
+def selected_test_targets(toolkit: Path, listing: dict) -> list[str] | None:
+    """Ask ninja which outputs the tests of listing need (see targets_for_tests)."""
     known_outputs: set[str] = set()
     line: str
     for line in captured('ninja', '-C', toolkit, '-t', 'targets', 'all').splitlines():
@@ -333,9 +399,21 @@ def configure_tree(toolkit: Path, configure: list[str]) -> None:
     record_path.write_text(configure_record(configure, dict(os.environ), cache.read_bytes()), encoding='utf-8')
 
 
+def changed_tests_listing(changed: list[str], listing: dict) -> dict | None:
+    """The part of listing the changed paths select (change_selection.py), or None for every test."""
+    selection: change_selection.Selection = change_selection.select(
+        changed, change_selection.load_rules(), listing, ROOT / 'gui_forms')
+    path: str
+    for path in changed:
+        print(f'changed {path}: {selection.reasons[path]}', flush=True)
+    if selection.every_test:
+        return None
+    return {'tests': change_selection.selected_tests(listing, selection)}
+
+
 def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False,
                   sanitize: bool = False, tests: str = '', test_jobs: int = 1,
-                  debug_info: str = 'lines', skip_labels: str = '') -> None:
+                  debug_info: str = 'lines', skip_labels: str = '', changed_from: str = '') -> None:
     """Build, test, then install only into the explicitly supplied build SDK.
 
     With sanitize, the toolkit is built in its own directory with the
@@ -349,7 +427,18 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     ctest -LE pattern, leaves out the tests with matching labels (for
     example gallery_accessibility, the Gallery-wide accessibility tests)
     from the run and from a narrowed build.
+    changed_from, a ref, narrows the sanitized run further to the tests the
+    paths changed since it can affect (tools/change_selection.py, the areas
+    of tools/test_areas.json) and the build to what they read; when no
+    changed path is read by any test, nothing is configured, built or run.
     """
+    changed: list[str] = []
+    if changed_from:
+        changed = change_selection.changed_paths(ROOT / 'gui_forms', changed_from)
+        if not change_selection.any_path_read(changed, change_selection.load_rules()):
+            print(f'no test reads the {len(changed)} paths changed since {changed_from}; nothing to build or run',
+                  flush=True)
+            return
     toolkit: Path = build / ('gui-forms-sanitize' if sanitize else 'gui-forms')
     options: list[str] = []
     gallery_option: str = 'ON' if gallery else 'OFF'
@@ -400,18 +489,33 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options]
     configure_tree(toolkit, configure)
     # A narrowed run builds only what its tests read, not every program in the tree.
+    selection: list[str] = ctest_selection(tests, skip_labels)
     targets: list[str] | None = None
-    if tests:
-        targets = selected_test_targets(toolkit, tests, skip_labels)
+    if tests or changed_from:
+        listing: dict = test_listing(toolkit, tests, skip_labels)
+        if changed_from:
+            changed_listing: dict | None = changed_tests_listing(changed, listing)
+            if changed_listing is not None:
+                listing = changed_listing
+                if not listing['tests']:
+                    print(f'no test is affected by the paths changed since {changed_from}; nothing to build or run',
+                          flush=True)
+                    return
+                names: list[str] = []
+                test: dict
+                for test in listing['tests']:
+                    names.append(test['name'])
+                print(f'{len(names)} tests are affected by the paths changed since {changed_from}', flush=True)
+                selection = ctest_selection(change_selection.name_pattern(names), skip_labels)
+        targets = selected_test_targets(toolkit, listing)
     if targets is None:
         run('cmake', '--build', toolkit, '--parallel', jobs)
     elif targets:
-        print(f'{len(targets)} build outputs serve the tests matching {tests}', flush=True)
+        print(f'{len(targets)} build outputs serve the selected tests', flush=True)
         run('cmake', '--build', toolkit, '--parallel', jobs, '--target', *targets)
     else:
-        print(f'the tests matching {tests} read no build output; nothing to build', flush=True)
+        print('the selected tests read no build output; nothing to build', flush=True)
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
-    selection: list[str] = ctest_selection(tests, skip_labels)
     if sanitize:
         run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
             '--parallel', test_jobs, *selection)
@@ -448,6 +552,9 @@ def main() -> None:
                              'and macOS) and only test')
     parser.add_argument('--tests', default='',
                         help='with --sanitize, build and run only what the tests matching this ctest -R pattern need')
+    parser.add_argument('--changed-from', default='',
+                        help='with --sanitize, build and run only the tests the paths changed since this ref '
+                             'can affect (tools/change_selection.py); every test when a path touches everything')
     parser.add_argument('--gallery', action='store_true',
                         help='also configure GUI_FORMS_BUILD_GALLERY=ON '
                              '(or set GUI_FORMS_CI_BUILD_GALLERY=1); default OFF')
@@ -458,6 +565,8 @@ def main() -> None:
         parser.error('--test-jobs must be positive')
     if args.tests and not args.sanitize:
         parser.error('--tests narrows the sanitized run only')
+    if args.changed_from and not args.sanitize:
+        parser.error('--changed-from narrows the sanitized run only')
     if args.debug_info and not args.sanitize:
         parser.error('--debug-info applies to the sanitized build only')
     debug_info: str = 'lines'
@@ -475,7 +584,7 @@ def main() -> None:
     os.environ['BUILD_JOBS'] = str(args.jobs)
     build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
                   gallery_enabled(args.gallery, dict(os.environ)), args.sanitize, args.tests,
-                  args.test_jobs, debug_info, args.skip_labels)
+                  args.test_jobs, debug_info, args.skip_labels, args.changed_from)
 
 
 if __name__ == '__main__':

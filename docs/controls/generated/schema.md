@@ -48,16 +48,17 @@ Theme engine 0.2 (T2): the primitives a theme's rules may select, the atoms each
 |---|---|---|---|---|---|
 | `bulge` | 0.1 | `face` | `pressed`, `active_tool` | 320 | `amplitude`, `exponent`, `light_colour`, `light_peak`, `shade_colour`, `shade_peak`, `crown_colour`, `crown_peak`, `gold_light_colour`, `gold_light_peak`, `gold_shade_colour`, `gold_shade_peak`, `gold_crown_colour`, `gold_crown_peak` |
 | `dithered_bulge` | 0.1 | `face` | `pressed`, `active_tool` | 280 | `amplitude`, `exponent`, `lit_1`, `lit_2`, `lit_3`, `shaded_1`, `shaded_2`, `shaded_3`, `lit_gain`, `shade_gain`, `crown_gain`, `gold_lit_1`, `gold_lit_2`, `gold_lit_3`, `gold_body_1`, `gold_body_2`, `gold_body_3`, `gold_shaded_1`, `gold_shaded_2`, `gold_shaded_3` |
-| `pill_plate` | 0.2 | `face`, `actuator`, `thumb`, `chip` | `hot`, `pressed`, `disabled`, `preselect` | 256 | `shape`, `corner_radius`, `face_top`, `face_bottom`, `border`, `upper_line`, `lower_line`, `contact_shadow`, `hot_face_top`, `hot_face_bottom`, `hot_border`, `pressed_face_top`, `pressed_face_bottom`, `pressed_upper_line`, `pressed_lower_line`, `disabled_face_top`, `disabled_face_bottom`, `disabled_border`, `disabled_upper_line`, `perimeter` |
-| `gold_plate` | 0.2 | `face`, `actuator`, `chip` | `pressed` | 192 | `shape`, `corner_radius`, `face_top`, `face_bottom`, `border`, `pressed_face_top`, `pressed_face_bottom`, `upper_line`, `left_line`, `lower_line` |
-| `inset_well` | 0.2 | `well`, `track` | none | 160 | `shape`, `corner_radius`, `face_top`, `face_bottom`, `border`, `inner_shade`, `outer_highlight` |
+| `pill_plate` | 0.2 | `face`, `actuator`, `thumb`, `chip` | `hot`, `pressed`, `disabled`, `preselect` | 256 | `shape`, `corner_radius`, `face_top`, `face_bottom`, `border`, `upper_line`, `lower_line`, `contact_shadow`, `hot_face_top`, `hot_face_bottom`, `hot_border`, `pressed_face_top`, `pressed_face_bottom`, `pressed_upper_line`, `pressed_lower_line`, `disabled_face_top`, `disabled_face_bottom`, `disabled_border`, `disabled_upper_line`, `perimeter`, `text_padding` |
+| `gold_plate` | 0.2 | `face`, `actuator`, `chip` | `pressed` | 192 | `shape`, `corner_radius`, `face_top`, `face_bottom`, `border`, `pressed_face_top`, `pressed_face_bottom`, `upper_line`, `left_line`, `lower_line`, `text_padding` |
+| `inset_well` | 0.2 | `well`, `track` | none | 160 | `shape`, `corner_radius`, `face_top`, `face_bottom`, `border`, `inner_shade`, `outer_highlight`, `text_padding` |
 | `etched_divider` | 0.2 | `divider` | none | 32 | `shade_line`, `light_line` |
 | `seam_line` | 0.2 | `seam` | none | 16 | `line` |
 | `grip` | 0.2 | `grip` | none | 16 | `dot` |
+| `material` | 0.2 | `region`, `face`, `actuator`, `well`, `track`, `thumb`, `chip` | `hot`, `pressed`, `captured`, `selected`, `checked`, `current`, `open`, `active_tool`, `focus_visible`, `preselect`, `disabled`, `unavailable` | 512 | `recipe` |
 
 Bounded expressions: at most 64 operations and a stack of 16, from `constant`, `input`, `state`, `parameter`, `negate`, `add`, `subtract`, `multiply`, `divide`, `minimum`, `maximum`, `less`, `less_equal`, `greater`, `greater_equal`, `equal`, `not_equal`, `clamp`, `mix`, `smoothstep`, `choose`.
 
-Transitions run on `opacity` and on the primitives' animated parameters: at most 8 states a machine and 4 transitions a part. Ambient effects: at most 30 frames per second over at most 0.1 of the window on everyday surfaces.
+Transitions run on `opacity`, `scale` and on the primitives' animated parameters: at most 8 states a machine and 4 transitions a part. Ambient effects: at most 30 frames per second over at most 0.1 of the window on everyday surfaces.
 
 ## `button_base` (ButtonBase, control)
 

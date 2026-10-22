@@ -5,14 +5,15 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <span>
 #include <vector>
 
 namespace gui_drawing {
 
 struct ImageAttributesSnapshot final {
-    bool has_color_matrix{};
-    std::array<double, 25> color_matrix{};
+    // The colour matrix as set_color_matrix took it; absent when none is set.
+    std::optional<std::array<double, 25>> color_matrix{};
     struct ColorRemap final {
         Color old_color;
         Color new_color;

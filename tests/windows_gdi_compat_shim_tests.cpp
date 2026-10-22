@@ -444,6 +444,7 @@ bool run_dib_overlap_case(const gf_api_v0& api, HMODULE shim,
     info.bmiHeader.biCompression = BI_RGB;
     const bool top_down = source != DibOverlapSource::bottom_up_section;
     const char* orientation = "bottom-up";
+    // A bottom-up section keeps the name above.
     if (source == DibOverlapSource::top_down_shim_get_dc) {
         orientation = "top-down";
     } else if (source == DibOverlapSource::top_down_abi_bridge) {
