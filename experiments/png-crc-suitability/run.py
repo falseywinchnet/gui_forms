@@ -96,7 +96,7 @@ def main():
             command = ['clang++', '-std=c++20', *flags, *candidate_flags, *includes, '-fconstexpr-steps=4000000',
                        str(source / 'compact.cpp'), str(source / 'crc_kernels.cpp'), str(source / 'study.cpp'),
                        str(ROOT / 'src/core/image/png_decoder.cpp'), str(ROOT / 'src/core/image/png_writer.cpp'),
-                       str(ROOT / 'stx_zlib/src/inflate.cpp'), str(ROOT / 'stx_zlib/src/deflate.cpp'), str(decoder), str(oracle), str(portable_oracle), '-o', str(binary)]
+                       str(ROOT / 'stx_zlib/src/inflate.cpp'), str(ROOT / 'stx_zlib/src/deflate.cpp'), str(ROOT / 'stx_zlib/src/checksum.cpp'), str(decoder), str(oracle), str(portable_oracle), '-o', str(binary)]
             record['commands'].append(command)
             subprocess.run(command, check=True)
             command = [str(binary), 'verify']

@@ -82,6 +82,7 @@ def main() -> None:
             command = ['clang++', '-std=c++20', '-O3', *includes, *flags,
                        str(ROOT / 'src/core/image/png_decoder.cpp'), str(ROOT / 'src/core/image/png_writer.cpp'),
                        str(ROOT / 'stx_zlib/src/inflate.cpp'), str(ROOT / 'stx_zlib/src/deflate.cpp'),
+                       str(ROOT / 'stx_zlib/src/checksum.cpp'),
                        str(ROOT / 'tests/image/png_benchmark.cpp'),
                        str(baseline_object), str(oracle), *objects, '-o', str(binary)]
             record['commands'].append(command)

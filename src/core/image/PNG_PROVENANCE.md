@@ -6,12 +6,11 @@ No libpng, libspng, LodePNG, BFFT or Airspy source/table is copied into them.
 The governing format reference is the [W3C PNG recommendation of 24 June
 2025](https://www.w3.org/TR/2025/REC-png-3-20250624/).
 
-The existing first-party writer's `png_crc32` now computes the same IEEE CRC
-in eight-byte groups using eight constexpr tables derived from its original
-bit recurrence. Tables are generated from polynomial 0xedb88320, not imported.
-This changes the shared checksum implementation used by the existing writer
-as well as the candidate decoder; it does not select a new production decoder.
-The registry still has its existing checksum pending the later consolidation.
+The IEEE CRC-32 computed in eight-byte groups, with eight constexpr tables
+derived from the bit recurrence of polynomial 0xedb88320 (generated, not
+imported), first lived in the writer as `png_crc32`. Phase 4 moved it to
+`stx_zlib/src/checksum.cpp` (`stx_zlib::crc32`), which the decoder, writer
+and registry now share; the registry's separate byte-table CRC is gone.
 
 Reference roles and exact inspected pins are in the Z-stage brief and the
 phase-2 optimization record. In particular, libpng's NEON filters may rely on

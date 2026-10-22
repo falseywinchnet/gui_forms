@@ -1,5 +1,5 @@
 #include "png_decoder.hpp"
-#include "png_writer.hpp"
+#include "stx_zlib/checksum.hpp"
 
 #include <algorithm>
 #include <array>
@@ -348,7 +348,7 @@ PngDecodeError parse(std::span<const std::byte> encoded,
         }
         if ((byte(encoded[offset + 6]) & 32U) != 0) return PngDecodeError::invalid_chunk_type;
         const std::span<const std::byte> checked = encoded.subspan(offset + 4, length + 4ULL);
-        if (png_crc32(checked) != read32(encoded, chunk.next - 4)) return PngDecodeError::crc_mismatch;
+        if (stx_zlib::crc32(checked) != read32(encoded, chunk.next - 4)) return PngDecodeError::crc_mismatch;
         const std::span<const std::byte> data = encoded.subspan(chunk.data_offset, chunk.length);
         if (!saw_header && chunk.type != ihdr) return PngDecodeError::invalid_order;
         if (saw_idat && chunk.type != idat) ended_idat = true;

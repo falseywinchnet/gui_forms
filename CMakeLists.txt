@@ -3490,7 +3490,7 @@ if(GUI_FORMS_BUILD_FUZZERS)
     )
     unset(CMAKE_REQUIRED_FLAGS)
     add_executable(gui_forms_inflate_fuzz
-        fuzz/inflate_fuzz.cpp stx_zlib/src/inflate.cpp)
+        fuzz/inflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp)
     target_include_directories(gui_forms_inflate_fuzz PRIVATE include stx_zlib/include)
     target_compile_options(gui_forms_inflate_fuzz PRIVATE
         -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
@@ -3503,7 +3503,7 @@ if(GUI_FORMS_BUILD_FUZZERS)
     endif()
 
     add_executable(gui_forms_inflate_protocol_fuzz
-        fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp)
+        fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp)
     target_include_directories(gui_forms_inflate_protocol_fuzz PRIVATE include stx_zlib/include)
     target_compile_options(gui_forms_inflate_protocol_fuzz PRIVATE
         -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
@@ -3516,7 +3516,7 @@ if(GUI_FORMS_BUILD_FUZZERS)
     endif()
 
     add_executable(gui_forms_deflate_fuzz
-        fuzz/deflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp)
+        fuzz/deflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp stx_zlib/src/checksum.cpp)
     target_include_directories(gui_forms_deflate_fuzz PRIVATE stx_zlib/include)
     target_compile_options(gui_forms_deflate_fuzz PRIVATE
         -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
@@ -3530,7 +3530,8 @@ if(GUI_FORMS_BUILD_FUZZERS)
 
     add_executable(gui_forms_png_decode_fuzz
         fuzz/png_decode_fuzz.cpp src/core/image/png_decoder.cpp
-        src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp)
+        src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp
+        stx_zlib/src/checksum.cpp)
     target_include_directories(gui_forms_png_decode_fuzz PRIVATE include stx_zlib/include)
     target_compile_options(gui_forms_png_decode_fuzz PRIVATE
         -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
@@ -3545,9 +3546,11 @@ if(GUI_FORMS_BUILD_FUZZERS)
     add_executable(gui_forms_png_registry_fuzz
         fuzz/png_registry_fuzz.cpp
         src/core/resources/image_registry/image_registry.cpp
+        stx_zlib/src/checksum.cpp
     )
     target_include_directories(gui_forms_png_registry_fuzz PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/stx_zlib/include
     )
     target_compile_features(gui_forms_png_registry_fuzz PRIVATE cxx_std_20)
     if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)

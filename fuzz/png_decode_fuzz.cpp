@@ -46,7 +46,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
 // Repair only chunk CRCs after mutation so fuzzing reaches deflate, filters and
 // metadata as well as the envelope. Truncated/invalid envelopes stay malformed.
 #if !defined(GUI_FORMS_FUZZ_STANDALONE)
-#include "../src/core/image/png_writer.hpp"
+#include "stx_zlib/checksum.hpp"
 extern "C" std::size_t LLVMFuzzerMutate(std::uint8_t*, std::size_t, std::size_t);
 extern "C" std::size_t LLVMFuzzerCustomMutator(std::uint8_t* data, std::size_t size,
                                               std::size_t maximum, unsigned seed) {
@@ -60,7 +60,7 @@ extern "C" std::size_t LLVMFuzzerCustomMutator(std::uint8_t* data, std::size_t s
         if (length > changed - offset - 12) break;
         const std::span<const std::uint8_t> checked(data + offset + 4, length + 4ULL);
         const std::span<const std::byte> bytes = std::as_bytes(checked);
-        const std::uint32_t crc = gui_forms::image::png_crc32(bytes);
+        const std::uint32_t crc = stx_zlib::crc32(bytes);
         for (unsigned index = 0; index < 4; ++index) {
             data[offset + 8 + length + index] = static_cast<std::uint8_t>(crc >> (24 - index * 8));
         }

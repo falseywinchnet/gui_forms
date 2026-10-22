@@ -57,7 +57,7 @@ struct PngEncodeInput final {
 [[nodiscard]] bool encode_png(const PngEncodeInput& input,
                               std::vector<std::byte>& output);
 
-[[nodiscard]] std::uint32_t png_crc32(std::span<const std::byte> bytes) noexcept;
-[[nodiscard]] std::uint32_t png_adler32(std::span<const std::byte> bytes) noexcept;
+// Chunk CRCs and the zlib Adler-32 come from stx_zlib/checksum.hpp, the one
+// implementation of each.
 
 } // namespace gui_forms::image
