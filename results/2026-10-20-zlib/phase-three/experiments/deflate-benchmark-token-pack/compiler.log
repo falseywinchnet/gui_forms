@@ -1,0 +1,212 @@
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:153:9: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+  153 |         for (std::size_t index = 0; index < count; ++index) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:185:5: remark: vectorized loop (vectorization width: 4, interleaved count: 1) [-Rpass=loop-vectorize]
+  185 |     for (std::size_t index = 0; index < source.size(); ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:307:17: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  307 |                 while (length < maximum) {
+      |                 ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:295:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  295 |         for (std::size_t position = history_live_; position < end; ++position) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:342:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  342 |     for (std::size_t position = history_begin; position < history_key_end; ++position) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:397:13: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  397 |             for (std::size_t index = position + 1; index < insert_end; ++index) {
+      |             ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:403:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  403 |     for (; position < end; ++position) append_token(std::to_integer<unsigned>(data_[position]), 0, count);
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:420:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  420 |     for (unsigned symbol = 0; symbol < alphabet; ++symbol) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:427:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  427 |     for (unsigned symbol = 0; active < 2 && symbol < alphabet; ++symbol) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:433:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  433 |     for (unsigned index = 0; index < active; ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:443:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  443 |     while (next < node_count) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:461:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  461 |     for (unsigned index = node_count - 1; index != 0;) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:467:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  467 |     for (unsigned index = 0; index < active; ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:478:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  478 |         while (depth != 0 && counts[depth] == 0) --depth;
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:487:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  487 |         for (unsigned count = 0; count < counts[depth]; ++count) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:494:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  494 |     for (unsigned depth = 1; depth <= maximum; ++depth) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:38:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   38 |     for (unsigned index = 0; index < count; ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:532:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  532 |         while (remaining != 0) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:555:5: remark: vectorized loop (vectorization width: 8, interleaved count: 4) [-Rpass=loop-vectorize]
+  555 |     for (unsigned symbol = 0; symbol < 286; ++symbol) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:561:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  561 |     for (unsigned index = 0; index < run_count_; ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  572 |     while (bit_count_ >= 8) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:592:5: remark: vectorized loop (vectorization width: 16, interleaved count: 2) [-Rpass=loop-vectorize]
+  592 |     for (unsigned symbol = 0; symbol < literal_frequency_.size(); ++symbol) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:629:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  629 |         while (live >= 8) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  572 |     while (bit_count_ >= 8) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:653:9: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-missed=loop-vectorize]
+  653 |         for (unsigned symbol = 0; symbol < 286; ++symbol) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:653:9: remark: the cost-model indicates that interleaving is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  572 |     while (bit_count_ >= 8) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:185:5: remark: vectorized loop (vectorization width: 4, interleaved count: 1) [-Rpass=loop-vectorize]
+  185 |     for (std::size_t index = 0; index < source.size(); ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:185:5: remark: vectorized loop (vectorization width: 4, interleaved count: 1) [-Rpass=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  572 |     while (bit_count_ >= 8) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:572:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:153:9: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+  153 |         for (std::size_t index = 0; index < count; ++index) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:754:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  754 |     while (phase_ != Phase::failed && phase_ != Phase::done) {
+      |     ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:1:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include/stx_zlib/deflate.hpp:3:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include/stx_zlib/inflate.hpp:3:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/array:598:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/algorithm:1888:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/nth_element.h:15:
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:635:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  635 |     do {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:629:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  629 |     do {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:608:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  608 |     while (__first < __last && !__comp(*--__last, __pivot))
+      |     ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:612:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  612 |     do {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:599:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  599 |   do {
+      |   ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:288:7: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  288 |       do {
+      |       ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:258:7: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  258 |       do {
+      |       ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:672:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  672 |     while (++__first < __last && !__comp(__pivot, *__first)) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:665:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  665 |     do {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:679:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  679 |     do {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:694:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  694 |     do {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:688:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  688 |     do {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:341:7: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  341 |       do {
+      |       ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:1:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include/stx_zlib/deflate.hpp:3:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include/stx_zlib/inflate.hpp:3:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/array:598:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/algorithm:1875:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/make_heap.h:16:
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sift_down.h:60:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   60 |   do {
+      |   ^
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sift_down.h:60:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:1:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include/stx_zlib/deflate.hpp:3:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include/stx_zlib/inflate.hpp:3:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/array:598:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/algorithm:1888:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/nth_element.h:15:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sort.h:17:
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/partial_sort.h:45:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   45 |   for (; __i != __last; ++__i) {
+      |   ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:1:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include/stx_zlib/deflate.hpp:3:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include/stx_zlib/inflate.hpp:3:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/array:598:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/algorithm:1875:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/make_heap.h:15:
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/push_heap.h:44:7: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   44 |       do {
+      |       ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp:1:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include/stx_zlib/deflate.hpp:3:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include/stx_zlib/inflate.hpp:3:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/array:598:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/algorithm:1875:
+In file included from /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/make_heap.h:16:
+/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1/__algorithm/sift_down.h:95:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   95 |   while (true) {
+      |   ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp:139:9: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+  139 |         for (std::size_t index = 0; index < input.size(); ++index) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp:139:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp:139:9: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp:139:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp:82:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   82 |         for (;;) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp:82:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp:91:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   91 |     for (unsigned pair = 0; pair < 11; ++pair) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp:51:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   51 |         for (unsigned iteration = 0; iteration < iterations; ++iteration) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp:43:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+   43 |         for (unsigned iteration = 0; iteration < iterations; ++iteration) {
+      |         ^

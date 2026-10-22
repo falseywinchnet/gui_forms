@@ -28,7 +28,8 @@ struct PngEncodeInput final {
 // filter type 0, zlib stream of stored (uncompressed) deflate blocks with a
 // hand-written adler32 and crc32. Output size is roughly the raw pixel size;
 // the writer exists so hosts without a compressing codec can still emit a
-// portable image. Returns false on invalid input or overflow; output is then
+// portable image. Pixel input must not overlap the live output storage.
+// Returns false on invalid input, overlap or overflow; output is then
 // left empty.
 [[nodiscard]] bool encode_png(const PngEncodeInput& input,
                               std::vector<std::byte>& output);

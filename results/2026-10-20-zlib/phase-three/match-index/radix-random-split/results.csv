@@ -1,0 +1,2 @@
+workload,schedule,bytes,queries,chain_seconds,tree_seconds,tree_speed_ratio,ratio_min,ratio_max,chain_visits,tree_visits,chain_compared,tree_compared,chain_writes,tree_writes,chain_reused,tree_reused
+entropy,greedy,131072,130642,0.001047708,0.001898616,0.5546,0.4061,0.7002,56939,68991,455197,65475,262140,472604,0,114898
