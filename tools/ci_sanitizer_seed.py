@@ -17,17 +17,21 @@ compiler cache: ccache content-checks every hit, and every test still runs.
 """
 from __future__ import annotations
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import tarfile
-from typing import Any, TextIO
+from typing import Any, BinaryIO, TextIO
+import zipfile
 
 ROOT: Path = Path(__file__).resolve().parents[2]
 ARTIFACT_NAME: str = 'gui-sanitize-ccache-linux-x64'
 ARCHIVE_NAME: str = 'gui-sanitize-ccache.tar'
+DIGEST_NAME: str = ARCHIVE_NAME + '.sha256'
+DOWNLOADS: int = 2
 DOWNLOAD: Path = ROOT / '.ci' / 'sanitizer-seed'
 
 
@@ -126,31 +130,99 @@ def safe_member(name: str) -> bool:
     return bool(path.parts) and not path.is_absolute() and '..' not in path.parts and path.parts[0] == '.ccache'
 
 
-def restore_seed() -> None:
-    """Replace .ccache with the downloaded seed; the archive is checked before anything is removed."""
+def file_digest(path: Path) -> str:
+    stream: BinaryIO
+    with path.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def seed_verified() -> bool:
+    """Whether the downloaded archive matches the digest packed beside it."""
     archive: Path = DOWNLOAD / ARCHIVE_NAME
-    with tarfile.open(archive) as payload:
-        entry: tarfile.TarInfo
-        for entry in payload.getmembers():
-            if not safe_member(entry.name) or not (entry.isfile() or entry.isdir()):
-                raise ValueError('Unexpected sanitizer seed member: ' + entry.name)
-        shutil.rmtree(ROOT / '.ccache', ignore_errors=True)
-        payload.extractall(ROOT, filter='data')
-    archive.unlink()
+    digest: Path = DOWNLOAD / DIGEST_NAME
+    if not archive.is_file() or not digest.is_file():
+        return False
+    return file_digest(archive) == digest.read_text(encoding='utf-8').strip()
+
+
+def download_seed(artifact_id: int) -> None:
+    """Fetch the seed artifact's zip with gh (to a file) and extract the archive and its digest.
+
+    actions/download-artifact@v4 can end its step successfully with a file
+    cut short (see ci_reuse.download_archive), so a mismatch is fetched again.
+    """
+    repository: str = os.environ['GITHUB_REPOSITORY']
+    DOWNLOAD.mkdir(parents=True, exist_ok=True)
+    zipped: Path = DOWNLOAD / (ARCHIVE_NAME + '.zip')
+    stream: BinaryIO
+    with zipped.open('wb') as stream:
+        subprocess.run(['gh', 'api', 'repos/' + repository + '/actions/artifacts/' + str(artifact_id) + '/zip'],
+                       check=True, stdout=stream)
+    try:
+        bundle: zipfile.ZipFile
+        with zipfile.ZipFile(zipped) as bundle:
+            if sorted(bundle.namelist()) != sorted([ARCHIVE_NAME, DIGEST_NAME]):
+                raise ValueError('Unexpected sanitizer seed artifact members: ' + ', '.join(bundle.namelist()))
+            name: str
+            for name in (ARCHIVE_NAME, DIGEST_NAME):
+                source: BinaryIO
+                target: BinaryIO
+                with bundle.open(name) as source, (DOWNLOAD / name).open('wb') as target:
+                    shutil.copyfileobj(source, target, 1024 * 1024)
+    finally:
+        zipped.unlink(missing_ok=True)
+
+
+def restore_seed(artifact_id: int) -> bool:
+    """Replace .ccache with the downloaded seed, or keep the restored cache when it cannot be verified.
+
+    The archive must match the digest packed beside it (fetched again up to
+    DOWNLOADS times when it does not) and hold only .ccache/ members; both
+    are checked before anything is removed. A seed only fills ccache, which
+    checks every hit, so a seed that fails is skipped with a warning rather
+    than failing the job. Returns whether the seed was restored.
+    """
+    attempts: int = 0
+    try:
+        while not seed_verified():
+            if attempts == DOWNLOADS or artifact_id <= 0:
+                raise ValueError('sanitizer seed digest mismatch')
+            attempts += 1
+            print('Sanitizer seed digest mismatch; downloading artifact ' + str(artifact_id) + ' again (attempt '
+                  + str(attempts) + ')', flush=True)
+            download_seed(artifact_id)
+        archive: Path = DOWNLOAD / ARCHIVE_NAME
+        with tarfile.open(archive) as payload:
+            entry: tarfile.TarInfo
+            for entry in payload.getmembers():
+                if not safe_member(entry.name) or not (entry.isfile() or entry.isdir()):
+                    raise ValueError('Unexpected sanitizer seed member: ' + entry.name)
+            shutil.rmtree(ROOT / '.ccache', ignore_errors=True)
+            payload.extractall(ROOT, filter='data')
+        archive.unlink()
+    except (ValueError, OSError, tarfile.TarError, zipfile.BadZipFile, subprocess.CalledProcessError, KeyError) as error:
+        print('::warning::Sanitizer seed not restored (' + str(error) + '); building from the restored cache',
+              flush=True)
+        return False
+    return True
 
 
 def pack_seed() -> None:
-    """Write .ccache to gui-sanitize-ccache.tar at the workspace root (uncompressed: entries already are)."""
-    with tarfile.open(ROOT / ARCHIVE_NAME, 'w') as payload:
+    """Write .ccache to gui-sanitize-ccache.tar at the workspace root (uncompressed: entries already are),
+    and its SHA-256 beside it for restore_seed."""
+    archive: Path = ROOT / ARCHIVE_NAME
+    with tarfile.open(archive, 'w') as payload:
         payload.add(ROOT / '.ccache', arcname='.ccache')
+    (ROOT / DIGEST_NAME).write_text(file_digest(archive) + '\n', encoding='utf-8')
 
 
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('find', 'restore', 'pack'))
+    parser.add_argument('--artifact-id', type=int, default=0, help='restore: the seed artifact, to fetch it again')
     args: argparse.Namespace = parser.parse_args()
     if args.command == 'restore':
-        restore_seed()
+        restore_seed(args.artifact_id)
         return
     if args.command == 'pack':
         pack_seed()
