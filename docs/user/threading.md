@@ -95,7 +95,8 @@ a process.
   the pool.
 
 Workers use system pthreads on macOS and Linux and MSYS2 winpthreads on
-Windows; ship `libwinpthread-1.dll` beside a Windows executable.
+Windows. On Windows `libgui_forms_threading.dll` links winpthreads
+statically, so no `libwinpthread-1.dll` is needed beside it.
 
 ## Pattern: compute off-thread, publish on-thread
 
