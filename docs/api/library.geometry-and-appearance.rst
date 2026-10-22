@@ -2036,7 +2036,7 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   How a primitive behind the overlay seam is composited (E9-A, owner 2026-10-22: the seam serves the sheen only). Its raster is ``size``, in logical units, baked once per (size, state, scale) and never per pointer position; the engine composites it with its centre across at the part-local pointer, its top at the part's top, clipped to the part's shape, and damages only the part's extent when the pointer moves within it. While the pointer is not over the part, and always under reduced motion, its centre rests at ``rest`` times the part's width.
+   How a primitive behind the overlay seam is composited (E9-A, owner 2026-10-22: the seam serves the sheen only). Its raster is ``size``, in logical units, baked once per (size, state, scale) and never per pointer position; the engine composites it with its centre across at the part-local pointer, its top at the part's top, clipped to the part's shape, and damages only the part's extent when the pointer moves within it. While the pointer is not over the part, and always under reduced motion, its centre rests at ``rest`` times the part's width. It follows the part's presentational scale as a face does: baked at the scaled size at rest, and stretched with the face while the scale moves.
 
    .. cpp:member:: Size size
 

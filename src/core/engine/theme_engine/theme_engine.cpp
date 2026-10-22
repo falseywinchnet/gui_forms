@@ -531,25 +531,44 @@ bool follows_pointer(const CompiledThemeRules::Resolution& resolution, const Par
     return follows;
 }
 
-// Composites a primitive's overlay raster (E9-A) over `part`: its centre
-// across at the part-local `pointer_x` (NaN while the pointer is not over
-// the part), or at its rest with no pointer or under reduced motion; its
-// top at the part's top; clipped to the part's rounded shape (its own
-// corner radius, else its family recipe's), so that it never draws outside
-// the part's extent.
+// Where an overlay is composited: over the part as shown (`face`, its
+// bounds at the presentational scale `granted`, 1 when unscaled), its
+// raster stretched by `granted` while the scale moves, centred at the
+// part-local `pointer_x` (NaN while the pointer is not over the part).
+struct OverlayPlacement final {
+    Rect face{};
+    double granted{1.0};
+    bool stretched{};
+    double pointer_x{};
+    bool reduced_motion{};
+};
+
+// Composites a primitive's overlay raster (E9-A) over the part as shown:
+// its centre across at the pointer, or at its rest across the shown face
+// with no pointer or under reduced motion; its top at the face's top;
+// clipped to the face's rounded shape (the part's own corner radius, else
+// its family recipe's, scaled with the face while it stretches), so that
+// it never draws outside the part's extent.
 void paint_pointer_overlay(Painter& painter, const Control& control, const PartPaint& part,
-                           const PointerOverlay& overlay, const std::shared_ptr<const PartRaster>& raster,
-                           double pointer_x, bool reduced_motion, double opacity) {
-    double centre = overlay.rest * part.bounds.width;
-    if (!reduced_motion && std::isfinite(pointer_x)) centre = pointer_x;
-    const Point origin{part.bounds.x + centre - overlay.size.width * 0.5, part.bounds.y};
+                           const PointerOverlay& overlay, const OverlayPlacement& placement,
+                           const std::shared_ptr<const PartRaster>& raster, double opacity) {
+    const Rect& face = placement.face;
+    double centre = face.x + overlay.rest * face.width;
+    if (!placement.reduced_motion && std::isfinite(placement.pointer_x)) centre = part.bounds.x + placement.pointer_x;
+    const double width = overlay.size.width * placement.granted;
     const ControlVisualContext context = part_visual_context(control, part.states);
     const ControlVisualRecipe& recipe = control.effective_theme().resolve(part.family, context);
     double radius = recipe.material.corner_radius;
     if (part.corner_radius) radius = std::max(0.0, *part.corner_radius);
+    if (placement.stretched) radius = radius * placement.granted;
     painter.save();
-    painter.clip_rounded_rect(part.bounds, radius);
-    painter.draw_part_raster(raster, origin, opacity);
+    painter.clip_rounded_rect(face, radius);
+    if (placement.stretched) {
+        const Rect destination{centre - width * 0.5, face.y, width, face.height};
+        painter.draw_part_raster_scaled(raster, destination, opacity);
+    } else {
+        painter.draw_part_raster(raster, Point{centre - width * 0.5, face.y}, opacity);
+    }
     painter.restore();
 }
 
@@ -765,19 +784,24 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     // break the animated frame budget, is drawn at its own size. While its
     // scale moves, its raster at its own size is stretched over the scaled
     // bounds (E7r form b), so that the move bakes nothing.
+    PartPaint shown = scaled_part(part, presented.scale);
+    const bool stretched = shown.bounds != part.bounds && presented.scale_moving;
     // A primitive behind the overlay seam (E9-A, the sheen) bakes its own
-    // size, a band of the part's height, and is placed when composited; the
-    // presentational scale does not apply to it.
+    // size, a band of the part's height, and is placed when composited. It
+    // follows the part's presentational scale as a face does: at rest it
+    // bakes at the scaled size, and while the scale moves its raster at the
+    // part's own size is stretched by the same factor (E7r form b).
+    const double granted = std::min(presented.scale, granted_scale(part.bounds, part.granted_overflow));
     const std::optional<PointerOverlay> placed =
         (*request.primitive).pointer_overlay(request.parameters, Size{part.bounds.width, part.bounds.height});
     if (placed) {
-        request.target.logical_size = (*placed).size;
-        request.extent = raster_extent((*placed).size, Insets{}, decided.scale.value);
+        const double baked_scale = stretched || shown.bounds == part.bounds ? 1.0 : granted;
+        const Size baked{(*placed).size.width * baked_scale, (*placed).size.height * baked_scale};
+        request.target.logical_size = baked;
+        request.extent = raster_extent(baked, Insets{}, decided.scale.value);
         if (request.extent.width == 0U || request.extent.height == 0U) return;
     }
-    PartPaint shown = placed ? part : scaled_part(part, presented.scale);
-    const bool stretched = shown.bounds != part.bounds && presented.scale_moving;
-    if (shown.bounds != part.bounds && !stretched) {
+    if (!placed && shown.bounds != part.bounds && !stretched) {
         const double scale = decided.scale.value;
         const Size shown_size{shown.bounds.width, shown.bounds.height};
         const DeviceExtent scaled = raster_extent(shown_size, descriptor.outsets, scale);
@@ -858,7 +882,13 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     }
     if (placed) {
         const double pointer_x = inputs[input_slot(EngineInput::pointer_x)];
-        paint_pointer_overlay(painter, control, part, *placed, raster, pointer_x, reduced_motion, opacity);
+        OverlayPlacement placement{};
+        placement.face = shown.bounds;
+        placement.granted = shown.bounds == part.bounds ? 1.0 : granted;
+        placement.stretched = stretched;
+        placement.pointer_x = pointer_x;
+        placement.reduced_motion = reduced_motion;
+        paint_pointer_overlay(painter, control, part, *placed, placement, raster, opacity);
         return;
     }
     // A face that changed from one discrete state to another cross-fades

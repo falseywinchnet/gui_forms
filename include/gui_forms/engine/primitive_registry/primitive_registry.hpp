@@ -306,7 +306,9 @@ enum class RasterOutcome : std::uint8_t {
 // part-local pointer, its top at the part's top, clipped to the part's
 // shape, and damages only the part's extent when the pointer moves within
 // it. While the pointer is not over the part, and always under reduced
-// motion, its centre rests at `rest` times the part's width.
+// motion, its centre rests at `rest` times the part's width. It follows the
+// part's presentational scale as a face does: baked at the scaled size at
+// rest, and stretched with the face while the scale moves.
 struct PointerOverlay final {
     Size size{};
     double rest{};

@@ -9,7 +9,9 @@
 // The sheen (owner E9-A) stands behind the overlay seam: its band is baked
 // once and composited at the pointer, clipped to the part's shape; a
 // pointer move within the part damages only the part and bakes nothing;
-// under reduced motion the band rests and the pointer damages nothing.
+// under reduced motion the band rests and the pointer damages nothing. It
+// follows the part's presentational scale: stretched with the face while
+// the scale moves, baked at the scaled size once it rests.
 
 #include "gui_forms/gui_forms.hpp"
 
@@ -18,6 +20,7 @@
 #include "../src/core/engine/primitives/material/overlay_shadow_primitive.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -37,6 +40,7 @@
 
 namespace {
 using namespace gui_forms;
+using std::chrono::milliseconds;
 
 void require(bool condition, const char* message) {
     if (condition) return;
@@ -80,12 +84,30 @@ public:
     void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin, double) override {
         rasters.push_back(raster);
         origins.push_back(origin);
+        stretched = false;
+    }
+    void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination,
+                                 double) override {
+        rasters.push_back(raster);
+        origins.push_back(Point{destination.x, destination.y});
+        stretched_to = destination;
+        stretched = true;
     }
     std::vector<std::shared_ptr<const PartRaster>> rasters;
     std::vector<Point> origins;
     std::vector<Rect> clips;
     std::vector<double> clip_radii;
+    // Whether the last raster was stretched, and over what.
+    bool stretched{};
+    Rect stretched_to{};
     std::size_t box_shadows{};
+};
+
+// The motion clock's time, advanced by hand.
+class ManualTime final : public MotionTimeSource {
+public:
+    [[nodiscard]] FrameTime now() const noexcept override { return time; }
+    FrameTime time{std::chrono::seconds(1000)};
 };
 
 // A control casting a shadow from a 120 by 40 surface of radius 4.
@@ -235,36 +257,59 @@ public:
         part.bounds = face;
         part.corner_radius = 6.0;
         part.key = PartKey{"sheen", {}, {}};
+        part.granted_overflow = overflow;
         if (hot) part.states.insert(AnatomyState::hot);
         paint_part(painter, *this, part);
     }
     bool hot{};
     Rect face{20.0, 20.0, 100.0, 30.0};
+    Insets overflow{};
 };
 
 struct SheenFixture final {
+    ManualTime time{};
     std::shared_ptr<Panel> root;
     std::shared_ptr<Glint> glint;
     std::unique_ptr<Window> window;
     ShadowWatch painter{};
 };
 
-std::unique_ptr<SheenFixture> make_sheen(double scale, bool reduced_motion) {
+// The part grows to `hot_scale` while hot, linearly over 100 ms.
+PropertyTransition grow(double hot_scale) {
+    PropertyTransition transition{};
+    transition.property = std::string(scale_property);
+    PresentationState hot{};
+    hot.when.push_back(AnatomyState::hot);
+    hot.target = hot_scale;
+    PresentationState rest{};
+    rest.target = 1.0;
+    transition.states.push_back(hot);
+    transition.states.push_back(rest);
+    transition.curve = MotionCurve::timed(milliseconds(100), MotionEasing::linear);
+    return transition;
+}
+
+// A sheen theme; with `hot_scale` above 1 the part pops while hot, within
+// a granted overflow of 10 on every side.
+std::unique_ptr<SheenFixture> make_sheen(double scale, bool reduced_motion, double hot_scale = 1.0) {
     ThemeDefinition definition = windows_professional_theme_definition();
     definition.id = "engine-light-sheen";
     ThemeRule rule{};
     rule.label = "sheen";
     rule.selector.role = PartRole::sheen;
     rule.declarations.push_back(RuleDeclaration::primitive("sheen"));
+    if (hot_scale != 1.0) rule.transitions.push_back(grow(hot_scale));
     definition.rules.rules.push_back(rule);
     std::unique_ptr<SheenFixture> fixture = std::make_unique<SheenFixture>();
     SheenFixture& made = *fixture;
     made.root = make_control<Panel>(StableId("root"));
     made.glint = make_control<Glint>(StableId("glint"));
     (*made.glint).set_requested_bounds(Rect{0.0, 0.0, 200.0, 120.0});
+    if (hot_scale != 1.0) (*made.glint).overflow = Insets{10.0, 10.0, 10.0, 10.0};
     (*made.root).add_child(made.glint);
     made.window = std::make_unique<Window>(made.root, Size{240.0, 160.0});
     Window& window = *made.window;
+    window.motion_clock().set_time_source(&made.time);
     window.set_scale(scale);
     window.set_theme(Theme::create(definition));
     require(window.theme().engine().rules().diagnostics().empty(), "the sheen theme compiles cleanly");
@@ -387,6 +432,50 @@ void sheen_at_scale_two() {
     require(band_left(made) == 33.0, "and rests at the same logical place");
 }
 
+bool near(double left, double right) {
+    const bool close = std::abs(left - right) < 1e-9;
+    return close;
+}
+
+// The part pops to 1.2 (its granted limit: 1 + 2 × 10 / 100) while hot.
+void sheen_follows_the_presentational_scale() {
+    std::unique_ptr<SheenFixture> fixture = make_sheen(1.0, false, 1.2);
+    SheenFixture& made = *fixture;
+    Window& window = *made.window;
+    const std::shared_ptr<const PartRaster> baked = made.painter.rasters.back();
+    move_to(window, Point{60.0, 35.0});
+    static_cast<void>(repaint(made));
+    std::size_t moving_frames = 0U;
+    for (int frame = 0; frame < 12; ++frame) {
+        made.time.time += milliseconds(16);
+        static_cast<void>(window.poll_frame_schedule(made.time.time));
+        static_cast<void>(repaint(made));
+        if (!made.painter.stretched) continue;
+        moving_frames = moving_frames + 1U;
+        // The face as shown: the clip is its rounded shape, scaled with it.
+        const Rect face = made.painter.clips.back();
+        const Rect band = made.painter.stretched_to;
+        const double factor = face.width / 100.0;
+        require(factor > 1.0 && factor < 1.2 + 1e-9, "the face grows within its grant");
+        require(near(band.y, face.y) && near(band.height, face.height) && near(band.width, 24.0 * factor),
+                "while the scale moves the band is stretched with the face");
+        require(near(band.x + band.width * 0.5, 60.0), "and stays centred at the pointer");
+        require(near(made.painter.clip_radii.back(), 6.0 * factor), "clipped to the face's scaled shape");
+        require(made.painter.rasters.back() == baked, "the move stretches the band baked first, baking nothing");
+    }
+    require(moving_frames >= 3U, "the pop spans frames");
+    // At rest at 1.2 the band is baked sharp at the scaled size.
+    require(!made.painter.stretched, "at rest the band is composited unstretched");
+    const PartRaster& sharp = *made.painter.rasters.back();
+    require(sharp.extent().width == 29U && sharp.extent().height == 36U, "baked at 24 × 1.2 by 30 × 1.2");
+    const Rect face = made.painter.clips.back();
+    require(near(face.x, 10.0) && near(face.y, 17.0) && near(face.width, 120.0) && near(face.height, 36.0),
+            "clipped to the popped face");
+    require(near(made.painter.clip_radii.back(), 6.0), "with the part's own radius, as the face is baked");
+    require(near(made.painter.origins.back().x, 60.0 - 14.4) && near(made.painter.origins.back().y, 17.0),
+            "the band's centre stays at the pointer and its top at the face's");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -398,6 +487,7 @@ int main(int argc, char** argv) {
     sheen_follows_the_pointer();
     sheen_rests_under_reduced_motion();
     sheen_at_scale_two();
+    sheen_follows_the_presentational_scale();
     std::cout << "engine light tests passed\n";
     return 0;
 }
