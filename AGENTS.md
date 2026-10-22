@@ -368,3 +368,23 @@ Repeat the CRC experiment with `--baseline-isa` and a separate output directory
 to measure baseline Armv8-A candidate code without Apple-target three-input XOR
 fusion. This option is specific to the arm64 measurement host; the candidate
 algorithm itself has no platform intrinsics.
+
+## Standalone CONV: native binary32 and binary64 verification
+
+The independent `stx_conv/` package has no GUI.Forms runtime dependency. With
+its pinned test-only Plan Paint sources available in `build-stx-conv-sources`,
+run the release suite, relocated installed-consumer check, clean adjacent
+sanitizer build and common-width assembly inspection on the M4 mirror:
+
+```sh
+/Users/ultimussecundai/.local/bin/m4build -- sh stx_conv/tools/verify_precision.sh stx-conv-precision-NEW
+```
+
+Choose a new record name each time. The sanitizer runner emits only `PASS` or
+`STOP`; do not inspect its diagnostic file in this chat. On `STOP`, hand the
+review to the owner's Daybreak sibling. The deterministic precision benchmark
+is `build/stx-conv-release/stx_conv_precision --benchmark` on the mirror; run
+it sequentially after builds. It compares native float32/float64 with prepared
+plans and workspaces, reports both timing ranges and payload bytes, and records
+cross-precision structural differences separately from correctness checks.
+The x86-64 SSE2 assembly is inspection evidence, not x86 execution evidence.
