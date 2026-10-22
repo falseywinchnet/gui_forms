@@ -74,8 +74,8 @@ from the repository root. Each Python script prints its full options with
 : Builds an independent consumer against an installed SDK prefix and checks
   that requests for missing CMake components fail. `--native` exercises the
   `Application` component, `--relocate` copies the SDK to a new prefix first,
-  and `--toolchain`, `--runner wine` and `--runtime-dir` run a cross-built
-  consumer under Wine.
+  and `--toolchain` and `--runner` build the consumer with another CMake
+  toolchain and run its tests through an emulator.
   `python3 tools/verify_install.py /path/to/prefix --native`
 
 `tools/package_programs.py`
@@ -129,12 +129,6 @@ from the repository root. Each Python script prints its full options with
   `rg`. The plain and text smokes accept `GUI_FORMS_EVIDENCE_DIR` to redirect
   their logs and captures.
   `tools/run_windows_wine_smoke.sh build-windows-x64`
-
-`tools/stage_mingw_runtime.sh`
-: Copies `libgcc_s_seh-1.dll`, `libstdc++-6.dll` and `libwinpthread-1.dll`
-  from Homebrew's mingw-w64 toolchain into a directory, for running a
-  cross-built program under Wine.
-  `tools/stage_mingw_runtime.sh build-windows-x64`
 
 ## Measurement, data and test machines
 

@@ -1,7 +1,9 @@
 """Unit tests for the option resolution in ci_build.py (no build is run)."""
 from __future__ import annotations
+import os
 from pathlib import Path
 import re
+import tempfile
 import unittest
 
 import ci_build
@@ -75,6 +77,46 @@ class SanitizerOptionTests(unittest.TestCase):
             self.assertNotIn('LDFLAGS', environment, host)
 
 
+TREE: Path = Path(os.path.abspath('example-build-tree'))
+
+
+def test_record(command: list[str], properties: list[dict] | None = None) -> dict:
+    return {'name': 'example', 'command': command, 'properties': properties or []}
+
+
+class TestTargetTests(unittest.TestCase):
+    KNOWN: set[str] = {'gui_forms_example_tests.exe', 'libgui_forms_core.a', 'sub/tool.exe'}
+
+    def test_a_test_executable_is_its_own_target(self) -> None:
+        listing: dict = {'tests': [test_record([str(TREE / 'gui_forms_example_tests.exe')])]}
+        self.assertEqual(ci_build.targets_for_tests(listing, self.KNOWN, TREE), ['gui_forms_example_tests.exe'])
+
+    def test_definition_values_and_nested_outputs_are_read(self) -> None:
+        listing: dict = {'tests': [test_record(['cmake', '-DCORE=' + str(TREE / 'libgui_forms_core.a'),
+                                                str(TREE / 'sub' / 'tool.exe'), '-P', 'check.cmake'])]}
+        self.assertEqual(ci_build.targets_for_tests(listing, self.KNOWN, TREE),
+                         ['libgui_forms_core.a', 'sub/tool.exe'])
+
+    def test_a_test_reading_only_sources_needs_nothing_built(self) -> None:
+        listing: dict = {'tests': [test_record(['python', os.path.abspath('tools/check.py'), '--check'])]}
+        self.assertEqual(ci_build.targets_for_tests(listing, self.KNOWN, TREE), [])
+
+    def test_an_unknown_tree_file_builds_everything(self) -> None:
+        listing: dict = {'tests': [test_record([str(TREE / 'generated' / 'table.txt')])]}
+        self.assertIsNone(ci_build.targets_for_tests(listing, self.KNOWN, TREE))
+
+    def test_tests_depending_on_other_tests_build_everything(self) -> None:
+        name: str
+        for name in ('FIXTURES_REQUIRED', 'DEPENDS', 'REQUIRED_FILES'):
+            listing: dict = {'tests': [test_record([str(TREE / 'gui_forms_example_tests.exe')],
+                                                   [{'name': name, 'value': ['setup']}])]}
+            self.assertIsNone(ci_build.targets_for_tests(listing, self.KNOWN, TREE), name)
+
+    def test_a_sibling_directory_with_the_same_prefix_is_outside_the_tree(self) -> None:
+        listing: dict = {'tests': [test_record([str(TREE) + '-other' + os.sep + 'gui_forms_example_tests.exe'])]}
+        self.assertEqual(ci_build.targets_for_tests(listing, self.KNOWN, TREE), [])
+
+
 CHECKOUT: Path = Path(__file__).resolve().parents[1]
 FIRST_PARTY_DIRECTORIES: tuple[str, ...] = ('include', 'src', 'demo', 'tests', 'examples',
                                             'file_manager_demoboard', 'stx_vorbis')
@@ -108,6 +150,38 @@ def rule_expression(pattern: str) -> re.Pattern[str]:
     for piece in pattern.split('*'):
         pieces.append(re.escape(piece))
     return re.compile('.*'.join(pieces))
+
+
+class SetupSkipTests(unittest.TestCase):
+    def test_pins_without_checkouts_are_not_current(self) -> None:
+        directory: str
+        with tempfile.TemporaryDirectory() as directory:
+            script: Path = Path(directory) / 'fetch.sh'
+            script.write_text('example_revision=' + '0' * 40 + '\n', encoding='utf-8')
+            self.assertFalse(ci_build.pinned_checkouts_current(script))
+
+    def test_a_script_without_pins_is_not_current(self) -> None:
+        directory: str
+        with tempfile.TemporaryDirectory() as directory:
+            script: Path = Path(directory) / 'fetch.sh'
+            script.write_text('git fetch somewhere\n', encoding='utf-8')
+            self.assertFalse(ci_build.pinned_checkouts_current(script))
+
+    def test_the_fetch_script_pins_are_readable(self) -> None:
+        # If the pins stop matching the pattern the skip silently stops working.
+        script: str = (CHECKOUT / 'third_party/fetch_text_stack.sh').read_text(encoding='utf-8')
+        names: list[str] = []
+        pin: tuple[str, str]
+        for pin in ci_build.PIN_PATTERN.findall(script):
+            names.append(pin[0])
+        self.assertEqual(names, ['harfbuzz', 'freetype'])
+
+    def test_the_configure_record_covers_command_environment_and_cache(self) -> None:
+        base: str = ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'clang'}, b'cache')
+        self.assertEqual(base, ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'clang', 'HOME': 'x'}, b'cache'))
+        self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=2'], {'CC': 'clang'}, b'cache'))
+        self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'gcc'}, b'cache'))
+        self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'clang'}, b'edited'))
 
 
 class LeakSuppressionTests(unittest.TestCase):
