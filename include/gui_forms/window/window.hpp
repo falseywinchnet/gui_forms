@@ -1140,6 +1140,11 @@ private:
                                           bool explicit_request) const;
     [[nodiscard]] bool has_popup_paint_dirty() const noexcept;
     [[nodiscard]] bool has_plane_damage() const noexcept;
+    // Whether a paint is owed: a change during the last render, a control
+    // or popup whose paint is dirty, or damage on any plane. Derived each
+    // time, so taking damage (any overload) or painting cannot leave a stale
+    // flag behind that keeps the window asking for frames.
+    [[nodiscard]] bool paint_pending() const noexcept;
     void collect_visible_overlay_rectangles(
         const Control::Ptr& control, std::vector<Rect>& rectangles) const;
     [[nodiscard]] static std::vector<Rect> subtract_rectangle(
@@ -1178,7 +1183,6 @@ private:
     std::shared_ptr<detail::DispatcherState> dispatcher_state_;
     std::uint64_t update_depth_{};
     bool layout_dirty_{true};
-    bool paint_dirty_{true};
     bool hit_test_dirty_{true};
     bool in_layout_{};
     bool in_paint_{};

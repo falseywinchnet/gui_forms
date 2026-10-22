@@ -9,7 +9,7 @@
 namespace gui_forms {
 
 bool Window::needs_frame() const noexcept {
-    return paint_dirty_;
+    return paint_pending();
 }
 
 std::optional<FrameTime> Window::next_wake() const noexcept {
@@ -297,7 +297,7 @@ void Window::set_occluded(bool occluded, FrameTime transition_time) {
         // Ambient effects stopped while hidden resume with their parts'
         // next paint (E7).
         resume_engine_ambient();
-        if (paint_dirty_) request_paint_wake();
+        if (paint_pending()) request_paint_wake();
     }
     update_paint_lease_state();
     update_frame_schedule_metrics();

@@ -331,7 +331,6 @@ ImageLoadResult Window::replace_png(ImageId image,
 void Window::repaint_for_image_replacement() {
     add_damage_all_planes({0.0, 0.0, client_size_.width, client_size_.height});
     touch_paint();
-    paint_dirty_ = true;
 }
 
 void Window::repaint_for_image_removal() {
@@ -2028,7 +2027,6 @@ void Window::detach_subtree(const Control::Ptr& control) {
     }
     in_lifecycle_notification_ = false;
     touch_paint();
-    paint_dirty_ = true;
     ++semantic_generation_;
     if (semantic_generation_ == 0U) ++semantic_generation_;
     metrics_.record_dirty_mark(old_bounds.area());
@@ -2073,7 +2071,6 @@ void Window::dispose_subtree(const Control::Ptr& control) noexcept {
     }
     (*control).parent_.reset();
     touch_paint();
-    paint_dirty_ = true;
     layout_dirty_ = true;
     hit_test_dirty_ = true;
     ++semantic_generation_;
@@ -2272,7 +2269,6 @@ void Window::mark_dirty(Control& control, Dirty requested_dirty) {
     }
     if (has_dirty(requested_dirty, Dirty::paint)) {
         touch_paint();
-        paint_dirty_ = true;
         Rect bounds = paint_damage_bounds_of(control);
         if (bounds.empty()) {
             bounds = control.requested_bounds_;
@@ -2301,7 +2297,6 @@ void Window::mark_paint_dirty(Control& control, Rect local_damage) {
     }
     metrics_.record_mutation();
     touch_paint();
-    paint_dirty_ = true;
     const Rect bounds = absolute_bounds_of(control);
     const Rect window_damage{bounds.x + local_damage.x,
                              bounds.y + local_damage.y,
@@ -2550,7 +2545,6 @@ void Window::mark_subtree_dirty(Control& control, Dirty requested_dirty) {
     }
     if (has_dirty(requested_dirty, Dirty::paint)) {
         touch_paint();
-        paint_dirty_ = true;
         metrics_.record_dirty_mark(requested_damage_area);
     } else {
         metrics_.record_dirty_mark(0.0);
@@ -2635,9 +2629,9 @@ void Window::update_paint_lease_state() noexcept {
         paint_lease_state_ = dirty_after_render_
             ? PaintLeaseState::rendering_dirty
             : PaintLeaseState::rendering;
-    } else if (occluded_ && paint_dirty_) {
+    } else if (occluded_ && paint_pending()) {
         paint_lease_state_ = PaintLeaseState::occluded_dirty;
-    } else if (paint_dirty_ || rendered_revision_ < content_revision_) {
+    } else if (paint_pending() || rendered_revision_ < content_revision_) {
         paint_lease_state_ = PaintLeaseState::dirty_queued;
     } else if (presented_revision_ < rendered_revision_) {
         paint_lease_state_ = PaintLeaseState::ready;
@@ -2877,7 +2871,6 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
             add_damage_all_planes(old_bounds);
             add_damage_all_planes(new_bounds);
             touch_paint();
-            paint_dirty_ = true;
             (*control).publish_change((*control).arranged_bounds_changed_,
                                     new_bounds);
         }
