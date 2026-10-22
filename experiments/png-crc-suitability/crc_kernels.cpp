@@ -1,5 +1,5 @@
 #include "crc_kernels.hpp"
-#include "../../src/core/image/png_writer.hpp"
+#include "stx_zlib/checksum.hpp"
 
 namespace crc_study {
 namespace {
@@ -187,7 +187,7 @@ std::uint32_t matrix_four(std::span<const std::byte> bytes, std::uint32_t seed) 
 }
 
 std::uint32_t baseline(std::span<const std::byte> bytes, std::uint32_t) {
-    const std::uint32_t result = gui_forms::image::png_crc32(bytes);
+    const std::uint32_t result = stx_zlib::crc32(bytes);
     return result;
 }
 

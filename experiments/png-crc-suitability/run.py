@@ -37,8 +37,8 @@ def main():
     source = ROOT / 'experiments/png-crc-suitability'
     names = ['compact.cpp', 'compact.hpp', 'crc_kernels.cpp', 'crc_kernels.hpp', 'study.cpp', 'run.py']
     sources = [source / name for name in names]
-    sources.extend(ROOT / name for name in ['src/core/image/png_decoder.cpp',
-        'src/core/image/png_decoder.hpp', 'src/core/image/png_writer.cpp',
+    sources.extend(ROOT / name for name in ['stx_png/src/decoder.cpp',
+        'stx_png/include/stx_png/decoder.hpp', 'stx_png/src/encoder.cpp',
         'stx_zlib/src/inflate.cpp', 'include/gui_forms/compression/inflate.hpp'])
     record = {'compiler': compiler, 'platform': platform.platform(), 'upstream_zlib': pin['revision'],
               'sources': {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
@@ -51,7 +51,7 @@ def main():
         shutil.copyfile(path, workloads / path.name)
     shutil.copyfile(ROOT / 'assets/fixtures/compression/red-pixel.png', workloads / 'asset-red-pixel.png')
     record['workloads'] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in workloads.glob('*.png')}
-    includes = ['-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'stx_zlib/include'), '-I' + str(zlib)]
+    includes = ['-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'stx_zlib/include'), '-I' + str(ROOT / 'stx_png/include'), '-I' + str(zlib)]
     env = dict(os.environ)
     env['ASAN_OPTIONS'] = 'detect_leaks=1:halt_on_error=1'
     env['UBSAN_OPTIONS'] = 'halt_on_error=1:print_stacktrace=1'
@@ -89,14 +89,14 @@ def main():
             command = ['clang++', '-std=c++20', *flags, *candidate_flags, *includes,
                        '-Dpng_crc32=experimental_crc', '-Ddecode_png_samples=crc_decode_png_samples',
                        '-Dinspect_png_samples=crc_inspect_png_samples', '-c',
-                       str(ROOT / 'src/core/image/png_decoder.cpp'), '-o', str(decoder)]
+                       str(ROOT / 'stx_png/src/decoder.cpp'), '-o', str(decoder)]
             record['commands'].append(command)
             subprocess.run(command, check=True)
             binary = output / ('study-' + mode)
             command = ['clang++', '-std=c++20', *flags, *candidate_flags, *includes, '-fconstexpr-steps=4000000',
                        str(source / 'compact.cpp'), str(source / 'crc_kernels.cpp'), str(source / 'study.cpp'),
-                       str(ROOT / 'src/core/image/png_decoder.cpp'), str(ROOT / 'src/core/image/png_writer.cpp'),
-                       str(ROOT / 'stx_zlib/src/inflate.cpp'), str(ROOT / 'stx_zlib/src/deflate.cpp'), str(decoder), str(oracle), str(portable_oracle), '-o', str(binary)]
+                       str(ROOT / 'stx_png/src/decoder.cpp'), str(ROOT / 'stx_png/src/encoder.cpp'),
+                       str(ROOT / 'stx_zlib/src/inflate.cpp'), str(ROOT / 'stx_zlib/src/deflate.cpp'), str(ROOT / 'stx_zlib/src/checksum.cpp'), str(decoder), str(oracle), str(portable_oracle), '-o', str(binary)]
             record['commands'].append(command)
             subprocess.run(command, check=True)
             command = [str(binary), 'verify']

@@ -64,8 +64,8 @@ enum class PartRole : std::uint8_t {
     count,
 };
 
-// The §8.4 state set. Display scale, text scale and density are scalar
-// environment inputs rather than states and are not listed here.
+// The §8.4 state set. Display scale and text scale are scalar engine
+// inputs (EngineInput) rather than states and are not listed here.
 enum class AnatomyState : std::uint8_t {
     // interaction
     normal,
@@ -109,6 +109,31 @@ enum class AnatomyState : std::uint8_t {
     reduced_motion,
     count,
 };
+
+// The engine inputs (design language §9.6 and §12.7; T2 GIVEN B1-1, B2-1
+// and B4-2): the scalar values the theme engine sets for each part it
+// draws, which a primitive declares it reads and a theme's expressions read
+// by position. Nothing but the engine writes them, and nothing in a theme
+// writes back to the application. Besides these, the engine reads the
+// numeric values an application publishes by name (Window::publish_value),
+// which are not vocabulary: each theme names the ones it reads. There is no
+// density input (B4-2).
+enum class EngineInput : std::uint8_t {
+    // The pointer's position from the part's top-left corner, in logical
+    // units (B2-1). Published only while the part is hot; otherwise it reads
+    // as not published.
+    pointer_x,
+    pointer_y,
+    // Seconds since the part's published states last changed.
+    time_in_state,
+    // Device pixels per logical unit, the window's display scale.
+    display_scale,
+    // The presentation's text scale.
+    text_scale,
+    count,
+};
+
+inline constexpr std::size_t engine_input_count = static_cast<std::size_t>(EngineInput::count);
 
 inline constexpr std::size_t part_role_count =
     static_cast<std::size_t>(PartRole::count);
@@ -323,6 +348,7 @@ struct PartGeometryBuffer final {
 // Registered (snake_case) public names.
 [[nodiscard]] std::string_view part_role_name(PartRole role) noexcept;
 [[nodiscard]] std::string_view anatomy_state_name(AnatomyState state) noexcept;
+[[nodiscard]] std::string_view engine_input_name(EngineInput input) noexcept;
 [[nodiscard]] std::optional<PartRole> part_role_from_name(
     std::string_view name) noexcept;
 [[nodiscard]] std::optional<AnatomyState> anatomy_state_from_name(

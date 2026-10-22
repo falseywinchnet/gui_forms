@@ -38,6 +38,31 @@ std::uint64_t draw_case(const std::size_t kind_index, const std::size_t scale_in
     return hash;
 }
 
+// One group case: its hash, after checking what the Skia raster alone can
+// show (one image where commands overlap, the refusal past the depth limit).
+std::uint64_t draw_group_case(const std::size_t kind_index, const std::size_t scale_index) {
+    const double scale = scene::scales[scale_index];
+    const scene::GroupCase kind = scene::group_cases[kind_index];
+    render::SkiaRaster raster{};
+    require(raster.resize(scene::scene_size, scale), "raster allocated");
+    DamageRegion damage{};
+    damage.add({0.0, 0.0, scene::scene_size.width, scene::scene_size.height});
+    raster.begin_frame(damage);
+    scene::paint_group_scene(raster, kind, scale);
+    raster.end_frame();
+    const std::uint8_t* const bytes = static_cast<const std::uint8_t*>(raster.pixels());
+    require(bytes != nullptr, "raster readable");
+    if (kind == scene::GroupCase::overlap) {
+        require(scene::overlap_is_one_image(bytes, raster.row_bytes(), text_identity::Order::rgba, scale),
+                "a group's overlapping commands composite as one image");
+    }
+    require((kind == scene::GroupCase::refused) == (raster.group_refusals() == 1U),
+            "only the group past the depth limit is refused");
+    const std::uint64_t hash =
+        text_identity::pixel_hash(bytes, raster.pixel_width(), raster.pixel_height(), raster.row_bytes());
+    return hash;
+}
+
 } // namespace
 
 int main() {
@@ -50,6 +75,17 @@ int main() {
             std::printf("part-composite %s %.1f 0x%016llxULL\n", scene::case_names[kind], scene::scales[scale],
                         static_cast<unsigned long long>(observed));
             if (observed != scene::expected[kind][scale]) mismatch = true;
+        }
+    }
+    for (std::size_t kind = 0U; kind < scene::group_cases.size(); ++kind) {
+        for (std::size_t scale = 0U; scale < scene::scales.size(); ++scale) {
+            const std::uint64_t observed = draw_group_case(kind, scale);
+            std::printf("paint-group %s %.1f 0x%016llxULL\n", scene::group_case_names[kind], scene::scales[scale],
+                        static_cast<unsigned long long>(observed));
+            if (observed != scene::expected_groups[kind][scale]) mismatch = true;
+            if (scene::group_cases[kind] == scene::GroupCase::opacity_one) {
+                require(observed == scene::expected[0][scale], "a group at opacity 1 equals drawing without one");
+            }
         }
     }
     if (printing) return 0;

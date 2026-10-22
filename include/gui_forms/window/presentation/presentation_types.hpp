@@ -18,12 +18,18 @@ struct PresentationSettings final {
     bool high_contrast{};
     bool reduced_motion{};
     bool sound_enabled{true};
+    // The application's motion switch (design language §9.4 item 3, T2 E7):
+    // off, the theme engine's ambient effects stop and their parts rest at
+    // their static poses. Transitions are not affected; reduced motion,
+    // the host's preference, ends them.
+    bool ambient_motion{true};
     friend constexpr bool operator==(const PresentationSettings& left,
                                      const PresentationSettings& right) noexcept {
         return left.text_scale == right.text_scale &&
                left.high_contrast == right.high_contrast &&
                left.reduced_motion == right.reduced_motion &&
-               left.sound_enabled == right.sound_enabled;
+               left.sound_enabled == right.sound_enabled &&
+               left.ambient_motion == right.ambient_motion;
     }
 };
 

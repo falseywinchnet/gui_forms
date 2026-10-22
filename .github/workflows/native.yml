@@ -29,6 +29,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_macos_runtime_manifest.py
           python3 -B -m unittest discover -s tools -p test_ci_reuse.py
           python3 -B -m unittest discover -s tools -p test_ci_promote.py
+          python3 -B -m unittest discover -s tools -p test_ci_sanitizer_seed.py
           python3 -B -m unittest discover -s tools -p test_publish_cache.py
           python3 -B -m unittest discover -s tools -p test_windows_toolchain.py
           python3 -B -m unittest discover -s tools -p test_control_registry.py
@@ -39,11 +40,11 @@ jobs:
           python3 tools/control_schema.py render --check
           python3 -B -m unittest discover -s tools -p test_generate_library_docs.py
           python3 tools/generate_library_docs.py --check
-          python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib
+          python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png fuzz
           python3 -B -m unittest discover -s tools -p test_lifetime_rules.py
+          python3 -B -m unittest discover -s tools -p test_state_machines.py
           python3 -B -m unittest discover -s tools -p test_ci_build.py
-          python3 -B -m unittest discover -s tools -p test_inflate_campaign.py
-          python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib
+          python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png fuzz
   docs:
     runs-on: ubuntu-24.04
     steps:
@@ -111,8 +112,16 @@ jobs:
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "GUI_FORMS_SANITIZER_DEBUG_INFO=$mode" >> "$GITHUB_ENV"
           echo "Sanitizer debug information: $mode"
-      # The mode is in the key, so line-table and full objects never share an entry.
-      - uses: actions/cache@v4
+      # Pull requests restore main's cache and never save one: a new 600 MB
+      # entry per run evicted the dependency and object caches from the
+      # repository's 10 GB. Objects of a branch's own earlier push, of the
+      # branch a pull request is stacked on, or (on main) of the merged pull
+      # request come from the seed artifact below instead. The debug-information
+      # mode is in the key, so line-table and full objects never share an entry,
+      # and only line-table runs find or pack a seed: a full -g hunt starts from
+      # main's cache and leaves no seed behind for a line-table run to restore.
+      - uses: actions/cache/restore@v4
+        id: sanitizer-cache
         with:
           path: |
             .ccache
@@ -123,8 +132,54 @@ jobs:
           key: gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-${{ github.sha }}
           restore-keys: |
             gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-
+      - name: Find sanitizer objects of the nearest branch
+        id: seed
+        if: steps.debug-info.outputs.mode == 'lines'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python gui_forms/tools/ci_sanitizer_seed.py find
+      - uses: actions/download-artifact@v4
+        if: steps.seed.outputs.seeded == 'true'
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.seed.outputs.producer-run }}
+          artifact-ids: ${{ steps.seed.outputs.artifact-id }}
+          path: .ci/sanitizer-seed
+          merge-multiple: true
+      - name: Replace the restored objects with the seed (every test still runs)
+        if: steps.seed.outputs.seeded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python gui_forms/tools/ci_sanitizer_seed.py restore --artifact-id "${{ steps.seed.outputs.artifact-id }}"
       - name: Build and test the whole suite under the sanitizers
-        run: xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/ci_build.py --jobs 4 --sanitize
+        run: |
+          ccache --zero-stats
+          xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/ci_build.py --jobs 4 --sanitize
+      - name: Report cache statistics
+        if: always()
+        run: ccache --show-stats --verbose
+      - name: Pack the sanitizer objects as the next run's seed
+        if: success() && steps.debug-info.outputs.mode == 'lines'
+        run: python gui_forms/tools/ci_sanitizer_seed.py pack
+      - uses: actions/upload-artifact@v4
+        if: success() && steps.debug-info.outputs.mode == 'lines'
+        with:
+          name: gui-sanitize-ccache-linux-x64
+          path: |
+            gui-sanitize-ccache.tar
+            gui-sanitize-ccache.tar.sha256
+          compression-level: 0
+          retention-days: 7
+      - uses: actions/cache/save@v4
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: |
+            .ccache
+            gui_forms/third_party/skia
+            gui_forms/third_party/harfbuzz
+            gui_forms/third_party/freetype
+            .build/native-linux-x64/skia
+          key: ${{ steps.sanitizer-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -382,6 +437,17 @@ jobs:
           else
             python gui_forms/tools/ci_build.py --jobs 4
           fi
+      - name: Prove one compression and PNG implementation in the link map
+        if: steps.promotion.outputs.reused != 'true' && (steps.reuse.outputs.reused != 'true')
+        run: |
+          # Every static archive the toolkit links, plus Skia's: no C zlib,
+          # FreeType gzip or libpng may remain (Z-stage I5, decision 3A).
+          build=.build/native-${{ matrix.platform }}
+          archives=$(find "$build/gui-forms" -name '*.a' -not -path '*/_deps/*' -not -name '*.dll.a')
+          skia=$(find "$build/skia" -maxdepth 1 -name '*.a' 2>/dev/null || true)
+          python gui_forms/tools/audit_link_map.py --forbid-foreign $archives $skia
+          # Archive sizes for third_party/SKIA_BUILD_EVIDENCE.md.
+          if [ -n "$skia" ]; then ls -l $skia; fi
       - name: Test development text-mask ownership on Windows
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Windows' && steps.reuse.outputs.reused != 'true')
         shell: msys2 {0}
@@ -443,8 +509,11 @@ jobs:
       - name: Report cache statistics
         if: steps.promotion.outputs.reused != 'true' && (always())
         run: ccache --show-stats --verbose
+      # Only main saves object caches: pull requests seed from validated
+      # archives (ci_promote.py seed), and their per-tree entries evicted the
+      # dependency caches from the repository's 10 GB.
       - uses: actions/cache/save@v4
-        if: steps.promotion.outputs.reused != 'true' && (always() && (steps.reuse.outputs.reused == 'true' || (steps.objects.outputs.cache-primary-key != '' && steps.objects.outputs.cache-hit != 'true')))
+        if: steps.promotion.outputs.reused != 'true' && github.event_name != 'pull_request' && (always() && (steps.reuse.outputs.reused == 'true' || (steps.objects.outputs.cache-primary-key != '' && steps.objects.outputs.cache-hit != 'true')))
         with:
           path: .ccache
           key: gui-objects-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ steps.inputs.outputs.tree }}
@@ -494,3 +563,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python gui_forms/tools/publish_cache.py --platform "${{ matrix.platform }}"
+
+  # The demonstration programs, their tests, packages and (on main) the tested
+  # release, built after the native jobs from their objects. One failed native
+  # platform skips the programs of all four, as a release needs all four.
+  programs:
+    needs: native
+    uses: ./.github/workflows/release.yml
+    with:
+      from_native: true
+    permissions:
+      contents: write
+      actions: read

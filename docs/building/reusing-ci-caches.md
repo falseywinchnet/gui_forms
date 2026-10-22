@@ -62,6 +62,19 @@ Promotion applies when the `main` commit has exactly the tested tree, as when
 an up-to-date branch is merged. Any other merge builds fresh, usually from a
 seed.
 
+## The sanitizer job's cache
+
+The sanitizer job always builds and runs the whole suite; it never reuses a
+result. Its compiler cache crosses the branch boundary through an artifact:
+each successful job uploads its `.ccache` as `gui-sanitize-ccache-linux-x64`
+(kept seven days), and the next job takes the newest one of the nearest
+branch (`tools/ci_sanitizer_seed.py`): a pull request's own earlier push,
+then the branch it is stacked on; on `main`, the merged pull request's head.
+Without one it keeps `main`'s Actions cache. Only pushes to `main` save
+Actions caches for the sanitizer, native object and programs object caches;
+pull requests restore `main`'s, so per-run entries no longer evict the
+dependency caches from the repository's 10 GB.
+
 ## Publication
 
 On `main`, each platform publishes as soon as its own job passes

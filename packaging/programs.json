@@ -4,7 +4,7 @@
     "Program manifest consumed by tools/package_programs.py, tools/smoke_package.py and tools/publish_tested_release.py.",
     "Each program lists, per platform, the CMake target and the path pattern of what the build directory produces.",
     "A platform entry marked planned=true names a target another workstream still has to add; packaging logs it as skipped when the build directory lacks it and never fails on it.",
-    "Font and notice lists mirror GUI_FORMS_GALLERY_FONTS / GUI_FORMS_GALLERY_FONT_NOTICES in CMakeLists.txt. macOS bundles embed them in Contents/Resources/fonts at build time; Windows post-build copies them to fonts/ beside the executable; Linux has no post-build copy yet, so packaging supplies fonts/ from assets/fonts.",
+    "Font and notice lists mirror GUI_FORMS_GALLERY_FONTS / GUI_FORMS_GALLERY_FONT_NOTICES in CMakeLists.txt. macOS bundles embed them in Contents/Resources/fonts at build time; Windows stages them in fonts/ beside the executables (target gui_forms_program_fonts); Linux has no post-build copy yet, so packaging supplies fonts/ from assets/fonts.",
     "Identifiers: macOS pkg identifier is <vendor.bundle_prefix>.<id>; Debian package is <vendor.deb_prefix>-<id>; Windows uninstall key is <vendor.windows_uninstall_prefix><id> under HKCU."
   ],
   "vendor": {

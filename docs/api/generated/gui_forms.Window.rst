@@ -379,6 +379,12 @@ gui_forms::Window
         -  
       * - :cpp:func:`motion_clock <gui_forms::Window::motion_clock>`
         - The window's :cpp:class:`MotionClock <gui_forms::MotionClock>`: one frame request, armed only while some control's :cpp:class:`MotionValue <gui_forms::MotionValue>` is moving, however many are.
+      * - :cpp:func:`publish_value <gui_forms::Window::publish_value>`
+        - Publishes a named number for the theme engine, such as a meter's ``level``.
+      * - :cpp:func:`withdraw_value <gui_forms::Window::withdraw_value>`
+        - Withdraws a published value; its readers then read it as not published and give their expressions' fallbacks.
+      * - :cpp:func:`published_value <gui_forms::Window::published_value>`
+        - The value published under a name, or none.
       * - :cpp:func:`metrics <gui_forms::Window::metrics>`
         - The live instrumentation counters, for hosts and renderers that record into them.
       * - :cpp:func:`reset_activity_metrics <gui_forms::Window::reset_activity_metrics>`
@@ -1148,6 +1154,25 @@ gui_forms::Window
       control's :cpp:class:`MotionValue <gui_forms::MotionValue>` is moving, however many are. Once every value
       has settled it schedules nothing. Tests install a :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>` on
       it so that motion is sampled from their own time.
+
+   .. cpp:function:: bool publish_value(std::string_view name, double value)
+
+      Publishes a named number for the theme engine, such as a meter's
+      ``level``. A theme's expressions read the values its rule sheet names; a
+      theme never writes them. A changed value damages only the parts whose
+      expressions read it, within their extents
+      (``MetricsSnapshot::engine_input_damaged_parts``). Returns false, changing
+      nothing, for a name that is not 1 to 64 lowercase ASCII letters, digits,
+      '-' and '_' starting with a letter, or a value that is not finite.
+
+   .. cpp:function:: void withdraw_value(std::string_view name)
+
+      Withdraws a published value; its readers then read it as not published
+      and give their expressions' fallbacks.
+
+   .. cpp:function:: std::optional<double> published_value(std::string_view name) const
+
+      The value published under a name, or none.
 
    .. cpp:function:: Metrics& metrics() noexcept
 

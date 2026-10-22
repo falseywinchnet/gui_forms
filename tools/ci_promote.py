@@ -96,8 +96,7 @@ def promote_archive() -> None:
     receipt: dict[str, Any] = json.loads((ci_reuse.STATE / 'reused.json').read_text())
     filename: str = 'gui-forms-cache-' + identity['platform'] + '.tar.gz'
     source: Path = ci_reuse.STATE / 'download' / filename
-    if ci_reuse.file_digest(source) != receipt['archive_sha256']:
-        raise ValueError('Promoted cache archive digest mismatch')
+    ci_reuse.verified_archive(source, receipt)
     destination: Path = ci_reuse.ROOT / filename
     temporary: Path = destination.with_suffix('.partial')
     manifest_count: int = 0
@@ -131,6 +130,22 @@ def promote_archive() -> None:
         temporary.unlink(missing_ok=True)
 
 
+def restore_seed() -> None:
+    """Restore a seed's objects, or build without them when its archive cannot be verified.
+
+    A seed only fills ccache, which checks every hit, and every test still
+    runs, so an archive that fails its digest even after the downloads
+    verified_archive retries is skipped with a warning instead of failing the
+    job. Nothing is extracted from an archive that failed.
+    """
+    identity: dict[str, Any] = json.loads((ci_reuse.STATE / 'inputs.json').read_text())
+    try:
+        ci_reuse.restore_archive(identity, ci_reuse.STATE / 'seed.json')
+    except (ValueError, OSError, tarfile.TarError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
+        print('::warning::Seed objects not restored (' + str(error) + '); building from the restored cache',
+              flush=True)
+
+
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('lookup', 'archive', 'seed', 'restore-seed'))
@@ -140,8 +155,7 @@ def main() -> None:
         promote_archive()
         return
     if args.command == 'restore-seed':
-        identity: dict[str, Any] = json.loads((ci_reuse.STATE / 'inputs.json').read_text())
-        ci_reuse.restore_archive(identity, ci_reuse.STATE / 'seed.json')
+        restore_seed()
         return
     found: bool = False
     seed: bool = args.command == 'seed'

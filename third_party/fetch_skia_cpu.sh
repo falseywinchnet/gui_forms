@@ -4,8 +4,6 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 skia_dir="$script_dir/skia"
 skia_revision=2a9b593bab4b2fd019fa494c8d401ff1fab0b883
-libpng_revision=d5515b5b8be3901aac04e5bd8bd5c89f287bcd33
-zlib_revision=646b7f569718921d7d4b5b8e22572ff6c76f2596
 freetype_revision=264b5fbf5b912b39f98d038bf75d39be0a73f21b
 
 # fetch_revision destination upstream revision [mirror]
@@ -66,17 +64,10 @@ else
   "$skia_dir/bin/fetch-ninja"
 fi
 mkdir -p "$skia_dir/third_party/externals"
-fetch_revision "$skia_dir/third_party/externals/libpng" \
-  https://skia.googlesource.com/third_party/libpng.git "$libpng_revision" \
-  https://github.com/pnggroup/libpng.git
-# Chromium's zlib fork has no GitHub copy; it comes from its upstream only.
-fetch_revision "$skia_dir/third_party/externals/zlib" \
-  https://chromium.googlesource.com/chromium/src/third_party/zlib "$zlib_revision"
+# Skia is built without libpng and zlib (Z-stage I5); neither is fetched.
 fetch_revision "$skia_dir/third_party/externals/freetype" \
   https://chromium.googlesource.com/chromium/src/third_party/freetype2.git "$freetype_revision" \
   https://github.com/freetype/freetype.git
 
 test "$(git -C "$skia_dir" rev-parse HEAD)" = "$skia_revision"
-test "$(git -C "$skia_dir/third_party/externals/libpng" rev-parse HEAD)" = "$libpng_revision"
-test "$(git -C "$skia_dir/third_party/externals/zlib" rev-parse HEAD)" = "$zlib_revision"
 test "$(git -C "$skia_dir/third_party/externals/freetype" rev-parse HEAD)" = "$freetype_revision"
