@@ -41,7 +41,10 @@ def make_tree(msys_root: Path, spec: dict[str, Any]) -> None:
     write_file(msys_root / 'tmp/runner-scratch.txt', b'scratch')
     name: str
     for name in spec['packages']:
-        write_package(msys_root, name, '1.0-1')
+        if name == windows_toolchain.CLANG_PACKAGE:
+            write_package(msys_root, name, spec['llvm'] + '-3')
+        else:
+            write_package(msys_root, name, '1.0-1')
     write_package(msys_root, 'mingw-w64-clang-x86_64-llvm-libs', '22.1.8-3')
 
 
@@ -137,6 +140,18 @@ class ArchiveTests(unittest.TestCase):
         spec['packages'].append('mingw-w64-clang-x86_64-absent')
         with self.assertRaisesRegex(ValueError, 'absent'):
             windows_toolchain.pack(self.msys_root, self.output, spec, PRODUCER)
+
+    def test_an_llvm_the_specification_does_not_pin_is_not_packaged(self) -> None:
+        # MSYS2 moved on: the mirrors installed the current clang, not the pinned one.
+        write_package(self.msys_root, windows_toolchain.CLANG_PACKAGE, '23.1.3-1')
+        clang_records: list[Path] = sorted((self.msys_root / 'var/lib/pacman/local').glob(
+            windows_toolchain.CLANG_PACKAGE + '-' + self.spec['llvm'] + '-*'))
+        record: Path
+        for record in clang_records:
+            (record / 'desc').unlink()
+        with self.assertRaisesRegex(windows_toolchain.ToolchainUnavailable, '23.1.3-1'):
+            windows_toolchain.pack(self.msys_root, self.output, self.spec, PRODUCER)
+        self.assertFalse((self.output / windows_toolchain.ARCHIVE_NAME).exists())
 
     def test_changed_archive_bytes_fail_closed(self) -> None:
         manifest: dict[str, Any] = windows_toolchain.pack(self.msys_root, self.output, self.spec, PRODUCER)
@@ -299,6 +314,102 @@ class DiscoveryTests(unittest.TestCase):
              patch.object(windows_toolchain.ci_reuse, 'api', return_value=listing):
             with self.assertRaisesRegex(ValueError, 'force_validation'):
                 windows_toolchain.download_artifact('owner/repo', 'a' * 64, Path(directory))
+
+
+class PinnedReleaseCommands:
+    """Fake gh: one release read by its tag (None: not found) and its toolchain manifest."""
+
+    def __init__(self, release: dict[str, Any] | None, manifest: dict[str, Any]) -> None:
+        self.release: dict[str, Any] | None = release
+        self.manifest: dict[str, Any] = manifest
+
+    def run(self, command: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
+        if command[1] == 'api':
+            if self.release is None:
+                return subprocess.CompletedProcess(command, 1, '', 'HTTP 404: Not Found')
+            return subprocess.CompletedProcess(command, 0, json.dumps(self.release), '')
+        destination: Path = Path(command[command.index('--dir') + 1])
+        (destination / windows_toolchain.MANIFEST_NAME).write_text(json.dumps(self.manifest))
+        return subprocess.CompletedProcess(command, 0, '', '')
+
+
+class StepOutputs:
+    """Records the step outputs restore_command writes."""
+
+    def __init__(self) -> None:
+        self.outputs: list[tuple[str, str]] = []
+
+    def record(self, name: str, value: str) -> None:
+        self.outputs.append((name, value))
+
+
+class PinnedReleaseTests(unittest.TestCase):
+    def test_the_checked_in_pin_names_the_current_specification(self) -> None:
+        spec: dict[str, Any] = windows_toolchain.load_spec()
+        pin: dict[str, Any] = json.loads(windows_toolchain.PIN_PATH.read_text(encoding='utf-8'))
+        self.assertEqual(pin['spec_sha256'], windows_toolchain.spec_digest(spec))
+        self.assertEqual(pin['llvm'], spec['llvm'])
+        self.assertTrue(pin['tag'].startswith('build-'))
+        pinned: dict[str, Any] = json.loads((windows_toolchain.SPEC_PATH.parents[1] / 'packaging'
+                                             / 'pinned_cache_revisions.json').read_text(encoding='utf-8'))
+        revisions: list[str] = []
+        entry: dict[str, Any]
+        for entry in pinned['pinned']:
+            revisions.append(entry['sha'])
+        self.assertIn(pin['tag'][len('build-'):], revisions)
+
+    def pinned(self, pin: dict[str, Any], release: dict[str, Any] | None,
+               manifest: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+        commands: PinnedReleaseCommands = PinnedReleaseCommands(release, manifest)
+        with tempfile.TemporaryDirectory() as directory:
+            pin_path: Path = Path(directory) / 'pin.json'
+            pin_path.write_text(json.dumps(pin), encoding='utf-8')
+            with patch.object(windows_toolchain, 'PIN_PATH', pin_path), \
+                 patch.object(windows_toolchain.subprocess, 'run', side_effect=commands.run):
+                found: tuple[str, dict[str, Any]] | None = windows_toolchain.pinned_release('owner/repo', 'spec')
+        return found
+
+    def test_the_pinned_release_is_read_by_its_tag(self) -> None:
+        manifest: dict[str, Any] = toolchain_manifest('a' * 64, 'c')
+        found: tuple[str, dict[str, Any]] | None = self.pinned(
+            {'spec_sha256': 'spec', 'archive_sha256': 'a' * 64, 'tag': 'build-1'}, release('build-1', True), manifest)
+        self.assertIsNotNone(found)
+        if found is not None:
+            self.assertEqual(found[0], 'build-1')
+
+    def test_a_pin_of_another_specification_or_archive_is_not_used(self) -> None:
+        manifest: dict[str, Any] = toolchain_manifest('a' * 64, 'c')
+        self.assertIsNone(self.pinned({'spec_sha256': 'older', 'archive_sha256': 'a' * 64, 'tag': 'build-1'},
+                                      release('build-1', True), manifest))
+        self.assertIsNone(self.pinned({'spec_sha256': 'spec', 'archive_sha256': 'b' * 64, 'tag': 'build-1'},
+                                      release('build-1', True), manifest))
+
+    def test_a_missing_or_empty_pinned_release_is_not_used(self) -> None:
+        manifest: dict[str, Any] = toolchain_manifest('a' * 64, 'c')
+        pin: dict[str, Any] = {'spec_sha256': 'spec', 'archive_sha256': 'a' * 64, 'tag': 'build-1'}
+        self.assertIsNone(self.pinned(pin, None, manifest))
+        self.assertIsNone(self.pinned(pin, release('build-1', False), manifest))
+
+
+class RestoreTests(unittest.TestCase):
+    def restore(self, environ: dict[str, str]) -> list[tuple[str, str]]:
+        outputs: StepOutputs = StepOutputs()
+        with patch.object(windows_toolchain, 'pinned_release', return_value=None), \
+             patch.object(windows_toolchain, 'find_release', return_value=None), \
+             patch.object(windows_toolchain.ci_reuse, 'output', side_effect=outputs.record), \
+             patch.dict(windows_toolchain.os.environ, environ, clear=True):
+            windows_toolchain.restore_command('owner/repo')
+        return outputs.outputs
+
+    def test_without_a_published_toolchain_the_job_stops(self) -> None:
+        with self.assertRaisesRegex(windows_toolchain.ToolchainUnavailable, 'will not install'):
+            self.restore({})
+        with self.assertRaises(windows_toolchain.ToolchainUnavailable):
+            self.restore({windows_toolchain.PACKAGE_VARIABLE: 'false'})
+
+    def test_only_a_packaging_request_reaches_the_mirrors(self) -> None:
+        outputs: list[tuple[str, str]] = self.restore({windows_toolchain.PACKAGE_VARIABLE: 'true'})
+        self.assertIn(('restored', 'false'), outputs)
 
 
 class ExclusionTests(unittest.TestCase):

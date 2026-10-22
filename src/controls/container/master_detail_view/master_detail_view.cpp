@@ -39,6 +39,31 @@ MasterDetailLayout themed_master_detail_layout(const Theme& theme) noexcept {
             true};
 }
 
+// Collapses and expands `split`'s panels to present `mode`, recording
+// `origin`; false for automatic, which is no presentation of its own.
+bool collapse_for_mode(SplitContainer& split, MasterDetailDisplayMode mode,
+                       SplitCollapseOrigin origin) {
+    switch (mode) {
+    case MasterDetailDisplayMode::side_by_side:
+        if (split.first_collapsed()) split.set_first_collapsed(false, origin);
+        if (split.second_collapsed()) split.set_second_collapsed(false, origin);
+        return true;
+    case MasterDetailDisplayMode::master_only:
+        if (split.first_collapsed()) split.set_first_collapsed(false, origin);
+        if (!split.second_collapsed()) split.set_second_collapsed(true, origin);
+        return true;
+    case MasterDetailDisplayMode::detail_only:
+        if (split.second_collapsed()) split.set_second_collapsed(false, origin);
+        if (!split.first_collapsed()) split.set_first_collapsed(true, origin);
+        return true;
+    case MasterDetailDisplayMode::automatic:
+        // Resolved to one of the others before it is applied.
+        return false;
+    }
+    // A mode outside the enumeration presents nothing.
+    return false;
+}
+
 } // namespace
 
 MasterDetailView::MasterDetailView(StableId stable_id)
@@ -189,46 +214,9 @@ void MasterDetailView::apply_display_mode(MasterDetailDisplayMode mode,
                                           bool automatic) {
     if (effective_display_mode_ == mode) return;
     const MasterDetailDisplayMode previous = effective_display_mode_;
-    switch (mode) {
-    case MasterDetailDisplayMode::side_by_side:
-        if ((*split_).first_collapsed()) {
-            (*split_).set_first_collapsed(false,
-                automatic ? SplitCollapseOrigin::automatic_accommodation
-                          : SplitCollapseOrigin::programmatic);
-        }
-        if ((*split_).second_collapsed()) {
-            (*split_).set_second_collapsed(false,
-                automatic ? SplitCollapseOrigin::automatic_accommodation
-                          : SplitCollapseOrigin::programmatic);
-        }
-        break;
-    case MasterDetailDisplayMode::master_only:
-        if ((*split_).first_collapsed()) {
-            (*split_).set_first_collapsed(false,
-                automatic ? SplitCollapseOrigin::automatic_accommodation
-                          : SplitCollapseOrigin::programmatic);
-        }
-        if (!(*split_).second_collapsed()) {
-            (*split_).set_second_collapsed(true,
-                automatic ? SplitCollapseOrigin::automatic_accommodation
-                          : SplitCollapseOrigin::programmatic);
-        }
-        break;
-    case MasterDetailDisplayMode::detail_only:
-        if ((*split_).second_collapsed()) {
-            (*split_).set_second_collapsed(false,
-                automatic ? SplitCollapseOrigin::automatic_accommodation
-                          : SplitCollapseOrigin::programmatic);
-        }
-        if (!(*split_).first_collapsed()) {
-            (*split_).set_first_collapsed(true,
-                automatic ? SplitCollapseOrigin::automatic_accommodation
-                          : SplitCollapseOrigin::programmatic);
-        }
-        break;
-    case MasterDetailDisplayMode::automatic:
-        return;
-    }
+    const SplitCollapseOrigin origin = automatic
+        ? SplitCollapseOrigin::automatic_accommodation : SplitCollapseOrigin::programmatic;
+    if (!collapse_for_mode(*split_, mode, origin)) return;
     effective_display_mode_ = mode;
     publish_change(presentation_changed_,
                    MasterDetailPresentationChange{previous, mode, automatic});

@@ -763,29 +763,29 @@ std::optional<BindingValue> convert_binding_value(
         if (const std::optional<bool> converted = binding_value_to_bool(value)) {
             return BindingValue{*converted};
         }
-        break;
+        return std::nullopt;
     case BindingValueKind::signed_integer:
         if (const std::optional<std::int64_t> converted = binding_value_to_signed(value)) {
             return BindingValue{*converted};
         }
-        break;
+        return std::nullopt;
     case BindingValueKind::unsigned_integer:
         if (const std::optional<std::uint64_t> converted = binding_value_to_unsigned(value)) {
             return BindingValue{*converted};
         }
-        break;
+        return std::nullopt;
     case BindingValueKind::number:
         if (const std::optional<double> converted = binding_value_to_number(value)) {
             return BindingValue{*converted};
         }
-        break;
+        return std::nullopt;
     case BindingValueKind::text:
         return BindingValue{binding_value_to_string(value)};
     case BindingValueKind::image:
         if (const std::optional<std::uint64_t> converted = binding_value_to_unsigned(value)) {
             return BindingValue{ImageId{*converted}};
         }
-        break;
+        return std::nullopt;
     case BindingValueKind::point:
     case BindingValueKind::size:
     case BindingValueKind::rectangle:
@@ -795,8 +795,10 @@ std::optional<BindingValue> convert_binding_value(
     case BindingValueKind::enumeration:
     case BindingValueKind::object:
     case BindingValueKind::collection:
-        break;
+        // Structured kinds take only a value of their own kind (above).
+        return std::nullopt;
     }
+    // A kind outside the enumeration converts to nothing.
     return std::nullopt;
 }
 

@@ -22,24 +22,28 @@ void validate(const AnimationSpec& specification) {
     }
 }
 
+// `progress` played forward, or backward when `reverse`.
+double played(double progress, bool reverse) noexcept {
+    const double result = reverse ? 1.0 - progress : progress;
+    return result;
+}
+
 double directed_progress(AnimationDirection direction,
                          std::uint64_t iteration,
                          double progress) noexcept {
-    bool reverse = false;
+    const bool odd = (iteration % 2U) != 0U;
     switch (direction) {
     case AnimationDirection::normal:
-        break;
+        return played(progress, false);
     case AnimationDirection::reverse:
-        reverse = true;
-        break;
+        return played(progress, true);
     case AnimationDirection::alternate:
-        reverse = (iteration % 2U) != 0U;
-        break;
+        return played(progress, odd);
     case AnimationDirection::alternate_reverse:
-        reverse = (iteration % 2U) == 0U;
-        break;
+        return played(progress, !odd);
     }
-    return reverse ? 1.0 - progress : progress;
+    // A direction outside the enumeration plays forward.
+    return played(progress, false);
 }
 
 } // namespace

@@ -43,8 +43,7 @@ HostClipboardTextResult HeadlessHostServices::read_clipboard_text_impl() {
 HostServiceStatus HeadlessHostServices::write_clipboard_text_impl(
     std::string_view text_utf8) {
     clipboard_text_.assign(text_utf8);
-    clipboard_image_ = {};
-    clipboard_has_image_ = false;
+    clipboard_image_.reset();
     clipboard_has_text_ = true;
     ++clipboard_generation_;
     return {};
@@ -59,7 +58,7 @@ void HeadlessHostServices::set_dialog_handler(DialogHandler handler) {
 }
 
 HostClipboardImageResult HeadlessHostServices::read_clipboard_image_impl() {
-    return {{}, clipboard_image_, clipboard_generation_, clipboard_has_image_};
+    return {{}, clipboard_image_, clipboard_generation_};
 }
 
 HostServiceStatus HeadlessHostServices::write_clipboard_image_impl(HostImageView image) {
@@ -67,7 +66,6 @@ HostServiceStatus HeadlessHostServices::write_clipboard_image_impl(HostImageView
     clipboard_image_ = std::move(owned);
     clipboard_text_.clear();
     clipboard_has_text_ = false;
-    clipboard_has_image_ = true;
     ++clipboard_generation_;
     return {};
 }
@@ -187,8 +185,7 @@ void HeadlessHostServices::shutdown_impl() noexcept {
     tray_menu_choices_.clear();
     clipboard_text_.clear();
     clipboard_has_text_ = false;
-    clipboard_image_ = {};
-    clipboard_has_image_ = false;
+    clipboard_image_.reset();
     dialog_results_.clear();
     sound_trace_.clear();
 }

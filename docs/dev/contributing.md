@@ -69,11 +69,54 @@ LeakSanitizer (`python tools/ci_build.py --sanitize`); any report fails it.
 
 The same command is the standard local sanitizer tree, kept by every build
 tree on every platform: it builds `.build/native-<host>-<arch>/gui-forms-sanitize`
-with CI's flags and runs the suite, or with `--tests REGEX` only the matching
-tests, incrementally after the first build. AddressSanitizer and
+with CI's flags and runs the suite, or with `--tests REGEX` builds and runs
+only what the matching tests need, incrementally after the first build.
+`--test-jobs N` runs N tests at once. `--skip-labels gallery_accessibility`
+leaves out the Gallery-wide accessibility tests (each walks every Gallery page
+through MSAA, UI Automation, AT-SPI or AX; together the slowest sanitized
+tests by far) from a local run and from its narrowed build; CI passes no
+label and still runs them. The sanitized objects carry
+`-fdebug-compilation-dir=.`, so checkouts with the CI layout share them
+through one `ccache`; a second checkout of the same sources compiles
+almost nothing. A rerun with nothing changed skips the dependency checkout
+and the configure. AddressSanitizer and
 UndefinedBehaviorSanitizer run everywhere; LeakSanitizer runs on Linux and
 macOS, since the Windows MinGW runtime has none. Host code is sanitized only
 where it builds, so the Windows and macOS hosts depend on these local trees.
+
+Sanitized trees carry line tables, not full debug information, by default
+(`--debug-info lines`, `-gline-tables-only`): every report frame keeps its
+file, line and column; objects and programs are about 60 to 70% smaller and
+compiles about 28% faster than with `-g`. Frames of our code then lose their
+namespaces and parameter types, and a debugger loses locals. While hunting a
+defect, build with full `-g` and switch back afterwards:
+`ci_build.py --sanitize --debug-info full`, or
+`GUI_FORMS_SANITIZER_DEBUG_INFO=full` in the environment. A tree rebuilds when
+the mode changes. On CI, the sanitizer job uses `full` when the head commit's
+message contains `[sanitizer-full-g]`, and keys its cache by the mode. LeakSanitizer
+suppressions (`tools/sanitizer/lsan.supp`) therefore name functions without a
+namespace where the name allows.
+
+Every test carries one area label, `area_<area>`: `core`, `codec`, `audio`,
+`render`, `controls`, `docs`, `host`, `gui` (the Gallery, demoboard and lab
+tests) or `a11y` (the accessibility clients and providers), so
+`ctest -L area_gui` runs one area. `tools/test_areas.json` holds both the
+name patterns that give the labels (`cmake/TestAreas.cmake`) and the rules
+that map source paths to the areas whose tests read them. `--changed-from REF`
+on a sanitized run builds and runs only the tests the paths changed since
+`REF` (its merge base with `HEAD`, plus uncommitted and untracked files) can
+affect; `python tools/change_selection.py --base REF --format areas` prints
+the areas and the reason for each path, and with `--tree` and the default
+format a `ctest -R` pattern. Core sources reach every area but `gui` and
+`a11y`; controls, render and host sources reach those too; codec and audio
+sources reach only their own area; a test source selects its own test;
+documentation, planning and results reach no test. A path in the
+touches-everything set (`CMakeLists.txt`, `cmake/`, `third_party/`,
+`.github/`, `assets/`, the headers under `include/gui_forms/` outside the
+controls, compression and audio directories, the selection tool and its
+rules, `tools/ci_build.py`, `tools/sanitizer/`, and the shared test support
+and fixtures) or a path no rule names runs every test. CI's sanitizer job
+selects this way on pull requests and runs the whole suite on main.
 
 ## Tests and evidence
 

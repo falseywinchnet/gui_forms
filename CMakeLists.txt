@@ -64,6 +64,14 @@ option(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE "Record private run directions for g
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
        "Build the deterministic native File Manager first-party consumer" OFF)
 
+# HarfBuzz's CMakeLists sets THREADS_PREFER_PTHREAD_FLAG and caches that
+# -pthread works. Without the same preference here, a tree's first configure
+# gave Threads::Threads -lpthread and every later configure -pthread, so the
+# compile commands of every target using threads changed on reconfigure:
+# fresh trees (every CI job) and reconfigured ones never shared an object,
+# and CI's second configure of the native tree recompiled what it built.
+# Prefer the flag from the first configure on.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 include(GNUInstallDirs)
 
@@ -83,6 +91,7 @@ if(WIN32 AND NOT MSVC)
 endif()
 include(CMakePackageConfigHelpers)
 add_subdirectory(stx_zlib)
+add_subdirectory(stx_png)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -194,10 +203,9 @@ add_library(gui_forms_core STATIC
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
     src/core/host/image/clipboard_png.cpp
-    src/core/image/png_decoder.cpp
     src/core/image/png_pixels.cpp
     src/core/image/png_color.cpp
-    src/core/image/png_writer.cpp
+    src/core/image/color_conversion.cpp
     src/core/host/frame_capture/frame_capture.cpp
     src/core/host/types/host_types.cpp
     src/core/host/types/host_capabilities/host_capabilities.cpp
@@ -239,7 +247,7 @@ add_library(gui_forms_core STATIC
     src/core/window/command_route/window_command_route.cpp
     src/core/commands/command_route/command_route.cpp
 )
-target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib)
+target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib stx_png::stx_png)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
 set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 # Compatibility properties alone do not traverse LINK_ONLY dependencies of
@@ -286,6 +294,13 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     add_subdirectory("${GUI_FORMS_FREETYPE_ROOT}"
                      "${CMAKE_CURRENT_BINARY_DIR}/third_party/freetype"
                      EXCLUDE_FROM_ALL)
+    # Decision 3A: FT_DISABLE_ZLIB only stops a system zlib search; the stock
+    # options still compile FreeType's bundled inflate. This options header
+    # undefines FT_CONFIG_OPTION_USE_ZLIB for the library's own compile.
+    target_include_directories(freetype BEFORE PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/freetype")
+    target_compile_definitions(freetype PRIVATE
+        "FT_CONFIG_OPTIONS_H=<gui_forms_ftoption.h>")
 
     set(HB_HAVE_CAIRO OFF CACHE BOOL "" FORCE)
     set(HB_HAVE_CORETEXT OFF CACHE BOOL "" FORCE)
@@ -744,21 +759,7 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
             gui_forms_file_manager_demoboard_model gui_forms_host_windows)
         set_target_properties(gui_forms_file_manager_demoboard_windows PROPERTIES
             OUTPUT_NAME "File Manager Demoboard")
-        add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_windows>/fonts")
-        foreach(font_file IN LISTS GUI_FORMS_DEMOBOARD_FONTS)
-            get_filename_component(font_name "${font_file}" NAME)
-            add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${font_file}"
-                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_windows>/fonts/${font_name}")
-        endforeach()
-        foreach(notice_file IN LISTS GUI_FORMS_DEMOBOARD_FONT_NOTICES)
-            get_filename_component(notice_name "${notice_file}" NAME)
-            add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${notice_file}"
-                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_windows>/fonts/${notice_name}")
-        endforeach()
+        # Its fonts are staged with the other programs' at the end of this file.
     endif()
 
     if(GUI_FORMS_ENABLE_LINUX_HOST)
@@ -768,23 +769,7 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
             gui_forms_file_manager_demoboard_model gui_forms_host_linux)
         set_target_properties(gui_forms_file_manager_demoboard_linux PROPERTIES
             OUTPUT_NAME "gui-forms-explore")
-        # The X11 host discovers bundled faces next to the executable (or under
-        # GUI_FORMS_FONT_DIR); mirror the Windows post-build copy.
-        add_custom_command(TARGET gui_forms_file_manager_demoboard_linux POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_linux>/fonts")
-        foreach(font_file IN LISTS GUI_FORMS_DEMOBOARD_FONTS)
-            get_filename_component(font_name "${font_file}" NAME)
-            add_custom_command(TARGET gui_forms_file_manager_demoboard_linux POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${font_file}"
-                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_linux>/fonts/${font_name}")
-        endforeach()
-        foreach(notice_file IN LISTS GUI_FORMS_DEMOBOARD_FONT_NOTICES)
-            get_filename_component(notice_name "${notice_file}" NAME)
-            add_custom_command(TARGET gui_forms_file_manager_demoboard_linux POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${notice_file}"
-                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_linux>/fonts/${notice_name}")
-        endforeach()
+        # Its fonts are staged with the other programs' at the end of this file.
     endif()
 
     if(GUI_FORMS_BUILD_TESTS)
@@ -823,8 +808,6 @@ if(GUI_FORMS_ENABLE_SKIA)
     set(GUI_FORMS_SKIA_ARCHIVES
         ${GUI_FORMS_SKIA_OUT}/libskia.a
         ${GUI_FORMS_SKIA_OUT}/libskcms.a
-        ${GUI_FORMS_SKIA_OUT}/libpng.a
-        ${GUI_FORMS_SKIA_OUT}/libzlib.a
     )
 
     if(GUI_FORMS_SKIA_PREBUILT)
@@ -843,13 +826,13 @@ if(GUI_FORMS_ENABLE_SKIA)
                 ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh
                 ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_cpu_args.gn
                 ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_png_only.patch
-            COMMENT "Building pinned CPU-only, PNG-only Skia"
+            COMMENT "Building pinned CPU-only, codec-free Skia"
             VERBATIM
         )
     endif()
     add_custom_target(gui_forms_skia_dependency DEPENDS ${GUI_FORMS_SKIA_ARCHIVES})
 
-    foreach(archive IN ITEMS skia skcms png zlib)
+    foreach(archive IN ITEMS skia skcms)
         add_library(gui_forms_${archive}_archive STATIC IMPORTED GLOBAL)
         set_target_properties(gui_forms_${archive}_archive PROPERTIES
             IMPORTED_LOCATION ${GUI_FORMS_SKIA_OUT}/lib${archive}.a
@@ -872,8 +855,6 @@ if(GUI_FORMS_ENABLE_SKIA)
         PRIVATE
             gui_forms_skia_archive
             gui_forms_skcms_archive
-            gui_forms_png_archive
-            gui_forms_zlib_archive
     )
     # ADR-004: the Skia painter draws text only through the shared
     # HarfBuzz/FreeType engine; Skia itself has no font backend.
@@ -896,10 +877,6 @@ if(GUI_FORMS_ENABLE_SKIA)
         )
     endif()
     target_compile_definitions(gui_forms_skia PRIVATE
-        SK_CODEC_DECODES_PNG
-        SK_CODEC_DECODES_PNG_WITH_LIBPNG
-        SK_CODEC_ENCODES_PNG
-        SK_CODEC_ENCODES_PNG_WITH_LIBPNG
         SK_DISABLE_TRACING
     )
 
@@ -931,8 +908,6 @@ if(GUI_FORMS_ENABLE_SKIA)
             freetype
             gui_forms_skia_archive
             gui_forms_skcms_archive
-            gui_forms_png_archive
-            gui_forms_zlib_archive
     )
     if(APPLE)
         target_link_libraries(gui_drawing_skia PRIVATE
@@ -942,10 +917,6 @@ if(GUI_FORMS_ENABLE_SKIA)
         )
     endif()
     target_compile_definitions(gui_drawing_skia PRIVATE
-        SK_CODEC_DECODES_PNG
-        SK_CODEC_DECODES_PNG_WITH_LIBPNG
-        SK_CODEC_ENCODES_PNG
-        SK_CODEC_ENCODES_PNG_WITH_LIBPNG
         SK_DISABLE_TRACING
     )
 
@@ -1054,8 +1025,6 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         gui_forms_host_macos
         gui_forms_skia_archive
         gui_forms_skcms_archive
-        gui_forms_png_archive
-        gui_forms_zlib_archive
         ${GUI_FORMS_APPKIT}
         ${GUI_FORMS_QUARTZCORE}
         ${GUI_FORMS_COREGRAPHICS}
@@ -1680,34 +1649,8 @@ if(GUI_FORMS_BUILD_GALLERY)
         set_target_properties(gui_forms_seam_proximity_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Physical Seam + Proximity Lab"
         )
-        foreach(font_target IN ITEMS
-                gui_forms_gallery_windows
-                gui_forms_vsync_lab_windows
-                gui_forms_visual_inspector_lab_windows
-                gui_forms_layered_material_lab_windows
-                gui_forms_custom_chrome_lab_windows
-                gui_forms_typography_scale_lab_windows
-                gui_forms_responsive_tracks_lab_windows
-                gui_forms_connected_controls_lab_windows
-                gui_forms_seam_proximity_lab_windows)
-            add_custom_command(TARGET ${font_target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_FILE_DIR:${font_target}>/fonts")
-            foreach(font_file IN LISTS GUI_FORMS_GALLERY_FONTS)
-                get_filename_component(font_name "${font_file}" NAME)
-                add_custom_command(TARGET ${font_target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${font_file}"
-                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${font_name}")
-            endforeach()
-            foreach(notice_file IN LISTS GUI_FORMS_GALLERY_FONT_NOTICES)
-                get_filename_component(notice_name "${notice_file}" NAME)
-                add_custom_command(TARGET ${font_target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${notice_file}"
-                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${notice_name}")
-            endforeach()
-        endforeach()
+        # The Gallery and the labs bundle GUI_FORMS_GALLERY_FONTS beside them;
+        # the staging at the end of this file copies them.
         find_program(GUI_FORMS_WINDOWS_OBJDUMP
             NAMES x86_64-w64-mingw32-objdump
             NO_CMAKE_FIND_ROOT_PATH
@@ -1767,26 +1710,8 @@ if(GUI_FORMS_BUILD_GALLERY)
         )
 
         # The X11 host discovers bundled faces in <executable dir>/fonts (or
-        # GUI_FORMS_FONT_DIR, or ../share/GUIForms/fonts once installed).
-        foreach(font_target IN ITEMS gui_forms_gallery_linux)
-            add_custom_command(TARGET ${font_target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_FILE_DIR:${font_target}>/fonts")
-            foreach(font_file IN LISTS GUI_FORMS_GALLERY_FONTS)
-                get_filename_component(font_name "${font_file}" NAME)
-                add_custom_command(TARGET ${font_target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${font_file}"
-                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${font_name}")
-            endforeach()
-            foreach(notice_file IN LISTS GUI_FORMS_GALLERY_FONT_NOTICES)
-                get_filename_component(notice_name "${notice_file}" NAME)
-                add_custom_command(TARGET ${font_target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${notice_file}"
-                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${notice_name}")
-            endforeach()
-        endforeach()
+        # GUI_FORMS_FONT_DIR, or ../share/GUIForms/fonts once installed);
+        # they are staged at the end of this file.
     endif()
 
     include(demo/correspondence/correspondence.cmake)
@@ -2233,6 +2158,12 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_inflate_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_inflate_tests COMMAND gui_forms_inflate_tests)
 
+    # The deflate contract harness's standalone inputs, in the normal suite.
+    add_executable(gui_forms_deflate_fuzz_tests fuzz/deflate_fuzz.cpp)
+    target_link_libraries(gui_forms_deflate_fuzz_tests PRIVATE stx_zlib::stx_zlib)
+    target_compile_definitions(gui_forms_deflate_fuzz_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    add_test(NAME gui_forms_deflate_fuzz_tests COMMAND gui_forms_deflate_fuzz_tests)
+
     add_executable(gui_forms_inflate_protocol_tests fuzz/inflate_protocol_fuzz.cpp)
     target_link_libraries(gui_forms_inflate_protocol_tests PRIVATE gui_forms_core)
     target_compile_definitions(gui_forms_inflate_protocol_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
@@ -2245,6 +2176,23 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_png_pixels_tests tests/image/png_pixels_tests.cpp)
     target_link_libraries(gui_forms_png_pixels_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_pixels_tests COMMAND gui_forms_png_pixels_tests)
+
+    # Deterministic malformed-input sweeps (owner revision of decision 6A).
+    add_executable(gui_forms_malformed_sweep_tests tests/compression/malformed_sweep_tests.cpp)
+    target_link_libraries(gui_forms_malformed_sweep_tests PRIVATE stx_zlib::stx_zlib)
+    add_test(NAME gui_forms_malformed_sweep_tests COMMAND gui_forms_malformed_sweep_tests)
+    add_executable(gui_forms_png_malformed_sweep_tests tests/image/png_malformed_sweep_tests.cpp)
+    target_link_libraries(gui_forms_png_malformed_sweep_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_png_malformed_sweep_tests COMMAND gui_forms_png_malformed_sweep_tests)
+
+    if(TARGET freetype)
+        # Decision 3A: FreeType refuses compressed data; plain fonts still load.
+        add_executable(gui_forms_freetype_zlib_tests tests/freetype_zlib_tests.cpp)
+        target_link_libraries(gui_forms_freetype_zlib_tests PRIVATE freetype)
+        target_compile_definitions(gui_forms_freetype_zlib_tests PRIVATE
+            GUI_FORMS_TEST_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf")
+        add_test(NAME gui_forms_freetype_zlib_tests COMMAND gui_forms_freetype_zlib_tests)
+    endif()
 
     add_executable(gui_forms_png_color_tests tests/image/png_color_tests.cpp)
     target_link_libraries(gui_forms_png_color_tests PRIVATE gui_forms_core)
@@ -3346,6 +3294,8 @@ if(GUI_FORMS_BUILD_TESTS)
                      COMMAND gui_forms_macos_accessibility_client_tests --gallery
                          --app $<TARGET_BUNDLE_DIR:gui_forms_macos_accessibility_gallery_app>
                          --dump ${CMAKE_CURRENT_BINARY_DIR}/accessibility_gallery_semantics.json)
+            # Gallery-wide: walks every page; `ctest -LE gallery_accessibility` skips it.
+            set_property(TEST gui_forms_macos_accessibility_client_gallery_tests APPEND PROPERTY LABELS gallery_accessibility)
             set_tests_properties(gui_forms_macos_accessibility_client_gallery_tests PROPERTIES
                 SKIP_RETURN_CODE 77 TIMEOUT 600)
         endif()
@@ -3495,7 +3445,7 @@ if(GUI_FORMS_BUILD_FUZZERS)
     )
     unset(CMAKE_REQUIRED_FLAGS)
     add_executable(gui_forms_inflate_fuzz
-        fuzz/inflate_fuzz.cpp stx_zlib/src/inflate.cpp)
+        fuzz/inflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp)
     target_include_directories(gui_forms_inflate_fuzz PRIVATE include stx_zlib/include)
     target_compile_options(gui_forms_inflate_fuzz PRIVATE
         -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
@@ -3508,7 +3458,7 @@ if(GUI_FORMS_BUILD_FUZZERS)
     endif()
 
     add_executable(gui_forms_inflate_protocol_fuzz
-        fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp)
+        fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp)
     target_include_directories(gui_forms_inflate_protocol_fuzz PRIVATE include stx_zlib/include)
     target_compile_options(gui_forms_inflate_protocol_fuzz PRIVATE
         -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
@@ -3520,10 +3470,24 @@ if(GUI_FORMS_BUILD_FUZZERS)
         target_compile_definitions(gui_forms_inflate_protocol_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
     endif()
 
+    add_executable(gui_forms_deflate_fuzz
+        fuzz/deflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp stx_zlib/src/checksum.cpp)
+    target_include_directories(gui_forms_deflate_fuzz PRIVATE stx_zlib/include)
+    target_compile_options(gui_forms_deflate_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_deflate_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_deflate_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_deflate_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_deflate_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
     add_executable(gui_forms_png_decode_fuzz
-        fuzz/png_decode_fuzz.cpp src/core/image/png_decoder.cpp
-        src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp)
-    target_include_directories(gui_forms_png_decode_fuzz PRIVATE include stx_zlib/include)
+        fuzz/png_decode_fuzz.cpp stx_png/src/decoder.cpp
+        stx_png/src/encoder.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp
+        stx_zlib/src/checksum.cpp)
+    target_include_directories(gui_forms_png_decode_fuzz PRIVATE stx_png/include stx_zlib/include)
     target_compile_options(gui_forms_png_decode_fuzz PRIVATE
         -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
     target_link_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=address,undefined)
@@ -3537,9 +3501,11 @@ if(GUI_FORMS_BUILD_FUZZERS)
     add_executable(gui_forms_png_registry_fuzz
         fuzz/png_registry_fuzz.cpp
         src/core/resources/image_registry/image_registry.cpp
+        stx_zlib/src/checksum.cpp
     )
     target_include_directories(gui_forms_png_registry_fuzz PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/stx_zlib/include
     )
     target_compile_features(gui_forms_png_registry_fuzz PRIVATE cxx_std_20)
     if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
@@ -3615,7 +3581,14 @@ include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
-install(FILES src/core/compression/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
+# stx_zlib and stx_png install their own licences and provenance under
+# share/licenses/<package>; the SDK also carries them beside GUI.Forms' others.
+install(FILES stx_zlib/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE.txt)
+install(FILES stx_zlib/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-puff.txt)
+install(FILES stx_zlib/LICENSE-zlib.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-zlib.txt)
+install(FILES stx_zlib/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-PROVENANCE.md)
+install(FILES stx_png/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-LICENSE.txt)
+install(FILES stx_png/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-PROVENANCE.md)
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 # Every third-party component the SDK and the programs ship, with its licence
 # and the FreeType credit (THIRD_PARTY_NOTICES.md).
@@ -3627,8 +3600,6 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
 endif()
 if(GUI_FORMS_ENABLE_SKIA)
     install(FILES "${GUI_FORMS_SKIA_ROOT}/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Skia-LICENSE.txt)
-    install(FILES "${GUI_FORMS_SKIA_ROOT}/third_party/externals/libpng/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME libpng-LICENSE.txt)
-    install(FILES "${GUI_FORMS_SKIA_ROOT}/third_party/externals/zlib/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME zlib-LICENSE.txt)
 endif()
 
 install(FILES third_party/sheenbidi/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME SheenBidi-LICENSE.txt)
@@ -3721,6 +3692,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
                          ${CMAKE_CURRENT_SOURCE_DIR}/tests/linux_accessibility_gallery_client.py
                          $<TARGET_FILE:gui_forms_linux_accessibility_gallery_fixture>
                          ${CMAKE_CURRENT_SOURCE_DIR}/manifests/controls.json)
+        # Gallery-wide: walks every page; `ctest -LE gallery_accessibility` skips it.
+        set_property(TEST gui_forms_linux_accessibility_gallery_tests APPEND PROPERTY LABELS gallery_accessibility)
         set_tests_properties(gui_forms_linux_accessibility_gallery_tests PROPERTIES
             SKIP_RETURN_CODE 77 TIMEOUT 900)
     endif()
@@ -3754,6 +3727,8 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
         # about 10 s in a release tree, about 340 s in the sanitizer tree
         # (measured 2026-10-20 on the owner's machine with other builds
         # running), whose ctest budget is 900 s.
+        # Gallery-wide: walks every page; `ctest -LE gallery_accessibility` skips it.
+        set_property(TEST gui_forms_windows_accessibility_msaa_gallery_tests APPEND PROPERTY LABELS gallery_accessibility)
         set_tests_properties(gui_forms_windows_accessibility_msaa_gallery_tests PROPERTIES TIMEOUT 900)
         # Stage A, A-W3: an IUIAutomation client on a thread of its own
         # enumerates every Gallery page and performs each control's default
@@ -3770,6 +3745,82 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
         # than 1800 s through ctest on 2026-10-20 while other workspaces'
         # builds left it about 55% of a core. The limit is twice the
         # heaviest load measured.
+        # Gallery-wide: walks every page; `ctest -LE gallery_accessibility` skips it.
+        set_property(TEST gui_forms_windows_accessibility_uia_gallery_tests APPEND PROPERTY LABELS gallery_accessibility)
         set_tests_properties(gui_forms_windows_accessibility_uia_gallery_tests PROPERTIES TIMEOUT 3600)
     endif()
+endif()
+
+# Programs that bundle fonts share one output directory, so one fonts/
+# beside them (the Windows and X11 hosts look there): the Gallery and its
+# labs and the Correspondence demonstration (GUI_FORMS_GALLERY_FONTS), and the
+# File Manager demoboard (GUI_FORMS_DEMOBOARD_FONTS), largely the same faces.
+# Each program used to copy its list there after linking, so on a cold
+# parallel build several post-build steps wrote the same files at once and
+# one could fail ("Error copying file"; seen on Windows and on Linux). One
+# target stages every file once, each through its own build rule (one writer
+# per file, recopied when the source changes), and the programs depend on it.
+# macOS bundles carry their fonts as resources instead.
+set(gui_forms_font_programs)
+set(gui_forms_font_sources)
+foreach(gallery_program IN ITEMS
+        gui_forms_gallery_windows
+        gui_forms_vsync_lab_windows
+        gui_forms_visual_inspector_lab_windows
+        gui_forms_layered_material_lab_windows
+        gui_forms_custom_chrome_lab_windows
+        gui_forms_typography_scale_lab_windows
+        gui_forms_responsive_tracks_lab_windows
+        gui_forms_connected_controls_lab_windows
+        gui_forms_seam_proximity_lab_windows
+        gui_forms_correspondence_windows
+        gui_forms_gallery_linux
+        gui_forms_correspondence_linux)
+    if(TARGET ${gallery_program})
+        list(APPEND gui_forms_font_programs ${gallery_program})
+        list(APPEND gui_forms_font_sources ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
+    endif()
+endforeach()
+foreach(demoboard_program IN ITEMS gui_forms_file_manager_demoboard_windows gui_forms_file_manager_demoboard_linux)
+    if(TARGET ${demoboard_program})
+        list(APPEND gui_forms_font_programs ${demoboard_program})
+        list(APPEND gui_forms_font_sources ${GUI_FORMS_DEMOBOARD_FONTS} ${GUI_FORMS_DEMOBOARD_FONT_NOTICES})
+    endif()
+endforeach()
+if(gui_forms_font_programs)
+    set(gui_forms_program_directory "${CMAKE_CURRENT_BINARY_DIR}")
+    if(CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+        set(gui_forms_program_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    endif()
+    list(REMOVE_DUPLICATES gui_forms_font_sources)
+    set(gui_forms_staged_fonts)
+    set(gui_forms_staged_font_names)
+    foreach(font_file IN LISTS gui_forms_font_sources)
+        get_filename_component(font_name "${font_file}" NAME)
+        if(font_name IN_LIST gui_forms_staged_font_names)
+            message(FATAL_ERROR "Two bundled font files share the name ${font_name}")
+        endif()
+        list(APPEND gui_forms_staged_font_names "${font_name}")
+        set(staged_font "${gui_forms_program_directory}/fonts/${font_name}")
+        add_custom_command(OUTPUT "${staged_font}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${gui_forms_program_directory}/fonts"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${font_file}" "${staged_font}"
+            DEPENDS "${font_file}"
+            VERBATIM)
+        list(APPEND gui_forms_staged_fonts "${staged_font}")
+    endforeach()
+    add_custom_target(gui_forms_program_fonts DEPENDS ${gui_forms_staged_fonts})
+    foreach(font_target IN LISTS gui_forms_font_programs)
+        get_target_property(font_target_directory ${font_target} RUNTIME_OUTPUT_DIRECTORY)
+        if(font_target_directory AND NOT font_target_directory STREQUAL gui_forms_program_directory)
+            message(FATAL_ERROR "${font_target} is built outside ${gui_forms_program_directory}, where its fonts are staged")
+        endif()
+        add_dependencies(${font_target} gui_forms_program_fonts)
+    endforeach()
+endif()
+
+# Every test carries one area label (cmake/TestAreas.cmake, tools/test_areas.json).
+if(GUI_FORMS_BUILD_TESTS)
+    include(cmake/TestAreas.cmake)
+    gui_forms_label_test_areas(stx_zlib stx_png)
 endif()

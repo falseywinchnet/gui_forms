@@ -79,22 +79,24 @@ Rect dock_drop_highlight(Rect bounds, DockDropZone zone, bool edge) noexcept {
     switch (zone) {
     case DockDropZone::top:
         area.height = across_height;
-        break;
+        return area;
     case DockDropZone::bottom:
         area.y = bounds.y + bounds.height - across_height;
         area.height = across_height;
-        break;
+        return area;
     case DockDropZone::left:
         area.width = across_width;
-        break;
+        return area;
     case DockDropZone::right:
         area.x = bounds.x + bounds.width - across_width;
         area.width = across_width;
-        break;
+        return area;
     case DockDropZone::center:
-        break;
+        // A drop into the stack highlights all of it.
+        return bounds;
     }
-    return area;
+    // A zone outside the enumeration highlights the whole target.
+    return bounds;
 }
 
 DockDropZone dock_zone_at(Rect pane, Point point) noexcept {

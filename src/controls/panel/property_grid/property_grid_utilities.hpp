@@ -56,9 +56,21 @@ inline std::vector<CompoundFieldSpec> compound_fields(BindingValueKind kind) {
                 {"italic", BindingValueKind::boolean,
                  PropertyEditorKind::boolean},
                 {"letter_spacing", BindingValueKind::number}};
-    default:
+    case BindingValueKind::null:
+    case BindingValueKind::boolean:
+    case BindingValueKind::signed_integer:
+    case BindingValueKind::unsigned_integer:
+    case BindingValueKind::number:
+    case BindingValueKind::text:
+    case BindingValueKind::image:
+    case BindingValueKind::enumeration:
+    case BindingValueKind::object:
+    case BindingValueKind::collection:
+        // Not compound: edited as one value.
         return {};
     }
+    // A kind outside the enumeration has no fields.
+    return {};
 }
 
 inline std::optional<BindingValue> compound_field_value(
@@ -92,6 +104,8 @@ inline std::optional<BindingValue> compound_field_value(
             case FontRole::content: return BindingValue{std::string("content")};
             case FontRole::monospace: return BindingValue{std::string("monospace")};
             }
+            // A role outside the enumeration has no spelling.
+            return {};
         }
         if (field == "size") return BindingValue{(*item).size};
         if (field == "weight") {
