@@ -1,7 +1,10 @@
 // The engine's retained forms (T2 plan, phase E7r; owner, 2026-10-22):
 // nothing in the engine bakes per frame. A part's face that changes between
 // discrete states bakes each endpoint once and cross-fades them through a
-// paint group (form a): the old face at 1 - t, the new one added at t.
+// paint group (form a): the old face at 1 - t, the new one added at t. The
+// proof: with every transition running at once (opacity, scale, face and
+// an animated parameter), nothing is baked between the discrete changes
+// that start them and the rest that ends them.
 
 #include "gui_forms/gui_forms.hpp"
 
@@ -101,10 +104,12 @@ public:
         part.family = ControlVisualRole::button;
         part.bounds = Rect{20.0, 20.0, 40.0, 24.0};
         part.key = PartKey{"face", {}, {}};
+        part.granted_overflow = overflow;
         if (hot) part.states.insert(AnatomyState::hot);
         paint_part(painter, *this, part);
     }
     bool hot{};
+    Insets overflow{};
 };
 
 // The pad's face is the material plate, cross-faded over 100 ms.
@@ -122,6 +127,41 @@ ThemeRule fading_rule(std::string id) {
     return rule;
 }
 
+// A two-state machine for `property`: `hot_target` while hot, else
+// `rest_target`, linearly over 100 ms.
+PropertyTransition hot_machine(std::string_view property, double hot_target, double rest_target) {
+    PropertyTransition transition{};
+    transition.property = std::string(property);
+    PresentationState hot{};
+    hot.when.push_back(AnatomyState::hot);
+    hot.target = hot_target;
+    PresentationState rest{};
+    rest.target = rest_target;
+    transition.states.push_back(hot);
+    transition.states.push_back(rest);
+    transition.curve = MotionCurve::timed(milliseconds(100), MotionEasing::linear);
+    return transition;
+}
+
+// The bulge with every transition at once: its amplitude, its opacity, its
+// scale and its face.
+ThemeRule moving_rule(std::string id) {
+    ThemeRule rule{};
+    rule.label = id;
+    rule.level = CascadeLevel::theme_sheet;
+    rule.selector.stable_id = std::move(id);
+    rule.selector.part = "face";
+    rule.declarations.push_back(RuleDeclaration::primitive("bulge"));
+    rule.transitions.push_back(hot_machine("amplitude", 0.75, 0.25));
+    rule.transitions.push_back(hot_machine(opacity_property, 1.0, 0.8));
+    rule.transitions.push_back(hot_machine(scale_property, 1.25, 1.0));
+    PropertyTransition fade{};
+    fade.property = std::string(face_property);
+    fade.curve = MotionCurve::timed(milliseconds(100), MotionEasing::linear);
+    rule.transitions.push_back(fade);
+    return rule;
+}
+
 struct Fixture final {
     ManualTime time{};
     std::shared_ptr<Panel> root;
@@ -130,19 +170,24 @@ struct Fixture final {
     CallWatch painter{};
 };
 
-std::unique_ptr<Fixture> make_fixture() {
+std::unique_ptr<Fixture> make_fixture(bool moving = false) {
     std::unique_ptr<Fixture> fixture = std::make_unique<Fixture>();
     Fixture& made = *fixture;
     made.root = make_control<Panel>(StableId("root"));
     made.pad = make_control<Pad>(StableId("pad"));
     (*made.pad).set_requested_bounds(Rect{100.0, 100.0, 100.0, 80.0});
+    (*made.pad).overflow = Insets{5.0, 3.0, 5.0, 3.0};
     (*made.root).add_child(made.pad);
     made.window = std::make_unique<Window>(made.root, Size{400.0, 300.0});
     Window& window = *made.window;
     window.motion_clock().set_time_source(&made.time);
     ThemeDefinition definition = windows_professional_theme_definition();
     definition.id = "engine-retained-test";
-    definition.rules.rules.push_back(fading_rule("pad"));
+    if (moving) {
+        definition.rules.rules.push_back(moving_rule("pad"));
+    } else {
+        definition.rules.rules.push_back(fading_rule("pad"));
+    }
     window.set_theme(Theme::create(definition));
     require(window.theme().engine().rules().diagnostics().empty(), "the fading theme compiles cleanly");
     window.perform_layout();
@@ -235,6 +280,67 @@ void face_cross_fades_between_baked_endpoints() {
     require(made.painter.calls.size() == 1U && made.painter.calls[0].raster == cold, "the cold face rests alone");
 }
 
+// Runs the clock until the part's motion settles, requiring that no frame
+// while it runs bakes anything; returns the frames that ran.
+std::size_t run_without_bakes(Fixture& fixture, const char* message) {
+    Window& window = *fixture.window;
+    const std::uint64_t started = bakes(window);
+    std::size_t frames = 0U;
+    for (int step = 0; step < 40 && window.motion_clock().armed(); ++step) {
+        fixture.time.time += milliseconds(16);
+        static_cast<void>(window.poll_frame_schedule(fixture.time.time));
+        repaint(fixture);
+        // The frame that settles the motion is its rest, which bakes sharp.
+        if (!window.motion_clock().armed()) break;
+        require(bakes(window) == started, message);
+        frames = frames + 1U;
+    }
+    require(!window.motion_clock().armed(), "the motion settles");
+    return frames;
+}
+
+void no_bakes_while_transitions_run() {
+    std::unique_ptr<Fixture> fixture = make_fixture(true);
+    Fixture& made = *fixture;
+    Window& window = *made.window;
+    // Owner A: the keyframes bake in idle frames first, one a frame.
+    for (int step = 0; step < 40 && window.engine_parts().idle_keyframes_waiting(); ++step) {
+        const std::uint64_t before = bakes(window);
+        made.time.time += milliseconds(16);
+        static_cast<void>(window.poll_frame_schedule(made.time.time));
+        repaint(made);
+        require(bakes(window) <= before + 1U, "an idle frame bakes one keyframe");
+    }
+    require(!window.engine_parts().idle_keyframes_waiting(), "the idle keyframes are all baked");
+    const std::uint64_t rested = bakes(window);
+    require(rested >= 1U, "the face at rest is baked");
+
+    // The discrete change: the bakes it needs (the new face, the keyframes
+    // the rise passes, the face at its own size to stretch) happen now.
+    static_cast<void>(window.dispatch_pointer({PointerAction::move, PointerButton::none, Point{150.0, 140.0}}));
+    repaint(made);
+    require(window.motion_clock().armed(), "every transition starts");
+    const std::uint64_t changed = bakes(window);
+    require(changed >= rested, "the change bakes at most what the transitions will show first");
+    const std::size_t rising = run_without_bakes(made, "nothing is baked while the transitions run");
+    require(rising >= 3U, "the transitions span frames");
+    const std::uint64_t risen = bakes(window);
+    require(risen - changed <= 2U, "the rest bakes at most the sharp scaled face and the exact amplitude");
+
+    static_cast<void>(window.dispatch_pointer({PointerAction::move, PointerButton::none, Point{390.0, 290.0}}));
+    repaint(made);
+    require(window.motion_clock().armed(), "every transition starts back");
+    const std::size_t falling = run_without_bakes(made, "nothing is baked while they run back");
+    require(falling >= 3U, "the way back spans frames");
+
+    // A second round finds everything held: only the rests bake.
+    const std::uint64_t again = bakes(window);
+    static_cast<void>(window.dispatch_pointer({PointerAction::move, PointerButton::none, Point{150.0, 140.0}}));
+    repaint(made);
+    require(bakes(window) == again, "a second change bakes nothing");
+    static_cast<void>(run_without_bakes(made, "nor does its run"));
+}
+
 void face_transition_is_checked_at_load() {
     ThemeRuleSheet sheet{};
     ThemeRule stated = fading_rule("stated");
@@ -271,6 +377,7 @@ void face_transition_is_checked_at_load() {
 int main() {
     face_transition_is_checked_at_load();
     face_cross_fades_between_baked_endpoints();
+    no_bakes_while_transitions_run();
     std::cout << "engine retained form tests passed\n";
     return 0;
 }

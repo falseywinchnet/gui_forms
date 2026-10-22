@@ -79,8 +79,9 @@ bool same_material(const CachedPartRaster& cached, const PrimitiveTarget& target
 
 // Whether `cached` was drawn for what `request` asks: the same primitive,
 // extent, size, scale, read states and inputs, parameters and material.
-bool answers(const CachedPartRaster& cached, const PartRasterRequest& request) noexcept {
-    if (!cached.raster || cached.primitive != request.primitive) return false;
+// Whether `cached` describes what `request` asks for (its raster aside).
+bool describes(const CachedPartRaster& cached, const PartRasterRequest& request) noexcept {
+    if (cached.primitive != request.primitive) return false;
     if (!(cached.extent == request.extent)) return false;
     if (!(cached.target.logical_size == request.target.logical_size)) return false;
     if (!(cached.target.scale == request.target.scale)) return false;
@@ -90,6 +91,13 @@ bool answers(const CachedPartRaster& cached, const PartRasterRequest& request) n
     if (!same_parameters(cached.parameters, request.parameters)) return false;
     const bool same = same_material(cached, request.target);
     return same;
+}
+
+// Whether `cached` holds a raster for `request`.
+bool answers(const CachedPartRaster& cached, const PartRasterRequest& request) noexcept {
+    if (!cached.raster) return false;
+    const bool held = describes(cached, request);
+    return held;
 }
 
 // Records in `cached` what drew `raster` for `request`, with the lent
@@ -434,8 +442,10 @@ std::shared_ptr<PartRaster> EnginePartTable::shared_bake(const PartRasterRequest
                                                       (*baked).view());
     if (outcome != RasterOutcome::painted && outcome != RasterOutcome::empty) return nullptr;
     statistics_.bakes = statistics_.bakes + 1U;
-    if (keyframe) {
-        statistics_.keyframe_bakes = statistics_.keyframe_bakes + 1U;
+    if (use == SharedUse::idle_keyframe) {
+        statistics_.keyframe_idle_bakes = statistics_.keyframe_idle_bakes + 1U;
+    } else if (keyframe) {
+        statistics_.keyframe_demand_bakes = statistics_.keyframe_demand_bakes + 1U;
     } else {
         statistics_.slice_bakes = statistics_.slice_bakes + 1U;
     }
@@ -469,11 +479,59 @@ std::shared_ptr<PartRaster> EnginePartTable::shared_bake(const PartRasterRequest
     return baked;
 }
 
-PartRasterStatus EnginePartTable::prepare_shared(const PartRasterRequest& request, const std::uint64_t paint_sequence) {
-    if (request.primitive == nullptr) return PartRasterStatus::refused;
-    const std::shared_ptr<PartRaster> held = shared_bake(request, paint_sequence, false, SharedUse::keyframe);
-    if (!held) return PartRasterStatus::refused;
-    return PartRasterStatus::shared;
+void EnginePartTable::queue_idle_keyframe(const PartRasterRequest& request) {
+    if (request.primitive == nullptr || idle_keyframes_.size() >= maximum_idle_keyframes) return;
+    for (const SharedBake& held : shared_bakes_) {
+        if (answers(held.cached, request)) return;
+    }
+    for (const CachedPartRaster& queued : idle_keyframes_) {
+        if (describes(queued, request)) return;
+    }
+    std::optional<SurfaceMaterial> material{};
+    std::uint64_t image_revision = 0U;
+    if (request.target.material != nullptr) {
+        material = *request.target.material;
+        if (request.target.images != nullptr) image_revision = (*request.target.images).snapshot().revision;
+    }
+    CachedPartRaster queued{};
+    queued.shared = true;
+    keep_request(queued, request, std::move(material), image_revision);
+    idle_keyframes_.push_back(std::move(queued));
+    statistics_.idle_keyframes_queued = idle_keyframes_.size();
+}
+
+bool EnginePartTable::bake_idle_keyframe(const ImageRegistry* images, const std::uint64_t paint_sequence) {
+    while (!idle_keyframes_.empty()) {
+        const CachedPartRaster queued = std::move(idle_keyframes_.front());
+        idle_keyframes_.pop_front();
+        statistics_.idle_keyframes_queued = idle_keyframes_.size();
+        // The request again, its material and the window's images lent.
+        PartRasterRequest request{};
+        request.primitive = queued.primitive;
+        request.parameters = queued.parameters;
+        request.target = queued.target;
+        request.extent = queued.extent;
+        request.shared = true;
+        if (queued.material) {
+            if (images == nullptr || (*images).snapshot().revision != queued.image_revision) continue;
+            request.target.material = &*queued.material;
+            request.target.images = images;
+        }
+        bool held = false;
+        for (const SharedBake& bake : shared_bakes_) {
+            if (answers(bake.cached, request)) held = true;
+        }
+        if (held) continue;
+        static_cast<void>(shared_bake(request, paint_sequence, false, SharedUse::idle_keyframe));
+        break;
+    }
+    const bool waiting = !idle_keyframes_.empty();
+    return waiting;
+}
+
+bool EnginePartTable::idle_keyframes_waiting() const noexcept {
+    const bool waiting = !idle_keyframes_.empty();
+    return waiting;
 }
 
 RasterOutcome EnginePartTable::draw(const PartRasterRequest& request, PrimitivePreparation& preparation,
@@ -664,6 +722,8 @@ void EnginePartTable::invalidate_raster(const PartRecordHandle handle) noexcept 
 void EnginePartTable::invalidate_rasters() noexcept {
     raster_table_generation_ = raster_table_generation_ + 1U;
     clear_shared_bakes();
+    idle_keyframes_.clear();
+    statistics_.idle_keyframes_queued = 0U;
 }
 
 } // namespace gui_forms

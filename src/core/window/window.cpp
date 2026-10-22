@@ -3122,7 +3122,8 @@ void Window::update_display_cache_metrics() noexcept {
 void Window::compact_frame_requests() noexcept {
     for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
         if ((*request).kind == detail::FrameRequestKind::ui_timer ||
-            (*request).kind == detail::FrameRequestKind::motion_clock) {
+            (*request).kind == detail::FrameRequestKind::motion_clock ||
+            (*request).kind == detail::FrameRequestKind::engine_idle) {
             continue;
         }
         const std::shared_ptr<gui_forms::Control> target = (*request).target.lock();

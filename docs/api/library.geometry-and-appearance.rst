@@ -827,9 +827,15 @@ Types
 
    .. cpp:member:: std::shared_ptr<const PartRaster> shown_face
 
-      For a part with a face cross-fade (E7r form a): the face it showed last, and while a fade runs the face it fades from. Both are shared with the raster cache and the display; they keep a replaced face alive only until its fade settles, and are released on the first paint without a face transition.
+      For a part with a face cross-fade (E7r form a): the face it showed last and the states it showed it in, and while a fade runs the face it fades from. A fade starts only when the states change (a discrete change), never when a keyframe step or a scale replaces the face. The faces are shared with the raster cache and the display; they keep a replaced face alive only until its fade settles, and are released on the first paint without a face transition.
 
    .. cpp:member:: std::shared_ptr<const PartRaster> fading_face
+
+   .. cpp:member:: AnatomyStateSet face_states
+
+   .. cpp:member:: std::optional<AnatomyStateSet> keyframe_states
+
+      The states whose keyframes were last queued for idle frames (E7r): queued again when the part's states change.
 
    .. cpp:member:: bool ambient
 
@@ -877,6 +883,8 @@ Types
 
       Record storage allocated, live or free: released and evicted slots are reused before it grows, so it stays near the most records live at once.
 
+   .. cpp:function:: bool idle_keyframes_waiting() const noexcept
+
    .. cpp:function:: RasterCacheStatistics cache_statistics() const noexcept
 
 
@@ -904,9 +912,11 @@ Types
 
       The part's raster for ``request``, painted on window paint ``paint_sequence`` (the record's new last_painted). - The cached raster is returned unchanged while its primitive, parameters, target, read states and extent are the request's and neither generation has advanced. - Otherwise the primitive draws the part. It draws into the cached raster's storage when the extent and scale are unchanged and no recorded command still holds that raster (a held raster is never rewritten, since a recording shows it), and into new storage otherwise. - New storage is made room for by evicting other parts' rasters, least recently painted first, until the cache fits its budget. A raster larger than the whole budget is drawn and returned but not kept. - The record's preparation is remade when the primitive refuses it as stale. If the primitive refuses, nothing is evicted and the record keeps its cached raster. Allocation failure propagates as std::bad_alloc, with the record unchanged.
 
-   .. cpp:function:: PartRasterStatus prepare_shared(const PartRasterRequest& request, std::uint64_t paint_sequence)
+   .. cpp:function:: void queue_idle_keyframe(const PartRasterRequest& request)
 
-      Bakes the shared raster for ``request`` (a keyframe) if the table holds none, so that a transition about to pass through it finds it ready. Refused as raster_for is; allocation failure propagates as std::bad_alloc.
+      Idle keyframes (E7r; owner A, 2026-10-22). queue_idle_keyframe keeps a copy of ``request`` (its lent material copied, its borrows cleared) to bake in an idle frame, unless the table holds or queues it already or the queue is full. bake_idle_keyframe bakes the oldest queued keyframe the table does not hold, lending it ``images`` (a queued material whose images changed is dropped), and returns whether any remain queued. A theme change (invalidate_rasters) empties the queue. Allocation failure propagates as std::bad_alloc, the queue then holding what it held less the keyframe taken.
+
+   .. cpp:function:: bool bake_idle_keyframe(const ImageRegistry* images, std::uint64_t paint_sequence)
 
    .. cpp:function:: PartRasterResult raster_without_record(const PartRasterRequest& request, std::uint64_t paint_sequence)
 
@@ -2282,11 +2292,15 @@ Types
 
    .. cpp:member:: std::uint64_t slice_axis_fallbacks
 
-   .. cpp:member:: std::uint64_t keyframe_bakes
+   .. cpp:member:: std::uint64_t keyframe_idle_bakes
 
-      Keyframes (E7r): baked, and taken from the shared bakes already held.
+      Keyframes (E7r; owner A, 2026-10-22): baked in idle frames ahead of use, baked on demand the first time a paint reached one not yet held, and taken from the shared bakes already held; and those queued for idle frames now.
+
+   .. cpp:member:: std::uint64_t keyframe_demand_bakes
 
    .. cpp:member:: std::uint64_t keyframe_hits
+
+   .. cpp:member:: std::size_t idle_keyframes_queued
 
    .. cpp:member:: std::uint64_t shared_evictions
 
@@ -3844,6 +3858,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t shared_bake_budget_bytes
 
    The most bytes of shared bakes one window keeps (E7r), apart from raster_cache_budget_bytes: slice references, a few kilobytes each for a button at scale 2, and keyframes, ten whole rasters for each size and state of a part with an animated parameter (some 200 KB for a large ribbon button at scale 1.5). A proposed default. Value: ``4U * 1024U * 1024U``.
+
+.. cpp:var:: constexpr std::size_t maximum_idle_keyframes
+
+   The most keyframes queued for idle frames at once (E7r): ten levels for each of about six parts. A keyframe that does not fit is baked on demand when a paint first reaches it. Value: ``64U``.
 
 .. cpp:namespace:: gui_forms
 

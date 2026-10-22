@@ -199,9 +199,9 @@ double rest_value(const CompiledTransition& transition, const PrimitiveParameter
 }
 
 // The engine properties a part is shown with this paint, and what its
-// transitions did: whether its scale is still moving; by parameter
-// position, the bits of the parameters still moving and of those whose move
-// started on this paint, and the target of each that started.
+// transitions did: whether its scale is still moving, and by parameter
+// position the bits of the parameters it transitions and of those still
+// moving.
 struct PresentedProperties final {
     double opacity{1.0};
     double scale{1.0};
@@ -209,9 +209,8 @@ struct PresentedProperties final {
     // The part's face cross-fade (E7r form a), when it has one and a
     // record: its value, 1 when settled. The paint starts it.
     MotionValue* face{};
+    std::uint32_t transitioned_parameters{};
     std::uint32_t moving_parameters{};
-    std::uint32_t started_parameters{};
-    std::array<double, maximum_primitive_parameters> targets{};
 };
 
 std::uint32_t parameter_bit(std::size_t parameter) noexcept {
@@ -329,16 +328,13 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
             }
         }
         MotionValue& value = *channel.value;
-        const MotionStart start = value.animate_to(target);
+        static_cast<void>(value.animate_to(target));
         show_value(transition, value.current(), range, parameters, presented);
         if (transition.property == PresentationProperty::scale && !value.settled()) presented.scale_moving = true;
         if (transition.property == PresentationProperty::parameter) {
             const std::uint32_t bit = parameter_bit(transition.parameter);
+            presented.transitioned_parameters = presented.transitioned_parameters | bit;
             if (!value.settled()) presented.moving_parameters = presented.moving_parameters | bit;
-            if (start == MotionStart::started) {
-                presented.started_parameters = presented.started_parameters | bit;
-                presented.targets[transition.parameter] = std::clamp(target, range.minimum, range.maximum);
-            }
         }
     }
     if (motion != nullptr) {
@@ -366,18 +362,20 @@ bool fades_between(const PartRaster& from, const PartRaster& to) noexcept {
     return same;
 }
 
-// Notes the face a part shows on this paint and starts its cross-fade
-// when the face changed, and returns the face it fades from (null when
-// none fades). A part without a face transition holds no faces.
+// Notes the face a part shows on this paint in `states`, starts its
+// cross-fade when its states changed and with them its face, and returns
+// the face it fades from (null when none fades). A part without a face
+// transition holds no faces.
 std::shared_ptr<const PartRaster> note_face(EnginePartRecord& part, MotionValue* face,
-                                            const std::shared_ptr<const PartRaster>& raster) {
+                                            const std::shared_ptr<const PartRaster>& raster, AnatomyStateSet states) {
     if (face == nullptr) {
         part.shown_face.reset();
         part.fading_face.reset();
         return nullptr;
     }
     MotionValue& value = *face;
-    if (part.shown_face && part.shown_face != raster) {
+    const bool discrete = part.face_states != states;
+    if (discrete && part.shown_face && part.shown_face != raster) {
         if (fades_between(*part.shown_face, *raster)) {
             part.fading_face = part.shown_face;
             value.jump_to(0.0);
@@ -389,6 +387,7 @@ std::shared_ptr<const PartRaster> note_face(EnginePartRecord& part, MotionValue*
         }
     }
     part.shown_face = raster;
+    part.face_states = states;
     if (value.settled()) part.fading_face.reset();
     std::shared_ptr<const PartRaster> from = part.fading_face;
     return from;
@@ -415,13 +414,37 @@ std::size_t nearest_keyframe(const PrimitiveParameterDeclaration& declared, doub
     return level;
 }
 
-// Steps each animated parameter whose transition runs on this paint to its
-// nearest keyframe level, and returns whether every animated parameter now
-// stands at a level (false for a primitive with none), so that its raster
-// may be a shared keyframe. A parameter an expression drives with the time
-// in state needs no step: an ambient effect's time steps through its loop's
-// frames, and nothing else repaints a part as time passes.
-bool step_to_keyframes(const PrimitiveDescriptor& descriptor, const PresentedProperties& presented,
+// The pointer inputs: an expression reading them moves its parameter as
+// the pointer moves.
+constexpr std::uint64_t pointer_inputs() noexcept {
+    const std::uint64_t across = expression_input_bit(engine_input_position(EngineInput::pointer_x));
+    const std::uint64_t down = expression_input_bit(engine_input_position(EngineInput::pointer_y));
+    return across | down;
+}
+
+// By parameter position, the animated parameters an expression drives
+// from the pointer (owner D, 2026-10-22: they step through the keyframes).
+std::uint32_t pointer_driven(const CompiledThemeRules::Resolution& resolution,
+                             const PrimitiveDescriptor& descriptor) noexcept {
+    std::uint32_t driven = 0U;
+    for (std::size_t index = 0; index < resolution.parameters.count; ++index) {
+        const EngineExpression* const expression = resolution.expressions[index];
+        if (!descriptor.parameters[index].animated || expression == nullptr) continue;
+        if (((*expression).dependencies().inputs & pointer_inputs()) == 0U) continue;
+        driven = driven | parameter_bit(index);
+    }
+    return driven;
+}
+
+// Steps each animated parameter in `stepped` (bits by parameter position:
+// those whose transition runs on this paint, and those the pointer
+// drives) to its nearest keyframe level, and returns whether every animated
+// parameter now stands at a level (false for a primitive with none), so
+// that its raster may be a shared keyframe. A parameter an expression
+// drives with the time in state needs no step: an ambient effect's time
+// steps through its loop's frames, and nothing else repaints a part as
+// time passes.
+bool step_to_keyframes(const PrimitiveDescriptor& descriptor, std::uint32_t stepped,
                        PrimitiveParameterBlock& parameters) noexcept {
     bool any = false;
     bool all_at_levels = true;
@@ -429,7 +452,7 @@ bool step_to_keyframes(const PrimitiveDescriptor& descriptor, const PresentedPro
         const PrimitiveParameterDeclaration& declared = descriptor.parameters[index];
         if (!declared.animated) continue;
         any = true;
-        const bool moving = (presented.moving_parameters & parameter_bit(index)) != 0U;
+        const bool moving = (stepped & parameter_bit(index)) != 0U;
         double& value = parameters.values[index].number;
         const double level = keyframe_value(declared, nearest_keyframe(declared, value));
         if (moving) value = level;
@@ -683,7 +706,14 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     const PresentedProperties presented = run_transitions(resolution, transitions, &descriptor, request.parameters);
     // E7r: nothing bakes per frame. Moving animated parameters step through
     // shared keyframes, and an ambient effect's loop frames are shared.
-    const bool at_keyframes = step_to_keyframes(descriptor, presented, request.parameters);
+    // Owner C and D (2026-10-22): a running transition, or the pointer,
+    // steps its parameter to the nearest of the keyframes.
+    const std::uint32_t driven = pointer_driven(resolution, descriptor);
+    const bool at_keyframes =
+        step_to_keyframes(descriptor, presented.moving_parameters | driven, request.parameters);
+    // The parameters whose keyframes are worth baking ahead: those a
+    // transition or the pointer can move.
+    const std::uint32_t movable = presented.transitioned_parameters | driven;
     // While its scale moves, the part's raster at its own size is shown
     // stretched (form b), so it is shared too: baked when the move starts.
     request.shared = kept != nullptr && (at_keyframes || ambient_time.has_value() || presented.scale_moving);
@@ -730,11 +760,13 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     // A primitive that refuses the part leaves it to the built-in recipe;
     // a keyed part's refusal is counted when it begins (E8c).
     const bool accepted = (*request.primitive).accepts(request.parameters, request.target);
-    // A transition that starts on this paint has the keyframes it will pass
-    // baked now, at the discrete change, so that none is baked while it
-    // runs.
-    if (accepted && kept != nullptr && presented.started_parameters != 0U) {
-        prepare_keyframes(*window, request, presented.started_parameters, presented.targets);
+    // Owner A (2026-10-22): a part that can move its parameters has their
+    // keyframes queued for idle frames when it first paints and whenever
+    // its states change; one it reaches first is baked on demand.
+    const bool requeue = kept != nullptr && (!(*kept).keyframe_states || *(*kept).keyframe_states != part.states);
+    if (accepted && movable != 0U && requeue) {
+        (*kept).keyframe_states = part.states;
+        queue_keyframes(*window, request, movable);
     }
     if (invisible) return;
     const bool newly_refused = kept == nullptr || !(*kept).primitive_refused;
@@ -762,7 +794,7 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     // (form a): the old face at 1 - t and the new one added at t, in one
     // isolated group at the part's opacity.
     std::shared_ptr<const PartRaster> fading_from{};
-    if (kept != nullptr) fading_from = note_face(*kept, presented.face, raster);
+    if (kept != nullptr) fading_from = note_face(*kept, presented.face, raster, part.states);
     // The raster covers the part grown by its primitive's outsets; stretched,
     // that rectangle is scaled about the part's centre as its bounds are.
     const Insets outsets = descriptor.outsets;
@@ -803,27 +835,30 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     painter.draw_part_raster(raster, Point{shown.bounds.x - outsets.left, shown.bounds.y - outsets.top}, opacity);
 }
 
-// Bakes into the window's shared bakes the keyframes that each animated
-// parameter whose transition started on this paint will pass, from the
-// level shown now to its target's, with the part's other parameters as
-// `request` has them. Blank keyframes (a flat bulge) need none.
-void ThemeEngine::prepare_keyframes(Window& window, const PartRasterRequest& request, std::uint32_t started,
-                                    std::span<const double> targets) {
+// Queues every keyframe level of each animated parameter in `movable`,
+// nearest the value `request` shows first, with the part's other
+// parameters as `request` has them. Blank keyframes (a flat bulge) need
+// none.
+void ThemeEngine::queue_keyframes(Window& window, const PartRasterRequest& request, std::uint32_t movable) {
     const EnginePrimitive& primitive = *request.primitive;
     const PrimitiveDescriptor& descriptor = primitive.descriptor();
     for (std::size_t index = 0; index < request.parameters.count; ++index) {
         const PrimitiveParameterDeclaration& declared = descriptor.parameters[index];
-        if (!declared.animated || (started & parameter_bit(index)) == 0U) continue;
-        const std::size_t from = nearest_keyframe(declared, request.parameters.values[index].number);
-        const std::size_t to = nearest_keyframe(declared, targets[index]);
-        const std::size_t low = std::min(from, to);
-        const std::size_t high = std::max(from, to);
+        if (!declared.animated || (movable & parameter_bit(index)) == 0U) continue;
+        const std::size_t shown = nearest_keyframe(declared, request.parameters.values[index].number);
         PartRasterRequest keyframe = request;
         keyframe.shared = true;
-        for (std::size_t level = low; level <= high; ++level) {
-            keyframe.parameters.values[index].number = keyframe_value(declared, level);
-            if (primitive.blank(keyframe.parameters)) continue;
-            static_cast<void>(window.engine_prepare_shared(keyframe));
+        // Outward from the level shown: shown, shown + 1, shown - 1, ...
+        for (std::size_t distance = 0U; distance < animated_keyframe_levels; ++distance) {
+            for (std::size_t side = 0U; side < 2U; ++side) {
+                if (distance == 0U && side == 1U) continue;
+                if (side == 1U && distance > shown) continue;
+                const std::size_t level = side == 0U ? shown + distance : shown - distance;
+                if (level >= animated_keyframe_levels) continue;
+                keyframe.parameters.values[index].number = keyframe_value(declared, level);
+                if (primitive.blank(keyframe.parameters)) continue;
+                window.engine_queue_keyframe(keyframe);
+            }
         }
     }
 }

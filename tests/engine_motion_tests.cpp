@@ -381,6 +381,22 @@ std::size_t run_until_settled(RibbonFixture& fixture, BitHash& hash, std::vector
     return frames;
 }
 
+// Runs idle frames until the window has baked every queued keyframe,
+// requiring at most one bake per frame (owner A, 2026-10-22); returns the
+// frames run.
+std::size_t drain_idle_keyframes(RibbonFixture& fixture) {
+    Window& window = *fixture.window;
+    std::size_t frames = 0U;
+    for (int step = 0; step < 40 && window.engine_parts().idle_keyframes_waiting(); ++step) {
+        const std::uint64_t before = window.engine_parts().cache_statistics().bakes;
+        static_cast<void>(run_frame(window, fixture.time, fixture.painter));
+        require(window.engine_parts().cache_statistics().bakes <= before + 1U, "an idle frame bakes one keyframe");
+        frames = frames + 1U;
+    }
+    require(!window.engine_parts().idle_keyframes_waiting(), "the idle keyframes are all baked");
+    return frames;
+}
+
 // The expected hashes of the rise and the fall, recorded on Windows x64
 // and checked on every CI platform.
 constexpr std::uint64_t expected_rise_hash = 0x94265deb32d68de6ULL;
@@ -393,16 +409,21 @@ void ribbon_rise() {
     FaceFrame rest = face_frame(window);
     require(rest.pixels.empty() && !window.motion_clock().armed(),
             "a ribbon button is flat at rest: nothing is drawn and nothing moves");
+    // E7r (owner A): the rise's keyframes, the nine levels above the flat
+    // plane, are baked in idle frames after the first paint, one a frame.
+    require(window.engine_parts().idle_keyframes_waiting(), "the first paint queues the keyframes");
+    const std::size_t idle_frames = drain_idle_keyframes(*fixture);
+    require(idle_frames >= 9U && window.engine_parts().cache_statistics().keyframe_idle_bakes >= 9U,
+            "each keyframe takes an idle frame of its own");
 
     move_to(window, centre(face));
     repaint(window, (*fixture).painter);
     const FaceFrame start = face_frame(window);
     require(start.amplitude == 0.0 && start.pixels.empty() && window.motion_clock().armed(),
             "hot, the rise starts from the flat plane on the window's clock");
-    // E7r: the rise's keyframes are baked when it starts, the nine levels
-    // above the flat plane, and nothing is baked while it runs.
+    // With the idle bakes done, nothing is baked while the rise runs.
     const RasterCacheStatistics started = window.engine_parts().cache_statistics();
-    require(started.keyframe_bakes == 9U, "the rise's nine keyframes are baked when it starts");
+    require(started.keyframe_demand_bakes == 0U, "no keyframe is baked on demand");
     BitHash rise{};
     std::vector<double> rising{};
     const std::size_t rise_frames = run_until_settled(*fixture, rise, rising);
@@ -453,6 +474,27 @@ void ribbon_rise() {
     }
     require(rise.value == expected_rise_hash, "the rise has the same bits on every host");
     require(fall.value == expected_fall_hash, "the fall has the same bits on every host");
+}
+
+// Before the idle frames have run, a rise bakes each keyframe the first
+// time it reaches it, one at most in a frame (owner A, 2026-10-22).
+void ribbon_rise_before_idle_bakes() {
+    std::unique_ptr<RibbonFixture> fixture = make_ribbon();
+    Window& window = *(*fixture).window;
+    const Rect face = paste_face(*(*fixture).ribbon);
+    move_to(window, centre(face));
+    repaint(window, (*fixture).painter);
+    require(window.motion_clock().armed(), "the rise starts at once");
+    std::uint64_t previous = window.engine_parts().cache_statistics().bakes;
+    for (int step = 0; step < 100 && window.motion_clock().armed(); ++step) {
+        static_cast<void>(run_frame(window, (*fixture).time, (*fixture).painter));
+        const std::uint64_t now = window.engine_parts().cache_statistics().bakes;
+        require(now <= previous + 1U, "a frame bakes at most the one keyframe it reaches first");
+        previous = now;
+    }
+    const RasterCacheStatistics ran = window.engine_parts().cache_statistics();
+    require(ran.keyframe_demand_bakes <= 10U && ran.keyframe_idle_bakes == 0U,
+            "while the rise runs no idle frame bakes, and each keyframe is baked once at most");
 }
 
 void ribbon_without_motion() {
@@ -889,6 +931,7 @@ void ambient_effects() {
 int main() {
     machines_are_rule_data();
     ribbon_rise();
+    ribbon_rise_before_idle_bakes();
     ribbon_without_motion();
     tile_fade();
     ambient_effects();

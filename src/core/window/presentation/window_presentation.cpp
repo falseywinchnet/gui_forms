@@ -1,4 +1,6 @@
 #include "gui_forms/live_surface.hpp"
+
+#include "../../scheduler/request/scheduled_frame_request.hpp"
 #include "gui_forms/paint_framebuffer.hpp"
 #include "gui_forms/window.hpp"
 
@@ -318,9 +320,20 @@ PartRasterResult Window::engine_part_raster(PartRecordHandle handle, const PartR
     return result;
 }
 
-PartRasterStatus Window::engine_prepare_shared(const PartRasterRequest& request) {
-    const PartRasterStatus status = engine_parts_.prepare_shared(request, paint_leases_completed_);
-    return status;
+void Window::engine_queue_keyframe(const PartRasterRequest& request) {
+    engine_parts_.queue_idle_keyframe(request);
+    if (!engine_parts_.idle_keyframes_waiting()) return;
+    for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& scheduled : frame_requests_) {
+        if ((*scheduled).connected() && (*scheduled).kind == detail::FrameRequestKind::engine_idle) return;
+    }
+    compact_frame_requests();
+    if (frame_requests_.size() >= maximum_scheduled_frame_requests) return;
+    const FrameTime first = motion_clock_.now() + motion_frame_interval;
+    std::shared_ptr<gui_forms::detail::ScheduledFrameRequest> idle = std::make_shared<detail::ScheduledFrameRequest>(
+        detail::FrameRequestKind::engine_idle, Control::WeakPtr{}, first, motion_frame_interval);
+    frame_requests_.push_back(std::move(idle));
+    metrics_.record_frame_request();
+    update_frame_schedule_metrics();
 }
 
 PartRasterResult Window::engine_unkeyed_raster(const PartRasterRequest& request) {
