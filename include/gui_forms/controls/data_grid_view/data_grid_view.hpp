@@ -721,6 +721,10 @@ private:
     void erase_selected_row(std::string_view row_id);
     void select_range(DataGridViewCellAddress from, DataGridViewCellAddress to);
     bool move_current(DataGridViewCellAddress target, SelectionGesture gesture);
+    // A row header's click: makes `row` current in the current column and,
+    // in cell mode with a plain click, selects the whole row. False when the
+    // row could not become current.
+    bool click_row_header(DataGridViewRowPosition row, SelectionGesture gesture);
     void apply_current(std::optional<CellKey> cell);
     void clear_selection_state() noexcept;
     void select_current_alone();
@@ -745,6 +749,7 @@ private:
     // Semantics.
     [[nodiscard]] std::string cell_stable_id(DataGridViewRowPosition row, std::size_t column) const;
     [[nodiscard]] std::string column_stable_id(std::size_t column) const;
+    [[nodiscard]] std::string row_header_prefix() const;
     [[nodiscard]] std::optional<DataGridViewCellAddress> cell_from_stable_id(std::string_view id) const;
 
     std::vector<DataGridViewColumn> columns_{};

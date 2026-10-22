@@ -1893,13 +1893,7 @@ void DataGridView::on_pointer(PointerEvent& event) {
             return;
         }
         if (hit.zone == HitZone::row_header) {
-            const std::size_t column = current_ ? (*current_).column : 0U;
-            if (!move_current({hit.row, column}, gesture)) return;
-            if (selection_mode_ == DataGridViewSelectionMode::cell_select && gesture == SelectionGesture::replace) {
-                const std::uint64_t before = selection_revision_;
-                select_range({hit.row, 0U}, {hit.row, columns_.size() - 1U});
-                publish_selection(before);
-            }
+            static_cast<void>(click_row_header(hit.row, gesture));
             return;
         }
         if (hit.zone != HitZone::cell) return;
@@ -2141,6 +2135,26 @@ std::string DataGridView::column_stable_id(std::size_t column) const {
     return identity;
 }
 
+// The start of every row header's identity; the row's identity follows it.
+// It begins with the grid's own identity, as a column header's does, so it
+// is no row's identity followed by a column name.
+std::string DataGridView::row_header_prefix() const {
+    std::string prefix(stable_id().value());
+    prefix += ".row_header.";
+    return prefix;
+}
+
+bool DataGridView::click_row_header(DataGridViewRowPosition row, SelectionGesture gesture) {
+    const std::size_t column = current_ ? (*current_).column : 0U;
+    if (!move_current({row, column}, gesture)) return false;
+    if (selection_mode_ == DataGridViewSelectionMode::cell_select && gesture == SelectionGesture::replace) {
+        const std::uint64_t before = selection_revision_;
+        select_range({row, 0U}, {row, columns_.size() - 1U});
+        publish_selection(before);
+    }
+    return true;
+}
+
 std::optional<DataGridViewCellAddress> DataGridView::cell_from_stable_id(std::string_view id) const {
     // Column names hold no '.', so the last '.' separates row and column.
     const std::size_t dot = id.rfind('.');
@@ -2197,6 +2211,7 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
         }
     }
     const std::size_t row_end = visible_row_end(layout);
+    const std::string header_prefix = row_header_prefix();
     for (std::size_t position = std::min(first_row_, row_end); position < row_end; ++position) {
         const DataGridViewRowPosition row{position};
         SemanticNode row_node{};
@@ -2217,6 +2232,22 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
         if (row_read_only(row) || read_only_) row_node.states |= SemanticState::read_only;
         if (focus_within && is_current_row(row)) row_node.states |= SemanticState::focused;
         row_node.actions = {SemanticAction::focus, SemanticAction::select};
+        // A drawn row header is published first in its row (owner decision,
+        // stage A gap 4), named as the row is; pressing it clicks it.
+        if (row_headers_visible_) {
+            const RowParts placed_row = row_parts(row, layout);
+            SemanticNode header{};
+            header.stable_id = header_prefix + row_node.stable_id;
+            header.runtime_id = virtual_semantic_runtime_id(header.stable_id);
+            header.role = SemanticRole::row_header;
+            header.row_index = position + 1U;
+            header.name = row_node.name;
+            header.bounds = {absolute.x + placed_row.row_header.bounds.x, absolute.y + placed_row.row_header.bounds.y,
+                             placed_row.row_header.bounds.width, placed_row.row_header.bounds.height};
+            header.states = SemanticState::visible | SemanticState::enabled;
+            header.actions = {SemanticAction::press};
+            row_node.children.push_back(std::move(header));
+        }
         for (std::size_t column = first_column; column < column_end; ++column) {
             const DataGridViewColumn& definition = columns_[column];
             const CellParts placed = cell_parts(row, column, layout);
@@ -2237,28 +2268,26 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
             if (read_only) cell.states |= SemanticState::read_only;
             if (current && edit_invalid_) cell.states |= SemanticState::invalid;
             cell.actions = {SemanticAction::focus, SemanticAction::select};
-            // A cell keeps the role of its kind, so that a host offers the
-            // editing its kind needs (text, toggle, choice, press); its row
-            // and column place it in the table (vocabulary decision).
+            // Every cell is a cell, placed by its row and column; its kind's
+            // behaviour stays on it as states and actions (a toggle, a value,
+            // a choice, a press), from which a host offers the editing it
+            // needs (owner decision, stage A gap 1).
+            cell.role = SemanticRole::cell;
             if (definition.kind == DataGridViewColumnKind::check_box) {
-                cell.role = SemanticRole::check_box;
                 cell.states |= SemanticState::checkable;
                 const bool checked = binding_value_to_bool(stored_value(row, column)).value_or(false);
                 if (checked) cell.states |= SemanticState::checked;
                 if (!read_only) cell.actions.push_back(SemanticAction::press);
             } else if (definition.kind == DataGridViewColumnKind::button) {
-                cell.role = SemanticRole::button;
                 cell.name = cell.value;
                 cell.actions.push_back(SemanticAction::press);
             } else if (definition.kind == DataGridViewColumnKind::combo_box) {
-                cell.role = SemanticRole::combo_box;
                 if (current && edit_kind_ == EditKind::choice) cell.states |= SemanticState::expanded;
                 if (!read_only) {
                     cell.actions.push_back(SemanticAction::set_value);
                     cell.actions.push_back(SemanticAction::expand);
                 }
             } else {
-                cell.role = SemanticRole::text_box;
                 if (!read_only) cell.actions.push_back(SemanticAction::set_value);
             }
             row_node.children.push_back(std::move(cell));
@@ -2285,6 +2314,15 @@ bool DataGridView::on_semantic_child_action(std::string_view id, SemanticAction 
         if (!column || action != SemanticAction::press) return false;
         column_header_click_.emit(*column);
         return true;
+    }
+    const std::string header_prefix = row_header_prefix();
+    if (id.compare(0U, header_prefix.size(), header_prefix) == 0) {
+        const std::optional<std::size_t> row = find_row(id.substr(header_prefix.size()));
+        if (!row || columns_.empty() || action != SemanticAction::press) return false;
+        Window* const host = window();
+        if (host != nullptr) static_cast<void>((*host).request_focus(shared_from_this()));
+        const bool clicked = click_row_header(DataGridViewRowPosition{*row}, SelectionGesture::replace);
+        return clicked;
     }
     const std::optional<DataGridViewCellAddress> cell = cell_from_stable_id(id);
     if (!cell) {

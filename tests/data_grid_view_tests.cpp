@@ -152,6 +152,13 @@ std::vector<DataGridViewColumn> virtual_columns() {
     return columns;
 }
 
+bool has_action(const SemanticNode& node, SemanticAction action) {
+    for (const SemanticAction offered : node.actions) {
+        if (offered == action) return true;
+    }
+    return false;
+}
+
 std::shared_ptr<DataGridView> make_grid(const char* identity) {
     std::shared_ptr<DataGridView> grid = make_control<DataGridView>(StableId(identity));
     (*grid).set_columns(sample_columns());
@@ -950,15 +957,26 @@ void semantics() {
                 nodes[3].column_index == 4U,
             "column headers carry their column, before the rows");
     const SemanticNode& row = nodes[4];
-    require(row.role == SemanticRole::row && row.stable_id == "alpha" && row.children.size() == 4U &&
-                row.row_index == 1U && row.children[2].row_index == 1U && row.children[2].column_index == 3U,
-            "each row holds its cells, and each carries its row and column");
-    require(row.children[0].role == SemanticRole::text_box && row.children[0].value == "Alpha" &&
-                row.children[1].role == SemanticRole::check_box &&
-                has_semantic_state(row.children[1].states, SemanticState::checkable) &&
-                has_semantic_state(row.children[1].states, SemanticState::checked) &&
-                row.children[2].role == SemanticRole::combo_box && row.children[3].role == SemanticRole::button,
-            "cells take the nearest roles of their kinds");
+    require(row.role == SemanticRole::row && row.stable_id == "alpha" && row.children.size() == 5U &&
+                row.row_index == 1U && row.children[3].row_index == 1U && row.children[3].column_index == 3U,
+            "each row holds its header and its cells, and each cell carries its row and column");
+    const SemanticNode& header = row.children[0];
+    require(header.role == SemanticRole::row_header && header.stable_id == "grid.semantics.row_header.alpha" &&
+                header.row_index == 1U && !header.column_index && header.name == row.name &&
+                header.actions == std::vector<SemanticAction>{SemanticAction::press},
+            "a drawn row header comes first in its row, carrying its row only");
+    bool all_cells = true;
+    for (std::size_t index = 1U; index < row.children.size(); ++index) {
+        if (row.children[index].role != SemanticRole::cell) all_cells = false;
+    }
+    require(all_cells, "every cell publishes the cell role, whatever its kind");
+    require(row.children[1].value == "Alpha" && has_action(row.children[1], SemanticAction::set_value) &&
+                has_semantic_state(row.children[2].states, SemanticState::checkable) &&
+                has_semantic_state(row.children[2].states, SemanticState::checked) &&
+                has_action(row.children[2], SemanticAction::press) &&
+                has_action(row.children[3], SemanticAction::expand) &&
+                has_action(row.children[4], SemanticAction::press),
+            "a cell keeps its kind's behaviour: a value, a toggle, a choice, a press");
     require((*grid).on_semantic_child_action("alpha.active", SemanticAction::press, {}) &&
                 (*grid).cell_value(row_at(0U), 1U) == BindingValue{false},
             "press toggles a check box cell");
@@ -973,6 +991,17 @@ void semantics() {
     require((*grid).on_semantic_child_action("bravo", SemanticAction::select, {}) &&
                 (*grid).current_row_id() == id("bravo"),
             "selecting a row node by its ID makes its row current");
+    require((*grid).on_semantic_child_action("grid.semantics.row_header.charlie", SemanticAction::press, {}) &&
+                (*grid).current_row_id() == id("charlie"),
+            "pressing a row header makes its row current");
+    require(!(*grid).on_semantic_child_action("grid.semantics.row_header.zulu", SemanticAction::press, {}) &&
+                !(*grid).on_semantic_child_action("grid.semantics.row_header.alpha", SemanticAction::select, {}),
+            "a row header of no row, or an action other than press, is refused");
+    (*grid).set_row_headers_visible(false);
+    window.perform_layout();
+    const std::vector<SemanticNode> headless = (*grid).semantic_virtual_children();
+    require(headless[4].children.size() == 4U && headless[4].children[0].role == SemanticRole::cell,
+            "a grid that draws no row headers publishes none");
     std::vector<std::size_t> header_clicks;
     SubscriptionToken token = (*grid).column_header_click().subscribe(RecordIndex{&header_clicks});
     require((*grid).on_semantic_child_action("grid.semantics.column.mode", SemanticAction::press, {}) &&

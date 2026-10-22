@@ -378,10 +378,13 @@ gui_forms::DataGridView
    The grid publishes the accessibility role ``table``, with the row count and
    the column count, and is ``multiselectable`` while :cpp:func:`multi_select <gui_forms::DataGridView::multi_select>` is on. The
    visible column headers are ``column_header`` children, and each visible row
-   is a ``row`` holding its cells: a ``text_box``, ``check_box`` (also
-   ``checkable``), ``combo_box`` or ``button`` by column kind, so that each keeps
-   its editing interface, with its row and column index (counting from 1). A cell's
-   stable ID is its row's ID, ``.`` and its column's name. Cells take
+   is a ``row`` holding its row header (a ``row_header`` with its row index,
+   while row headers are shown; its stable ID is the grid's ID,
+   ``.row_header.`` and the row's ID, and ``press`` clicks it) and then its
+   cells: each a ``cell`` with its row and column index (counting from 1),
+   whatever its kind, keeping its kind's behaviour as states and actions (a
+   check box cell is ``checkable`` and ``checked``). A cell's stable ID is its
+   row's ID, ``.`` and its column's name. Cells take
    :cpp:enumerator:`SemanticAction::set_value <gui_forms::SemanticAction::set_value>` (text through the same validation and conversion
    as typing), ``press`` (toggle or click) and ``expand`` (open the choices).
 

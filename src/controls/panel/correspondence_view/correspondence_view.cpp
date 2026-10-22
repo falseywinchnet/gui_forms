@@ -812,6 +812,9 @@ void CorrespondenceView::on_focus_changed(bool focused) {
     }
 }
 
+// A list, not a table: a record shows its facts as lines, not in columns
+// (owner decision, stage A gap 3; a view that shows real columns would be a
+// table).
 SemanticDescriptor CorrespondenceView::semantic_descriptor() const {
     SemanticDescriptor descriptor;
     descriptor.role = SemanticRole::list;

@@ -2072,6 +2072,9 @@ void Ribbon::append_group_node(SemanticNode& parent, const Layout& placed, std::
         if (item.kind == RibbonCommandKind::drop_down) node.role = SemanticRole::menu_button;
         node.has_popup = has_menu(item.kind);
         node.name = command_text(item);
+        // The command's keyboard letter, its mnemonic (the ribbon has no
+        // KeyTips, RB-16), is its access key (owner decision, stage A gap 5).
+        node.access_key = mnemonic_access_key(authored_text(item));
         node.position_in_set = position;
         node.set_size = set_size;
         node.bounds = to_window(absolute, bounds);
@@ -2115,6 +2118,7 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
     application.runtime_id = 0U;
     application.role = SemanticRole::menu_button;
     application.name = parse_mnemonic_text(application_text_).display_text;
+    application.access_key = mnemonic_access_key(application_text_);
     application.has_popup = true;
     application.bounds = to_window(absolute, placed.application);
     application.states = base | SemanticState::focusable;
@@ -2138,6 +2142,7 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
         node.stable_id = node_identity(ribbon_id, "tab", tabs_[tab].stable_id);
         node.role = SemanticRole::tab;
         node.name = parse_mnemonic_text(tabs_[tab].text).display_text;
+        node.access_key = mnemonic_access_key(tabs_[tab].text);
         if (tab_set_of_[tab]) node.description = tab_sets_[*tab_set_of_[tab]].caption;
         node.position_in_set = place.position;
         node.set_size = place.count;

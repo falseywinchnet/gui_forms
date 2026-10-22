@@ -1267,8 +1267,9 @@ std::vector<SemanticNode> ObjectView::semantic_virtual_children() const {
 }
 
 // The details view's column headers whose extent meets the header band (the
-// realized columns), in column order. They take no semantic action: a
-// header sorts only through header focus (keyboard or pointer).
+// realized columns), in column order. A sortable column's header offers
+// press, which sorts as clicking it does (owner decision, stage A gap 2);
+// the others do nothing when clicked and offer no action.
 void ObjectView::append_column_headers(std::vector<SemanticNode>& nodes) const {
     const Rect absolute = absolute_bounds();
     const Rect band{4.0, 2.0, std::max(0.0, local_bounds().width - 8.0), header_height()};
@@ -1289,6 +1290,7 @@ void ObjectView::append_column_headers(std::vector<SemanticNode>& nodes) const {
         node.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
         node.states = SemanticState::visible;
         if (effectively_enabled()) node.states |= SemanticState::enabled;
+        if (definition.sortable) node.actions = {SemanticAction::press};
         nodes.push_back(std::move(node));
     }
 }
@@ -1328,7 +1330,11 @@ bool ObjectView::on_semantic_child_action(std::string_view id,
                                           SemanticAction action,
                                           std::string_view) {
     const std::optional<std::size_t> index = item_index(id);
-    if (!index || (action != SemanticAction::focus &&
+    if (!index) {
+        const bool pressed = press_column_header(id, action);
+        return pressed;
+    }
+    if ((action != SemanticAction::focus &&
                    action != SemanticAction::select &&
                    action != SemanticAction::press &&
                    action != SemanticAction::show_menu)) return false;
@@ -1355,6 +1361,29 @@ bool ObjectView::on_semantic_child_action(std::string_view id,
     return true;
 }
 
+
+// A press sent to a sortable column header's node: the header takes focus,
+// as a click gives it, and requests the sort the click would. False for any
+// other node or action, a column that does not sort, or a disabled view.
+bool ObjectView::press_column_header(std::string_view id, SemanticAction action) {
+    if (action != SemanticAction::press || !has_details_columns() || !effectively_enabled()) return false;
+    const std::string prefix = std::string(stable_id().value()) + ".column.";
+    if (id.compare(0U, prefix.size(), prefix) != 0) return false;
+    const ObjectColumnId column_id{std::string(id.substr(prefix.size()))};
+    const std::optional<std::size_t> column = column_index(column_id);
+    if (!column || !details_columns_[*column].sortable) return false;
+    const Control::Ptr lifetime = shared_from_this();
+    if (window() != nullptr) {
+        const bool accepted = (*window()).request_focus(lifetime);
+        if (!accepted) return false;
+    }
+    if (!is_alive() || !has_details_columns() || *column >= details_columns_.size()) return false;
+    header_focused_ = true;
+    focused_column_ = *column;
+    reveal_header();
+    request_header_sort(*column);
+    return true;
+}
 
 bool ObjectView::has_details_columns() const noexcept {
     const bool result = view_mode_ == ObjectViewMode::details && !details_columns_.empty();

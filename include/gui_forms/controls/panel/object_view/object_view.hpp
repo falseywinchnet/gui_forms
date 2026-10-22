@@ -306,6 +306,7 @@ private:
     void reveal_header();
     void cancel_header_interaction();
     void request_header_sort(std::size_t column);
+    bool press_column_header(std::string_view id, SemanticAction action);
     void append_column_headers(std::vector<SemanticNode>& nodes) const;
     void append_row_cells(std::size_t index, SemanticNode& row_node) const;
     struct DetailsPointerContext final {

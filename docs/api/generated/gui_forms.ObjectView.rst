@@ -250,7 +250,8 @@ gui_forms::ObjectView
 
    In details mode with columns the control publishes the accessibility role
    ``table``: the columns are ``column_header`` children with their column index
-   and sort direction, and each item in view is a ``row`` holding a ``cell`` per
+   and sort direction (a sortable column's header takes ``press``, which sorts
+   as a click does), and each item in view is a ``row`` holding a ``cell`` per
    column with the cell text. Otherwise it publishes ``list``, and each item in
    view is a virtual ``list_item``. Indices count from 1.
 
@@ -616,14 +617,16 @@ gui_forms::ObjectView
       Publishes the items in view named by their name, with the secondary
       text as value, and the ``selected`` and ``focused`` states: as ``row`` with
       their row index and a ``cell`` per column in details mode with columns,
-      after a ``column_header`` per column; otherwise as ``list_item``.
+      after a ``column_header`` per column (a sortable column's offering
+      press); otherwise as ``list_item``.
 
    .. cpp:function:: bool on_semantic_child_action(std::string_view stable_id, SemanticAction action, std::string_view value) override
 
       Handles focus, select, press and show_menu on an item: the view takes
       focus; focus moves the focus rectangle, select and press select the
       item, press also activates it, and show_menu raises
-      :cpp:func:`context_requested <gui_forms::ObjectView::context_requested>`.
+      :cpp:func:`context_requested <gui_forms::ObjectView::context_requested>`. A press on a sortable column's header focuses the
+      header and raises :cpp:func:`sort_requested <gui_forms::ObjectView::sort_requested>`, as clicking it does.
 
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
 
