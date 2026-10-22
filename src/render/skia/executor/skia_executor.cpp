@@ -1,7 +1,5 @@
 #include "skia_executor.hpp"
 
-#include "include/codec/SkCodec.h"
-#include "include/codec/SkPngDecoder.h"
 #include "include/core/SkBlendMode.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkColorFilter.h"
@@ -24,6 +22,7 @@
 #include "core_text_font_bytes.hpp"
 #endif
 
+#include "../../../core/image/png_pixels.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
 #include "../../text/glyph_run/glyph_run_raster.hpp"
 #include "../../text/harfbuzz/harfbuzz_font_engine.hpp"
@@ -1059,63 +1058,36 @@ DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
         return DecodeResult::failure(RasterError::encoded_limit_exceeded);
     }
     try {
-        sk_sp<SkData> data = SkData::MakeWithCopy(encoded.data(), encoded.size());
-        SkCodec::Result codec_result = SkCodec::kInternalError;
-        std::unique_ptr<SkCodec> codec =
-            SkPngDecoder::Decode(std::move(data), &codec_result);
-        if (!codec || codec_result != SkCodec::kSuccess) {
-            return DecodeResult::failure(RasterError::decode_failed);
+        // The shared owned decode (src/core/image/png_pixels), as on every
+        // host: premultiplied BGRA straight into the bitmap. iCCP is refused
+        // for this purpose (owner decision D1, option 2).
+        gui_forms::image::PngPixelRequest request{};
+        request.limits = gui_forms::image::png_limits_for_pixels(limits.maximum_pixels, encoded.size());
+        request.limits.dimension = std::min<std::uint32_t>(
+            std::max(limits.maximum_width, limits.maximum_height), 0x7fffffffU);
+        request.target = {gui_forms::image::PixelOrder::bgra,
+                          gui_forms::image::PixelAlpha::premultiplied};
+        request.purpose = gui_forms::image::PngPixelPurpose::drawing_decode;
+        gui_forms::image::PngPixelDecoder decoder{};
+        const gui_forms::image::PngPixelResult inspected = decoder.inspect(encoded, request);
+        if (inspected.error != gui_forms::image::PngPixelError::none) {
+            const bool too_large = inspected.decode_error == gui_forms::image::PngDecodeError::resource_limit;
+            return DecodeResult::failure(too_large ? RasterError::dimension_limit_exceeded
+                                                   : RasterError::decode_failed);
         }
-        const SkImageInfo source = (*codec).getInfo();
-        if (source.width() <= 0 || source.height() <= 0 ||
-            static_cast<std::uint32_t>(source.width()) > limits.maximum_width ||
-            static_cast<std::uint32_t>(source.height()) > limits.maximum_height ||
-            static_cast<std::uint64_t>(source.width()) * source.height() >
-                limits.maximum_pixels) {
+        if (inspected.width > limits.maximum_width || inspected.height > limits.maximum_height) {
             return DecodeResult::failure(RasterError::dimension_limit_exceeded);
         }
         std::unique_ptr<gui_drawing::Bitmap> bitmap = std::make_unique<Bitmap>(
-            static_cast<std::uint32_t>(source.width()),
-            static_cast<std::uint32_t>(source.height()),
-            PixelFormat::bgra32_premultiplied);
+            inspected.width, inspected.height, PixelFormat::bgra32_premultiplied);
         const BitmapLockView lock = (*bitmap).lock(BitmapLockMode::write);
         BitmapUnlock unlock(*bitmap, lock.token);
-        const SkImageInfo output = image_info(lock.width, lock.height,
-                                              lock.pixel_format);
-        if ((*codec).getPixels(output, lock.writable_data, lock.row_bytes) !=
-            SkCodec::kSuccess) {
+        const std::size_t byte_count = lock.row_bytes * static_cast<std::size_t>(lock.height);
+        const std::span<std::byte> pixels(static_cast<std::byte*>(lock.writable_data), byte_count);
+        const gui_forms::image::PngPixelResult decoded =
+            decoder.decode(encoded, request, pixels, lock.row_bytes);
+        if (decoded.error != gui_forms::image::PngPixelError::none) {
             return DecodeResult::failure(RasterError::decode_failed);
-        }
-        // A few palette/tRNS PNGs are returned by SkCodec with straight RGB
-        // channels even though the requested destination is tagged premultiplied.
-        // Transparent WinForms theme glyphs then carry non-zero color at A=0,
-        // which becomes an opaque pale square when that raster is composited by
-        // another retained surface. Detect the impossible premultiplied values
-        // and normalize the complete decoded image exactly once.
-        std::uint8_t* pixels = reinterpret_cast<std::uint8_t*>(lock.writable_data);
-        bool straight_alpha{};
-        for (std::uint32_t y = 0; y < lock.height && !straight_alpha; ++y) {
-            const std::uint8_t* row = pixels + static_cast<std::size_t>(y) * lock.row_bytes;
-            for (std::uint32_t x = 0; x < lock.width; ++x) {
-                const std::uint8_t* pixel = row + static_cast<std::size_t>(x) * 4U;
-                const std::uint8_t alpha = pixel[3];
-                if (pixel[0] > alpha || pixel[1] > alpha || pixel[2] > alpha) {
-                    straight_alpha = true;
-                    break;
-                }
-            }
-        }
-        if (straight_alpha) {
-            for (std::uint32_t y = 0; y < lock.height; ++y) {
-                std::uint8_t* row = pixels + static_cast<std::size_t>(y) * lock.row_bytes;
-                for (std::uint32_t x = 0; x < lock.width; ++x) {
-                    std::uint8_t* pixel = row + static_cast<std::size_t>(x) * 4U;
-                    const std::uint8_t alpha = pixel[3];
-                    pixel[0] = premultiply(pixel[0], alpha);
-                    pixel[1] = premultiply(pixel[1], alpha);
-                    pixel[2] = premultiply(pixel[2], alpha);
-                }
-            }
         }
         unlock.release();
         return DecodeResult::success(std::move(bitmap));

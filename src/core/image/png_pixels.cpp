@@ -188,8 +188,9 @@ PngDecodeLimits png_limits_for_image(std::uint32_t width, std::uint32_t height,
     // Adam7 passes adds one filter byte per pass row, and no pass has more
     // rows than the image; 7 * height bounds them together. The registry's
     // own dimension limits keep these products far from wrapping; the guard
-    // keeps the helper safe for any argument.
-    const std::uint64_t maximum = std::numeric_limits<std::uint64_t>::max() / 16U;
+    // (filtered <= 15 * pixels, work = 4 * filtered) keeps the helper safe
+    // for any argument.
+    const std::uint64_t maximum = std::numeric_limits<std::uint64_t>::max() / 64U;
     if (pixels <= maximum) {
         const std::uint64_t filtered = pixels * 8U + 7U * static_cast<std::uint64_t>(height);
         limits.filtered_bytes = filtered;
@@ -197,6 +198,26 @@ PngDecodeLimits png_limits_for_image(std::uint32_t width, std::uint32_t height,
         limits.inflate_work.value = std::max(limits.inflate_work.value, scaled_work);
     } else {
         // Refused at inspection: a zero filtered allowance admits no pass.
+        limits.filtered_bytes = 0U;
+    }
+    return limits;
+}
+
+PngDecodeLimits png_limits_for_pixels(std::uint64_t maximum_pixels,
+                                      std::size_t encoded_bytes) noexcept {
+    PngDecodeLimits limits{};
+    limits.encoded_bytes = encoded_bytes;
+    limits.dimension = 0x7fffffffU;
+    const std::uint64_t maximum = std::numeric_limits<std::uint64_t>::max() / 64U;
+    if (maximum_pixels <= maximum) {
+        limits.pixels = maximum_pixels;
+        const std::uint64_t filtered = maximum_pixels * 15U;
+        limits.filtered_bytes = filtered;
+        const std::uint64_t scaled_work = filtered * 4U;
+        limits.inflate_work.value = std::max(limits.inflate_work.value, scaled_work);
+    } else {
+        // Out of range: zero pixels admits no image.
+        limits.pixels = 0U;
         limits.filtered_bytes = 0U;
     }
     return limits;

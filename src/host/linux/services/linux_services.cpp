@@ -1,4 +1,5 @@
 #include "../../../core/host/image/clipboard_image_wire.hpp"
+#include "../../../core/host/image/clipboard_png.hpp"
 #include "../../../render/skia/raster/clipboard_png.hpp"
 #include "../application/linux_host_internal.hpp"
 #include "x11_foreign_window.hpp"
@@ -220,7 +221,7 @@ HostClipboardImageResult Services::read_clipboard_image_impl() {
   bytes = runtime.read_selection(window_, runtime.atom("CLIPBOARD"),
                                  runtime.atom("image/png"));
   if (!bytes.empty())
-    return render::decode_clipboard_png(bytes);
+    return detail::decode_clipboard_png(bytes);
   return {};
 }
 HostServiceStatus Services::write_clipboard_image_impl(HostImageView image) {

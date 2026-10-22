@@ -99,6 +99,14 @@ struct PngPixelResult final {
 [[nodiscard]] PngDecodeLimits png_limits_for_image(std::uint32_t width,
     std::uint32_t height, std::size_t encoded_bytes) noexcept;
 
+// Finite decode limits for an image of unknown dimensions from outside the
+// toolkit (the clipboard): any width and height up to the PNG maximum whose
+// product is at most maximum_pixels. No pass has more rows than the image has
+// pixels, so 15 * maximum_pixels bounds the filtered bytes (eight bytes per
+// 16-bit RGBA pixel plus at most seven filter bytes per image row).
+[[nodiscard]] PngDecodeLimits png_limits_for_pixels(std::uint64_t maximum_pixels,
+    std::size_t encoded_bytes) noexcept;
+
 // Owns the inflate workspace and the reusable decode storage: two filter
 // rows, the RGBA16 sample image, a fixed 4 KiB metadata scratch and one
 // record per ancillary chunk. Compressed metadata is validated through the

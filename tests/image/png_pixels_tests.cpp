@@ -2,6 +2,7 @@
 // owned decode through every target layout, the colour-chunk policy, and the
 // cross-platform identity hashes. The same expected hashes are checked on
 // every CI platform, so a pass there proves byte-identical decoded pixels.
+#include "../../src/core/host/image/clipboard_png.hpp"
 #include "../../src/core/image/png_pixels.hpp"
 #include "png_test_files.hpp"
 
@@ -292,6 +293,39 @@ void metadata_is_validated_not_stored() {
     require(empty_scratch.error == image::PngDecodeError::invalid_argument, "empty scratch accepted");
 }
 
+// Owner decision D1, option 2, on the clipboard side: every host's clipboard
+// read decodes a profile-tagged PNG, treating its samples as sRGB, into the
+// straight-alpha RGBA8 host-service contract.
+void clipboard_reads_ignore_profile() {
+    const Format rgba{6, 8, 4};
+    const Bytes plain = png_file(9, 7, rgba, false, {});
+    const std::array<Extra, 1> icc{{{"iCCP", icc_profile_payload()}}};
+    const Bytes profiled = png_file(9, 7, rgba, false, icc);
+    const HostClipboardImageResult reference = detail::decode_clipboard_png(plain);
+    const HostClipboardImageResult read = detail::decode_clipboard_png(profiled);
+    require(reference.has_image && reference.status.error == HostServiceError::none, "clipboard PNG refused");
+    require(read.has_image && read.status.error == HostServiceError::none, "clipboard refused an iCCP PNG");
+    require(read.image.width == 9U && read.image.height == 7U && read.image.row_bytes == 36U,
+            "clipboard image shape");
+    require(read.image.pixels == reference.image.pixels, "clipboard iCCP changed samples");
+    // Straight alpha, as the host contract states.
+    for (std::uint32_t y = 0; y < 7U; ++y) {
+        for (std::uint32_t x = 0; x < 9U; ++x) {
+            const std::size_t at = (static_cast<std::size_t>(y) * 9U + x) * 4U;
+            for (unsigned channel = 0; channel < 4U; ++channel) {
+                require(std::to_integer<unsigned>(read.image.pixels[at + channel]) ==
+                        sample_at(x, y, channel, rgba), "clipboard sample is not straight RGBA8");
+            }
+        }
+    }
+    Bytes corrupt = plain;
+    corrupt[20] ^= std::byte{1};
+    const HostClipboardImageResult refused = detail::decode_clipboard_png(corrupt);
+    require(!refused.has_image && refused.status.error == HostServiceError::invalid_argument,
+            "corrupt clipboard PNG accepted");
+    require(!detail::decode_clipboard_png({}).has_image, "empty clipboard PNG accepted");
+}
+
 void decode_failures() {
     const Format rgba{6, 8, 4};
     Bytes png = png_file(4, 4, rgba, false, {});
@@ -349,6 +383,7 @@ int main() {
         decode_identity_hashes();
         colour_chunk_policy();
         metadata_is_validated_not_stored();
+        clipboard_reads_ignore_profile();
         decode_failures();
         limits_for_image();
     } catch (const std::exception& error) {

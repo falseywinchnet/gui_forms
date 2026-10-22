@@ -1,10 +1,10 @@
 #include "coregraphics_raster.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
+#include "../../../core/image/png_pixels.hpp"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <CoreText/CoreText.h>
-#include <ImageIO/ImageIO.h>
 
 #include <algorithm>
 #include <array>
@@ -321,6 +321,8 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
     }
 
     bool synchronized = true;
+    // One shared owned decoder for the batch (src/core/image/png_pixels).
+    gui_forms::image::PngPixelDecoder decoder{};
     std::unordered_set<std::uint64_t> active;
     for (const ImageId id : registry.image_ids()) {
         active.insert(id.value);
@@ -335,49 +337,57 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
             continue;
         }
 
+        // Premultiplied RGBA source rows: swizzled from a BGRA resource, or
+        // decoded by the shared owned PNG path (as on every host).
         CGImageRef source_image = nullptr;
+        const std::size_t tight_row_bytes =
+            static_cast<std::size_t>((*resource).metadata.width) * 4U;
+        std::vector<std::byte> rgba;
+        bool have_rgba = false;
         if ((*resource).encoding == ImageResourceEncoding::bgra32_premultiplied) {
-            const std::size_t tight_row_bytes =
-                static_cast<std::size_t>((*resource).metadata.width) * 4U;
             if ((*resource).row_bytes == tight_row_bytes &&
                 (*resource).encoded.size() ==
                     tight_row_bytes * (*resource).metadata.height) {
-                std::vector<std::byte> rgba((*resource).encoded.size());
+                rgba.resize((*resource).encoded.size());
                 for (std::size_t offset = 0; offset < rgba.size(); offset += 4U) {
                     rgba[offset] = (*resource).encoded[offset + 2U];
                     rgba[offset + 1U] = (*resource).encoded[offset + 1U];
                     rgba[offset + 2U] = (*resource).encoded[offset];
                     rgba[offset + 3U] = (*resource).encoded[offset + 3U];
                 }
-                CFDataRef data = CFDataCreate(
-                    kCFAllocatorDefault,
-                    reinterpret_cast<const UInt8*>(rgba.data()),
-                    static_cast<CFIndex>(rgba.size()));
-                CGDataProviderRef provider = data == nullptr
-                    ? nullptr : CGDataProviderCreateWithCFData(data);
-                constexpr CGBitmapInfo source_info =
-                    static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) |
-                    static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Big);
-                source_image = provider == nullptr ? nullptr : CGImageCreate(
-                    (*resource).metadata.width, (*resource).metadata.height, 8, 32,
-                    tight_row_bytes, (*impl_).color_space, source_info, provider,
-                    nullptr, false, kCGRenderingIntentDefault);
-                if (provider != nullptr) CGDataProviderRelease(provider);
-                if (data != nullptr) CFRelease(data);
+                have_rgba = true;
             }
-        } else {
-            CFDataRef encoded = CFDataCreate(
+        } else if ((*resource).metadata.decoded_byte_count <=
+                   std::numeric_limits<std::size_t>::max()) {
+            gui_forms::image::PngPixelRequest request{};
+            request.limits = gui_forms::image::png_limits_for_image((*resource).metadata.width,
+                (*resource).metadata.height, (*resource).encoded.size());
+            request.target = {gui_forms::image::PixelOrder::rgba,
+                              gui_forms::image::PixelAlpha::premultiplied};
+            request.purpose = gui_forms::image::PngPixelPurpose::resource;
+            rgba.resize(static_cast<std::size_t>((*resource).metadata.decoded_byte_count));
+            const gui_forms::image::PngPixelResult decoded =
+                decoder.decode((*resource).encoded, request, rgba, tight_row_bytes);
+            have_rgba = decoded.error == gui_forms::image::PngPixelError::none &&
+                        decoded.width == (*resource).metadata.width &&
+                        decoded.height == (*resource).metadata.height;
+        }
+        if (have_rgba) {
+            CFDataRef data = CFDataCreate(
                 kCFAllocatorDefault,
-                reinterpret_cast<const UInt8*>((*resource).encoded.data()),
-                static_cast<CFIndex>((*resource).encoded.size()));
-            CGImageSourceRef source = encoded == nullptr
-                ? nullptr
-                : CGImageSourceCreateWithData(encoded, nullptr);
-            if (encoded != nullptr) CFRelease(encoded);
-            source_image = source == nullptr
-                ? nullptr
-                : CGImageSourceCreateImageAtIndex(source, 0, nullptr);
-            if (source != nullptr) CFRelease(source);
+                reinterpret_cast<const UInt8*>(rgba.data()),
+                static_cast<CFIndex>(rgba.size()));
+            CGDataProviderRef provider = data == nullptr
+                ? nullptr : CGDataProviderCreateWithCFData(data);
+            constexpr CGBitmapInfo source_info =
+                static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) |
+                static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Big);
+            source_image = provider == nullptr ? nullptr : CGImageCreate(
+                (*resource).metadata.width, (*resource).metadata.height, 8, 32,
+                tight_row_bytes, (*impl_).color_space, source_info, provider,
+                nullptr, false, kCGRenderingIntentDefault);
+            if (provider != nullptr) CGDataProviderRelease(provider);
+            if (data != nullptr) CFRelease(data);
         }
         if (source_image == nullptr ||
             CGImageGetWidth(source_image) != (*resource).metadata.width ||

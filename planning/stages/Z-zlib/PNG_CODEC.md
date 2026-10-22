@@ -83,3 +83,60 @@ references, with provenance and restrictions in the phase-2 optimization record.
   output tests. The existing stored-block writer remains a baseline, not proof
   that the new encoder phase is complete.
 - Phase-6 migration/packaging/link-map evidence and full acceptance campaigns.
+
+## Integration record
+
+### I2: one decode path on every host (2026-10-21)
+
+Every PNG decode now goes through `src/core/image/png_pixels`: the owned
+sample decoder, then one RGBA16 to 8-bit kernel whose rounding rule is stated
+in `png_pixels.hpp` (exact nearest integer, in integer arithmetic; ties cannot
+occur). The callers are:
+
+| Path | Before | Now (purpose) |
+|---|---|---|
+| Windows renderer (`windows_host.cpp`) | WIC, premultiplied BGRA | owned, BGRA premultiplied (`resource`); WIC and `windowscodecs` removed |
+| Skia renderer (`skia_raster.cpp`) | `SkPngDecoder` + skcms | owned, RGBA premultiplied (`resource`) |
+| GUI.Drawing decode (`skia_executor.cpp`) | `SkPngDecoder` + skcms, a straight-alpha repair pass | owned, BGRA premultiplied (`drawing_decode`); the repair pass is gone |
+| Linux clipboard read | `SkPngDecoder`, no colour transform | owned, RGBA straight (`clipboard`), in `src/core/host/image/clipboard_png` |
+| macOS clipboard read | ImageIO drawn into an sRGB context; TIFF fallback | the same core function; TIFF fallback removed (decision 4A) |
+| CoreGraphics raster | ImageIO | owned, RGBA premultiplied (`resource`); ImageIO no longer linked |
+
+The pixel path uses `decode_png_samples_discarding_metadata`. It validates
+compressed iCCP, zTXt and iTXt once through a 4 KiB scratch, with the same
+checks and quotas, and stores nothing.
+
+**Colour policy before I2, by path** (measured or read from the pinned
+sources). The Skia paths converted gAMA/cHRM (and, in GUI.Drawing decode,
+iCCP) to sRGB through skcms. The macOS clipboard and CoreGraphics paths let
+ColorSync convert. WIC ignored gAMA and cHRM: probe PNGs decoded through a
+WIC-backed decoder with a plain Pbgra32 conversion gave the same pixels with
+and without gAMA 1.0, a Rec.2020 cHRM, or 16-bit samples. The Linux clipboard
+ignored every colour chunk. The registry refused iCCP. The hosts disagreed,
+so no single path could keep all of these behaviours.
+
+**Decision D2, option 1 (coordinator, 2026-10-20).** I2 passes the samples
+through everywhere. sRGB, gAMA and cHRM are validated structurally and
+leave the samples unchanged. Stage I6 adds the owner's gAMA/cHRM conversion
+everywhere. I2 and I6 are merged together, so main never carries the
+pass-through alone.
+
+**Decision D1, option 2 (owner, 2026-10-20).** iCCP is refused, with
+`unsupported_color_profile`, for registry resources (`validate_png`, and the
+`resource` purpose) and for GUI.Drawing decode (`drawing_decode`; the
+executor reports `decode_failed`). Clipboard reads (`clipboard`, Linux and
+macOS; Windows has no PNG clipboard path) ignore the profile and treat the
+samples as sRGB. `icc_profile_rule` in `png_pixels.cpp` is the one switch
+point.
+
+**Identity.** `gui_forms_png_pixels_tests` checks four FNV-1a digests, one
+per target layout, over 180 generated images: every colour type and depth,
+Adam7, tRNS, and filters cycling 0–4. CI runs it on all four platforms, so a
+pass there shows byte-identical decoded pixels. It also checks:
+- the rounding rule, exhaustively for 8-bit sources and on a 16-bit lattice;
+- both sides of D1;
+- metadata validation without storage, including the shared work quota.
+
+**Memory.** For a W × H image the decoder briefly holds 8·W·H bytes of
+RGBA16 samples beside the caller's 4·W·H destination. Each batch (one
+registry synchronization) keeps one decoder and frees it afterwards.

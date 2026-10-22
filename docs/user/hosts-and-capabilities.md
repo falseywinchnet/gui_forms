@@ -97,14 +97,15 @@ macOS (AppKit)
   the bundle.
 
 Windows (Win32)
-: `src/host/windows/`, the only place Win32, COM and WIC types are allowed. An
+: `src/host/windows/`, the only place Win32 and COM types are allowed. An
   ordinary resizable top-level window presents a top-down 32-bit DIB with
   software alpha blending. The process asks for per-monitor DPI awareness
   (`SetProcessDpiAwarenessContext`, resolved at run time, falling back to
   `SetProcessDPIAware`); the scale is the window DPI divided by 96, never
   below 1, and `WM_DPICHANGED` delivers a scale notification and applies the
-  suggested window rectangle. WIC decodes the PNG resources the core has
-  already validated. Text comes from the shared engine, not GDI, using the
+  suggested window rectangle. The PNG resources the core has already
+  validated are decoded by the shared owned PNG decoder, as on every host
+  (no WIC). Text comes from the shared engine, not GDI, using the
   bundled faces in `fonts\` beside the executable, or in the directory
   `GUI_FORMS_FONT_DIR` names; with an incomplete font pack the renderer name
   says so and no text metrics provider is installed. An opt-in `WM_COPYDATA`
@@ -167,7 +168,9 @@ The host presents pixels; it does not paint them. Painting goes through the
 `Painter` implemented by a private renderer:
 
 - A CPU-only Skia build (no GPU backend, no font backend, PNG as the only
-  codec) on macOS and Linux, confined to `src/render/skia/`.
+  codec) on macOS and Linux, confined to `src/render/skia/`. PNG decoding
+  on every host uses the shared owned decoder in `src/core/image/`; Skia
+  still encodes PNG until the owned encoder replaces it.
 - A DIB compositor on Windows that implements the same blending arithmetic
   byte for byte.
 

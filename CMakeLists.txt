@@ -170,6 +170,7 @@ add_library(gui_forms_core STATIC
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
+    src/core/host/image/clipboard_png.cpp
     src/core/image/png_decoder.cpp
     src/core/image/png_pixels.cpp
     src/core/image/png_writer.cpp
@@ -959,7 +960,6 @@ if(APPLE)
     find_library(GUI_FORMS_COREFOUNDATION CoreFoundation REQUIRED)
     find_library(GUI_FORMS_COREGRAPHICS CoreGraphics REQUIRED)
     find_library(GUI_FORMS_CORETEXT CoreText REQUIRED)
-    find_library(GUI_FORMS_IMAGEIO ImageIO REQUIRED)
     add_library(gui_forms_coregraphics STATIC
         src/render/coregraphics/raster/coregraphics_raster.cpp
     )
@@ -972,14 +972,12 @@ if(APPLE)
             ${GUI_FORMS_COREFOUNDATION}
             ${GUI_FORMS_COREGRAPHICS}
             ${GUI_FORMS_CORETEXT}
-            ${GUI_FORMS_IMAGEIO}
     )
 endif()
 
 if(GUI_FORMS_ENABLE_MACOS_HOST)
     enable_language(OBJCXX)
     find_library(GUI_FORMS_APPKIT AppKit REQUIRED)
-    find_library(GUI_FORMS_IMAGEIO ImageIO REQUIRED)
     find_library(GUI_FORMS_QUARTZCORE QuartzCore REQUIRED)
     find_library(GUI_FORMS_COREGRAPHICS CoreGraphics REQUIRED)
     find_library(GUI_FORMS_UNIFORMTYPEIDENTIFIERS UniformTypeIdentifiers REQUIRED)
@@ -995,7 +993,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     target_compile_options(gui_forms_host_macos PRIVATE -fobjc-arc)
     target_link_libraries(gui_forms_host_macos
         PUBLIC gui_forms_core gui_forms_skia
-        PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_IMAGEIO} ${GUI_FORMS_QUARTZCORE}
+        PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_QUARTZCORE}
                 ${GUI_FORMS_COREGRAPHICS}
                 ${GUI_FORMS_UNIFORMTYPEIDENTIFIERS}
     )
@@ -1145,7 +1143,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     endif()
     target_link_libraries(gui_forms_host_windows
         PUBLIC gui_forms_core
-        PRIVATE gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid windowscodecs comdlg32 shell32
+        PRIVATE gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid comdlg32 shell32
     )
     target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_windows)
     target_compile_definitions(gui_forms_c_api PRIVATE GF_C_API_HAS_WINDOWS_HOST=1)
@@ -1166,7 +1164,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
             "-Wl,--whole-archive" gui_forms_core gui_drawing_core
             gui_forms_controls gui_forms_host_windows "-Wl,--no-whole-archive"
             gui_forms_text_engine freetype harfbuzz gui_forms_bidi
-            user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid windowscodecs comdlg32 shell32)
+            user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid comdlg32 shell32)
         target_link_options(gui_forms_application PRIVATE "-Wl,--export-all-symbols")
         install(TARGETS gui_forms_application EXPORT GUIFormsApplicationTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -2035,7 +2033,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1 GUI_FORMS_DIB_LIFECYCLE_TEST=1)
             target_link_libraries(gui_forms_windows_dib_lifecycle_tests PRIVATE
                 gui_forms_core gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid
-                windowscodecs comdlg32 shell32)
+                comdlg32 shell32)
             add_test(NAME gui_forms_windows_dib_lifecycle_tests
                      COMMAND gui_forms_windows_dib_lifecycle_tests)
             set_tests_properties(gui_forms_windows_dib_lifecycle_tests PROPERTIES TIMEOUT 30)
@@ -2056,7 +2054,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1 GUI_FORMS_WINDOWS_TOOLTIP_TEST=1)
             target_link_libraries(gui_forms_windows_tooltip_tests PRIVATE
                 gui_forms_core gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid
-                windowscodecs comdlg32 shell32)
+                comdlg32 shell32)
             add_test(NAME gui_forms_windows_tooltip_tests
                      COMMAND gui_forms_windows_tooltip_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
             set_tests_properties(gui_forms_windows_tooltip_tests PROPERTIES TIMEOUT 30)
@@ -2080,7 +2078,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     GUI_FORMS_WINDOWS_PREPARED_TEXT=1 GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST=1)
                 target_link_libraries(gui_forms_windows_prepared_text_tests PRIVATE
                     gui_forms_prepared_text_impl gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid
-                    windowscodecs comdlg32 shell32)
+                    comdlg32 shell32)
                 add_test(NAME gui_forms_windows_prepared_text_tests
                     COMMAND gui_forms_windows_prepared_text_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
                 set_tests_properties(gui_forms_windows_prepared_text_tests PROPERTIES TIMEOUT 30)
@@ -3414,7 +3412,8 @@ if(GUI_FORMS_BUILD_TESTS)
             GUI_DRAWING_TEST_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf"
             GUI_DRAWING_TEST_BOLD_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf"
         )
-        target_link_libraries(gui_drawing_skia_tests PRIVATE gui_drawing_skia)
+        target_link_libraries(gui_drawing_skia_tests PRIVATE gui_drawing_skia gui_forms_core)
+        target_include_directories(gui_drawing_skia_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
         add_test(NAME gui_drawing_skia_tests COMMAND gui_drawing_skia_tests)
 
         add_executable(gui_drawing_raster_c_api_tests
