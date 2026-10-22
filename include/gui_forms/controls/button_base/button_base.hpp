@@ -178,11 +178,10 @@ protected:
     // content offset and a theme's visual offset are presentation and are
     // applied only when painting.
     struct ContentLayout final {
-        Rect text{};
-        Rect image{};
+        // None when the button shows no text, or no image.
+        std::optional<Rect> text{};
+        std::optional<Rect> image{};
         double line_height{};
-        bool has_text{};
-        bool has_image{};
     };
 
     [[nodiscard]] Rect local_bounds() const noexcept;

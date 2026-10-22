@@ -288,13 +288,22 @@ void ToolTip::arm(std::chrono::milliseconds delay, PendingAction action) {
 void ToolTip::timer_tick() {
     if ((*timer_).enabled()) (*timer_).stop();
     const PendingAction action = std::exchange(pending_action_, PendingAction::none);
-    if (action == PendingAction::show) {
+    switch (action) {
+    case PendingAction::show: {
         const std::shared_ptr<gui_forms::Control> target = pending_target_.lock();
         pending_target_.reset();
         if (target) show_now(target, keyboard_initiated_, auto_pop_delay_);
-    } else if (action == PendingAction::auto_hide) {
-        close_overlay(true);
+        return;
     }
+    case PendingAction::auto_hide:
+        close_overlay(true);
+        return;
+    case PendingAction::none:
+        // The timer fired with nothing pending.
+        return;
+    }
+    // An action outside the enumeration does nothing.
+    return;
 }
 
 void ToolTip::show(const std::shared_ptr<Control>& target) {

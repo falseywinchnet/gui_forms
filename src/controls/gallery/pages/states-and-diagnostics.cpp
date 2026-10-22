@@ -192,36 +192,38 @@ void StatesPage::run_step(const DispatcherStep step) {
     switch (step) {
     case DispatcherStep::append_a:
         trace_.push_back('A');
-        break;
+        return;
     case DispatcherStep::append_b_then_post_d:
         trace_.push_back('B');
         operations_.push_back((*status_).begin_invoke(
             PostedStep(self_, DispatcherStep::commit_turn_two)));
-        break;
+        return;
     case DispatcherStep::commit_turn_one:
         trace_.push_back('C');
         (*status_).set_text("Turn 1 committed · order " + trace_ +
                             " · nested D remains posted");
-        break;
+        return;
     case DispatcherStep::commit_turn_two: {
         trace_.push_back('D');
         const DispatcherSnapshot snapshot = dispatcher_snapshot();
         (*status_).set_text("Turn 2 committed · order " + trace_ +
                             " · invoked " + std::to_string(snapshot.invoked) +
                             " · faults " + std::to_string(snapshot.faulted));
-        break;
+        return;
     }
     case DispatcherStep::cancelled_callback:
         (*status_).set_text("ERROR · cancelled callback executed");
-        break;
+        return;
     case DispatcherStep::worker_released: {
         const DispatcherSnapshot snapshot = dispatcher_snapshot();
         (*status_).set_text("Worker released after UI callback · marshalled " +
                             std::to_string(snapshot.marshalled_invocations));
         invoke_.set_enabled(true);
-        break;
+        return;
     }
     }
+    // A step outside the enumeration was never posted; nothing runs.
+    return;
 }
 
 void StatesPage::on_post() {

@@ -65,6 +65,41 @@ private:
     std::size_t count_{};
     std::size_t next_{};
 };
+
+// How much of the `free` width an alignment leaves before the content: none
+// at the left, half in the centre, all at the right.
+double horizontal_offset(ContentAlignment alignment, double free) noexcept {
+    switch (alignment) {
+    case ContentAlignment::top_left:
+    case ContentAlignment::middle_left:
+    case ContentAlignment::bottom_left: return 0.0;
+    case ContentAlignment::top_center:
+    case ContentAlignment::middle_center:
+    case ContentAlignment::bottom_center: return free * 0.5;
+    case ContentAlignment::top_right:
+    case ContentAlignment::middle_right:
+    case ContentAlignment::bottom_right: return free;
+    }
+    // An alignment outside the enumeration keeps to the left.
+    return 0.0;
+}
+
+// How much of the `free` height an alignment leaves above the content.
+double vertical_offset(ContentAlignment alignment, double free) noexcept {
+    switch (alignment) {
+    case ContentAlignment::top_left:
+    case ContentAlignment::top_center:
+    case ContentAlignment::top_right: return 0.0;
+    case ContentAlignment::middle_left:
+    case ContentAlignment::middle_center:
+    case ContentAlignment::middle_right: return free * 0.5;
+    case ContentAlignment::bottom_left:
+    case ContentAlignment::bottom_center:
+    case ContentAlignment::bottom_right: return free;
+    }
+    // An alignment outside the enumeration keeps to the top.
+    return 0.0;
+}
 }
 
 std::shared_ptr<const PropertyEnumDescriptor> picture_box_size_mode_enum() {
@@ -131,34 +166,8 @@ Rect aligned_rect(Rect bounds, Size size,
                   ContentAlignment alignment) noexcept {
     const double width = std::min(std::max(0.0, size.width), bounds.width);
     const double height = std::min(std::max(0.0, size.height), bounds.height);
-    double x = bounds.x;
-    double y = bounds.y;
-    switch (alignment) {
-    case ContentAlignment::top_center:
-    case ContentAlignment::middle_center:
-    case ContentAlignment::bottom_center:
-        x += (bounds.width - width) * 0.5;
-        break;
-    case ContentAlignment::top_right:
-    case ContentAlignment::middle_right:
-    case ContentAlignment::bottom_right:
-        x += bounds.width - width;
-        break;
-    default: break;
-    }
-    switch (alignment) {
-    case ContentAlignment::middle_left:
-    case ContentAlignment::middle_center:
-    case ContentAlignment::middle_right:
-        y += (bounds.height - height) * 0.5;
-        break;
-    case ContentAlignment::bottom_left:
-    case ContentAlignment::bottom_center:
-    case ContentAlignment::bottom_right:
-        y += bounds.height - height;
-        break;
-    default: break;
-    }
+    const double x = bounds.x + horizontal_offset(alignment, bounds.width - width);
+    const double y = bounds.y + vertical_offset(alignment, bounds.height - height);
     return {x, y, width, height};
 }
 
