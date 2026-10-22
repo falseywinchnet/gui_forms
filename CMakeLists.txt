@@ -64,6 +64,14 @@ option(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE "Record private run directions for g
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
        "Build the deterministic native File Manager first-party consumer" OFF)
 
+# HarfBuzz's CMakeLists sets THREADS_PREFER_PTHREAD_FLAG and caches that
+# -pthread works. Without the same preference here, a tree's first configure
+# gave Threads::Threads -lpthread and every later configure -pthread, so the
+# compile commands of every target using threads changed on reconfigure:
+# fresh trees (every CI job) and reconfigured ones never shared an object,
+# and CI's second configure of the native tree recompiled what it built.
+# Prefer the flag from the first configure on.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 include(GNUInstallDirs)
 
