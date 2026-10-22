@@ -11,6 +11,8 @@ import re
 import shutil
 import subprocess
 
+import native_tests
+
 ROOT: Path = Path(__file__).resolve().parents[2]
 
 
@@ -410,10 +412,14 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         print(f'the tests matching {tests} read no build output; nothing to build', flush=True)
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
     selection: list[str] = ctest_selection(tests, skip_labels)
-    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
-        '--parallel', test_jobs, *selection)
     if sanitize:
+        run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
+            '--parallel', test_jobs, *selection)
         return
+    # The JUnit report names the passed tests the cache manifest records
+    # (tools/native_tests.py); the programs job does not run them again.
+    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
+        '--parallel', test_jobs, *selection, '--output-junit', native_tests.JUNIT_NAME)
     run('cmake', '--install', toolkit)
     check_installed_notices(sdk)
     if host == 'windows':
