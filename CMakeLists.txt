@@ -696,6 +696,8 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansGurmukhi-Regular.ttf)
     set(GUI_FORMS_DEMOBOARD_FONT_NOTICES
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/ATTRIBUTION.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/LICENSE-PortsmouthRapids.txt
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Noto.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Carlito.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Cousine.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-NotoSansCJKjp.txt
@@ -1273,6 +1275,7 @@ if(GUI_FORMS_BUILD_GALLERY OR (GUI_FORMS_BUILD_TESTS AND GUI_FORMS_ENABLE_MACOS_
     set(GUI_FORMS_GALLERY_FONT_NOTICES
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/ATTRIBUTION.md
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/LICENSE-PortsmouthRapids.txt
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Noto.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Carlito.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Cousine.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-NotoSansCJKjp.txt
@@ -3560,6 +3563,9 @@ install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIFo
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
 install(FILES src/core/compression/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
+# Every third-party component the SDK and the programs ship, with its licence
+# and the FreeType credit (THIRD_PARTY_NOTICES.md).
+install(FILES THIRD_PARTY_NOTICES.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 install(FILES third_party/unicode/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Unicode-LICENSE.txt)
 if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/harfbuzz/COPYING" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME HarfBuzz-COPYING.txt)
