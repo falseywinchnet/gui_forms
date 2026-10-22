@@ -52,7 +52,7 @@ shown in [Installation](../user/install). SheenBidi is already vendored in the r
 
 | Script | Purpose |
 |---|---|
-| `fetch_skia_cpu.sh` | Fetch Skia and its pinned libpng, zlib and FreeType sources, with the PNG-only decoder patch applied |
+| `fetch_skia_cpu.sh` | Fetch Skia and its pinned FreeType source (no libpng or zlib: PNG is stx_png on stx_zlib), with the decoder-removal patch applied |
 | `build_skia_cpu.sh`, `build_skia_cpu_linux.sh` | Build the fetched CPU-only Skia for macOS or Linux; they do not fetch sources |
 | `fetch_text_stack.sh` | HarfBuzz and FreeType |
 | `fetch_linebreak.sh` | libunibreak, required before configuring `GUI_FORMS_BUILD_TEXT_MASKS=ON` |

@@ -34,11 +34,10 @@ source files carry "Copyright (C) 1996-2025".)
 | HarfBuzz | 14.6.0, `c7a7457b` | HarfBuzz licence ("Old MIT") | all | `licenses/HarfBuzz.txt` | `HarfBuzz-COPYING.txt` |
 | FreeType | 2.14.2, `f4205da1` | FreeType License (FTL), elected from FTL/GPLv2 | all | `licenses/FreeType-FTL.txt` | `FreeType-FTL.txt` |
 | SheenBidi | 2.9.0, `829d9991` | Apache-2.0 | all | `licenses/SheenBidi.txt` | `SheenBidi-LICENSE.txt` |
-| stx_zlib (the owned zlib codec) | in this repository | MIT for GUI.Forms' own code; the zlib License notices of the puff-derived inflate and the zlib-informed deflate are retained | all | `licenses/stx_zlib-puff.txt` and `licenses/stx_zlib-zlib.txt` | `share/licenses/stx_zlib/LICENSE-puff.txt` and `LICENSE-zlib.txt` |
+| stx_zlib (the owned zlib codec) | in this repository | MIT; the zlib License notices of the puff-derived inflate and the zlib-informed deflate are retained | all | `licenses/stx_zlib.txt`, `licenses/stx_zlib-puff.txt` and `licenses/stx_zlib-zlib.txt` | `stx_zlib-LICENSE.txt`, `stx_zlib-LICENSE-puff.txt` and `stx_zlib-LICENSE-zlib.txt` (and `share/licenses/stx_zlib/`) |
+| stx_png (the owned PNG codec) | in this repository | MIT | all | `licenses/stx_png.txt` | `stx_png-LICENSE.txt` (and `share/licenses/stx_png/`) |
 | Unicode Character Database (grapheme tables) | Unicode 17.0.0 | Unicode License v3 | all | `licenses/Unicode.txt` | `Unicode-LICENSE.txt` |
 | Skia | `chrome/m152`, `2a9b593b` | BSD-3-Clause | macOS, Linux | `licenses/Skia.txt` | `Skia-LICENSE.txt` |
-| libpng (inside Skia) | Skia DEPS `d5515b5b` | libpng License v2 | macOS, Linux | `licenses/libpng.txt` | `libpng-LICENSE.txt` |
-| zlib (inside Skia) | Skia DEPS `646b7f56` | zlib License | macOS, Linux | `licenses/zlib.txt` | `zlib-LICENSE.txt` |
 | LLVM libc++ and libc++abi | 22.1.8 | Apache-2.0 WITH LLVM-exception | macOS (bundled dylibs), Windows (statically linked) | Windows `licenses/LLVM/libc++-LICENSE.TXT`; macOS `licenses/LLVM/libcxx-LICENSE.TXT` and `licenses/LLVM/libcxxabi-LICENSE.TXT` | `libc++-LICENSE.txt` (Windows) |
 | LLVM libunwind | 22.1.8 | Apache-2.0 WITH LLVM-exception | macOS (bundled dylib), Windows (statically linked) | `licenses/LLVM/libunwind-LICENSE.TXT` | `libunwind-LICENSE.txt` (Windows) |
 | LLVM compiler-rt builtins | 22.1.8 | Apache-2.0 WITH LLVM-exception | Windows (statically linked) | `licenses/LLVM/compiler-rt-LICENSE.TXT` | `compiler-rt-LICENSE.txt` |
@@ -77,6 +76,8 @@ header and IDL files imported from Wine. The Windows build was checked on
   `msxml.h`, `wincodec.h`, `dcommon.h`, `dxgiformat.h`, `exdisp.h` and
   `objectarray.h`, the last six generated from Wine IDL files), by 91
   objects, found from the build's header dependencies (`ninja -t deps`).
+  `wincodec.h` was the Windows host's WIC PNG decoder, which Z-stage I2
+  removed the same day; it is no longer included, so the list now has nine.
 - No function from them is compiled into an object: every code symbol the
   91 objects define (`llvm-nm --defined-only`) is GUI.Forms', HarfBuzz's,
   FreeType's, the C++ runtime's or a test's. Besides code, the objects hold

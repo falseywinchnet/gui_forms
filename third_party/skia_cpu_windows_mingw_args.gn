@@ -16,7 +16,7 @@ extra_cflags = [
   # _WIN32. Enable those language extensions without selecting the MSVC ABI.
   "-fms-extensions",
   # Clang supplies its own target-compatible SIMD headers. Injecting GCC's
-  # private intrinsic directory here shadows them and breaks zlib's SSE path.
+  # private intrinsic directory here would shadow them.
   # Keep the target CRT after libstdc++ so its include_next directives can
   # resolve stdlib.h/math.h while Clang's built-in intrinsics stay first.
   "-idirafter/opt/homebrew/opt/mingw-w64/toolchain-x86_64/x86_64-w64-mingw32/include",
@@ -73,12 +73,13 @@ skia_use_client_icu = false
 skia_use_bidi = false
 skia_use_libgrapheme = false
 
-skia_use_libpng_decode = true
-skia_use_libpng_encode = true
+# No codec and no zlib in Skia (Z-stage I5): PNG is stx_png on stx_zlib.
+skia_use_libpng_decode = false
+skia_use_libpng_encode = false
 skia_use_rust_png_decode = false
 skia_use_rust_png_encode = false
 skia_use_system_libpng = false
-skia_use_zlib = true
+skia_use_zlib = false
 skia_use_system_zlib = false
 
 skia_use_libjpeg_turbo_decode = false

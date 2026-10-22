@@ -60,6 +60,14 @@ public:
                            Rect destination, double opacity) override;
     void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin,
                           double opacity) override;
+    // Records the group. One begun deeper than maximum_paint_group_depth is
+    // refused by name: it is recorded as save() and clip_rect(bounds), drawn
+    // without isolation, and counted in group_refusals(). end_group throws
+    // std::logic_error without a group to end or when the saves inside the
+    // group are unbalanced; finish() throws for a group left open.
+    void begin_group(const PaintGroup& group) override;
+    void end_group() override;
+    [[nodiscard]] std::uint64_t group_refusals() const noexcept { return group_refusals_; }
     void draw_image_region(ImageId image, Rect source, Rect destination,
                            double opacity) override;
     void draw_image_region_sampled(ImageId image, Rect source,
@@ -72,9 +80,27 @@ public:
     [[nodiscard]] std::shared_ptr<const DisplayChunk> finish(
         std::uint64_t generation, PaintPlane plane, Rect logical_bounds);
 
+    // Where the current coordinate origin lies in the recording control's
+    // own coordinates: the sum of the translations in force (T2 E6, so that
+    // the engine knows where a part it draws lands).
+    [[nodiscard]] Point origin() const noexcept { return origin_; }
+
 private:
     std::vector<DisplayCommand> commands_;
     std::uint64_t save_depth_{};
+    Point origin_{};
+    // Each open group's kind (isolated or refused) and the save depth at
+    // its beginning, innermost last; `group_depth_` counts the recorded
+    // (not refused) ones.
+    struct OpenGroup final {
+        bool refused{};
+        std::uint64_t save_depth{};
+    };
+    std::vector<OpenGroup> open_groups_;
+    std::size_t group_depth_{};
+    std::uint64_t group_refusals_{};
+    // The origin at each save in force, restored by its restore.
+    std::vector<Point> saved_origins_;
     TextMetricsProvider* text_metrics_{};
 #if defined(GUI_FORMS_PREPARED_TEXT)
     std::optional<PreparedTextStatus> prepared_failure_{};

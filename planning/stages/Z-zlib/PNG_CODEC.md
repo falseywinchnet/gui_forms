@@ -222,3 +222,61 @@ six cases (RGBA and BGRA; straight, premultiplied and opaque; levels 0, 1, 6
 and 9) on all four CI platforms. It also checks round trips through the owned
 decoder at every level, and that a premultiplied image survives encoding and
 decoding exactly.
+
+### I4: the stx_png package (2026-10-21)
+
+The owner's decision of 2026-10-20 was option 1: `stx_png` holds the codec,
+and the consumer's policy stays with the consumer. On that basis:
+
+- **`stx_png/`** holds the decoder (`stx_png/decoder.hpp`), the encoder
+  (`stx_png/encoder.hpp`) and the 8-bit conversion kernel
+  (`stx_png/pixels.hpp`), in namespace `stx_png`.
+  - It depends only on `stx_zlib::stx_zlib`, and installs as
+    `stx_png::stx_png`; its config finds stx_zlib.
+  - Its MIT licence and provenance are installed under `share/licenses/stx_png/`.
+  - It has a standalone test and an installed-consumer fixture. The
+    `stx-packages.yml` workflow runs both packages standalone on all four
+    platforms and consumes a relocated installation.
+- **GUI.Forms (`src/core/image/`)** keeps the policy:
+  - `png_pixels`: the purposes, the D1 iCCP switch, limits and
+    `PngPixelDecoder`;
+  - `png_color`: the PNG colour metadata, read into a codec-neutral
+    `ColorEncoding`;
+  - `color_conversion`: the gamma and chromaticity conversion to sRGB. It
+    takes decoded samples plus a `ColorEncoding` and knows no file format,
+    so another codec can sit beside stx_png later without changing it.
+  - No codec interface is added (house style §7).
+  - `png_decoder.hpp` and `png_writer.hpp` remain as thin seams with
+    using-declarations, so existing callers are unchanged.
+- **SDK licences:** the SDK installs both packages' licences and provenance
+  beside GUI.Forms' others (`share/licenses/GUIForms/stx_*`).
+- **Program licences:** packages ship `licenses/stx_zlib*.txt` and
+  `licenses/stx_png.txt`, and `THIRD_PARTY_NOTICES.md` has both rows.
+- **Cleanup:** the stale `src/core/compression/` directory is removed;
+  stx_zlib owns that licence and provenance.
+- **Link map:** see
+  [results/2026-10-21-link-map](../../../results/2026-10-21-link-map/README.md).
+  On Windows, FreeType's bundled gzip is the only foreign compression code
+  left. Stage I5 removes it, along with Skia's libpng and zlib.
+
+### I5: the old paths removed (2026-10-21)
+
+- **Skia:** built with `skia_use_libpng_decode`, `skia_use_libpng_encode`
+  and `skia_use_zlib` false (`third_party/skia_cpu_args.gn` and the MinGW
+  profile). `libpng.a` and `libzlib.a` are no longer built, linked,
+  fetched or licensed. Skia's archive policy now forbids SkPng*, libpng and
+  `Cr_z_` symbols. `fetch_skia_cpu.sh` no longer contacts
+  chromium.googlesource.com for zlib, which had no mirror.
+- **FreeType (decision 3A):** compiled with `FT_CONFIG_OPTION_USE_ZLIB`
+  undefined, through `cmake/freetype/gui_forms_ftoption.h`. FreeType's gzip
+  entry points remain as stubs returning `Unimplemented_Feature`. As a
+  result, gzip-wrapped fonts and WOFF 1 fonts with compressed tables are
+  refused. `gui_forms_freetype_zlib_tests` checks that refusal and that
+  ordinary TrueType still loads.
+- **One implementation, checked in CI:** the native CI job runs
+  `tools/audit_link_map.py --forbid-foreign` on all four platforms. It
+  covers every toolkit archive and the Skia archives, and fails on any C
+  zlib, FreeType inflater (`ft_gzip_*`) or libpng symbol. Locally on Windows,
+  every archive and the Gallery executable report none.
+- **Notices:** the libpng and zlib rows and licence files are gone from the
+  packages, the SDK and `THIRD_PARTY_NOTICES.md`.
