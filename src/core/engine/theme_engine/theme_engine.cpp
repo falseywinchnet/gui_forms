@@ -365,6 +365,16 @@ ThemeEngine::PartPlan ThemeEngine::plan(const Control& control, const PartPaint&
     return result;
 }
 
+PartHitRegion ThemeEngine::hit_region(const Control& control, const PartPaint& part) const noexcept {
+    PartHitRegion region{};
+    region.bounds = part.bounds;
+    const PartPlan decided = plan(control, part);
+    if (decided.drawing == PartDrawing::primitive) {
+        region.shape = (*decided.resolution.primitive).shape(decided.resolution.parameters);
+    }
+    return region;
+}
+
 void ThemeEngine::paint(Painter& painter, const Control& control, const PartPaint& part) const {
     Window* const window = control.attached_window();
     std::optional<PartRecordHandle> record{};

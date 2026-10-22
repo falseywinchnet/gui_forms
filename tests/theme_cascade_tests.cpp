@@ -305,14 +305,17 @@ void budgets_refuse_unbounded_costs() {
 
 void newer_engine_rules_fall_back() {
     ThemeRuleSheet sheet{};
-    sheet.requires_engine = EngineVersion{0, 2};
+    // The version after this engine's, whatever this engine's is.
+    const EngineVersion next{current_engine_version.major,
+                             static_cast<std::uint16_t>(current_engine_version.minor + 1U)};
+    sheet.requires_engine = next;
     sheet.rules.push_back(rule("future", CascadeLevel::theme_sheet, by_type(), bulge(0.5)));
     ThemeRule today = rule("today", CascadeLevel::class_rule, by_class("loud"), bulge(0.7));
     today.requires_engine = EngineVersion{0, 1};
     sheet.rules.push_back(today);
     const CompiledThemeRules rules = CompiledThemeRules::compile(sheet, builtin_primitive_registry());
     require(has_diagnostic(rules, RuleDiagnosticKind::needs_newer_engine, "future") && rules.rule_count() == 1U,
-            "a rule of a sheet needing engine 0.2 is set aside on engine 0.1");
+            "a rule of a sheet needing a newer engine is set aside");
     const std::vector<std::string> none{};
     const std::vector<std::string> loud{"loud"};
     require(rules.resolve(face_of("x", none)).outcome == CompiledThemeRules::Outcome::no_rule,

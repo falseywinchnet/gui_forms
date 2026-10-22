@@ -120,6 +120,8 @@ Types
      - A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that group layer may be needed for"): commands drawn as one image, then composited once.
    * - :cpp:class:`ParameterValidation <gui_forms::ParameterValidation>`
      - The first defect found and the index of the parameter it concerns.
+   * - :cpp:class:`PartHitRegion <gui_forms::PartHitRegion>`
+     - A part's hit region (T1's hand-off): its shape in its bounds, never less than the minimum target.
    * - :cpp:class:`PartKey <gui_forms::PartKey>`
      - A painted part's identity from frame to frame (T2 GIVEN H3-1), which lets the engine keep a record for it: its states and when it entered them, its transitions, its preparation and its cached raster.
    * - :cpp:class:`PartMotion <gui_forms::PartMotion>`
@@ -138,6 +140,8 @@ Types
      - What acquire() did.
    * - :cpp:class:`PartRecordHandle <gui_forms::PartRecordHandle>`
      - Which record a handle names: a slot of the table and the slot's generation when the record was made.
+   * - :cpp:class:`PartShape <gui_forms::PartShape>`
+     -  
    * - :cpp:class:`PartTransitionChannel <gui_forms::PartTransitionChannel>`
      - One property's transition on a part (E7): opacity or the parameter at ``parameter``, the state of its machine the part was last painted in (none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
    * - :cpp:class:`Point <gui_forms::Point>`
@@ -924,6 +928,10 @@ Types
 
       Whether the primitive draws nothing at all with ``parameters``, such as a bulge at amplitude 0 (the flat plane): the engine then composites nothing and keeps no raster for the part (E7). False unless the primitive says otherwise. ``parameters`` match the declarations.
 
+   .. cpp:function:: virtual PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept
+
+      The shape the primitive draws with ``parameters``, its radius in logical units (E8): what the part's hit region derives from (design language §7.4 rule 1). A rectangle filling the box unless the primitive says otherwise. ``parameters`` match the declarations.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: EngineSineCosine final
@@ -1676,6 +1684,18 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PartHitRegion final
+
+   ``#include <gui_forms/engine/part_shape/part_shape.hpp>``
+
+   A part's hit region (T1's hand-off): its shape in its bounds, never less than the minimum target. A point hits when it lies in the bounds and either inside the shape or inside the minimum target centred in the bounds (clipped to them), so a hit region may exceed what is drawn but never falls below the minimum.
+
+   .. cpp:member:: Rect bounds
+
+   .. cpp:member:: PartShape shape
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PartKey final
 
    ``#include <gui_forms/engine/types/engine_types.hpp>``
@@ -1886,6 +1906,20 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PartShape final
+
+   ``#include <gui_forms/engine/part_shape/part_shape.hpp>``
+
+   .. cpp:member:: PartShapeKind kind
+
+      Default: ``{PartShapeKind::rounded_rectangle}``.
+
+   .. cpp:member:: double corner_radius
+
+      The corner radius of a rounded rectangle, in logical units.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PartTransitionChannel final
 
    ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
@@ -1998,7 +2032,7 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   One declared parameter. A number must lie in [minimum, maximum]. A colour's alpha scales whatever the primitive uses the colour for. An ``animated`` parameter is one a transition drives from frame to frame, such as the bulge's amplitude during the ribbon's rise. A primitive's preparation never reads it, so changing it never makes a preparation stale (see PrimitivePreparation).
+   One declared parameter. A number must lie in [minimum, maximum]. A colour's alpha scales whatever the primitive uses the colour for. A choice is one of ``choices`` (snake_case, each once), by position; ``default_number`` is the default choice's position. An ``animated`` parameter is one a transition drives from frame to frame, such as the bulge's amplitude during the ribbon's rise. A primitive's preparation never reads it, so changing it never makes a preparation stale (see PrimitivePreparation).
 
    .. cpp:member:: std::string_view name
 
@@ -2015,6 +2049,8 @@ Types
    .. cpp:member:: Color default_colour
 
    .. cpp:member:: bool animated
+
+   .. cpp:member:: std::span<const std::string_view> choices
 
 .. cpp:namespace:: gui_forms
 
@@ -2220,6 +2256,10 @@ Types
    .. cpp:function:: static RuleDeclaration number_value(std::string_view parameter, double value)
 
    .. cpp:function:: static RuleDeclaration colour_value(std::string_view parameter, Color value)
+
+   .. cpp:function:: static RuleDeclaration choice_value(std::string_view parameter, std::string_view choice)
+
+      A choice parameter's value by the choice's name, such as a shape.
 
    .. cpp:function:: static RuleDeclaration expression_value(std::string_view parameter, std::span<const ExpressionInstruction> program, double fallback)
 
@@ -2474,6 +2514,10 @@ Types
    .. cpp:function:: void paint(Painter& painter, const Control& control, const PartPaint& part) const
 
       Paints one part of ``control`` (see paint_part). A part with a key (PartPaint::key) and paintable bounds, painted by a control attached to a window, has its record in that window's part table made or updated first; a primitive then draws into the record's cached raster. A part without a key leaves no record; a primitive draws it into a raster of its own for this paint. If the primitive refuses the part, the built-in recipe draws it.
+
+   .. cpp:function:: PartHitRegion hit_region(const Control& control, const PartPaint& part) const noexcept
+
+      The hit region of one part of ``control`` (E8, T1's hand-off): the part's bounds and the shape its primitive draws there, as plan() decides it. A part the built-in recipe draws, for any reason, has a rectangle. Themes choose a primitive's shape; they never set a hit region (design language §7.4 rule 1). Test a point with part_hit.
 
 .. cpp:namespace:: gui_forms
 
@@ -3220,6 +3264,24 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PartShapeKind
+
+   ``#include <gui_forms/engine/part_shape/part_shape.hpp>``
+
+   .. cpp:enumerator:: rounded_rectangle
+
+   .. cpp:enumerator:: pill
+
+   .. cpp:enumerator:: circle
+
+   .. cpp:enumerator:: cap_start
+
+   .. cpp:enumerator:: cap_end
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PartTextAlignment
 
    ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
@@ -3251,6 +3313,8 @@ Enumerations
    .. cpp:enumerator:: number
 
    .. cpp:enumerator:: colour
+
+   .. cpp:enumerator:: choice
 
 .. cpp:namespace:: gui_forms
 
@@ -3321,6 +3385,8 @@ Enumerations
    .. cpp:enumerator:: too_many_prepared_values
 
    .. cpp:enumerator:: input_out_of_range
+
+   .. cpp:enumerator:: choices_invalid
 
 .. cpp:namespace:: gui_forms
 
@@ -3567,6 +3633,36 @@ Functions, constants and aliases
 
 .. cpp:namespace:: gui_forms
 
+``#include <gui_forms/engine/part_shape/part_shape.hpp>``
+
+.. cpp:function:: double shape_signed_distance(PartShape shape, Rect box, Point point) noexcept
+
+   The signed distance from ``point`` to the edge of ``shape`` drawn in ``box``, in the box's units: negative inside, positive outside.
+
+.. cpp:function:: bool shape_contains(PartShape shape, Rect box, Point point) noexcept
+
+   Whether ``point`` lies inside ``shape`` drawn in ``box``, all in the same units. The box's left and top edges are inside, its right and bottom edges outside.
+
+.. cpp:function:: double shape_coverage(PartShape shape, Rect box, double scale, std::int64_t x, std::int64_t y) noexcept
+
+   How much of the device pixel (x, y) ``shape`` covers when drawn in ``box`` (logical units) at ``scale`` device pixels per unit, from 0 to 1: one half minus the signed distance of the pixel's centre in device pixels, clamped. The same inputs give the same coverage on every host.
+
+.. cpp:function:: bool part_hit(const PartHitRegion& region, Point point) noexcept
+
+.. cpp:var:: constexpr std::size_t part_shape_kind_count
+
+   Value: ``static_cast<std::size_t>(PartShapeKind::count)``.
+
+.. cpp:var:: constexpr std::array<std::string_view, part_shape_kind_count> part_shape_names
+
+   The shapes' registered names, in PartShapeKind order: the choices of a primitive's ``shape`` parameter.
+
+.. cpp:var:: constexpr double minimum_hit_target
+
+   The pointer target minimum of dense chrome (design language §7.4, 20 × 20 logical units, proposed). Value: ``20.0``.
+
+.. cpp:namespace:: gui_forms
+
 ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
 
 .. cpp:var:: constexpr std::size_t maximum_item_part_records
@@ -3596,6 +3692,14 @@ Functions, constants and aliases
    Set one parameter of ``block`` by name. Anything but ``assigned`` leaves the block unchanged.
 
 .. cpp:function:: ParameterAssignment set_colour_parameter(PrimitiveParameterBlock& block, const PrimitiveDescriptor& descriptor, std::string_view name, Color value) noexcept
+
+.. cpp:function:: ParameterAssignment set_choice_parameter(PrimitiveParameterBlock& block, const PrimitiveDescriptor& descriptor, std::string_view name, std::string_view choice) noexcept
+
+   A choice by its name; an unknown choice is out_of_range.
+
+.. cpp:function:: std::optional<std::size_t> find_choice(const PrimitiveParameterDeclaration& declaration, std::string_view choice) noexcept
+
+   The position of ``choice`` among a choice parameter's choices, or none.
 
 .. cpp:function:: const char* registration_outcome_name(RegistrationOutcome outcome) noexcept
 
@@ -3687,7 +3791,7 @@ Functions, constants and aliases
 
 .. cpp:var:: constexpr EngineVersion current_engine_version
 
-   The version this build of the engine implements. E1 (the kernels, the registry and the bulge pair) is 0.1. Value: ``{0, 1}``.
+   The version this build of the engine implements. E1 (the kernels, the registry and the bulge pair) is 0.1; E8 (the relief primitives, shapes and choice parameters) is 0.2. Value: ``{0, 2}``.
 
 .. cpp:var:: constexpr double minimum_device_scale
 

@@ -95,6 +95,13 @@ public:
     // the built-in recipe draws it.
     void paint(Painter& painter, const Control& control, const PartPaint& part) const;
 
+    // The hit region of one part of `control` (E8, T1's hand-off): the
+    // part's bounds and the shape its primitive draws there, as plan()
+    // decides it. A part the built-in recipe draws, for any reason, has a
+    // rectangle. Themes choose a primitive's shape; they never set a hit
+    // region (design language §7.4 rule 1). Test a point with part_hit.
+    [[nodiscard]] PartHitRegion hit_region(const Control& control, const PartPaint& part) const noexcept;
+
 private:
     // E7: an ambient part's time_in_state for this paint, starting its
     // effect on the window's clock, or stopping it and returning the pose

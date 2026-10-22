@@ -85,7 +85,14 @@ std::optional<RuleDiagnosticKind> parameter_defect(const PrimitiveDescriptor& de
     const std::optional<std::size_t> found = find_parameter(descriptor, declaration.property);
     if (!found) return RuleDiagnosticKind::unknown_parameter;
     const PrimitiveParameterDeclaration& parameter = descriptor.parameters[*found];
-    if (declaration.kind == RuleValueKind::name) return RuleDiagnosticKind::parameter_wrong_kind;
+    // A choice is named, and only a choice is.
+    const bool choice = parameter.kind == PrimitiveParameterKind::choice;
+    if ((declaration.kind == RuleValueKind::name) != choice) return RuleDiagnosticKind::parameter_wrong_kind;
+    if (choice) {
+        if (!find_choice(parameter, declaration.name)) return RuleDiagnosticKind::parameter_out_of_range;
+        index = *found;
+        return std::nullopt;
+    }
     // An expression gives a number; its fallback, in `number`, is checked
     // as a number value is.
     const bool number = declaration.kind == RuleValueKind::number || declaration.kind == RuleValueKind::expression;
@@ -206,6 +213,14 @@ RuleDeclaration RuleDeclaration::colour_value(std::string_view parameter, Color 
     result.property = std::string(parameter);
     result.kind = RuleValueKind::colour;
     result.colour = value;
+    return result;
+}
+
+RuleDeclaration RuleDeclaration::choice_value(std::string_view parameter, std::string_view choice) {
+    RuleDeclaration result{};
+    result.property = std::string(parameter);
+    result.kind = RuleValueKind::name;
+    result.name = std::string(choice);
     return result;
 }
 
@@ -359,6 +374,11 @@ void CompiledThemeRules::add_rules(CompiledThemeRules& result, const ThemeRuleSh
             } else if (declaration.kind == RuleValueKind::number) {
                 value.value.kind = PrimitiveParameterKind::number;
                 value.value.number = declaration.number;
+            } else if (declaration.kind == RuleValueKind::name) {
+                const PrimitiveParameterDeclaration& declared =
+                    (*compiled.primitive).descriptor().parameters[parameter];
+                value.value.kind = PrimitiveParameterKind::choice;
+                value.value.number = static_cast<double>(*find_choice(declared, declaration.name));
             } else {
                 value.value.kind = PrimitiveParameterKind::colour;
                 value.value.colour = declaration.colour;
