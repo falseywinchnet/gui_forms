@@ -12,6 +12,7 @@ import shutil
 import subprocess
 
 import change_selection
+import native_tests
 
 ROOT: Path = Path(__file__).resolve().parents[2]
 
@@ -247,7 +248,26 @@ SANITIZER_FLAGS: str = ('-fsanitize=address,undefined -fno-sanitize-recover=unde
 SANITIZER_LINK_FLAGS: str = '-fsanitize=address,undefined'
 
 
-def sanitizer_options(host: str, lsan_suppressions: Path) -> tuple[list[str], dict[str, str]]:
+# Debug information of the sanitized build type (owner, 2026-10-21). Line
+# tables are the default: every report frame keeps file, line and column,
+# objects are about 58% smaller and programs about 70% smaller than with -g,
+# and compiles about 28% faster (measured on the tool_strip test program).
+# Frames inlined into our code then lose their namespace and parameter types,
+# and a debugger loses locals; `full` restores -g while hunting a defect.
+DEBUG_INFO_FLAGS: dict[str, str] = {'lines': '-gline-tables-only', 'full': '-g'}
+DEBUG_INFO_VARIABLE: str = 'GUI_FORMS_SANITIZER_DEBUG_INFO'
+
+
+def debug_info_mode(flag: str, environ: dict[str, str]) -> str:
+    """The sanitizer debug-information mode: the flag, else the environment, else `lines`."""
+    mode: str = flag or environ.get(DEBUG_INFO_VARIABLE, '').strip().lower() or 'lines'
+    if mode not in DEBUG_INFO_FLAGS:
+        raise ValueError(DEBUG_INFO_VARIABLE + ' must be lines or full, not ' + repr(mode))
+    return mode
+
+
+def sanitizer_options(host: str, lsan_suppressions: Path,
+                      debug_info: str = 'lines') -> tuple[list[str], dict[str, str]]:
     """CMake options and the configure and test environment for the sanitized suite on host.
 
     Address and undefined-behaviour sanitizers everywhere, and the leak
@@ -264,11 +284,20 @@ def sanitizer_options(host: str, lsan_suppressions: Path) -> tuple[list[str], di
     when it first configures the tree; OBJCXXFLAGS also instruments the
     Objective-C++ host. Being read at the first configure only, they reach a
     macOS tree configured earlier only after that tree is deleted.
+
+    debug_info (`lines` or `full`) sets the build type's own flags,
+    CMAKE_<LANG>_FLAGS_RELWITHDEBINFO, on every host and every configure, so
+    changing the mode rebuilds an existing tree with the other flags.
     """
     detect_leaks: str = '0'
     if host in ('linux', 'macos'):
         detect_leaks = '1'
-    options: list[str] = ['-DCMAKE_BUILD_TYPE=RelWithDebInfo']
+    build_type_flags: str = '-O2 ' + DEBUG_INFO_FLAGS[debug_info] + ' -DNDEBUG'
+    options: list[str] = ['-DCMAKE_BUILD_TYPE=RelWithDebInfo',
+                          '-DCMAKE_C_FLAGS_RELWITHDEBINFO=' + build_type_flags,
+                          '-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=' + build_type_flags]
+    if host == 'macos':
+        options.append('-DCMAKE_OBJCXX_FLAGS_RELWITHDEBINFO=' + build_type_flags)
     environment: dict[str, str] = {
         'ASAN_OPTIONS': 'detect_leaks=' + detect_leaks + ':halt_on_error=1:abort_on_error=0:print_summary=1',
         'UBSAN_OPTIONS': 'print_stacktrace=1:halt_on_error=1:print_summary=1',
@@ -384,7 +413,7 @@ def changed_tests_listing(changed: list[str], listing: dict) -> dict | None:
 
 def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False,
                   sanitize: bool = False, tests: str = '', test_jobs: int = 1,
-                  skip_labels: str = '', changed_from: str = '') -> None:
+                  debug_info: str = 'lines', skip_labels: str = '', changed_from: str = '') -> None:
     """Build, test, then install only into the explicitly supplied build SDK.
 
     With sanitize, the toolkit is built in its own directory with the
@@ -393,9 +422,11 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     the matching tests and the build to the outputs they read (fails when it
     matches none); empty builds everything and runs the whole suite.
     test_jobs is how many tests ctest runs at once (1, the default, runs
-    them one after another). skip_labels, a ctest -LE pattern, leaves out
-    the tests with matching labels (for example gallery_accessibility, the
-    Gallery-wide accessibility tests) from the run and from a narrowed build.
+    them one after another). debug_info is the sanitized build's debug
+    information, `lines` or `full` (see DEBUG_INFO_FLAGS). skip_labels, a
+    ctest -LE pattern, leaves out the tests with matching labels (for
+    example gallery_accessibility, the Gallery-wide accessibility tests)
+    from the run and from a narrowed build.
     changed_from, a ref, narrows the sanitized run further to the tests the
     paths changed since it can affect (tools/change_selection.py, the areas
     of tools/test_areas.json) and the build to what they read; when no
@@ -444,7 +475,8 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     if sanitize:
         sanitizer_cmake: list[str]
         sanitizer_environment: dict[str, str]
-        sanitizer_cmake, sanitizer_environment = sanitizer_options(host, ROOT / 'gui_forms/tools/sanitizer/lsan.supp')
+        sanitizer_cmake, sanitizer_environment = sanitizer_options(
+            host, ROOT / 'gui_forms/tools/sanitizer/lsan.supp', debug_info)
         options.extend(sanitizer_cmake)
         os.environ.update(sanitizer_environment)
         timeout = '900'
@@ -484,10 +516,14 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     else:
         print('the selected tests read no build output; nothing to build', flush=True)
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
-    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
-        '--parallel', test_jobs, *selection)
     if sanitize:
+        run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
+            '--parallel', test_jobs, *selection)
         return
+    # The JUnit report names the passed tests the cache manifest records
+    # (tools/native_tests.py); the programs job does not run them again.
+    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
+        '--parallel', test_jobs, *selection, '--output-junit', native_tests.JUNIT_NAME)
     run('cmake', '--install', toolkit)
     check_installed_notices(sdk)
     if host == 'windows':
@@ -505,6 +541,9 @@ def main() -> None:
     parser.add_argument('--jobs', type=int, default=4)
     parser.add_argument('--test-jobs', type=int, default=1,
                         help='tests ctest runs at once (default 1: one after another)')
+    parser.add_argument('--debug-info', choices=tuple(DEBUG_INFO_FLAGS), default='',
+                        help='with --sanitize, the debug information: lines (-gline-tables-only, the default) '
+                             'or full (-g); also ' + DEBUG_INFO_VARIABLE)
     parser.add_argument('--skip-labels', default='',
                         help='leave out tests whose labels match this ctest -LE pattern, such as '
                              'gallery_accessibility (the Gallery-wide accessibility tests); CI passes none')
@@ -528,6 +567,13 @@ def main() -> None:
         parser.error('--tests narrows the sanitized run only')
     if args.changed_from and not args.sanitize:
         parser.error('--changed-from narrows the sanitized run only')
+    if args.debug_info and not args.sanitize:
+        parser.error('--debug-info applies to the sanitized build only')
+    debug_info: str = 'lines'
+    try:
+        debug_info = debug_info_mode(args.debug_info, dict(os.environ))
+    except ValueError as error:
+        parser.error(str(error))
     hosts: dict[str, str] = {'Darwin': 'macos', 'Linux': 'linux', 'Windows': 'windows'}
     host: str = hosts[platform.system()]
     architecture: str = 'x64'
@@ -538,7 +584,7 @@ def main() -> None:
     os.environ['BUILD_JOBS'] = str(args.jobs)
     build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
                   gallery_enabled(args.gallery, dict(os.environ)), args.sanitize, args.tests,
-                  args.test_jobs, args.skip_labels, args.changed_from)
+                  args.test_jobs, debug_info, args.skip_labels, args.changed_from)
 
 
 if __name__ == '__main__':

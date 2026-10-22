@@ -46,6 +46,34 @@ HostCapabilities with_tray(HostCapabilities capabilities, Display *display) {
         capabilities.available | HostCapability::notification_area;
   return capabilities;
 }
+
+// The X cursor-font shape for a cursor kind.
+unsigned font_cursor_shape(CursorKind cursor) noexcept {
+  switch (cursor) {
+  case CursorKind::arrow:
+    return XC_left_ptr;
+  case CursorKind::text:
+    return XC_xterm;
+  case CursorKind::hand:
+    return XC_hand2;
+  case CursorKind::crosshair:
+    return XC_crosshair;
+  case CursorKind::resize_horizontal:
+    return XC_sb_h_double_arrow;
+  case CursorKind::resize_vertical:
+    return XC_sb_v_double_arrow;
+  case CursorKind::resize_diagonal_down:
+    return XC_bottom_right_corner;
+  case CursorKind::resize_diagonal_up:
+    return XC_top_right_corner;
+  case CursorKind::wait:
+    return XC_watch;
+  case CursorKind::forbidden:
+    return XC_X_cursor;
+  }
+  // A kind outside the enumeration shows the arrow.
+  return XC_left_ptr;
+}
 } // namespace
 Services::Services(NativeWindow &window)
     : HostServices(with_tray(linux_capabilities(), window.runtime.display)),
@@ -115,38 +143,7 @@ HostMonitorResult Services::query_monitors_impl() {
 HostServiceStatus Services::set_cursor_impl(CursorKind cursor) {
   if (window_.cursor_set && window_.current_cursor == cursor)
     return {};
-  unsigned shape = XC_left_ptr;
-  switch (cursor) {
-  case CursorKind::text:
-    shape = XC_xterm;
-    break;
-  case CursorKind::hand:
-    shape = XC_hand2;
-    break;
-  case CursorKind::crosshair:
-    shape = XC_crosshair;
-    break;
-  case CursorKind::resize_horizontal:
-    shape = XC_sb_h_double_arrow;
-    break;
-  case CursorKind::resize_vertical:
-    shape = XC_sb_v_double_arrow;
-    break;
-  case CursorKind::resize_diagonal_down:
-    shape = XC_bottom_right_corner;
-    break;
-  case CursorKind::resize_diagonal_up:
-    shape = XC_top_right_corner;
-    break;
-  case CursorKind::wait:
-    shape = XC_watch;
-    break;
-  case CursorKind::forbidden:
-    shape = XC_X_cursor;
-    break;
-  default:
-    break;
-  }
+  const unsigned shape = font_cursor_shape(cursor);
   const Cursor native = XCreateFontCursor(window_.runtime.display, shape);
   if (native == None)
     return {HostServiceError::backend_failure};

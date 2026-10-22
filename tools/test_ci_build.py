@@ -58,7 +58,11 @@ class SanitizerOptionTests(unittest.TestCase):
         options: list[str]
         environment: dict[str, str]
         options, environment = ci_build.sanitizer_options('macos', Path('lsan.supp'))
-        self.assertEqual(options, ['-DCMAKE_BUILD_TYPE=RelWithDebInfo'])
+        flag: str
+        for flag in options:
+            # Only the build type and its own flags: CMAKE_<LANG>_FLAGS would replace the toolchain's.
+            self.assertTrue(flag.startswith('-DCMAKE_BUILD_TYPE=') or '_FLAGS_RELWITHDEBINFO=' in flag, flag)
+        self.assertIn('-DCMAKE_OBJCXX_FLAGS_RELWITHDEBINFO=-O2 -gline-tables-only -DNDEBUG', options)
         name: str
         for name in ('CFLAGS', 'CXXFLAGS', 'OBJCXXFLAGS'):
             self.assertEqual(environment[name], ci_build.SANITIZER_FLAGS, name)
@@ -255,6 +259,34 @@ class SetupSkipTests(unittest.TestCase):
         self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=2'], {'CC': 'clang'}, b'cache'))
         self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'gcc'}, b'cache'))
         self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'clang'}, b'edited'))
+
+
+class DebugInfoTests(unittest.TestCase):
+    def test_line_tables_are_the_default(self) -> None:
+        self.assertEqual(ci_build.debug_info_mode('', {}), 'lines')
+        options: list[str]
+        environment: dict[str, str]
+        options, environment = ci_build.sanitizer_options('linux', Path('lsan.supp'))
+        self.assertIn('-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -gline-tables-only -DNDEBUG', options)
+        self.assertIn('-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -gline-tables-only -DNDEBUG', options)
+
+    def test_full_restores_g_from_the_flag_or_the_environment(self) -> None:
+        self.assertEqual(ci_build.debug_info_mode('full', {}), 'full')
+        self.assertEqual(ci_build.debug_info_mode('', {ci_build.DEBUG_INFO_VARIABLE: ' Full '}), 'full')
+        self.assertEqual(ci_build.debug_info_mode('lines', {ci_build.DEBUG_INFO_VARIABLE: 'full'}), 'lines')
+        options: list[str]
+        environment: dict[str, str]
+        options, environment = ci_build.sanitizer_options('windows', Path('lsan.supp'), 'full')
+        self.assertIn('-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g -DNDEBUG', options)
+
+    def test_other_modes_are_refused(self) -> None:
+        with self.assertRaises(ValueError):
+            ci_build.debug_info_mode('', {ci_build.DEBUG_INFO_VARIABLE: 'some'})
+
+    def test_the_sanitizer_job_sets_the_variable_this_tool_reads(self) -> None:
+        workflow: str = (CHECKOUT / '.github/workflows/native.yml').read_text(encoding='utf-8')
+        self.assertIn(ci_build.DEBUG_INFO_VARIABLE + '=$mode', workflow)
+        self.assertIn('gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-', workflow)
 
 
 class SelectionTests(unittest.TestCase):

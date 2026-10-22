@@ -1176,20 +1176,33 @@ void NavigationPane::select_page(std::size_t position, PageSelectionCause cause)
 }
 
 void NavigationPane::activate(const Target& target) {
-    if (target.kind == TargetKind::collapse) {
+    switch (target.kind) {
+    case TargetKind::collapse:
         set_collapsed(!collapsed_);
-    } else if (target.kind == TargetKind::caption) {
+        return;
+    case TargetKind::caption:
         if (popup_open_) {
             close_popup();
         } else {
             static_cast<void>(open_popup());
         }
-    } else if (target.kind == TargetKind::configure) {
+        return;
+    case TargetKind::configure:
         static_cast<void>(show_configure_menu(MenuOpenMode::keyboard));
-    } else if (target.kind == TargetKind::tab) {
+        return;
+    case TargetKind::tab: {
         const std::optional<PagePosition> position = pages_.find(target.page);
         if (position) select_page((*position).value, PageSelectionCause::keyboard);
+        return;
     }
+    case TargetKind::none:
+    case TargetKind::grip:
+        // Nothing to activate: the grip is dragged or stepped with the arrow
+        // keys.
+        return;
+    }
+    // A target outside the enumeration activates nothing.
+    return;
 }
 
 // -- keyboard ------------------------------------------------------------------------

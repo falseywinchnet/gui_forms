@@ -98,21 +98,37 @@ std::shared_ptr<MaskLedger> make_mask_ledger() {
     (*ledger).commit(MaskResource::metadata, bytes);
     return ledger;
 }
-TextMaskResult mask_budget_result(const MaskResource resource) noexcept {
-    TextMaskLimit limit = TextMaskLimit::metadata_bytes;
+namespace {
+
+// The public limit a ledger resource's budget is reported as.
+TextMaskLimit mask_limit(const MaskResource resource) noexcept {
     switch (resource) {
-    case MaskResource::utf8: limit = TextMaskLimit::key_bytes; break;
-    case MaskResource::coverage: limit = TextMaskLimit::live_mask_bytes; break;
-    case MaskResource::masks: limit = TextMaskLimit::live_mask_objects; break;
-    case MaskResource::shaping: limit = TextMaskLimit::shaping_payload; break;
-    case MaskResource::workspace: limit = TextMaskLimit::workspace; break;
-    case MaskResource::keys: limit = TextMaskLimit::source_key_objects; break;
-    case MaskResource::slots: limit = TextMaskLimit::request_slots; break;
-    case MaskResource::fonts: limit = TextMaskLimit::font_bytes; break;
-    case MaskResource::banks: limit = TextMaskLimit::font_banks; break;
-    default: break;
+    case MaskResource::utf8: return TextMaskLimit::key_bytes;
+    case MaskResource::metadata: return TextMaskLimit::metadata_bytes;
+    case MaskResource::coverage: return TextMaskLimit::live_mask_bytes;
+    case MaskResource::masks: return TextMaskLimit::live_mask_objects;
+    case MaskResource::shaping: return TextMaskLimit::shaping_payload;
+    case MaskResource::workspace: return TextMaskLimit::workspace;
+    case MaskResource::keys: return TextMaskLimit::source_key_objects;
+    case MaskResource::slots: return TextMaskLimit::request_slots;
+    case MaskResource::fonts: return TextMaskLimit::font_bytes;
+    case MaskResource::banks: return TextMaskLimit::font_banks;
+    case MaskResource::cache:
+        // No public limit names the cache's entry count; it is reported
+        // with the metadata it is kept in.
+        return TextMaskLimit::metadata_bytes;
+    case MaskResource::count:
+        // The count sentinel is no resource.
+        return TextMaskLimit::metadata_bytes;
     }
-    const TextMaskResult result{TextMaskStatus::limit_exceeded, limit};
+    // A resource outside the enumeration is reported as metadata.
+    return TextMaskLimit::metadata_bytes;
+}
+
+} // namespace
+
+TextMaskResult mask_budget_result(const MaskResource resource) noexcept {
+    const TextMaskResult result{TextMaskStatus::limit_exceeded, mask_limit(resource)};
     return result;
 }
 } // namespace gui_forms::detail

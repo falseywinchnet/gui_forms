@@ -84,6 +84,19 @@ UndefinedBehaviorSanitizer run everywhere; LeakSanitizer runs on Linux and
 macOS, since the Windows MinGW runtime has none. Host code is sanitized only
 where it builds, so the Windows and macOS hosts depend on these local trees.
 
+Sanitized trees carry line tables, not full debug information, by default
+(`--debug-info lines`, `-gline-tables-only`): every report frame keeps its
+file, line and column; objects and programs are about 60 to 70% smaller and
+compiles about 28% faster than with `-g`. Frames of our code then lose their
+namespaces and parameter types, and a debugger loses locals. While hunting a
+defect, build with full `-g` and switch back afterwards:
+`ci_build.py --sanitize --debug-info full`, or
+`GUI_FORMS_SANITIZER_DEBUG_INFO=full` in the environment. A tree rebuilds when
+the mode changes. On CI, the sanitizer job uses `full` when the head commit's
+message contains `[sanitizer-full-g]`, and keys its cache by the mode. LeakSanitizer
+suppressions (`tools/sanitizer/lsan.supp`) therefore name functions without a
+namespace where the name allows.
+
 Every test carries one area label, `area_<area>`: `core`, `codec`, `audio`,
 `render`, `controls`, `docs`, `host`, `gui` (the Gallery, demoboard and lab
 tests) or `a11y` (the accessibility clients and providers), so

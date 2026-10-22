@@ -83,6 +83,29 @@ double easing_slope(MotionEasing easing, double p) noexcept {
     return 1.0;
 }
 
+// Whether a motion of curve `kind` has settled: a timed one when its time
+// has elapsed, the others when within `tolerance` of the target (a spring
+// also moving less than that over a frame).
+bool curve_settled(MotionKind kind, bool elapsed_all, double gap, double velocity,
+                   double tolerance) noexcept {
+    switch (kind) {
+    case MotionKind::timed:
+        return elapsed_all;
+    case MotionKind::follow:
+    case MotionKind::decay: {
+        const bool near = gap <= tolerance;
+        return near;
+    }
+    case MotionKind::spring: {
+        const double frame_travel = std::fabs(velocity) * motion_settle_frame_seconds;
+        const bool still = gap <= tolerance && frame_travel <= tolerance;
+        return still;
+    }
+    }
+    // A curve outside the enumeration settles at once: the motion stops.
+    return true;
+}
+
 } // namespace
 
 MotionCurve MotionCurve::timed(FrameInterval duration, MotionEasing easing) noexcept {
@@ -375,21 +398,8 @@ bool MotionValue::advance(FrameTime now, double scale) noexcept {
     const double device_units = extent_ * scale;
     const double tolerance = motion_settle_tolerance / device_units;
     const double gap = std::fabs(sample.position - segment_.target);
-    bool settled = false;
-    switch (segment_.curve.kind) {
-    case MotionKind::timed:
-        settled = sample.elapsed_all;
-        break;
-    case MotionKind::follow:
-    case MotionKind::decay:
-        settled = gap <= tolerance;
-        break;
-    case MotionKind::spring: {
-        const double frame_travel = std::fabs(sample.velocity) * motion_settle_frame_seconds;
-        settled = gap <= tolerance && frame_travel <= tolerance;
-        break;
-    }
-    }
+    bool settled = curve_settled(segment_.curve.kind, sample.elapsed_all, gap,
+                                 sample.velocity, tolerance);
     if (!std::isfinite(sample.position) || !std::isfinite(sample.velocity)) settled = true;
     if (settled) {
         stop();
