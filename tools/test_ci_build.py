@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import re
+import tempfile
 import unittest
 
 import ci_build
@@ -149,6 +150,38 @@ def rule_expression(pattern: str) -> re.Pattern[str]:
     for piece in pattern.split('*'):
         pieces.append(re.escape(piece))
     return re.compile('.*'.join(pieces))
+
+
+class SetupSkipTests(unittest.TestCase):
+    def test_pins_without_checkouts_are_not_current(self) -> None:
+        directory: str
+        with tempfile.TemporaryDirectory() as directory:
+            script: Path = Path(directory) / 'fetch.sh'
+            script.write_text('example_revision=' + '0' * 40 + '\n', encoding='utf-8')
+            self.assertFalse(ci_build.pinned_checkouts_current(script))
+
+    def test_a_script_without_pins_is_not_current(self) -> None:
+        directory: str
+        with tempfile.TemporaryDirectory() as directory:
+            script: Path = Path(directory) / 'fetch.sh'
+            script.write_text('git fetch somewhere\n', encoding='utf-8')
+            self.assertFalse(ci_build.pinned_checkouts_current(script))
+
+    def test_the_fetch_script_pins_are_readable(self) -> None:
+        # If the pins stop matching the pattern the skip silently stops working.
+        script: str = (CHECKOUT / 'third_party/fetch_text_stack.sh').read_text(encoding='utf-8')
+        names: list[str] = []
+        pin: tuple[str, str]
+        for pin in ci_build.PIN_PATTERN.findall(script):
+            names.append(pin[0])
+        self.assertEqual(names, ['harfbuzz', 'freetype'])
+
+    def test_the_configure_record_covers_command_environment_and_cache(self) -> None:
+        base: str = ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'clang'}, b'cache')
+        self.assertEqual(base, ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'clang', 'HOME': 'x'}, b'cache'))
+        self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=2'], {'CC': 'clang'}, b'cache'))
+        self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'gcc'}, b'cache'))
+        self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'clang'}, b'edited'))
 
 
 class LeakSuppressionTests(unittest.TestCase):
