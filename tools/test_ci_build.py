@@ -112,9 +112,37 @@ class TestTargetTests(unittest.TestCase):
                                                    [{'name': name, 'value': ['setup']}])]}
             self.assertIsNone(ci_build.targets_for_tests(listing, self.KNOWN, TREE), name)
 
+    def test_a_test_without_a_command_builds_everything(self) -> None:
+        listing: dict = {'tests': [{'name': 'example', 'properties': []}]}
+        self.assertIsNone(ci_build.targets_for_tests(listing, self.KNOWN, TREE))
+
     def test_a_sibling_directory_with_the_same_prefix_is_outside_the_tree(self) -> None:
         listing: dict = {'tests': [test_record([str(TREE) + '-other' + os.sep + 'gui_forms_example_tests.exe'])]}
         self.assertEqual(ci_build.targets_for_tests(listing, self.KNOWN, TREE), [])
+
+
+class TestCommandTests(unittest.TestCase):
+    def test_arguments_are_unquoted(self) -> None:
+        self.assertEqual(ci_build.cmake_arguments('[=[a b]=] "x\\"y" plain [[c]]'), ['a b', 'x"y', 'plain', 'c'])
+
+    def test_commands_come_from_the_tree_and_its_subdirectories(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            tree: Path = Path(scratch)
+            (tree / 'sub').mkdir()
+            (tree / 'CTestTestfile.cmake').write_text(
+                '# CMake generated Testfile\n'
+                'add_test("first_tests" "/b/first_tests.exe")\n'
+                'set_tests_properties("first_tests" PROPERTIES  LABELS "area_core")\n'
+                'subdirs("sub")\n', encoding='utf-8')
+            (tree / 'sub' / 'CTestTestfile.cmake').write_text(
+                'add_test([=[second_tests]=] "/usr/bin/python3" "/s/check.py" "-DX=/b/sub/tool")\n', encoding='utf-8')
+            commands: dict[str, list[str]] = ci_build.test_commands(tree)
+        self.assertEqual(commands, {'first_tests': ['/b/first_tests.exe'],
+                                    'second_tests': ['/usr/bin/python3', '/s/check.py', '-DX=/b/sub/tool']})
+
+    def test_a_tree_without_tests_has_no_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            self.assertEqual(ci_build.test_commands(Path(scratch)), {})
 
 
 CHECKOUT: Path = Path(__file__).resolve().parents[1]

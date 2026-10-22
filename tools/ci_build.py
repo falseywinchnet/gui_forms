@@ -62,12 +62,15 @@ def targets_for_tests(listing: dict, known_outputs: set[str], tree: Path) -> lis
     build-tree files its command names (its executable, or the libraries and
     programs an audit script inspects). The whole tree is built instead when
     a test names a build-tree file ninja does not produce, or depends on other
-    tests (fixtures, DEPENDS), whose products this reading cannot see. A test
-    naming no build-tree file needs nothing built.
+    tests (fixtures, DEPENDS), whose products this reading cannot see, or
+    has no command at all (see test_commands). A test naming no build-tree
+    file needs nothing built.
     """
     targets: set[str] = set()
     test: dict
     for test in listing.get('tests', []):
+        if 'command' not in test:
+            return None
         property_record: dict
         for property_record in test.get('properties', []):
             if property_record.get('name') in ('FIXTURES_REQUIRED', 'DEPENDS', 'REQUIRED_FILES'):
@@ -94,10 +97,68 @@ def ctest_selection(tests: str, skip_labels: str) -> list[str]:
     return selection
 
 
+# One argument of a CMake command: a quoted argument (a backslash escapes the
+# next character), a bracket argument [=[...]=], or an unquoted run.
+CMAKE_ARGUMENT: re.Pattern[str] = re.compile(r'"((?:[^"\\]|\\.)*)"|\[(=*)\[(.*?)\]\2\]|([^\s()"]+)', re.DOTALL)
+CMAKE_ESCAPE: re.Pattern[str] = re.compile(r'\\(.)', re.DOTALL)
+CMAKE_CALL: re.Pattern[str] = re.compile(r'^(add_test|subdirs)\((.*)\)\s*$', re.MULTILINE)
+
+
+def cmake_arguments(text: str) -> list[str]:
+    """The arguments of one CMake command's parenthesized text, unquoted."""
+    arguments: list[str] = []
+    match: re.Match[str]
+    for match in CMAKE_ARGUMENT.finditer(text):
+        if match.group(1) is not None:
+            arguments.append(CMAKE_ESCAPE.sub(r'\1', match.group(1)))
+        elif match.group(3) is not None:
+            arguments.append(match.group(3))
+        else:
+            arguments.append(match.group(4))
+    return arguments
+
+
+def test_commands(directory: Path) -> dict[str, list[str]]:
+    """Every test's command as directory's CTestTestfile.cmake (and its subdirs) records it.
+
+    ctest --show-only=json-v1 leaves out the command of a test whose
+    executable is not built yet, which is every test of a fresh tree; the
+    generated file still names it.
+    """
+    commands: dict[str, list[str]] = {}
+    test_file: Path = directory / 'CTestTestfile.cmake'
+    if not test_file.is_file():
+        return commands
+    call: re.Match[str]
+    for call in CMAKE_CALL.finditer(test_file.read_text(encoding='utf-8', errors='replace')):
+        arguments: list[str] = cmake_arguments(call.group(2))
+        if call.group(1) == 'subdirs':
+            subdirectory: str
+            for subdirectory in arguments:
+                commands.update(test_commands(directory / subdirectory))
+        elif arguments:
+            commands[arguments[0]] = arguments[1:]
+    return commands
+
+
 def test_listing(toolkit: Path, tests: str, skip_labels: str) -> dict:
-    """ctest's --show-only=json-v1 listing of the tests ctest_selection(tests, skip_labels) chooses."""
-    return json.loads(captured('ctest', '--test-dir', toolkit, '--show-only=json-v1',
-                               *ctest_selection(tests, skip_labels)))
+    """ctest's --show-only=json-v1 listing of the tests ctest_selection(tests, skip_labels) chooses.
+
+    A test whose executable is not built yet gets its command from the
+    generated test files (test_commands), so that the listing names it.
+    """
+    listing: dict = json.loads(captured('ctest', '--test-dir', toolkit, '--show-only=json-v1',
+                                        *ctest_selection(tests, skip_labels)))
+    commands: dict[str, list[str]] | None = None
+    test: dict
+    for test in listing.get('tests', []):
+        if 'command' in test:
+            continue
+        if commands is None:
+            commands = test_commands(toolkit)
+        if test['name'] in commands:
+            test['command'] = commands[test['name']]
+    return listing
 
 
 def selected_test_targets(toolkit: Path, listing: dict) -> list[str] | None:
