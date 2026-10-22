@@ -129,7 +129,9 @@ jobs:
           merge-multiple: true
       - name: Replace the restored objects with the seed (every test still runs)
         if: steps.seed.outputs.seeded == 'true'
-        run: python gui_forms/tools/ci_sanitizer_seed.py restore
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python gui_forms/tools/ci_sanitizer_seed.py restore --artifact-id "${{ steps.seed.outputs.artifact-id }}"
       - name: Build and test the whole suite under the sanitizers
         run: |
           ccache --zero-stats
@@ -144,7 +146,9 @@ jobs:
         if: success()
         with:
           name: gui-sanitize-ccache-linux-x64
-          path: gui-sanitize-ccache.tar
+          path: |
+            gui-sanitize-ccache.tar
+            gui-sanitize-ccache.tar.sha256
           compression-level: 0
           retention-days: 7
       - uses: actions/cache/save@v4

@@ -1,6 +1,8 @@
 """The sanitizer seed comes only from earlier same-repository runs of the nearest branch."""
 from __future__ import annotations
+import hashlib
 import io
+import os
 from pathlib import Path
 import tarfile
 import tempfile
@@ -68,12 +70,17 @@ def archive_with(names: list[str]) -> bytes:
 
 
 class RestoreTests(unittest.TestCase):
-    def restore(self, root: Path, names: list[str]) -> None:
+    def restore(self, root: Path, names: list[str], digest: str | None = None, artifact_id: int = 0) -> bool:
         download: Path = root / '.ci' / 'sanitizer-seed'
         download.mkdir(parents=True)
-        (download / ci_sanitizer_seed.ARCHIVE_NAME).write_bytes(archive_with(names))
+        data: bytes = archive_with(names)
+        (download / ci_sanitizer_seed.ARCHIVE_NAME).write_bytes(data)
+        if digest is None:
+            digest = hashlib.sha256(data).hexdigest()
+        (download / ci_sanitizer_seed.DIGEST_NAME).write_text(digest, encoding='utf-8')
         with patch.object(ci_sanitizer_seed, 'ROOT', root), patch.object(ci_sanitizer_seed, 'DOWNLOAD', download):
-            ci_sanitizer_seed.restore_seed()
+            restored: bool = ci_sanitizer_seed.restore_seed(artifact_id)
+        return restored
 
     def test_the_seed_replaces_the_cache(self) -> None:
         directory: str
@@ -81,11 +88,11 @@ class RestoreTests(unittest.TestCase):
             root: Path = Path(directory)
             (root / '.ccache').mkdir()
             (root / '.ccache' / 'stale').write_bytes(b'old')
-            self.restore(root, ['.ccache/a/b'])
+            self.assertTrue(self.restore(root, ['.ccache/a/b']))
             self.assertTrue((root / '.ccache' / 'a' / 'b').is_file())
             self.assertFalse((root / '.ccache' / 'stale').exists())
 
-    def test_members_outside_the_cache_are_refused_before_anything_is_removed(self) -> None:
+    def test_members_outside_the_cache_skip_the_seed_before_anything_is_removed(self) -> None:
         name: str
         for name in ('outside', '.ccache/../escape', '/absolute'):
             directory: str
@@ -93,9 +100,24 @@ class RestoreTests(unittest.TestCase):
                 root: Path = Path(directory)
                 (root / '.ccache').mkdir()
                 (root / '.ccache' / 'kept').write_bytes(b'old')
-                with self.assertRaises(ValueError, msg=name):
-                    self.restore(root, ['.ccache/a', name])
+                self.assertFalse(self.restore(root, ['.ccache/a', name]), name)
                 self.assertTrue((root / '.ccache' / 'kept').is_file(), name)
+
+    def test_a_cut_short_seed_is_fetched_again_then_skipped(self) -> None:
+        directory: str
+        with tempfile.TemporaryDirectory() as directory:
+            root: Path = Path(directory)
+            (root / '.ccache').mkdir()
+            (root / '.ccache' / 'kept').write_bytes(b'old')
+            downloads: list[int] = []
+
+            def download_nothing_better(artifact_id: int) -> None:
+                downloads.append(artifact_id)
+
+            with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'owner/repo'}),                     patch.object(ci_sanitizer_seed, 'download_seed', side_effect=download_nothing_better):
+                self.assertFalse(self.restore(root, ['.ccache/a'], digest='0' * 64, artifact_id=7))
+            self.assertEqual(downloads, [7] * ci_sanitizer_seed.DOWNLOADS)
+            self.assertTrue((root / '.ccache' / 'kept').is_file())
 
 
 if __name__ == '__main__':
