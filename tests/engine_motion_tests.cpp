@@ -383,8 +383,8 @@ std::size_t run_until_settled(RibbonFixture& fixture, BitHash& hash, std::vector
 
 // The expected hashes of the rise and the fall, recorded on Windows x64
 // and checked on every CI platform.
-constexpr std::uint64_t expected_rise_hash = 0x245cf70b59b32edcULL;
-constexpr std::uint64_t expected_fall_hash = 0x1051f2233ce0173dULL;
+constexpr std::uint64_t expected_rise_hash = 0x94265deb32d68de6ULL;
+constexpr std::uint64_t expected_fall_hash = 0x14208adee63a9a21ULL;
 
 void ribbon_rise() {
     std::unique_ptr<RibbonFixture> fixture = make_ribbon();
@@ -399,9 +399,14 @@ void ribbon_rise() {
     const FaceFrame start = face_frame(window);
     require(start.amplitude == 0.0 && start.pixels.empty() && window.motion_clock().armed(),
             "hot, the rise starts from the flat plane on the window's clock");
+    // E7r: the rise's keyframes are baked when it starts, the nine levels
+    // above the flat plane, and nothing is baked while it runs.
+    const RasterCacheStatistics started = window.engine_parts().cache_statistics();
+    require(started.keyframe_bakes == 9U, "the rise's nine keyframes are baked when it starts");
     BitHash rise{};
     std::vector<double> rising{};
     const std::size_t rise_frames = run_until_settled(*fixture, rise, rising);
+    require(window.engine_parts().cache_statistics().bakes == started.bakes, "nothing is baked while the rise runs");
     require(rise_frames == 30U && rising.size() == 30U,
             "the rise settles within half an 8-bit step after 30 frames of 16 ms (480 ms)");
     const double first = 1.0 - std::exp(-16.0 / 75.0);
@@ -426,11 +431,21 @@ void ribbon_rise() {
     std::vector<double> falling{};
     const std::size_t fall_frames = run_until_settled(*fixture, fall, falling);
     require(fall_frames == 30U && falling.back() == 0.0, "it falls back in 30 frames and rests flat");
+    require(window.engine_parts().cache_statistics().bakes == started.bakes,
+            "nor while it falls: it steps back through the same keyframes");
     for (std::size_t index = 1; index < falling.size(); ++index) {
         require(falling[index] < falling[index - 1U], "the amplitude only falls");
     }
     require(run_frame(window, (*fixture).time, (*fixture).painter) == 0U && !window.motion_clock().armed(),
             "and then nothing is scheduled");
+    // Hovered again, the rise bakes nothing at all.
+    move_to(window, centre(face));
+    repaint(window, (*fixture).painter);
+    BitHash again{};
+    std::vector<double> rising_again{};
+    static_cast<void>(run_until_settled(*fixture, again, rising_again));
+    require(window.engine_parts().cache_statistics().bakes == started.bakes, "a second rise bakes nothing");
+    require(again.value == rise.value, "and shows the same frames");
     if (print_mode()) {
         std::cout << "ribbon rise hash 0x" << std::hex << rise.value << ", fall hash 0x" << fall.value << std::dec
                   << '\n';

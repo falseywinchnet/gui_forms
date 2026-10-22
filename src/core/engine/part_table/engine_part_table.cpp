@@ -345,10 +345,14 @@ std::size_t EnginePartTable::release_control(std::string_view control_id) noexce
 void EnginePartTable::drop_raster(EnginePartRecord& record) noexcept {
     if (!record.cached || !(*record.cached).raster) return;
     CachedPartRaster& cached = *record.cached;
-    statistics_.bytes = statistics_.bytes - (*cached.raster).pixels().size();
-    statistics_.rasters = statistics_.rasters - 1U;
+    // A shared raster counts against the shared bakes' budget, not this one.
+    if (!cached.shared) {
+        statistics_.bytes = statistics_.bytes - (*cached.raster).pixels().size();
+        statistics_.rasters = statistics_.rasters - 1U;
+    }
     cached.raster.reset();
     cached.primitive = nullptr;
+    cached.shared = false;
 }
 
 void EnginePartTable::make_room(const std::size_t incoming, const EnginePartRecord* const keep) noexcept {
@@ -359,6 +363,7 @@ void EnginePartTable::make_room(const std::size_t incoming, const EnginePartReco
         for (RecordSlot& slot : slots_) {
             if (!slot.record || &*slot.record == keep) continue;
             if (!(*slot.record).cached || !(*(*slot.record).cached).raster) continue;
+            if ((*(*slot.record).cached).shared) continue;
             if (oldest == nullptr || (*slot.record).last_painted < (*oldest).last_painted) oldest = &*slot.record;
         }
         if (oldest == nullptr) return;
@@ -376,82 +381,99 @@ bool EnginePartTable::raster_current(const EnginePartRecord& record, const PartR
     return current;
 }
 
-void EnginePartTable::clear_slice_references() noexcept {
-    slice_references_.clear();
-    statistics_.slice_references = 0U;
-    statistics_.slice_bytes = 0U;
+void EnginePartTable::clear_shared_bakes() noexcept {
+    shared_bakes_.clear();
+    statistics_.shared_rasters = 0U;
+    statistics_.shared_bytes = 0U;
 }
 
-void EnginePartTable::make_slice_room(const std::size_t incoming) noexcept {
-    while (!slice_references_.empty() && statistics_.slice_bytes + incoming > slice_cache_budget_bytes) {
+void EnginePartTable::make_shared_room(const std::size_t incoming) noexcept {
+    while (!shared_bakes_.empty() && statistics_.shared_bytes + incoming > shared_bake_budget_bytes) {
         // The least recently used; ties go to the earlier entry.
         std::size_t oldest = 0U;
-        for (std::size_t index = 1U; index < slice_references_.size(); ++index) {
-            if (slice_references_[index].last_used < slice_references_[oldest].last_used) oldest = index;
+        for (std::size_t index = 1U; index < shared_bakes_.size(); ++index) {
+            if (shared_bakes_[index].last_used < shared_bakes_[oldest].last_used) oldest = index;
         }
-        statistics_.slice_bytes = statistics_.slice_bytes - (*slice_references_[oldest].cached.raster).pixels().size();
-        statistics_.slice_references = statistics_.slice_references - 1U;
-        statistics_.slice_evictions = statistics_.slice_evictions + 1U;
-        // Order does not matter: move the last entry into the hole.
-        if (oldest + 1U != slice_references_.size()) slice_references_[oldest] = std::move(slice_references_.back());
-        slice_references_.pop_back();
+        statistics_.shared_bytes = statistics_.shared_bytes - (*shared_bakes_[oldest].cached.raster).pixels().size();
+        statistics_.shared_rasters = statistics_.shared_rasters - 1U;
+        statistics_.shared_evictions = statistics_.shared_evictions + 1U;
+        // Order does not matter: move the last entry into the hole. A part
+        // using the evicted raster keeps it alive until it draws again.
+        if (oldest + 1U != shared_bakes_.size()) shared_bakes_[oldest] = std::move(shared_bakes_.back());
+        shared_bakes_.pop_back();
     }
 }
 
-std::shared_ptr<const PartRaster> EnginePartTable::slice_reference(const PartRasterRequest& reference,
-                                                                   const std::uint64_t paint_sequence,
-                                                                   const bool refresh) {
-    std::size_t found = slice_references_.size();
-    for (std::size_t index = 0U; index < slice_references_.size(); ++index) {
-        if (answers(slice_references_[index].cached, reference)) found = index;
+std::shared_ptr<PartRaster> EnginePartTable::shared_bake(const PartRasterRequest& request,
+                                                         const std::uint64_t paint_sequence, const bool refresh,
+                                                         const SharedUse use) {
+    std::size_t found = shared_bakes_.size();
+    for (std::size_t index = 0U; index < shared_bakes_.size(); ++index) {
+        if (answers(shared_bakes_[index].cached, request)) found = index;
     }
-    if (found != slice_references_.size() && !refresh) {
-        slice_references_[found].last_used = paint_sequence;
-        statistics_.slice_hits = statistics_.slice_hits + 1U;
-        const std::shared_ptr<const PartRaster> held = slice_references_[found].cached.raster;
+    const bool keyframe = use == SharedUse::keyframe;
+    if (found != shared_bakes_.size() && !refresh) {
+        shared_bakes_[found].last_used = paint_sequence;
+        if (keyframe) {
+            statistics_.keyframe_hits = statistics_.keyframe_hits + 1U;
+        } else {
+            statistics_.slice_hits = statistics_.slice_hits + 1U;
+        }
+        const std::shared_ptr<PartRaster> held = shared_bakes_[found].cached.raster;
         return held;
     }
-    // Bake the reference. Everything that can fail comes first.
-    const EnginePrimitive& primitive = *reference.primitive;
-    std::shared_ptr<PartRaster> baked = PartRaster::create(reference.extent, reference.target.scale);
+    // Bake. Everything that can fail comes first.
+    const EnginePrimitive& primitive = *request.primitive;
+    std::shared_ptr<PartRaster> baked = PartRaster::create(request.extent, request.target.scale);
     if (!baked) return nullptr;
     PrimitivePreparation preparation{};
-    if (primitive.prepare(reference.parameters, reference.target, preparation) != PreparationOutcome::prepared) {
+    if (primitive.prepare(request.parameters, request.target, preparation) != PreparationOutcome::prepared) {
         return nullptr;
     }
-    const RasterOutcome outcome = primitive.rasterize(reference.parameters, reference.target, preparation,
+    const RasterOutcome outcome = primitive.rasterize(request.parameters, request.target, preparation,
                                                       (*baked).view());
     if (outcome != RasterOutcome::painted && outcome != RasterOutcome::empty) return nullptr;
     statistics_.bakes = statistics_.bakes + 1U;
-    statistics_.slice_bakes = statistics_.slice_bakes + 1U;
+    if (keyframe) {
+        statistics_.keyframe_bakes = statistics_.keyframe_bakes + 1U;
+    } else {
+        statistics_.slice_bakes = statistics_.slice_bakes + 1U;
+    }
     std::optional<SurfaceMaterial> material{};
     std::uint64_t image_revision = 0U;
-    if (reference.target.material != nullptr) {
-        material = *reference.target.material;
-        if (reference.target.images != nullptr) image_revision = (*reference.target.images).snapshot().revision;
+    if (request.target.material != nullptr) {
+        material = *request.target.material;
+        if (request.target.images != nullptr) image_revision = (*request.target.images).snapshot().revision;
     }
     const std::size_t bytes = (*baked).pixels().size();
-    if (found != slice_references_.size()) {
+    if (found != shared_bakes_.size()) {
         // Baked again in place of the stale one.
-        SliceReference& replaced = slice_references_[found];
-        statistics_.slice_bytes = statistics_.slice_bytes - (*replaced.cached.raster).pixels().size() + bytes;
+        SharedBake& replaced = shared_bakes_[found];
+        statistics_.shared_bytes = statistics_.shared_bytes - (*replaced.cached.raster).pixels().size() + bytes;
         replaced.cached.raster = baked;
-        keep_request(replaced.cached, reference, std::move(material), image_revision);
+        keep_request(replaced.cached, request, std::move(material), image_revision);
         replaced.last_used = paint_sequence;
         return baked;
     }
-    if (bytes > slice_cache_budget_bytes) return baked;
-    SliceReference made{};
+    if (bytes > shared_bake_budget_bytes) return baked;
+    SharedBake made{};
     made.cached.raster = baked;
-    keep_request(made.cached, reference, std::move(material), image_revision);
+    keep_request(made.cached, request, std::move(material), image_revision);
     made.last_used = paint_sequence;
-    slice_references_.reserve(slice_references_.size() + 1U);
+    shared_bakes_.reserve(shared_bakes_.size() + 1U);
     // Commit: nothing below allocates.
-    make_slice_room(bytes);
-    slice_references_.push_back(std::move(made));
-    statistics_.slice_references = statistics_.slice_references + 1U;
-    statistics_.slice_bytes = statistics_.slice_bytes + bytes;
+    make_shared_room(bytes);
+    shared_bakes_.push_back(std::move(made));
+    statistics_.shared_rasters = statistics_.shared_rasters + 1U;
+    statistics_.shared_bytes = statistics_.shared_bytes + bytes;
     return baked;
+}
+
+PartRasterStatus EnginePartTable::prepare_shared(const PartRasterRequest& request, const std::uint64_t paint_sequence) {
+    if (request.primitive == nullptr) return PartRasterStatus::refused;
+    const std::shared_ptr<PartRaster> held = shared_bake(request, paint_sequence, false, SharedUse::keyframe);
+    if (!held) return PartRasterStatus::refused;
+    return PartRasterStatus::shared;
 }
 
 RasterOutcome EnginePartTable::draw(const PartRasterRequest& request, PrimitivePreparation& preparation,
@@ -470,7 +492,8 @@ RasterOutcome EnginePartTable::draw(const PartRasterRequest& request, PrimitiveP
         PartRasterRequest reference = request;
         reference.target.logical_size = plan.reference_size;
         reference.extent = plan.reference_extent;
-        const std::shared_ptr<const PartRaster> held = slice_reference(reference, paint_sequence, refresh);
+        const std::shared_ptr<const PartRaster> held =
+            shared_bake(reference, paint_sequence, refresh, SharedUse::slice_reference);
         if (!held) return RasterOutcome::invalid_target;
         if (destination.extent.width == 0U || destination.extent.height == 0U) return RasterOutcome::empty;
         assemble_slices(*held, plan, destination);
@@ -520,12 +543,34 @@ PartRasterResult EnginePartTable::raster_for(const PartRecordHandle handle, cons
     // that an allocation failure leaves the record as it was.
     if (!part.cached) part.cached = std::make_unique<CachedPartRaster>();
     CachedPartRaster& cached = *part.cached;
+    // A part invalidated on its own since its raster was drawn bakes again
+    // the shared raster it uses.
+    const bool refresh = cached.raster && cached.raster_generation != part.generation;
+
+    if (request.shared) {
+        // A keyframe: the shared raster becomes the part's own, uncopied.
+        std::optional<SurfaceMaterial> shared_material{};
+        std::uint64_t shared_revision = 0U;
+        if (request.target.material != nullptr) {
+            shared_material = *request.target.material;
+            if (request.target.images != nullptr) shared_revision = (*request.target.images).snapshot().revision;
+        }
+        const std::shared_ptr<PartRaster> held = shared_bake(request, paint_sequence, refresh, SharedUse::keyframe);
+        if (!held) return PartRasterResult{nullptr, PartRasterStatus::refused};
+        drop_raster(part);
+        cached.raster = held;
+        cached.shared = true;
+        keep_request(cached, request, std::move(shared_material), shared_revision);
+        cached.raster_generation = part.generation;
+        cached.raster_table_generation = raster_table_generation_;
+        return PartRasterResult{held, PartRasterStatus::shared};
+    }
 
     // Choose the storage. The cached raster is rewritten only when the cache
     // holds its one reference: a recorded command still showing it keeps
     // its pixels.
     const std::size_t bytes = raster_bytes(request.extent);
-    const bool reusable = cached.raster && cached.extent == request.extent &&
+    const bool reusable = cached.raster && !cached.shared && cached.extent == request.extent &&
                           (*cached.raster).scale() == request.target.scale && cached.raster.use_count() == 1;
     std::shared_ptr<PartRaster> storage{};
     PartRasterStatus status = PartRasterStatus::reused_storage;
@@ -545,10 +590,7 @@ PartRasterResult EnginePartTable::raster_for(const PartRecordHandle handle, cons
         if (request.target.images != nullptr) image_revision = (*request.target.images).snapshot().revision;
     }
 
-    // Draw, preparing again when the record's preparation is stale. A part
-    // invalidated on its own since its raster was drawn bakes its slice
-    // reference again too.
-    const bool refresh = cached.raster && cached.raster_generation != part.generation;
+    // Draw, preparing again when the record's preparation is stale.
     const PartRasterView destination = (*storage).view();
     const RasterOutcome outcome = draw(request, part.preparation, destination, paint_sequence, refresh);
     if (outcome != RasterOutcome::painted && outcome != RasterOutcome::empty) {
@@ -565,6 +607,7 @@ PartRasterResult EnginePartTable::raster_for(const PartRecordHandle handle, cons
         drop_raster(part);
         make_room(bytes, &part);
         cached.raster = storage;
+        cached.shared = false;
         statistics_.bytes = statistics_.bytes + bytes;
         statistics_.rasters = statistics_.rasters + 1U;
         statistics_.storage_allocations = statistics_.storage_allocations + 1U;
@@ -620,7 +663,7 @@ void EnginePartTable::invalidate_raster(const PartRecordHandle handle) noexcept 
 
 void EnginePartTable::invalidate_rasters() noexcept {
     raster_table_generation_ = raster_table_generation_ + 1U;
-    clear_slice_references();
+    clear_shared_bakes();
 }
 
 } // namespace gui_forms

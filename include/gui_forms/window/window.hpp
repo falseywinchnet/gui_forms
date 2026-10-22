@@ -776,6 +776,10 @@ private:
     // for this paint only, assembled from the table's slice references when
     // its primitive slices (EnginePartTable::raster_without_record).
     [[nodiscard]] PartRasterResult engine_unkeyed_raster(const PartRasterRequest& request);
+    // Called by ThemeEngine::paint when a transition starts (E7r): bakes the
+    // shared keyframe for `request` unless the table holds it
+    // (EnginePartTable::prepare_shared).
+    PartRasterStatus engine_prepare_shared(const PartRasterRequest& request);
     // Where a part ThemeEngine::paint draws with `painter` lands (E6): the
     // control whose display chunk records it (the control being recorded,
     // which may paint on behalf of `control`, or else `control` itself), the

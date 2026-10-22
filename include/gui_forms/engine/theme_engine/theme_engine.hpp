@@ -5,6 +5,7 @@
 #include "gui_forms/engine/theme_rules/theme_rules.hpp"
 
 #include <optional>
+#include <span>
 
 #include <cstdint>
 
@@ -121,6 +122,11 @@ private:
                                                 const AmbientEffect& ambient, bool area_ok);
     // Stops the ambient effect of a part whose paint has none.
     static void stop_ambient(Window& window, EnginePartRecord& record, PartRecordHandle handle) noexcept;
+    // E7r: bakes into the window's shared bakes the keyframes each animated
+    // parameter in `started` (bits by parameter position) will pass, from
+    // the level `request` shows to that of its entry in `targets`.
+    static void prepare_keyframes(Window& window, const PartRasterRequest& request, std::uint32_t started,
+                                  std::span<const double> targets);
 
     // Borrowed: the built-in registry has static storage.
     const PrimitiveRegistry* registry_;

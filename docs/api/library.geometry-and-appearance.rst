@@ -305,6 +305,10 @@ Types
 
    .. cpp:member:: std::uint64_t image_revision
 
+   .. cpp:member:: bool shared
+
+      Whether ``raster`` is one of the table's shared bakes (a keyframe): it then counts against shared_bake_budget_bytes, not the part cache's, and is never drawn over.
+
    .. cpp:member:: std::uint64_t raster_generation
 
       The record's and the table's raster generations when ``raster`` was drawn; invalidation advances the current ones.
@@ -893,6 +897,10 @@ Types
    .. cpp:function:: PartRasterResult raster_for(PartRecordHandle handle, const PartRasterRequest& request, std::uint64_t paint_sequence)
 
       The part's raster for ``request``, painted on window paint ``paint_sequence`` (the record's new last_painted). - The cached raster is returned unchanged while its primitive, parameters, target, read states and extent are the request's and neither generation has advanced. - Otherwise the primitive draws the part. It draws into the cached raster's storage when the extent and scale are unchanged and no recorded command still holds that raster (a held raster is never rewritten, since a recording shows it), and into new storage otherwise. - New storage is made room for by evicting other parts' rasters, least recently painted first, until the cache fits its budget. A raster larger than the whole budget is drawn and returned but not kept. - The record's preparation is remade when the primitive refuses it as stale. If the primitive refuses, nothing is evicted and the record keeps its cached raster. Allocation failure propagates as std::bad_alloc, with the record unchanged.
+
+   .. cpp:function:: PartRasterStatus prepare_shared(const PartRasterRequest& request, std::uint64_t paint_sequence)
+
+      Bakes the shared raster for ``request`` (a keyframe) if the table holds none, so that a transition about to pass through it finds it ready. Refused as raster_for is; allocation failure propagates as std::bad_alloc.
 
    .. cpp:function:: PartRasterResult raster_without_record(const PartRasterRequest& request, std::uint64_t paint_sequence)
 
@@ -1874,7 +1882,7 @@ Types
 
    ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
 
-   What a part needs drawn: the primitive a rule selected, its parameters, the part's target, and the destination extent in device pixels (normally the logical size grown by the primitive's outsets, times the scale, rounded up).
+   What a part needs drawn: the primitive a rule selected, its parameters, the part's target, and the destination extent in device pixels (normally the logical size grown by the primitive's outsets, times the scale, rounded up). ``shared`` asks for the table's shared raster for the request (a keyframe, E7r) in place of one of the part's own: set for a part whose animated parameters stand at keyframe levels or whose ambient effect is at a frame of its loop, so that its rasters are baked once and kept for every transition after.
 
    .. cpp:member:: const EnginePrimitive* primitive
 
@@ -1883,6 +1891,8 @@ Types
    .. cpp:member:: PrimitiveTarget target
 
    .. cpp:member:: DeviceExtent extent
+
+   .. cpp:member:: bool shared
 
 .. cpp:namespace:: gui_forms
 
@@ -2250,7 +2260,7 @@ Types
 
    .. cpp:member:: std::uint64_t slice_bakes
 
-      Slicing (E7r): references baked; parts assembled from a reference already held; parts of a slicing primitive baked whole because neither axis could be sliced, and axes kept whole, each counted per draw; references evicted to keep within their budget; and the references held now, with their bytes.
+      Slicing (E7r): references baked; parts assembled from a reference already held; parts of a slicing primitive baked whole because neither axis could be sliced, and axes kept whole, each counted per draw.
 
    .. cpp:member:: std::uint64_t slice_hits
 
@@ -2258,11 +2268,19 @@ Types
 
    .. cpp:member:: std::uint64_t slice_axis_fallbacks
 
-   .. cpp:member:: std::uint64_t slice_evictions
+   .. cpp:member:: std::uint64_t keyframe_bakes
 
-   .. cpp:member:: std::size_t slice_references
+      Keyframes (E7r): baked, and taken from the shared bakes already held.
 
-   .. cpp:member:: std::size_t slice_bytes
+   .. cpp:member:: std::uint64_t keyframe_hits
+
+   .. cpp:member:: std::uint64_t shared_evictions
+
+      The shared bakes: evicted to keep within their budget, held now, and their bytes.
+
+   .. cpp:member:: std::size_t shared_rasters
+
+   .. cpp:member:: std::size_t shared_bytes
 
 .. cpp:namespace:: gui_forms
 
@@ -3362,6 +3380,8 @@ Enumerations
 
    .. cpp:enumerator:: uncached
 
+   .. cpp:enumerator:: shared
+
    .. cpp:enumerator:: stale_record
 
    .. cpp:enumerator:: refused
@@ -3803,9 +3823,9 @@ Functions, constants and aliases
 
    The most bytes of cached rasters one window keeps (GIVEN F2-1: 8 MB). Value: ``8U * 1024U * 1024U``.
 
-.. cpp:var:: constexpr std::size_t slice_cache_budget_bytes
+.. cpp:var:: constexpr std::size_t shared_bake_budget_bytes
 
-   The most bytes of slice references one window keeps (E7r), apart from the rasters assembled from them. A reference is a part's corners, edges and one centre pixel: a few kilobytes for a button at scale 2, so 1 MB holds some hundreds. Value: ``1U * 1024U * 1024U``.
+   The most bytes of shared bakes one window keeps (E7r), apart from raster_cache_budget_bytes: slice references, a few kilobytes each for a button at scale 2, and keyframes, ten whole rasters for each size and state of a part with an animated parameter (some 200 KB for a large ribbon button at scale 1.5). A proposed default. Value: ``4U * 1024U * 1024U``.
 
 .. cpp:namespace:: gui_forms
 
@@ -3918,6 +3938,14 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::uint64_t maximum_animated_operations_per_frame
 
    Value: ``4'000'000U``.
+
+.. cpp:var:: constexpr std::size_t animated_keyframe_levels
+
+   Keyframes (E7r, owner 2026-10-22: 8 to 12). While an animated parameter's transition runs, the part shows the nearest of this many levels evenly spaced over the parameter's declared range, each baked once and shared; settled, it shows its exact value. When a transition starts, the levels it will pass are baked at once: at most this many bakes, each within the animated budget above, so that none is baked while it runs. Value: ``10U``.
+
+.. cpp:var:: constexpr std::size_t maximum_ambient_loop_frames
+
+   The most frames in an ambient effect's loop (E7r): its time in the period steps through at most this many, or its frame rate's count for one period if fewer, each baked once, the first time it is shown, and shared. Value: ``24U``.
 
 .. cpp:var:: constexpr std::size_t sheet_diagnostic
 

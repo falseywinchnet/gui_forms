@@ -318,6 +318,11 @@ PartRasterResult Window::engine_part_raster(PartRecordHandle handle, const PartR
     return result;
 }
 
+PartRasterStatus Window::engine_prepare_shared(const PartRasterRequest& request) {
+    const PartRasterStatus status = engine_parts_.prepare_shared(request, paint_leases_completed_);
+    return status;
+}
+
 PartRasterResult Window::engine_unkeyed_raster(const PartRasterRequest& request) {
     const PartRasterResult result = engine_parts_.raster_without_record(request, paint_leases_completed_);
     return result;

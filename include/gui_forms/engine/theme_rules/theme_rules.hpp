@@ -292,6 +292,18 @@ struct ThemeRuleSheet final {
 inline constexpr std::uint32_t maximum_operations_per_device_pixel = 512U;
 inline constexpr std::uint64_t maximum_animated_operations_per_frame = 4'000'000U;
 
+// Keyframes (E7r, owner 2026-10-22: 8 to 12). While an animated parameter's
+// transition runs, the part shows the nearest of this many levels evenly spaced
+// over the parameter's declared range, each baked once and shared; settled,
+// it shows its exact value. When a transition starts, the levels it will
+// pass are baked at once: at most this many bakes, each within the animated
+// budget above, so that none is baked while it runs.
+inline constexpr std::size_t animated_keyframe_levels = 10U;
+// The most frames in an ambient effect's loop (E7r): its time in the period
+// steps through at most this many, or its frame rate's count for one
+// period if fewer, each baked once, the first time it is shown, and shared.
+inline constexpr std::size_t maximum_ambient_loop_frames = 24U;
+
 enum class RuleDiagnosticKind : std::uint8_t {
     // The rule is set aside: it needs a newer engine than this one. Its
     // parts fall back to lower rules or the built-in recipe. Not an error.

@@ -195,11 +195,22 @@ double rest_value(const CompiledTransition& transition, const PrimitiveParameter
     return value;
 }
 
-// The engine properties a part is shown with this paint.
+// The engine properties a part is shown with this paint, and what its
+// parameter transitions did: by parameter position, the bits of those still
+// moving and of those whose move started on this paint, and the target of
+// each that started.
 struct PresentedProperties final {
     double opacity{1.0};
     double scale{1.0};
+    std::uint32_t moving_parameters{};
+    std::uint32_t started_parameters{};
+    std::array<double, maximum_primitive_parameters> targets{};
 };
+
+std::uint32_t parameter_bit(std::size_t parameter) noexcept {
+    const std::uint32_t bit = std::uint32_t{1} << parameter;
+    return bit;
+}
 
 // Shows a transition's value: the part's opacity or scale, or its
 // parameter, clamped to the property's range.
@@ -293,8 +304,16 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
             }
         }
         MotionValue& value = *channel.value;
-        static_cast<void>(value.animate_to(target));
+        const MotionStart start = value.animate_to(target);
         show_value(transition, value.current(), range, parameters, presented);
+        if (transition.property == PresentationProperty::parameter) {
+            const std::uint32_t bit = parameter_bit(transition.parameter);
+            if (!value.settled()) presented.moving_parameters = presented.moving_parameters | bit;
+            if (start == MotionStart::started) {
+                presented.started_parameters = presented.started_parameters | bit;
+                presented.targets[transition.parameter] = std::clamp(target, range.minimum, range.maximum);
+            }
+        }
     }
     if (motion != nullptr) {
         for (std::size_t channel = 0; channel < maximum_part_transitions; ++channel) {
@@ -308,6 +327,51 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
         (*record).motion_unsettled = false;
     }
     return presented;
+}
+
+// -- keyframes (E7r) ------------------------------------------------------------
+
+// Keyframe level `level` of a parameter's declared range, its ends exact.
+double keyframe_value(const PrimitiveParameterDeclaration& declared, std::size_t level) noexcept {
+    if (level + 1U >= animated_keyframe_levels) return declared.maximum;
+    const double span = declared.maximum - declared.minimum;
+    const double steps = static_cast<double>(animated_keyframe_levels - 1U);
+    const double value = declared.minimum + span * static_cast<double>(level) / steps;
+    return value;
+}
+
+// The keyframe level nearest `value`.
+std::size_t nearest_keyframe(const PrimitiveParameterDeclaration& declared, double value) noexcept {
+    const double span = declared.maximum - declared.minimum;
+    if (!(span > 0.0)) return 0U;
+    const double steps = static_cast<double>(animated_keyframe_levels - 1U);
+    const double position = std::clamp((value - declared.minimum) / span * steps, 0.0, steps);
+    const std::size_t level = static_cast<std::size_t>(std::round(position));
+    return level;
+}
+
+// Steps each animated parameter whose transition runs on this paint to its
+// nearest keyframe level, and returns whether every animated parameter now
+// stands at a level (false for a primitive with none), so that its raster
+// may be a shared keyframe. A parameter an expression drives with the time
+// in state needs no step: an ambient effect's time steps through its loop's
+// frames, and nothing else repaints a part as time passes.
+bool step_to_keyframes(const PrimitiveDescriptor& descriptor, const PresentedProperties& presented,
+                       PrimitiveParameterBlock& parameters) noexcept {
+    bool any = false;
+    bool all_at_levels = true;
+    for (std::size_t index = 0; index < parameters.count; ++index) {
+        const PrimitiveParameterDeclaration& declared = descriptor.parameters[index];
+        if (!declared.animated) continue;
+        any = true;
+        const bool moving = (presented.moving_parameters & parameter_bit(index)) != 0U;
+        double& value = parameters.values[index].number;
+        const double level = keyframe_value(declared, nearest_keyframe(declared, value));
+        if (moving) value = level;
+        if (value != level) all_at_levels = false;
+    }
+    const bool shared = any && all_at_levels;
+    return shared;
 }
 
 // Whether the part's transitions include its scale.
@@ -552,10 +616,15 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     evaluate_expressions(resolution, inputs, part.states, request.parameters);
     const PrimitiveDescriptor& descriptor = (*request.primitive).descriptor();
     const PresentedProperties presented = run_transitions(resolution, transitions, &descriptor, request.parameters);
+    // E7r: nothing bakes per frame. Moving animated parameters step through
+    // shared keyframes, and an ambient effect's loop frames are shared.
+    const bool at_keyframes = step_to_keyframes(descriptor, presented, request.parameters);
+    request.shared = kept != nullptr && (at_keyframes || ambient_time.has_value());
     const double opacity = presented.opacity;
     // A part at opacity 0, or one its primitive draws as nothing (a flat
-    // bulge), composites nothing and needs no raster.
-    if (opacity <= 0.0 || (*request.primitive).blank(request.parameters)) return;
+    // bulge), composites nothing and needs no raster: it only prepares the
+    // keyframes of a transition starting from it (a rise from the plane).
+    const bool invisible = opacity <= 0.0 || (*request.primitive).blank(request.parameters);
     // A scaled part is drawn at its scaled size (D5-1), so that its edges
     // stay sharp; one whose scaled raster would not fit, or would break the
     // animated frame budget, is drawn at its own size.
@@ -591,6 +660,13 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     // A primitive that refuses the part leaves it to the built-in recipe;
     // a keyed part's refusal is counted when it begins (E8c).
     const bool accepted = (*request.primitive).accepts(request.parameters, request.target);
+    // A transition that starts on this paint has the keyframes it will pass
+    // baked now, at the discrete change, so that none is baked while it
+    // runs.
+    if (accepted && kept != nullptr && presented.started_parameters != 0U) {
+        prepare_keyframes(*window, request, presented.started_parameters, presented.targets);
+    }
+    if (invisible) return;
     const bool newly_refused = kept == nullptr || !(*kept).primitive_refused;
     if (kept != nullptr) (*kept).primitive_refused = !accepted;
     if (!accepted) {
@@ -617,6 +693,31 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     painter.draw_part_raster(raster, Point{shown.bounds.x - outsets.left, shown.bounds.y - outsets.top}, opacity);
 }
 
+// Bakes into the window's shared bakes the keyframes that each animated
+// parameter whose transition started on this paint will pass, from the
+// level shown now to its target's, with the part's other parameters as
+// `request` has them. Blank keyframes (a flat bulge) need none.
+void ThemeEngine::prepare_keyframes(Window& window, const PartRasterRequest& request, std::uint32_t started,
+                                    std::span<const double> targets) {
+    const EnginePrimitive& primitive = *request.primitive;
+    const PrimitiveDescriptor& descriptor = primitive.descriptor();
+    for (std::size_t index = 0; index < request.parameters.count; ++index) {
+        const PrimitiveParameterDeclaration& declared = descriptor.parameters[index];
+        if (!declared.animated || (started & parameter_bit(index)) == 0U) continue;
+        const std::size_t from = nearest_keyframe(declared, request.parameters.values[index].number);
+        const std::size_t to = nearest_keyframe(declared, targets[index]);
+        const std::size_t low = std::min(from, to);
+        const std::size_t high = std::max(from, to);
+        PartRasterRequest keyframe = request;
+        keyframe.shared = true;
+        for (std::size_t level = low; level <= high; ++level) {
+            keyframe.parameters.values[index].number = keyframe_value(declared, level);
+            if (primitive.blank(keyframe.parameters)) continue;
+            static_cast<void>(window.engine_prepare_shared(keyframe));
+        }
+    }
+}
+
 double ThemeEngine::ambient_seconds(Window& window, EnginePartRecord* record,
                                     const std::optional<PartRecordHandle>& handle, const AmbientEffect& ambient,
                                     bool area_ok) {
@@ -635,11 +736,19 @@ double ThemeEngine::ambient_seconds(Window& window, EnginePartRecord* record,
     const FrameInterval interval = std::chrono::ceil<FrameInterval>(frame);
     window.run_engine_ambient(*handle, interval);
     // The time in the part's states, wrapped to the period, so the effect
-    // cycles; exact in the clock's ticks.
+    // cycles, and stepped to the start of its loop frame (E7r), so that each
+    // frame's raster is baked once and shown again every period; exact in
+    // the clock's ticks.
     const FrameInterval elapsed = window.motion_clock().now() - part.state_entered;
     const FrameInterval forward = elapsed < FrameInterval::zero() ? FrameInterval::zero() : elapsed;
     const FrameInterval within = forward % ambient.period;
-    const double seconds = std::chrono::duration<double>(within).count();
+    const double frames_in_period = std::ceil(std::chrono::duration<double>(ambient.period).count() *
+                                              ambient.frames_per_second);
+    const double frames = std::clamp(frames_in_period, 1.0, static_cast<double>(maximum_ambient_loop_frames));
+    const FrameInterval::rep frame_ticks = ambient.period.count() / static_cast<FrameInterval::rep>(frames);
+    FrameInterval stepped = within;
+    if (frame_ticks > 0) stepped = FrameInterval(within.count() / frame_ticks * frame_ticks);
+    const double seconds = std::chrono::duration<double>(stepped).count();
     return seconds;
 }
 

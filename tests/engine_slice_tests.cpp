@@ -314,11 +314,11 @@ void twenty_buttons_one_bake() {
     RasterCacheStatistics statistics = window.engine_parts().cache_statistics();
     require(statistics.bakes == 1U && statistics.slice_bakes == 1U, "twenty widths take one bake");
     require(statistics.slice_hits == 19U, "the other nineteen are assembled from the held reference");
-    require(statistics.slice_references == 1U, "one reference is held");
+    require(statistics.shared_rasters == 1U, "one reference is held");
     // A theme change drops the reference; the next paint bakes one again.
     window.set_theme(Theme::create(definition));
     statistics = window.engine_parts().cache_statistics();
-    require(statistics.slice_references == 0U, "a theme change drops the references");
+    require(statistics.shared_rasters == 0U, "a theme change drops the references");
 }
 
 } // namespace
