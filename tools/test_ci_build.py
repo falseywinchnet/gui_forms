@@ -145,6 +145,51 @@ class TestCommandTests(unittest.TestCase):
             self.assertEqual(ci_build.test_commands(Path(scratch)), {})
 
 
+class UnbuiltListingCommands:
+    """Stands in for ci_build.captured: ctest's listing of a fresh tree, where no
+    test executable exists yet, so ctest leaves every command out."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def capture(self, *arguments: str | Path) -> str:
+        command: list[str] = []
+        argument: str | Path
+        for argument in arguments:
+            command.append(str(argument))
+        self.calls.append(command)
+        return ('{"tests": [{"name": "stx_png_core_tests", "properties": []},'
+                ' {"name": "gui_forms_paint_group_tests", "properties": []}]}')
+
+
+class TestsPatternListingTests(unittest.TestCase):
+    """--tests on a fresh tree (#217): the matching tests are listed with their
+    commands, so the narrowed build makes their executables and none is Not Run."""
+
+    def test_unbuilt_tests_matching_the_pattern_get_commands_and_targets(self) -> None:
+        fake: UnbuiltListingCommands = UnbuiltListingCommands()
+        original: object = ci_build.captured
+        ci_build.captured = fake.capture
+        try:
+            with tempfile.TemporaryDirectory() as scratch:
+                tree: Path = Path(scratch)
+                (tree / 'stx_png').mkdir()
+                (tree / 'CTestTestfile.cmake').write_text(
+                    'add_test([=[gui_forms_paint_group_tests]=] "' + (tree / 'gui_forms_paint_group_tests.exe').as_posix()
+                    + '")\nsubdirs("stx_png")\n', encoding='utf-8')
+                (tree / 'stx_png' / 'CTestTestfile.cmake').write_text(
+                    'add_test([=[stx_png_core_tests]=] "' + (tree / 'stx_png' / 'stx_png_core_tests.exe').as_posix()
+                    + '")\n', encoding='utf-8')
+                listing: dict = ci_build.test_listing(tree, 'stx_png_core|paint_group', '')
+                known: set[str] = {'gui_forms_paint_group_tests.exe', 'stx_png/stx_png_core_tests.exe'}
+                targets: list[str] | None = ci_build.targets_for_tests(listing, known, tree)
+        finally:
+            ci_build.captured = original
+        self.assertIn('-R', fake.calls[0])
+        self.assertIn('stx_png_core|paint_group', fake.calls[0])
+        self.assertEqual(targets, ['gui_forms_paint_group_tests.exe', 'stx_png/stx_png_core_tests.exe'])
+
+
 CHECKOUT: Path = Path(__file__).resolve().parents[1]
 FIRST_PARTY_DIRECTORIES: tuple[str, ...] = ('include', 'src', 'demo', 'tests', 'examples',
                                             'file_manager_demoboard', 'stx_vorbis')
