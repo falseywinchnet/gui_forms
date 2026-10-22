@@ -64,6 +64,14 @@ option(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE "Record private run directions for g
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
        "Build the deterministic native File Manager first-party consumer" OFF)
 
+# HarfBuzz's CMakeLists sets THREADS_PREFER_PTHREAD_FLAG and caches that
+# -pthread works. Without the same preference here, a tree's first configure
+# gave Threads::Threads -lpthread and every later configure -pthread, so the
+# compile commands of every target using threads changed on reconfigure:
+# fresh trees (every CI job) and reconfigured ones never shared an object,
+# and CI's second configure of the native tree recompiled what it built.
+# Prefer the flag from the first configure on.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 include(GNUInstallDirs)
 
@@ -3757,10 +3765,12 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_windows_accessibility_uia_gallery_tests PRIVATE
             gui_forms_gallery_model gui_forms_host_windows uiautomationcore ole32 oleaut32 uuid)
         add_test(NAME gui_forms_windows_accessibility_uia_gallery_tests COMMAND gui_forms_windows_accessibility_uia_gallery_tests)
-        # About 49 s in a release tree and 741 s in the sanitizer tree
-        # (measured 2026-10-20 with other builds running): every provider
-        # call takes a fresh snapshot of the whole Gallery. The limit leaves
-        # the sanitizer run room under heavier load.
-        set_tests_properties(gui_forms_windows_accessibility_uia_gallery_tests PROPERTIES TIMEOUT 1800)
+        # About 49 s in a release tree. In the sanitizer tree it needs about
+        # 950 s of CPU time (every provider call takes a fresh snapshot of the
+        # page): 741 s and 975 s wall on a lightly loaded machine, and more
+        # than 1800 s through ctest on 2026-10-20 while other workspaces'
+        # builds left it about 55% of a core. The limit is twice the
+        # heaviest load measured.
+        set_tests_properties(gui_forms_windows_accessibility_uia_gallery_tests PROPERTIES TIMEOUT 3600)
     endif()
 endif()

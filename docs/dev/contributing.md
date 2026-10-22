@@ -69,8 +69,13 @@ LeakSanitizer (`python tools/ci_build.py --sanitize`); any report fails it.
 
 The same command is the standard local sanitizer tree, kept by every build
 tree on every platform: it builds `.build/native-<host>-<arch>/gui-forms-sanitize`
-with CI's flags and runs the suite, or with `--tests REGEX` only the matching
-tests, incrementally after the first build. AddressSanitizer and
+with CI's flags and runs the suite, or with `--tests REGEX` builds and runs
+only what the matching tests need, incrementally after the first build.
+`--test-jobs N` runs N tests at once. The sanitized objects carry
+`-fdebug-compilation-dir=.`, so checkouts with the CI layout share them
+through one `ccache`; a second checkout of the same sources compiles
+almost nothing. A rerun with nothing changed skips the dependency checkout
+and the configure. AddressSanitizer and
 UndefinedBehaviorSanitizer run everywhere; LeakSanitizer runs on Linux and
 macOS, since the Windows MinGW runtime has none. Host code is sanitized only
 where it builds, so the Windows and macOS hosts depend on these local trees.
