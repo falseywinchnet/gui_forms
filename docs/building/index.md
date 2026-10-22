@@ -164,10 +164,19 @@ before treating it as a finding.
 
 ## Windows builds and Wine
 
-Use the native MSYS2 CLANG64 instructions in [Installation](../user/install). The older
-`cmake/toolchains/x86_64-w64-mingw32.cmake` selects GCC and is rejected by
-the current LLVM 22.1.x configure check. It is not a working cross-build
-recipe for the current tree.
+Use the native MSYS2 CLANG64 instructions in [Installation](../user/install).
+There is no cross-build from macOS or Linux: the former MinGW-w64 GCC
+toolchain file, which the LLVM 22.1.x configure check rejected, and the
+script that staged GCC's runtime DLLs beside a cross-built program were
+retired on 2026-10-21. Windows binaries never use a GCC runtime.
+
+Every Windows executable and DLL links the LLVM runtimes (libc++, libc++abi,
+libunwind, compiler-rt), winpthreads and the MinGW-w64 CRT statically
+(`add_link_options(-static)` in `CMakeLists.txt`), so none imports a runtime
+DLL. `llvm-objdump -p <binary>` lists only Windows system DLLs, and
+GUI.Forms' own DLLs where a program uses them (`libgui_forms_threading.dll`).
+`tools/package_programs.py` fails a package whose binaries import a GCC or
+LLVM runtime DLL.
 
 Windows builds target the Windows 10 API level (`_WIN32_WINNT=0x0A00`). A
 Windows host build produces `GUI.Forms Gallery.exe` (statically linked),
@@ -175,12 +184,9 @@ Windows host build produces `GUI.Forms Gallery.exe` (statically linked),
 `gui_forms_windows_probe.exe` and a `fonts/` directory, all in the build
 directory.
 
-To run a Windows build under Wine, run it from that directory with
-`libwinpthread-1.dll` beside the executable: the threading DLL imports it,
-and without it the program fails to start. A cross-built program also needs
-its compiler runtime DLLs; `tools/stage_mingw_runtime.sh <dir>` copies
-`libwinpthread-1.dll`, `libgcc_s_seh-1.dll` and `libstdc++-6.dll` from
-Homebrew's mingw-w64 toolchain. Then run `wine "GUI.Forms Gallery.exe"`; add
+To run a Windows build under Wine, copy its build directory to the Mac and
+run the program from there: `libgui_forms_threading.dll` sits beside it and
+no runtime DLL is needed. Run `wine "GUI.Forms Gallery.exe"`; add
 `--automation` to accept commands from the probe.
 
 `tools/run_windows_wine_smoke.sh <build-dir>` launches the gallery with

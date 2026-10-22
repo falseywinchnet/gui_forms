@@ -184,6 +184,27 @@ void parser_contract() {
     require(validate_png(profile).error == ImageResourceError::unsupported_color_profile,
             "compressed ICC profile crossed the bounded color policy");
 
+    // cICP: sRGB-equivalent values are accepted, others refused, and a
+    // malformed chunk is invalid colour metadata.
+    const std::array<std::byte, 4> cicp_srgb{std::byte{1}, std::byte{13}, std::byte{0}, std::byte{1}};
+    const std::array<std::byte, 4> cicp_pq{std::byte{9}, std::byte{16}, std::byte{0}, std::byte{1}};
+    const std::array<std::byte, 3> cicp_short{std::byte{1}, std::byte{13}, std::byte{0}};
+    std::vector<std::byte> cicp_accepted = bytes;
+    const std::vector<std::byte> srgb_points = chunk({'c', 'I', 'C', 'P'}, cicp_srgb);
+    cicp_accepted.insert(cicp_accepted.begin() + 33, srgb_points.begin(), srgb_points.end());
+    require(validate_png(cicp_accepted).error == ImageResourceError::none,
+            "sRGB-equivalent cICP was refused");
+    std::vector<std::byte> cicp_refused = bytes;
+    const std::vector<std::byte> pq_points = chunk({'c', 'I', 'C', 'P'}, cicp_pq);
+    cicp_refused.insert(cicp_refused.begin() + 33, pq_points.begin(), pq_points.end());
+    require(validate_png(cicp_refused).error == ImageResourceError::unsupported_color_profile,
+            "non-sRGB cICP was accepted");
+    std::vector<std::byte> cicp_malformed = bytes;
+    const std::vector<std::byte> short_points = chunk({'c', 'I', 'C', 'P'}, cicp_short);
+    cicp_malformed.insert(cicp_malformed.begin() + 33, short_points.begin(), short_points.end());
+    require(validate_png(cicp_malformed).error == ImageResourceError::invalid_color_metadata,
+            "malformed cICP was accepted");
+
     std::vector<std::byte> unknown = bytes;
     const std::vector<std::byte> critical = chunk({'A', 'B', 'C', 'D'});
     unknown.insert(unknown.begin() + 33, critical.begin(), critical.end());

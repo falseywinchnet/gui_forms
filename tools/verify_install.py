@@ -23,7 +23,6 @@ def main() -> None:
     parser.add_argument("--native", action="store_true", help="Exercise the selected native Application component")
     parser.add_argument("--toolchain", type=Path, help="Target CMake toolchain for cross-build verification")
     parser.add_argument("--runner", help="CTest cross-compiling emulator command, such as wine")
-    parser.add_argument("--runtime-dir", type=Path, help="Directory containing the MinGW runtime DLLs for a Wine run")
     parser.add_argument("--relocate", action="store_true", help="Copy the installed SDK to a new prefix before verification")
     args: argparse.Namespace = parser.parse_args()
     prefix: Path = args.prefix.resolve(strict=True)
@@ -52,10 +51,6 @@ def main() -> None:
             configure.append("-DGUI_FORMS_EXAMPLE_NATIVE=ON")
         run(configure)
         run(["cmake", "--build", str(build), "--parallel", "2"])
-        if args.runtime_dir:
-            name: str
-            for name in ("libgcc_s_seh-1.dll", "libstdc++-6.dll", "libwinpthread-1.dll"):
-                shutil.copy2(args.runtime_dir / name, build / name)
         test_output: str = run(["ctest", "--test-dir", str(build), "--output-on-failure"])
         print(test_output)
         invalid: Path = scratch_path / "invalid"

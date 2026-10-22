@@ -641,6 +641,49 @@ and [phase-2 evidence](../../../results/2026-10-19-zlib/phase-two/README.md)
 record the source decision and open gate. House style is mandatory; it is not
 a substitute for the accepted executable verification.
 
+### Revisions of 2026-10-20 (owner)
+
+- **Ownership.** The `codex/*` thread that built the cores has ended. GUI.Forms
+  workers now own `stx_zlib` and the PNG codec (to become `stx_png`) and
+  finish both for general availability. House style and the verification
+  gates below still apply.
+- **6A revised: no sustained fuzz campaigns.** The 24-hour-per-target
+  campaign gate is dropped, and so is the sustained mode of the
+  `INFLATE_CAMPAIGN` workflow. Nothing long-running runs on the owner's
+  machine. In their place:
+  1. **Safe by construction.** Every decoder and encoder is a state machine
+     whose impossible states cannot be represented in its types: wrapper
+     types for sizes, offsets and bit counts; closed enums; state shapes
+     that cannot hold contradictory values. Whatever the types cannot rule
+     out gets one defined fallback, a named failure with a stated recovery.
+     There are no scattered asserts and no error-handling overhead on the
+     hot path. The audit of every input-reading function follows the JPL
+     "Power of Ten" rules (bounded loops, no allocation after
+     initialization, no recursion, every return checked, every parameter
+     validated, impossible states still handled), and its record is part of
+     stage Z-S. It cites the house style's §1 (shapes that cannot hold
+     contradictory values) and §9 (a switch or state machine keeps a default
+     that reaches one defined fallback, without compensating checks).
+  2. **Evidence instead of campaigns:**
+     - deterministic malformed-input sweeps in the normal suite, run under
+       the sanitizers: every truncation point, and every single-bit flip of
+       every header, table and chunk-header byte over a set of seed streams;
+     - differential checks against the pinned zlib and libpng (accept/reject
+       and output);
+     - the whole suite under ASan and UBSan.
+  3. **Light fuzzing as a build check only.** A short libFuzzer smoke run of
+     a few minutes per target per PR, on GitHub's CI runners. It is not a
+     certificate, and it never runs on the owner's machine.
+- **Phase 5's zlib-compatible C shim is dropped from GA.** Nothing uses it:
+  the owned PNG codec (choice 2B) replaces libpng, which was its only
+  consumer. It is not a planned feature.
+- **Colour (stage I6).** gAMA and cHRM are converted to sRGB by a
+  first-party deterministic pipeline, and iCCP is still refused. See the
+  integration record in [PNG_CODEC.md](PNG_CODEC.md).
+- **iCCP, decision D1, option 2.** iCCP is refused in the registry and in
+  GUI.Drawing decode. Clipboard reads ignore the profile and treat the
+  samples as sRGB.
+
 ## 12. Direct source references for review
 
 These links supplement the repository-relative pointers and exact pins above:

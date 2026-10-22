@@ -90,4 +90,18 @@ struct PngDecodeResult final {
     std::span<std::uint16_t> rgba, std::span<std::byte> metadata,
     std::span<PngMetadataRecord> records) noexcept;
 
+// As decode_png_samples, for a consumer that needs the pixels but not the
+// decoded metadata. Each compressed field (iCCP, zTXt, compressed iTXt) is
+// inflated once through the nonempty, reusable scratch, with the same
+// checksum, text and quota checks, and then discarded, so no storage
+// proportional to the metadata limit is needed. Records describe every
+// ancillary chunk; their decoded_offset and decoded_length are zero, and
+// metadata_bytes reports the validated decoded total. The image and the
+// metadata share one inflate work quota. Scratch joins the disjoint storage.
+[[nodiscard]] PngDecodeResult decode_png_samples_discarding_metadata(
+    std::span<const std::byte> encoded, PngDecodeLimits limits,
+    compression::InflateStream& workspace, std::span<std::byte> rows,
+    std::span<std::uint16_t> rgba, std::span<std::byte> scratch,
+    std::span<PngMetadataRecord> records) noexcept;
+
 } // namespace gui_forms::image

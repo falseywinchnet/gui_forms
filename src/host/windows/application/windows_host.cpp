@@ -29,11 +29,11 @@
 
 #include "../paint_endpoint/windows_compatibility_paint_endpoint_metrics.hpp"
 #include "../../../core/host/frame_capture/frame_capture.hpp"
+#include "../../../core/image/png_pixels.hpp"
 #include "../../../core/image/png_writer.hpp"
 
 #include <windows.h>
 #include <windowsx.h>
-#include <wincodec.h>
 #include <commdlg.h>
 #include <shlobj.h>
 #include <shellapi.h>
@@ -836,7 +836,8 @@ public:
             return images_synchronized_;
         }
         if (&registry != image_registry_) images_.clear();
-        IWICImagingFactory* factory{};
+        // One decoder for the batch; its storage is released when it goes.
+        gui_forms::image::PngPixelDecoder decoder{};
         bool synchronized = true;
         std::unordered_set<std::uint64_t> active;
         for (const ImageId id : registry.image_ids()) {
@@ -872,14 +873,7 @@ public:
                     static_cast<std::size_t>(decoded.width) * decoded.height);
                 std::memcpy(decoded.pixels.data(), (*resource).encoded.data(), expected);
             } else {
-                if (factory == nullptr && FAILED(CoCreateInstance(
-                        CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                        IID_PPV_ARGS(&factory)))) {
-                    images_.erase(id.value);
-                    synchronized = false;
-                    continue;
-                }
-                if (!decode_png(*factory, *resource, decoded)) {
+                if (!decode_png(decoder, *resource, decoded)) {
                     images_.erase(id.value);
                     synchronized = false;
                     continue;
@@ -892,7 +886,6 @@ public:
             iterator = active.contains((*iterator).first) ? std::next(iterator)
                                                         : images_.erase(iterator);
         }
-        if (factory != nullptr) (*factory).Release();
         image_registry_ = &registry;
         image_revision_ = snapshot.revision;
         images_synchronized_ = synchronized;
@@ -1033,7 +1026,7 @@ public:
             reinterpret_cast<const std::byte*>(saved_pixels),
             static_cast<std::size_t>(saved_width) * static_cast<std::size_t>(saved_height) * 4U);
         input.order = gui_forms::image::PngChannelOrder::bgra;
-        input.opaque = true;
+        input.alpha = gui_forms::image::PngSourceAlpha::opaque;
         return gui_forms::image::encode_png(input, output);
     }
 
@@ -2166,51 +2159,25 @@ private:
         glyph_runs_.reset();
     }
 
-    static bool decode_png(IWICImagingFactory& factory,
+    // The shared owned decode (src/core/image/png_pixels), as on every host:
+    // premultiplied BGRA, the DIB's native order.
+    static bool decode_png(gui_forms::image::PngPixelDecoder& decoder,
                            const ImageResourceView& resource,
                            DecodedImage& output) {
-        if (resource.encoded.empty() || resource.encoded.size() > MAXDWORD ||
-            output.width == 0 || output.height == 0 ||
-            output.width > std::numeric_limits<std::size_t>::max() / output.height) return false;
-        IWICStream* stream{};
-        IWICBitmapDecoder* decoder{};
-        IWICBitmapFrameDecode* frame{};
-        IWICFormatConverter* converter{};
-        HRESULT status = factory.CreateStream(&stream);
-        if (SUCCEEDED(status)) {
-            status = (*stream).InitializeFromMemory(
-                reinterpret_cast<BYTE*>(const_cast<std::byte*>(resource.encoded.data())),
-                static_cast<DWORD>(resource.encoded.size()));
-        }
-        if (SUCCEEDED(status)) {
-            status = factory.CreateDecoderFromStream(stream, nullptr,
-                WICDecodeMetadataCacheOnLoad, &decoder);
-        }
-        if (SUCCEEDED(status)) status = (*decoder).GetFrame(0, &frame);
-        UINT width{};
-        UINT height{};
-        if (SUCCEEDED(status)) status = (*frame).GetSize(&width, &height);
-        if (SUCCEEDED(status) && (width != output.width || height != output.height)) {
-            status = E_FAIL;
-        }
-        if (SUCCEEDED(status)) status = factory.CreateFormatConverter(&converter);
-        if (SUCCEEDED(status)) {
-            status = (*converter).Initialize(frame, GUID_WICPixelFormat32bppPBGRA,
-                WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
-        }
-        if (SUCCEEDED(status)) {
-            output.pixels.resize(static_cast<std::size_t>(output.width) * output.height);
-            const UINT stride = output.width * 4U;
-            const std::size_t bytes = output.pixels.size() * sizeof(std::uint32_t);
-            if (bytes > MAXDWORD) status = E_OUTOFMEMORY;
-            else status = (*converter).CopyPixels(nullptr, stride, static_cast<UINT>(bytes),
-                                                reinterpret_cast<BYTE*>(output.pixels.data()));
-        }
-        if (converter != nullptr) (*converter).Release();
-        if (frame != nullptr) (*frame).Release();
-        if (decoder != nullptr) (*decoder).Release();
-        if (stream != nullptr) (*stream).Release();
-        return SUCCEEDED(status);
+        if (resource.encoded.empty() || output.width == 0 || output.height == 0 ||
+            output.width > std::numeric_limits<std::size_t>::max() / 4U / output.height) return false;
+        gui_forms::image::PngPixelRequest request{};
+        request.limits = gui_forms::image::png_limits_for_image(output.width, output.height,
+                                                     resource.encoded.size());
+        request.target = {gui_forms::image::PixelOrder::bgra, gui_forms::image::PixelAlpha::premultiplied};
+        request.purpose = gui_forms::image::PngPixelPurpose::resource;
+        output.pixels.resize(static_cast<std::size_t>(output.width) * output.height);
+        const std::span<std::byte> pixels = std::as_writable_bytes(std::span<std::uint32_t>(output.pixels));
+        const std::size_t row_bytes = static_cast<std::size_t>(output.width) * 4U;
+        const gui_forms::image::PngPixelResult decoded = decoder.decode(resource.encoded, request, pixels, row_bytes);
+        const bool accepted = decoded.error == gui_forms::image::PngPixelError::none &&
+                              decoded.width == output.width && decoded.height == output.height;
+        return accepted;
     }
 
     bool offscreen_{};
@@ -2414,7 +2381,7 @@ public:
         (*model_).set_framebuffer_painter(fonts_ready ? &raster_ : nullptr);
         (*model_).metrics().set_renderer(
             fonts_ready
-                ? "Win32 DIB CPU · HarfBuzz/FreeType text · WIC PNG · bundled fonts"
+                ? "Win32 DIB CPU · HarfBuzz/FreeType text · owned PNG · bundled fonts"
                 : "Win32 DIB CPU · incomplete bundled font pack",
             true);
         const HostDispatchResult attached = dispatch(HostAttachEvent{logical, scale_});
