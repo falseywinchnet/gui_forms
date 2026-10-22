@@ -1009,7 +1009,11 @@ as far as their APIs allow:
 - UI Automation: tree, tree item, table, data item (rows and cells),
   header item, data grid (a tree grid), pane with IsDialog (a dialog),
   status bar and group with a polite LiveSetting (a live region); Level,
-  AccessKey ("Alt+key"), CanSelectMultiple, SmallChange and LargeChange.
+  AccessKey ("Alt+key"), CanSelectMultiple, SmallChange and LargeChange;
+  the Grid pattern on a node with row and column counts and the GridItem
+  pattern on one with row and column indices (from zero, spanning one row
+  and one column); LiveRegionChanged when a live region's name changes to
+  a new announcement.
 - ATK: tree, tree item, table, table row, table cell, column and row
   header, tree table, dialog and status bar roles (a live region is a
   panel with the "live" and "container-live" attributes); the checkable,
