@@ -332,6 +332,9 @@ semantic_snapshot
 perform_semantic_action
     Performs an automation action, such as focus or press, and returns
     whether it was performed. One overload names the control by stable ID.
+    Focus on a control that is not focusable itself, such as a composite
+    over an inner editor, is left to the control, and is performed only if
+    focus then lies inside it.
     The overload native accessibility hosts use names a published node by
     its control's runtime ID and, for a virtual child, the child's stable
     ID; a disposed or replaced control's runtime ID is refused.
@@ -341,6 +344,19 @@ metrics
 reset_activity_metrics
     Zeroes the activity counters, keeping the population and depth values,
     so a test can measure one workload.
+publish_value
+    Publishes a named number for the theme engine, such as a meter's
+    `level`. A theme's expressions read the values its rule sheet names; a
+    theme never writes them. A changed value damages only the parts whose
+    expressions read it, within their extents
+    (`MetricsSnapshot::engine_input_damaged_parts`). Returns false, changing
+    nothing, for a name that is not 1 to 64 lowercase ASCII letters, digits,
+    '-' and '_' starting with a letter, or a value that is not finite.
+withdraw_value
+    Withdraws a published value; its readers then read it as not published
+    and give their expressions' fallbacks.
+published_value
+    The value published under a name, or none.
 
 See Also
 --------

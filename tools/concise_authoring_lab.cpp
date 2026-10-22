@@ -3,7 +3,6 @@
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/window.hpp"
 #include "skia_raster.hpp"
-#include "clipboard_png.hpp"
 #ifndef GUI_FORMS_AUTHORING_BASELINE
 #include "gui_forms/commands.hpp"
 #include "gui_forms/value.hpp"
@@ -106,9 +105,8 @@ int main(const int argc, const char* const* argv) {
     }
     std::cout << "pixel_hash," << hash << '\n';
     if (argc > 2) {
-        const gf::HostImageView image{raster.pixel_width(), raster.pixel_height(),
-            static_cast<std::uint64_t>(raster.row_bytes()), {pixels, raster.byte_size()}};
-        const std::vector<std::byte> png = gf::render::encode_clipboard_png(image);
+        // The raster's own capture: the shared owned encoder, unpremultiplied.
+        const std::vector<std::byte> png = raster.encode_png();
         std::ofstream output(argv[2], std::ios::binary);
         output.write(reinterpret_cast<const char*>(png.data()), static_cast<std::streamsize>(png.size()));
         if (!output) return 6;

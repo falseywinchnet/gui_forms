@@ -277,6 +277,41 @@ the plan left a number or a form open, E3 chose:
    design language would give an opening surface smoothstep; that choice is
    DK D8's or T4's.
 
+## Decisions taken in E7 (#216; reviewed by the owner, 2026-10-21)
+
+1. **Opacity on parts the built-in recipe draws: changed by the owner.** E7
+   first drew each of the recipe's commands at the part's opacity
+   (`detail::OpacityPainter`), so overlapping commands showed through one
+   another mid-fade. The owner, verbatim: "Opacity fading is a problem. But
+   getting it wrong and going back and correcting it would be worse. Let's
+   add a group layer instead." And: "there are other things that group
+   layer may be needed for." So:
+   - a part at partial opacity is drawn as one group, then composited once
+     at that opacity through the shared ADR-004 blend;
+   - the group is a general Painter facility, built in the recording, Skia
+     and Windows DIB painters, for E9's translucency, glass, reflection and
+     pop too;
+   - it has an explicit lifetime and nesting, an opacity and a composite
+     mode (source-over only for now), and bounds given up front so that its
+     storage is sized and reused;
+   - opacity 1 stays exact, and 0 draws nothing.
+2. **A checked ribbon toggle and an open menu keep today's plate**, rather
+   than the bulge: accepted.
+3. **The rise covers ribbon command faces and collapsed group buttons** of
+   every size (RB decision 23); not the tab row, the File tab, launchers or
+   split arrows: accepted.
+4. **A theme transition settles within half an 8-bit step of its
+   property's range** (1/510 of it); the rise therefore runs 30 frames of
+   16 ms: accepted.
+5. **The ambient area cap is checked per effect, against the part's
+   extent, when the part is drawn**; the frame cap when the sheet loads:
+   accepted.
+6. **The application's motion switch is `PresentationSettings::ambient_motion`**
+   (default on). It stops ambient effects only; transitions follow reduced
+   motion: accepted.
+7. **Ceremonial is a `Control` property** (`set_ceremonial`), inherited by
+   descendants: accepted.
+
 ## Open decisions (ask, do not decide)
 
 The proposed numbers (light angle 135°, overshoot 8 %, blur cap 8 px,

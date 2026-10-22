@@ -34,6 +34,9 @@ enum class SemanticState : std::uint32_t {
     none = 0,
     enabled = 1U << 0U,
     visible = 1U << 1U,
+    // The node's control can take focus, or a control the node hides (one
+    // that publishes no node of its own, such as a composite's inner editor)
+    // can; focused likewise covers focus on such a hidden control.
     focusable = 1U << 2U,
     focused = 1U << 3U,
     selected = 1U << 4U,

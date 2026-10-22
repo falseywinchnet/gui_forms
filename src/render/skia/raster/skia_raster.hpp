@@ -139,6 +139,15 @@ public:
     void fill_image_pattern(ImageId image, Size source_pixel_size,
                             Rect destination, Size logical_tile_size,
                             ImagePatternWrap wrap, double opacity) override;
+    // Paint groups (Painter::begin_group). An isolated group draws into its
+    // level's scratch surface (premultiplied RGBA, grown to the largest
+    // clipped bounds met and reused), then composites it once into the
+    // parent canvas through the shared blend at the group's opacity, under
+    // the clip in force when it began, as part rasters are composited.
+    void begin_group(const PaintGroup& group) override;
+    void end_group() override;
+    // Paint groups begun deeper than maximum_paint_group_depth.
+    [[nodiscard]] std::uint64_t group_refusals() const noexcept;
 
 private:
     friend struct SkiaLiveSurfaceTestAccess;

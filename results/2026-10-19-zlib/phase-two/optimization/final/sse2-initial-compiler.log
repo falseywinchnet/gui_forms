@@ -1,0 +1,139 @@
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:4:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/include/gui_forms/compression/inflate.hpp:3:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/array:119:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/__algorithm/lexicographical_compare.h:30:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/cwchar:118:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:122:
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/__mbstate_t.h:51:4: error: "We don't know how to get the definition of mbstate_t on your platform."
+   51 | #  error "We don't know how to get the definition of mbstate_t on your platform."
+      |    ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:4:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/include/gui_forms/compression/inflate.hpp:3:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/array:119:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/__algorithm/lexicographical_compare.h:30:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/cwchar:118:
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:142:20: error: use of undeclared identifier 'wcschr'
+  142 |   return (wchar_t*)wcschr(__s, __c);
+      |                    ^~~~~~
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:152:20: error: use of undeclared identifier 'wcspbrk'
+  152 |   return (wchar_t*)wcspbrk(__s1, __s2);
+      |                    ^~~~~~~
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:163:20: error: use of undeclared identifier 'wcsrchr'; did you mean 'wcschr'?
+  163 |   return (wchar_t*)wcsrchr(__s, __c);
+      |                    ^~~~~~~
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:144:72: note: 'wcschr' declared here
+  144 | inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_PREFERRED_OVERLOAD const wchar_t* wcschr(const wchar_t* __s, wchar_t __c) {
+      |                                                                        ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:173:20: error: use of undeclared identifier 'wcsstr'; did you mean 'wcschr'?
+  173 |   return (wchar_t*)wcsstr(__s1, __s2);
+      |                    ^~~~~~
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:147:66: note: 'wcschr' declared here
+  147 | inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_PREFERRED_OVERLOAD wchar_t* wcschr(wchar_t* __s, wchar_t __c) {
+      |                                                                  ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:173:20: error: no matching function for call to 'wcschr'
+  147 |   return (wchar_t*)wcsstr(__s1, __s2);
+      |                    ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:147:66: note: candidate disabled: <no message provided>
+  147 | inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_PREFERRED_OVERLOAD wchar_t* wcschr(wchar_t* __s, wchar_t __c) {
+      |                              ~~~~~~~~~~~~~~~~~~~~~~~~~~          ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:173:27: error: cannot initialize a parameter of type 'wchar_t *' with an lvalue of type 'const wchar_t *'
+  173 |   return (wchar_t*)wcsstr(__s1, __s2);
+      |                           ^~~~
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:147:82: note: passing argument to parameter '__s' here
+  147 | inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_PREFERRED_OVERLOAD wchar_t* wcschr(wchar_t* __s, wchar_t __c) {
+      |                                                                                  ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/wchar.h:184:20: error: use of undeclared identifier 'wmemchr'
+  184 |   return (wchar_t*)wmemchr(__s, __c, __n);
+      |                    ^~~~~~~
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:4:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/include/gui_forms/compression/inflate.hpp:3:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/array:145:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdexcept:285:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/cstdlib:90:
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdlib.h:126:30: error: unknown type name 'ldiv_t'
+  126 | inline _LIBCPP_HIDE_FROM_ABI ldiv_t div(long __x, long __y) _NOEXCEPT { return ::ldiv(__x, __y); }
+      |                              ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdlib.h:126:82: error: no member named 'ldiv' in the global namespace; did you mean 'div'?
+  126 | inline _LIBCPP_HIDE_FROM_ABI ldiv_t div(long __x, long __y) _NOEXCEPT { return ::ldiv(__x, __y); }
+      |                                                                                  ^~~~
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdlib.h:126:37: note: 'div' declared here
+  126 | inline _LIBCPP_HIDE_FROM_ABI ldiv_t div(long __x, long __y) _NOEXCEPT { return ::ldiv(__x, __y); }
+      |                                     ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdlib.h:128:30: error: unknown type name 'lldiv_t'
+  128 | inline _LIBCPP_HIDE_FROM_ABI lldiv_t div(long long __x, long long __y) _NOEXCEPT { return ::lldiv(__x, __y); }
+      |                              ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdlib.h:128:93: error: no member named 'lldiv' in the global namespace
+  128 | inline _LIBCPP_HIDE_FROM_ABI lldiv_t div(long long __x, long long __y) _NOEXCEPT { return ::lldiv(__x, __y); }
+      |                                                                                             ^~~~~
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:4:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/include/gui_forms/compression/inflate.hpp:3:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/array:145:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdexcept:287:
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/iosfwd:136:14: error: reference to unresolved using declaration
+  136 | typedef fpos<mbstate_t> streampos;
+      |              ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/__std_mbstate_t.h:25:1: note: using declaration annotated with 'using_if_exists' here
+   25 | using ::mbstate_t _LIBCPP_USING_IF_EXISTS;
+      | ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:4:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/include/gui_forms/compression/inflate.hpp:3:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/array:145:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdexcept:287:
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/iosfwd:136:14: error: reference to unresolved using declaration
+  136 | typedef fpos<mbstate_t> streampos;
+      |              ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/__std_mbstate_t.h:25:1: note: using declaration annotated with 'using_if_exists' here
+   25 | using ::mbstate_t _LIBCPP_USING_IF_EXISTS;
+      | ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:4:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/include/gui_forms/compression/inflate.hpp:3:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/array:145:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdexcept:287:
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/iosfwd:138:14: error: reference to unresolved using declaration
+  138 | typedef fpos<mbstate_t> wstreampos;
+      |              ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/__std_mbstate_t.h:25:1: note: using declaration annotated with 'using_if_exists' here
+   25 | using ::mbstate_t _LIBCPP_USING_IF_EXISTS;
+      | ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:4:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/include/gui_forms/compression/inflate.hpp:3:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/array:145:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdexcept:287:
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/iosfwd:138:14: error: reference to unresolved using declaration
+  138 | typedef fpos<mbstate_t> wstreampos;
+      |              ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/__std_mbstate_t.h:25:1: note: using declaration annotated with 'using_if_exists' here
+   25 | using ::mbstate_t _LIBCPP_USING_IF_EXISTS;
+      | ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:4:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/include/gui_forms/compression/inflate.hpp:3:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/array:145:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdexcept:287:
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/iosfwd:141:14: error: reference to unresolved using declaration
+  141 | typedef fpos<mbstate_t> u8streampos;
+      |              ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/__std_mbstate_t.h:25:1: note: using declaration annotated with 'using_if_exists' here
+   25 | using ::mbstate_t _LIBCPP_USING_IF_EXISTS;
+      | ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:4:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/include/gui_forms/compression/inflate.hpp:3:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/array:145:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdexcept:287:
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/iosfwd:141:14: error: reference to unresolved using declaration
+  141 | typedef fpos<mbstate_t> u8streampos;
+      |              ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/__std_mbstate_t.h:25:1: note: using declaration annotated with 'using_if_exists' here
+   25 | using ::mbstate_t _LIBCPP_USING_IF_EXISTS;
+      | ^
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:4:
+In file included from /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/include/gui_forms/compression/inflate.hpp:3:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/array:145:
+In file included from /opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/stdexcept:287:
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/iosfwd:143:14: error: reference to unresolved using declaration
+  143 | typedef fpos<mbstate_t> u16streampos;
+      |              ^
+/opt/homebrew/Cellar/llvm@22/22.1.8/bin/../include/c++/v1/__std_mbstate_t.h:25:1: note: using declaration annotated with 'using_if_exists' here
+   25 | using ::mbstate_t _LIBCPP_USING_IF_EXISTS;
+      | ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.

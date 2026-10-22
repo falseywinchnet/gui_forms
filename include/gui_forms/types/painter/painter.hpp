@@ -4,6 +4,8 @@
 #include "gui_forms/types/paint_types/paint_types.hpp"
 #include "gui_forms/typography.hpp"
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <string_view>
@@ -32,9 +34,51 @@ struct RetainedDrawCache final {
     std::unique_ptr<RetainedDrawMemo> memo;
 };
 
+// How a paint group's image joins what lies beneath it. Premultiplied
+// source-over through the shared ADR-004 blend (detail::composite_part_raster)
+// is the only mode today; another is added here when a primitive needs it.
+enum class PaintGroupComposite : std::uint8_t { source_over };
+
+// A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that
+// group layer may be needed for"): commands drawn as one image, then
+// composited once.
+// - `bounds`, in the current coordinates when the group begins, limits the
+//   group. It is given up front so that a painter sizes its storage once:
+//   nothing the group draws outside `bounds` (or outside the clip in force
+//   at its beginning) is shown.
+// - `opacity` in [0, 1] multiplies the group's whole image. Below 1 the group
+//   is isolated: its commands draw into a transparent premultiplied image the
+//   size of its clipped bounds, which is composited once at `opacity` by
+//   `composite`, so overlapping commands never show through one another. At
+//   1 (or above) the commands draw directly under clip_rect(bounds), which is
+//   exactly what isolation would give for source-over. At 0 (or NaN) nothing
+//   is drawn.
+struct PaintGroup final {
+    Rect bounds{};
+    double opacity{1.0};
+    PaintGroupComposite composite{PaintGroupComposite::source_over};
+};
+
+// The deepest groups nest (T2, coordinator decision Q2/Q3). A group begun
+// deeper is refused by name: it draws without isolation (as clip_rect(bounds)
+// under a save), and the refusal is counted.
+inline constexpr std::size_t maximum_paint_group_depth = 4;
+
 class Painter : public TextMetricsProvider {
 public:
     virtual ~Painter() = default;
+    // Paint groups (see PaintGroup). begin_group and end_group pair like save
+    // and restore and nest like them, up to maximum_paint_group_depth: the
+    // state in force at end_group (transform, clips, saves) must be the one
+    // at its begin_group. Within a retained display chunk every group ends in
+    // the chunk that begins it; the recorder refuses a chunk left unbalanced.
+    // The recording, Skia and Windows DIB painters isolate; each keeps one
+    // reusable scratch image per nesting level, grown to the largest clipped
+    // bounds it has met and released with the painter. The base
+    // implementation is a minimal painter's fallback without isolation:
+    // save() and clip_rect(bounds), then restore().
+    virtual void begin_group(const PaintGroup& group);
+    virtual void end_group();
     // Native renderers preserve their fonts and drawing semantics offscreen.
     // Recording/headless painters explicitly report this facility unavailable.
     [[nodiscard]] virtual std::unique_ptr<PaintFramebuffer> create_framebuffer(

@@ -93,10 +93,15 @@ starts with a document-only study and threat model. Its
 accepted decisions; phase 1 evidence is in `results/2026-10-19-zlib`. The owner
 has decided to remove WIC PNG decoding and use one owned zlib on every host.
 The owner accepted all six recommended decisions, including naming/location,
-pinned libpng and disabled FreeType compression. The requested
+initially pinned libpng and disabled FreeType compression. A subsequent owner
+direction authorizes source reuse and house-style rewrites of both deflate and
+PNG, revising the PNG choice to an owned codec. Phase 2 inflate is implemented
+for review; its verification gate remains open. The owner explicitly started
+the [owned PNG phase](stages/Z-zlib/PNG_CODEC.md) alongside it on 2026-10-19;
+its private sample decoder does not yet replace a production path. The requested
 [precursor alternatives audit](stages/Z-zlib/ALTERNATIVES_LIGHT_AUDIT.md) is recorded;
-no candidate has been adopted. Each phase gets its own PR; implementation waits for the
-owner's review of the study. This addition does not change other stage gates.
+the source choice is recorded in the phase-2 provenance. Each phase gets its
+own PR and gate; no production decoder has switched. This addition does not change other stage gates.
 
 ## 3. Foundations
 

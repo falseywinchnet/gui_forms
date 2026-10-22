@@ -1,0 +1,172 @@
+{
+  "host": "macOS-26.5-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "compiler": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin25.cfg\n",
+  "oracle_revision": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+  "source_sha256": {
+    "stx_zlib/src/deflate.cpp": "a74dfe4de2d3b3539b5a35ee57fc1ff9cc2037fbe97812d398407654e9180ffb",
+    "stx_zlib/include/stx_zlib/deflate.hpp": "0e65b95c5e60e808578076b4d3552b578202bf36398b3bcee903371d5165d0a3",
+    "stx_zlib/include/stx_zlib/inflate.hpp": "d6fcd9b09de987547ec3c73a8088841511c7a1e8ec8776ebc5bc993b1d1f437a",
+    "stx_zlib/bench/deflate.cpp": "0889688b43e7cb3dba2d1aa5d09c702dfe83ffc26cb47c56db04cc7155382518",
+    "tools/benchmark_deflate.py": "47ec05d42236b9699c9062f425b840cb7a325e2996c274528055a275de1dcf07"
+  },
+  "flags": [
+    "-O3",
+    "-DNDEBUG"
+  ],
+  "cxx_flags": [
+    "-std=c++20",
+    "-stdlib=libc++",
+    "-nostdinc++",
+    "-isystem",
+    "/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1"
+  ],
+  "link_flags": [
+    "-L/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/lib",
+    "-Wl,-rpath,/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/lib",
+    "-lunwind"
+  ],
+  "no_vector": false,
+  "profile": true,
+  "lto": false,
+  "commands": [
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/adler32.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/adler32.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/crc32.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/crc32.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/deflate.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/deflate.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/inflate.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/inflate.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/inffast.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/inffast.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/inftrees.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/inftrees.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/trees.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/trees.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/zutil.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/zutil.o"
+    ],
+    [
+      "clang++",
+      "-std=c++20",
+      "-stdlib=libc++",
+      "-nostdinc++",
+      "-isystem",
+      "/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1",
+      "-O3",
+      "-DNDEBUG",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-Rpass=loop-vectorize",
+      "-Rpass-missed=loop-vectorize",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/profile-deflate.cpp",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/adler32.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/crc32.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/deflate.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/inflate.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/inffast.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/inftrees.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/trees.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/zutil.o",
+      "-L/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/lib",
+      "-Wl,-rpath,/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/lib",
+      "-lunwind",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/benchmark"
+    ],
+    [
+      "clang++",
+      "-std=c++20",
+      "-stdlib=libc++",
+      "-nostdinc++",
+      "-isystem",
+      "/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1",
+      "-O3",
+      "-DNDEBUG",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-S",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/candidate.s"
+    ],
+    [
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-profile-entropy/benchmark",
+      "2",
+      "6"
+    ]
+  ],
+  "sampling": "calibrate >=25ms, two warmup batches, five samples; reset included; allocation excluded",
+  "hardware": "machdep.cpu.brand_string: Apple M4\nhw.memsize: 17179869184\n"
+}

@@ -2,22 +2,30 @@
   "notes": [
     "Third-party notices copied into each packaged program's licenses/ directory by tools/package_programs.py.",
     "Paths are relative to the repository root unless prefixed with $GUI_FORMS_LLVM_RUNTIME (macOS runtime prefix) or $MSYS_PREFIX (the CLANG64 tree on Windows).",
-    "optional=true entries are skipped with a log line when the file is absent (fetched dependencies, platform runtimes); the others fail the package."
+    "optional=true entries are skipped with a log line when the file is absent (fetched dependencies, platform runtimes); the others fail the package.",
+    "Windows binaries link the LLVM runtimes (libc++, libunwind, compiler-rt), winpthreads and the MinGW-w64 CRT statically; their licences are shipped although the LLVM exception does not require it for embedded runtime code.",
+    "component names the row of THIRD_PARTY_NOTICES.md that covers the file; tools/package_programs.py checks every package against that file. One entry per line, so adding or removing a component is a one-line edit here and one row there."
   ],
   "notices": [
-    {"name": "GUIForms.txt", "source": "LICENSE"},
-    {"name": "Unicode.txt", "source": "third_party/unicode/LICENSE.txt"},
-    {"name": "SheenBidi.txt", "source": "third_party/sheenbidi/LICENSE"},
-    {"name": "HarfBuzz.txt", "source": "third_party/harfbuzz/COPYING", "optional": true},
-    {"name": "FreeType.txt", "source": "third_party/freetype/docs/FTL.TXT", "optional": true},
-    {"name": "libunibreak.txt", "source": "third_party/libunibreak/LICENCE", "optional": true},
-    {"name": "Skia.txt", "source": "third_party/skia/LICENSE", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
-    {"name": "libpng.txt", "source": "third_party/skia/third_party/externals/libpng/LICENSE", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
-    {"name": "zlib.txt", "source": "third_party/skia/third_party/externals/zlib/LICENSE", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
-    {"name": "LLVM/libcxx-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libcxx-LICENSE.TXT", "optional": true, "platforms": ["macos-arm64"]},
-    {"name": "LLVM/libcxxabi-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libcxxabi-LICENSE.TXT", "optional": true, "platforms": ["macos-arm64"]},
-    {"name": "LLVM/libunwind-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libunwind-LICENSE.TXT", "optional": true, "platforms": ["macos-arm64"]},
-    {"name": "LLVM/libc++-LICENSE.TXT", "source": "$MSYS_PREFIX/share/licenses/libc++/LICENSE.TXT", "optional": true, "platforms": ["windows-x64"]},
-    {"name": "winpthreads-COPYING.txt", "source": "$MSYS_PREFIX/share/licenses/winpthreads/COPYING", "optional": true, "platforms": ["windows-x64"]}
+    {"name": "THIRD_PARTY_NOTICES.md", "source": "THIRD_PARTY_NOTICES.md"},
+    {"name": "GUIForms.txt", "source": "LICENSE", "component": "GUI.Forms"},
+    {"name": "threadpool_atomic_fast.txt", "source": "src/core/threading/atomic_pool/LICENSE", "component": "threadpool_atomic_fast (the owner's thread pool)"},
+    {"name": "Unicode.txt", "source": "third_party/unicode/LICENSE.txt", "component": "Unicode Character Database (grapheme tables)"},
+    {"name": "SheenBidi.txt", "source": "third_party/sheenbidi/LICENSE", "component": "SheenBidi"},
+    {"name": "stx_zlib-puff.txt", "source": "stx_zlib/LICENSE-puff.txt", "component": "stx_zlib (the owned zlib codec)"},
+    {"name": "stx_zlib-zlib.txt", "source": "stx_zlib/LICENSE-zlib.txt", "component": "stx_zlib (the owned zlib codec)"},
+    {"name": "HarfBuzz.txt", "source": "third_party/harfbuzz/COPYING", "component": "HarfBuzz", "optional": true},
+    {"name": "FreeType-FTL.txt", "source": "third_party/freetype/docs/FTL.TXT", "component": "FreeType", "optional": true},
+    {"name": "Skia.txt", "source": "third_party/skia/LICENSE", "component": "Skia", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
+    {"name": "libpng.txt", "source": "third_party/skia/third_party/externals/libpng/LICENSE", "component": "libpng (inside Skia)", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
+    {"name": "zlib.txt", "source": "third_party/skia/third_party/externals/zlib/LICENSE", "component": "zlib (inside Skia)", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
+    {"name": "LLVM/libcxx-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libcxx-LICENSE.TXT", "component": "LLVM libc++ and libc++abi", "optional": true, "platforms": ["macos-arm64"]},
+    {"name": "LLVM/libcxxabi-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libcxxabi-LICENSE.TXT", "component": "LLVM libc++ and libc++abi", "optional": true, "platforms": ["macos-arm64"]},
+    {"name": "LLVM/libunwind-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libunwind-LICENSE.TXT", "component": "LLVM libunwind", "optional": true, "platforms": ["macos-arm64"]},
+    {"name": "LLVM/libc++-LICENSE.TXT", "source": "$MSYS_PREFIX/share/licenses/libc++/LICENSE", "component": "LLVM libc++ and libc++abi", "platforms": ["windows-x64"]},
+    {"name": "LLVM/libunwind-LICENSE.TXT", "source": "$MSYS_PREFIX/share/licenses/libunwind/LICENSE", "component": "LLVM libunwind", "platforms": ["windows-x64"]},
+    {"name": "LLVM/compiler-rt-LICENSE.TXT", "source": "$MSYS_PREFIX/share/licenses/compiler-rt/LICENSE", "component": "LLVM compiler-rt builtins", "platforms": ["windows-x64"]},
+    {"name": "winpthreads-COPYING.txt", "source": "$MSYS_PREFIX/share/licenses/winpthreads/COPYING", "component": "MinGW-w64 winpthreads", "platforms": ["windows-x64"]},
+    {"name": "mingw-w64-runtime-COPYING.txt", "source": "$MSYS_PREFIX/share/licenses/crt/COPYING.MinGW-w64-runtime.txt", "component": "MinGW-w64 runtime (CRT startup, libmingwex, libuuid GUID data)", "platforms": ["windows-x64"]}
   ]
 }

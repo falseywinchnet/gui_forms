@@ -1,0 +1,104 @@
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+   41 |             raw = (raw >> 1) ^ ((0U - (raw & 1U)) & 0xedb88320U);
+      |                              ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: note: could not determine the original source location for experiments/png-crc-suitability/compact.cpp:0:0
+  105 | std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+      |               ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: remark: Stores SLP vectorized with cost -1 and with tree size 9 [-Rpass=slp-vectorizer]
+  105 | std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+      |               ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: note: could not determine the original source location for experiments/png-crc-suitability/compact.cpp:0:0
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: note: could not determine the original source location for experiments/png-crc-suitability/compact.cpp:0:0
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: remark: Stores SLP vectorized with cost -1 and with tree size 9 [-Rpass=slp-vectorizer]
+  105 | std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+      |               ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: note: could not determine the original source location for experiments/png-crc-suitability/compact.cpp:0:0
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: note: could not determine the original source location for experiments/png-crc-suitability/compact.cpp:0:0
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  105 | std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+      |               ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: note: could not determine the original source location for experiments/png-crc-suitability/compact.cpp:0:0
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+   41 |             raw = (raw >> 1) ^ ((0U - (raw & 1U)) & 0xedb88320U);
+      |                              ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: remark: SLP vectorized with cost -7 and with tree size 17 [-Rpass=slp-vectorizer]
+  105 | std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+      |               ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:84:33: remark: Stores SLP vectorized with cost -8 and with tree size 6 [-Rpass=slp-vectorizer]
+   84 |             state.s[slot][lane] ^= state.q[recent][lane] ^ state.q[other][lane];
+      |                                 ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: note: could not determine the original source location for experiments/png-crc-suitability/compact.cpp:0:0
+  105 | std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+      |               ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  105 | std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+      |               ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: note: could not determine the original source location for experiments/png-crc-suitability/compact.cpp:0:0
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+   41 |             raw = (raw >> 1) ^ ((0U - (raw & 1U)) & 0xedb88320U);
+      |                              ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: remark: SLP vectorized with cost -17 and with tree size 17 [-Rpass=slp-vectorizer]
+  105 | std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+      |               ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:84:33: remark: Stores SLP vectorized with cost -20 and with tree size 6 [-Rpass=slp-vectorizer]
+   84 |             state.s[slot][lane] ^= state.q[recent][lane] ^ state.q[other][lane];
+      |                                 ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:68:39: remark: Stores SLP vectorized with cost -2 and with tree size 6 [-Rpass=slp-vectorizer]
+   68 |         state.s[state.s_cursor][lane] = a ^ b;
+      |                                       ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:67:39: remark: Stores SLP vectorized with cost -7 and with tree size 4 [-Rpass=slp-vectorizer]
+   67 |         state.q[state.q_cursor][lane] = a ^ state.q[q150][lane];
+      |                                       ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:68:39: remark: Stores SLP vectorized with cost -4 and with tree size 8 [-Rpass=slp-vectorizer]
+   68 |         state.s[state.s_cursor][lane] = a ^ b;
+      |                                       ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:67:39: remark: Stores SLP vectorized with cost -7 and with tree size 4 [-Rpass=slp-vectorizer]
+   67 |         state.q[state.q_cursor][lane] = a ^ state.q[q150][lane];
+      |                                       ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:68:39: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+   68 |         state.s[state.s_cursor][lane] = a ^ b;
+      |                                       ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:67:39: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+   67 |         state.q[state.q_cursor][lane] = a ^ state.q[q150][lane];
+      |                                       ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: note: could not determine the original source location for experiments/png-crc-suitability/compact.cpp:0:0
+  105 | std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+      |               ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: remark: Stores SLP vectorized with cost -1 and with tree size 2 [-Rpass=slp-vectorizer]
+  105 | std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+      |               ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:105:15: note: could not determine the original source location for experiments/png-crc-suitability/compact.cpp:0:0
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+   41 |             raw = (raw >> 1) ^ ((0U - (raw & 1U)) & 0xedb88320U);
+      |                              ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+  221 |     for (unsigned index = 0; index < 52; ++index) terminal.s[index][0] = auxiliary[index / 4][index % 4];
+      |                                                                        ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:221:72: remark: Stores SLP vectorized with cost -5 and with tree size 2 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+   41 |             raw = (raw >> 1) ^ ((0U - (raw & 1U)) & 0xedb88320U);
+      |                              ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:41:30: remark: Vectorized horizontal reduction with cost -2 and with tree size 8 [-Rpass=slp-vectorizer]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:263:70: remark: SLP vectorized with cost -10 and with tree size 11 [-Rpass=slp-vectorizer]
+  263 |             for (unsigned lane = 0; lane < Lanes; ++lane) word[lane] ^= q[wrapped(cursor, age, 300)][lane];
+      |                                                                      ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:250:29: remark: Stores SLP vectorized with cost -33 and with tree size 10 [-Rpass=slp-vectorizer]
+  250 |             q[cursor][lane] = (word[lane] ^ q[cursor][lane]) ^ (q[a][lane] ^ q[b][lane]) ^ q[c][lane];
+      |                             ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/experiments/png-crc-suitability/compact.cpp:250:29: remark: Stores SLP vectorized with cost -2 and with tree size 2 [-Rpass=slp-vectorizer]

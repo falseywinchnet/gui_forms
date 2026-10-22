@@ -58,6 +58,9 @@ RegistrationOutcome check_descriptor(const PrimitiveDescriptor& descriptor) noex
     for (const AnatomyState state : descriptor.states_read) {
         if (static_cast<std::size_t>(state) >= anatomy_state_count) return RegistrationOutcome::state_out_of_range;
     }
+    for (const EngineInput input : descriptor.inputs_read) {
+        if (static_cast<std::size_t>(input) >= engine_input_count) return RegistrationOutcome::input_out_of_range;
+    }
     if (current_engine_version < descriptor.introduced) return RegistrationOutcome::introduced_after_engine;
     if (descriptor.prepared_values > maximum_prepared_values) return RegistrationOutcome::too_many_prepared_values;
     const RegistrationOutcome parameters = check_parameters(descriptor);
@@ -165,6 +168,10 @@ ParameterAssignment set_colour_parameter(PrimitiveParameterBlock& block, const P
     return ParameterAssignment::assigned;
 }
 
+bool EnginePrimitive::blank(const PrimitiveParameterBlock&) const noexcept {
+    return false;
+}
+
 PreparationOutcome EnginePrimitive::prepare(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
                                             PrimitivePreparation& preparation) const noexcept {
     const PrimitiveDescriptor& described = descriptor();
@@ -216,6 +223,7 @@ const char* registration_outcome_name(RegistrationOutcome outcome) noexcept {
     case RegistrationOutcome::default_out_of_range: return "default_out_of_range";
     case RegistrationOutcome::introduced_after_engine: return "introduced_after_engine";
     case RegistrationOutcome::too_many_prepared_values: return "too_many_prepared_values";
+    case RegistrationOutcome::input_out_of_range: return "input_out_of_range";
     }
     return "unknown";
 }

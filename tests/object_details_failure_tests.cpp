@@ -102,6 +102,49 @@ void operator delete(void* const memory, const std::align_val_t) noexcept { deta
 void operator delete[](void* const memory, const std::align_val_t) noexcept { details_allocation_probe::release_aligned(memory); }
 void operator delete(void* const memory, std::size_t, const std::align_val_t) noexcept { details_allocation_probe::release_aligned(memory); }
 void operator delete[](void* const memory, std::size_t, const std::align_val_t) noexcept { details_allocation_probe::release_aligned(memory); }
+// The nothrow forms too, so that every allocation (std::stable_sort's
+// temporary buffer, for one, uses nothrow new) meets the replaced delete
+// that frees it. A failure they would throw becomes a null result.
+void* operator new(const std::size_t bytes, const std::nothrow_t&) noexcept {
+    try {
+        void* const memory = details_allocation_probe::allocate(bytes);
+        return memory;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    }
+}
+void* operator new[](const std::size_t bytes, const std::nothrow_t&) noexcept {
+    try {
+        void* const memory = details_allocation_probe::allocate(bytes);
+        return memory;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    }
+}
+void* operator new(const std::size_t bytes, const std::align_val_t alignment, const std::nothrow_t&) noexcept {
+    try {
+        void* const memory = details_allocation_probe::allocate_aligned(bytes, static_cast<std::size_t>(alignment));
+        return memory;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    }
+}
+void* operator new[](const std::size_t bytes, const std::align_val_t alignment, const std::nothrow_t&) noexcept {
+    try {
+        void* const memory = details_allocation_probe::allocate_aligned(bytes, static_cast<std::size_t>(alignment));
+        return memory;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    }
+}
+void operator delete(void* const memory, const std::nothrow_t&) noexcept { std::free(memory); }
+void operator delete[](void* const memory, const std::nothrow_t&) noexcept { std::free(memory); }
+void operator delete(void* const memory, const std::align_val_t, const std::nothrow_t&) noexcept {
+    details_allocation_probe::release_aligned(memory);
+}
+void operator delete[](void* const memory, const std::align_val_t, const std::nothrow_t&) noexcept {
+    details_allocation_probe::release_aligned(memory);
+}
 
 namespace {
 using namespace gui_forms;

@@ -74,6 +74,14 @@ public:
     void record_motion_settled() noexcept;
     void record_motion_finished() noexcept;
     void set_motion_values_moving(std::uint64_t moving) noexcept;
+    // The engine's inputs: one change seen, and `parts` parts damaged over
+    // `area` because they read a changed input.
+    void record_engine_input_change() noexcept;
+    void record_engine_input_damage(std::uint64_t parts, double area) noexcept;
+    // An ambient part repainted for its effect, or an effect refused.
+    void record_engine_ambient_frame() noexcept;
+    void record_engine_ambient_refusal() noexcept;
+    void record_paint_group_refusals(std::uint64_t refusals) noexcept;
     void record_frame_callback_fault() noexcept;
     void record_reentrant_frame_poll() noexcept;
     void set_active_surface_count(std::size_t count) noexcept;

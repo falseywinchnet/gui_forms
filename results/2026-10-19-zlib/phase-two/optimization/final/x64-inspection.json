@@ -1,0 +1,8 @@
+{
+  "command": "clang++ --target=x86_64-apple-macos14 -std=c++20 -O3 -DNDEBUG -isysroot $(xcrun --sdk macosx --show-sdk-path) -march=x86-64 -mtune=generic -msse2 -mno-avx -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Iinclude -S src/core/compression/inflate.cpp -o build/inflate-release-benchmark-final/candidate-x64-baseline.s",
+  "exit_code": 0,
+  "executed_binary": false,
+  "source_sha256": "09d188197c8911803e7f70d024eb727a044d7809f87065d3ae4011665972b08f",
+  "header_sha256": "6f136007584e278c0ef20a9e8e74f0f445c4375aa127bcda2402faf1feb28ea0",
+  "assembly_sha256_after_whitespace_normalization": "a7f60ca0e7848d59366ca251b162d0607a1714cde7f4d0857e89ec0b9f9138b5"
+}
