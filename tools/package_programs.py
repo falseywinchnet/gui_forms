@@ -59,7 +59,58 @@ WINDOWS_SYSTEM_DLLS: frozenset[str] = frozenset({
 WINDOWS_FORBIDDEN_RUNTIME_DLL: re.Pattern[str] = re.compile(
     r"(libgcc_s_[a-z0-9_]+-\d+|libstdc\+\+-\d+|libgomp-\d+|libatomic-\d+|libssp-\d+|libquadmath-\d+"
     r"|libc\+\+|libc\+\+abi|libunwind|libwinpthread-\d+)\.dll", re.IGNORECASE)
+# The credit the FreeType License requires in the documentation of a binary
+# that uses FreeType (FTL section 3); THIRD_PARTY_NOTICES.md carries it.
+FREETYPE_CREDIT: str = ("Portions of this software are copyright \u00a9 2026 The FreeType Project "
+                        "(www.freetype.org). All rights reserved.")
+NOTICES_NAME: str = "THIRD_PARTY_NOTICES.md"
+# The title every GNU GPL, LGPL and AGPL text begins with; a package carries
+# none of them.
+GPL_TITLE: re.Pattern[str] = re.compile(r"GNU (LESSER |LIBRARY |AFFERO )?GENERAL PUBLIC LICENSE")
 LINUX_FALLBACK_DEPENDS: str = "libc6, libx11-6, libxcursor1, libatk1.0-0t64 | libatk1.0-0, libatk-bridge2.0-0t64 | libatk-bridge2.0-0"
+
+
+def check_package_notices(root: Path, platform: str, licenses: dict[str, Any], font_notices: list[str]) -> None:
+    """Raise RuntimeError unless the package at `root` is covered by its notices file.
+
+    See Packager.check_notices; a separate function so the tests can call it
+    on a fixture package.
+    """
+    notices_path = root / "licenses" / NOTICES_NAME
+    if not notices_path.is_file():
+        raise RuntimeError(f"the package lacks licenses/{NOTICES_NAME}")
+    notices = notices_path.read_text(encoding="utf-8")
+    if FREETYPE_CREDIT not in notices:
+        raise RuntimeError(f"licenses/{NOTICES_NAME} lacks the FreeType credit")
+    licence_files: list[str] = []
+    licences = root / "licenses"
+    for path in sorted(licences.rglob("*")):
+        if path.is_file() and path.name != NOTICES_NAME:
+            licence_files.append("licenses/" + path.relative_to(licences).as_posix())
+    for name in font_notices:
+        if name != "ATTRIBUTION.md" and (root / "fonts" / name).is_file():
+            licence_files.append("fonts/" + name)
+    for name in licence_files:
+        if name not in notices:
+            raise RuntimeError(f"{name} is shipped but not named in {NOTICES_NAME}")
+    for notice in licenses["notices"]:
+        component = notice.get("component")
+        platforms = notice.get("platforms")
+        if component is None or (platforms and platform not in platforms):
+            continue
+        if f"| {component} |" not in notices:
+            raise RuntimeError(f"{NOTICES_NAME} has no row for {component!r}")
+    for path in sorted(root.rglob("*")):
+        if "gpl" in path.name.lower():
+            raise RuntimeError(f"the package contains {path.relative_to(root).as_posix()}, whose name says GPL")
+        if not path.is_file() or path.suffix.lower() in (".exe", ".dll", ".dylib", ".so", ".ttf", ".otf", ".png", ".icns"):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        if GPL_TITLE.search(text):
+            raise RuntimeError(f"{path.relative_to(root).as_posix()} carries a GNU General Public License text")
 
 
 class ManifestError(ValueError):
@@ -365,13 +416,29 @@ class Packager:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
 
+    def check_notices(self, root: Path) -> None:
+        """Fail unless the package at `root` is covered by THIRD_PARTY_NOTICES.md.
+
+        `root` holds licenses/ and fonts/ (a bundle, or a macOS app's
+        Resources). The notices file must be in licenses/ and carry the
+        FreeType credit; every licence file under licenses/ and every font
+        licence in fonts/ must be named in it; every packaging/licenses.json
+        component that applies to this platform must have a row in its
+        table; and no file in the package may carry a GPL text or a name
+        containing "GPL".
+        """
+        check_package_notices(root, self.platform, json.loads(LICENSES_PATH.read_text(encoding="utf-8")),
+                              self.manifest.fonts["notices"])
+        self.log(f"  notices checked: {NOTICES_NAME}, FreeType credit, licence files named, no GPL text")
+
     def write_readme(self, destination: Path, program: Program, launch: str) -> None:
         (destination / "README.txt").write_text(
             f"{program.display_name} {self.version}\n\n{program.description}\n\n"
             f"Launch: {launch}\n"
             "Fonts ship beside the program; no host fonts are read.\n"
             f"Source and release notes: https://github.com/{self.manifest.vendor['repository']}\n"
-            "Third-party notices: licenses/ and the fonts' OFL files.\n", encoding="utf-8")
+            "Third-party notices: licenses/THIRD_PARTY_NOTICES.md, licenses/ and the fonts' licence files.\n",
+            encoding="utf-8")
 
     def write_package_manifest(self, destination: Path, program: Program, root: Path) -> None:
         files: dict[str, str] = {}
@@ -498,6 +565,7 @@ class Packager:
         self.copy_fonts(resources / "fonts")
         self.copy_notices(resources / "licenses")
         self.write_readme(resources, program, f"open \"{program.display_name}.app\"")
+        self.check_notices(resources)
         plist_path = app / "Contents/Info.plist"
         plist = plistlib.loads(plist_path.read_bytes())
         plist["CFBundleShortVersionString"] = self.version
@@ -662,6 +730,7 @@ class Packager:
         self.copy_fonts(bundle / "fonts")
         self.copy_notices(bundle / "licenses")
         self.write_readme(bundle, program, entry.executable)
+        self.check_notices(bundle)
         self.write_package_manifest(bundle, program, bundle)
         archive = self.out / names["archive"]
         archive.unlink(missing_ok=True)
@@ -735,6 +804,7 @@ class Packager:
         self.copy_fonts(bundle / "fonts")
         self.copy_notices(bundle / "licenses")
         self.write_readme(bundle, program, "./" + entry.executable + " (X11 display required)")
+        self.check_notices(bundle)
         self.write_package_manifest(bundle, program, bundle)
         archive = self.out / names["archive"]
         archive.unlink(missing_ok=True)

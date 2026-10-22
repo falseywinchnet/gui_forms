@@ -53,6 +53,23 @@ def check_windows_sdk_imports(sdk: Path) -> None:
         print(f'installed {dll.relative_to(sdk)}: imports {", ".join(own) if own else "system DLLs only"}', flush=True)
 
 
+def check_installed_notices(sdk: Path) -> None:
+    """Fail unless the installed SDK carries THIRD_PARTY_NOTICES.md with the
+    FreeType credit and no GPL text (the rules of package_programs.py)."""
+    from package_programs import FREETYPE_CREDIT, GPL_TITLE, NOTICES_NAME
+    licences: Path = sdk / 'share' / 'licenses' / 'GUIForms'
+    notices: Path = licences / NOTICES_NAME
+    if not notices.is_file() or FREETYPE_CREDIT not in notices.read_text(encoding='utf-8'):
+        raise RuntimeError(f'the installed SDK lacks {notices} or its FreeType credit')
+    path: Path
+    for path in sorted(licences.rglob('*')):
+        if 'gpl' in path.name.lower():
+            raise RuntimeError(f'the installed SDK ships {path.name}')
+        if path.is_file() and GPL_TITLE.search(path.read_text(encoding='utf-8', errors='replace')):
+            raise RuntimeError(f'the installed {path.name} carries a GNU General Public License text')
+    print(f'installed notices checked: {notices.relative_to(sdk)}', flush=True)
+
+
 def gallery_enabled(flag: bool, environ: dict[str, str]) -> bool:
     """Resolve whether the demo programs are configured.
 
@@ -179,6 +196,7 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     if sanitize:
         return
     run('cmake', '--install', toolkit)
+    check_installed_notices(sdk)
     if host == 'windows':
         check_windows_sdk_imports(sdk)
     examples: Path = build / 'installed-reference-examples'

@@ -135,6 +135,64 @@ class PlanTests(unittest.TestCase):
             self.assertEqual(gallery.built, build / "demo/GUI.Forms Gallery.exe")
 
 
+class NoticeCheckTests(unittest.TestCase):
+    """check_package_notices on a fixture package."""
+
+    def make_package(self, root: Path) -> dict[str, Any]:
+        (root / "licenses").mkdir()
+        (root / "fonts").mkdir()
+        lines = ["| Example | 1.0 | MIT | all | `licenses/Example.txt` | x |", pp.FREETYPE_CREDIT, "`fonts/OFL-Example.txt`"]
+        (root / "licenses" / pp.NOTICES_NAME).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        (root / "licenses" / "Example.txt").write_text("MIT License\n", encoding="utf-8")
+        (root / "fonts" / "OFL-Example.txt").write_text("SIL Open Font License\n", encoding="utf-8")
+        licenses = {"notices": [{"name": "Example.txt", "source": "x", "component": "Example"}]}
+        return licenses
+
+    def test_a_covered_package_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            licenses = self.make_package(root)
+            pp.check_package_notices(root, "windows-x64", licenses, ["OFL-Example.txt"])
+
+    def test_the_checked_in_notices_carry_the_freetype_credit(self) -> None:
+        text = (pp.ROOT / pp.NOTICES_NAME).read_text(encoding="utf-8")
+        self.assertIn(pp.FREETYPE_CREDIT, text)
+        self.assertIsNone(pp.GPL_TITLE.search(text))
+        data = json.loads(pp.LICENSES_PATH.read_text(encoding="utf-8"))
+        for notice in data["notices"]:
+            if notice.get("component"):
+                self.assertIn(f"| {notice['component']} |", text, notice["component"])
+
+    def test_each_defect_is_refused(self) -> None:
+        cases = (
+            ("credit", "lacks the FreeType credit"),
+            ("unnamed licence", "not named"),
+            ("missing row", "has no row"),
+            ("gpl text", "General Public License text"),
+            ("gpl name", "whose name says GPL"),
+        )
+        for case, message in cases:
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                licenses = self.make_package(root)
+                notices = root / "licenses" / pp.NOTICES_NAME
+                text = notices.read_text(encoding="utf-8")
+                if case == "credit":
+                    notices.write_text(text.replace(pp.FREETYPE_CREDIT, ""), encoding="utf-8")
+                elif case == "unnamed licence":
+                    (root / "licenses" / "Other.txt").write_text("BSD\n", encoding="utf-8")
+                elif case == "missing row":
+                    licenses["notices"].append({"name": "Absent.txt", "source": "y", "component": "Absent"})
+                elif case == "gpl text":
+                    (root / "README.txt").write_text("GNU GENERAL PUBLIC LICENSE\nVersion 2, June 1991\n",
+                                                     encoding="utf-8")
+                else:
+                    (root / "licenses" / "GPLv2.TXT").write_text("text\n", encoding="utf-8")
+                    notices.write_text(text + "`licenses/GPLv2.TXT`\n", encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError, message, msg=case):
+                    pp.check_package_notices(root, "windows-x64", licenses, ["OFL-Example.txt"])
+
+
 class StagingTests(unittest.TestCase):
     def test_placeholder_icon_is_a_png(self) -> None:
         data = pp.placeholder_png(8)
