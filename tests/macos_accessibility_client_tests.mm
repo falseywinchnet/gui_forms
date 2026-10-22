@@ -422,8 +422,7 @@ bool write_request(const std::string& dump_path, std::uint64_t request) {
     const std::string temporary = path + ".tmp";
     std::FILE* file = std::fopen(temporary.c_str(), "w");
     if (file == nullptr) return false;
-    const int printed = std::fprintf(file, "%llu
-", static_cast<unsigned long long>(request));
+    const int printed = std::fprintf(file, "%llu\n", static_cast<unsigned long long>(request));
     const int closed = std::fclose(file);
     if (printed <= 0 || closed != 0) return false;
     const int renamed = std::rename(temporary.c_str(), path.c_str());

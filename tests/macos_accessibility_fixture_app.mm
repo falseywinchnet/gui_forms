@@ -39,7 +39,9 @@
 // writes a new number after its last action and then waits for a dump with
 // that number and "settled" true reads a tree that reflects the action and
 // is quiet; it never infers quiet from timing. The writer's ticks run on the
-// main thread, after any AX action the client already completed there. The fixture variant adds two controls: "ax.disposable" and the
+// main thread, after any AX action the client already completed there.
+//
+// The fixture variant adds two controls: "ax.disposable" and the
 // button "ax.dispose", whose click removes and destroys "ax.disposable", so
 // the client can hold an element of a disposed control (interview GF017).
 //
