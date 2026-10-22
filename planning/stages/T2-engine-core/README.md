@@ -512,7 +512,9 @@ measures the cost per pixel within a rounded shadow's corners. It uses a box
 rounded to a circle, where every pixel is a corner pixel. The figure is net
 of the separable cost.
 
-The machine was the same, on 2026-10-22, under lighter load. The inset
+These two figures are **provisional** until the quiet-machine re-measure,
+which records the CPU load. The machine was the same, on 2026-10-22. The
+load was not sampled. It was lighter than in the E8c runs: the inset
 shadow, unchanged, measured 47.5–48.7 ns against 59.1 earlier. So each
 median is scaled by 1.25 and rounded up. There were seven runs, in
 nanoseconds per pixel:

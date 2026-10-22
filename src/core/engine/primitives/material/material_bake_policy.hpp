@@ -65,11 +65,12 @@ struct MaterialBakeCosts final {
 // at this workload (single runs measured below zero), so they carry
 // conservative upper figures rather than measurements. The runs are
 // recorded in planning/stages/T2-engine-core/README.md, "E8c bake costs".
-// outer_shadow and outer_corner were measured again for E9's separable
-// outer shadow, on the same machine on 2026-10-22 under lighter load: each
-// is the median of seven runs scaled by 1.25 (the earlier session's inset
-// shadow cost over this one's) and rounded up; see "E9 shadow costs" there.
-// The quiet-machine re-measure replaces every figure.
+// outer_shadow and outer_corner are PROVISIONAL: they were measured again
+// for E9's separable outer shadow, on the same machine on 2026-10-22, with
+// the CPU load not sampled (lighter than before, judged by the unchanged
+// inset shadow: 48 ns against 59). Each is the median of seven runs scaled
+// by 1.25 (that ratio) and rounded up; see "E9 shadow costs" there. The
+// quiet-machine re-measure, with the load recorded, replaces every figure.
 inline constexpr MaterialBakeCosts measured_material_costs{
     .base = 26.0,
     .solid = 10.0,
