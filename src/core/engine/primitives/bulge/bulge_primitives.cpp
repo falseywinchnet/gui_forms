@@ -472,6 +472,12 @@ const PrimitiveDescriptor& BulgePrimitive::descriptor() const noexcept {
     return smooth_descriptor;
 }
 
+// The amplitude is the first parameter of both bulges.
+bool BulgePrimitive::blank(const PrimitiveParameterBlock& parameters) const noexcept {
+    const bool flat = parameters.count > 0U && parameters.values[0].number == 0.0;
+    return flat;
+}
+
 void BulgePrimitive::derive(const PrimitiveParameterBlock&, const PrimitiveTarget&, std::span<double>) const noexcept {
     // The smooth form has no value worth keeping between frames.
 }
@@ -520,6 +526,11 @@ void BulgePrimitive::fill(const PrimitiveParameterBlock& parameters, const Primi
 
 const PrimitiveDescriptor& DitheredBulgePrimitive::descriptor() const noexcept {
     return dithered_descriptor;
+}
+
+bool DitheredBulgePrimitive::blank(const PrimitiveParameterBlock& parameters) const noexcept {
+    const bool flat = parameters.count > 0U && parameters.values[0].number == 0.0;
+    return flat;
 }
 
 // The preparation visits every dot of the lattice once, at amplitude 1, and

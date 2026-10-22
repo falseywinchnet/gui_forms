@@ -198,6 +198,22 @@ void Metrics::record_motion_finished() noexcept {
 void Metrics::set_motion_values_moving(std::uint64_t moving) noexcept {
     values_.motion_values_moving = moving;
 }
+void Metrics::record_engine_input_change() noexcept {
+    values_.engine_input_changes = values_.engine_input_changes + 1U;
+}
+void Metrics::record_engine_input_damage(std::uint64_t parts, double area) noexcept {
+    values_.engine_input_damaged_parts = values_.engine_input_damaged_parts + parts;
+    values_.engine_input_damage_area = values_.engine_input_damage_area + area;
+}
+void Metrics::record_engine_ambient_frame() noexcept {
+    values_.engine_ambient_frames = values_.engine_ambient_frames + 1U;
+}
+void Metrics::record_engine_ambient_refusal() noexcept {
+    values_.engine_ambient_refusals = values_.engine_ambient_refusals + 1U;
+}
+void Metrics::record_paint_group_refusals(std::uint64_t refusals) noexcept {
+    values_.paint_group_refusals = values_.paint_group_refusals + refusals;
+}
 void Metrics::record_frame_callback_fault() noexcept {
     ++values_.frame_callback_faults;
 }

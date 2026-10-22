@@ -1103,7 +1103,11 @@ void Ribbon::paint_groups(Painter& painter, const Layout& placed) const {
             part.states = parts.group_button.states;
             part.role = PartRole::face;
             part.bounds = parts.group_button.bounds;
+            // Keyed by the group (T2 GIVEN H3-1), so that the engine's
+            // built-in rules raise its dithered bulge while it is hot.
+            part.key = PartKey{"group_button", groups[group].stable_id, {}};
             paint_part(painter, *this, part);
+            part.key.reset();
             if (parts.group_button_icon.present) {
                 part.role = PartRole::icon;
                 part.bounds = parts.group_button_icon.bounds;
@@ -1166,7 +1170,12 @@ void Ribbon::paint_groups(Painter& painter, const Layout& placed) const {
             part.role = PartRole::face;
             part.states = face_states;
             part.bounds = command_part.command_face.bounds;
+            // Keyed by the command (T2 GIVEN H3-1): the engine's built-in
+            // rules draw its dithered bulge, flat at rest and rising while
+            // it is hot (GIVEN D3-1, G4-1).
+            part.key = PartKey{"command_face", spec.stable_id, {}};
             paint_part(painter, *this, part);
+            part.key.reset();
             if (command_part.command_arrow.present) {
                 part.role = PartRole::actuator;
                 part.states = command_part.command_arrow.states;

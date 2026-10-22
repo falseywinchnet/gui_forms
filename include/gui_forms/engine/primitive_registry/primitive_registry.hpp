@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/anatomy/types/anatomy_types.hpp"
+#include "gui_forms/engine/part_shape/part_shape.hpp"
 #include "gui_forms/engine/types/engine_types.hpp"
 #include "gui_forms/types/geometry/geometry.hpp"
 #include "gui_forms/types/paint_types/paint_types.hpp"
@@ -25,10 +26,15 @@ namespace gui_forms {
 enum class PrimitiveParameterKind : std::uint8_t {
     number,
     colour,
+    // One of the declaration's named choices (E8), such as a shape. The
+    // value is the choice's position, kept in `number`; theme data names it.
+    choice,
 };
 
 // One declared parameter. A number must lie in [minimum, maximum]. A colour's
-// alpha scales whatever the primitive uses the colour for.
+// alpha scales whatever the primitive uses the colour for. A choice is one
+// of `choices` (snake_case, each once), by position; `default_number` is the
+// default choice's position.
 //
 // An `animated` parameter is one a transition drives from frame to frame,
 // such as the bulge's amplitude during the ribbon's rise. A primitive's
@@ -42,6 +48,7 @@ struct PrimitiveParameterDeclaration final {
     double default_number{};
     Color default_colour{};
     bool animated{};
+    std::span<const std::string_view> choices{};
 };
 
 // A declared upper bound on a primitive's work. One rasterization costs at
@@ -77,6 +84,11 @@ struct PrimitiveDescriptor final {
     // How many values the primitive's preparation derives, at most
     // maximum_prepared_values; zero for a primitive that derives none.
     std::size_t prepared_values{};
+    // The engine inputs the primitive's output depends on (E6), read from
+    // PrimitiveTarget::inputs. A change to any other input never repaints
+    // it. Like animated parameters, inputs are never read by the
+    // preparation.
+    std::span<const EngineInput> inputs_read{};
 };
 
 inline constexpr std::size_t maximum_primitive_parameters = 24;
@@ -142,15 +154,25 @@ enum class ParameterAssignment : std::uint8_t {
 [[nodiscard]] ParameterAssignment set_colour_parameter(PrimitiveParameterBlock& block,
                                                        const PrimitiveDescriptor& descriptor,
                                                        std::string_view name, Color value) noexcept;
+// A choice by its name; an unknown choice is out_of_range.
+[[nodiscard]] ParameterAssignment set_choice_parameter(PrimitiveParameterBlock& block,
+                                                       const PrimitiveDescriptor& descriptor,
+                                                       std::string_view name, std::string_view choice) noexcept;
+// The position of `choice` among a choice parameter's choices, or none.
+[[nodiscard]] std::optional<std::size_t> find_choice(const PrimitiveParameterDeclaration& declaration,
+                                                     std::string_view choice) noexcept;
 
 // The part a primitive draws: its size in logical units (the box the
-// primitive's geometry is measured in), the display scale, and its
-// published states. The destination's extent is the caller's choice,
-// normally the logical size times the scale, rounded up.
+// primitive's geometry is measured in), the display scale, its published
+// states, and the engine inputs' values for it, by EngineInput (NaN for an
+// input that is not published, such as the pointer of a part that is not
+// hot). The destination's extent is the caller's choice, normally the
+// logical size times the scale, rounded up.
 struct PrimitiveTarget final {
     Size logical_size{};
     DeviceScale scale{};
     AnatomyStateSet states{};
+    std::array<double, engine_input_count> inputs{};
 };
 
 class EnginePrimitive;
@@ -220,6 +242,18 @@ public:
 
     [[nodiscard]] virtual const PrimitiveDescriptor& descriptor() const noexcept = 0;
 
+    // Whether the primitive draws nothing at all with `parameters`, such as
+    // a bulge at amplitude 0 (the flat plane): the engine then composites
+    // nothing and keeps no raster for the part (E7). False unless the
+    // primitive says otherwise. `parameters` match the declarations.
+    [[nodiscard]] virtual bool blank(const PrimitiveParameterBlock& parameters) const noexcept;
+
+    // The shape the primitive draws with `parameters`, its radius in
+    // logical units (E8): what the part's hit region derives from (design
+    // language §7.4 rule 1). A rectangle filling the box unless the
+    // primitive says otherwise. `parameters` match the declarations.
+    [[nodiscard]] virtual PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept;
+
     // Validates the target and the parameters, then derives the
     // preparation's values. Anything but `prepared` leaves `preparation`
     // unchanged. Its cost is the descriptor's preparation_per_device_pixel
@@ -265,6 +299,8 @@ enum class RegistrationOutcome : std::uint8_t {
     default_out_of_range,
     introduced_after_engine,
     too_many_prepared_values,
+    input_out_of_range,
+    choices_invalid,
 };
 
 [[nodiscard]] const char* registration_outcome_name(RegistrationOutcome outcome) noexcept;

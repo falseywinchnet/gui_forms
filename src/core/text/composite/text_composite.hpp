@@ -82,6 +82,9 @@ struct PartRasterSource final {
     std::size_t row_bytes{};
     std::int64_t left{};
     std::int64_t top{};
+    // The source's memory order: red first for a part raster, the target's
+    // own order for a paint group's image (Painter::begin_group).
+    TextPixelOrder order{TextPixelOrder::rgba};
 };
 
 // A part opacity in [0, 1] as the byte the blend reads: floor(o * 255 + 0.5),

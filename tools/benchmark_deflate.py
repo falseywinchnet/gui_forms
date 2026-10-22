@@ -115,7 +115,7 @@ def main():
         source = ROOT / 'stx_zlib/src/deflate.cpp'
         if args.profile:
             instrumented = source.read_text()
-            stages = ['adler', 'tokenize', 'prepare_dynamic', 'emit_tokens', 'encode_block']
+            stages = ['tokenize', 'prepare_dynamic', 'emit_tokens', 'encode_block']
             for index, stage in enumerate(stages):
                 start = instrumented.index('DeflateStream::' + stage + '(')
                 brace = instrumented.index('{', start)
@@ -152,7 +152,7 @@ struct Scope final {
                   '-I' + str(ROOT / 'stx_zlib/include'), '-I' + str(oracle)]
         executable = str(output / 'benchmark')
         command = [*common, '-Rpass=loop-vectorize', '-Rpass-missed=loop-vectorize',
-                   str(source), str(ROOT / 'stx_zlib/bench/deflate.cpp'),
+                   str(source), str(ROOT / 'stx_zlib/src/checksum.cpp'), str(ROOT / 'stx_zlib/bench/deflate.cpp'),
                    *objects, *link_flags, '-o', executable]
         commands.append(command)
         with (output / 'compiler.log').open('w') as log:

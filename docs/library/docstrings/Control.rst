@@ -142,6 +142,14 @@ classes
     and throws `std::invalid_argument`, changing nothing, for an invalid
     name; `add_class` and `remove_class` change one. A change repaints
     the control.
+ceremonial : default ``false``
+    Whether the application marks the control's surface ceremonial, as an
+    installer's or a first run's world (T2, decision B3-1). On it and its
+    descendants the theme engine's ambient effects may cover more than the
+    everyday 10 % of the window; nothing else changes. A theme never sets
+    it. A change repaints the control and its descendants.
+on_ceremonial_surface
+    Whether this control or one of its ancestors is marked `ceremonial`.
 cursor
     The pointer shape over the control, or none to use the parent's.
     `effective_cursor` resolves it; the default at the root is the arrow.

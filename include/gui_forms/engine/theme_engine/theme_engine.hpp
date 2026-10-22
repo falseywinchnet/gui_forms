@@ -1,7 +1,10 @@
 #pragma once
 
+#include "gui_forms/engine/part_table/engine_part_table.hpp"
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
 #include "gui_forms/engine/theme_rules/theme_rules.hpp"
+
+#include <optional>
 
 #include <cstdint>
 
@@ -9,6 +12,7 @@ namespace gui_forms {
 
 class Control;
 class Painter;
+class Window;
 struct PartPaint;
 
 // The theme engine's entry point (T2 plan, ThemeEngine). paint_part hands it
@@ -17,19 +21,30 @@ struct PartPaint;
 // Ownership: a Theme owns its engine, and every window showing the theme
 // shares it. An application's windows share one theme (ApplicationResources),
 // so they share one engine. The engine is immutable once its theme is made:
-// it holds the theme's compiled rules (the cascade, E4) and borrows the
+// it holds the theme's compiled rules (the cascade, E4), below them the
+// engine's own built-in rules (built_in_theme_rules, E7), and borrows the
 // built-in primitive registry. What changes from frame to frame belongs to
-// each window's EnginePartTable.
+// each window's EnginePartTable and MotionClock.
 //
 // The engine draws a part with a primitive only when the cascade selects a
 // registered primitive for the part, its parameters validate, the cost is
 // within budget (GIVEN F1-1) and the presentation is not forced high
 // contrast. In every other case the built-in recipe draws it: the body
-// paint_part had before the engine existed. A theme with no rules draws
-// every part with the built-in recipe, as before E4.
+// paint_part had before the engine existed. A theme with no rules of its
+// own draws every part with the built-in recipe except those the built-in
+// rules address: the ribbon's command faces and group buttons, which take
+// the dithered bulge and its rise, and the docking tiles, which fade in.
+//
+// A keyed part's transitions run on its window's motion clock (E7): the
+// part's states select each machine's state, the property moves toward it,
+// and the part repaints within its extent as it moves. Its opacity
+// multiplies a primitive's composite in the shared blend; a part the
+// built-in recipe draws is drawn as one paint group (Painter::begin_group)
+// composited once at that opacity. A part painted without a key stands at
+// its machines' targets and its ambient effect's pose.
 class ThemeEngine final {
 public:
-    // An engine with no rules.
+    // An engine with only the built-in rules.
     ThemeEngine();
     // An engine with `sheet` compiled against the built-in registry.
     // Invalid rules and declarations are dropped with diagnostics; nothing
@@ -80,7 +95,24 @@ public:
     // the built-in recipe draws it.
     void paint(Painter& painter, const Control& control, const PartPaint& part) const;
 
+    // The hit region of one part of `control` (E8, T1's hand-off): the
+    // part's bounds and the shape its primitive draws there, as plan()
+    // decides it. A part the built-in recipe draws, for any reason, has a
+    // rectangle. Themes choose a primitive's shape; they never set a hit
+    // region (design language §7.4 rule 1). Test a point with part_hit.
+    [[nodiscard]] PartHitRegion hit_region(const Control& control, const PartPaint& part) const noexcept;
+
 private:
+    // E7: an ambient part's time_in_state for this paint, starting its
+    // effect on the window's clock, or stopping it and returning the pose
+    // when the effect is refused for its area (`area_ok` false) or ambient
+    // motion is stopped. A part without a record is at its pose.
+    [[nodiscard]] static double ambient_seconds(Window& window, EnginePartRecord* record,
+                                                const std::optional<PartRecordHandle>& handle,
+                                                const AmbientEffect& ambient, bool area_ok);
+    // Stops the ambient effect of a part whose paint has none.
+    static void stop_ambient(Window& window, EnginePartRecord& record, PartRecordHandle handle) noexcept;
+
     // Borrowed: the built-in registry has static storage.
     const PrimitiveRegistry* registry_;
     CompiledThemeRules rules_{};
