@@ -99,7 +99,10 @@ def main() -> None:
                   '-I' + str(source_root / 'stx_zlib/include'), '-I' + str(oracle)]
         source = str(source_root / ('src/core/compression/inflate.cpp' if variant == 'baseline'
                                     else 'stx_zlib/src/inflate.cpp'))
-        run([*common, '-Rpass=loop-vectorize', '-Rpass-missed=loop-vectorize', source,
+        # The candidate's Adler-32 lives in stx_zlib/src/checksum.cpp; the
+        # baseline revision predates that file.
+        checksum = [] if variant == 'baseline' else [str(source_root / 'stx_zlib/src/checksum.cpp')]
+        run([*common, '-Rpass=loop-vectorize', '-Rpass-missed=loop-vectorize', source, *checksum,
              str(ROOT / 'tests/compression/inflate_benchmark.cpp'), *objects, '-o', variant], variant + '-compiler.log')
         run([*common, '-S', source, '-o', variant + '.s'])
         run([*common, '-fstack-usage', '-c', source, '-o', variant + '-stack.o'])

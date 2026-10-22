@@ -299,89 +299,101 @@ std::span<const DrawingCommand> GraphicsRecorder::commands() const {
     return commands_;
 }
 
+namespace {
+
+// The fields of one command's trace entry that its kind carries.
+void append_command_fields(const DrawingCommand& command, std::string& trace) {
+    switch (command.kind) {
+    case CommandKind::save:
+    case CommandKind::restore:
+        trace += "|token=" + std::to_string(command.token.value);
+        return;
+    case CommandKind::translate:
+        trace += "|offset=" + point_text(command.first);
+        return;
+    case CommandKind::set_clip:
+        trace += "|rect=" + rect_text(command.rect);
+        return;
+    case CommandKind::clear:
+        trace += "|color=" + color_text(command.color);
+        return;
+    case CommandKind::fill_rectangle:
+        trace += "|rect=" + rect_text(command.rect) +
+                 "|brush=" + brush_text(command.brush);
+        return;
+    case CommandKind::draw_rectangle:
+        trace += "|rect=" + rect_text(command.rect) +
+                 "|pen=" + pen_text(command.pen);
+        return;
+    case CommandKind::draw_line:
+        trace += "|from=" + point_text(command.first) +
+                 "|to=" + point_text(command.second) +
+                 "|pen=" + pen_text(command.pen);
+        return;
+    case CommandKind::draw_string:
+        trace += "|at=" + point_text(command.first) +
+                 "|font=" + escaped(command.font.family) + "," +
+                 number(command.font.size) + "," +
+                 std::to_string(command.font.style) +
+                 "|brush=" + color_text(command.color) +
+                 "|format=" + std::to_string(static_cast<unsigned>(command.format.alignment)) +
+                 "," + std::to_string(static_cast<unsigned>(command.format.line_alignment)) +
+                 "," + std::to_string(static_cast<unsigned>(command.format.trimming)) +
+                 "," + std::to_string(command.format.flags) +
+                 "|text=" + escaped(command.text);
+        return;
+    case CommandKind::draw_ellipse:
+        trace += "|bounds=" + rect_text(command.rect) +
+                 "|pen=" + pen_text(command.pen);
+        return;
+    case CommandKind::fill_ellipse:
+        trace += "|bounds=" + rect_text(command.rect) +
+                 "|brush=" + brush_text(command.brush);
+        return;
+    case CommandKind::fill_polygon:
+        trace += "|fill=" +
+                 std::to_string(static_cast<unsigned>(command.path.fill_mode)) +
+                 "|points=" + points_text(command.points) +
+                 "|brush=" + brush_text(command.brush);
+        return;
+    case CommandKind::draw_path:
+        trace += "|path=" + path_text(command.path) +
+                 "|pen=" + pen_text(command.pen);
+        return;
+    case CommandKind::fill_path:
+        trace += "|path=" + path_text(command.path) +
+                 "|brush=" + brush_text(command.brush);
+        return;
+    case CommandKind::draw_image:
+        trace += "|image=" + std::to_string(command.image.stable_id) + "," +
+                 std::to_string(command.image.width) + "," +
+                 std::to_string(command.image.height) + "," +
+                 std::to_string(static_cast<unsigned>(command.image.pixel_format)) +
+                 "," + std::to_string(command.image.generation) +
+                 "|destination=" + rect_text(command.rect) +
+                 "|source=" + point_text(command.first) + "," +
+                 point_text(command.second) +
+                 "|attributes=" + image_attributes_text(command.image_attributes);
+        return;
+    case CommandKind::set_transform:
+    case CommandKind::reset_clip:
+    case CommandKind::set_quality:
+        // Their effect is the state every entry traces after its fields.
+        return;
+    }
+    // A kind outside the enumeration carries no fields of its own.
+    return;
+}
+
+} // namespace
+
 std::string GraphicsRecorder::deterministic_trace() const {
     require_alive();
     std::string trace = "gui.drawing.trace/v1\n";
     for (std::size_t index = 0; index < commands_.size(); ++index) {
         const DrawingCommand& command = commands_[index];
         trace += std::to_string(index) + "|" + command_name(command.kind);
-        switch (command.kind) {
-        case CommandKind::save:
-        case CommandKind::restore:
-            trace += "|token=" + std::to_string(command.token.value);
-            break;
-        case CommandKind::translate:
-            trace += "|offset=" + point_text(command.first);
-            break;
-        case CommandKind::set_clip:
-            trace += "|rect=" + rect_text(command.rect);
-            break;
-        case CommandKind::clear:
-            trace += "|color=" + color_text(command.color);
-            break;
-        case CommandKind::fill_rectangle:
-            trace += "|rect=" + rect_text(command.rect) +
-                     "|brush=" + brush_text(command.brush);
-            break;
-        case CommandKind::draw_rectangle:
-            trace += "|rect=" + rect_text(command.rect) +
-                     "|pen=" + pen_text(command.pen);
-            break;
-        case CommandKind::draw_line:
-            trace += "|from=" + point_text(command.first) +
-                     "|to=" + point_text(command.second) +
-                     "|pen=" + pen_text(command.pen);
-            break;
-        case CommandKind::draw_string:
-            trace += "|at=" + point_text(command.first) +
-                     "|font=" + escaped(command.font.family) + "," +
-                     number(command.font.size) + "," +
-                     std::to_string(command.font.style) +
-                     "|brush=" + color_text(command.color) +
-                     "|format=" + std::to_string(static_cast<unsigned>(command.format.alignment)) +
-                     "," + std::to_string(static_cast<unsigned>(command.format.line_alignment)) +
-                     "," + std::to_string(static_cast<unsigned>(command.format.trimming)) +
-                     "," + std::to_string(command.format.flags) +
-                     "|text=" + escaped(command.text);
-            break;
-        case CommandKind::draw_ellipse:
-            trace += "|bounds=" + rect_text(command.rect) +
-                     "|pen=" + pen_text(command.pen);
-            break;
-        case CommandKind::fill_ellipse:
-            trace += "|bounds=" + rect_text(command.rect) +
-                     "|brush=" + brush_text(command.brush);
-            break;
-        case CommandKind::fill_polygon:
-            trace += "|fill=" +
-                     std::to_string(static_cast<unsigned>(command.path.fill_mode)) +
-                     "|points=" + points_text(command.points) +
-                     "|brush=" + brush_text(command.brush);
-            break;
-        case CommandKind::draw_path:
-            trace += "|path=" + path_text(command.path) +
-                     "|pen=" + pen_text(command.pen);
-            break;
-        case CommandKind::fill_path:
-            trace += "|path=" + path_text(command.path) +
-                     "|brush=" + brush_text(command.brush);
-            break;
-        case CommandKind::draw_image:
-            trace += "|image=" + std::to_string(command.image.stable_id) + "," +
-                     std::to_string(command.image.width) + "," +
-                     std::to_string(command.image.height) + "," +
-                     std::to_string(static_cast<unsigned>(command.image.pixel_format)) +
-                     "," + std::to_string(command.image.generation) +
-                     "|destination=" + rect_text(command.rect) +
-                     "|source=" + point_text(command.first) + "," +
-                     point_text(command.second) +
-                     "|attributes=" + image_attributes_text(command.image_attributes);
-            break;
-        case CommandKind::set_transform:
-        case CommandKind::reset_clip:
-        case CommandKind::set_quality:
-            break;
-        }
+        append_command_fields(command, trace);
         trace += "|transform=" + matrix_text(command.state.transform);
         trace += command.state.clip ? "|clip=" + rect_text(*command.state.clip) : "|clip=none";
         trace += "|quality=" +

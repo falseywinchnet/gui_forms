@@ -268,8 +268,8 @@ void incoming(Runtime &runtime, NativeWindow &window, const char *type,
   if (image) {
     const HostClipboardImageResult result =
         (*window.services).read_clipboard_image();
-    require(result.has_image && result.image.width == 256 &&
-                result.image.height == 256,
+    require(result.image.has_value() && (*result.image).width == 256 &&
+                (*result.image).height == 256,
             "External PNG clipboard decode failed");
   } else if (std::string_view(type) == "text/uri-list" ||
              std::string_view(type) == "x-special/gnome-copied-files") {

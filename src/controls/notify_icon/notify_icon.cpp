@@ -179,20 +179,30 @@ HostServiceStatus NotifyIcon::show_balloon_tip(std::string title, std::string te
 
 void NotifyIcon::on_tray_event(const HostTrayIconEvent& event) {
     if (!is_alive() || event.icon_id != icon_id_ || current_services() != services_) return;
-    if (event.action == HostTrayIconAction::click) {
+    switch (event.action) {
+    case HostTrayIconAction::click: {
         const NotifyIconClick clicked{PointerButton::primary};
         click_.emit(clicked);
-    } else if (event.action == HostTrayIconAction::double_click) {
+        return;
+    }
+    case HostTrayIconAction::double_click:
         double_click_.emit();
-    } else if (event.action == HostTrayIconAction::context) {
+        return;
+    case HostTrayIconAction::context: {
         const NotifyIconClick clicked{PointerButton::secondary};
         click_.emit(clicked);
         if (is_alive()) show_menu();
-    } else if (event.action == HostTrayIconAction::notification_clicked) {
-        balloon_tip_clicked_.emit();
-    } else if (event.action == HostTrayIconAction::notification_closed) {
-        balloon_tip_closed_.emit();
+        return;
     }
+    case HostTrayIconAction::notification_clicked:
+        balloon_tip_clicked_.emit();
+        return;
+    case HostTrayIconAction::notification_closed:
+        balloon_tip_closed_.emit();
+        return;
+    }
+    // An action outside the enumeration raises nothing.
+    return;
 }
 
 // Shows the context menu's rows natively, then runs the chosen row's command.

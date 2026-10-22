@@ -136,15 +136,36 @@ class PromotionTests(unittest.TestCase):
                     self.assertEqual(updated['runner_image_version'], 'producer-image')
                     self.assertEqual(updated['validation_provenance']['run_id'], '10')
                     self.assertEqual(promoted.extractfile('.ccache/object').read(), b'bytes')
-                archive.write_bytes(archive.read_bytes() + b'corruption')
-                with self.assertRaisesRegex(ValueError, 'digest mismatch'):
-                    ci_promote.promote_archive()
+                corrupted: bytes = archive.read_bytes() + b'corruption'
+                archive.write_bytes(corrupted)
+                downloads: list[int] = []
+
+                def download_corrupted(artifact_id: int, target: Path) -> None:
+                    downloads.append(artifact_id)
+                    target.write_bytes(corrupted)
+
+                # A mismatch is downloaded again from the receipt's artifact, then refused.
+                with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'owner/repo'}),                         patch.object(ci_reuse, 'download_archive', side_effect=download_corrupted):
+                    with self.assertRaisesRegex(ValueError, 'digest mismatch'):
+                        ci_promote.promote_archive()
+                self.assertEqual(len(downloads), ci_reuse.ARCHIVE_DOWNLOADS)
 
     def test_manifest_must_match_receipt(self) -> None:
         fixture: PromotionAPI = PromotionAPI()
         manifest: dict[str, Any] = {'revision': 'wrong', 'compiler': 'compiler', 'platform': 'linux-x64'}
         with self.assertRaisesRegex(ValueError, 'match validated producer'):
             ci_promote.promoted_manifest(manifest, fixture.receipt, fixture.identity)
+
+
+
+class SeedRestoreTests(unittest.TestCase):
+    def test_an_unverifiable_seed_is_skipped_not_fatal(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state: Path = Path(directory)
+            ci_reuse.write_json(state / 'inputs.json', {'platform': 'linux-x64'})
+            with patch.object(ci_reuse, 'STATE', state),                     patch.object(ci_reuse, 'restore_archive',
+                                 side_effect=ValueError('Reused cache archive digest mismatch')):
+                ci_promote.restore_seed()
 
 
 if __name__ == '__main__':
