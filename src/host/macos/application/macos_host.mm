@@ -774,6 +774,22 @@ NSString* native_accessibility_role(SemanticRole role) {
     // with the AXTabPanel subrole (accessibilitySubrole).
     case SemanticRole::pane: return NSAccessibilityGroupRole;
     case SemanticRole::tab_panel: return NSAccessibilityGroupRole;
+    // The stage A vocabulary (12.13), as AppKit's outline and table views
+    // and WebKit publish them: a tree and a tree grid are outlines, a tree
+    // item and a table row are rows, a cell and a header are cells, and a
+    // dialog, a status bar and a live region are groups told apart by their
+    // subroles (accessibilitySubrole).
+    case SemanticRole::tree: return NSAccessibilityOutlineRole;
+    case SemanticRole::tree_item: return NSAccessibilityRowRole;
+    case SemanticRole::table: return NSAccessibilityTableRole;
+    case SemanticRole::row: return NSAccessibilityRowRole;
+    case SemanticRole::cell: return NSAccessibilityCellRole;
+    case SemanticRole::column_header: return NSAccessibilityCellRole;
+    case SemanticRole::row_header: return NSAccessibilityCellRole;
+    case SemanticRole::tree_grid: return NSAccessibilityOutlineRole;
+    case SemanticRole::dialog: return NSAccessibilityGroupRole;
+    case SemanticRole::status_bar: return NSAccessibilityGroupRole;
+    case SemanticRole::live_region: return NSAccessibilityGroupRole;
     case SemanticRole::generic: return NSAccessibilityGroupRole;
     case SemanticRole::count: return NSAccessibilityGroupRole;
     }
@@ -1013,7 +1029,11 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 }
 
 - (BOOL)isAccessibilityElement { return YES; }
-- (NSString*)accessibilityRole { return native_accessibility_role(_node.role); }
+// A text box whose text runs over several lines is AppKit's text area.
+- (NSString*)accessibilityRole {
+    if (_node.role == SemanticRole::text_box && _node.multiline) return NSAccessibilityTextAreaRole;
+    return native_accessibility_role(_node.role);
+}
 - (NSString*)accessibilityLabel { return native_string(_node.name); }
 - (NSString*)accessibilityHelp { return native_string(_node.description); }
 - (NSString*)accessibilityIdentifier { return native_string(_node.stable_id); }
@@ -1048,10 +1068,41 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 // AppKit declares no constant for the tab-panel subrole; WebKit publishes
 // ARIA tab panels with this one. A tab is a radio button with AppKit's
 // tab-button subrole, as NSTabView's tabs are.
+// A tree item is an outline row; a dialog, a status bar and a live region
+// carry WebKit's subroles for them.
 - (NSString*)accessibilitySubrole {
     if (_node.role == SemanticRole::tab_panel) return @"AXTabPanel";
     if (_node.role == SemanticRole::tab) return NSAccessibilityTabButtonSubrole;
+    if (_node.role == SemanticRole::tree_item) return NSAccessibilityOutlineRowSubrole;
+    if (_node.role == SemanticRole::dialog) return @"AXApplicationDialog";
+    if (_node.role == SemanticRole::status_bar) return @"AXApplicationStatus";
+    if (_node.role == SemanticRole::live_region) return @"AXApplicationLog";
     return [super accessibilitySubrole];
+}
+// A tree item's depth, counting from zero as AppKit does.
+- (NSInteger)accessibilityDisclosureLevel {
+    if (!_node.level || *_node.level == 0) return 0;
+    return static_cast<NSInteger>(*_node.level - 1);
+}
+// A row's, cell's or header's place in its table, counting from zero, and a
+// table's size.
+- (NSRange)accessibilityRowIndexRange {
+    if (!_node.row_index || *_node.row_index == 0) return NSMakeRange(NSNotFound, 0);
+    return NSMakeRange(static_cast<NSUInteger>(*_node.row_index - 1), 1);
+}
+- (NSRange)accessibilityColumnIndexRange {
+    if (!_node.column_index || *_node.column_index == 0) return NSMakeRange(NSNotFound, 0);
+    return NSMakeRange(static_cast<NSUInteger>(*_node.column_index - 1), 1);
+}
+- (NSInteger)accessibilityRowCount {
+    return _node.row_count ? static_cast<NSInteger>(*_node.row_count) : 0;
+}
+- (NSInteger)accessibilityColumnCount {
+    return _node.column_count ? static_cast<NSInteger>(*_node.column_count) : 0;
+}
+// A dialog that blocks the rest of its window.
+- (BOOL)isAccessibilityModal {
+    return _node.modal ? YES : NO;
 }
 // A tab list's orientation.
 - (NSAccessibilityOrientation)accessibilityOrientation {

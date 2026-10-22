@@ -113,6 +113,22 @@ inline void append_node(std::ostringstream& stream, const SemanticNode& node) {
     } else {
         stream << "null";
     }
+    stream << ",\"level\":";
+    append_count(stream, node.level);
+    stream << ",\"modal\":" << (node.modal ? "true" : "false");
+    stream << ",\"row_index\":";
+    append_count(stream, node.row_index);
+    stream << ",\"column_index\":";
+    append_count(stream, node.column_index);
+    stream << ",\"row_count\":";
+    append_count(stream, node.row_count);
+    stream << ",\"column_count\":";
+    append_count(stream, node.column_count);
+    stream << ",\"access_key\":";
+    append_string(stream, node.access_key);
+    stream << ",\"small_step\":";
+    append_number(stream, node.small_step);
+    stream << ",\"multiline\":" << (node.multiline ? "true" : "false");
     stream << ",\"states\":" << static_cast<std::uint32_t>(node.states) << ",\"actions\":[";
     for (std::size_t index = 0; index < node.actions.size(); ++index) {
         if (index != 0U) stream << ',';

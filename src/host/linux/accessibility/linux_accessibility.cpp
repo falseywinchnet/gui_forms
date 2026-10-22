@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <locale>
 #include <map>
+#include <optional>
 #include <poll.h>
 #include <sstream>
 #include <string>
@@ -43,6 +44,9 @@ struct NodeData {
     NodeKey key;
     // The node's actions in published order: the default action first.
     std::vector<SemanticAction> actions;
+    // The default action's key binding (action_keybinding), from the node's
+    // access key; empty without one. Rebuilt with the node.
+    std::string keybinding;
     AtkObject* parent = nullptr;
     std::vector<AtkObject*> children;
     int index = 0;
@@ -92,6 +96,20 @@ AtkRole native_role(SemanticRole role) {
     // the ARIA core mapping publish a tab panel on ATK.
     case SemanticRole::pane: return ATK_ROLE_PANEL;
     case SemanticRole::tab_panel: return ATK_ROLE_SCROLL_PANE;
+    // The stage A vocabulary (12.13). A tree grid is ATK's tree table; ATK
+    // has no live-region role, so a live region is a panel with the
+    // "live" and "container-live" attributes, as browsers publish one.
+    case SemanticRole::tree: return ATK_ROLE_TREE;
+    case SemanticRole::tree_item: return ATK_ROLE_TREE_ITEM;
+    case SemanticRole::table: return ATK_ROLE_TABLE;
+    case SemanticRole::row: return ATK_ROLE_TABLE_ROW;
+    case SemanticRole::cell: return ATK_ROLE_TABLE_CELL;
+    case SemanticRole::column_header: return ATK_ROLE_COLUMN_HEADER;
+    case SemanticRole::row_header: return ATK_ROLE_ROW_HEADER;
+    case SemanticRole::tree_grid: return ATK_ROLE_TREE_TABLE;
+    case SemanticRole::dialog: return ATK_ROLE_DIALOG;
+    case SemanticRole::status_bar: return ATK_ROLE_STATUSBAR;
+    case SemanticRole::live_region: return ATK_ROLE_PANEL;
     case SemanticRole::split_pane: return ATK_ROLE_SPLIT_PANE;
     case SemanticRole::date_picker: return ATK_ROLE_DATE_EDITOR;
     case SemanticRole::calendar: return ATK_ROLE_CALENDAR;
@@ -121,7 +139,8 @@ constexpr StateMapping state_mappings[] = {
     {SemanticState::selected, ATK_STATE_SELECTED}, {SemanticState::checked, ATK_STATE_CHECKED},
     {SemanticState::mixed, ATK_STATE_INDETERMINATE}, {SemanticState::expanded, ATK_STATE_EXPANDED},
     {SemanticState::busy, ATK_STATE_BUSY}, {SemanticState::read_only, ATK_STATE_READ_ONLY},
-    {SemanticState::invalid, ATK_STATE_INVALID_ENTRY}};
+    {SemanticState::invalid, ATK_STATE_INVALID_ENTRY},
+    {SemanticState::checkable, ATK_STATE_CHECKABLE}, {SemanticState::multiselectable, ATK_STATE_MULTISELECTABLE}};
 
 // The ATK states of a live node, one bit per AtkStateType.
 using StateBits = std::uint64_t;
@@ -138,9 +157,10 @@ bool has_action(const std::vector<SemanticAction>& actions, SemanticAction wante
 }
 
 // The mapped semantic states, and the states ATK derives from the role and
-// actions: editable for a writable text box, checkable for the check and
-// radio roles, expandable for a node that expands or collapses, selectable
-// for one that can be selected, has-popup, and the tab list's orientation.
+// actions: editable and single- or multi-line for a text box, checkable for
+// the check and radio roles, expandable for a node that expands or
+// collapses, selectable for one that can be selected, has-popup, and the
+// tab list's orientation.
 StateBits state_bits(const SemanticNode& node) {
     StateBits bits = 0U;
     for (const StateMapping& mapping : state_mappings) {
@@ -148,6 +168,9 @@ StateBits state_bits(const SemanticNode& node) {
     }
     if (node.role == SemanticRole::text_box && !has_semantic_state(node.states, SemanticState::read_only)) {
         bits |= state_bit(ATK_STATE_EDITABLE);
+    }
+    if (node.role == SemanticRole::text_box) {
+        bits |= state_bit(node.multiline ? ATK_STATE_MULTI_LINE : ATK_STATE_SINGLE_LINE);
     }
     if (node.role == SemanticRole::check_box || node.role == SemanticRole::check_list_item ||
         node.role == SemanticRole::radio_button) {
@@ -159,6 +182,7 @@ StateBits state_bits(const SemanticNode& node) {
     }
     if (has_action(node.actions, SemanticAction::select)) bits |= state_bit(ATK_STATE_SELECTABLE);
     if (node.has_popup) bits |= state_bit(ATK_STATE_HAS_POPUP);
+    if (node.modal) bits |= state_bit(ATK_STATE_MODAL);
     if (node.orientation) {
         const bool row = *node.orientation == SemanticOrientation::horizontal;
         bits |= state_bit(row ? ATK_STATE_HORIZONTAL : ATK_STATE_VERTICAL);
@@ -262,20 +286,41 @@ AtkRelationSet* relations(AtkObject* object) {
     if (panel != nullptr) { atk_relation_set_add_relation_by_type(set, ATK_RELATION_CONTROLLER_FOR, panel); }
     return set;
 }
-// Position in set and set size as the object attributes "posinset" and
-// "setsize", which AT-SPI clients read.
-AtkAttributeSet* add_attribute(AtkAttributeSet* set, const char* name, std::size_t number) {
+// The object attributes AT-SPI clients read, as browsers publish them:
+// "posinset" and "setsize" (published together), a tree item's "level", a
+// table's "rowcount" and "colcount", a row's, cell's or header's
+// "rowindex" and "colindex" (all counting from one), and a live region's
+// "live" and "container-live" ("polite").
+AtkAttributeSet* add_attribute(AtkAttributeSet* set, const char* name, const char* text) {
     AtkAttribute* attribute = g_new(AtkAttribute, 1);
     (*attribute).name = g_strdup(name);
-    (*attribute).value = g_strdup(std::to_string(number).c_str());
+    (*attribute).value = g_strdup(text);
     return g_slist_prepend(set, attribute);
+}
+AtkAttributeSet* add_count(AtkAttributeSet* set, const char* name, const std::optional<std::size_t>& number) {
+    if (!number) return set;
+    const std::string text = std::to_string(*number);
+    AtkAttributeSet* result = add_attribute(set, name, text.c_str());
+    return result;
 }
 AtkAttributeSet* attributes(AtkObject* object) {
     const NodeData& value = data(object);
     AtkAttributeSet* set = nullptr;
-    if (!value.live || !value.node.position_in_set || !value.node.set_size) { return set; }
-    set = add_attribute(set, "setsize", *value.node.set_size);
-    set = add_attribute(set, "posinset", *value.node.position_in_set);
+    if (!value.live) { return set; }
+    const SemanticNode& node = value.node;
+    if (node.position_in_set && node.set_size) {
+        set = add_count(set, "setsize", node.set_size);
+        set = add_count(set, "posinset", node.position_in_set);
+    }
+    set = add_count(set, "level", node.level);
+    set = add_count(set, "rowindex", node.row_index);
+    set = add_count(set, "colindex", node.column_index);
+    set = add_count(set, "rowcount", node.row_count);
+    set = add_count(set, "colcount", node.column_count);
+    if (node.role == SemanticRole::live_region) {
+        set = add_attribute(set, "live", "polite");
+        set = add_attribute(set, "container-live", "polite");
+    }
     return set;
 }
 void class_init(gpointer raw, gpointer) {
@@ -295,6 +340,13 @@ const gchar* action_name(AtkAction* object, gint index) {
     const std::vector<SemanticAction>& actions = data(object).actions;
     return index >= 0 && static_cast<std::size_t>(index) < actions.size() ? semantic_action_name(actions[index]) : nullptr;
 }
+// The default action's key binding, "<Alt>key;;" (mnemonic, no sequence, no
+// shortcut), for a node with an access key; the others have none.
+const gchar* action_keybinding(AtkAction* object, gint index) {
+    const NodeData& value = data(object);
+    if (index != 0 || value.keybinding.empty()) return nullptr;
+    return value.keybinding.c_str();
+}
 gboolean do_action(AtkAction* object, gint index) {
     const std::vector<SemanticAction>& actions = data(object).actions;
     if (index < 0 || static_cast<std::size_t>(index) >= actions.size()) { return false; }
@@ -304,7 +356,7 @@ gboolean do_action(AtkAction* object, gint index) {
 void action_init(gpointer raw, gpointer) {
     AtkActionIface& face = *static_cast<AtkActionIface*>(raw);
     face.get_n_actions = action_count; face.get_name = action_name; face.get_localized_name = action_name;
-    face.do_action = do_action;
+    face.do_action = do_action; face.get_keybinding = action_keybinding;
 }
 void extents(AtkComponent* object, gint* x, gint* y, gint* width, gint* height, AtkCoordType coordinates);
 gboolean contains(AtkComponent* object, gint x, gint y, AtkCoordType coordinates) {
@@ -344,9 +396,15 @@ void set_value(AtkValue* object, gdouble value) {
     std::ostringstream text; text.imbue(std::locale::classic()); text.precision(17); text << value;
     static_cast<void>(perform(object, SemanticAction::set_value, text.str()));
 }
+// A range node's small step; zero when it publishes none.
+gdouble increment(AtkValue* object) {
+    const gdouble step = data(object).node.small_step.value_or(0.0);
+    return step;
+}
 void value_init(gpointer raw, gpointer) {
     AtkValueIface& face = *static_cast<AtkValueIface*>(raw);
     face.get_value_and_text = value_and_text; face.get_range = range; face.set_value = set_value;
+    face.get_increment = increment;
 }
 gchar* text(AtkText* object, gint start, gint end) {
     const std::string& value = data(object).node.value;
@@ -451,6 +509,12 @@ struct LinuxAccessibility::Impl {
         value.children.clear();
         value.flags = flags; value.owner = this; value.key = key; value.node = node; value.node.children.clear(); value.live = true;
         order_actions(node.actions, value.actions);
+        value.keybinding.clear();
+        if (!node.access_key.empty()) {
+            gchar* key = g_utf8_strdown(node.access_key.c_str(), -1);
+            value.keybinding = std::string("<Alt>") + key + ";;";
+            g_free(key);
+        }
         value.parent = parent; value.index = index;
         data(parent).children.push_back(object);
         if (!created && old_name != node.name) { g_object_notify(G_OBJECT(object), "accessible-name"); }

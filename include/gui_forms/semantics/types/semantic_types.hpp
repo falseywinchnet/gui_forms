@@ -1,10 +1,12 @@
 #pragma once
 
+#include "gui_forms/text/types/text_types.hpp"
 #include "gui_forms/types.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -15,8 +17,12 @@ namespace gui_forms {
 // separate menu arrow) and menu_button (a button that opens a menu) were
 // admitted with the ribbon plan (owner decision RB-22, 12.8); pane (a tool
 // panel or another F6 region) and tab_panel (the content a tab shows) with
-// the docking plan (owner decisions DK-35 and DK-40, 12.10). `count` is not
-// a role; it sizes tables over the roles.
+// the docking plan (owner decisions DK-35 and DK-40, 12.10). The stage A
+// vocabulary (owner, 2026-10-21, 12.13) admitted tree and tree_item (a
+// hierarchy of items), table, row, cell, column_header and row_header (a
+// grid of cells), tree_grid (a table whose rows are tree items), dialog,
+// status_bar, and live_region (a region whose changes are announced, owner
+// decision DK-51). `count` is not a role; it sizes tables over the roles.
 enum class SemanticRole : std::uint8_t {
     generic, group, static_text, button, check_box, radio_button, link,
     text_box, list, list_item, check_list_item, combo_box, slider,
@@ -24,7 +30,8 @@ enum class SemanticRole : std::uint8_t {
     numeric_field, tool_tip, date_picker, calendar, date_cell, property_grid,
     property_group, property_row, menu_bar, menu_bar_item, menu, menu_item,
     separator, toolbar, radio_group, split_button, menu_button, pane,
-    tab_panel,
+    tab_panel, tree, tree_item, table, row, cell, column_header, row_header,
+    tree_grid, dialog, status_bar, live_region,
     count,
 };
 
@@ -47,6 +54,21 @@ enum class SemanticState : std::uint32_t {
     busy = 1U << 9U,
     protected_content = 1U << 10U,
     invalid = 1U << 11U,
+    // Admitted with the stage A vocabulary (12.13): the node can be checked
+    // (a check box, a toggle button, a checkable menu item, a docking pin),
+    // whether or not it is now; it selects more than one of its items at a
+    // time.
+    checkable = 1U << 12U,
+    multiselectable = 1U << 13U,
+};
+
+// Every semantic state, in bit order, for tables and the schema export.
+inline constexpr SemanticState semantic_states[] = {
+    SemanticState::enabled, SemanticState::visible, SemanticState::focusable,
+    SemanticState::focused, SemanticState::selected, SemanticState::checked,
+    SemanticState::mixed, SemanticState::read_only, SemanticState::expanded,
+    SemanticState::busy, SemanticState::protected_content, SemanticState::invalid,
+    SemanticState::checkable, SemanticState::multiselectable,
 };
 
 [[nodiscard]] constexpr SemanticState operator|(
@@ -81,6 +103,19 @@ inline constexpr std::size_t semantic_action_count = static_cast<std::size_t>(Se
 // DK-40).
 enum class SemanticOrientation : std::uint8_t { horizontal, vertical };
 
+// The selection and caret of a node's text (owner decision A-T1, 12.13), as
+// UTF-8 byte offsets into the node's value, on grapheme boundaries; with
+// nothing selected the anchor and the caret are the same offset.
+struct SemanticTextSelection final {
+    Utf8Offset anchor{};
+    Utf8Offset caret{};
+    friend constexpr bool operator==(const SemanticTextSelection& left,
+                                     const SemanticTextSelection& right) noexcept {
+        const bool same = left.anchor == right.anchor && left.caret == right.caret;
+        return same;
+    }
+};
+
 // The position of an element among its siblings of one set (a list's items,
 // a strip's buttons) and the set's size, both counting from one, and whether
 // the element opens a popup (a menu, a list or a dialog) when activated.
@@ -93,6 +128,20 @@ enum class SemanticOrientation : std::uint8_t { horizontal, vertical };
 // relation), or empty; the panel need not be in the same snapshot, since a
 // hidden page's panel is not. On a tab list (tab_group), `orientation` says
 // whether its tabs run in a row or a column; other nodes leave it empty.
+//
+// The stage A vocabulary (owner, 2026-10-21, 12.13) admitted these fields:
+// - `level`: a tree item's depth, counting from one at the top level;
+// - `modal`: a dialog blocks the rest of its window while it is open;
+// - `row_index` and `column_index`: a row's, cell's or header's place in its
+//   table, counting from one; `row_count` and `column_count`: a table's size
+//   (all rows and columns, realized or not);
+// - `access_key`: the character of the control's mnemonic, as UTF-8 (the
+//   host adds its modifier, Alt on Windows and Linux); empty without one;
+// - `small_step` and `large_step`: how far a range node's value moves for a
+//   small change (an arrow key) and a large one (a page key);
+// - `text_selection` and `multiline`: a text node's selection and caret
+//   (absent for protected content) and whether its text runs over several
+//   lines.
 struct SemanticDescriptor final {
     SemanticRole role{SemanticRole::generic};
     std::string name;
@@ -106,6 +155,17 @@ struct SemanticDescriptor final {
     bool has_popup{};
     std::string controlled_panel;
     std::optional<SemanticOrientation> orientation;
+    std::optional<std::size_t> level;
+    bool modal{};
+    std::optional<std::size_t> row_index;
+    std::optional<std::size_t> column_index;
+    std::optional<std::size_t> row_count;
+    std::optional<std::size_t> column_count;
+    std::string access_key;
+    std::optional<double> small_step;
+    std::optional<double> large_step;
+    std::optional<SemanticTextSelection> text_selection;
+    bool multiline{};
     SemanticState states{SemanticState::none};
     std::vector<SemanticAction> actions;
     bool exposed{};
@@ -127,6 +187,17 @@ struct SemanticNode final {
     bool has_popup{};
     std::string controlled_panel;
     std::optional<SemanticOrientation> orientation;
+    std::optional<std::size_t> level;
+    bool modal{};
+    std::optional<std::size_t> row_index;
+    std::optional<std::size_t> column_index;
+    std::optional<std::size_t> row_count;
+    std::optional<std::size_t> column_count;
+    std::string access_key;
+    std::optional<double> small_step;
+    std::optional<double> large_step;
+    std::optional<SemanticTextSelection> text_selection;
+    bool multiline{};
     Rect bounds{};
     SemanticState states{SemanticState::none};
     std::vector<SemanticAction> actions;
@@ -143,6 +214,10 @@ struct SemanticSnapshot final {
 [[nodiscard]] const char* semantic_role_name(SemanticRole role) noexcept;
 [[nodiscard]] const char* semantic_action_name(SemanticAction action) noexcept;
 [[nodiscard]] const char* semantic_orientation_name(SemanticOrientation orientation) noexcept;
+// The name of one state bit (`state` holds exactly one of semantic_states).
+[[nodiscard]] const char* semantic_state_name(SemanticState state) noexcept;
+// The node fields the vocabulary admits, by name, for the schema export.
+[[nodiscard]] std::span<const char* const> semantic_field_names() noexcept;
 
 // The runtime ID of a virtual semantic child (a tab, an item, a caption
 // button: a SemanticNode with no control of its own), from its stable ID: a

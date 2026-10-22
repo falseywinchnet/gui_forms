@@ -265,10 +265,10 @@ def validate(schema: Mapping[str, object], registry: control_registry.Registry,
     vocabulary: object = schema.get("vocabulary")
     if not isinstance(vocabulary, dict):
         findings.append("the schema has no vocabulary (part roles, states, custom states, marks, values, "
-                        "families, semantic roles, actions and fields)")
+                        "families, semantic roles, actions, states and fields)")
     else:
         for key in ("part_roles", "states", "custom_states", "marks", "values", "families",
-                    "semantic_roles", "semantic_actions", "semantic_fields"):
+                    "semantic_roles", "semantic_actions", "semantic_states", "semantic_fields"):
             names: object = vocabulary.get(key)
             if not isinstance(names, list) or not names:
                 findings.append(f"vocabulary: {key} is missing or empty")
@@ -378,6 +378,7 @@ def render_page(schema: Mapping[str, object]) -> str:
                                          ("families", "Recipe families"),
                                          ("semantic_roles", "Semantic roles"),
                                          ("semantic_actions", "Semantic actions"),
+                                         ("semantic_states", "Semantic states"),
                                          ("semantic_fields", "Semantic node fields")]
         for key, title in titles:
             names: Sequence[object] = vocabulary.get(key, [])  # type: ignore[assignment]

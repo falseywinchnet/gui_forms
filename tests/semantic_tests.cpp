@@ -535,6 +535,65 @@ void test_hidden_focus_is_published_on_the_composite() {
             "a disabled composite's hidden editor cannot take focus, so its node is not focusable");
 }
 
+// A control that publishes every field of the stage A vocabulary (12.13).
+class StageAFields final : public Control {
+public:
+    explicit StageAFields(StableId stable_id) : Control(std::move(stable_id)) {}
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+        SemanticDescriptor descriptor;
+        descriptor.role = SemanticRole::tree_item;
+        descriptor.name = "Item";
+        descriptor.level = 3U;
+        descriptor.modal = true;
+        descriptor.row_index = 4U;
+        descriptor.column_index = 2U;
+        descriptor.row_count = 10U;
+        descriptor.column_count = 5U;
+        descriptor.access_key = "F";
+        descriptor.small_step = 1.0;
+        descriptor.large_step = 10.0;
+        descriptor.text_selection = SemanticTextSelection{Utf8Offset(1U), Utf8Offset(3U)};
+        descriptor.multiline = true;
+        descriptor.states = SemanticState::checkable | SemanticState::multiselectable;
+        descriptor.exposed = true;
+        return descriptor;
+    }
+};
+
+// The stage A atoms: the role and state names, the field list, and every
+// field from a descriptor to its node and the snapshot's JSON.
+void test_stage_a_vocabulary_reaches_the_snapshot() {
+    require(std::string_view(semantic_role_name(SemanticRole::tree_grid)) == "tree_grid" &&
+                std::string_view(semantic_role_name(SemanticRole::live_region)) == "live_region" &&
+                std::string_view(semantic_state_name(SemanticState::multiselectable)) == "multiselectable",
+            "the new roles and states have their names");
+    const std::span<const char* const> fields = semantic_field_names();
+    require(fields.size() == 16U && std::string_view(fields[5]) == "level" &&
+                std::string_view(fields[15]) == "multiline",
+            "the field list names the admitted fields in order");
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("stage-a.root"));
+    std::shared_ptr<StageAFields> item = make_control<StageAFields>(StableId("stage-a.item"));
+    (*item).set_requested_bounds({0, 0, 40, 20});
+    (*root).add_child(item);
+    Window window(root, {100, 50});
+    const SemanticSnapshot snapshot = window.semantic_snapshot();
+    const SemanticNode* node = find_node(snapshot.roots, "stage-a.item");
+    require(node != nullptr && (*node).role == SemanticRole::tree_item && (*node).level == 3U && (*node).modal &&
+                (*node).row_index == 4U && (*node).column_index == 2U && (*node).row_count == 10U &&
+                (*node).column_count == 5U && (*node).access_key == "F" && (*node).small_step == 1.0 &&
+                (*node).large_step == 10.0 && (*node).text_selection &&
+                (*(*node).text_selection).anchor == Utf8Offset(1U) && (*(*node).text_selection).caret == Utf8Offset(3U) &&
+                (*node).multiline && has_semantic_state((*node).states, SemanticState::checkable) &&
+                has_semantic_state((*node).states, SemanticState::multiselectable),
+            "every stage A field reaches the node");
+    const std::string json = snapshot.to_json();
+    require(json.find("\"role\":\"tree_item\"") != std::string::npos &&
+                json.find("\"level\":3,\"modal\":true,\"row_index\":4,\"column_index\":2,\"row_count\":10,"
+                          "\"column_count\":5,\"access_key\":\"F\",\"small_step\":1,\"large_step\":10,"
+                          "\"text_selection\":{\"anchor\":1,\"caret\":3},\"multiline\":true") != std::string::npos,
+            "the snapshot's JSON carries every stage A field");
+}
+
 // The helper every control's virtual semantic children used to copy, kept
 // verbatim as the reference the shared helper must match byte for byte.
 std::uint64_t former_copy(std::string_view id) noexcept {
@@ -691,6 +750,7 @@ int main() {
         test_unnumbered_virtual_children_get_runtime_ids();
         test_semantic_focus_reaches_composites();
         test_hidden_focus_is_published_on_the_composite();
+        test_stage_a_vocabulary_reaches_the_snapshot();
         test_semantics_enforce_ui_thread();
         std::cout << "gui_forms_semantic_tests: all tests passed\n";
         return EXIT_SUCCESS;
