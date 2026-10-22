@@ -1,5 +1,5 @@
 #include "../../../core/host/image/clipboard_image_wire.hpp"
-#include "../../../render/skia/raster/clipboard_png.hpp"
+#include "../../../core/host/image/clipboard_png.hpp"
 #include "../application/linux_host_internal.hpp"
 #include "x11_foreign_window.hpp"
 #include <X11/Xatom.h>
@@ -220,12 +220,12 @@ HostClipboardImageResult Services::read_clipboard_image_impl() {
   bytes = runtime.read_selection(window_, runtime.atom("CLIPBOARD"),
                                  runtime.atom("image/png"));
   if (!bytes.empty())
-    return render::decode_clipboard_png(bytes);
+    return detail::decode_clipboard_png(bytes);
   return {};
 }
 HostServiceStatus Services::write_clipboard_image_impl(HostImageView image) {
   Runtime &runtime = window_.runtime;
-  std::vector<std::byte> png = render::encode_clipboard_png(image);
+  std::vector<std::byte> png = detail::encode_clipboard_png(image);
   if (png.empty())
     return {HostServiceError::backend_failure};
   runtime.clipboard_image = detail::copy_host_image(image);
