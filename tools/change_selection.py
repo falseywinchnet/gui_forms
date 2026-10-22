@@ -279,7 +279,11 @@ def changed_paths(source_root: Path, base: str) -> list[str]:
                                              start, 'HEAD')
     if committed is None:
         raise RuntimeError('git cannot compare ' + base + ' with HEAD in ' + str(source_root))
-    working: list[str] = git_lines(source_root, 'diff', '--name-only', '--no-renames', '--relative', 'HEAD') or []
+    # A checkout written with core.autocrlf by one git and read by another
+    # without it (MSYS2's git on Windows) differs from HEAD only in line
+    # endings in every file; such files are not changed.
+    working: list[str] = git_lines(source_root, 'diff', '--name-only', '--no-renames', '--relative',
+                                   '--ignore-cr-at-eol', 'HEAD') or []
     untracked: list[str] = git_lines(source_root, 'ls-files', '--others', '--exclude-standard') or []
     paths: list[str] = []
     path: str
