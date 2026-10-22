@@ -44,20 +44,33 @@ std::uint32_t read32(std::span<const std::byte> data, std::size_t offset) noexce
     return value;
 }
 
-// Data offset of the first PLTE or IDAT chunk. Requires a file the decoder
-// accepted, so every chunk envelope lies inside the span.
+// Data offset of the first PLTE or IDAT chunk, or encoded.size() when there
+// is none. The decoder already proved the envelopes of an accepted file; an
+// envelope that leaves the span ends the walk (the defined fallback), so a
+// mismatched argument cannot read outside it.
 std::size_t first_image_chunk(std::span<const std::byte> encoded) noexcept {
     std::size_t offset = 8U;
-    while (offset < encoded.size()) {
+    while (offset <= encoded.size() && encoded.size() - offset >= 12U) {
         const std::uint32_t length = read32(encoded, offset);
         const std::uint32_t type = read32(encoded, offset + 4U);
         if (type == plte || type == idat) {
             const std::size_t data_offset = offset + 8U;
             return data_offset;
         }
+        if (length > encoded.size() - offset - 12U) break;
         offset += static_cast<std::size_t>(length) + 12U;
     }
     return encoded.size();
+}
+
+// A record names a live range of encoded with its chunk's fixed length.
+bool record_fits(std::span<const std::byte> encoded, const PngMetadataRecord& record,
+                 std::size_t required) noexcept {
+    const bool inside = record.encoded_offset <= encoded.size() &&
+                        record.encoded_length <= encoded.size() - record.encoded_offset;
+    const bool sized = required == 0U || record.encoded_length == required;
+    const bool fits = inside && sized;
+    return fits;
 }
 
 Vector3 multiply(const Matrix3& m, const Vector3& v) noexcept {
@@ -204,6 +217,15 @@ PngColorResolution resolve_png_color(std::span<const std::byte> encoded,
     PngColorEncoding& colour = result.encoding;
     const std::size_t image_start = first_image_chunk(encoded);
     for (const PngMetadataRecord& record : records) {
+        // Records come from a successful decode of encoded; one that does not
+        // fit is the one defined failure, never a read outside the span.
+        std::size_t required = 0U;
+        if (record.type == gama) required = 4U;
+        if (record.type == chrm) required = 32U;
+        if (!record_fits(encoded, record, required)) {
+            result.error = PngColorError::invalid_color_metadata;
+            return result;
+        }
         const std::span<const std::byte> data = encoded.subspan(record.encoded_offset, record.encoded_length);
         if (record.type == cicp) {
             // Structure: four bytes, once, before PLTE and IDAT. The decoder

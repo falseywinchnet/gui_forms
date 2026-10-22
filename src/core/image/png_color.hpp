@@ -77,6 +77,8 @@ struct PngColorResolution final {
 // Reads the colour chunks named by records (from a successful decode of
 // encoded) and applies the precedence above. icc_ignored states whether the
 // caller's rule ignored an iCCP chunk; a refused profile never reaches here.
+// A record outside encoded, or a gAMA/cHRM record of the wrong length, is
+// refused as invalid_color_metadata rather than read.
 [[nodiscard]] PngColorResolution resolve_png_color(std::span<const std::byte> encoded,
     std::span<const PngMetadataRecord> records, bool icc_ignored) noexcept;
 

@@ -26,6 +26,12 @@ constexpr std::uint32_t text = 0x74455874U;
 constexpr std::uint32_t srgb = 0x73524742U;
 constexpr std::uint32_t gama = 0x67414d41U;
 constexpr std::uint32_t chrm = 0x6348524dU;
+// Colour chunks already seen, one bit each; every one may appear at most once,
+// and sRGB excludes iCCP.
+constexpr unsigned seen_srgb = 1U;
+constexpr unsigned seen_gamma = 2U;
+constexpr unsigned seen_chromaticities = 4U;
+constexpr unsigned seen_icc = 8U;
 
 unsigned byte(std::byte value) noexcept {
     return std::to_integer<unsigned>(value);
@@ -415,15 +421,15 @@ PngDecodeError parse(std::span<const std::byte> encoded,
                 if (chunk.next != encoded.size()) return PngDecodeError::trailing_data;
                 return PngDecodeError::none;
             case srgb: case gama: case chrm: case iccp: {
-                unsigned flag = 1;
-                if (chunk.type == gama) flag = 2;
-                if (chunk.type == chrm) flag = 4;
-                if (chunk.type == iccp) flag = 8;
+                unsigned flag = seen_srgb;
+                if (chunk.type == gama) flag = seen_gamma;
+                if (chunk.type == chrm) flag = seen_chromaticities;
+                if (chunk.type == iccp) flag = seen_icc;
                 if (saw_palette || saw_idat || (color_flags & flag) != 0) return PngDecodeError::invalid_metadata;
-                if (chunk.type == srgb && (length != 1 || byte(data[0]) > 3 || (color_flags & 8U) != 0)) return PngDecodeError::invalid_metadata;
+                if (chunk.type == srgb && (length != 1 || byte(data[0]) > 3 || (color_flags & seen_icc) != 0)) return PngDecodeError::invalid_metadata;
                 if (chunk.type == gama && (length != 4 || read32(data, 0) == 0)) return PngDecodeError::invalid_metadata;
                 if (chunk.type == chrm && length != 32) return PngDecodeError::invalid_metadata;
-                if (chunk.type == iccp && (color_flags & 1U) != 0) return PngDecodeError::invalid_metadata;
+                if (chunk.type == iccp && (color_flags & seen_srgb) != 0) return PngDecodeError::invalid_metadata;
                 color_flags |= flag;
                 break;
             }

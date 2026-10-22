@@ -2246,6 +2246,12 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_inflate_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_inflate_tests COMMAND gui_forms_inflate_tests)
 
+    # The deflate contract harness's standalone inputs, in the normal suite.
+    add_executable(gui_forms_deflate_fuzz_tests fuzz/deflate_fuzz.cpp)
+    target_link_libraries(gui_forms_deflate_fuzz_tests PRIVATE stx_zlib::stx_zlib)
+    target_compile_definitions(gui_forms_deflate_fuzz_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    add_test(NAME gui_forms_deflate_fuzz_tests COMMAND gui_forms_deflate_fuzz_tests)
+
     add_executable(gui_forms_inflate_protocol_tests fuzz/inflate_protocol_fuzz.cpp)
     target_link_libraries(gui_forms_inflate_protocol_tests PRIVATE gui_forms_core)
     target_compile_definitions(gui_forms_inflate_protocol_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
@@ -2258,6 +2264,14 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_png_pixels_tests tests/image/png_pixels_tests.cpp)
     target_link_libraries(gui_forms_png_pixels_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_pixels_tests COMMAND gui_forms_png_pixels_tests)
+
+    # Deterministic malformed-input sweeps (owner revision of decision 6A).
+    add_executable(gui_forms_malformed_sweep_tests tests/compression/malformed_sweep_tests.cpp)
+    target_link_libraries(gui_forms_malformed_sweep_tests PRIVATE stx_zlib::stx_zlib)
+    add_test(NAME gui_forms_malformed_sweep_tests COMMAND gui_forms_malformed_sweep_tests)
+    add_executable(gui_forms_png_malformed_sweep_tests tests/image/png_malformed_sweep_tests.cpp)
+    target_link_libraries(gui_forms_png_malformed_sweep_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_png_malformed_sweep_tests COMMAND gui_forms_png_malformed_sweep_tests)
 
     add_executable(gui_forms_png_color_tests tests/image/png_color_tests.cpp)
     target_link_libraries(gui_forms_png_color_tests PRIVATE gui_forms_core)
@@ -3499,6 +3513,19 @@ if(GUI_FORMS_BUILD_FUZZERS)
         target_link_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=fuzzer)
     else()
         target_compile_definitions(gui_forms_inflate_protocol_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
+    add_executable(gui_forms_deflate_fuzz
+        fuzz/deflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp)
+    target_include_directories(gui_forms_deflate_fuzz PRIVATE stx_zlib/include)
+    target_compile_options(gui_forms_deflate_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_deflate_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_deflate_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_deflate_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_deflate_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
     endif()
 
     add_executable(gui_forms_png_decode_fuzz

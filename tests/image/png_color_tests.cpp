@@ -223,6 +223,26 @@ void precedence_and_degenerate_values() {
             resolution.encoding.source == image::PngColorSource::srgb_default, "ignored chunks not reported");
 }
 
+// Mismatched records (not from a decode of this file) are refused without
+// reading outside the encoded span.
+void mismatched_records_are_refused() {
+    const Bytes file = ramp_file({});
+    std::array<image::PngMetadataRecord, 1> records{};
+    records[0].type = 0x67414d41U; // gAMA
+    records[0].encoded_offset = file.size() - 2U;
+    records[0].encoded_length = 4U;
+    require(image::resolve_png_color(file, records, false).error == image::PngColorError::invalid_color_metadata,
+            "record past the end was read");
+    records[0].encoded_offset = 8U;
+    records[0].encoded_length = 3U;
+    require(image::resolve_png_color(file, records, false).error == image::PngColorError::invalid_color_metadata,
+            "short gAMA record was read");
+    const Bytes truncated(file.begin(), file.begin() + 20);
+    const std::array<image::PngMetadataRecord, 0> none{};
+    require(image::resolve_png_color(truncated, none, false).error == image::PngColorError::none,
+            "truncated walk failed");
+}
+
 void identity_hashes() {
     std::array<Fnv1a, 3> digests{};
     const std::array<Extra, 1> gamma22{{{"gAMA", gamma_payload(45455)}}};
@@ -259,6 +279,7 @@ int main() {
     try {
         reference_values();
         precedence_and_degenerate_values();
+        mismatched_records_are_refused();
         identity_hashes();
     } catch (const std::exception& error) {
         std::cerr << "png_color_tests: " << error.what() << '\n';
