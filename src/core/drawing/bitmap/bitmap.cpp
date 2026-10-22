@@ -187,11 +187,11 @@ std::unique_ptr<Bitmap> Bitmap::adjusted(
                 ++remap;
             }
             if (remap != adjustment.remap_table.end()) input = (*remap).new_color;
-            if (!adjustment.has_color_matrix) {
+            if (!adjustment.color_matrix.has_value()) {
                 store_color(*(*result).storage_, x, y, input);
                 continue;
             }
-            const std::array<double, 25>& matrix = adjustment.color_matrix;
+            const std::array<double, 25>& matrix = *adjustment.color_matrix;
             const double values[5] = {
                 input.red() / 255.0, input.green() / 255.0,
                 input.blue() / 255.0, input.alpha() / 255.0, 1.0};

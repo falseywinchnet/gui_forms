@@ -286,9 +286,26 @@ def find_switches(text: str) -> list[Switch]:
     return switches
 
 
+def without_preprocessor_lines(body: str) -> str:
+    """`body` without its preprocessor lines (and their backslash continuations).
+
+    A directive is not a statement: the `#endif` after a configured enumerator's
+    case would otherwise end the case before it, which then seems not to leave."""
+    kept: list[str] = []
+    continued: bool = False
+    line: str
+    for line in body.split("\n"):
+        directive: bool = continued or line.lstrip().startswith("#")
+        continued = directive and line.rstrip().endswith("\\")
+        if not directive:
+            kept.append(line)
+    result: str = "\n".join(kept)
+    return result
+
+
 def body_statements(text: str, label: Label) -> str:
-    """A label's body without braces, whitespace runs collapsed."""
-    body: str = text[label.body_start:label.body_end]
+    """A label's body without braces or preprocessor lines, whitespace runs collapsed."""
+    body: str = without_preprocessor_lines(text[label.body_start:label.body_end])
     result: str = " ".join(body.replace("{", " ").replace("}", " ").split())
     return result
 

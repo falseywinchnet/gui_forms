@@ -120,6 +120,12 @@ struct PartPaint final {
     // identity, not vocabulary: it changes nothing a part looks like today.
     // Its views are borrowed for the call.
     std::optional<PartKey> key{};
+    // How far past `bounds` the control lets the part be drawn when a theme
+    // scales it (T2 GIVEN D5-1, E8), in logical units. The presentational
+    // scale grows the part about its centre only as far as this allows:
+    // with none granted, the default, a part never grows. Layout and the
+    // part's hit region ignore it.
+    Insets granted_overflow{};
 };
 
 // The theme context a part's states select: hot, pressed or captured,

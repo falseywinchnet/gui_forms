@@ -97,6 +97,27 @@ message contains `[sanitizer-full-g]`, and keys its cache by the mode. LeakSanit
 suppressions (`tools/sanitizer/lsan.supp`) therefore name functions without a
 namespace where the name allows.
 
+Every test carries one area label, `area_<area>`: `core`, `codec`, `audio`,
+`render`, `controls`, `docs`, `host`, `gui` (the Gallery, demoboard and lab
+tests) or `a11y` (the accessibility clients and providers), so
+`ctest -L area_gui` runs one area. `tools/test_areas.json` holds both the
+name patterns that give the labels (`cmake/TestAreas.cmake`) and the rules
+that map source paths to the areas whose tests read them. `--changed-from REF`
+on a sanitized run builds and runs only the tests the paths changed since
+`REF` (its merge base with `HEAD`, plus uncommitted and untracked files) can
+affect; `python tools/change_selection.py --base REF --format areas` prints
+the areas and the reason for each path, and with `--tree` and the default
+format a `ctest -R` pattern. Core sources reach every area but `gui` and
+`a11y`; controls, render and host sources reach those too; codec and audio
+sources reach only their own area; a test source selects its own test;
+documentation, planning and results reach no test. A path in the
+touches-everything set (`CMakeLists.txt`, `cmake/`, `third_party/`,
+`.github/`, `assets/`, the headers under `include/gui_forms/` outside the
+controls, compression and audio directories, the selection tool and its
+rules, `tools/ci_build.py`, `tools/sanitizer/`, and the shared test support
+and fixtures) or a path no rule names runs every test. CI's sanitizer job
+selects this way on pull requests and runs the whole suite on main.
+
 ## Tests and evidence
 
 Every behavioural change ships with a test. Core and control behaviour is

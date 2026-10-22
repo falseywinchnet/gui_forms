@@ -23,8 +23,8 @@ int main() {
             std::byte{231}, std::byte{43}, std::byte{19}, std::byte{0}};
         require((*services).write_clipboard_image({2, 2, 8, pixels}).accepted(), "native image write failed");
         gui_forms::HostClipboardImageResult result = (*services).read_clipboard_image();
-        require(result.status.accepted() && result.has_image && result.image.width == 2 && result.image.height == 2 &&
-                result.image.pixels == std::vector<std::byte>(pixels.begin(), pixels.end()),
+        require(result.status.accepted() && result.image.has_value() && (*result.image).width == 2 && (*result.image).height == 2 &&
+                (*result.image).pixels == std::vector<std::byte>(pixels.begin(), pixels.end()),
                 "private native clipboard roundtrip was not exact");
         require((*services).write_clipboard_image({2, 2, 7, pixels}).error == gui_forms::HostServiceError::invalid_argument,
                 "invalid image was published");
@@ -35,14 +35,14 @@ int main() {
         [pasteboard clearContents];
         require([pasteboard setData:png forType:NSPasteboardTypePNG], "PNG-only fixture write failed");
         result = (*services).read_clipboard_image();
-        require(result.status.accepted() && result.has_image && result.image.width == 2 && result.image.height == 2,
+        require(result.status.accepted() && result.image.has_value() && (*result.image).width == 2 && (*result.image).height == 2,
                 "PNG from an external clipboard producer was not decoded");
         for (std::size_t index = 0; index < 12U; ++index) {
-            require(result.image.pixels[index] == pixels[index], "native PNG changed row orientation or opaque colors");
+            require((*result.image).pixels[index] == pixels[index], "native PNG changed row orientation or opaque colors");
         }
-        require(result.image.pixels[15] == std::byte{0}, "native PNG lost transparent alpha");
+        require((*result.image).pixels[15] == std::byte{0}, "native PNG lost transparent alpha");
         require((*services).write_clipboard_text("clipboard image test").accepted() &&
-                !(*services).read_clipboard_image().has_image, "native text did not replace image");
+                !(*services).read_clipboard_image().image.has_value(), "native text did not replace image");
         [pasteboard clearContents];
         NSURL* file = [NSURL fileURLWithPath:@"/tmp/Rainstar copied image Ω.png"];
         require([pasteboard writeObjects:@[file]], "file reference fixture failed");

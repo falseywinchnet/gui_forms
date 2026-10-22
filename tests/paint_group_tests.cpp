@@ -95,29 +95,31 @@ public:
             painter.fill_rect({5.0, 5.0, 4.0, 4.0}, Color::rgba(4, 5, 6, 255));
             painter.end_group();
             painter.end_group();
-            break;
+            return;
         case Script::too_deep:
             for (std::size_t level = 0U; level < maximum_paint_group_depth + 2U; ++level) {
                 painter.begin_group(group_of({0.0, 0.0, 50.0, 40.0}, 0.5));
             }
             painter.fill_rect({2.0, 2.0, 10.0, 10.0}, Color::rgba(1, 2, 3, 255));
             for (std::size_t level = 0U; level < maximum_paint_group_depth + 2U; ++level) painter.end_group();
-            break;
+            return;
         case Script::left_open:
             painter.begin_group(group_of({0.0, 0.0, 50.0, 40.0}, 0.5));
-            break;
+            return;
         case Script::ended_twice:
             painter.begin_group(group_of({0.0, 0.0, 50.0, 40.0}, 0.5));
             painter.end_group();
             painter.end_group();
-            break;
+            return;
         case Script::saves_cross:
             painter.begin_group(group_of({0.0, 0.0, 50.0, 40.0}, 0.5));
             painter.save();
             painter.end_group();
             painter.restore();
-            break;
+            return;
         }
+        // A script outside the enumeration draws nothing.
+        return;
     }
 
     Script script{Script::nested};
