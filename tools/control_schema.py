@@ -251,6 +251,20 @@ def _engine_findings(engine: object, vocabulary: object) -> list[str]:
         for parameter in parameter_names:
             if not _SNAKE.fullmatch(parameter):
                 findings.append(f"engine: {name}: parameter {parameter!r} is not snake_case")
+        for item in primitive.get("parameters", []):
+            if item.get("kind") != "choice":
+                continue
+            # A choice parameter (E8) names its choices once each, in
+            # snake_case, and defaults to one of them.
+            choices: list[str] = [str(choice) for choice in item.get("choices", [])]
+            label: str = f"engine: {name}: choice {item.get('name')!r}"
+            if not choices or len(set(choices)) != len(choices):
+                findings.append(f"{label} needs distinct choices")
+            for choice in choices:
+                if not _SNAKE.fullmatch(choice):
+                    findings.append(f"{label}: {choice!r} is not snake_case")
+            if str(item.get("default")) not in choices:
+                findings.append(f"{label} defaults to {item.get('default')!r}, which is not a choice")
     findings.extend(_expression_findings(engine.get("expressions")))
     findings.extend(_motion_findings(engine.get("transitions"), engine.get("ambient")))
     return findings

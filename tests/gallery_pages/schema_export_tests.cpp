@@ -254,6 +254,16 @@ void append_parameters(std::string& out, std::span<const PrimitiveParameterDecla
             append_json_string(out, "default");
             out += ": ";
             append_number(out, parameter.default_number);
+        } else if (parameter.kind == PrimitiveParameterKind::choice) {
+            append_json_string(out, "choice");
+            out += ", ";
+            append_json_string(out, "choices");
+            out += ": ";
+            append_name_list(out, parameter.choices);
+            out += ", ";
+            append_json_string(out, "default");
+            out += ": ";
+            append_json_string(out, parameter.choices[static_cast<std::size_t>(parameter.default_number)]);
         } else {
             append_json_string(out, "colour");
             out += ", ";

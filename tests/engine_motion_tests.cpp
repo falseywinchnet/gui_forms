@@ -172,8 +172,8 @@ PropertyTransition transition_on(std::string property, double target) {
 void machines_are_rule_data() {
     const CompiledThemeRules built_in =
         CompiledThemeRules::compile_with_built_in(ThemeRuleSheet{}, builtin_primitive_registry());
-    require(built_in.diagnostics().empty() && built_in.built_in_rule_count() == 7U && built_in.rule_count() == 7U,
-            "the engine's seven built-in rules compile cleanly");
+    require(built_in.diagnostics().empty() && built_in.built_in_rule_count() == 8U && built_in.rule_count() == 8U,
+            "the engine's eight built-in rules compile cleanly");
     const CompiledThemeRules::Resolution face =
         built_in.resolve(facts_of("ribbon", "command_face", PartRole::face));
     require(face.outcome == CompiledThemeRules::Outcome::primitive &&
@@ -188,9 +188,18 @@ void machines_are_rule_data() {
     require(toggle.outcome == CompiledThemeRules::Outcome::built_in_selected && toggle.transition_count == 0U,
             "a checked toggle keeps today's plate");
     const CompiledThemeRules::Resolution tile = built_in.resolve(facts_of("dock_site", "tile", PartRole::actuator));
-    require(tile.outcome == CompiledThemeRules::Outcome::no_rule && tile.transition_count == 1U &&
+    require(tile.outcome == CompiledThemeRules::Outcome::primitive &&
+                (*tile.primitive).descriptor().name == "pill_plate" && tile.transition_count == 1U &&
                 (*tile.transitions[0]).opacity && (*tile.transitions[0]).states.size() == 2U,
-            "a docking tile keeps the built-in recipe and gains its opacity's fade");
+            "a docking tile is the pill plate (E8) with its opacity's fade");
+    AnatomyStateSet lit{};
+    lit.insert(AnatomyState::selected);
+    const CompiledThemeRules::Resolution gold =
+        built_in.resolve(facts_of("dock_site", "tile", PartRole::actuator, lit));
+    require(gold.outcome == CompiledThemeRules::Outcome::primitive &&
+                (*gold.primitive).descriptor().name == "gold_plate" && gold.transition_count == 1U &&
+                (*gold.transitions[0]).opacity,
+            "a lit tile is the gold plate, and fades as any tile");
     const CompiledThemeRules::Resolution other = built_in.resolve(facts_of("button", "face", PartRole::face));
     require(other.outcome == CompiledThemeRules::Outcome::no_rule && other.transition_count == 0U,
             "every other part is as before");
@@ -548,7 +557,8 @@ struct TileFrame final {
     std::vector<double> opacities{};
     std::vector<double> edge_opacities{};
     std::uint64_t drawn{};
-    // Paint groups at a partial opacity around the cross's tiles.
+    // The cross's parts composited at a partial opacity: each tile's plate
+    // raster, and a paint group around each glyph.
     std::size_t fading_groups{};
 };
 
@@ -616,18 +626,23 @@ TileFrame tile_frame(Window& window, const DockSite& site) {
             const bool group_around = operation.operation == VisualPaintOperation::begin_group &&
                                       inside(operation.rect, cross);
             const bool group_end = operation.operation == VisualPaintOperation::end_group;
-            if (rect_inside || line_inside || group_around || group_end) within = true;
+            // A tile's plate is its primitive's raster (E8), placed at the
+            // tile's origin.
+            const bool raster_at = operation.operation == VisualPaintOperation::draw_part_raster &&
+                                   inside(cross, Rect{operation.first.x, operation.first.y, 0.0, 0.0});
+            if (rect_inside || line_inside || group_around || group_end || raster_at) within = true;
         }
         if (within) hash_operation(hash, operation);
-        const bool fading = operation.operation == VisualPaintOperation::begin_group && operation.scalar > 0.0 &&
-                            operation.scalar < 1.0;
+        const bool composited = operation.operation == VisualPaintOperation::begin_group ||
+                                operation.operation == VisualPaintOperation::draw_part_raster;
+        const bool fading = composited && operation.scalar > 0.0 && operation.scalar < 1.0;
         if (fading) frame.fading_groups = frame.fading_groups + 1U;
     }
     frame.drawn = hash.value;
     return frame;
 }
 
-constexpr std::uint64_t expected_fade_hash = 0x131aa7a1b417e8e4ULL;
+constexpr std::uint64_t expected_fade_hash = 0xeaf1494d77d12d8fULL;
 
 void tile_fade() {
     std::unique_ptr<DockFixture> fixture = make_dock();
@@ -658,7 +673,7 @@ void tile_fade() {
         fade.add_word(frame.drawn);
         if (step < 7) {
             require(frame.fading_groups == 10U,
-                    "mid-fade, each tile and glyph is one paint group, composited once at its opacity");
+                    "mid-fade, each tile's plate and each glyph's group composite once at its opacity");
         }
     }
     for (int step = 0; step < 6; ++step) {

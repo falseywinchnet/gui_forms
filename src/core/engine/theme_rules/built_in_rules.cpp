@@ -84,9 +84,18 @@ ThemeRuleSheet make_built_in_rules() {
     ThemeRuleSheet sheet{};
     add_ribbon_button(sheet, "command_face", true);
     add_ribbon_button(sheet, "group_button", false);
+    // The tiles' plates are engine primitives (E8): the pill plate, the gold
+    // plate while lit, so that a tile's fade composites one engine raster
+    // and its pixels are the same on every host. Their quiet look (dark
+    // plates, reduced strength) remains the theme's (T2-4).
     ThemeRule tile = built_in_rule("dock_tile_fade:tile", "dock_site", "tile");
+    tile.declarations.push_back(RuleDeclaration::primitive("pill_plate"));
     tile.transitions.push_back(tile_fade());
     sheet.rules.push_back(std::move(tile));
+    ThemeRule lit = built_in_rule("dock_tile_lit:tile", "dock_site", "tile");
+    lit.selector.states.push_back(AnatomyState::selected);
+    lit.declarations.push_back(RuleDeclaration::primitive("gold_plate"));
+    sheet.rules.push_back(std::move(lit));
     ThemeRule glyph = built_in_rule("dock_tile_fade:tile_glyph", "dock_site", "tile_glyph");
     glyph.transitions.push_back(tile_fade());
     sheet.rules.push_back(std::move(glyph));

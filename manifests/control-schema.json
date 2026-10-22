@@ -17,7 +17,7 @@
     "semantic_fields": ["position_in_set", "set_size", "has_popup", "controlled_panel", "orientation"]
   },
   "engine": {
-    "version": "0.1",
+    "version": "0.2",
     "cascade_levels": ["built_in", "theme_sheet", "class_rule", "stable_id_rule", "inline_style", "forced_high_contrast"],
     "budgets": {"operations_per_device_pixel": 512, "animated_operations_per_frame": 4000000},
     "primitives": [
@@ -75,6 +75,113 @@
           {"name": "gold_shaded_1", "kind": "colour", "default": "#e8ac3eff", "animated": false},
           {"name": "gold_shaded_2", "kind": "colour", "default": "#ce8e28ff", "animated": false},
           {"name": "gold_shaded_3", "kind": "colour", "default": "#aa7018ff", "animated": false}
+        ]
+      },
+      {
+        "name": "pill_plate",
+        "introduced": "0.2",
+        "roles": ["face", "actuator", "thumb", "chip"],
+        "states_read": ["hot", "pressed", "disabled", "preselect"],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 256, "fixed": 64, "preparation_per_device_pixel": 0},
+        "outsets": [0, 0, 0, 0],
+        "parameters": [
+          {"name": "shape", "kind": "choice", "choices": ["rounded_rectangle", "pill", "circle", "cap_start", "cap_end"], "default": "rounded_rectangle", "animated": false},
+          {"name": "corner_radius", "kind": "number", "minimum": 0, "maximum": 64, "default": 3, "animated": false},
+          {"name": "face_top", "kind": "colour", "default": "#d2e4fbff", "animated": false},
+          {"name": "face_bottom", "kind": "colour", "default": "#a3c1ecff", "animated": false},
+          {"name": "border", "kind": "colour", "default": "#6384b2ff", "animated": false},
+          {"name": "upper_line", "kind": "colour", "default": "#ffffffe6", "animated": false},
+          {"name": "lower_line", "kind": "colour", "default": "#31568687", "animated": false},
+          {"name": "contact_shadow", "kind": "colour", "default": "#294b7755", "animated": false},
+          {"name": "hot_face_top", "kind": "colour", "default": "#dae9fcff", "animated": false},
+          {"name": "hot_face_bottom", "kind": "colour", "default": "#b1ccf2ff", "animated": false},
+          {"name": "hot_border", "kind": "colour", "default": "#355e96ff", "animated": false},
+          {"name": "pressed_face_top", "kind": "colour", "default": "#98b5daff", "animated": false},
+          {"name": "pressed_face_bottom", "kind": "colour", "default": "#b5ccebff", "animated": false},
+          {"name": "pressed_upper_line", "kind": "colour", "default": "#2c568482", "animated": false},
+          {"name": "pressed_lower_line", "kind": "colour", "default": "#ffffff9b", "animated": false},
+          {"name": "disabled_face_top", "kind": "colour", "default": "#becfe4ff", "animated": false},
+          {"name": "disabled_face_bottom", "kind": "colour", "default": "#b5c7deff", "animated": false},
+          {"name": "disabled_border", "kind": "colour", "default": "#8fa6c464", "animated": false},
+          {"name": "disabled_upper_line", "kind": "colour", "default": "#ffffff64", "animated": false},
+          {"name": "perimeter", "kind": "colour", "default": "#214b81ff", "animated": false}
+        ]
+      },
+      {
+        "name": "gold_plate",
+        "introduced": "0.2",
+        "roles": ["face", "actuator", "chip"],
+        "states_read": ["pressed"],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 192, "fixed": 64, "preparation_per_device_pixel": 0},
+        "outsets": [0, 0, 0, 0],
+        "parameters": [
+          {"name": "shape", "kind": "choice", "choices": ["rounded_rectangle", "pill", "circle", "cap_start", "cap_end"], "default": "rounded_rectangle", "animated": false},
+          {"name": "corner_radius", "kind": "number", "minimum": 0, "maximum": 64, "default": 2, "animated": false},
+          {"name": "face_top", "kind": "colour", "default": "#ffedbaff", "animated": false},
+          {"name": "face_bottom", "kind": "colour", "default": "#ffcf66ff", "animated": false},
+          {"name": "border", "kind": "colour", "default": "#c49332ff", "animated": false},
+          {"name": "pressed_face_top", "kind": "colour", "default": "#f6c15bff", "animated": false},
+          {"name": "pressed_face_bottom", "kind": "colour", "default": "#ffe297ff", "animated": false},
+          {"name": "upper_line", "kind": "colour", "default": "#fffff0ff", "animated": false},
+          {"name": "left_line", "kind": "colour", "default": "#fffff0b4", "animated": false},
+          {"name": "lower_line", "kind": "colour", "default": "#a06d1c23", "animated": false}
+        ]
+      },
+      {
+        "name": "inset_well",
+        "introduced": "0.2",
+        "roles": ["well", "track"],
+        "states_read": [],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 160, "fixed": 64, "preparation_per_device_pixel": 0},
+        "outsets": [0, 0, 0, 0],
+        "parameters": [
+          {"name": "shape", "kind": "choice", "choices": ["rounded_rectangle", "pill", "circle", "cap_start", "cap_end"], "default": "rounded_rectangle", "animated": false},
+          {"name": "corner_radius", "kind": "number", "minimum": 0, "maximum": 64, "default": 0, "animated": false},
+          {"name": "face_top", "kind": "colour", "default": "#f8fbffff", "animated": false},
+          {"name": "face_bottom", "kind": "colour", "default": "#ffffffff", "animated": false},
+          {"name": "border", "kind": "colour", "default": "#94acc8ff", "animated": false},
+          {"name": "inner_shade", "kind": "colour", "default": "#6f8eb14b", "animated": false},
+          {"name": "outer_highlight", "kind": "colour", "default": "#ffffffe1", "animated": false}
+        ]
+      },
+      {
+        "name": "etched_divider",
+        "introduced": "0.2",
+        "roles": ["divider"],
+        "states_read": [],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 32, "fixed": 16, "preparation_per_device_pixel": 0},
+        "outsets": [0, 0, 0, 0],
+        "parameters": [
+          {"name": "shade_line", "kind": "colour", "default": "#8faac97d", "animated": false},
+          {"name": "light_line", "kind": "colour", "default": "#ffffffeb", "animated": false}
+        ]
+      },
+      {
+        "name": "seam_line",
+        "introduced": "0.2",
+        "roles": ["seam"],
+        "states_read": [],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 16, "fixed": 16, "preparation_per_device_pixel": 0},
+        "outsets": [0, 0, 0, 0],
+        "parameters": [
+          {"name": "line", "kind": "colour", "default": "#94acc8ff", "animated": false}
+        ]
+      },
+      {
+        "name": "grip",
+        "introduced": "0.2",
+        "roles": ["grip"],
+        "states_read": [],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 16, "fixed": 16, "preparation_per_device_pixel": 0},
+        "outsets": [0, 0, 0, 0],
+        "parameters": [
+          {"name": "dot", "kind": "colour", "default": "#627997ff", "animated": false}
         ]
       }
     ],

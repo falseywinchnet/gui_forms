@@ -133,6 +133,8 @@ struct RuleDeclaration final {
     [[nodiscard]] static RuleDeclaration primitive(std::string_view primitive_name);
     [[nodiscard]] static RuleDeclaration number_value(std::string_view parameter, double value);
     [[nodiscard]] static RuleDeclaration colour_value(std::string_view parameter, Color value);
+    // A choice parameter's value by the choice's name, such as a shape.
+    [[nodiscard]] static RuleDeclaration choice_value(std::string_view parameter, std::string_view choice);
     [[nodiscard]] static RuleDeclaration expression_value(std::string_view parameter,
                                                           std::span<const ExpressionInstruction> program,
                                                           double fallback);
