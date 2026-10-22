@@ -206,6 +206,11 @@ struct Dump final {
     // and whether the app was settled then (see the fixture app).
     std::uint64_t request{};
     bool settled{};
+    // What the app's "settled" was made of, for a named failure.
+    bool frame_pending{};
+    bool occluded{};
+    bool motion_armed{};
+    bool freeze_pending{};
     // Control type by stable id: (stable id, manifest id).
     std::vector<std::pair<std::string, std::string>> types;
     SemanticSnapshot snapshot;
@@ -276,6 +281,10 @@ Dump read_dump(const std::string& path) {
     dump.effects = static_cast<std::uint64_t>(ns_number(object[@"effects"]).value_or(0.0));
     dump.request = static_cast<std::uint64_t>(ns_number(object[@"request"]).value_or(0.0));
     dump.settled = ns_number(object[@"settled"]).value_or(0.0) != 0.0;
+    dump.frame_pending = ns_number(object[@"frame_pending"]).value_or(0.0) != 0.0;
+    dump.occluded = ns_number(object[@"occluded"]).value_or(0.0) != 0.0;
+    dump.motion_armed = ns_number(object[@"motion_armed"]).value_or(0.0) != 0.0;
+    dump.freeze_pending = ns_number(object[@"freeze_pending"]).value_or(0.0) != 0.0;
     NSDictionary* types = object[@"types"];
     for (NSString* key in types) dump.types.emplace_back(ns_text(key), ns_text(types[key]));
     NSDictionary* snapshot = object[@"snapshot"];
@@ -379,6 +388,9 @@ struct Report final {
     std::vector<Mismatch> mismatches;
     std::vector<std::string> failures;
     std::vector<std::string> notes;
+    // Set by the first settle that timed out: the run then stops, since
+    // every later comparison would read an unsettled app.
+    bool settle_failed{};
 };
 
 TypeTally& tally_for(Report& report, const std::string& control_type) {
@@ -429,10 +441,20 @@ bool write_request(const std::string& dump_path, std::uint64_t request) {
     return renamed == 0;
 }
 
+const char* yes_no(bool value) noexcept { return value ? "yes" : "no"; }
+
 // The first dump that answers a new request and is settled. A request the
-// app has not answered settled within settle_timeout_ms is a failure named
-// for `where`; the latest dump is returned then.
+// app has not answered settled within settle_timeout_ms (measured on the
+// steady clock, file reads included) is a failure named for `where`, with
+// what the app's last dump said held it; the latest dump is returned then
+// and report.settle_failed is set. After that, it returns the current dump
+// at once, so that a run that cannot settle ends well inside the test's
+// timeout.
 Dump settled_dump(const std::string& path, Report& report, const std::string& where) {
+    if (report.settle_failed) {
+        const Dump current = read_dump(path);
+        return current;
+    }
     const std::uint64_t request = last_request(path) + 1U;
     if (!write_request(path, request)) {
         report.failures.push_back("settle (" + where + "): could not write the request file");
@@ -440,7 +462,9 @@ Dump settled_dump(const std::string& path, Report& report, const std::string& wh
         return current;
     }
     Dump latest = read_dump(path);
-    for (int waited = 0; waited < settle_timeout_ms; waited += 20) {
+    const std::chrono::steady_clock::time_point deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(settle_timeout_ms);
+    while (std::chrono::steady_clock::now() < deadline) {
         const Dump current = read_dump(path);
         if (current.valid) {
             latest = current;
@@ -448,10 +472,14 @@ Dump settled_dump(const std::string& path, Report& report, const std::string& wh
         }
         sleep_milliseconds(20);
     }
+    report.settle_failed = true;
     report.failures.push_back("settle (" + where + "): the app answered request " + std::to_string(request) +
                               " with no settled dump within " + std::to_string(settle_timeout_ms) +
                               " ms (last dump: request " + std::to_string(latest.request) + ", settled " +
-                              (latest.settled ? "true" : "false") + ")");
+                              yes_no(latest.settled) + ", frame pending " + yes_no(latest.frame_pending) +
+                              ", occluded " + yes_no(latest.occluded) + ", motion armed " +
+                              yes_no(latest.motion_armed) + ", freeze pending " + yes_no(latest.freeze_pending) +
+                              "); the run stops here");
     return latest;
 }
 
@@ -642,6 +670,7 @@ Dump perform_default_actions(const std::string& path, AXUIElementRef application
     for (const SemanticNode& root : dump.snapshot.roots) collect_entries(dump, root, entries);
     for (const std::string& entry : entries) {
         dump = settled_dump(path, report, "before " + entry);
+        if (report.settle_failed) break;
         AxElement surface = find_surface(application);
         const SemanticNode* control = find_semantic_node(dump.snapshot.roots, entry);
         const std::string type = control_type(dump, entry);
@@ -743,6 +772,7 @@ Dump compare_gallery_pages(const std::string& path, AXUIElementRef application, 
     for (std::size_t index = 0U; index < rows.size(); ++index) {
         const std::string& row = rows[index];
         dump = settled_dump(path, report, "before pressing " + row);
+        if (report.settle_failed) break;
         AxElement surface = find_surface(application);
         AxElement element = find_identified(surface.get(), row);
         if (element.get() == nullptr) {
@@ -753,6 +783,7 @@ Dump compare_gallery_pages(const std::string& path, AXUIElementRef application, 
         const AXError pressed = AXUIElementPerformAction(element.get(), kAXPressAction);
         static_cast<void>(wait_for_new_dump(path, dump, 2000));
         dump = settled_dump(path, report, "after pressing " + row);
+        if (report.settle_failed) break;
         const bool shown = index == 0U || snapshot_ids(dump.snapshot) != ids_before;
         if (pressed != kAXErrorSuccess || !shown) {
             report.failures.push_back("gallery: pressing " + row + " through AX did not show its page");
@@ -870,7 +901,9 @@ int run(const Options& options) {
     }
     Report report;
     dump = settled_dump(options.dump, report, "initial");
-    if (surface.get() == nullptr) {
+    if (report.settle_failed) {
+        // Named by settled_dump; nothing later could be compared.
+    } else if (surface.get() == nullptr) {
         report.failures.push_back("the app's retained surface is not published through AX");
     } else if (options.gallery) {
         compare_surface(dump, surface.get(), report, "initial");
@@ -879,9 +912,11 @@ int run(const Options& options) {
         compare_surface(dump, surface.get(), report, "initial");
         dump = perform_default_actions(options.dump, application.get(), dump, report);
         dump = settled_dump(options.dump, report, "after-actions");
-        AxElement after_surface = find_surface(application.get());
-        compare_surface(dump, after_surface.get(), report, "after-actions");
-        dump = check_stale_element(options.dump, application.get(), dump, report);
+        if (!report.settle_failed) {
+            AxElement after_surface = find_surface(application.get());
+            compare_surface(dump, after_surface.get(), report, "after-actions");
+            dump = check_stale_element(options.dump, application.get(), dump, report);
+        }
     }
     close_app(application.get(), dump.pid);
     print_report(report);

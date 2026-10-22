@@ -24,16 +24,21 @@
 // Gallery. While it runs it writes a dump the client compares against:
 //
 //   {"pid":N,"generation":G,"effects":E,"request":R,"settled":S,
+//    "frame_pending":F,"occluded":O,"motion_armed":M,"freeze_pending":Z,
 //    "types":{stable id: manifest id},"snapshot":<SemanticSnapshot::to_json()>}
 //
 // to the path after --semantic-dump, whenever its content changes (checked
 // every 50 ms), by writing a temporary file and renaming it over the
 // dump.
 //
-// "settled" is true when the window has painted at least once, no
-// invalidation is pending (Window::needs_frame) and the motion clock is not
-// armed: nothing the app knows of will change the tree or a value (such as
-// a paint counter a diagnostics control publishes) before the next input.
+// "settled" is true when no invalidation waits for a paint
+// (Window::needs_frame) or the window is occluded, so that none will paint
+// until it shows, the motion clock is not armed, and (Gallery) no page
+// freeze is pending: nothing the app knows of will change the tree or a
+// value (such as a paint counter a diagnostics control publishes) before the
+// next input. An occluded window (a CI runner's session may show none)
+// paints nothing, so a paint is never required. The four inputs are written
+// beside it, so that a client that waits in vain can say which held.
 // "request" is the number the client last wrote to the file at the dump's
 // path plus ".request", as read by the writer's latest tick. A client that
 // writes a new number after its last action and then waits for a dump with
@@ -136,23 +141,32 @@ private:
     void write_if_changed() {
         const std::uint64_t effects = effects_ == nullptr ? 0U : (*effects_).total();
         const std::uint64_t request = read_request();
-        const bool settled = is_settled();
-        const std::string text = dump_text(effects, request, settled);
+        const SettleState settle = settle_state();
+        const std::string text = dump_text(effects, request, settle);
         if (text == written_text_) return;
         write(text);
         written_text_ = text;
     }
 
-    // Painted at least once, no invalidation pending, no motion armed, and
-    // (Gallery) the shown page frozen. Its inputs are read on the main
-    // thread, which also paints, so they cannot change while it runs.
-    bool is_settled() const {
-        const gui_forms::MetricsSnapshot metrics = window_.metrics_snapshot();
-        if (metrics.paint_passes == 0U) return false;
-        if (window_.needs_frame()) return false;
-        if (window_.motion_clock().armed()) return false;
-        if (freeze_pending_) return false;
-        return true;
+    // What decides "settled" (see the file comment), read on the main
+    // thread, which also paints, so the inputs cannot change while it runs.
+    struct SettleState final {
+        bool frame_pending{};
+        bool occluded{};
+        bool motion_armed{};
+        bool freeze_pending{};
+        bool settled{};
+    };
+
+    SettleState settle_state() const {
+        SettleState state{};
+        state.frame_pending = window_.needs_frame();
+        state.occluded = window_.occluded();
+        state.motion_armed = window_.motion_clock().armed();
+        state.freeze_pending = freeze_pending_;
+        const bool paint_quiet = !state.frame_pending || state.occluded;
+        state.settled = paint_quiet && !state.motion_armed && !state.freeze_pending;
+        return state;
     }
 
     // The client's latest request number, or 0 when it wrote none or the
@@ -169,13 +183,19 @@ private:
         return request;
     }
 
-    std::string dump_text(std::uint64_t effects, std::uint64_t request, bool settled) const {
+    static const char* json_bool(bool value) noexcept { return value ? "true" : "false"; }
+
+    std::string dump_text(std::uint64_t effects, std::uint64_t request, const SettleState& settle) const {
         const SemanticSnapshot snapshot = window_.semantic_snapshot();
         std::string text = "{\"pid\":" + std::to_string(static_cast<long long>(getpid())) +
                            ",\"generation\":" + std::to_string(snapshot.generation) +
                            ",\"effects\":" + std::to_string(effects) +
                            ",\"request\":" + std::to_string(request) +
-                           ",\"settled\":" + (settled ? "true" : "false") + ",\"types\":{";
+                           ",\"settled\":" + json_bool(settle.settled) +
+                           ",\"frame_pending\":" + json_bool(settle.frame_pending) +
+                           ",\"occluded\":" + json_bool(settle.occluded) +
+                           ",\"motion_armed\":" + json_bool(settle.motion_armed) +
+                           ",\"freeze_pending\":" + json_bool(settle.freeze_pending) + ",\"types\":{";
         bool first = true;
         for (const SemanticNode& root : snapshot.roots) append_types(window_, root, text, first);
         text += "},\"snapshot\":";
