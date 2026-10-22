@@ -1,5 +1,37 @@
 # Skia CPU proving-build evidence
 
+## 2026-10-21: codec-free Skia (Z-stage I5)
+
+`skia_cpu_args.gn` and `skia_cpu_windows_mingw_args.gn` now set
+`skia_use_libpng_decode`, `skia_use_libpng_encode` and `skia_use_zlib` to
+false. GUI.Forms decodes and encodes PNG with `stx_png` on `stx_zlib`, and
+no Skia codec is called. The build produces `libskia.a` and `libskcms.a`
+only; `libpng.a` and `libzlib.a` are gone, along with their fetches.
+`cmake/check_skia_archive.cmake` now also forbids SkPng*, libpng and
+`Cr_z_` symbols.
+
+The native CI job runs `tools/audit_link_map.py --forbid-foreign` over
+every toolkit archive and the Skia archives on all four platforms, and
+prints the Skia archive sizes. This build was not reproduced locally (no
+Mac in this workspace), so the sizes below come from that CI step: PR #239,
+head 48c7bf06, native jobs 119657438851 (macOS), 119657438744 (Linux x64)
+and 119657438878 (Linux arm64). The runners used LLVM 22.1.8.
+
+| Platform | `libskia.a` | `libskcms.a` | `libpng.a`, `libzlib.a` |
+|---|---|---|---|
+| macOS arm64 | 5,239,168 bytes | 73,840 bytes | not built |
+| Linux x64 | 10,241,702 bytes | 192,846 bytes | not built |
+| Linux arm64 | 8,893,756 bytes | 105,510 bytes | not built |
+
+Every platform passed `gui_forms_skia_archive_policy`, which now forbids
+SkPng*, libpng and `Cr_z_` symbols. The link-map audit reported zero C
+zlib, FreeType inflater and libpng symbols in every archive. Linux and
+macOS ran the full CTest suite (176 tests on Linux) and all passed.
+
+The 2026-08-03 macOS figures below came from Apple Clang 16 with libpng
+and zlib still built. They are historical and not a like-for-like
+comparison with this table.
+
 Status: **MEASURED** for the named local build only. This record does not select
 Skia as the permanent GUI.Forms renderer.
 

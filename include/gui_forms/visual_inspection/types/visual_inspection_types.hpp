@@ -39,6 +39,9 @@ enum class VisualPaintOperation : std::uint8_t {
     fill_image_pattern,
     draw_live_surface,
     draw_part_raster,
+    // A paint group: `rect` its bounds, `scalar` its opacity.
+    begin_group,
+    end_group,
 #if defined(GUI_FORMS_PREPARED_TEXT)
     draw_prepared_text,
 #endif

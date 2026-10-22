@@ -102,6 +102,14 @@ FrameRequestToken Window::request_motion_frames(FrameTime first_deadline) {
     return FrameRequestToken(request);
 }
 
+void Window::set_motion_frame_deadline(FrameTime deadline) noexcept {
+    for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
+        if ((*request).connected() && (*request).kind == detail::FrameRequestKind::motion_clock) {
+            (*request).deadline = deadline;
+        }
+    }
+}
+
 FrameRequestToken Window::schedule_ui_timer(
     Component& owner, FrameInterval interval, FrameTime first_deadline,
     std::function<void(FrameTime)> callback) {
@@ -286,6 +294,9 @@ void Window::set_occluded(bool occluded, FrameTime transition_time) {
                 (*request).deadline = transition_time;
             }
         }
+        // Ambient effects stopped while hidden resume with their parts'
+        // next paint (E7).
+        resume_engine_ambient();
         if (paint_dirty_) request_paint_wake();
     }
     update_paint_lease_state();

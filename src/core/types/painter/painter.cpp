@@ -248,6 +248,18 @@ void Painter::draw_part_raster(const std::shared_ptr<const PartRaster>&, Point, 
     // part rasters, through the shared blend.
 }
 
+void Painter::begin_group(const PaintGroup& group) {
+    // A minimal painter cannot isolate: the group's commands draw directly,
+    // limited to its bounds, and a group at opacity 0 (or NaN) to nothing.
+    save();
+    clip_rect(group.bounds);
+    if (!(group.opacity > 0.0)) clip_rect(Rect{});
+}
+
+void Painter::end_group() {
+    restore();
+}
+
 void Painter::draw_image_region_sampled(
     ImageId image, Rect source, Rect destination, ImageSampling,
     double opacity) {

@@ -54,6 +54,7 @@ namespace detail {
 struct LiveSurfaceIdleWake;
 class PopupAttachment;
 class AcceleratorAttachment;
+class RecordingPainter;
 }
 
 class PopupToken final {
@@ -673,6 +674,21 @@ public:
     // MotionValue finds it here; tests install a time source on it.
     [[nodiscard]] MotionClock& motion_clock() noexcept { return motion_clock_; }
     [[nodiscard]] const MotionClock& motion_clock() const noexcept { return motion_clock_; }
+    // Values the application publishes for the theme engine (T2 E6; GIVEN
+    // B1-1): named, numeric and read-only to themes. A theme's expressions
+    // read the ones its rule sheet names (ThemeRuleSheet::published_values);
+    // nothing in a theme writes them. Publishing a changed value, or
+    // withdrawing one, damages only the parts whose expressions read it,
+    // within their extents. A name that is not published reads as not
+    // published: NaN, so the expression reading it gives its fallback.
+    //
+    // publish_value returns false and changes nothing for a name that is not
+    // 1 to 64 characters of lowercase ASCII letters, digits, '-' and '_'
+    // starting with a letter, or for a value that is not finite. UI thread
+    // only.
+    bool publish_value(std::string_view name, double value);
+    void withdraw_value(std::string_view name);
+    [[nodiscard]] std::optional<double> published_value(std::string_view name) const;
     Metrics& metrics() noexcept { return metrics_; }
     void reset_activity_metrics() noexcept { metrics_.reset_activity(); }
     // Captures the committed retained visual state without exposing a renderer
@@ -716,6 +732,10 @@ private:
     // calls the clock's advance; the clock disconnects the request when
     // nothing moves. Throws std::length_error at the request limit.
     [[nodiscard]] FrameRequestToken request_motion_frames(FrameTime first_deadline);
+    // Called by the motion clock while only ambient effects run (E7): its
+    // request's next frame is due at `deadline`, the earliest effect's,
+    // rather than one motion_frame_interval after the last.
+    void set_motion_frame_deadline(FrameTime deadline) noexcept;
     // Called by HostSession: seeds the window's bindings with the host's
     // defaults unless they are seeded already.
     void install_host_key_map(const KeyMap& defaults);
@@ -752,6 +772,67 @@ private:
     // Called by ThemeEngine::paint: the part's raster from its record's
     // cache (EnginePartTable::raster_for), on the paint in progress.
     [[nodiscard]] PartRasterResult engine_part_raster(PartRecordHandle handle, const PartRasterRequest& request);
+    // Where a part ThemeEngine::paint draws with `painter` lands (E6): the
+    // control whose display chunk records it (the control being recorded,
+    // which may paint on behalf of `control`, or else `control` itself), the
+    // painter's origin in that control's coordinates, and that origin in
+    // window coordinates.
+    struct EnginePaintPlace final {
+        const Control* painted_by{};
+        Point origin{};
+        Point window_origin{};
+    };
+    [[nodiscard]] EnginePaintPlace engine_paint_place(const Control& control, const Painter& painter) const;
+    // Called by ThemeEngine::paint for a keyed part: what its paint read
+    // and where it was drawn (EnginePartTable::note_paint).
+    void note_engine_paint(PartRecordHandle handle, std::uint64_t inputs_read, const Control& painted_by,
+                           Rect extent);
+    // The pointer's window position for the engine's pointer inputs, or
+    // none while it is outside the window.
+    [[nodiscard]] const std::optional<Point>& engine_pointer() const noexcept { return engine_pointer_; }
+    // Damage by dependency (E6): invalidates the extent of every keyed part
+    // reading any of `inputs` (only hot parts when `hot_only`), or reading
+    // the published value `name`, on the control that recorded it, and
+    // counts it in the metrics.
+    void damage_engine_readers(std::uint64_t inputs, bool hot_only);
+    void damage_published_readers(std::string_view name);
+    struct EngineDamage final {
+        std::uint64_t parts{};
+        double area{};
+    };
+    // Invalidates one record's extent on the control that recorded it, if
+    // that control is still in this window; returns whether it did.
+    bool damage_engine_part(const EnginePartRecord& record, EngineDamage& damage);
+    // Follows the pointer for the engine: a move inside the window damages
+    // the hot parts reading the pointer.
+    void note_engine_pointer(const PointerEvent& event);
+    friend class PartMotion;
+    // Called by PartMotion (E7): one of a part's transition values stepped.
+    // Its extent repaints on the control that recorded it; when the value
+    // settled, the record's motion_unsettled follows its other values.
+    void engine_part_moved(PartRecordHandle handle, bool settled);
+    // Called by ThemeEngine::paint: the record a handle names, to run its
+    // transitions; null when the handle is stale.
+    [[nodiscard]] EnginePartRecord* engine_part_record(PartRecordHandle handle) noexcept {
+        return engine_parts_.record(handle);
+    }
+    // Called by ThemeEngine::paint: runs a part's ambient effect on the
+    // motion clock, its frames at least `interval` apart, or stops it.
+    void run_engine_ambient(PartRecordHandle handle, FrameInterval interval);
+    void stop_engine_ambient(PartRecordHandle handle) noexcept;
+    // Called by MotionClock: one ambient frame for the record in `slot`
+    // with `generation`. Returns false, and repaints nothing, when the
+    // record is gone or the part was not repainted since the frame that
+    // saw paint `seen`, so that the effect ends; otherwise repaints the
+    // part's extent and updates `seen`.
+    bool engine_ambient_frame(std::uint32_t slot, std::uint32_t generation, std::uint64_t& seen);
+    // Called by MotionClock when ambient effects stop: the part repaints, at
+    // its static pose.
+    void repaint_engine_part(std::uint32_t slot, std::uint32_t generation);
+    // Repaints every part whose last paint had an ambient effect, so that
+    // its effect resumes: when the window is shown again, reduced motion
+    // ends or the motion switch is turned on.
+    void resume_engine_ambient();
     friend class detail::AcceleratorAttachment;
 
     using ControlList = std::vector<Control::Ptr>;
@@ -1071,6 +1152,19 @@ private:
     EnginePartTable engine_parts_;
     // After metrics_, which it reports into, so that it is destroyed first.
     MotionClock motion_clock_{*this};
+    // The values the application publishes for the engine, in publication
+    // order (E6).
+    struct PublishedValue final {
+        std::string name;
+        double value{};
+    };
+    std::vector<PublishedValue> published_values_;
+    std::optional<Point> engine_pointer_{};
+    // The control whose display chunk is being recorded and its recorder,
+    // while one is (E6); null otherwise. Observing: both live on the stack
+    // of the paint that records.
+    const Control* recording_control_{};
+    const detail::RecordingPainter* recording_painter_{};
     // Shared with every window constructed with the same resources; this
     // window is registered with them from construction to destruction.
     std::shared_ptr<ApplicationResources> resources_;

@@ -38,11 +38,11 @@ def main() -> None:
               'timing': '50ms calibration, rotating order, 2 warmup + 7 paired rounds',
               'workloads': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in workloads.glob('*.png')},
               'sources': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in (
-                  'src/core/image/png_decoder.cpp','src/core/image/png_decoder.hpp',
-                  'src/core/image/png_writer.cpp','stx_zlib/src/inflate.cpp',
+                  'stx_png/src/decoder.cpp','stx_png/include/stx_png/decoder.hpp',
+                  'stx_png/src/encoder.cpp','stx_zlib/src/inflate.cpp',
                   'include/gui_forms/compression/inflate.hpp',
                   'tests/image/png_benchmark.cpp','tests/image/png_oracle.c','tools/benchmark_png.py')}}
-    includes = ['-I' + str(output), '-I' + str(png), '-I' + str(zlib), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'stx_zlib/include'), '-I' + str(ROOT / 'src/core/image')]
+    includes = ['-I' + str(output), '-I' + str(png), '-I' + str(zlib), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'stx_zlib/include'), '-I' + str(ROOT / 'stx_png/include'), '-I' + str(ROOT / 'src/core/image')]
     shutil.copyfile(png / 'scripts/pnglibconf.h.prebuilt', output / 'pnglibconf.h')
     native_neon = platform.machine().lower() in ('arm64', 'aarch64')
     record['oracle_simd'] = 'NEON intrinsics' if native_neon else 'portable C'
@@ -80,8 +80,9 @@ def main() -> None:
             subprocess.run(command, check=True)
             binary = output / ('benchmark-' + mode)
             command = ['clang++', '-std=c++20', '-O3', *includes, *flags,
-                       str(ROOT / 'src/core/image/png_decoder.cpp'), str(ROOT / 'src/core/image/png_writer.cpp'),
+                       str(ROOT / 'stx_png/src/decoder.cpp'), str(ROOT / 'stx_png/src/encoder.cpp'),
                        str(ROOT / 'stx_zlib/src/inflate.cpp'), str(ROOT / 'stx_zlib/src/deflate.cpp'),
+                       str(ROOT / 'stx_zlib/src/checksum.cpp'),
                        str(ROOT / 'tests/image/png_benchmark.cpp'),
                        str(baseline_object), str(oracle), *objects, '-o', str(binary)]
             record['commands'].append(command)
@@ -98,7 +99,7 @@ def main() -> None:
         for name, flags in targets:
             command = ['clang++', '-std=c++20', '-O3', '-S', '-Rpass=loop-vectorize',
                        '-Rpass-missed=loop-vectorize', *includes, *flags,
-                       str(ROOT / 'src/core/image/png_decoder.cpp'), '-o', str(output / (name + '.s'))]
+                       str(ROOT / 'stx_png/src/decoder.cpp'), '-o', str(output / (name + '.s'))]
             record['commands'].append(command)
             with (output / (name + '-remarks.txt')).open('w') as log:
                 subprocess.run(command, stderr=log, check=True)
