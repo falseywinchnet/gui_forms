@@ -30,6 +30,7 @@ constexpr std::uint32_t srgb = chunk_type('s', 'R', 'G', 'B');
 constexpr std::uint32_t gama = chunk_type('g', 'A', 'M', 'A');
 constexpr std::uint32_t chrm = chunk_type('c', 'H', 'R', 'M');
 constexpr std::uint32_t iccp = chunk_type('i', 'C', 'C', 'P');
+constexpr std::uint32_t cicp = chunk_type('c', 'I', 'C', 'P');
 
 std::uint32_t read_u32(const std::byte* bytes) noexcept {
     return (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[0])) << 24U) |
@@ -192,6 +193,7 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
     bool saw_srgb = false;
     bool saw_gama = false;
     bool saw_chrm = false;
+    bool saw_cicp = false;
 
     while (offset < encoded.size()) {
         if (++chunk_count > limits.maximum_chunks_per_image) {
@@ -308,6 +310,19 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
             // Compressed ICC profiles are an independent decompression boundary.
             // This proving slice fixes decoded output to sRGB and rejects them.
             return PngValidationResult::failure(ImageResourceError::unsupported_color_profile);
+        } else if (type == cicp) {
+            // Coding-independent code points outrank every other colour
+            // chunk. Only the sRGB-equivalent values (BT.709 primaries, sRGB
+            // transfer, RGB matrix, full range) match the fixed sRGB output.
+            if (saw_cicp || saw_plte || saw_idat || length != 4U) {
+                return PngValidationResult::failure(ImageResourceError::invalid_color_metadata);
+            }
+            const bool srgb_equivalent = data[0] == std::byte{1} && data[1] == std::byte{13} &&
+                                         data[2] == std::byte{0} && data[3] == std::byte{1};
+            if (!srgb_equivalent) {
+                return PngValidationResult::failure(ImageResourceError::unsupported_color_profile);
+            }
+            saw_cicp = true;
         } else if (type == trns) {
             if (saw_trns || saw_idat) {
                 return PngValidationResult::failure(ImageResourceError::invalid_transparency);

@@ -140,3 +140,65 @@ pass there shows byte-identical decoded pixels. It also checks:
 **Memory.** For a W × H image the decoder briefly holds 8·W·H bytes of
 RGBA16 samples beside the caller's 4·W·H destination. Each batch (one
 registry synchronization) keeps one decoder and frees it afterwards.
+
+### I6: gAMA and cHRM converted to sRGB (owner, 2026-10-20)
+
+The owner accepted converting gAMA and cHRM to sRGB on 2026-10-20, in a
+first-party, deterministic conversion, while still refusing iCCP. Full ICC
+support is a later study. The coordinator accepted the three detailed points
+the same day:
+- a cICP chunk with sRGB-equivalent values means sRGB, and any other cICP is
+  refused;
+- gAMA 45455 is converted literally, with no "approximately sRGB" special case;
+- cHRM without gAMA assumes the sRGB transfer function.
+
+The conversion is implemented in `src/core/image/png_color`. Every host uses
+it through `PngPixelDecoder`, after decoding and before the 8-bit kernel.
+
+**Precedence** follows the PNG specification (third edition, 4.3): cICP,
+then iCCP, then sRGB, then cHRM and gAMA. An iCCP chunk that the purpose's
+rule ignores (clipboard reads) means sRGB, so gAMA beside it is not applied.
+The registry also refuses a cICP that is not sRGB-equivalent at load time
+(`unsupported_color_profile`). It reports a malformed cICP (wrong length,
+duplicate, or after PLTE/IDAT) as `invalid_color_metadata`.
+
+**Pipeline.** All arithmetic is in doubles, with floating-point contraction
+off, using the engine's deterministic `engine_power` and no host libm:
+1. **Decode.** linear = (sample / 65535) ^ (100000 / gAMA). Without a usable
+   gAMA, the sRGB decoding curve is used.
+2. **Gamut matrix.** M = inverse(sRGB primaries) × Bradford(image white → D65)
+   × image primaries, built from the cHRM chromaticities with each primary
+   scaled to the image white. The matrix step is skipped when there is no
+   usable cHRM.
+3. **Clip.** Each channel is clipped to [0, 1].
+4. **Encode.** The result is the 16-bit code found by binary search over
+   65535 precomputed thresholds, each the sRGB decoding of a midpoint between
+   adjacent codes.
+   - Rounding: the nearest code; a value exactly on a threshold takes the
+     upper code.
+   - Error bound: within one 16-bit code of the exact result.
+   - Tables: images of 8 bits or fewer use a 256-entry decode table, since
+     every such sample is a multiple of 257; 16-bit images use 65536 entries.
+     Without a matrix, a per-sample output table replaces the per-pixel search.
+
+**Degenerate values are ignored, as if the chunk were absent, and reported.**
+- A gAMA value outside 16..625000000. That is the range the previous libpng
+  paths accepted, so files they honoured keep their gamma.
+- A cHRM with any y = 0, x + y > 1, a singular primary matrix, or a white
+  point outside the primaries' triangle.
+
+The PNG specification allows a decoder to ignore an erroneous ancillary
+chunk. Structural errors (length, order, duplicates, gAMA 0) remain refused,
+per decision 5A.
+
+**Tests** (`gui_forms_png_color_tests`) compare against references computed
+with the host's `std::pow` (the references may use it; the code may not):
+- gAMA 45455 alone, gAMA 1.0, and Rec.709 cHRM with gAMA 45455: within one
+  8-bit code;
+- Rec.2020 cHRM with gAMA 45455, against the four-decimal ITU-R BT.2087
+  matrix: within two 8-bit codes;
+- cHRM without gAMA: within one code.
+They also cover precedence, cICP, an ignored iCCP, degenerate values, and
+identity hashes over three conversion cases × four formats × Adam7 (checked
+on all four CI platforms): `0x44de97c1f2726691`, `0xf284508a59809f75`,
+`0x66e109f833f56831`.

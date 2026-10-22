@@ -114,17 +114,22 @@ void command_execution_and_png_round_trip() {
     CHECK(checksum((*decoded.bitmap).snapshot()) == first_checksum);
 
     // Owner decision D1, option 2: GUI.Drawing decode refuses an embedded
-    // ICC profile; gAMA and cHRM leave the samples unchanged (stage I6 adds
-    // their conversion). Chunks go straight after IHDR (8 + 25 bytes).
+    // ICC profile; an sRGB chunk leaves the samples unchanged, and gAMA is
+    // converted to sRGB (stage I6). Chunks go straight after IHDR (8 + 25 bytes).
     std::vector<std::byte> profiled(png.begin(), png.begin() + 33);
     gui_forms_png_files::chunk(profiled, "iCCP", gui_forms_png_files::icc_profile_payload());
     profiled.insert(profiled.end(), png.begin() + 33, png.end());
     CHECK(executor.decode_png(profiled).error == RasterError::decode_failed);
+    std::vector<std::byte> tagged(png.begin(), png.begin() + 33);
+    gui_forms_png_files::chunk(tagged, "sRGB", std::vector<std::byte>{std::byte{0}});
+    tagged.insert(tagged.end(), png.begin() + 33, png.end());
+    DecodeResult tagged_decoded = executor.decode_png(tagged);
+    CHECK(tagged_decoded && checksum((*tagged_decoded.bitmap).snapshot()) == first_checksum);
     std::vector<std::byte> gamma(png.begin(), png.begin() + 33);
     gui_forms_png_files::chunk(gamma, "gAMA", gui_forms_png_files::gamma_payload(100000));
     gamma.insert(gamma.end(), png.begin() + 33, png.end());
     DecodeResult gamma_decoded = executor.decode_png(gamma);
-    CHECK(gamma_decoded && checksum((*gamma_decoded.bitmap).snapshot()) == first_checksum);
+    CHECK(gamma_decoded && checksum((*gamma_decoded.bitmap).snapshot()) != first_checksum);
 
     std::vector<std::byte> malformed = png;
     malformed[0] = std::byte{0};

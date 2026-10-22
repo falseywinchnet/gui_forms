@@ -1,5 +1,6 @@
 #pragma once
 
+#include "png_color.hpp"
 #include "png_decoder.hpp"
 
 #include <cstddef>
@@ -14,9 +15,9 @@ namespace gui_forms::image {
 // reconstructs straight-alpha RGBA16 samples; one kernel converts them to the
 // four 8-bit channels each consumer stores. Nothing here calls a host codec.
 //
-// Colour: samples are treated as sRGB. sRGB, gAMA and cHRM chunks are
-// validated structurally and do not change the samples (decision D2, option 1;
-// the gAMA/cHRM conversion is stage I6). iCCP follows icc_profile_rule.
+// Colour: output is sRGB. iCCP follows icc_profile_rule; cICP, sRGB, gAMA
+// and cHRM follow png_color.hpp (stage I6), which converts gAMA/cHRM images
+// to sRGB before the 8-bit kernel.
 
 // Memory order of the four 8-bit channels of one destination pixel.
 enum class PixelOrder { rgba, bgra };
@@ -72,7 +73,7 @@ enum class PngPixelPurpose {
 
 enum class PngPixelError {
     none, invalid_argument, decode_failed, unsupported_color_profile,
-    insufficient_storage, allocation_failed
+    invalid_color_metadata, insufficient_storage, allocation_failed
 };
 
 struct PngPixelRequest final {
@@ -146,6 +147,7 @@ private:
     std::vector<std::uint16_t> samples_;
     std::vector<std::byte> scratch_;
     std::vector<PngMetadataRecord> records_;
+    PngColorWorkspace color_work_;
 };
 
 } // namespace gui_forms::image

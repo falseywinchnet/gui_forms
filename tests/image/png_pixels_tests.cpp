@@ -199,18 +199,13 @@ void colour_chunk_policy() {
     const Bytes reference = decode_pixels(decoder, plain, request, result);
     require(result.error == image::PngPixelError::none, "plain image refused");
 
-    // sRGB, gAMA and cHRM are validated and the samples pass through as sRGB
-    // (decision D2, option 1, until the I6 conversion).
+    // An sRGB chunk passes the samples through unchanged; gAMA and cHRM
+    // conversion is covered by gui_forms_png_color_tests.
     const std::array<Extra, 1> srgb{{{"sRGB", Bytes{std::byte{0}}}}};
-    const std::array<Extra, 2> gamma{{{"gAMA", gamma_payload(100000)}, {"cHRM", chromaticity_payload()}}};
     const Bytes srgb_file = png_file(9, 7, rgba, false, srgb);
-    const Bytes gamma_file = png_file(9, 7, rgba, false, gamma);
     const Bytes srgb_pixels = decode_pixels(decoder, srgb_file, request, result);
     require(result.error == image::PngPixelError::none && srgb_pixels == reference,
             "sRGB chunk changed decoded pixels");
-    const Bytes gamma_pixels = decode_pixels(decoder, gamma_file, request, result);
-    require(result.error == image::PngPixelError::none && gamma_pixels == reference,
-            "gAMA or cHRM changed decoded pixels");
 
     // Decision D1, option 2: the one switch point, then each side of it.
     require(image::icc_profile_rule(image::PngPixelPurpose::resource) == image::IccProfileRule::refuse &&
