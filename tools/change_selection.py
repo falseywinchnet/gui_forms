@@ -294,10 +294,10 @@ def changed_paths(source_root: Path, base: str) -> list[str]:
 
 
 def ctest_listing(tree: Path) -> dict:
-    completed: subprocess.CompletedProcess[str] = subprocess.run(
-        ['ctest', '--test-dir', str(tree), '--show-only=json-v1'], check=True, capture_output=True, text=True,
-        encoding='utf-8', errors='replace')
-    return json.loads(completed.stdout)
+    """Every test of tree, with the commands of tests not built yet (ci_build.test_listing)."""
+    # Imported here: ci_build imports this module.
+    import ci_build
+    return ci_build.test_listing(tree, '', '')
 
 
 def load_rules() -> list[PathRule]:
