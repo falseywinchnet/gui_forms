@@ -28,6 +28,15 @@ ARCHIVE_NAME: str = 'gui-forms-toolchain-windows-x64.tar.zst'
 MANIFEST_NAME: str = 'gui-forms-toolchain-windows-x64.json'
 CACHE_NAME: str = 'gui-forms-cache-windows-x64.tar.gz'
 SPEC_PATH: Path = Path(__file__).resolve().parent / 'windows_toolchain.json'
+# The release that holds the published archive of the current specification,
+# kept apart from the specification, whose digest names the toolchain.
+PIN_PATH: Path = Path(__file__).resolve().parent / 'windows_toolchain_release.json'
+# Set to 1 (native.yml's package_windows_toolchain input) to let a job with
+# no published archive install the specification's packages from the MSYS2
+# mirrors and package them. Only for a deliberate specification change: the
+# mirrors carry only the current LLVM, never an older pinned one.
+PACKAGE_VARIABLE: str = 'GUI_FORMS_PACKAGE_WINDOWS_TOOLCHAIN'
+CLANG_PACKAGE: str = 'mingw-w64-clang-x86_64-clang'
 LOCAL_MANIFEST: Path = ci_reuse.STATE / 'windows-toolchain.json'
 ARCHIVE_ROOT: str = 'msys64'
 COMPILER_MEMBER: str = 'msys64/clang64/bin/clang.exe'
@@ -65,6 +74,19 @@ def load_spec() -> dict[str, Any]:
     if spec.get('schema') != 1 or spec.get('msystem') != 'CLANG64':
         raise ValueError('Unsupported Windows toolchain specification')
     return spec
+
+
+class ToolchainUnavailable(RuntimeError):
+    """The pinned Windows toolchain cannot be restored, and installing the current one was not requested."""
+
+
+def check_llvm_version(packages: dict[str, str], spec: dict[str, Any]) -> None:
+    """Raise unless the installed clang package is the specification's LLVM release (any package revision)."""
+    installed: str = packages.get(CLANG_PACKAGE, 'none')
+    if not installed.startswith(spec['llvm'] + '-'):
+        raise ToolchainUnavailable('tools/windows_toolchain.json pins LLVM ' + spec['llvm'] + ', but the installed '
+                                   + CLANG_PACKAGE + ' is ' + installed + '. The MSYS2 mirrors carry only the '
+                                   'current LLVM; packaging a new toolchain needs a specification that names it.')
 
 
 def spec_digest(spec: dict[str, Any]) -> str:
@@ -161,6 +183,7 @@ def pack(msys_root: Path, destination: Path, spec: dict[str, Any], producer: dic
     for requested in spec['packages']:
         if requested not in packages:
             raise ValueError('Specified toolchain package is not installed: ' + requested)
+    check_llvm_version(packages, spec)
     compiler: Path = msys_root / 'clang64/bin/clang.exe'
     compiler_sha256: str = file_digest(compiler)
     archive: Path = destination / ARCHIVE_NAME
@@ -244,12 +267,17 @@ def release_manifest(repository: str, tag: str, directory: Path) -> dict[str, An
 
 
 def find_release(repository: str, field: str, value: str) -> tuple[str, dict[str, Any]] | None:
-    """Return the newest build-<sha> release whose toolchain manifest has manifest[field] == value."""
+    """Return the newest build-<sha> release whose toolchain manifest has manifest[field] == value.
+
+    Prints what it listed and inspected, so that a miss can be explained
+    from the job log.
+    """
     inspected: int = 0
     page: int
     for page in range(1, RELEASE_PAGES + 1):
         releases: list[dict[str, Any]] = ci_reuse.api(
             'repos/' + repository + '/releases?per_page=' + str(RELEASES_PER_PAGE) + '&page=' + str(page))
+        print('Release page ' + str(page) + ': ' + str(len(releases)) + ' releases', flush=True)
         release: dict[str, Any]
         for release in releases:
             tag: str = release['tag_name']
@@ -267,11 +295,50 @@ def find_release(repository: str, field: str, value: str) -> tuple[str, dict[str
             manifest: dict[str, Any]
             with tempfile.TemporaryDirectory() as directory:
                 manifest = release_manifest(repository, tag, Path(directory))
+            print('  ' + tag + ': ' + field + ' ' + str(manifest.get(field)), flush=True)
             if manifest.get('schema') == 1 and manifest.get(field) == value:
                 return tag, manifest
         if len(releases) < RELEASES_PER_PAGE:
             break
+    print('No release among ' + str(inspected) + ' inspected toolchain manifests has ' + field + ' ' + value,
+          flush=True)
     return None
+
+
+def pinned_release(repository: str, digest: str) -> tuple[str, dict[str, Any]] | None:
+    """The release PIN_PATH names for specification digest, read by its tag (no listing).
+
+    None, with the reason printed, when the pin names another specification
+    (it must follow every specification change) or its release does not
+    hold the pinned archive.
+    """
+    pin: dict[str, Any] = json.loads(PIN_PATH.read_text(encoding='utf-8'))
+    if pin.get('spec_sha256') != digest:
+        print(PIN_PATH.name + ' pins specification ' + str(pin.get('spec_sha256')) + ', not the current ' + digest,
+              flush=True)
+        return None
+    tag: str = pin['tag']
+    completed: subprocess.CompletedProcess[str] = subprocess.run(
+        ['gh', 'api', 'repos/' + repository + '/releases/tags/' + tag], capture_output=True, text=True)
+    if completed.returncode != 0:
+        print('Pinned release ' + tag + ' cannot be read: ' + completed.stderr.strip(), flush=True)
+        return None
+    release: dict[str, Any] = json.loads(completed.stdout)
+    names: list[str] = []
+    asset: dict[str, Any]
+    for asset in release['assets']:
+        names.append(asset['name'])
+    if ARCHIVE_NAME not in names or MANIFEST_NAME not in names:
+        print('Pinned release ' + tag + ' holds no toolchain archive', flush=True)
+        return None
+    manifest: dict[str, Any]
+    with tempfile.TemporaryDirectory() as directory:
+        manifest = release_manifest(repository, tag, Path(directory))
+    if manifest.get('spec_sha256') != digest or manifest.get('archive_sha256') != pin.get('archive_sha256'):
+        print('Pinned release ' + tag + ' holds archive ' + str(manifest.get('archive_sha256')) + ' of specification '
+              + str(manifest.get('spec_sha256')) + ', not the pinned one', flush=True)
+        return None
+    return tag, manifest
 
 
 def download_release_archive(repository: str, tag: str, manifest: dict[str, Any], destination: Path) -> Path:
@@ -347,15 +414,34 @@ def publication_files(root: Path) -> list[Path]:
     return files
 
 
+def packaging_requested(environ: dict[str, str]) -> bool:
+    return environ.get(PACKAGE_VARIABLE, '').strip().lower() in ('1', 'true')
+
+
 def restore_command(repository: str) -> None:
+    """Restore the published toolchain of the current specification, or stop the job.
+
+    The pinned release is read first, then the recent releases are listed.
+    Without either, the job fails with ToolchainUnavailable, unless
+    PACKAGE_VARIABLE asks for a new toolchain: only then does the
+    `restored` output stay false, so that setup-msys2 installs one.
+    """
     spec: dict[str, Any] = load_spec()
     digest: str = spec_digest(spec)
     ci_reuse.output('packages', ' '.join(spec['packages']))
     ci_reuse.output('spec', digest)
-    found: tuple[str, dict[str, Any]] | None = find_release(repository, 'spec_sha256', digest)
+    found: tuple[str, dict[str, Any]] | None = pinned_release(repository, digest)
     if found is None:
-        print('No published toolchain for specification ' + digest + '; setup-msys2 will install one',
-              flush=True)
+        found = find_release(repository, 'spec_sha256', digest)
+    if found is None:
+        if not packaging_requested(dict(os.environ)):
+            raise ToolchainUnavailable(
+                'No published Windows toolchain for specification ' + digest + ' (LLVM ' + spec['llvm'] + '). '
+                'This job will not install the current MSYS2 packages in its place. Publish the pinned archive '
+                'again, or, for a deliberate change of tools/windows_toolchain.json, run native.yml with '
+                'package_windows_toolchain.')
+        print('No published toolchain for specification ' + digest + '; packaging was requested, so setup-msys2 '
+              'installs one', flush=True)
         ci_reuse.output('restored', 'false')
         return
     tag: str = found[0]
@@ -389,7 +475,12 @@ def pack_command(msys_root: Path) -> None:
 def fetch_recorded_command(repository: str) -> None:
     record: dict[str, Any] = cache_toolchain(ci_reuse.ROOT / CACHE_NAME)
     archive_sha256: str = record['sha256']
-    found: tuple[str, dict[str, Any]] | None = find_release(repository, 'archive_sha256', archive_sha256)
+    found: tuple[str, dict[str, Any]] | None = None
+    pin: dict[str, Any] = json.loads(PIN_PATH.read_text(encoding='utf-8'))
+    if pin.get('archive_sha256') == archive_sha256:
+        found = pinned_release(repository, str(pin.get('spec_sha256')))
+    if found is None:
+        found = find_release(repository, 'archive_sha256', archive_sha256)
     manifest: dict[str, Any]
     if found is None:
         manifest = download_artifact(repository, archive_sha256, ci_reuse.ROOT)
