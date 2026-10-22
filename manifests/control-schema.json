@@ -208,6 +208,20 @@
         "cost": {"per_device_pixel": 512, "fixed": 64, "preparation_per_device_pixel": 0},
         "outsets": [32, 32, 32, 32],
         "parameters": []
+      },
+      {
+        "name": "sheen",
+        "introduced": "0.2",
+        "roles": ["sheen"],
+        "states_read": [],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 16, "fixed": 16, "preparation_per_device_pixel": 0},
+        "outsets": [0, 0, 0, 0],
+        "parameters": [
+          {"name": "colour", "kind": "colour", "default": "#ffffff60", "animated": false},
+          {"name": "width", "kind": "number", "minimum": 2, "maximum": 96, "default": 24, "animated": false},
+          {"name": "rest", "kind": "number", "minimum": 0, "maximum": 1, "default": 0.25, "animated": false}
+        ]
       }
     ],
     "expressions": {"maximum_operations": 64, "maximum_stack": 16, "operations": ["constant", "input", "state", "parameter", "negate", "add", "subtract", "multiply", "divide", "minimum", "maximum", "less", "less_equal", "greater", "greater_equal", "equal", "not_equal", "clamp", "mix", "smoothstep", "choose"]},

@@ -56,6 +56,7 @@ Theme engine 0.2 (T2): the primitives a theme's rules may select, the atoms each
 | `grip` | 0.2 | `grip` | none | 16 | `dot` |
 | `material` | 0.2 | `region`, `face`, `actuator`, `well`, `track`, `thumb`, `chip` | `hot`, `pressed`, `captured`, `selected`, `checked`, `current`, `open`, `active_tool`, `focus_visible`, `preselect`, `disabled`, `unavailable` | 512 | `recipe` |
 | `overlay_shadow` | 0.2 | `shadow` | none | 512 | none |
+| `sheen` | 0.2 | `sheen` | none | 16 | `colour`, `width`, `rest` |
 
 Bounded expressions: at most 64 operations and a stack of 16, from `constant`, `input`, `state`, `parameter`, `negate`, `add`, `subtract`, `multiply`, `divide`, `minimum`, `maximum`, `less`, `less_equal`, `greater`, `greater_equal`, `equal`, `not_equal`, `clamp`, `mix`, `smoothstep`, `choose`.
 

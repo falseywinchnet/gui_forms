@@ -504,6 +504,34 @@ assembles any size of a sliceable material from one reference bake.
   back, counted. `gui_forms_overlay_shadow_tests` sees the raster first in
   each tooltip's and context menu's operations.
 
+### E9.2, the sheen behind the overlay seam
+
+- **The seam (E9-A).** `EnginePrimitive::pointer_overlay` returns a
+  `PointerOverlay`: the raster's logical size and its rest, a fraction of
+  the part's width. The engine bakes that raster through the part's
+  record, keyed like any other: once per (size, state, scale), never per
+  pointer position. It composites the raster with its centre across at the
+  part-local pointer and its top at the part's top. The raster is clipped
+  to the part's rounded shape: the part's own radius, else its family
+  recipe's. The part reads the pointer inputs for damage only, so a move
+  while the part is hot damages the part's extent and bakes nothing.
+- **Rest.** Without the pointer (the part is not hot), the band rests at
+  `rest`. Under reduced motion it always rests, and the part does not read
+  the pointer, so a move damages nothing (§9.5). The presentational scale
+  does not apply to an overlay.
+- **The sheen.** The `sheen` primitive is the seam's only user. Its band
+  is `width` logical units wide (2 to 96, default 24) and the part's height
+  tall. Its colour's alpha is weighted by (1 − t²)² across the band, with
+  no transcendental function, and is uniform down the part. Its colour
+  defaults to white at alpha 96. `rest` defaults to 0.25, towards the light.
+  No built-in rule selects it (§9.3 item 5: no theme must carry it).
+- **Proof.** `gui_forms_engine_light_tests`:
+  - the band's bytes, hash 0xd4c2e5fcf3e31bf5 at scale 1;
+  - the rest place, the rounded clip, and the band following the pointer;
+  - a move within the part damages exactly the part and composites the same raster;
+  - leaving the control returns the band to rest;
+  - reduced motion, and scale 2.
+
 ### E9 shadow costs
 
 The outer shadow was measured again after the separable kernel, with

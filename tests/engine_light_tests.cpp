@@ -5,12 +5,19 @@
 // the same layers and damage outsets as before and none in high contrast;
 // a shadow reaching past the primitive's outsets falls back to
 // Painter::draw_box_shadow, counted.
+//
+// The sheen (owner E9-A) stands behind the overlay seam: its band is baked
+// once and composited at the pointer, clipped to the part's shape; a
+// pointer move within the part damages only the part and bakes nothing;
+// under reduced motion the band rests and the pointer damages nothing.
 
 #include "gui_forms/gui_forms.hpp"
 
 #include "../src/core/engine/primitives/material/material_primitive.hpp"
+#include "../src/core/engine/primitives/light/sheen_primitive.hpp"
 #include "../src/core/engine/primitives/material/overlay_shadow_primitive.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -52,14 +59,18 @@ std::uint64_t hash_bytes(std::span<const std::uint8_t> bytes) {
     return hash;
 }
 
-// A painter that keeps the part rasters and box shadows composited, and
-// draws nothing.
+// A painter that keeps the part rasters and box shadows composited, and the
+// rounded clips, and draws nothing.
 class ShadowWatch final : public Painter {
 public:
     void save() override {}
     void restore() override {}
     void translate(Point) override {}
     void clip_rect(Rect) override {}
+    void clip_rounded_rect(Rect rect, double radius) override {
+        clips.push_back(rect);
+        clip_radii.push_back(radius);
+    }
     void fill_rect(Rect, Color) override {}
     void stroke_rect(Rect, Color, double) override {}
     void draw_line(Point, Point, Color, double) override {}
@@ -72,6 +83,8 @@ public:
     }
     std::vector<std::shared_ptr<const PartRaster>> rasters;
     std::vector<Point> origins;
+    std::vector<Rect> clips;
+    std::vector<double> clip_radii;
     std::size_t box_shadows{};
 };
 
@@ -198,6 +211,182 @@ void too_wide_falls_back() {
     require((*made.window).metrics_snapshot().engine_primitive_refusals == 1U, "and the refusal is counted");
 }
 
+// -- the sheen ---------------------------------------------------------------------
+
+// A control showing a keyed sheen over a 100 by 30 face of radius 6, hot
+// while the pointer is over the control.
+class Glint final : public Control {
+public:
+    explicit Glint(StableId stable_id) : Control(std::move(stable_id)) {}
+    void on_pointer(PointerEvent& event) override {
+        if (event.action == PointerAction::enter) {
+            hot = true;
+            invalidate(Dirty::paint);
+        }
+        if (event.action == PointerAction::leave) {
+            hot = false;
+            invalidate(Dirty::paint);
+        }
+    }
+    void on_paint(Painter& painter, Rect) override {
+        PartPaint part{};
+        part.role = PartRole::sheen;
+        part.family = ControlVisualRole::button;
+        part.bounds = face;
+        part.corner_radius = 6.0;
+        part.key = PartKey{"sheen", {}, {}};
+        if (hot) part.states.insert(AnatomyState::hot);
+        paint_part(painter, *this, part);
+    }
+    bool hot{};
+    Rect face{20.0, 20.0, 100.0, 30.0};
+};
+
+struct SheenFixture final {
+    std::shared_ptr<Panel> root;
+    std::shared_ptr<Glint> glint;
+    std::unique_ptr<Window> window;
+    ShadowWatch painter{};
+};
+
+std::unique_ptr<SheenFixture> make_sheen(double scale, bool reduced_motion) {
+    ThemeDefinition definition = windows_professional_theme_definition();
+    definition.id = "engine-light-sheen";
+    ThemeRule rule{};
+    rule.label = "sheen";
+    rule.selector.role = PartRole::sheen;
+    rule.declarations.push_back(RuleDeclaration::primitive("sheen"));
+    definition.rules.rules.push_back(rule);
+    std::unique_ptr<SheenFixture> fixture = std::make_unique<SheenFixture>();
+    SheenFixture& made = *fixture;
+    made.root = make_control<Panel>(StableId("root"));
+    made.glint = make_control<Glint>(StableId("glint"));
+    (*made.glint).set_requested_bounds(Rect{0.0, 0.0, 200.0, 120.0});
+    (*made.root).add_child(made.glint);
+    made.window = std::make_unique<Window>(made.root, Size{240.0, 160.0});
+    Window& window = *made.window;
+    window.set_scale(scale);
+    window.set_theme(Theme::create(definition));
+    require(window.theme().engine().rules().diagnostics().empty(), "the sheen theme compiles cleanly");
+    if (reduced_motion) {
+        PresentationSettings settings = window.presentation_settings();
+        settings.reduced_motion = true;
+        window.set_presentation_settings(settings);
+    }
+    window.perform_layout();
+    window.paint(made.painter);
+    static_cast<void>(window.take_damage());
+    return fixture;
+}
+
+void move_to(Window& window, Point point) {
+    static_cast<void>(window.dispatch_pointer({PointerAction::move, PointerButton::none, point}));
+}
+
+// Paints what is pending and returns the damage painted.
+DamageRegion repaint(SheenFixture& fixture) {
+    Window& window = *fixture.window;
+    const DamageRegion damage = window.take_damage();
+    if (!damage.empty()) window.paint(fixture.painter, damage.bounds());
+    return damage;
+}
+
+// The left edge at which the 24-unit band was last composited.
+double band_left(const SheenFixture& fixture) {
+    require(!fixture.painter.origins.empty(), "the band was composited");
+    const double left = fixture.painter.origins.back().x;
+    return left;
+}
+
+// The band at scale 1: zero at both edges, symmetric, strongest at its
+// centre, uniform down the part; recorded on Windows x64 and checked on
+// every CI platform.
+constexpr std::uint64_t expected_band_hash = 0xd4c2e5fcf3e31bf5ULL;
+
+void sheen_band_is_deterministic(bool printing) {
+    require(builtin_primitive_registry().find("sheen") != nullptr, "the sheen is registered");
+    std::unique_ptr<SheenFixture> fixture = make_sheen(1.0, false);
+    const SheenFixture& made = *fixture;
+    require(made.painter.rasters.size() == 1U, "the sheen composites one band");
+    const PartRaster& band = *made.painter.rasters[0];
+    require(band.extent().width == 24U && band.extent().height == 30U, "the band is its width by the part's height");
+    const std::span<const std::uint8_t> pixels = band.pixels();
+    const std::size_t row = band.row_bytes();
+    // Alpha by column, from the first row; every row repeats it.
+    for (std::size_t line = 1U; line < 30U; ++line) {
+        require(std::memcmp(pixels.data(), pixels.data() + line * row, row) == 0, "the band is uniform down the part");
+    }
+    std::uint8_t strongest = 0U;
+    for (std::size_t column = 0U; column < 24U; ++column) {
+        const std::uint8_t alpha = pixels[column * 4U + 3U];
+        const std::uint8_t mirrored = pixels[(23U - column) * 4U + 3U];
+        require(alpha == mirrored, "the band is symmetric");
+        strongest = std::max(strongest, alpha);
+    }
+    require(pixels[3] < pixels[11U * 4U + 3U] && strongest == pixels[11U * 4U + 3U] && strongest <= 96U,
+            "the band fades from its centre to its edges");
+    const std::uint64_t hash = hash_bytes(pixels);
+    if (printing) {
+        std::cout << "sheen band hash 0x" << std::hex << hash << std::dec << '\n';
+        return;
+    }
+    require(hash == expected_band_hash, "the band has the same bits on every host");
+}
+
+void sheen_follows_the_pointer() {
+    std::unique_ptr<SheenFixture> fixture = make_sheen(1.0, false);
+    SheenFixture& made = *fixture;
+    Window& window = *made.window;
+    // At rest, a quarter of the way across: 20 + 25 - 12.
+    require(band_left(made) == 33.0, "the band rests a quarter of the way across");
+    require(made.painter.clips.size() == 1U && made.painter.clips[0] == Rect{20.0, 20.0, 100.0, 30.0} &&
+                made.painter.clip_radii[0] == 6.0,
+            "the band is clipped to the part's rounded shape");
+    const std::shared_ptr<const PartRaster> baked = made.painter.rasters[0];
+
+    move_to(window, Point{60.0, 35.0});
+    static_cast<void>(repaint(made));
+    require(band_left(made) == 48.0, "the band's centre follows the pointer: 20 + 40 - 12");
+
+    // A move within the part damages only the part and bakes nothing.
+    const MetricsSnapshot before = window.metrics_snapshot();
+    move_to(window, Point{90.0, 40.0});
+    const DamageRegion damage = repaint(made);
+    require(damage.rectangles().size() == 1U && damage.rectangles()[0] == Rect{20.0, 20.0, 100.0, 30.0},
+            "a pointer move damages only the sheen's part");
+    require(band_left(made) == 78.0, "the band moves with the pointer: 20 + 70 - 12");
+    require(made.painter.rasters.back() == baked, "the same band is composited, never baked again");
+    const MetricsSnapshot after = window.metrics_snapshot();
+    require(after.engine_input_damaged_parts == before.engine_input_damaged_parts + 1U,
+            "the move damaged one reading part");
+
+    // Leaving the control returns the band to its rest.
+    move_to(window, Point{230.0, 150.0});
+    static_cast<void>(repaint(made));
+    require(band_left(made) == 33.0, "the band rests again once the pointer leaves");
+    require(made.painter.rasters.back() == baked, "and is still the band baked first");
+}
+
+void sheen_rests_under_reduced_motion() {
+    std::unique_ptr<SheenFixture> fixture = make_sheen(1.0, true);
+    SheenFixture& made = *fixture;
+    Window& window = *made.window;
+    move_to(window, Point{60.0, 35.0});
+    static_cast<void>(repaint(made));
+    require(band_left(made) == 33.0, "under reduced motion the band rests where the pointer is");
+    move_to(window, Point{90.0, 40.0});
+    require(window.take_damage().empty(), "and a pointer move within the part damages nothing");
+}
+
+void sheen_at_scale_two() {
+    std::unique_ptr<SheenFixture> fixture = make_sheen(2.0, false);
+    const SheenFixture& made = *fixture;
+    require(made.painter.rasters.size() == 1U, "the sheen composites one band at scale 2");
+    const PartRaster& band = *made.painter.rasters[0];
+    require(band.extent().width == 48U && band.extent().height == 60U, "the band is baked at device scale");
+    require(band_left(made) == 33.0, "and rests at the same logical place");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -205,6 +394,10 @@ int main(int argc, char** argv) {
     overlay_shadow_is_an_engine_primitive(printing);
     high_contrast_casts_none();
     too_wide_falls_back();
+    sheen_band_is_deterministic(printing);
+    sheen_follows_the_pointer();
+    sheen_rests_under_reduced_motion();
+    sheen_at_scale_two();
     std::cout << "engine light tests passed\n";
     return 0;
 }

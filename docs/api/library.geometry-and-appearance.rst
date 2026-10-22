@@ -146,6 +146,8 @@ Types
      - One property's transition on a part (E7): an engine property or the parameter at ``parameter``, the state of its machine the part was last painted in (none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
    * - :cpp:class:`Point <gui_forms::Point>`
      - Point is a renderer-neutral logical-coordinate pair.
+   * - :cpp:class:`PointerOverlay <gui_forms::PointerOverlay>`
+     - How a primitive behind the overlay seam is composited (E9-A, owner 2026-10-22: the seam serves the sheen only).
    * - :cpp:class:`PresentationState <gui_forms::PresentationState>`
      - One state of a part's presentational state machine (E7; design language §9.6).
    * - :cpp:class:`PrimitiveCost <gui_forms::PrimitiveCost>`
@@ -985,6 +987,10 @@ Types
    .. cpp:function:: virtual bool lends_overlay_shadow() const noexcept
 
       Whether the primitive draws the theme's overlay shadow (E9, GIVEN E1-1): the engine then lends the theme's overlay shadow layers for the part's presentation as a material of one transparent fill and those shadows, at the part's corner radius, and draws nothing when the theme casts none. False unless the primitive says otherwise.
+
+   .. cpp:function:: virtual std::optional<PointerOverlay> pointer_overlay(const PrimitiveParameterBlock& parameters, Size part) const noexcept
+
+      How the primitive is composited over a part of ``part`` size when it stands behind the overlay seam (PointerOverlay); none for a primitive drawn over the part's own box, unless the primitive says otherwise. ``parameters`` match the declarations.
 
    .. cpp:function:: virtual bool accepts(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target) const noexcept
 
@@ -2023,6 +2029,18 @@ Types
    .. cpp:member:: double x
 
    .. cpp:member:: double y
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PointerOverlay final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   How a primitive behind the overlay seam is composited (E9-A, owner 2026-10-22: the seam serves the sheen only). Its raster is ``size``, in logical units, baked once per (size, state, scale) and never per pointer position; the engine composites it with its centre across at the part-local pointer, its top at the part's top, clipped to the part's shape, and damages only the part's extent when the pointer moves within it. While the pointer is not over the part, and always under reduced motion, its centre rests at ``rest`` times the part's width.
+
+   .. cpp:member:: Size size
+
+   .. cpp:member:: double rest
 
 .. cpp:namespace:: gui_forms
 
