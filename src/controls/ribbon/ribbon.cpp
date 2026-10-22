@@ -2523,16 +2523,28 @@ ItemSystemIndex Ribbon::publish_realized_item_system(std::size_t item) const {
 void Ribbon::publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const {
     const Layout placed = layout();
     const RealizedItem located = locate_realized(placed, item);
-    if (located.kind == RealizedItem::Kind::tab) {
+    switch (located.kind) {
+    case RealizedItem::Kind::tab: {
         const TabParts record = tab_parts(placed, located.index);
         write_item_parts(anatomy().item_systems[tab_system.value], ribbon_tab_part_fields, record, geometry);
-    } else if (located.kind == RealizedItem::Kind::group) {
+        return;
+    }
+    case RealizedItem::Kind::group: {
         const GroupParts record = group_parts(placed, located.index);
         write_item_parts(anatomy().item_systems[group_system.value], ribbon_group_part_fields, record, geometry);
-    } else if (located.kind == RealizedItem::Kind::command) {
+        return;
+    }
+    case RealizedItem::Kind::command: {
         const CommandParts record = command_parts(placed, located.command);
         write_item_parts(anatomy().item_systems[command_system.value], ribbon_command_part_fields, record, geometry);
+        return;
     }
+    case RealizedItem::Kind::none:
+        // Past the end: no item, no parts.
+        return;
+    }
+    // A kind outside the enumeration publishes no parts.
+    return;
 }
 
 AnatomyStateSet Ribbon::realized_item_anatomy_states(std::size_t item) const {

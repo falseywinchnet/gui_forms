@@ -140,6 +140,76 @@ void FlowLayoutPanel::reconcile_flow_breaks() {
     }
 }
 
+namespace {
+
+// Where a line's first item starts along the line, and the extra space
+// between items, for `count` items with `free` space left over.
+struct MainPlacement final {
+    double origin{};
+    double spacing{};
+};
+
+MainPlacement place_along(FlowMainAlignment alignment, double free, std::size_t count) noexcept {
+    MainPlacement placement{};
+    switch (alignment) {
+    case FlowMainAlignment::start:
+        return placement;
+    case FlowMainAlignment::center:
+        placement.origin = free * 0.5;
+        return placement;
+    case FlowMainAlignment::end:
+        placement.origin = free;
+        return placement;
+    case FlowMainAlignment::space_between:
+        if (count > 1U) placement.spacing = free / static_cast<double>(count - 1U);
+        return placement;
+    case FlowMainAlignment::space_around:
+        if (count != 0U) {
+            placement.spacing = free / static_cast<double>(count);
+            placement.origin = placement.spacing * 0.5;
+        }
+        return placement;
+    case FlowMainAlignment::space_evenly:
+        if (count != 0U) {
+            placement.spacing = free / static_cast<double>(count + 1U);
+            placement.origin = placement.spacing;
+        }
+        return placement;
+    }
+    // An alignment outside the enumeration packs the line at its start.
+    return placement;
+}
+
+// Where an item starts across its line and how much of the line it takes:
+// its `desired` extent, or the line less its `margin` when stretched.
+// `item` is its desired extent with margins.
+struct CrossPlacement final {
+    double origin{};
+    double extent{};
+};
+
+CrossPlacement place_across(FlowCrossAlignment alignment, double line, double item,
+                            double desired, double margin) noexcept {
+    CrossPlacement placement{0.0, desired};
+    switch (alignment) {
+    case FlowCrossAlignment::start:
+        return placement;
+    case FlowCrossAlignment::center:
+        placement.origin = std::max(0.0, line - item) * 0.5;
+        return placement;
+    case FlowCrossAlignment::end:
+        placement.origin = std::max(0.0, line - item);
+        return placement;
+    case FlowCrossAlignment::stretch:
+        placement.extent = std::max(0.0, line - margin);
+        return placement;
+    }
+    // An alignment outside the enumeration keeps the item at the line's start.
+    return placement;
+}
+
+} // namespace
+
 Size FlowLayoutPanel::layout_children(Size available, bool assign) {
     reconcile_flow_breaks();
     const Insets inset = padding();
@@ -212,38 +282,10 @@ Size FlowLayoutPanel::layout_children(Size available, bool assign) {
         for (const Item& item : current.items) total_grow += item.grow;
         const double free_main = assign && total_grow > 0.0
             ? 0.0 : available_main;
-        double main_origin = 0.0;
-        double distributed_spacing = 0.0;
-        switch (main_alignment_) {
-        case FlowMainAlignment::start:
-            break;
-        case FlowMainAlignment::center:
-            main_origin = free_main * 0.5;
-            break;
-        case FlowMainAlignment::end:
-            main_origin = free_main;
-            break;
-        case FlowMainAlignment::space_between:
-            if (current.items.size() > 1U) {
-                distributed_spacing =
-                    free_main / static_cast<double>(current.items.size() - 1U);
-            }
-            break;
-        case FlowMainAlignment::space_around:
-            if (!current.items.empty()) {
-                distributed_spacing =
-                    free_main / static_cast<double>(current.items.size());
-                main_origin = distributed_spacing * 0.5;
-            }
-            break;
-        case FlowMainAlignment::space_evenly:
-            if (!current.items.empty()) {
-                distributed_spacing =
-                    free_main / static_cast<double>(current.items.size() + 1U);
-                main_origin = distributed_spacing;
-            }
-            break;
-        }
+        const MainPlacement main_placement =
+            place_along(main_alignment_, free_main, current.items.size());
+        double main_origin = main_placement.origin;
+        const double distributed_spacing = main_placement.spacing;
         const double line_cross = assign && lines.size() == 1U
             ? cross_limit : current.cross;
         for (std::size_t item_index = 0U; item_index < current.items.size();
@@ -255,29 +297,18 @@ Size FlowLayoutPanel::layout_children(Size available, bool assign) {
             const double item_cross = horizontal
                 ? vertical_extent(item.margin) + item.desired.height
                 : horizontal_extent(item.margin) + item.desired.width;
-            double cross_item_origin = 0.0;
-            double assigned_cross = horizontal
+            const double desired_cross = horizontal
                 ? item.desired.height : item.desired.width;
+            const double margin_cross = horizontal
+                ? vertical_extent(item.margin) : horizontal_extent(item.margin);
             const double assigned_main = (horizontal
                 ? item.desired.width : item.desired.height) +
                 (assign && total_grow > 0.0
                     ? available_main * item.grow / total_grow : 0.0);
-            switch (cross_alignment_) {
-            case FlowCrossAlignment::start:
-                break;
-            case FlowCrossAlignment::center:
-                cross_item_origin = std::max(0.0, line_cross - item_cross) * 0.5;
-                break;
-            case FlowCrossAlignment::end:
-                cross_item_origin = std::max(0.0, line_cross - item_cross);
-                break;
-            case FlowCrossAlignment::stretch:
-                assigned_cross = std::max(
-                    0.0, line_cross - (horizontal
-                        ? vertical_extent(item.margin)
-                        : horizontal_extent(item.margin)));
-                break;
-            }
+            const CrossPlacement cross_placement = place_across(
+                cross_alignment_, line_cross, item_cross, desired_cross, margin_cross);
+            const double cross_item_origin = cross_placement.origin;
+            const double assigned_cross = cross_placement.extent;
             Rect slot;
             if (horizontal) {
                 slot.width = assigned_main;

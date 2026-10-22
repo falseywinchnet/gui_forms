@@ -46,57 +46,76 @@ std::shared_ptr<Label> label(std::string id, std::string text, FontSpec font,
     return result;
 }
 
-ControlVisualRecipe pearl_recipe(const ControlSurfaceState state,
-                                 const bool selected) {
-    ControlVisualRecipe result;
-    Color top = Color::rgba(255, 255, 255);
-    Color middle = Color::rgba(239, 245, 250);
-    Color bottom = Color::rgba(201, 214, 229);
-    Color border = Color::rgba(118, 143, 167);
-    result.text = ink;
+// The pearl gradient's stops, border and text for one state.
+struct PearlColours final {
+    Color top;
+    Color middle;
+    Color bottom;
+    Color border;
+    Color text;
+};
+
+PearlColours pearl_colours(const ControlSurfaceState state, const bool selected) {
+    PearlColours colours{Color::rgba(255, 255, 255), Color::rgba(239, 245, 250),
+                         Color::rgba(201, 214, 229), Color::rgba(118, 143, 167), ink};
     if (selected) {
-        top = Color::rgba(239, 248, 255);
-        middle = Color::rgba(204, 228, 249);
-        bottom = Color::rgba(162, 198, 234);
-        border = Color::rgba(57, 117, 178);
+        colours.top = Color::rgba(239, 248, 255);
+        colours.middle = Color::rgba(204, 228, 249);
+        colours.bottom = Color::rgba(162, 198, 234);
+        colours.border = Color::rgba(57, 117, 178);
     }
     switch (state) {
     case ControlSurfaceState::hot:
-        top = Color::rgba(255, 255, 255);
-        middle = Color::rgba(225, 241, 252);
-        bottom = Color::rgba(183, 215, 239);
-        border = Color::rgba(72, 126, 169);
-        break;
+        colours.top = Color::rgba(255, 255, 255);
+        colours.middle = Color::rgba(225, 241, 252);
+        colours.bottom = Color::rgba(183, 215, 239);
+        colours.border = Color::rgba(72, 126, 169);
+        return colours;
     case ControlSurfaceState::pressed:
-        top = Color::rgba(174, 198, 217);
-        middle = Color::rgba(207, 223, 235);
-        bottom = Color::rgba(250, 253, 255);
-        border = Color::rgba(61, 94, 121);
-        break;
+        colours.top = Color::rgba(174, 198, 217);
+        colours.middle = Color::rgba(207, 223, 235);
+        colours.bottom = Color::rgba(250, 253, 255);
+        colours.border = Color::rgba(61, 94, 121);
+        return colours;
     case ControlSurfaceState::pending:
-        top = Color::rgba(255, 249, 218);
-        middle = Color::rgba(250, 239, 184);
-        bottom = Color::rgba(238, 218, 130);
-        border = Color::rgba(157, 119, 31);
-        break;
+        colours.top = Color::rgba(255, 249, 218);
+        colours.middle = Color::rgba(250, 239, 184);
+        colours.bottom = Color::rgba(238, 218, 130);
+        colours.border = Color::rgba(157, 119, 31);
+        return colours;
     case ControlSurfaceState::invalid:
-        top = Color::rgba(255, 242, 244);
-        middle = Color::rgba(249, 219, 225);
-        bottom = Color::rgba(235, 186, 196);
-        border = Color::rgba(157, 61, 78);
-        result.text = Color::rgba(112, 44, 58);
-        break;
+        colours.top = Color::rgba(255, 242, 244);
+        colours.middle = Color::rgba(249, 219, 225);
+        colours.bottom = Color::rgba(235, 186, 196);
+        colours.border = Color::rgba(157, 61, 78);
+        colours.text = Color::rgba(112, 44, 58);
+        return colours;
     case ControlSurfaceState::disabled:
     case ControlSurfaceState::deactivated:
-        top = Color::rgba(244, 246, 248);
-        middle = Color::rgba(231, 235, 238);
-        bottom = Color::rgba(211, 216, 220);
-        border = Color::rgba(154, 163, 171);
-        result.text = Color::rgba(117, 126, 134);
-        break;
-    case ControlSurfaceState::normal: break;
-    case ControlSurfaceState::count: break;
+        colours.top = Color::rgba(244, 246, 248);
+        colours.middle = Color::rgba(231, 235, 238);
+        colours.bottom = Color::rgba(211, 216, 220);
+        colours.border = Color::rgba(154, 163, 171);
+        colours.text = Color::rgba(117, 126, 134);
+        return colours;
+    case ControlSurfaceState::normal:
+    case ControlSurfaceState::count:
+        // The resting colours (count is no state).
+        return colours;
     }
+    // A state outside the enumeration takes the resting colours.
+    return colours;
+}
+
+ControlVisualRecipe pearl_recipe(const ControlSurfaceState state,
+                                 const bool selected) {
+    ControlVisualRecipe result;
+    const PearlColours colours = pearl_colours(state, selected);
+    const Color top = colours.top;
+    const Color middle = colours.middle;
+    const Color bottom = colours.bottom;
+    const Color border = colours.border;
+    result.text = colours.text;
     result.material.fills = {
         MaterialFillLayer::linear_css_angle(180.0, {
             {0.0, top}, {0.48, middle}, {0.52, middle}, {1.0, bottom},

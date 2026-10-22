@@ -953,6 +953,7 @@ bool CorrespondenceView::on_semantic_child_action(
                    action != SemanticAction::collapse)) return false;
     if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
     focus_index(*index, CorrespondenceExpansionReason::keyboard_focus);
+    // Focus needs nothing more; every other action was refused above.
     if (action == SemanticAction::select) {
         set_selected_id(stable_id);
     } else if (action == SemanticAction::press) {
