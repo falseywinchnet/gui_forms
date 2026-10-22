@@ -81,9 +81,21 @@ def targets_for_tests(listing: dict, known_outputs: set[str], tree: Path) -> lis
     return sorted(targets)
 
 
-def selected_test_targets(toolkit: Path, tests: str) -> list[str] | None:
-    """Ask ctest and ninja which outputs the tests matching tests need (see targets_for_tests)."""
-    listing: dict = json.loads(captured('ctest', '--test-dir', toolkit, '--show-only=json-v1', '-R', tests))
+def ctest_selection(tests: str, skip_labels: str) -> list[str]:
+    """ctest arguments choosing tests: -R tests (none matching fails), -LE skip_labels."""
+    selection: list[str] = []
+    if tests:
+        # A pattern that matches no test is a mistake, not a pass.
+        selection.extend(['-R', tests, '--no-tests=error'])
+    if skip_labels:
+        selection.extend(['-LE', skip_labels])
+    return selection
+
+
+def selected_test_targets(toolkit: Path, tests: str, skip_labels: str = '') -> list[str] | None:
+    """Ask ctest and ninja which outputs the selected tests need (see targets_for_tests)."""
+    listing: dict = json.loads(captured('ctest', '--test-dir', toolkit, '--show-only=json-v1',
+                                        *ctest_selection(tests, skip_labels)))
     known_outputs: set[str] = set()
     line: str
     for line in captured('ninja', '-C', toolkit, '-t', 'targets', 'all').splitlines():
@@ -321,7 +333,7 @@ def configure_tree(toolkit: Path, configure: list[str]) -> None:
 
 def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False,
                   sanitize: bool = False, tests: str = '', test_jobs: int = 1,
-                  debug_info: str = 'lines') -> None:
+                  debug_info: str = 'lines', skip_labels: str = '') -> None:
     """Build, test, then install only into the explicitly supplied build SDK.
 
     With sanitize, the toolkit is built in its own directory with the
@@ -331,7 +343,10 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     matches none); empty builds everything and runs the whole suite.
     test_jobs is how many tests ctest runs at once (1, the default, runs
     them one after another). debug_info is the sanitized build's debug
-    information, `lines` or `full` (see DEBUG_INFO_FLAGS).
+    information, `lines` or `full` (see DEBUG_INFO_FLAGS). skip_labels, a
+    ctest -LE pattern, leaves out the tests with matching labels (for
+    example gallery_accessibility, the Gallery-wide accessibility tests)
+    from the run and from a narrowed build.
     """
     toolkit: Path = build / ('gui-forms-sanitize' if sanitize else 'gui-forms')
     options: list[str] = []
@@ -385,7 +400,7 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     # A narrowed run builds only what its tests read, not every program in the tree.
     targets: list[str] | None = None
     if tests:
-        targets = selected_test_targets(toolkit, tests)
+        targets = selected_test_targets(toolkit, tests, skip_labels)
     if targets is None:
         run('cmake', '--build', toolkit, '--parallel', jobs)
     elif targets:
@@ -394,10 +409,7 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     else:
         print(f'the tests matching {tests} read no build output; nothing to build', flush=True)
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
-    selection: list[str] = []
-    if tests:
-        # A pattern that matches no test is a mistake, not a pass.
-        selection = ['-R', tests, '--no-tests=error']
+    selection: list[str] = ctest_selection(tests, skip_labels)
     run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
         '--parallel', test_jobs, *selection)
     if sanitize:
@@ -422,6 +434,9 @@ def main() -> None:
     parser.add_argument('--debug-info', choices=tuple(DEBUG_INFO_FLAGS), default='',
                         help='with --sanitize, the debug information: lines (-gline-tables-only, the default) '
                              'or full (-g); also ' + DEBUG_INFO_VARIABLE)
+    parser.add_argument('--skip-labels', default='',
+                        help='leave out tests whose labels match this ctest -LE pattern, such as '
+                             'gallery_accessibility (the Gallery-wide accessibility tests); CI passes none')
     parser.add_argument('--sanitize', action='store_true',
                         help='build in gui-forms-sanitize with ASan and UBSan (and LSan on Linux '
                              'and macOS) and only test')
@@ -454,7 +469,7 @@ def main() -> None:
     os.environ['BUILD_JOBS'] = str(args.jobs)
     build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
                   gallery_enabled(args.gallery, dict(os.environ)), args.sanitize, args.tests,
-                  args.test_jobs, debug_info)
+                  args.test_jobs, debug_info, args.skip_labels)
 
 
 if __name__ == '__main__':

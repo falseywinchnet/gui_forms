@@ -216,6 +216,21 @@ class DebugInfoTests(unittest.TestCase):
         self.assertIn('gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-', workflow)
 
 
+class SelectionTests(unittest.TestCase):
+    def test_patterns_and_labels_become_ctest_arguments(self) -> None:
+        self.assertEqual(ci_build.ctest_selection('', ''), [])
+        self.assertEqual(ci_build.ctest_selection('tool_strip', ''), ['-R', 'tool_strip', '--no-tests=error'])
+        self.assertEqual(ci_build.ctest_selection('', 'gallery_accessibility'), ['-LE', 'gallery_accessibility'])
+
+    def test_the_gallery_accessibility_tests_carry_the_label(self) -> None:
+        cmake: str = (CHECKOUT / 'CMakeLists.txt').read_text(encoding='utf-8')
+        name: str
+        for name in ('gui_forms_macos_accessibility_client_gallery_tests', 'gui_forms_linux_accessibility_gallery_tests',
+                     'gui_forms_windows_accessibility_msaa_gallery_tests',
+                     'gui_forms_windows_accessibility_uia_gallery_tests'):
+            self.assertIn('set_property(TEST ' + name + ' APPEND PROPERTY LABELS gallery_accessibility)', cmake)
+
+
 class LeakSuppressionTests(unittest.TestCase):
     def test_no_function_rule_can_match_a_first_party_frame(self) -> None:
         # A rule suppresses a leak when it matches any frame of the allocation

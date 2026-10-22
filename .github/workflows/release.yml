@@ -122,6 +122,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
+          # native.yml's dispatch input reaches this called workflow through github.event.
+          GUI_FORMS_PACKAGE_WINDOWS_TOOLCHAIN: ${{ github.event.inputs.package_windows_toolchain }}
         run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/windows_toolchain.py restore'
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
