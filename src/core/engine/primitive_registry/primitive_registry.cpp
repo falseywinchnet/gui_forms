@@ -2,6 +2,7 @@
 
 #include "gui_forms/schema/types/schema_types.hpp"
 #include "../primitives/bulge/bulge_primitives.hpp"
+#include "../primitives/material/material_primitive.hpp"
 #include "../primitives/relief/relief_primitives.hpp"
 
 #include <algorithm>
@@ -98,11 +99,13 @@ const engine_primitives::InsetWellPrimitive inset_well_primitive{};
 const engine_primitives::EtchedDividerPrimitive etched_divider_primitive{};
 const engine_primitives::SeamPrimitive seam_primitive{};
 const engine_primitives::GripPrimitive grip_primitive{};
+const engine_primitives::MaterialPrimitive material_primitive{};
 
 PrimitiveRegistry make_builtin_registry() {
     const EnginePrimitive* const first_party[] = {
         &bulge_primitive,       &dithered_bulge_primitive, &pill_plate_primitive, &gold_plate_primitive,
         &inset_well_primitive,  &etched_divider_primitive, &seam_primitive,       &grip_primitive,
+        &material_primitive,
     };
     PrimitiveRegistry registry{};
     for (const EnginePrimitive* const primitive : first_party) {
@@ -240,6 +243,14 @@ bool EnginePrimitive::blank(const PrimitiveParameterBlock&) const noexcept {
     return false;
 }
 
+std::optional<ControlVisualRole> EnginePrimitive::theme_material(const PrimitiveParameterBlock&) const noexcept {
+    return std::nullopt;
+}
+
+bool EnginePrimitive::accepts(const PrimitiveParameterBlock&, const PrimitiveTarget&) const noexcept {
+    return true;
+}
+
 PreparationOutcome EnginePrimitive::prepare(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
                                             PrimitivePreparation& preparation) const noexcept {
     const PrimitiveDescriptor& described = descriptor();
@@ -269,6 +280,7 @@ RasterOutcome EnginePrimitive::rasterize(const PrimitiveParameterBlock& paramete
     const ParameterValidation validation = validate_parameters(descriptor(), parameters);
     if (validation.defect != ParameterDefect::none) return RasterOutcome::invalid_parameters;
     if (!preparation_matches(*this, parameters, target, preparation)) return RasterOutcome::stale_preparation;
+    if (!accepts(parameters, target)) return RasterOutcome::invalid_target;
     if (destination.extent.width == 0U || destination.extent.height == 0U) return RasterOutcome::empty;
     const std::span<const double> prepared(preparation.values.data(), preparation.count);
     fill(parameters, target, prepared, destination);

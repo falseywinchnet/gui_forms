@@ -15,6 +15,12 @@
 
 namespace gui_forms {
 
+// Declared in theme_types.hpp and surface_material_types.hpp, which include
+// the engine's headers; a target only borrows them.
+enum class ControlVisualRole : std::uint8_t;
+struct SurfaceMaterial;
+class ImageRegistry;
+
 // The engine's primitive registry: the extension seam of stage T2 (brief
 // item 10). A primitive is one kind of effect, written in C++ under the house
 // style. It declares, in the words of the atom vocabulary (design language
@@ -167,12 +173,25 @@ enum class ParameterAssignment : std::uint8_t {
 // states, and the engine inputs' values for it, by EngineInput (NaN for an
 // input that is not published, such as the pointer of a part that is not
 // hot). The destination's extent is the caller's choice, normally the
-// logical size times the scale, rounded up.
+// logical size grown by the descriptor's outsets, times the scale, rounded
+// up. A primitive with outsets draws its box starting at the left and top
+// outsets times the scale, in device pixels, and clips what it draws to the
+// destination.
+//
+// A primitive that draws a theme material (theme_material) also gets the
+// part's material for its state, its own corner radius when the part sets
+// one (PartPaint::corner_radius, which replaces the material's), and the
+// window's image resources for the material's image fills. `material` and
+// `images` are borrowed for the call that receives the target; a caller that
+// keeps a target clears them.
 struct PrimitiveTarget final {
     Size logical_size{};
     DeviceScale scale{};
     AnatomyStateSet states{};
     std::array<double, engine_input_count> inputs{};
+    const SurfaceMaterial* material{};
+    std::optional<double> corner_radius{};
+    const ImageRegistry* images{};
 };
 
 class EnginePrimitive;
@@ -224,7 +243,8 @@ enum class RasterOutcome : std::uint8_t {
     empty,
     // Nothing was written: the destination's shape does not fit its buffer.
     invalid_view,
-    // Nothing was written: the size or scale is out of range.
+    // Nothing was written: the size or scale is out of range, or the
+    // primitive does not accept the target (EnginePrimitive::accepts).
     invalid_target,
     // Nothing was written: the parameters do not match the declarations.
     invalid_parameters,
@@ -262,6 +282,22 @@ public:
     // the declarations; `logical` and `scale` are positive and finite.
     [[nodiscard]] virtual Insets content_insets(const PrimitiveParameterBlock& parameters, Size logical,
                                                 DeviceScale scale, double text_scale) const noexcept;
+
+    // The recipe role (ControlVisualRole) whose theme material the
+    // primitive draws with `parameters` (E8-1): the engine then resolves
+    // the role's recipe for the part's state and lends its material in the
+    // target. None unless the primitive says otherwise. `parameters` match
+    // the declarations.
+    [[nodiscard]] virtual std::optional<ControlVisualRole> theme_material(
+        const PrimitiveParameterBlock& parameters) const noexcept;
+
+    // Whether the primitive will draw this target with `parameters`, such as
+    // a material whose bake would exceed its bound. A primitive that refuses
+    // is drawn by the built-in recipe instead, and the engine counts the
+    // refusal. True unless the primitive says otherwise. Called only with a
+    // target in range and parameters that match the declarations.
+    [[nodiscard]] virtual bool accepts(const PrimitiveParameterBlock& parameters,
+                                       const PrimitiveTarget& target) const noexcept;
 
     // Validates the target and the parameters, then derives the
     // preparation's values. Anything but `prepared` leaves `preparation`

@@ -1,0 +1,675 @@
+#include "material_primitive.hpp"
+
+#include "material_bake_policy.hpp"
+#include "material_image.hpp"
+#include "../kernel/pixel_kernel.hpp"
+
+#include "gui_forms/engine/engine_math/engine_math.hpp"
+#include "gui_forms/engine/part_shape/part_shape.hpp"
+#include "gui_forms/surface_material/painting/surface_material_painting.hpp"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <new>
+#include <string_view>
+#include <vector>
+
+// Identical bytes on every host: no fused multiply-add (see engine_math.cpp).
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+
+namespace gui_forms::engine_primitives {
+namespace {
+
+// -- the descriptor ----------------------------------------------------------------
+
+// How far the material draws outside the part's box, in logical units, on
+// every side: room for the outer shadows, which are clipped beyond it.
+constexpr double material_outset = 8.0;
+
+constexpr std::array<std::string_view, 12> recipe_names{
+    "window", "panel", "card", "button", "accent_button", "command_button",
+    "choice", "editor", "menu_item", "selection", "progress", "tool_tip"};
+
+const PartRole material_roles[] = {PartRole::region, PartRole::face,  PartRole::actuator, PartRole::well,
+                                   PartRole::track,  PartRole::thumb, PartRole::chip};
+
+// The states part_visual_context reads to choose the recipe's state. The
+// raster is also redrawn whenever the material lent for the state differs.
+const AnatomyState material_states[] = {
+    AnatomyState::hot,         AnatomyState::pressed,       AnatomyState::captured,  AnatomyState::selected,
+    AnatomyState::checked,     AnatomyState::current,       AnatomyState::open,      AnatomyState::active_tool,
+    AnatomyState::focus_visible, AnatomyState::preselect,   AnatomyState::disabled,  AnatomyState::unavailable};
+
+enum MaterialParameter : std::size_t {
+    material_recipe,
+    material_parameter_count,
+};
+
+// The default recipe is the button's (position 3).
+const PrimitiveParameterDeclaration material_parameters[] = {
+    {"recipe", PrimitiveParameterKind::choice, 0.0, 0.0, 3.0, {}, false, recipe_names},
+};
+static_assert(std::size(material_parameters) == material_parameter_count, "one declaration per material parameter");
+
+// The declared cost is the most the load check admits; a material's real
+// bake is bounded by its estimate instead (accepts, material_bake_policy.hpp).
+const PrimitiveDescriptor material_descriptor{
+    "material",
+    EngineVersion{0, 2},
+    material_roles,
+    material_states,
+    material_parameters,
+    PrimitiveCost{512U, 64U, 0U},
+    Insets{material_outset, material_outset, material_outset, material_outset},
+    0U};
+
+// -- the look: every layer resolved to device pixels, before the loops -----------
+
+struct ResolvedShadow final {
+    // The shadow's rectangle (an outer shadow's shape, an inset shadow's
+    // hole), its corner radius, and 1 / σ'.
+    Rect shape{};
+    double radius{};
+    double inverse_sigma{};
+    Color colour{};
+    // An inset shadow whose hole is empty covers the whole box.
+    bool solid{};
+};
+
+struct ResolvedFill final {
+    MaterialFillKind kind{MaterialFillKind::solid};
+    Color colour{};
+    // A linear gradient's t = (x − origin_x) × step_x + (y − origin_y) ×
+    // step_y; a radial gradient's centre and inverse radii.
+    double origin_x{};
+    double origin_y{};
+    double step_x{};
+    double step_y{};
+    double inverse_radius_x{};
+    double inverse_radius_y{};
+    GradientSpreadMode spread{GradientSpreadMode::pad};
+    // Borrowed from the material for the bake.
+    std::span<const GradientStop> stops{};
+    // An image fill's opacity and its resampled layer (MaterialImages).
+    double opacity{1.0};
+    std::size_t image{};
+};
+
+struct ResolvedBand final {
+    Rect band{};
+    Color colour{};
+    bool clipped{};
+};
+
+constexpr std::size_t maximum_bands = 4U + SurfaceMaterial::maximum_keylines;
+
+struct MaterialLook final {
+    Rect box{};
+    PartShape box_shape{};
+    // Two bands of pixel centres the box covers fully, avoiding its rounded
+    // corners: there its coverage is exactly 1 without its signed distance.
+    Rect wide_interior{};
+    Rect tall_interior{};
+    std::array<ResolvedShadow, SurfaceMaterial::maximum_shadows> outer{};
+    std::size_t outer_count{};
+    std::array<ResolvedShadow, SurfaceMaterial::maximum_shadows> inset{};
+    std::size_t inset_count{};
+    std::array<ResolvedFill, SurfaceMaterial::maximum_fill_layers> fills{};
+    std::size_t fill_count{};
+    bool border{};
+    Color border_colour{};
+    Rect border_inner{};
+    PartShape border_inner_shape{};
+    // The border's single edges, then the keylines.
+    std::array<ResolvedBand, maximum_bands> bands{};
+    std::size_t band_count{};
+};
+
+// A colour in straight alpha, each channel in [0, 255].
+struct Straight final {
+    double red{};
+    double green{};
+    double blue{};
+    double alpha{};
+};
+
+Straight straight_of(Color colour) noexcept {
+    const Straight straight{static_cast<double>(colour.red), static_cast<double>(colour.green),
+                            static_cast<double>(colour.blue), static_cast<double>(colour.alpha)};
+    return straight;
+}
+
+Unit premultiply_straight(Straight colour, double coverage) noexcept {
+    const double alpha = colour.alpha / 255.0 * coverage;
+    const Unit unit{colour.red / 255.0 * alpha, colour.green / 255.0 * alpha, colour.blue / 255.0 * alpha, alpha};
+    return unit;
+}
+
+double inverse_sigma_of(double blur, double scale) noexcept {
+    const double sigma = blur * 0.5 * scale;
+    // The pixel's own box filter adds a variance of 1/12.
+    const double widened = std::sqrt(sigma * sigma + 1.0 / 12.0);
+    const double inverse = 1.0 / widened;
+    return inverse;
+}
+
+PartShape rounded(double radius) noexcept {
+    PartShape shape{};
+    shape.kind = PartShapeKind::rounded_rectangle;
+    shape.corner_radius = radius;
+    return shape;
+}
+
+Rect material_box(const PrimitiveTarget& target) noexcept {
+    const double scale = target.scale.value;
+    const Rect box{material_outset * scale, material_outset * scale, target.logical_size.width * scale,
+                   target.logical_size.height * scale};
+    return box;
+}
+
+double material_radius(const SurfaceMaterial& material, const PrimitiveTarget& target) noexcept {
+    const double logical = target.corner_radius ? std::max(0.0, *target.corner_radius) : material.corner_radius;
+    const double radius = logical * target.scale.value;
+    return radius;
+}
+
+Point resolved_point(Point point, MaterialCoordinateSpace space, Rect box, double scale) noexcept {
+    if (space == MaterialCoordinateSpace::normalized) {
+        const Point normalized{box.x + point.x * box.width, box.y + point.y * box.height};
+        return normalized;
+    }
+    const Point logical{box.x + point.x * scale, box.y + point.y * scale};
+    return logical;
+}
+
+// A CSS angle's unit direction: 0 degrees points up, 90 right (as
+// resolve_css_linear_gradient, with the engine's sine and cosine).
+Point css_direction(double angle_degrees) noexcept {
+    double angle = std::fmod(angle_degrees, 360.0);
+    if (angle < 0.0) angle = angle + 360.0;
+    if (angle == 0.0 || angle == 360.0) return Point{0.0, -1.0};
+    if (angle == 90.0) return Point{1.0, 0.0};
+    if (angle == 180.0) return Point{0.0, 1.0};
+    if (angle == 270.0) return Point{-1.0, 0.0};
+    constexpr double degrees_to_radians = 3.14159265358979323846264338327950288 / 180.0;
+    const EngineSineCosine turned = engine_sine_cosine(angle * degrees_to_radians);
+    const Point direction{turned.sine, -turned.cosine};
+    return direction;
+}
+
+ResolvedFill resolve_fill(const MaterialFillLayer& layer, Rect box, double scale) noexcept {
+    ResolvedFill fill{};
+    fill.kind = layer.kind;
+    fill.colour = layer.color;
+    fill.spread = layer.spread;
+    fill.stops = std::span<const GradientStop>(layer.stops.data(), layer.stops.size());
+    fill.opacity = layer.opacity;
+    if (layer.kind == MaterialFillKind::linear_gradient) {
+        Point start{};
+        Point end{};
+        if (layer.linear_geometry == MaterialLinearGeometry::css_angle) {
+            const Point direction = css_direction(layer.angle_degrees);
+            const Point centre{box.x + box.width * 0.5, box.y + box.height * 0.5};
+            const double half = (std::abs(direction.x) * box.width + std::abs(direction.y) * box.height) * 0.5;
+            start = Point{centre.x - direction.x * half, centre.y - direction.y * half};
+            end = Point{centre.x + direction.x * half, centre.y + direction.y * half};
+        } else {
+            start = resolved_point(layer.start, layer.coordinate_space, box, scale);
+            end = resolved_point(layer.end, layer.coordinate_space, box, scale);
+        }
+        const double across = end.x - start.x;
+        const double down = end.y - start.y;
+        const double length_squared = across * across + down * down;
+        fill.origin_x = start.x;
+        fill.origin_y = start.y;
+        if (length_squared > 0.0) {
+            fill.step_x = across / length_squared;
+            fill.step_y = down / length_squared;
+        }
+    }
+    if (layer.kind == MaterialFillKind::radial_gradient) {
+        const Point centre = resolved_point(layer.center, layer.coordinate_space, box, scale);
+        const bool normalized = layer.coordinate_space == MaterialCoordinateSpace::normalized;
+        const double radius_x = normalized ? layer.radii.width * box.width : layer.radii.width * scale;
+        const double radius_y = normalized ? layer.radii.height * box.height : layer.radii.height * scale;
+        fill.origin_x = centre.x;
+        fill.origin_y = centre.y;
+        if (radius_x > 0.0) fill.inverse_radius_x = 1.0 / radius_x;
+        if (radius_y > 0.0) fill.inverse_radius_y = 1.0 / radius_y;
+    }
+    return fill;
+}
+
+void add_band(MaterialLook& look, Rect band, Color colour, bool clipped) noexcept {
+    if (band.width <= 0.0 || band.height <= 0.0 || look.band_count == maximum_bands) return;
+    look.bands[look.band_count] = ResolvedBand{band, colour, clipped};
+    look.band_count = look.band_count + 1U;
+}
+
+// A keyline's band (as paint_material_keyline places it), in device pixels;
+// none when the keyline does not fit across the box.
+void add_keyline(MaterialLook& look, const MaterialKeyline& keyline, double scale, bool clipped) noexcept {
+    const Rect box = look.box;
+    const double inset = keyline.inset * scale;
+    const double width = keyline.width * scale;
+    const double reach = (inset + width * 0.5) * 2.0;
+    switch (keyline.edge) {
+    case MaterialEdge::top:
+        if (reach > box.height) return;
+        add_band(look, Rect{box.x + inset, box.y + inset, box.width - inset * 2.0, width}, keyline.color, clipped);
+        return;
+    case MaterialEdge::right:
+        if (reach > box.width) return;
+        add_band(look, Rect{box.right() - inset - width, box.y + inset, width, box.height - inset * 2.0},
+                 keyline.color, clipped);
+        return;
+    case MaterialEdge::bottom:
+        if (reach > box.height) return;
+        add_band(look, Rect{box.x + inset, box.bottom() - inset - width, box.width - inset * 2.0, width},
+                 keyline.color, clipped);
+        return;
+    case MaterialEdge::left:
+        if (reach > box.width) return;
+        add_band(look, Rect{box.x + inset, box.y + inset, width, box.height - inset * 2.0}, keyline.color, clipped);
+        return;
+    }
+}
+
+MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget& target) noexcept {
+    const double scale = target.scale.value;
+    MaterialLook look{};
+    look.box = material_box(target);
+    const double radius = material_radius(material, target);
+    look.box_shape = rounded(radius);
+    const Rect box = look.box;
+    // A centre at least half a pixel inside the straight edges, and clear of
+    // the corners' radius along the other axis, has a signed distance of at
+    // most −0.5, where shape_coverage gives exactly 1.
+    const double clear = std::max(radius, 0.5);
+    look.wide_interior = Rect{box.x + 0.5, box.y + clear, box.width - 1.0, box.height - clear * 2.0};
+    look.tall_interior = Rect{box.x + clear, box.y + 0.5, box.width - clear * 2.0, box.height - 1.0};
+    for (const MaterialShadow& shadow : material.shadows) {
+        const double spread = shadow.spread * scale;
+        const double offset_x = shadow.offset.x * scale;
+        const double offset_y = shadow.offset.y * scale;
+        ResolvedShadow resolved{};
+        resolved.inverse_sigma = inverse_sigma_of(shadow.blur_radius, scale);
+        resolved.colour = shadow.color;
+        if (!shadow.inset) {
+            resolved.shape = Rect{box.x + offset_x - spread, box.y + offset_y - spread, box.width + spread * 2.0,
+                                  box.height + spread * 2.0};
+            resolved.radius = std::max(0.0, radius + spread);
+            if (resolved.shape.width <= 0.0 || resolved.shape.height <= 0.0) continue;
+            look.outer[look.outer_count] = resolved;
+            look.outer_count = look.outer_count + 1U;
+            continue;
+        }
+        resolved.shape = Rect{box.x + offset_x + spread, box.y + offset_y + spread, box.width - spread * 2.0,
+                              box.height - spread * 2.0};
+        resolved.radius = std::max(0.0, radius - spread);
+        resolved.solid = resolved.shape.width <= 0.0 || resolved.shape.height <= 0.0;
+        look.inset[look.inset_count] = resolved;
+        look.inset_count = look.inset_count + 1U;
+    }
+    for (std::size_t index = 0U; index < material.fills.size(); ++index) {
+        look.fills[index] = resolve_fill(material.fills[index], box, scale);
+        look.fills[index].image = index;
+    }
+    look.fill_count = material.fills.size();
+    if (material.border) {
+        const double width = (*material.border).width * scale;
+        look.border = true;
+        look.border_colour = (*material.border).color;
+        look.border_inner = Rect{box.x + width, box.y + width, std::max(0.0, box.width - width * 2.0),
+                                 std::max(0.0, box.height - width * 2.0)};
+        look.border_inner_shape = rounded(std::max(0.0, radius - width));
+    }
+    const MaterialBorderEdges& edges = material.border_edges;
+    if (edges.top) {
+        const double width = (*edges.top).width * scale;
+        add_band(look, Rect{box.x, box.y, box.width, width}, (*edges.top).color, false);
+    }
+    if (edges.right) {
+        const double width = (*edges.right).width * scale;
+        add_band(look, Rect{box.right() - width, box.y, width, box.height}, (*edges.right).color, false);
+    }
+    if (edges.bottom) {
+        const double width = (*edges.bottom).width * scale;
+        add_band(look, Rect{box.x, box.bottom() - width, box.width, width}, (*edges.bottom).color, false);
+    }
+    if (edges.left) {
+        const double width = (*edges.left).width * scale;
+        add_band(look, Rect{box.x, box.y, width, box.height}, (*edges.left).color, false);
+    }
+    const bool clip_keylines = radius > 0.0;
+    for (const MaterialKeyline& keyline : material.keylines) add_keyline(look, keyline, scale, clip_keylines);
+    return look;
+}
+
+// -- image fills -------------------------------------------------------------------
+
+// Each image fill's colour resampled to every destination pixel, by fill
+// index; empty for a fill that is not an image, or one whose image could
+// not be read or stored (it then draws nothing).
+struct MaterialImages final {
+    std::array<std::vector<Unit>, SurfaceMaterial::maximum_fill_layers> layers{};
+};
+
+// Reads and resamples each image fill. Storage that cannot be allocated
+// leaves that layer empty: fill() is noexcept and still writes every pixel.
+void prepare_images(const SurfaceMaterial& material, const PrimitiveTarget& target, const MaterialLook& look,
+                    DeviceExtent extent, MaterialImages& images) noexcept {
+    if (target.images == nullptr) return;
+    for (std::size_t index = 0U; index < material.fills.size(); ++index) {
+        const MaterialFillLayer& layer = material.fills[index];
+        if (layer.kind != MaterialFillKind::image) continue;
+        try {
+            MaterialImagePixels pixels{};
+            if (!read_material_image(*target.images, layer, pixels)) continue;
+            const double scale = target.scale.value;
+            const ImageAxisPlacement across = image_placement_across(layer, look.box.x, look.box.width, scale,
+                                                                     static_cast<double>(pixels.width));
+            const ImageAxisPlacement down = image_placement_down(layer, look.box.y, look.box.height, scale,
+                                                                 static_cast<double>(pixels.height));
+            ResampleAxis columns{};
+            ResampleAxis rows{};
+            plan_resample_axis(across, extent.width, columns);
+            plan_resample_axis(down, extent.height, rows);
+            std::vector<Unit> scratch{};
+            resample_material_image(pixels, columns, rows, scratch, images.layers[index]);
+        } catch (const std::bad_alloc&) {
+            images.layers[index].clear();
+        }
+    }
+}
+
+// -- the pixel ---------------------------------------------------------------------
+
+double blurred_coverage(const ResolvedShadow& shadow, double centre_x, double centre_y) noexcept {
+    const Rect& shape = shadow.shape;
+    const double inverse = shadow.inverse_sigma;
+    const double across =
+        gaussian_integral((shape.right() - centre_x) * inverse) - gaussian_integral((shape.x - centre_x) * inverse);
+    const double down =
+        gaussian_integral((shape.bottom() - centre_y) * inverse) - gaussian_integral((shape.y - centre_y) * inverse);
+    const double product = across * down;
+    if (shadow.radius <= 0.0) return product;
+    const double distance = shape_signed_distance(rounded(shadow.radius), shape, Point{centre_x, centre_y});
+    const double edge = gaussian_integral(-distance * inverse);
+    const double coverage = std::min(product, edge);
+    return coverage;
+}
+
+double spread_position(double t, GradientSpreadMode spread) noexcept {
+    switch (spread) {
+    case GradientSpreadMode::pad: {
+        const double padded = std::clamp(t, 0.0, 1.0);
+        return padded;
+    }
+    case GradientSpreadMode::repeat: {
+        const double repeated = t - std::floor(t);
+        return repeated;
+    }
+    case GradientSpreadMode::reflect: {
+        const double period = t - 2.0 * std::floor(t * 0.5);
+        const double reflected = period > 1.0 ? 2.0 - period : period;
+        return reflected;
+    }
+    }
+    return std::clamp(t, 0.0, 1.0);
+}
+
+// The gradient's straight colour at `t` in [0, 1]; the stops are valid
+// (valid_gradient_stops: at least two, from 0 to 1, increasing).
+Straight stop_colour(std::span<const GradientStop> stops, double t) noexcept {
+    std::size_t next = 1U;
+    while (next + 1U < stops.size() && t > stops[next].offset) next = next + 1U;
+    const GradientStop& low = stops[next - 1U];
+    const GradientStop& high = stops[next];
+    const double span = high.offset - low.offset;
+    const double f = std::clamp((t - low.offset) / span, 0.0, 1.0);
+    const Straight a = straight_of(low.color);
+    const Straight b = straight_of(high.color);
+    const Straight colour{a.red + (b.red - a.red) * f, a.green + (b.green - a.green) * f,
+                          a.blue + (b.blue - a.blue) * f, a.alpha + (b.alpha - a.alpha) * f};
+    return colour;
+}
+
+Unit fill_colour(const ResolvedFill& fill, const MaterialImages& images, std::size_t pixel, double centre_x,
+                 double centre_y, double coverage) noexcept {
+    switch (fill.kind) {
+    case MaterialFillKind::solid: {
+        const Unit solid = premultiply(fill.colour, coverage);
+        return solid;
+    }
+    case MaterialFillKind::linear_gradient: {
+        const double t = (centre_x - fill.origin_x) * fill.step_x + (centre_y - fill.origin_y) * fill.step_y;
+        const Unit linear = premultiply_straight(stop_colour(fill.stops, spread_position(t, fill.spread)), coverage);
+        return linear;
+    }
+    case MaterialFillKind::radial_gradient: {
+        const double across = (centre_x - fill.origin_x) * fill.inverse_radius_x;
+        const double down = (centre_y - fill.origin_y) * fill.inverse_radius_y;
+        const double t = std::sqrt(across * across + down * down);
+        const Unit radial = premultiply_straight(stop_colour(fill.stops, std::min(t, 1.0)), coverage);
+        return radial;
+    }
+    case MaterialFillKind::image: {
+        const std::vector<Unit>& layer = images.layers[fill.image];
+        if (layer.empty()) return Unit{};
+        const double weight = coverage * fill.opacity;
+        const Unit& sampled = layer[pixel];
+        const Unit image{sampled.red * weight, sampled.green * weight, sampled.blue * weight, sampled.alpha * weight};
+        return image;
+    }
+    }
+    return Unit{};
+}
+
+bool centre_within(Rect band, double x, double y) noexcept {
+    const bool within = x >= band.x && x <= band.right() && y >= band.y && y <= band.bottom();
+    return within;
+}
+
+// How much of pixel (x, y) the box covers.
+double box_coverage(const MaterialLook& look, std::int64_t x, std::int64_t y, double centre_x,
+                    double centre_y) noexcept {
+    if (centre_within(look.wide_interior, centre_x, centre_y) || centre_within(look.tall_interior, centre_x, centre_y)) {
+        return 1.0;
+    }
+    const double coverage = shape_coverage(look.box_shape, look.box, 1.0, x, y);
+    return coverage;
+}
+
+Unit material_pixel(const MaterialLook& look, const MaterialImages& images, std::size_t pixel, std::int64_t x,
+                    std::int64_t y) noexcept {
+    Unit result{};
+    const double centre_x = static_cast<double>(x) + 0.5;
+    const double centre_y = static_cast<double>(y) + 0.5;
+    for (std::size_t index = 0U; index < look.outer_count; ++index) {
+        const ResolvedShadow& shadow = look.outer[index];
+        blend_over(result, premultiply(shadow.colour, blurred_coverage(shadow, centre_x, centre_y)));
+    }
+    const double inside = box_coverage(look, x, y, centre_x, centre_y);
+    if (inside > 0.0) {
+        for (std::size_t index = 0U; index < look.fill_count; ++index) {
+            blend_over(result, fill_colour(look.fills[index], images, pixel, centre_x, centre_y, inside));
+        }
+        for (std::size_t index = 0U; index < look.inset_count; ++index) {
+            const ResolvedShadow& shadow = look.inset[index];
+            const double shaded = shadow.solid ? 1.0 : 1.0 - blurred_coverage(shadow, centre_x, centre_y);
+            blend_over(result, premultiply(shadow.colour, shaded * inside));
+        }
+        if (look.border) {
+            const double inner = shape_coverage(look.border_inner_shape, look.border_inner, 1.0, x, y);
+            blend_over(result, premultiply(look.border_colour, std::max(0.0, inside - inner)));
+        }
+    }
+    const double px = static_cast<double>(x);
+    const double py = static_cast<double>(y);
+    for (std::size_t index = 0U; index < look.band_count; ++index) {
+        const ResolvedBand& band = look.bands[index];
+        const double across = interval_overlap(px, band.band.x, band.band.right());
+        const double down = interval_overlap(py, band.band.y, band.band.bottom());
+        const double clip = band.clipped ? inside : 1.0;
+        blend_over(result, premultiply(band.colour, across * down * clip));
+    }
+    return result;
+}
+
+// -- the bake estimate -------------------------------------------------------------
+
+DeviceExtent destination_extent(const PrimitiveTarget& target) noexcept {
+    const double scale = target.scale.value;
+    const double width = std::ceil((target.logical_size.width + material_outset * 2.0) * scale);
+    const double height = std::ceil((target.logical_size.height + material_outset * 2.0) * scale);
+    const DeviceExtent extent{static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height)};
+    return extent;
+}
+
+double extra_stops(const MaterialFillLayer& layer) noexcept {
+    const double stops = static_cast<double>(layer.stops.size());
+    const double extra = std::max(0.0, stops - 2.0);
+    return extra;
+}
+
+// One image fill's decode and resampling, in nanoseconds.
+double image_estimate(const MaterialFillLayer& layer, const PrimitiveTarget& target, DeviceExtent extent) noexcept {
+    const MaterialBakeCosts& costs = measured_material_costs;
+    const double scale = target.scale.value;
+    const Rect box = material_box(target);
+    const double source_width = layer.image_pixel_size.width;
+    const double source_height = layer.image_pixel_size.height;
+    const ImageAxisPlacement across = image_placement_across(layer, box.x, box.width, scale, source_width);
+    const ImageAxisPlacement down = image_placement_down(layer, box.y, box.height, scale, source_height);
+    const double columns = static_cast<double>(extent.width);
+    const double rows = static_cast<double>(extent.height);
+    // The two passes: every source row across the output columns, then
+    // every output pixel down.
+    const double taps = source_height * columns * image_axis_taps(across) + rows * columns * image_axis_taps(down);
+    const double decode = source_width * source_height * costs.image_decode;
+    const double estimate = taps * costs.image_tap + decode;
+    return estimate;
+}
+
+} // namespace
+
+double gaussian_integral(double u) noexcept {
+    // Φ(u) = 1/2 + v · P(v²), v = u / 3.5, P fitted by least squares to the
+    // exact integral (maximum error 3.8e-4). Beyond ±3.5 it is exactly 0 or
+    // 1, so that a covered interior is opaque; the step there, under 4e-4,
+    // is less than a fifth of an 8-bit step.
+    constexpr double c0 = 1.3941422783609632;
+    constexpr double c1 = -2.782308136192413;
+    constexpr double c2 = 4.603387247455512;
+    constexpr double c3 = -4.9815632521829425;
+    constexpr double c4 = 3.0698264846092123;
+    constexpr double c5 = -0.8038758147952942;
+    if (u >= 3.5) return 1.0;
+    if (u <= -3.5) return 0.0;
+    const double v = u / 3.5;
+    const double w = v * v;
+    const double p = c0 + w * (c1 + w * (c2 + w * (c3 + w * (c4 + w * c5))));
+    const double value = std::clamp(0.5 + v * p, 0.0, 1.0);
+    return value;
+}
+
+std::span<const std::string_view> material_recipe_names() noexcept {
+    const std::span<const std::string_view> names(recipe_names.data(), recipe_names.size());
+    return names;
+}
+
+double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTarget& target) noexcept {
+    const MaterialBakeCosts& costs = measured_material_costs;
+    const DeviceExtent extent = destination_extent(target);
+    double per_pixel = costs.base;
+    double images = 0.0;
+    for (const MaterialFillLayer& layer : material.fills) {
+        switch (layer.kind) {
+        case MaterialFillKind::solid:
+            per_pixel = per_pixel + costs.solid;
+            break;
+        case MaterialFillKind::linear_gradient:
+            per_pixel = per_pixel + costs.linear + extra_stops(layer) * costs.gradient_stop;
+            break;
+        case MaterialFillKind::radial_gradient:
+            per_pixel = per_pixel + costs.radial + extra_stops(layer) * costs.gradient_stop;
+            break;
+        case MaterialFillKind::image:
+            per_pixel = per_pixel + costs.image;
+            images = images + image_estimate(layer, target, extent);
+            break;
+        }
+    }
+    for (const MaterialShadow& shadow : material.shadows) {
+        per_pixel = per_pixel + (shadow.inset ? costs.inset_shadow : costs.outer_shadow);
+    }
+    if (material.border) per_pixel = per_pixel + costs.border;
+    const MaterialBorderEdges& edges = material.border_edges;
+    const double edge_count = static_cast<double>(edges.top.has_value()) + static_cast<double>(edges.right.has_value()) +
+                              static_cast<double>(edges.bottom.has_value()) +
+                              static_cast<double>(edges.left.has_value());
+    per_pixel = per_pixel + edge_count * costs.border_edge;
+    per_pixel = per_pixel + static_cast<double>(material.keylines.size()) * costs.keyline;
+    const double pixels = static_cast<double>(extent.width) * static_cast<double>(extent.height);
+    const double estimate = pixels * per_pixel + images;
+    return estimate;
+}
+
+// -- MaterialPrimitive -------------------------------------------------------------
+
+const PrimitiveDescriptor& MaterialPrimitive::descriptor() const noexcept {
+    return material_descriptor;
+}
+
+std::optional<ControlVisualRole> MaterialPrimitive::theme_material(
+    const PrimitiveParameterBlock& parameters) const noexcept {
+    const double position = parameters.values[material_recipe].number;
+    const ControlVisualRole role = static_cast<ControlVisualRole>(static_cast<std::uint8_t>(position));
+    return role;
+}
+
+bool MaterialPrimitive::accepts(const PrimitiveParameterBlock&, const PrimitiveTarget& target) const noexcept {
+    if (target.material == nullptr) return false;
+    const SurfaceMaterial& material = *target.material;
+    if (!valid_surface_material(material)) return false;
+    for (const MaterialFillLayer& layer : material.fills) {
+        if (layer.kind != MaterialFillKind::image) continue;
+        if (target.images == nullptr || !material_image_available(*target.images, layer)) return false;
+    }
+    const double estimate = material_bake_estimate(material, target);
+    const bool within = estimate <= maximum_material_bake_nanoseconds;
+    return within;
+}
+
+void MaterialPrimitive::derive(const PrimitiveParameterBlock&, const PrimitiveTarget&, std::span<double>) const noexcept {}
+
+void MaterialPrimitive::fill(const PrimitiveParameterBlock&, const PrimitiveTarget& target, std::span<const double>,
+                             const PartRasterView& destination) const noexcept {
+    // accepts() has passed: the target lends a valid material.
+    bake_material(*target.material, target, destination);
+}
+
+void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                   const PartRasterView& destination) noexcept {
+    const MaterialLook look = resolve_look(material, target);
+    MaterialImages images{};
+    prepare_images(material, target, look, destination.extent, images);
+    const std::size_t width = destination.extent.width;
+    for (std::uint32_t row = 0U; row < destination.extent.height; ++row) {
+        const std::size_t start = static_cast<std::size_t>(row) * destination.row_bytes;
+        const std::size_t first_pixel = static_cast<std::size_t>(row) * width;
+        for (std::uint32_t column = 0U; column < destination.extent.width; ++column) {
+            const Unit pixel = material_pixel(look, images, first_pixel + column, static_cast<std::int64_t>(column),
+                                              static_cast<std::int64_t>(row));
+            store(destination, start + static_cast<std::size_t>(column) * part_raster_bytes_per_pixel, pixel);
+        }
+    }
+}
+
+} // namespace gui_forms::engine_primitives

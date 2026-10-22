@@ -1,5 +1,6 @@
 #include "gui_forms/engine/part_table/engine_part_table.hpp"
 
+#include "gui_forms/resources/image_registry/image_registry.hpp"
 #include "gui_forms/window/window.hpp"
 
 #include <cmath>
@@ -52,6 +53,27 @@ bool same_parameters(const PrimitiveParameterBlock& left, const PrimitiveParamet
         if (!(left.values[index] == right.values[index])) return false;
     }
     return true;
+}
+
+bool material_reads_images(const SurfaceMaterial& material) noexcept {
+    for (const MaterialFillLayer& layer : material.fills) {
+        if (layer.kind == MaterialFillKind::image) return true;
+    }
+    return false;
+}
+
+// Whether a material primitive's lent material, and the images it reads,
+// are those the cached raster was drawn with.
+bool same_material(const CachedPartRaster& cached, const PrimitiveTarget& target) noexcept {
+    if (target.material == nullptr) {
+        const bool none = !cached.material;
+        return none;
+    }
+    if (!cached.material || !(*cached.material == *target.material)) return false;
+    if (cached.target.corner_radius != target.corner_radius) return false;
+    if (!material_reads_images(*target.material)) return true;
+    const bool same_images = target.images != nullptr && cached.image_revision == (*target.images).snapshot().revision;
+    return same_images;
 }
 
 // The bytes of a raster of `extent`. Each side is at most
@@ -284,7 +306,8 @@ bool EnginePartTable::raster_current(const EnginePartRecord& record, const PartR
     const AnatomyStateSet read = read_states_of(*request.primitive, request.target);
     if (!(cached.target.states == read)) return false;
     if (!same_read_inputs(*request.primitive, cached.target, request.target)) return false;
-    const bool same = same_parameters(cached.parameters, request.parameters);
+    if (!same_parameters(cached.parameters, request.parameters)) return false;
+    const bool same = same_material(cached, request.target);
     return same;
 }
 
@@ -319,6 +342,14 @@ PartRasterResult EnginePartTable::raster_for(const PartRecordHandle handle, cons
         storage = PartRaster::create(request.extent, request.target.scale);
         if (!storage) return PartRasterResult{nullptr, PartRasterStatus::refused};
         status = bytes > raster_cache_budget_bytes ? PartRasterStatus::uncached : PartRasterStatus::new_storage;
+    }
+
+    // The lent material's copy, made before anything is drawn or committed.
+    std::optional<SurfaceMaterial> kept_material{};
+    std::uint64_t image_revision = 0U;
+    if (request.target.material != nullptr) {
+        kept_material = *request.target.material;
+        if (request.target.images != nullptr) image_revision = (*request.target.images).snapshot().revision;
     }
 
     // Draw, preparing again when the record's preparation is stale.
@@ -356,6 +387,10 @@ PartRasterResult EnginePartTable::raster_for(const PartRecordHandle handle, cons
     cached.parameters = request.parameters;
     cached.target = request.target;
     cached.target.states = read_states_of(primitive, request.target);
+    cached.target.material = nullptr;
+    cached.target.images = nullptr;
+    cached.material = std::move(kept_material);
+    cached.image_revision = image_revision;
     cached.extent = request.extent;
     cached.raster_generation = part.generation;
     cached.raster_table_generation = raster_table_generation_;
