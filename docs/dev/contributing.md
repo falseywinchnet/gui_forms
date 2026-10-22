@@ -71,7 +71,11 @@ The same command is the standard local sanitizer tree, kept by every build
 tree on every platform: it builds `.build/native-<host>-<arch>/gui-forms-sanitize`
 with CI's flags and runs the suite, or with `--tests REGEX` builds and runs
 only what the matching tests need, incrementally after the first build.
-`--test-jobs N` runs N tests at once. The sanitized objects carry
+`--test-jobs N` runs N tests at once. `--skip-labels gallery_accessibility`
+leaves out the Gallery-wide accessibility tests (each walks every Gallery page
+through MSAA, UI Automation, AT-SPI or AX; together the slowest sanitized
+tests by far) from a local run and from its narrowed build; CI passes no
+label and still runs them. The sanitized objects carry
 `-fdebug-compilation-dir=.`, so checkouts with the CI layout share them
 through one `ccache`; a second checkout of the same sources compiles
 almost nothing. A rerun with nothing changed skips the dependency checkout
@@ -79,6 +83,19 @@ and the configure. AddressSanitizer and
 UndefinedBehaviorSanitizer run everywhere; LeakSanitizer runs on Linux and
 macOS, since the Windows MinGW runtime has none. Host code is sanitized only
 where it builds, so the Windows and macOS hosts depend on these local trees.
+
+Sanitized trees carry line tables, not full debug information, by default
+(`--debug-info lines`, `-gline-tables-only`): every report frame keeps its
+file, line and column; objects and programs are about 60 to 70% smaller and
+compiles about 28% faster than with `-g`. Frames of our code then lose their
+namespaces and parameter types, and a debugger loses locals. While hunting a
+defect, build with full `-g` and switch back afterwards:
+`ci_build.py --sanitize --debug-info full`, or
+`GUI_FORMS_SANITIZER_DEBUG_INFO=full` in the environment. A tree rebuilds when
+the mode changes. On CI, the sanitizer job uses `full` when the head commit's
+message contains `[sanitizer-full-g]`, and keys its cache by the mode. LeakSanitizer
+suppressions (`tools/sanitizer/lsan.supp`) therefore name functions without a
+namespace where the name allows.
 
 ## Tests and evidence
 

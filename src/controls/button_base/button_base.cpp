@@ -132,6 +132,30 @@ std::vector<std::string_view> button_text_lines(std::string_view text) {
     }
     return result;
 }
+
+// The extent of a text block `text` and an image `image` placed by
+// `relation`, `gap` apart when side by side or stacked.
+Size combined_content_size(TextImageRelation relation, Size text, Size image, double gap) noexcept {
+    switch (relation) {
+    case TextImageRelation::image_before_text:
+    case TextImageRelation::text_before_image: {
+        const Size beside{image.width + gap + text.width, std::max(image.height, text.height)};
+        return beside;
+    }
+    case TextImageRelation::image_above_text:
+    case TextImageRelation::text_above_image: {
+        const Size stacked{std::max(image.width, text.width), image.height + gap + text.height};
+        return stacked;
+    }
+    case TextImageRelation::overlay: {
+        const Size overlaid{std::max(image.width, text.width), std::max(image.height, text.height)};
+        return overlaid;
+    }
+    }
+    // A relation outside the enumeration overlays the two.
+    const Size overlaid{std::max(image.width, text.width), std::max(image.height, text.height)};
+    return overlaid;
+}
 }
 
 ButtonBase::ButtonBase(StableId stable_id, std::string text)
@@ -494,32 +518,17 @@ Size ButtonBase::measure(Size available) {
     const bool has_text = text_width > 0.0;
     const bool has_image = image_size.width > 0.0 && image_size.height > 0.0;
     const double gap = has_text && has_image ? image_gap_ : 0.0;
-    double content_width = text_width;
-    double content_height = text_height;
+    Size content{text_width, text_height};
     if (has_image) {
-        switch (text_image_relation_) {
-        case TextImageRelation::image_before_text:
-        case TextImageRelation::text_before_image:
-            content_width = image_size.width + gap + text_width;
-            content_height = std::max(image_size.height, text_height);
-            break;
-        case TextImageRelation::image_above_text:
-        case TextImageRelation::text_above_image:
-            content_width = std::max(image_size.width, text_width);
-            content_height = image_size.height + gap + text_height;
-            break;
-        case TextImageRelation::overlay:
-            content_width = std::max(image_size.width, text_width);
-            content_height = std::max(image_size.height, text_height);
-            break;
-        }
+        content = combined_content_size(text_image_relation_, {text_width, text_height},
+                                        image_size, gap);
     }
     const double preferred_width = requested.width > 0.0
         ? requested.width
-        : content_width + content_padding_.left + content_padding_.right + 10.0;
+        : content.width + content_padding_.left + content_padding_.right + 10.0;
     const double preferred_height = requested.height > 0.0
         ? requested.height
-        : std::max(24.0, content_height + content_padding_.top +
+        : std::max(24.0, content.height + content_padding_.top +
                                      content_padding_.bottom + 4.0);
     return {std::min(available.width, preferred_width),
             std::min(available.height, preferred_height)};
@@ -626,8 +635,6 @@ ButtonBase::ContentLayout ButtonBase::layout_content(
     const bool has_text = text_size.width > 0.0 && text_size.height > 0.0;
     const bool has_image = image && image_size.width > 0.0 &&
                            image_size.height > 0.0;
-    layout.has_text = has_text;
-    layout.has_image = has_image;
     const ContentAlignment group_alignment = command_alignment
         ? ContentAlignment::middle_left : text_alignment_;
     const double gap = has_text && has_image ? image_gap_ : 0.0;
@@ -649,12 +656,12 @@ ButtonBase::ContentLayout ButtonBase::layout_content(
                                                : group.x + text_size.width + gap;
             const double text_x = image_first ? group.x + image_size.width + gap
                                               : group.x;
-            layout.image = {image_x,
-                            group.y + (group.height - image_size.height) * 0.5,
-                            image_size.width, image_size.height};
-            layout.text = {text_x,
-                           group.y + (group.height - text_size.height) * 0.5,
-                           text_size.width, text_size.height};
+            layout.image = Rect{image_x,
+                                group.y + (group.height - image_size.height) * 0.5,
+                                image_size.width, image_size.height};
+            layout.text = Rect{text_x,
+                               group.y + (group.height - text_size.height) * 0.5,
+                               text_size.width, text_size.height};
         } else {
             const bool image_first =
                 text_image_relation_ == TextImageRelation::image_above_text;
@@ -662,10 +669,10 @@ ButtonBase::ContentLayout ButtonBase::layout_content(
                                                : group.y + text_size.height + gap;
             const double text_y = image_first ? group.y + image_size.height + gap
                                               : group.y;
-            layout.image = {group.x + (group.width - image_size.width) * 0.5,
-                            image_y, image_size.width, image_size.height};
-            layout.text = {group.x + (group.width - text_size.width) * 0.5,
-                           text_y, text_size.width, text_size.height};
+            layout.image = Rect{group.x + (group.width - image_size.width) * 0.5,
+                                image_y, image_size.width, image_size.height};
+            layout.text = Rect{group.x + (group.width - text_size.width) * 0.5,
+                               text_y, text_size.width, text_size.height};
         }
     } else {
         if (has_image) layout.image = aligned_rect(content, image_size, image_alignment_);
@@ -712,11 +719,11 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
     }
     const ContentLayout layout =
         layout_content(content, line_sizes, font, selected, command_alignment);
-    const Rect image_rect = layout.image;
-    const Rect text_rect = layout.text;
+    const Rect image_rect = layout.image.value_or(Rect{});
+    const Rect text_rect = layout.text.value_or(Rect{});
     const double line_height = layout.line_height;
 
-    if (layout.has_image && !image_rect.empty()) {
+    if (layout.image.has_value() && !image_rect.empty()) {
         const ImageListResolution image = resolved_button_image(selected);
         const double opacity = !effectively_enabled() &&
                 image.resolved_state != ImageVisualState::disabled
@@ -726,7 +733,7 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
                             image_rect.width, image_rect.height},
                            opacity);
     }
-    if (layout.has_text && !text_rect.empty()) {
+    if (layout.text.has_value() && !text_rect.empty()) {
         for (std::size_t index = 0; index < lines.size(); ++index) {
             const Size measured = line_sizes[index];
             double x = text_rect.x;
@@ -805,11 +812,11 @@ ButtonBase::Parts ButtonBase::push_button_parts(bool selected,
     Parts record;
     record.region = PartGeometry::from_bounds(bounds);
     record.face = PartGeometry::from_bounds(bounds);
-    if (layout.has_image) {
-        record.icon = PartGeometry::from_bounds(layout.image);
+    if (layout.image.has_value()) {
+        record.icon = PartGeometry::from_bounds(*layout.image);
     }
-    if (layout.has_text) {
-        record.label = PartGeometry::from_bounds(layout.text);
+    if (layout.text.has_value()) {
+        record.label = PartGeometry::from_bounds(*layout.text);
     }
     // A cue part publishes the face it marks. Where the ring is stroked
     // relative to it is a theme recipe parameter until the engine (T2)

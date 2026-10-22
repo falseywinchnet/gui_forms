@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+import native_tests
 import windows_toolchain
 
 
@@ -64,6 +65,16 @@ def main() -> None:
     inputs: Path = source.parent / '.ci/inputs.json'
     if inputs.exists():
         manifest['validation_environment'] = json.loads(inputs.read_text(encoding='utf-8'))['environment']
+    # The tests this job's ci_build.py run passed; a reused validation keeps
+    # the producer's list from the manifest its archive restored here.
+    junit: Path = source.parent / ('.build/native-' + sys.argv[1] + '/gui-forms') / native_tests.JUNIT_NAME
+    if junit.is_file():
+        manifest['validated_tests'] = native_tests.passed_tests(junit)
+    elif reused.exists() and destination.is_file():
+        producer: dict[str, object] = json.loads(destination.read_text(encoding='utf-8'))
+        carried: list[str] | None = native_tests.validated_tests(producer)
+        if carried is not None:
+            manifest['validated_tests'] = carried
     if reused.exists():
         receipt: dict[str, object] = json.loads(reused.read_text(encoding='utf-8'))
         manifest['validation'] = 'reused successful provider validation for identical tracked tree and build environment'

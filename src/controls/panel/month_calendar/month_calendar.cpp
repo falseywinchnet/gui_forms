@@ -1131,11 +1131,13 @@ std::string MonthCalendar::realized_item_stable_id(std::size_t item) const {
         return month_stable_id(reference.month) + ".weekday." + std::to_string(reference.index);
     case ItemKind::week:
         return month_stable_id(reference.month) + ".week." + std::to_string(reference.index);
-    case ItemKind::day:
-        break;
+    case ItemKind::day: {
+        const DateTimeValue date = add_days(month_start(reference.month), static_cast<std::int64_t>(reference.index));
+        return day_stable_id(date);
     }
-    const DateTimeValue date = add_days(month_start(reference.month), static_cast<std::int64_t>(reference.index));
-    return day_stable_id(date);
+    }
+    // A kind outside the enumeration names no item.
+    return {};
 }
 
 ItemSystemIndex MonthCalendar::publish_realized_item_system(std::size_t item) const {
@@ -1170,6 +1172,8 @@ void MonthCalendar::publish_realized_item_geometry(std::size_t item, std::span<P
         return;
     }
     }
+    // A kind outside the enumeration publishes no parts.
+    return;
 }
 
 AnatomyStateSet MonthCalendar::realized_item_anatomy_states(std::size_t item) const {

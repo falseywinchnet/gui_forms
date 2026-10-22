@@ -801,6 +801,7 @@ PageStrip::ItemParts PageStrip::tab_parts_as(std::size_t position, bool hot) con
         const Rect shown = Rect::intersection(slot, bounds);
         interior_end = slot_offset - slot_gap * scale;
         const SlotContent content = slot_content(position, hot);
+        // An empty slot (none) publishes no part.
         if (content == SlotContent::close) {
             const AnatomyStateSet states = slot_states(Zone::tab_close, position);
             parts.tab_close = PartGeometry::from_bounds(shown);
