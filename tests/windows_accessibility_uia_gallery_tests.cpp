@@ -34,6 +34,7 @@
 #include "gallery_page_specs.hpp"
 #include "gui_forms/gui_forms.hpp"
 #include "gui_forms/platform/windows_host.hpp"
+#include "support/windows_own_window.hpp"
 
 #include <windows.h>
 #include <ole2.h>
@@ -64,7 +65,7 @@ namespace {
 
 using namespace gui_forms;
 
-constexpr const wchar_t* fixture_title = L"GUI.Forms UI Automation Gallery client";
+// The window title, followed by the process ID (test_support::process_title).
 constexpr std::string_view fixture_title_utf8 = "GUI.Forms UI Automation Gallery client";
 constexpr const wchar_t* framework_id = L"GUI.Forms";
 
@@ -459,7 +460,8 @@ bool show_page(Window& window, std::string_view page) {
 }
 
 // Shows a page and builds its expectation, on the UI thread. With
-// `freeze`, it first cancels the window's frame requests: the client reads
+// `freeze`, it first takes the native window's input away and ends any
+// pointer hover (below), then cancels the window's frame requests: the client reads
 // the tree through many UI-thread calls while the message loop runs, and
 // the timers and animations some pages start (the timing page's tick and
 // progress, the easing preview, the motion target) would change it between
@@ -477,7 +479,20 @@ struct PreparePage final {
         out.shown = show_page(*window, page);
         if (!out.shown) return;
         (*window).perform_layout();
-        if (freeze) (*window).cancel_frame_requests();
+        if (freeze) {
+            // The physical pointer may rest over the window: hovering shows
+            // a tooltip, and a later move hides it while the client reads.
+            // A disabled native window takes no pointer or key input (UI
+            // Automation still reaches the providers), and a leave ends any
+            // hover the pointer began before.
+            EnableWindow(hwnd, FALSE);
+            PointerEvent leave;
+            leave.action = PointerAction::leave;
+            leave.position = Point{-1.0, -1.0};
+            static_cast<void>((*window).dispatch_pointer(leave));
+            (*window).perform_layout();
+            (*window).cancel_frame_requests();
+        }
         const UINT dpi = GetDpiForWindow(hwnd);
         out.scale = dpi == 0U ? 1.0 : std::max(1.0, dpi / 96.0);
         out.origin = POINT{};
@@ -486,7 +501,7 @@ struct PreparePage final {
         std::vector<VirtualOwner> owners;
         collect_virtual_owners((*window).root(), owners);
         out.client = ExpectedNode{};
-        out.client.node.name = std::string(fixture_title_utf8);
+        out.client.node.name = test_support::process_title(fixture_title_utf8);
         out.client.control_type = "(window client)";
         out.client.children.resize(snapshot.roots.size());
         for (std::size_t index = 0; index < snapshot.roots.size(); ++index) {
@@ -604,23 +619,33 @@ std::vector<int> runtime_id(IUIAutomationElement& element) {
 
 // The element's children, in order: on the window element only the
 // GUI.Forms ones (the host's non-client parts are the system's).
+// With `trace`, which a mismatch report asks for by walking again, each raw
+// child's AutomationId and framework (or the failing HRESULT) and how the
+// walk ended are appended to it.
 std::vector<ElementReference> element_children(PageWalk& walk, IUIAutomationElement& element,
-                                               bool window_level) {
+                                               bool window_level, std::string* trace) {
     std::vector<ElementReference> children;
     ElementReference child;
     HRESULT status = walk.walker.GetFirstChildElement(&element, child.receive());
     while (SUCCEEDED(status) && child.get() != nullptr) {
         bool keep = true;
-        if (window_level) {
+        if (window_level || trace != nullptr) {
             BstrOwner framework;
             const HRESULT read = (*child.get()).get_CurrentFrameworkId(framework.receive());
-            keep = SUCCEEDED(read) && framework.wide() == framework_id;
+            if (window_level) keep = SUCCEEDED(read) && framework.wide() == framework_id;
+            if (trace != nullptr) {
+                BstrOwner id;
+                static_cast<void>((*child.get()).get_CurrentAutomationId(id.receive()));
+                const std::string seen = SUCCEEDED(read) ? framework.utf8() : hresult_text(read);
+                *trace += " [" + id.utf8() + " " + seen + "]";
+            }
         }
         ElementReference next;
         status = walk.walker.GetNextSiblingElement(child.get(), next.receive());
         if (keep) children.push_back(std::move(child));
         child = std::move(next);
     }
+    if (trace != nullptr) *trace += " end " + hresult_text(status);
     return children;
 }
 
@@ -929,11 +954,15 @@ void compare_element(PageWalk& walk, IUIAutomationElement& element, const Expect
         }
         consider_candidate(walk, expected);
     }
-    const std::vector<ElementReference> children = element_children(walk, element, window);
+    const std::vector<ElementReference> children = element_children(walk, element, window, nullptr);
     if (children.size() != expected.children.size()) {
+        std::string trace;
+        static_cast<void>(element_children(walk, element, window, &trace));
+        std::string wanted = std::to_string(expected.children.size()) + ":";
+        for (const ExpectedNode& child : expected.children) wanted += " " + child.node.stable_id;
         bool counted = true;
-        add_mismatch(walk, expected, "child count", std::to_string(expected.children.size()),
-                     std::to_string(children.size()), counted);
+        add_mismatch(walk, expected, "child count", wanted,
+                     std::to_string(children.size()) + ":" + trace, counted);
     }
     const std::size_t walked = std::min(children.size(), expected.children.size());
     for (std::size_t index = 0; index < walked; ++index) {
@@ -1448,6 +1477,14 @@ void run_client(ClientRun& run) {
     if (FAILED(found) || window_element.get() == nullptr) {
         throw std::runtime_error("the window has no UI Automation element");
     }
+    // The window's provider answers FrameworkId GUI.Forms; an element built
+    // from the system proxies answers "Win32".
+    BstrOwner framework;
+    const HRESULT read = (*window_element.get()).get_CurrentFrameworkId(framework.receive());
+    if (FAILED(read) || framework.wide() != framework_id) {
+        throw std::runtime_error("UI Automation did not use the window's provider (FrameworkId \"" +
+                                 framework.utf8() + "\", " + hresult_text(read) + ")");
+    }
     if (run.jobs != nullptr) {
         for (const ActionJob& job : *run.jobs) perform_job(run, *walker.get(), *window_element.get(), job);
         return;
@@ -1501,7 +1538,7 @@ struct HostReady final {
                     std::function<void()>, std::function<HostClipboardTextResult()>,
                     std::function<HostServiceStatus(std::string_view)>) const {
         (*run).request_close = std::move(request_close);
-        (*run).hwnd = FindWindowW(L"GUIForms.Window.v1", fixture_title);
+        (*run).hwnd = test_support::own_gui_forms_window(test_support::process_title_wide(fixture_title_utf8).c_str());
         if ((*run).hwnd == nullptr) {
             (*(*run).report).failure = "the window's native handle does not exist";
             (*run).request_close();
@@ -1559,7 +1596,7 @@ void run_window(Report& report, std::string_view window_kind, const std::vector<
     run.jobs = jobs;
     std::thread client;
     host::WindowsHostOptions options;
-    options.title = std::string(fixture_title_utf8);
+    options.title = test_support::process_title(fixture_title_utf8);
     options.initial_size = gallery::gallery_default_size;
     options.minimum_size = gallery::gallery_minimum_size;
     options.print_metrics_on_close = false;

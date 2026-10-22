@@ -258,3 +258,25 @@ and the consumer's policy stays with the consumer. On that basis:
   [results/2026-10-21-link-map](../../../results/2026-10-21-link-map/README.md).
   On Windows, FreeType's bundled gzip is the only foreign compression code
   left. Stage I5 removes it, along with Skia's libpng and zlib.
+
+### I5: the old paths removed (2026-10-21)
+
+- **Skia:** built with `skia_use_libpng_decode`, `skia_use_libpng_encode`
+  and `skia_use_zlib` false (`third_party/skia_cpu_args.gn` and the MinGW
+  profile). `libpng.a` and `libzlib.a` are no longer built, linked,
+  fetched or licensed. Skia's archive policy now forbids SkPng*, libpng and
+  `Cr_z_` symbols. `fetch_skia_cpu.sh` no longer contacts
+  chromium.googlesource.com for zlib, which had no mirror.
+- **FreeType (decision 3A):** compiled with `FT_CONFIG_OPTION_USE_ZLIB`
+  undefined, through `cmake/freetype/gui_forms_ftoption.h`. FreeType's gzip
+  entry points remain as stubs returning `Unimplemented_Feature`. As a
+  result, gzip-wrapped fonts and WOFF 1 fonts with compressed tables are
+  refused. `gui_forms_freetype_zlib_tests` checks that refusal and that
+  ordinary TrueType still loads.
+- **One implementation, checked in CI:** the native CI job runs
+  `tools/audit_link_map.py --forbid-foreign` on all four platforms. It
+  covers every toolkit archive and the Skia archives, and fails on any C
+  zlib, FreeType inflater (`ft_gzip_*`) or libpng symbol. Locally on Windows,
+  every archive and the Gallery executable report none.
+- **Notices:** the libpng and zlib rows and licence files are gone from the
+  packages, the SDK and `THIRD_PARTY_NOTICES.md`.

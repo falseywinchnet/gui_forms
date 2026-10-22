@@ -38,8 +38,6 @@ source files carry "Copyright (C) 1996-2025".)
 | stx_png (the owned PNG codec) | in this repository | MIT | all | `licenses/stx_png.txt` | `stx_png-LICENSE.txt` (and `share/licenses/stx_png/`) |
 | Unicode Character Database (grapheme tables) | Unicode 17.0.0 | Unicode License v3 | all | `licenses/Unicode.txt` | `Unicode-LICENSE.txt` |
 | Skia | `chrome/m152`, `2a9b593b` | BSD-3-Clause | macOS, Linux | `licenses/Skia.txt` | `Skia-LICENSE.txt` |
-| libpng (inside Skia) | Skia DEPS `d5515b5b` | libpng License v2 | macOS, Linux | `licenses/libpng.txt` | `libpng-LICENSE.txt` |
-| zlib (inside Skia) | Skia DEPS `646b7f56` | zlib License | macOS, Linux | `licenses/zlib.txt` | `zlib-LICENSE.txt` |
 | LLVM libc++ and libc++abi | 22.1.8 | Apache-2.0 WITH LLVM-exception | macOS (bundled dylibs), Windows (statically linked) | Windows `licenses/LLVM/libc++-LICENSE.TXT`; macOS `licenses/LLVM/libcxx-LICENSE.TXT` and `licenses/LLVM/libcxxabi-LICENSE.TXT` | `libc++-LICENSE.txt` (Windows) |
 | LLVM libunwind | 22.1.8 | Apache-2.0 WITH LLVM-exception | macOS (bundled dylib), Windows (statically linked) | `licenses/LLVM/libunwind-LICENSE.TXT` | `libunwind-LICENSE.txt` (Windows) |
 | LLVM compiler-rt builtins | 22.1.8 | Apache-2.0 WITH LLVM-exception | Windows (statically linked) | `licenses/LLVM/compiler-rt-LICENSE.TXT` | `compiler-rt-LICENSE.txt` |
@@ -78,6 +76,8 @@ header and IDL files imported from Wine. The Windows build was checked on
   `msxml.h`, `wincodec.h`, `dcommon.h`, `dxgiformat.h`, `exdisp.h` and
   `objectarray.h`, the last six generated from Wine IDL files), by 91
   objects, found from the build's header dependencies (`ninja -t deps`).
+  `wincodec.h` was the Windows host's WIC PNG decoder, which Z-stage I2
+  removed the same day; it is no longer included, so the list now has nine.
 - No function from them is compiled into an object: every code symbol the
   91 objects define (`llvm-nm --defined-only`) is GUI.Forms', HarfBuzz's,
   FreeType's, the C++ runtime's or a test's. Besides code, the objects hold

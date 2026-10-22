@@ -5,7 +5,9 @@ Reads each binary's symbol table with llvm-nm (or nm) and classifies:
   owned     stx_zlib / stx_png symbols (C++ names containing those namespaces);
   zlib      a C zlib: inflate, deflate, adler32, crc32 and their internals, or
             Chromium's Cr_z_-prefixed copy;
-  freetype  FreeType's bundled gzip/zlib (FT_Gzip_*, ft_gzip_*);
+  freetype  FreeType's bundled gzip inflater (its internal ft_gzip_* functions;
+            the public FT_Gzip_Uncompress and FT_Stream_OpenGzip remain as
+            stubs returning Unimplemented_Feature when it is compiled out);
   libpng    png_* entry points.
 With --forbid-foreign the exit status is 1 when any zlib, freetype or libpng
 symbol is present, so CI can prove one implementation. Without it the
@@ -26,7 +28,7 @@ ZLIB_NAMES: frozenset[str] = frozenset({
     'adler32', 'adler32_z', 'crc32', 'crc32_z', 'zcalloc', 'zcfree', 'zlibVersion', 'compress',
     'compress2', 'uncompress', 'uncompress2', '_tr_init', '_tr_flush_block', '_tr_stored_block'})
 LIBPNG_PATTERN: re.Pattern[str] = re.compile(r'^png_(create|read|write|set|get|destroy|init)_')
-FREETYPE_PATTERN: re.Pattern[str] = re.compile(r'^(FT_Gzip_|ft_gzip_)')
+FREETYPE_PATTERN: re.Pattern[str] = re.compile(r'^ft_gzip_')
 
 
 def symbol_names(path: Path) -> list[str]:

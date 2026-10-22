@@ -12,7 +12,15 @@ if(NOT nm_result EQUAL 0)
     message(FATAL_ERROR "nm failed for ${SKIA_ARCHIVE}: ${nm_error}")
 endif()
 
+# Skia carries no codec at all (Z-stage I5): PNG is stx_png, and Skia's
+# libpng and zlib are not built.
 set(forbidden_decoder_patterns
+    "SkPngDecoder"
+    "SkPngCodec"
+    "SkPngEncoder"
+    "png_create_read_struct"
+    "png_create_write_struct"
+    "Cr_z_"
     "SkBmpDecoder"
     "SkBmpCodec"
     "SkIcoCodec"
@@ -23,7 +31,7 @@ set(forbidden_decoder_patterns
 )
 foreach(pattern IN LISTS forbidden_decoder_patterns)
     if(symbols MATCHES "${pattern}")
-        message(FATAL_ERROR "Forbidden non-PNG decoder symbol found: ${pattern}")
+        message(FATAL_ERROR "Forbidden codec or zlib symbol found: ${pattern}")
     endif()
 endforeach()
 
@@ -50,5 +58,5 @@ foreach(pattern IN LISTS forbidden_font_backend_patterns)
     endif()
 endforeach()
 
-message(STATUS "Skia archive policy passed: PNG-only decoder, no GPU backend implementation, no font backend")
+message(STATUS "Skia archive policy passed: no codec or zlib, no GPU backend implementation, no font backend")
 
