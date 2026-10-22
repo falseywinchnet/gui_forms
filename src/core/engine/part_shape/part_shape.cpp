@@ -26,29 +26,36 @@ struct CornerRadii final {
 CornerRadii corner_radii(PartShape shape, Rect box) noexcept {
     const double half = std::min(box.width, box.height) * 0.5;
     const bool across = box.width >= box.height;
-    CornerRadii radii{};
     switch (shape.kind) {
     case PartShapeKind::rounded_rectangle: {
         const double radius = std::clamp(shape.corner_radius, 0.0, half);
-        radii = CornerRadii{radius, radius, radius, radius};
-        break;
+        const CornerRadii rounded{radius, radius, radius, radius};
+        return rounded;
     }
     case PartShapeKind::pill:
-    case PartShapeKind::circle:
-        radii = CornerRadii{half, half, half, half};
-        break;
-    case PartShapeKind::cap_start:
+    case PartShapeKind::circle: {
+        const CornerRadii round_ends{half, half, half, half};
+        return round_ends;
+    }
+    case PartShapeKind::cap_start: {
         // The start is the left of a box lying across, the top of one
         // standing upright.
-        radii = across ? CornerRadii{half, 0.0, 0.0, half} : CornerRadii{half, half, 0.0, 0.0};
-        break;
-    case PartShapeKind::cap_end:
-        radii = across ? CornerRadii{0.0, half, half, 0.0} : CornerRadii{0.0, 0.0, half, half};
-        break;
-    case PartShapeKind::count:
-        break;
+        const CornerRadii start = across ? CornerRadii{half, 0.0, 0.0, half} : CornerRadii{half, half, 0.0, 0.0};
+        return start;
     }
-    return radii;
+    case PartShapeKind::cap_end: {
+        const CornerRadii end = across ? CornerRadii{0.0, half, half, 0.0} : CornerRadii{0.0, 0.0, half, half};
+        return end;
+    }
+    case PartShapeKind::count: {
+        // The count sentinel is no shape: square corners.
+        const CornerRadii none{};
+        return none;
+    }
+    }
+    // A kind outside the enumeration has square corners.
+    const CornerRadii square{};
+    return square;
 }
 
 } // namespace
