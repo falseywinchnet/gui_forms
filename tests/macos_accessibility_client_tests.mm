@@ -211,6 +211,12 @@ struct Dump final {
     bool occluded{};
     bool motion_armed{};
     bool freeze_pending{};
+    // The app's paint count and paint lease (state and revisions).
+    std::uint64_t paint_passes{};
+    std::string lease;
+    std::uint64_t content_revision{};
+    std::uint64_t rendered_revision{};
+    std::uint64_t presented_revision{};
     // Control type by stable id: (stable id, manifest id).
     std::vector<std::pair<std::string, std::string>> types;
     SemanticSnapshot snapshot;
@@ -285,6 +291,12 @@ Dump read_dump(const std::string& path) {
     dump.occluded = ns_number(object[@"occluded"]).value_or(0.0) != 0.0;
     dump.motion_armed = ns_number(object[@"motion_armed"]).value_or(0.0) != 0.0;
     dump.freeze_pending = ns_number(object[@"freeze_pending"]).value_or(0.0) != 0.0;
+    dump.paint_passes = static_cast<std::uint64_t>(ns_number(object[@"paint_passes"]).value_or(0.0));
+    dump.lease = ns_text(object[@"lease"]);
+    dump.content_revision = static_cast<std::uint64_t>(ns_number(object[@"content_revision"]).value_or(0.0));
+    dump.rendered_revision = static_cast<std::uint64_t>(ns_number(object[@"rendered_revision"]).value_or(0.0));
+    dump.presented_revision =
+        static_cast<std::uint64_t>(ns_number(object[@"presented_revision"]).value_or(0.0));
     NSDictionary* types = object[@"types"];
     for (NSString* key in types) dump.types.emplace_back(ns_text(key), ns_text(types[key]));
     NSDictionary* snapshot = object[@"snapshot"];
@@ -479,7 +491,10 @@ Dump settled_dump(const std::string& path, Report& report, const std::string& wh
                               yes_no(latest.settled) + ", frame pending " + yes_no(latest.frame_pending) +
                               ", occluded " + yes_no(latest.occluded) + ", motion armed " +
                               yes_no(latest.motion_armed) + ", freeze pending " + yes_no(latest.freeze_pending) +
-                              "); the run stops here");
+                              ", paints " + std::to_string(latest.paint_passes) + ", paint lease " + latest.lease +
+                              " content " + std::to_string(latest.content_revision) + " rendered " +
+                              std::to_string(latest.rendered_revision) + " presented " +
+                              std::to_string(latest.presented_revision) + "); the run stops here");
     return latest;
 }
 

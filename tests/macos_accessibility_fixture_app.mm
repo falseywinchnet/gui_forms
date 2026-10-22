@@ -25,20 +25,21 @@
 //
 //   {"pid":N,"generation":G,"effects":E,"request":R,"settled":S,
 //    "frame_pending":F,"occluded":O,"motion_armed":M,"freeze_pending":Z,
+//    "paint_passes":P,"lease":L,"content_revision":C,"rendered_revision":D,
+//    "presented_revision":V,
 //    "types":{stable id: manifest id},"snapshot":<SemanticSnapshot::to_json()>}
 //
 // to the path after --semantic-dump, whenever its content changes (checked
 // every 50 ms), by writing a temporary file and renaming it over the
 // dump.
 //
-// "settled" is true when no invalidation waits for a paint
-// (Window::needs_frame) or the window is occluded, so that none will paint
-// until it shows, the motion clock is not armed, and (Gallery) no page
-// freeze is pending: nothing the app knows of will change the tree or a
-// value (such as a paint counter a diagnostics control publishes) before the
-// next input. An occluded window (a CI runner's session may show none)
-// paints nothing, so a paint is never required. The four inputs are written
-// beside it, so that a client that waits in vain can say which held.
+// "settled" is true when the window has painted at least once, no
+// invalidation waits for a paint (Window::needs_frame), the motion clock is
+// not armed and (Gallery) no page freeze is pending: nothing the app knows
+// of will change the tree or a value (such as a paint counter a diagnostics
+// control publishes) before the next input. Its inputs, the window's
+// occlusion and its paint lease (state and revisions) are written beside
+// it, so that a client that waits in vain can say what held it.
 // "request" is the number the client last wrote to the file at the dump's
 // path plus ".request", as read by the writer's latest tick. A client that
 // writes a new number after its last action and then waits for a dump with
@@ -151,22 +152,39 @@ private:
     // What decides "settled" (see the file comment), read on the main
     // thread, which also paints, so the inputs cannot change while it runs.
     struct SettleState final {
+        std::uint64_t paint_passes{};
         bool frame_pending{};
         bool occluded{};
         bool motion_armed{};
         bool freeze_pending{};
+        gui_forms::PaintLeaseSnapshot lease{};
         bool settled{};
     };
 
     SettleState settle_state() const {
         SettleState state{};
+        state.paint_passes = window_.metrics_snapshot().paint_passes;
         state.frame_pending = window_.needs_frame();
         state.occluded = window_.occluded();
         state.motion_armed = window_.motion_clock().armed();
         state.freeze_pending = freeze_pending_;
-        const bool paint_quiet = !state.frame_pending || state.occluded;
-        state.settled = paint_quiet && !state.motion_armed && !state.freeze_pending;
+        state.lease = window_.paint_lease_snapshot();
+        state.settled = state.paint_passes != 0U && !state.frame_pending && !state.motion_armed &&
+                        !state.freeze_pending;
         return state;
+    }
+
+    static const char* lease_state_name(gui_forms::PaintLeaseState state) noexcept {
+        switch (state) {
+        case gui_forms::PaintLeaseState::clean: return "clean";
+        case gui_forms::PaintLeaseState::dirty_queued: return "dirty_queued";
+        case gui_forms::PaintLeaseState::rendering: return "rendering";
+        case gui_forms::PaintLeaseState::ready: return "ready";
+        case gui_forms::PaintLeaseState::occluded_dirty: return "occluded_dirty";
+        case gui_forms::PaintLeaseState::retired: return "retired";
+        case gui_forms::PaintLeaseState::rendering_dirty: return "rendering_dirty";
+        }
+        return "unknown";
     }
 
     // The client's latest request number, or 0 when it wrote none or the
@@ -195,7 +213,13 @@ private:
                            ",\"frame_pending\":" + json_bool(settle.frame_pending) +
                            ",\"occluded\":" + json_bool(settle.occluded) +
                            ",\"motion_armed\":" + json_bool(settle.motion_armed) +
-                           ",\"freeze_pending\":" + json_bool(settle.freeze_pending) + ",\"types\":{";
+                           ",\"freeze_pending\":" + json_bool(settle.freeze_pending) +
+                           ",\"paint_passes\":" + std::to_string(settle.paint_passes) +
+                           ",\"lease\":\"" + lease_state_name(settle.lease.state) + "\"" +
+                           ",\"content_revision\":" + std::to_string(settle.lease.content_revision) +
+                           ",\"rendered_revision\":" + std::to_string(settle.lease.rendered_revision) +
+                           ",\"presented_revision\":" + std::to_string(settle.lease.presented_revision) +
+                           ",\"types\":{";
         bool first = true;
         for (const SemanticNode& root : snapshot.roots) append_types(window_, root, text, first);
         text += "},\"snapshot\":";
