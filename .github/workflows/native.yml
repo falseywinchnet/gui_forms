@@ -44,12 +44,12 @@ jobs:
           python3 tools/control_schema.py render --check
           python3 -B -m unittest discover -s tools -p test_generate_library_docs.py
           python3 tools/generate_library_docs.py --check
-          python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png fuzz
+          python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv fuzz
           python3 -B -m unittest discover -s tools -p test_lifetime_rules.py
           python3 -B -m unittest discover -s tools -p test_state_machines.py
           python3 -B -m unittest discover -s tools -p test_ci_build.py
           python3 -B -m unittest discover -s tools -p test_native_tests.py
-          python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png fuzz
+          python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv fuzz
   docs:
     runs-on: ubuntu-24.04
     steps:
