@@ -224,6 +224,7 @@ public:
     // when the canvas is not a uniform scale and translation equal to the
     // raster's scale, or cannot be addressed.
     bool composite_part(SkCanvas& target, const PartRaster& raster, Point origin, double opacity);
+    bool composite_part_scaled(SkCanvas& target, const PartRaster& raster, Rect destination, double opacity);
     // The shared step alone: premultiplied pixels placed in the canvas's
     // device pixels, composited under the recorded clips. False when the
     // canvas cannot be addressed or its clips are unknown.
@@ -1224,6 +1225,33 @@ bool SkiaRaster::Impl::composite_part(SkCanvas& target, const PartRaster& raster
     return composited;
 }
 
+// As composite_part, stretched over `destination`: its corners go on the
+// device pixels nearest them, and the shared blend samples the raster.
+bool SkiaRaster::Impl::composite_part_scaled(SkCanvas& target, const PartRaster& raster, const Rect destination,
+                                             const double opacity) {
+    const SkMatrix matrix = target.getTotalMatrix();
+    const SkScalar raster_scale = static_cast<SkScalar>(raster.scale().value);
+    if (!matrix.isScaleTranslate() || matrix.getScaleX() != raster_scale || matrix.getScaleY() != raster_scale) {
+        return false;
+    }
+    const SkPoint first = matrix.mapPoint(SkPoint::Make(static_cast<SkScalar>(destination.x),
+                                                        static_cast<SkScalar>(destination.y)));
+    const SkPoint last = matrix.mapPoint(SkPoint::Make(static_cast<SkScalar>(destination.x + destination.width),
+                                                       static_cast<SkScalar>(destination.y + destination.height)));
+    const long long left = std::llround(static_cast<double>(first.x()));
+    const long long top = std::llround(static_cast<double>(first.y()));
+    const long long right = std::llround(static_cast<double>(last.x()));
+    const long long bottom = std::llround(static_cast<double>(last.y()));
+    if (right <= left || bottom <= top) return true;
+    const DeviceExtent extent = raster.extent();
+    const detail::PartRasterSource source{.pixels = raster.pixels(), .width = extent.width, .height = extent.height,
+                                          .row_bytes = raster.row_bytes(), .left = left, .top = top,
+                                          .shown_width = static_cast<std::uint32_t>(right - left),
+                                          .shown_height = static_cast<std::uint32_t>(bottom - top)};
+    const bool composited = composite_source(target, source, opacity);
+    return composited;
+}
+
 bool SkiaRaster::Impl::composite_source(SkCanvas& target, const detail::PartRasterSource& source,
                                         const double opacity) {
     const std::optional<SharedComposite> shared = shared_composite(target);
@@ -1414,6 +1442,13 @@ void SkiaRaster::draw_part_raster(const std::shared_ptr<const PartRaster>& raste
     SkCanvas* const canvas = (*impl_).canvas();
     if (canvas == nullptr || !raster) return;
     static_cast<void>((*impl_).composite_part(*canvas, *raster, origin, opacity));
+}
+
+void SkiaRaster::draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, const Rect destination,
+                                         const double opacity) {
+    SkCanvas* const canvas = (*impl_).canvas();
+    if (canvas == nullptr || !raster) return;
+    static_cast<void>((*impl_).composite_part_scaled(*canvas, *raster, destination, opacity));
 }
 
 void SkiaRaster::draw_live_surface(const std::shared_ptr<LiveSurface> surface,

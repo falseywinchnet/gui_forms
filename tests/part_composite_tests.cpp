@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace {
@@ -220,6 +221,58 @@ void test_premultiplied_sources_never_overflow() {
 
 // -- PartRaster -----------------------------------------------------------------
 
+// A raster shown at another size (E7r): each device pixel samples the two
+// texels about its centre with 8-bit weights, transparent beyond the edges.
+void test_scaled_sampling() {
+    // Red then blue, opaque, shown twice as wide.
+    const std::vector<std::uint8_t> pair{255U, 0U, 0U, 255U, 0U, 0U, 255U, 255U};
+    PartRasterSource stretched = source_of(pair, 2U, 1U, 0, 0);
+    stretched.shown_width = 4U;
+    stretched.shown_height = 1U;
+    TestTarget wide = make_target(4U, 1U, 0U, TextPixelOrder::rgba, false);
+    require(detail::composite_part_raster(stretched, wide.target, whole(4U, 1U), 255U) ==
+                detail::TextCompositeStatus::success,
+            "a stretched raster composites");
+    // Pixel 0 samples -1/4 of a texel: three quarters red over nothing;
+    // pixel 1 a quarter of the way from red to blue; the rest mirror them.
+    require(wide.pixels[0] == pack(TextPixelOrder::rgba, 191U, 0U, 0U, 191U), "the edge fades out");
+    require(wide.pixels[1] == pack(TextPixelOrder::rgba, 191U, 0U, 64U, 255U), "red leans toward blue");
+    require(wide.pixels[2] == pack(TextPixelOrder::rgba, 64U, 0U, 191U, 255U), "blue leans toward red");
+    require(wide.pixels[3] == pack(TextPixelOrder::rgba, 0U, 0U, 191U, 191U), "the far edge fades out");
+
+    // Shown at its own size, the scaled path is the unscaled one.
+    const std::vector<std::uint8_t> grey = solid_source(3U, 2U, {40U, 50U, 60U, 128U});
+    PartRasterSource same = source_of(grey, 3U, 2U, 1, 1);
+    same.shown_width = 3U;
+    same.shown_height = 2U;
+    TestTarget shown = make_target(5U, 4U, pack(TextPixelOrder::bgra, 9U, 8U, 7U, 255U), TextPixelOrder::bgra, true);
+    TestTarget plain = shown;
+    plain.target.pixels = std::span<std::uint32_t>(plain.pixels.data(), plain.pixels.size());
+    static_cast<void>(detail::composite_part_raster(same, shown.target, whole(5U, 4U), 200U));
+    static_cast<void>(detail::composite_part_raster(source_of(grey, 3U, 2U, 1, 1), plain.target, whole(5U, 4U), 200U));
+    require(shown.pixels == plain.pixels, "a raster shown at its own size writes the unscaled bytes");
+
+    // A solid raster shrunk or grown is solid inside, under the clip.
+    const std::vector<std::uint8_t> solid = solid_source(4U, 4U, {10U, 20U, 30U, 255U});
+    PartRasterSource grown = source_of(solid, 4U, 4U, 0, 0);
+    grown.shown_width = 6U;
+    grown.shown_height = 6U;
+    TestTarget large = make_target(8U, 8U, 0U, TextPixelOrder::rgba, false);
+    TextCompositeClip clip{};
+    clip.rect = {0.0, 0.0, 5.0, 8.0};
+    static_cast<void>(detail::composite_part_raster(grown, large.target, clip, 255U));
+    require(large.pixels[2U * 8U + 2U] == pack(TextPixelOrder::rgba, 10U, 20U, 30U, 255U), "the inside is solid");
+    require(large.pixels[2U * 8U + 5U] == 0U && large.pixels[6U * 8U + 2U] == 0U,
+            "nothing is written beyond the clip or the shown size");
+
+    PartRasterSource huge = source_of(solid, 4U, 4U, 0, 0);
+    huge.shown_width = 0xffffffffU;
+    TestTarget untouched = make_target(2U, 2U, 0U, TextPixelOrder::rgba, false);
+    require(detail::composite_part_raster(huge, untouched.target, whole(2U, 2U), 255U) ==
+                detail::TextCompositeStatus::invalid_geometry,
+            "an unbounded shown size is refused");
+}
+
 void test_part_raster() {
     const std::shared_ptr<PartRaster> raster = PartRaster::create(DeviceExtent{3U, 2U}, DeviceScale{1.5});
     require(raster != nullptr, "a raster is made");
@@ -243,6 +296,8 @@ struct PartRasterCall final {
     std::shared_ptr<const PartRaster> raster;
     Point origin{};
     double opacity{};
+    // Set for a scaled call: its destination.
+    std::optional<Rect> destination{};
 };
 
 class CapturePainter final : public Painter {
@@ -257,7 +312,11 @@ public:
     void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
     void draw_image(ImageId, Rect, double) override {}
     void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin, double opacity) override {
-        calls.push_back(PartRasterCall{raster, origin, opacity});
+        calls.push_back(PartRasterCall{raster, origin, opacity, std::nullopt});
+    }
+    void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination,
+                                 double opacity) override {
+        calls.push_back(PartRasterCall{raster, Point{destination.x, destination.y}, opacity, destination});
     }
 
     std::vector<PartRasterCall> calls;
@@ -267,9 +326,16 @@ class RasterControl final : public Control {
 public:
     explicit RasterControl(StableId id) : Control(std::move(id)) {}
 
-    void on_paint(Painter& painter, Rect) override { painter.draw_part_raster(raster, Point{3.0, 4.0}, 0.75); }
+    void on_paint(Painter& painter, Rect) override {
+        if (stretched) {
+            painter.draw_part_raster_scaled(raster, Rect{2.0, 3.0, 30.0, 15.0}, 0.5);
+            return;
+        }
+        painter.draw_part_raster(raster, Point{3.0, 4.0}, 0.75);
+    }
 
     std::shared_ptr<const PartRaster> raster;
+    bool stretched{};
 };
 
 void test_command_is_recorded_replayed_and_inspected() {
@@ -310,6 +376,25 @@ void test_command_is_recorded_replayed_and_inspected() {
                 operation.rect.height == 10.0 && operation.scalar == 0.75,
             "inspection reports the raster's logical bounds and opacity");
 
+    // A stretched raster records, replays and inspects its destination.
+    (*control).raster = made;
+    (*control).stretched = true;
+    (*control).invalidate(Dirty::paint);
+    CapturePainter scaled;
+    static_cast<void>(window.paint(scaled, Rect{0.0, 0.0, 100.0, 80.0}));
+    require(scaled.calls.size() == 1U && scaled.calls[0].destination.has_value() &&
+                *scaled.calls[0].destination == (Rect{2.0, 3.0, 30.0, 15.0}) && scaled.calls[0].opacity == 0.5,
+            "a scaled raster replays its destination and opacity");
+    const VisualInspectionSnapshot stretched_snapshot = window.visual_inspection_snapshot();
+    const VisualControlInspection* const stretched_control = stretched_snapshot.find("raster");
+    require(stretched_control != nullptr && (*stretched_control).display_operations.size() == 1U,
+            "the scaled operation is inspectable");
+    const VisualPaintOperationSnapshot& stretched_operation = (*stretched_control).display_operations[0];
+    require(stretched_operation.operation == VisualPaintOperation::draw_part_raster &&
+                stretched_operation.rect == (Rect{2.0, 3.0, 30.0, 15.0}),
+            "inspection names it draw_part_raster at its destination");
+    (*control).stretched = false;
+
     // The base painter draws nothing, and a null raster is not recorded.
     (*control).raster = nullptr;
     (*control).invalidate(Dirty::paint);
@@ -327,6 +412,7 @@ int main() {
     test_placement_and_clip();
     test_refusals_write_nothing();
     test_premultiplied_sources_never_overflow();
+    test_scaled_sampling();
     test_part_raster();
     test_command_is_recorded_replayed_and_inspected();
     std::cout << "part composite tests passed\n";

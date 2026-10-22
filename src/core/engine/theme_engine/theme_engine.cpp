@@ -196,12 +196,13 @@ double rest_value(const CompiledTransition& transition, const PrimitiveParameter
 }
 
 // The engine properties a part is shown with this paint, and what its
-// parameter transitions did: by parameter position, the bits of those still
-// moving and of those whose move started on this paint, and the target of
-// each that started.
+// transitions did: whether its scale is still moving; by parameter
+// position, the bits of the parameters still moving and of those whose move
+// started on this paint, and the target of each that started.
 struct PresentedProperties final {
     double opacity{1.0};
     double scale{1.0};
+    bool scale_moving{false};
     std::uint32_t moving_parameters{};
     std::uint32_t started_parameters{};
     std::array<double, maximum_primitive_parameters> targets{};
@@ -306,6 +307,7 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
         MotionValue& value = *channel.value;
         const MotionStart start = value.animate_to(target);
         show_value(transition, value.current(), range, parameters, presented);
+        if (transition.property == PresentationProperty::scale && !value.settled()) presented.scale_moving = true;
         if (transition.property == PresentationProperty::parameter) {
             const std::uint32_t bit = parameter_bit(transition.parameter);
             if (!value.settled()) presented.moving_parameters = presented.moving_parameters | bit;
@@ -619,17 +621,22 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     // E7r: nothing bakes per frame. Moving animated parameters step through
     // shared keyframes, and an ambient effect's loop frames are shared.
     const bool at_keyframes = step_to_keyframes(descriptor, presented, request.parameters);
-    request.shared = kept != nullptr && (at_keyframes || ambient_time.has_value());
+    // While its scale moves, the part's raster at its own size is shown
+    // stretched (form b), so it is shared too: baked when the move starts.
+    request.shared = kept != nullptr && (at_keyframes || ambient_time.has_value() || presented.scale_moving);
     const double opacity = presented.opacity;
     // A part at opacity 0, or one its primitive draws as nothing (a flat
     // bulge), composites nothing and needs no raster: it only prepares the
     // keyframes of a transition starting from it (a rise from the plane).
     const bool invisible = opacity <= 0.0 || (*request.primitive).blank(request.parameters);
-    // A scaled part is drawn at its scaled size (D5-1), so that its edges
-    // stay sharp; one whose scaled raster would not fit, or would break the
-    // animated frame budget, is drawn at its own size.
+    // A scaled part at rest is drawn at its scaled size (D5-1), so that its
+    // edges stay sharp; one whose scaled raster would not fit, or would
+    // break the animated frame budget, is drawn at its own size. While its
+    // scale moves, its raster at its own size is stretched over the scaled
+    // bounds (E7r form b), so that the move bakes nothing.
     PartPaint shown = scaled_part(part, presented.scale);
-    if (shown.bounds != part.bounds) {
+    const bool stretched = shown.bounds != part.bounds && presented.scale_moving;
+    if (shown.bounds != part.bounds && !stretched) {
         const double scale = decided.scale.value;
         const Size shown_size{shown.bounds.width, shown.bounds.height};
         const DeviceExtent scaled = raster_extent(shown_size, descriptor.outsets, scale);
@@ -688,8 +695,20 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         paint_built_in(painter, control, shown, opacity);
         return;
     }
-    // The raster covers the part grown by its primitive's outsets.
+    // The raster covers the part grown by its primitive's outsets; stretched,
+    // that rectangle is scaled about the part's centre as its bounds are.
     const Insets outsets = descriptor.outsets;
+    if (stretched) {
+        const Rect covered{part.bounds.x - outsets.left, part.bounds.y - outsets.top,
+                           part.bounds.width + outsets.left + outsets.right,
+                           part.bounds.height + outsets.top + outsets.bottom};
+        const double granted = std::min(presented.scale, granted_scale(part.bounds, part.granted_overflow));
+        const Point centre{part.bounds.x + part.bounds.width * 0.5, part.bounds.y + part.bounds.height * 0.5};
+        const Rect destination{centre.x + (covered.x - centre.x) * granted, centre.y + (covered.y - centre.y) * granted,
+                               covered.width * granted, covered.height * granted};
+        painter.draw_part_raster_scaled(raster, destination, opacity);
+        return;
+    }
     painter.draw_part_raster(raster, Point{shown.bounds.x - outsets.left, shown.bounds.y - outsets.top}, opacity);
 }
 

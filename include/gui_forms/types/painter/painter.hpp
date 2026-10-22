@@ -192,6 +192,16 @@ public:
     // painters override it. A null raster draws nothing.
     virtual void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin,
                                   double opacity = 1.0);
+    // Composites a part raster shown at another size (E7r): the raster is
+    // stretched over `destination`, in logical units, whose corners the
+    // painter places on the device pixels nearest them. Each device pixel
+    // samples the raster bilinearly through the same shared blend, so every
+    // host writes the same bytes. The engine shows a part this way while its
+    // presentational scale moves, and bakes it sharp at its size once the
+    // scale rests. Otherwise as draw_part_raster; the base implementation
+    // draws nothing.
+    virtual void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination,
+                                         double opacity = 1.0);
     // Source-region replay is the renderer-neutral primitive behind image
     // strips, texture fills, and nine-patch materials. `source` is expressed
     // in source-image pixels. Minimal painters may preserve coherence by

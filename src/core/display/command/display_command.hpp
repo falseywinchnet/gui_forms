@@ -47,6 +47,9 @@ enum class DisplayOperation : std::uint8_t {
     // opacity, `secondary_scalar` its composite mode's value.
     begin_group = 23,
     end_group = 24,
+    // A part raster shown scaled (Painter::draw_part_raster_scaled): `rect`
+    // its logical destination, `scalar` its opacity.
+    draw_part_raster_scaled = 25,
 };
 
 struct DisplayCommand final {

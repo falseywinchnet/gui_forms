@@ -104,6 +104,9 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
         case DisplayOperation::draw_part_raster:
             painter.draw_part_raster(command.part_raster, command.first, command.scalar);
             break;
+        case DisplayOperation::draw_part_raster_scaled:
+            painter.draw_part_raster_scaled(command.part_raster, command.rect, command.scalar);
+            break;
         case DisplayOperation::begin_group: {
             PaintGroup group{};
             group.bounds = command.rect;

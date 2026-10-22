@@ -85,6 +85,14 @@ struct PartRasterSource final {
     // The source's memory order: red first for a part raster, the target's
     // own order for a paint group's image (Painter::begin_group).
     TextPixelOrder order{TextPixelOrder::rgba};
+    // The device pixels the source is shown across and down, from (left,
+    // top): zero for its own width and height, one raster pixel per device
+    // pixel. Another size shows it scaled (Painter::draw_part_raster_scaled,
+    // E7r): each device pixel's centre is mapped onto the source and sampled
+    // bilinearly, in premultiplied colour with 8-bit weights, transparent
+    // beyond the source's edges.
+    std::uint32_t shown_width{};
+    std::uint32_t shown_height{};
 };
 
 // A part opacity in [0, 1] as the byte the blend reads: floor(o * 255 + 0.5),

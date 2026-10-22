@@ -314,6 +314,18 @@ void RecordingPainter::draw_part_raster(const std::shared_ptr<const PartRaster>&
     commands_.push_back(std::move(command));
 }
 
+void RecordingPainter::draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination,
+                                               double opacity) {
+    if (!raster) return;
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_part_raster_scaled;
+    command.part_raster = raster;
+    command.first = Point{destination.x, destination.y};
+    command.rect = destination;
+    command.scalar = opacity;
+    commands_.push_back(std::move(command));
+}
+
 void RecordingPainter::draw_image_region(ImageId image, Rect source,
                                           Rect destination, double opacity) {
     DisplayCommand command;

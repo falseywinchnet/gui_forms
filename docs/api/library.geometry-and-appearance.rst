@@ -1682,6 +1682,10 @@ Types
 
       Composites one of the theme engine's part rasters (T2 plan, E2; GIVEN A2-2 and C1-1). ``origin`` is the raster's top-left corner in logical units; the painter places the raster's first pixel on the device pixel nearest to it, one raster pixel per device pixel, so the part is device-aligned and never resampled. ``opacity`` in [0, 1] is the part's opacity, one multiplier on its whole composite. The blend is the shared premultiplied source-over (detail::composite_part_raster) under the current clip, so every host writes the same bytes. A raster made for another display scale than the painter's is not drawn: the engine rasterizes a part for the scale it is shown at. The base implementation draws nothing; the recording, Skia and Windows DIB painters override it. A null raster draws nothing.
 
+   .. cpp:function:: virtual void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination, double opacity = 1.0)
+
+      Composites a part raster shown at another size (E7r): the raster is stretched over ``destination``, in logical units, whose corners the painter places on the device pixels nearest them. Each device pixel samples the raster bilinearly through the same shared blend, so every host writes the same bytes. The engine shows a part this way while its presentational scale moves, and bakes it sharp at its size once the scale rests. Otherwise as draw_part_raster; the base implementation draws nothing.
+
    .. cpp:function:: virtual void draw_image_region(ImageId image, Rect source, Rect destination, double opacity = 1.0)
 
       Source-region replay is the renderer-neutral primitive behind image strips, texture fills, and nine-patch materials. ``source`` is expressed in source-image pixels. Minimal painters may preserve coherence by falling back to whole-image scaling; production painters override it.

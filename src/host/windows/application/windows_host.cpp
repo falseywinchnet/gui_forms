@@ -2227,6 +2227,32 @@ private:
         const std::uint8_t byte = gui_forms::detail::part_composite_opacity(opacity);
         static_cast<void>(gui_forms::detail::composite_part_raster(source, target, clip, byte));
     }
+    // Composites a part raster stretched over `destination`, whose corners
+    // go on the device pixels nearest them, with the shared blend's scaled
+    // sampling. A raster made for another scale is not drawn.
+    void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, const Rect destination,
+                                 const double opacity) override {
+        if (!raster || pixels_ == nullptr || width_ <= 0 || height_ <= 0) return;
+        if ((*raster).scale().value != scale_) return;
+        const int left = logical_x(destination.x);
+        const int top = logical_y(destination.y);
+        const int right = logical_x(destination.x + destination.width);
+        const int bottom = logical_y(destination.y + destination.height);
+        if (right <= left || bottom <= top) return;
+        GdiFlush();
+        const gui_forms::detail::TextCompositeTarget target = shared_composite_target();
+        const gui_forms::detail::TextCompositeClip clip = shared_composite_clip();
+        const DeviceExtent extent = (*raster).extent();
+        const gui_forms::detail::PartRasterSource source{.pixels = (*raster).pixels(), .width = extent.width,
+                                                         .height = extent.height,
+                                                         .row_bytes = (*raster).row_bytes(),
+                                                         .left = left,
+                                                         .top = top - row_origin_,
+                                                         .shown_width = static_cast<std::uint32_t>(right - left),
+                                                         .shown_height = static_cast<std::uint32_t>(bottom - top)};
+        const std::uint8_t byte = gui_forms::detail::part_composite_opacity(opacity);
+        static_cast<void>(gui_forms::detail::composite_part_raster(source, target, clip, byte));
+    }
 public:
     // Paint groups (Painter::begin_group). An isolated group draws into its
     // level's scratch rows (the group's clipped rows across the target's full
