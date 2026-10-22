@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -33,12 +34,12 @@ enum class ColorSource {
 
 struct ColorEncoding final {
     ColorSource source = ColorSource::srgb_default;
-    bool has_gamma = false;
-    // Image gamma times 100000 (an encoding gamma; 45455 is about 1/2.2).
-    std::uint32_t gamma = 0;
-    bool has_chromaticities = false;
-    // Chromaticities times 100000: white x, y; red x, y; green x, y; blue x, y.
-    std::array<std::uint32_t, 8> chromaticities{};
+    // Image gamma times 100000 (an encoding gamma; 45455 is about 1/2.2);
+    // none without a usable gamma.
+    std::optional<std::uint32_t> gamma{};
+    // Chromaticities times 100000: white x, y; red x, y; green x, y; blue x, y;
+    // none without usable chromaticities.
+    std::optional<std::array<std::uint32_t, 8>> chromaticities{};
     bool ignored_gamma = false;
     bool ignored_chromaticities = false;
 

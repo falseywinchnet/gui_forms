@@ -94,7 +94,7 @@ std::string operation_summary(const VisualControlInspection& target) {
         case VisualPaintOperation::draw_box_shadow:
         case VisualPaintOperation::draw_inset_box_shadow: ++shadows; break;
         case VisualPaintOperation::draw_text: ++text; break;
-        default: break;
+        default: break; // The summary counts only the operations above.
         }
     }
     std::ostringstream output;

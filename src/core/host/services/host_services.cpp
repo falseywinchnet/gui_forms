@@ -491,8 +491,8 @@ HostClipboardImageResult HostServices::read_clipboard_image() {
     ++snapshot_.clipboard_reads;
     try {
         result = read_clipboard_image_impl();
-        if (result.status.accepted() && result.has_image) {
-            const HostImageError error = validate_host_image(result.image.view());
+        if (result.status.accepted() && result.image.has_value()) {
+            const HostImageError error = validate_host_image((*result.image).view());
             if (error != HostImageError::none) {
                 result.status.error = error == HostImageError::too_large
                     ? HostServiceError::too_large : HostServiceError::backend_failure;
@@ -502,11 +502,9 @@ HostClipboardImageResult HostServices::read_clipboard_image() {
         result.status.error = HostServiceError::backend_failure;
     }
     if (!result.status.accepted()) {
-        result.image = {};
-        result.has_image = false;
+        result.image.reset();
         ++snapshot_.rejected_requests;
     } else {
-        if (!result.has_image) result.image = {};
         snapshot_.clipboard_generation = result.generation;
     }
     return result;

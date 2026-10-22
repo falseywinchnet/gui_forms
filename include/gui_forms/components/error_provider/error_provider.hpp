@@ -48,8 +48,8 @@ enum class ErrorIconAlignment : std::uint8_t {
 
 struct ErrorProviderChange final {
     std::string target_stable_id;
+    // The target's new message; empty when its error was cleared.
     std::string error;
-    bool has_error{};
 };
 
 struct ErrorIconSnapshot final {

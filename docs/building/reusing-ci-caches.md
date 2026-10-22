@@ -62,6 +62,20 @@ Promotion applies when the `main` commit has exactly the tested tree, as when
 an up-to-date branch is merged. Any other merge builds fresh, usually from a
 seed.
 
+## Tests the programs job does not repeat
+
+The native job's `ci_build.py` run writes CTest's JUnit report
+(`ctest-native.xml` in the toolkit build directory). `cache_manifest.py`
+records the passed tests from it as `validated_tests` in
+`cache-manifest.json`. A reused validation carries the producer's list over.
+On a pull request, the programs job reads that list from its platform's
+archive and runs only the tests of its own build that are not on it
+(`tools/native_tests.py select`). Those are the Gallery and demoboard tests,
+which the native configuration leaves out, and any test the native job
+skipped. A manifest without the list runs every test. Pushes to `main`, which
+publish the release record, and direct runs of the programs workflow still
+run every test.
+
 ## The sanitizer job's cache
 
 The sanitizer job always builds and runs the whole suite; it never reuses a

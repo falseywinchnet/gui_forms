@@ -73,7 +73,7 @@ void paint_material_keyline(Painter& painter, Rect bounds,
         painter.draw_line({bounds.x + keyline.inset, bounds.y + offset},
                           {bounds.right() - keyline.inset, bounds.y + offset},
                           keyline.color, keyline.width);
-        break;
+        return;
     case MaterialEdge::right:
         if (offset * 2.0 > bounds.width) return;
         painter.draw_line({bounds.right() - offset,
@@ -81,7 +81,7 @@ void paint_material_keyline(Painter& painter, Rect bounds,
                           {bounds.right() - offset,
                            bounds.bottom() - keyline.inset},
                           keyline.color, keyline.width);
-        break;
+        return;
     case MaterialEdge::bottom:
         if (offset * 2.0 > bounds.height) return;
         painter.draw_line({bounds.x + keyline.inset,
@@ -89,15 +89,17 @@ void paint_material_keyline(Painter& painter, Rect bounds,
                           {bounds.right() - keyline.inset,
                            bounds.bottom() - offset},
                           keyline.color, keyline.width);
-        break;
+        return;
     case MaterialEdge::left:
         if (offset * 2.0 > bounds.width) return;
         painter.draw_line({bounds.x + offset, bounds.y + keyline.inset},
                           {bounds.x + offset,
                            bounds.bottom() - keyline.inset},
                           keyline.color, keyline.width);
-        break;
+        return;
     }
+    // An edge outside the enumeration draws no keyline.
+    return;
 }
 
 Point resolve_point(Point point, MaterialCoordinateSpace space,
@@ -373,27 +375,29 @@ struct HighContrastColours final {
 HighContrastColours high_contrast_colours(ControlSurfaceState state) noexcept {
     const Color black = Color::rgba(0, 0, 0);
     const Color white = Color::rgba(255, 255, 255);
+    // Black plates, white edges and text, unless the state says otherwise.
     HighContrastColours colours{black, white, white};
     switch (state) {
     case ControlSurfaceState::hot:
     case ControlSurfaceState::pending:
         colours.edge = Color::rgba(0, 255, 255);
-        break;
+        return colours;
     case ControlSurfaceState::pressed:
         colours = HighContrastColours{white, Color::rgba(255, 255, 0), black};
-        break;
+        return colours;
     case ControlSurfaceState::invalid:
         colours.edge = Color::rgba(255, 96, 96);
-        break;
+        return colours;
     case ControlSurfaceState::disabled:
         colours.edge = Color::rgba(128, 128, 128);
         colours.text = Color::rgba(160, 160, 160);
-        break;
+        return colours;
     case ControlSurfaceState::normal:
     case ControlSurfaceState::deactivated:
     case ControlSurfaceState::count:
-        break;
+        return colours;
     }
+    // A state outside the enumeration takes the plain colours.
     return colours;
 }
 
@@ -429,6 +433,62 @@ bool valid_recipe(const ControlVisualRecipe& value) noexcept {
            finite(value.pressed_content_offset) &&
            std::abs(value.pressed_content_offset.x) <= 32.0 &&
            std::abs(value.pressed_content_offset.y) <= 32.0;
+}
+
+// An image fill layer in its mode.
+void paint_image_fill(Painter& painter, Rect bounds, const MaterialFillLayer& fill) {
+    switch (fill.image_mode) {
+    case MaterialImageMode::stretch:
+        paint_stretched_image(painter, bounds, fill);
+        return;
+    case MaterialImageMode::tile:
+        paint_tiled_image(painter, bounds, fill);
+        return;
+    case MaterialImageMode::nine_patch:
+        paint_nine_patch(painter, bounds, fill);
+        return;
+    }
+    // A mode outside the enumeration draws no image.
+    return;
+}
+
+// One fill layer of a material over `bounds`; a solid fill follows the
+// material's rounded corners when the layers are `clipped` to them.
+void paint_fill_layer(Painter& painter, Rect bounds, const MaterialFillLayer& fill,
+                      bool clipped, double corner_radius) {
+    switch (fill.kind) {
+    case MaterialFillKind::solid:
+        if (clipped) {
+            painter.fill_rounded_rect(bounds, corner_radius, fill.color);
+        } else {
+            painter.fill_rect(bounds, fill.color);
+        }
+        return;
+    case MaterialFillKind::linear_gradient:
+        if (fill.linear_geometry == MaterialLinearGeometry::css_angle) {
+            const std::pair<Point, Point> endpoints =
+                resolve_css_linear_gradient(fill.angle_degrees, bounds);
+            painter.fill_linear_gradient_spread(
+                bounds, endpoints.first, endpoints.second, fill.stops,
+                fill.spread);
+            return;
+        }
+        painter.fill_linear_gradient_spread(
+            bounds, resolve_point(fill.start, fill.coordinate_space, bounds),
+            resolve_point(fill.end, fill.coordinate_space, bounds), fill.stops,
+            fill.spread);
+        return;
+    case MaterialFillKind::radial_gradient:
+        painter.fill_radial_gradient(
+            bounds, resolve_point(fill.center, fill.coordinate_space, bounds),
+            resolve_radii(fill.radii, fill.coordinate_space, bounds), fill.stops);
+        return;
+    case MaterialFillKind::image:
+        paint_image_fill(painter, bounds, fill);
+        return;
+    }
+    // A kind outside the enumeration paints nothing.
+    return;
 }
 
 } // namespace
@@ -597,48 +657,7 @@ void paint_surface_material(Painter& painter, Rect bounds,
         painter.clip_rounded_rect(bounds, material.corner_radius);
     }
     for (const MaterialFillLayer& fill : material.fills) {
-        switch (fill.kind) {
-        case MaterialFillKind::solid:
-            if (clipped) {
-                painter.fill_rounded_rect(bounds, material.corner_radius,
-                                          fill.color);
-            } else {
-                painter.fill_rect(bounds, fill.color);
-            }
-            break;
-        case MaterialFillKind::linear_gradient:
-            if (fill.linear_geometry == MaterialLinearGeometry::css_angle) {
-                const std::pair<Point, Point> endpoints =
-                    resolve_css_linear_gradient(fill.angle_degrees, bounds);
-                painter.fill_linear_gradient_spread(
-                    bounds, endpoints.first, endpoints.second, fill.stops,
-                    fill.spread);
-                break;
-            }
-            painter.fill_linear_gradient_spread(
-                bounds, resolve_point(fill.start, fill.coordinate_space, bounds),
-                resolve_point(fill.end, fill.coordinate_space, bounds), fill.stops,
-                fill.spread);
-            break;
-        case MaterialFillKind::radial_gradient:
-            painter.fill_radial_gradient(
-                bounds, resolve_point(fill.center, fill.coordinate_space, bounds),
-                resolve_radii(fill.radii, fill.coordinate_space, bounds), fill.stops);
-            break;
-        case MaterialFillKind::image:
-            switch (fill.image_mode) {
-            case MaterialImageMode::stretch:
-                paint_stretched_image(painter, bounds, fill);
-                break;
-            case MaterialImageMode::tile:
-                paint_tiled_image(painter, bounds, fill);
-                break;
-            case MaterialImageMode::nine_patch:
-                paint_nine_patch(painter, bounds, fill);
-                break;
-            }
-            break;
-        }
+        paint_fill_layer(painter, bounds, fill, clipped, material.corner_radius);
     }
     if (clipped) painter.restore();
     for (const MaterialShadow& shadow : material.shadows) {

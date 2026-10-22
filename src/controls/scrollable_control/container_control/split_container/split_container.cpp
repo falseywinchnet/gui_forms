@@ -338,6 +338,7 @@ void SplitContainer::set_automatic_collapse_threshold(double extent) {
     automatic_collapse_suppressed_ = false;
     if (extent == 0.0 && collapse_target_origin() ==
                              SplitCollapseOrigin::automatic_accommodation) {
+        // With no collapse target there is nothing to restore.
         if (collapse_panel_ == SplitFixedPanel::first) {
             set_first_collapsed(false,
                                 SplitCollapseOrigin::automatic_accommodation);
@@ -685,11 +686,19 @@ SplitCollapseOrigin SplitContainer::collapse_target_origin() const noexcept {
 }
 
 void SplitContainer::toggle_collapse_target(SplitCollapseOrigin origin) {
-    if (collapse_panel_ == SplitFixedPanel::first) {
+    switch (collapse_panel_) {
+    case SplitFixedPanel::first:
         set_first_collapsed(!first_collapsed_, origin);
-    } else if (collapse_panel_ == SplitFixedPanel::second) {
+        return;
+    case SplitFixedPanel::second:
         set_second_collapsed(!second_collapsed_, origin);
+        return;
+    case SplitFixedPanel::none:
+        // No panel is the collapse target.
+        return;
     }
+    // A panel outside the enumeration is no target.
+    return;
 }
 
 void SplitContainer::reconcile_automatic_collapse(double total_extent) {

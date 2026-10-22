@@ -29,10 +29,11 @@ std::size_t command_target_slot(CommandRouteStage stage) {
     case CommandRouteStage::active_panel: return 0U;
     case CommandRouteStage::active_document: return 1U;
     case CommandRouteStage::main_window: return 2U;
-    case CommandRouteStage::focused_route: break;
+    case CommandRouteStage::focused_route:
+        throw std::invalid_argument(
+            "the focused route has no single command target; controls carry its targets");
     }
-    throw std::invalid_argument(
-        "the focused route has no single command target; controls carry its targets");
+    throw std::invalid_argument("a command route stage outside the enumeration has no target");
 }
 
 // The first target in the chain with a handler for one command, and its

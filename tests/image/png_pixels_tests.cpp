@@ -298,17 +298,17 @@ void clipboard_reads_ignore_profile() {
     const Bytes profiled = png_file(9, 7, rgba, false, icc);
     const HostClipboardImageResult reference = detail::decode_clipboard_png(plain);
     const HostClipboardImageResult read = detail::decode_clipboard_png(profiled);
-    require(reference.has_image && reference.status.error == HostServiceError::none, "clipboard PNG refused");
-    require(read.has_image && read.status.error == HostServiceError::none, "clipboard refused an iCCP PNG");
-    require(read.image.width == 9U && read.image.height == 7U && read.image.row_bytes == 36U,
+    require(reference.image.has_value() && reference.status.error == HostServiceError::none, "clipboard PNG refused");
+    require(read.image.has_value() && read.status.error == HostServiceError::none, "clipboard refused an iCCP PNG");
+    require((*read.image).width == 9U && (*read.image).height == 7U && (*read.image).row_bytes == 36U,
             "clipboard image shape");
-    require(read.image.pixels == reference.image.pixels, "clipboard iCCP changed samples");
+    require((*read.image).pixels == (*reference.image).pixels, "clipboard iCCP changed samples");
     // Straight alpha, as the host contract states.
     for (std::uint32_t y = 0; y < 7U; ++y) {
         for (std::uint32_t x = 0; x < 9U; ++x) {
             const std::size_t at = (static_cast<std::size_t>(y) * 9U + x) * 4U;
             for (unsigned channel = 0; channel < 4U; ++channel) {
-                require(std::to_integer<unsigned>(read.image.pixels[at + channel]) ==
+                require(std::to_integer<unsigned>((*read.image).pixels[at + channel]) ==
                         sample_at(x, y, channel, rgba), "clipboard sample is not straight RGBA8");
             }
         }
@@ -316,9 +316,9 @@ void clipboard_reads_ignore_profile() {
     Bytes corrupt = plain;
     corrupt[20] ^= std::byte{1};
     const HostClipboardImageResult refused = detail::decode_clipboard_png(corrupt);
-    require(!refused.has_image && refused.status.error == HostServiceError::invalid_argument,
+    require(!refused.image.has_value() && refused.status.error == HostServiceError::invalid_argument,
             "corrupt clipboard PNG accepted");
-    require(!detail::decode_clipboard_png({}).has_image, "empty clipboard PNG accepted");
+    require(!detail::decode_clipboard_png({}).image.has_value(), "empty clipboard PNG accepted");
 }
 
 void decode_failures() {

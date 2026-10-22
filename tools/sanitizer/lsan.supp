@@ -4,6 +4,11 @@
 # GUI.Forms leaks. Never add a first-party frame here; a GUI.Forms leak is a
 # defect to fix (house style section 5). docs/building/index.md says how the
 # macOS baseline was checked.
+#
+# Function rules name only frames inside system libraries, and use the
+# unqualified function name where that is distinctive: a sanitized tree
+# built with line tables (the default) reports frames of code it compiled
+# without namespaces, and a rule should not depend on which mode built it.
 
 # Linux.
 leak:libX11.so
@@ -62,14 +67,14 @@ leak:_fetchInitializingClassList
 leak:look_up_class
 leak:fetch_cache
 # A pool page for objects autoreleased outside any pool (AppKit's event thread).
-leak:AutoreleasePoolPage::autoreleaseNoPage
+leak:autoreleaseNoPage
 # Swift runtime (AppKit's Swift parts): per-thread context, weak-reference
 # side tables. GUI.Forms has no Swift.
 leak:SwiftTLSContext
 leak:formWeakReference
 # dyld and libc per-thread and per-process state.
-leak:dyld::ThreadLocalVariables::instantiateVariable
-leak:dyld4::APIs::setErrorString
+leak:instantiateVariable
+leak:setErrorString
 leak:__parsefloat_buf
 leak:localtime
 # CoreFoundation: per-thread tables, preferences, observer registrations,
@@ -112,6 +117,12 @@ leak:-[NSApplication(NSPersistentUISupport)
 leak:IMKClient
 leak:IMKInputSession
 leak:CreateEventLoop
-# QuartzCore: per-thread transactions and cached contexts.
+# QuartzCore: per-thread transactions and cached contexts. The one rule
+# spelled with a namespace: its last identifier alone (create) would match
+# far too much. It names a frame inside QuartzCore, which LeakSanitizer
+# symbolizes from QuartzCore's own symbols, so our debug-information mode
+# (line tables drop qualifiers only for code we compile) cannot change it.
+# The owner accepted this exception on 2026-10-22: a system frame that cannot
+# be requalified.
 leak:CA::Transaction::create
 leak:CAReleaseCachedCGContext

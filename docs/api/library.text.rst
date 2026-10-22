@@ -1929,6 +1929,8 @@ Enumerations
 
    .. cpp:enumerator:: shaping_payload
 
+   .. cpp:enumerator:: cache_entries
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: TextMaskRaster

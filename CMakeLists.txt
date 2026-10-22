@@ -3273,6 +3273,8 @@ if(GUI_FORMS_BUILD_TESTS)
                      COMMAND gui_forms_macos_accessibility_client_tests --gallery
                          --app $<TARGET_BUNDLE_DIR:gui_forms_macos_accessibility_gallery_app>
                          --dump ${CMAKE_CURRENT_BINARY_DIR}/accessibility_gallery_semantics.json)
+            # Gallery-wide: walks every page; `ctest -LE gallery_accessibility` skips it.
+            set_property(TEST gui_forms_macos_accessibility_client_gallery_tests APPEND PROPERTY LABELS gallery_accessibility)
             set_tests_properties(gui_forms_macos_accessibility_client_gallery_tests PROPERTIES
                 SKIP_RETURN_CODE 77 TIMEOUT 600)
         endif()
@@ -3669,6 +3671,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
                          ${CMAKE_CURRENT_SOURCE_DIR}/tests/linux_accessibility_gallery_client.py
                          $<TARGET_FILE:gui_forms_linux_accessibility_gallery_fixture>
                          ${CMAKE_CURRENT_SOURCE_DIR}/manifests/controls.json)
+        # Gallery-wide: walks every page; `ctest -LE gallery_accessibility` skips it.
+        set_property(TEST gui_forms_linux_accessibility_gallery_tests APPEND PROPERTY LABELS gallery_accessibility)
         set_tests_properties(gui_forms_linux_accessibility_gallery_tests PROPERTIES
             SKIP_RETURN_CODE 77 TIMEOUT 900)
     endif()
@@ -3702,6 +3706,8 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
         # about 10 s in a release tree, about 340 s in the sanitizer tree
         # (measured 2026-10-20 on the owner's machine with other builds
         # running), whose ctest budget is 900 s.
+        # Gallery-wide: walks every page; `ctest -LE gallery_accessibility` skips it.
+        set_property(TEST gui_forms_windows_accessibility_msaa_gallery_tests APPEND PROPERTY LABELS gallery_accessibility)
         set_tests_properties(gui_forms_windows_accessibility_msaa_gallery_tests PROPERTIES TIMEOUT 900)
         # Stage A, A-W3: an IUIAutomation client on a thread of its own
         # enumerates every Gallery page and performs each control's default
@@ -3718,6 +3724,8 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
         # than 1800 s through ctest on 2026-10-20 while other workspaces'
         # builds left it about 55% of a core. The limit is twice the
         # heaviest load measured.
+        # Gallery-wide: walks every page; `ctest -LE gallery_accessibility` skips it.
+        set_property(TEST gui_forms_windows_accessibility_uia_gallery_tests APPEND PROPERTY LABELS gallery_accessibility)
         set_tests_properties(gui_forms_windows_accessibility_uia_gallery_tests PROPERTIES TIMEOUT 3600)
     endif()
 endif()
@@ -3788,4 +3796,10 @@ if(gui_forms_font_programs)
         endif()
         add_dependencies(${font_target} gui_forms_program_fonts)
     endforeach()
+endif()
+
+# Every test carries one area label (cmake/TestAreas.cmake, tools/test_areas.json).
+if(GUI_FORMS_BUILD_TESTS)
+    include(cmake/TestAreas.cmake)
+    gui_forms_label_test_areas(stx_zlib stx_png)
 endif()

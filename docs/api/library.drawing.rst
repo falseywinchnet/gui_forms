@@ -985,9 +985,9 @@ Types
 
    ImageAttributesSnapshot owns optional 5x5 color-matrix state and a bounded remap table.
 
-   .. cpp:member:: bool has_color_matrix
+   .. cpp:member:: std::optional<std::array<double, 25>> color_matrix
 
-   .. cpp:member:: std::array<double, 25> color_matrix
+      The colour matrix as set_color_matrix took it; absent when none is set.
 
    .. cpp:member:: std::vector<ColorRemap> remap_table
 

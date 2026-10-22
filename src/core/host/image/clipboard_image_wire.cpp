@@ -72,7 +72,6 @@ HostClipboardImageResult decode_clipboard_image(
     if (validate_host_image(view) != HostImageError::none) return result;
     result.image = copy_host_image(view);
     result.status = {};
-    result.has_image = true;
     return result;
 }
 } // namespace gui_forms::detail

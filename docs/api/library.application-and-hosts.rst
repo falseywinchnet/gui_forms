@@ -513,11 +513,11 @@ Related types
 
    .. cpp:member:: HostServiceStatus status
 
-   .. cpp:member:: HostImage image
+   .. cpp:member:: std::optional<HostImage> image
+
+      The clipboard's image; absent when the clipboard holds none or the read failed.
 
    .. cpp:member:: std::uint64_t generation
-
-   .. cpp:member:: bool has_image
 
 .. cpp:namespace:: gui_forms
 
@@ -1005,7 +1005,7 @@ Related types
 
    .. cpp:function:: HostClipboardImageResult read_clipboard_image()
 
-      Reads an owned straight-alpha RGBA8 image on the creating UI thread. Successful absence is distinguished by has_image == false.
+      Reads an owned straight-alpha RGBA8 image on the creating UI thread. Successful absence is distinguished by an absent image.
 
    .. cpp:function:: HostClipboardFilesResult read_clipboard_files()
 
