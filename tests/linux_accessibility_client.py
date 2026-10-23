@@ -11,7 +11,9 @@ The first form re-executes itself inside a private session bus
 (``dbus-run-session``), starts the AT-SPI bus launcher there, waits until the
 launcher owns ``org.a11y.Bus``, then starts FIXTURE and drives it as an
 assistive client would: it finds the fixture's application under the AT-SPI
-registry's desktop and uses the Action, Value and EditableText interfaces.
+registry's desktop and uses the Action, Value, EditableText and Text
+interfaces (A-L3: caret, selection, strings by granularity, character boxes
+and hit testing, on the A-T1 text core).
 The second form is registered when the build found no ATK or X11.
 
 Results. Exit 0 when every check passes; 1 on a mismatch or a failure.
@@ -26,6 +28,8 @@ Standard library and PyGObject only; Python 3.10+.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from functools import partial
 import os
 from pathlib import Path
 import shutil
@@ -43,6 +47,9 @@ SESSION_MARKER: str = 'GUI_FORMS_ATSPI_SESSION'
 # Seconds. The launcher and the fixture each get this long to appear.
 STARTUP_SECONDS: float = 15.0
 POLL_SECONDS: float = 0.1
+# Seconds a published change (the fixture's next update) may take to reach
+# the client; a named failure after that.
+PUBLISH_SECONDS: float = 10.0
 LAUNCHER_NAME: str = 'at-spi-bus-launcher'
 # Where distributions install the launcher outside PATH: Debian and Ubuntu
 # (/usr/libexec), older Debian (/usr/lib/at-spi2-core) and multiarch layouts.
@@ -230,6 +237,55 @@ def action_index(atspi: ModuleType, node: object, name: str) -> int:
     return -1
 
 
+def wait_for(read: Callable[[], object], wanted: object, message: str) -> None:
+    """Reads until read() returns wanted, for at most PUBLISH_SECONDS."""
+    deadline: float = time.monotonic() + PUBLISH_SECONDS
+    seen: object = read()
+    while seen != wanted and time.monotonic() < deadline:
+        time.sleep(POLL_SECONDS)
+        seen = read()
+    check(seen == wanted, message + ': wanted ' + repr(wanted) + ', got ' + repr(seen))
+
+
+def exercise_text(atspi: ModuleType, text: object) -> None:
+    """The Text interface on the A-T1 core (A-L3), after the edit to
+    'مرحبا ABC': nine characters, the second word at 6..9."""
+    wait_for(partial(atspi.Text.get_character_count, text), 9, 'the edit is published')
+    check(atspi.Text.get_text(text, 0, -1) == 'مرحبا ABC', 'the text reads back')
+    check(atspi.Text.set_caret_offset(text, 6), 'the caret moves to character 6')
+    check(atspi.Text.get_caret_offset(text) == 6, 'the caret reads back at 6')
+    check(atspi.Text.set_selection(text, 0, 6, 9), 'characters 6..9 are selected')
+    check(atspi.Text.get_n_selections(text) == 1, 'one selection')
+    selected: object = atspi.Text.get_selection(text, 0)
+    check(selected.start_offset == 6 and selected.end_offset == 9,
+          'the selection reads back as 6..9, got ' + str(selected.start_offset) + '..' + str(selected.end_offset))
+    check(atspi.Text.remove_selection(text, 0), 'the selection is removed')
+    check(atspi.Text.get_n_selections(text) == 0, 'no selection after removing it')
+    word: object = atspi.Text.get_string_at_offset(text, 7, atspi.TextGranularity.WORD)
+    check(word.content == 'ABC' and word.start_offset == 6 and word.end_offset == 9,
+          'the word at 7 is ABC at 6..9, got ' + repr(word.content))
+    first: object = atspi.Text.get_string_at_offset(text, 0, atspi.TextGranularity.WORD)
+    check(first.content == 'مرحبا ' and first.start_offset == 0 and first.end_offset == 6,
+          'the first word runs to the next word start, got ' + repr(first.content))
+    line: object = atspi.Text.get_string_at_offset(text, 3, atspi.TextGranularity.LINE)
+    check(line.content == 'مرحبا ABC' and line.start_offset == 0 and line.end_offset == 9,
+          'a single-line box is one line, got ' + repr(line.content))
+    sentence: object = atspi.Text.get_string_at_offset(text, 3, atspi.TextGranularity.SENTENCE)
+    check(sentence.content == '', 'sentences are unsupported, got ' + repr(sentence.content))
+    box: object = atspi.Text.get_character_extents(text, 6, atspi.CoordType.WINDOW)
+    check(box.width > 0 and box.height > 0, 'character 6 has a box, got ' + str(box.width) + 'x' + str(box.height))
+    hit: int = atspi.Text.get_offset_at_point(text, box.x + box.width // 2, box.y + box.height // 2,
+                                              atspi.CoordType.WINDOW)
+    check(hit == 6, 'the middle of character 6 hits character 6, got ' + str(hit))
+    # 'e', a combining acute accent and 'x': two graphemes, three characters.
+    check(atspi.EditableText.set_text_contents(text, 'e\u0301x'), 'a combining sequence is typed')
+    wait_for(partial(atspi.Text.get_character_count, text), 3, 'the combining edit is published')
+    check(not atspi.Text.set_caret_offset(text, 1), 'a caret inside a combining sequence is refused')
+    # The last request: the fixture finishes once the caret is after the
+    # accent (byte 3), so nothing is read after it.
+    check(atspi.Text.set_caret_offset(text, 2), 'a caret after the combining sequence is taken')
+
+
 def exercise_fixture(atspi: ModuleType, fixture: subprocess.Popen[str]) -> None:
     application: object = find_application(atspi, fixture)
     named: dict[str, object] = {}
@@ -256,6 +312,7 @@ def exercise_fixture(atspi: ModuleType, fixture: subprocess.Popen[str]) -> None:
     text: object = named['Artwork text']
     check(text.get_role() == atspi.Role.ENTRY, 'text box role is entry, got ' + text.get_role_name())
     check(atspi.EditableText.set_text_contents(text, 'مرحبا ABC'), 'Unicode text edit succeeds')
+    exercise_text(atspi, text)
 
 
 def stop_fixture(fixture: subprocess.Popen[str]) -> None:

@@ -2584,6 +2584,12 @@ bool Control::on_semantic_child_action(std::string_view, SemanticAction,
                                        std::string_view) {
     return false;
 }
+SemanticTextResult Control::on_semantic_text_layout(SemanticTextLayout&) {
+    return SemanticTextResult::no_text;
+}
+SemanticTextResult Control::on_set_semantic_text_selection(SemanticTextSelection) {
+    return SemanticTextResult::no_text;
+}
 void Control::on_drag_preview(DragEvent&) {}
 void Control::on_drag(DragEvent&) {}
 void Control::on_drag_bubble(DragEvent&) {}

@@ -290,6 +290,12 @@ public:
     void on_focus_changed(bool focused) override;
     void on_frame(FrameTime now) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    // The layout as painted: one line for a single-line box, the visual
+    // (wrapped) lines for a multiline one; graphemes at their painted
+    // positions after scrolling; word starts by next_word_boundary (the
+    // Ctrl+Right rule). A password box publishes no text: no_text.
+    [[nodiscard]] SemanticTextResult on_semantic_text_layout(SemanticTextLayout& layout) override;
+    [[nodiscard]] SemanticTextResult on_set_semantic_text_selection(SemanticTextSelection selection) override;
     bool on_semantic_action(SemanticAction action,
                             std::string_view value) override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
@@ -338,6 +344,11 @@ private:
     };
     void ensure_multiline_layout();
     void rebuild_multiline_rows(double width);
+    // Fill the lines and graphemes, or the word starts, of a host's text
+    // layout query (A-T1); the multiline form needs current visual rows.
+    void fill_single_line_text_layout(SemanticTextLayout& layout) const;
+    void fill_multiline_text_layout(SemanticTextLayout& layout) const;
+    void fill_word_starts(SemanticTextLayout& layout) const;
     [[nodiscard]] Rect multiline_text_rectangle() const noexcept;
     void set_multiline_scroll(Point position);
     [[nodiscard]] Rect paint_multiline(Painter& painter);

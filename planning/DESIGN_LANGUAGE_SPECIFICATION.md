@@ -1045,6 +1045,21 @@ and commands' access keys; live regions are announced on all three hosts
 as above; and a range publishes a large step only when it really has one
 (NumericUpDown has none).
 
+Editable text (A-T1, A-T2) is read and selected through two window queries
+rather than node fields: `Window::semantic_text_layout` returns a text
+node's visual lines, graphemes (with their boxes in client coordinates) and
+the control's own word starts; `Window::set_semantic_text_selection` moves
+its selection, refusing stale identities, calls during paint, targets
+outside the active focus scope and offsets off a grapheme boundary. TextBox
+(single-line and multiline) answers both, MaskedTextBox through its editor;
+a password box answers neither. On ATK (A-L3) the Text interface counts
+characters and converts to and from the core's UTF-8 offsets: the caret and
+one selection, read from `text_selection` and set through the window; the
+string at an offset by character (its grapheme), word, visual line and
+paragraph, with sentences unsupported; character boxes and the character
+at a point; and text-insert, text-remove, text-caret-moved and
+text-selection-changed when a published text node changes.
+
 ## 9. Motion, effects and sound
 
 ### 9.1 Character

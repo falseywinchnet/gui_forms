@@ -794,6 +794,12 @@ gui_forms::TextBox
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
+   .. cpp:function:: SemanticTextResult on_semantic_text_layout(SemanticTextLayout& layout) override
+
+      The layout as painted: one line for a single-line box, the visual (wrapped) lines for a multiline one; graphemes at their painted positions after scrolling; word starts by next_word_boundary (the Ctrl+Right rule). A password box publishes no text: no_text.
+
+   .. cpp:function:: SemanticTextResult on_set_semantic_text_selection(SemanticTextSelection selection) override
+
    .. cpp:function:: bool on_semantic_action(SemanticAction action, std::string_view value) override
 
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override

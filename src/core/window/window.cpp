@@ -2461,6 +2461,27 @@ bool Window::perform_semantic_action(RuntimeId control_id,
     return claimed;
 }
 
+SemanticTextResult Window::semantic_text_layout(RuntimeId control_id, SemanticTextLayout& layout) {
+    require_ui_thread("semantic text layout");
+    layout.clear();
+    if (in_paint_) return SemanticTextResult::during_paint;
+    const Control::Ptr control = find_runtime_control(control_id);
+    if (!control) return SemanticTextResult::stale_identity;
+    const SemanticTextResult result = (*control).on_semantic_text_layout(layout);
+    if (result != SemanticTextResult::done) layout.clear();
+    return result;
+}
+
+SemanticTextResult Window::set_semantic_text_selection(RuntimeId control_id, SemanticTextSelection selection) {
+    require_ui_thread("semantic text selection");
+    if (in_paint_) return SemanticTextResult::during_paint;
+    const Control::Ptr control = find_runtime_control(control_id);
+    if (!control) return SemanticTextResult::stale_identity;
+    if (!semantic_scope_reaches(control)) return SemanticTextResult::outside_focus_scope;
+    const SemanticTextResult result = (*control).on_set_semantic_text_selection(selection);
+    return result;
+}
+
 Control::Ptr Window::find_runtime_control(RuntimeId control) const {
     ControlList pending{root_};
     pending.reserve(1U + popups_.size());

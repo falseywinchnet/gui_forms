@@ -523,6 +523,25 @@ bool MaskedTextBox::on_semantic_action(SemanticAction action, std::string_view v
     return Panel::on_semantic_action(action, value);
 }
 
+bool MaskedTextBox::editor_shows_published_value() const {
+    if (!editor_) return false;
+    const std::string published = provider_.length() == 0U ? text() : provider_.display_text();
+    const bool same = (*editor_).text() == published;
+    return same;
+}
+
+SemanticTextResult MaskedTextBox::on_semantic_text_layout(SemanticTextLayout& layout) {
+    if (!editor_shows_published_value()) return SemanticTextResult::no_text;
+    const SemanticTextResult result = (*editor_).on_semantic_text_layout(layout);
+    return result;
+}
+
+SemanticTextResult MaskedTextBox::on_set_semantic_text_selection(SemanticTextSelection selection) {
+    if (!editor_shows_published_value()) return SemanticTextResult::no_text;
+    const SemanticTextResult result = (*editor_).on_set_semantic_text_selection(selection);
+    return result;
+}
+
 // -- anatomy -----------------------------------------------------------------------
 
 namespace {

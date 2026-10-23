@@ -116,6 +116,63 @@ struct SemanticTextSelection final {
     }
 };
 
+// One visual line of a text node's layout: the UTF-8 range of the node's
+// value it shows (without the line break that ends it) and its box. Boxes
+// are in window client coordinates, as node bounds are, and may lie outside
+// the node's bounds when the text is scrolled.
+struct SemanticTextLine final {
+    TextRange<Utf8Offset> range{};
+    Rect bounds{};
+};
+
+// One grapheme of a text node's layout: its UTF-8 range in the node's value,
+// the index of its visual line in SemanticTextLayout::lines, and its box. A
+// line break is not a grapheme of any line.
+struct SemanticTextGrapheme final {
+    TextRange<Utf8Offset> range{};
+    LineIndex line{};
+    Rect bounds{};
+};
+
+// The layout of a text node (owner decision A-T1, 12.13), built only when a
+// host asks through Window::semantic_text_layout. Lines and graphemes are in
+// text order. `word_starts` are the offsets at which the control's own word
+// rule stops (its Ctrl+Left and Ctrl+Right), ascending: 0, each word start,
+// and the end of the text; empty for empty text. Sentences are not reported
+// (A-T2).
+struct SemanticTextLayout final {
+    std::vector<SemanticTextLine> lines;
+    std::vector<SemanticTextGrapheme> graphemes;
+    std::vector<Utf8Offset> word_starts;
+    // Empties the three lists and keeps their storage for the next query.
+    void clear() noexcept {
+        lines.clear();
+        graphemes.clear();
+        word_starts.clear();
+    }
+};
+
+// What a text query or a selection change did (Window::semantic_text_layout
+// and Window::set_semantic_text_selection). Every result except `done`
+// leaves the control as it was and the caller's layout empty.
+enum class SemanticTextResult : std::uint8_t {
+    done,
+    // No attached control has that runtime identity: it was disposed,
+    // detached or replaced (interview GF017).
+    stale_identity,
+    // The query arrived while the window paints; the host asks again later.
+    during_paint,
+    // The control lies outside the active focus scope (a selection change
+    // only; a layout may be read anywhere).
+    outside_focus_scope,
+    // The node publishes no text a host may read or select: a control
+    // without editable text, or a password box (A-T2).
+    no_text,
+    // An offset past the end of the value or inside a grapheme, such as
+    // within a combining sequence (A-T2).
+    off_boundary,
+};
+
 // The position of an element among its siblings of one set (a list's items,
 // a strip's buttons) and the set's size, both counting from one, and whether
 // the element opens a popup (a menu, a list or a dialog) when activated.
@@ -214,6 +271,7 @@ struct SemanticSnapshot final {
 [[nodiscard]] const char* semantic_role_name(SemanticRole role) noexcept;
 [[nodiscard]] const char* semantic_action_name(SemanticAction action) noexcept;
 [[nodiscard]] const char* semantic_orientation_name(SemanticOrientation orientation) noexcept;
+[[nodiscard]] const char* semantic_text_result_name(SemanticTextResult result) noexcept;
 // The name of one state bit (`state` holds exactly one of semantic_states).
 [[nodiscard]] const char* semantic_state_name(SemanticState state) noexcept;
 // The node fields the vocabulary admits, by name, for the schema export.
