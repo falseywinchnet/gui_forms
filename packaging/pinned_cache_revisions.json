@@ -6,7 +6,7 @@
   "pinned": [
     {
       "sha": "5bb7a8ba74ccb358f11d1b9056831e0130bdd8d0",
-      "consumer": "PlaySuite (playsuite-games .github/workflows/applications.yml, tools/package_common.py TOOLKIT_REVISION)"
+      "consumer": "PlaySuite (playsuite-games .github/workflows/applications.yml, tools/package_common.py TOOLKIT_REVISION); also tools/windows_toolchain_release.json (the published Windows LLVM 22.1.8 toolchain)"
     }
   ]
 }

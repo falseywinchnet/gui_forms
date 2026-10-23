@@ -34,10 +34,14 @@ struct RetainedDrawCache final {
     std::unique_ptr<RetainedDrawMemo> memo;
 };
 
-// How a paint group's image joins what lies beneath it. Premultiplied
-// source-over through the shared ADR-004 blend (detail::composite_part_raster)
-// is the only mode today; another is added here when a primitive needs it.
-enum class PaintGroupComposite : std::uint8_t { source_over };
+// How a paint group's image joins what lies beneath it, through the shared
+// ADR-004 blend (detail::composite_part_raster):
+// - source_over: premultiplied source-over;
+// - plus (E7r): each premultiplied channel, alpha included, added to the
+//   one beneath and clamped at 255. The engine's cross-fade draws a part's
+//   old face at 1 - t and its new face in a plus group at t, inside one
+//   isolated group, so that the two sum to one face.
+enum class PaintGroupComposite : std::uint8_t { source_over, plus };
 
 // A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that
 // group layer may be needed for"): commands drawn as one image, then
@@ -53,10 +57,15 @@ enum class PaintGroupComposite : std::uint8_t { source_over };
 //   1 (or above) the commands draw directly under clip_rect(bounds), which is
 //   exactly what isolation would give for source-over. At 0 (or NaN) nothing
 //   is drawn.
+// - A group whose `composite` is not source-over, or that sets `isolated`,
+//   is isolated at any opacity: a group holding a plus group must be, so
+//   that the sum is formed before it meets what lies beneath. A painter
+//   that cannot isolate (no storage) draws the group directly.
 struct PaintGroup final {
     Rect bounds{};
     double opacity{1.0};
     PaintGroupComposite composite{PaintGroupComposite::source_over};
+    bool isolated{false};
 };
 
 // The deepest groups nest (T2, coordinator decision Q2/Q3). A group begun
@@ -192,6 +201,16 @@ public:
     // painters override it. A null raster draws nothing.
     virtual void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin,
                                   double opacity = 1.0);
+    // Composites a part raster shown at another size (E7r): the raster is
+    // stretched over `destination`, in logical units, whose corners the
+    // painter places on the device pixels nearest them. Each device pixel
+    // samples the raster bilinearly through the same shared blend, so every
+    // host writes the same bytes. The engine shows a part this way while its
+    // presentational scale moves, and bakes it sharp at its size once the
+    // scale rests. Otherwise as draw_part_raster; the base implementation
+    // draws nothing.
+    virtual void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination,
+                                         double opacity = 1.0);
     // Source-region replay is the renderer-neutral primitive behind image
     // strips, texture fills, and nine-patch materials. `source` is expressed
     // in source-image pixels. Minimal painters may preserve coherence by

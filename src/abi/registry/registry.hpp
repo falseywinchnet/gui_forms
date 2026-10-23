@@ -39,6 +39,30 @@ enum class AbiHostPhase : std::uint8_t {
     stopping,
 };
 
+// The managed trace's spelling of a host phase.
+[[nodiscard]] inline const char* host_phase_name(AbiHostPhase phase) noexcept {
+    switch (phase) {
+    case AbiHostPhase::idle: return "idle";
+    case AbiHostPhase::starting: return "starting";
+    case AbiHostPhase::ready: return "ready";
+    case AbiHostPhase::stopping: return "stopping";
+    }
+    // A phase outside the enumeration is traced as idle.
+    return "idle";
+}
+
+// The C ABI code for a component state.
+[[nodiscard]] inline std::uint32_t component_state_code(ComponentState state) noexcept {
+    switch (state) {
+    case ComponentState::alive: return GF_COMPONENT_ALIVE;
+    case ComponentState::disposing: return GF_COMPONENT_DISPOSING;
+    case ComponentState::disposed: return GF_COMPONENT_DISPOSED;
+    }
+    // A state outside the enumeration is reported disposed: the control is
+    // not to be used.
+    return GF_COMPONENT_DISPOSED;
+}
+
 struct ControlRecord final {
     std::shared_ptr<Control> control;
     gui_forms::PopupToken popup_token;
@@ -1959,11 +1983,7 @@ public:
         if (const gf_result result = get_control(handle, record); result != GF_OK) {
             return result;
         }
-        switch ((*(*record).control).component_state()) {
-        case ComponentState::alive: *output = GF_COMPONENT_ALIVE; break;
-        case ComponentState::disposing: *output = GF_COMPONENT_DISPOSING; break;
-        case ComponentState::disposed: *output = GF_COMPONENT_DISPOSED; break;
-        }
+        *output = component_state_code((*(*record).control).component_state());
         return GF_OK;
     }
 
@@ -2649,26 +2669,7 @@ private:
             const std::shared_ptr<Control> retained = control.lock();
             if (!retained) return;
             const Rect bounds = (*retained).absolute_bounds();
-            std::uint32_t kind = GF_EVENT_MOUSE_MOVE;
-            switch (event.action) {
-            case gui_forms::PointerAction::down:
-                kind = GF_EVENT_MOUSE_DOWN;
-                break;
-            case gui_forms::PointerAction::up:
-                kind = GF_EVENT_MOUSE_UP;
-                break;
-            case gui_forms::PointerAction::wheel:
-                kind = GF_EVENT_MOUSE_WHEEL;
-                break;
-            case gui_forms::PointerAction::enter:
-                kind = GF_EVENT_MOUSE_ENTER;
-                break;
-            case gui_forms::PointerAction::leave:
-                kind = GF_EVENT_MOUSE_LEAVE;
-                break;
-            case gui_forms::PointerAction::move:
-                break;
-            }
+            const std::uint32_t kind = pointer_event_kind(event.action);
             static_cast<void>((*subscription).pointer_callback(
                 sender, kind, event.position.x - bounds.x,
                 event.position.y - bounds.y, event.wheel_delta.y,
@@ -2996,13 +2997,7 @@ private:
 
     std::string managed_trace(const std::shared_ptr<ControlRecord>& root) {
         std::scoped_lock lock(mutex_);
-        const char* phase = "idle";
-        switch ((*root).host_phase) {
-        case AbiHostPhase::idle: phase = "idle"; break;
-        case AbiHostPhase::starting: phase = "starting"; break;
-        case AbiHostPhase::ready: phase = "ready"; break;
-        case AbiHostPhase::stopping: phase = "stopping"; break;
-        }
+        const char* phase = host_phase_name((*root).host_phase);
         return "{\"callback_faults\":" + std::to_string((*root).callback_faults) +
                ",\"dispatches\":" + std::to_string((*root).dispatches) +
                ",\"dispatch_turns\":" + std::to_string((*root).dispatch_turns) +

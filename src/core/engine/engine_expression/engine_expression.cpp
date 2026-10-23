@@ -57,57 +57,61 @@ Applied apply_operation(ExpressionOperation operation, const Operands& operands)
     const double b = operands.b;
     const double c = operands.c;
     switch (operation) {
-    case ExpressionOperation::negate: result.value = -a; break;
-    case ExpressionOperation::add: result.value = a + b; break;
-    case ExpressionOperation::subtract: result.value = a - b; break;
-    case ExpressionOperation::multiply: result.value = a * b; break;
+    case ExpressionOperation::negate: result.value = -a; return result;
+    case ExpressionOperation::add: result.value = a + b; return result;
+    case ExpressionOperation::subtract: result.value = a - b; return result;
+    case ExpressionOperation::multiply: result.value = a * b; return result;
     case ExpressionOperation::divide:
         if (b == 0.0) {
             result.division_by_zero = true;
-            break;
+            return result;
         }
         result.value = a / b;
-        break;
-    case ExpressionOperation::minimum: result.value = smaller(a, b); break;
-    case ExpressionOperation::maximum: result.value = larger(a, b); break;
-    case ExpressionOperation::less: result.value = truth(a < b); break;
-    case ExpressionOperation::less_equal: result.value = truth(a <= b); break;
-    case ExpressionOperation::greater: result.value = truth(a > b); break;
-    case ExpressionOperation::greater_equal: result.value = truth(a >= b); break;
-    case ExpressionOperation::equal: result.value = truth(a == b); break;
-    case ExpressionOperation::not_equal: result.value = truth(a != b); break;
+        return result;
+    case ExpressionOperation::minimum: result.value = smaller(a, b); return result;
+    case ExpressionOperation::maximum: result.value = larger(a, b); return result;
+    case ExpressionOperation::less: result.value = truth(a < b); return result;
+    case ExpressionOperation::less_equal: result.value = truth(a <= b); return result;
+    case ExpressionOperation::greater: result.value = truth(a > b); return result;
+    case ExpressionOperation::greater_equal: result.value = truth(a >= b); return result;
+    case ExpressionOperation::equal: result.value = truth(a == b); return result;
+    case ExpressionOperation::not_equal: result.value = truth(a != b); return result;
     case ExpressionOperation::clamp: {
         const double raised = larger(a, b);
         result.value = smaller(raised, c);
-        break;
+        return result;
     }
     case ExpressionOperation::mix: {
         const double span = b - a;
         const double travel = span * c;
         result.value = a + travel;
-        break;
+        return result;
     }
     case ExpressionOperation::smoothstep: {
         // smoothstep(edge0 = a, edge1 = b, x = c).
         const double width = b - a;
         if (width == 0.0) {
             result.division_by_zero = true;
-            break;
+            return result;
         }
         const double offset = c - a;
         const double ratio = offset / width;
         const double u = smaller(larger(ratio, 0.0), 1.0);
         const double rising = 3.0 - 2.0 * u;
         result.value = u * u * rising;
-        break;
+        return result;
     }
-    case ExpressionOperation::choose: result.value = a != 0.0 ? b : c; break;
+    case ExpressionOperation::choose: result.value = a != 0.0 ? b : c; return result;
     case ExpressionOperation::constant:
     case ExpressionOperation::input:
     case ExpressionOperation::state:
     case ExpressionOperation::parameter:
-    case ExpressionOperation::count: break;
+    case ExpressionOperation::count:
+        // Leaves and the count sentinel take no operands; callers never
+        // apply them. They yield zero.
+        return result;
     }
+    // An operation outside the enumeration yields zero.
     return result;
 }
 

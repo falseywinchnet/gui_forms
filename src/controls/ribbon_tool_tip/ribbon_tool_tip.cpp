@@ -39,8 +39,9 @@ bool valid_content(const RibbonToolTipContent& content) {
 // ToolStrip, and the subscriptions that observe it.
 struct RibbonToolTip::Entry final {
     std::weak_ptr<Control> target;
-    bool has_control_content{};
-    RibbonToolTipContent control_content;
+    // The content for the control as a whole; none when only its items
+    // have content.
+    std::optional<RibbonToolTipContent> control_content{};
     std::vector<ItemMapping> items;
     SubscriptionToken pointer;
     SubscriptionToken focus;
@@ -181,7 +182,6 @@ void RibbonToolTip::set_tool_tip(const std::shared_ptr<Control>& target, RibbonT
         throw std::invalid_argument("GUI.Forms RibbonToolTip content needs valid UTF-8 and a title or command");
     }
     Entry& entry = require_entry(target);
-    entry.has_control_content = true;
     entry.control_content = std::move(content);
     if (visible_target_.lock() == target && visible_item_.empty()) show_now(target, {}, keyboard_initiated_);
 }
@@ -218,7 +218,7 @@ void RibbonToolTip::set_item_tool_tip(const std::shared_ptr<ToolStrip>& strip, s
 }
 
 const RibbonToolTipContent* RibbonToolTip::find_content(const Entry& entry, std::string_view item_id) const {
-    if (item_id.empty()) return entry.has_control_content ? &entry.control_content : nullptr;
+    if (item_id.empty()) return entry.control_content.has_value() ? &*entry.control_content : nullptr;
     for (const ItemMapping& mapping : entry.items) {
         if (mapping.item_id == item_id) return &mapping.content;
     }
@@ -239,14 +239,13 @@ bool RibbonToolTip::remove_tool_tip(const Control& target, std::string_view item
     const bool affects_visible = visible_target_.lock().get() == &target && visible_item_ == item_id;
     if (affects_pending || affects_visible) hide();
     if (item_id.empty()) {
-        (*entry).has_control_content = false;
-        (*entry).control_content = {};
+        (*entry).control_content.reset();
     } else {
         std::vector<ItemMapping>::iterator found = (*entry).items.begin();
         while (found != (*entry).items.end() && (*found).item_id != item_id) ++found;
         (*entry).items.erase(found);
     }
-    if (!(*entry).has_control_content && (*entry).items.empty()) entries_.erase(target.runtime_id().value);
+    if (!(*entry).control_content.has_value() && (*entry).items.empty()) entries_.erase(target.runtime_id().value);
     return true;
 }
 
@@ -388,14 +387,23 @@ void RibbonToolTip::arm(std::chrono::milliseconds delay, PendingAction action) {
 void RibbonToolTip::timer_tick() {
     if ((*timer_).enabled()) (*timer_).stop();
     const PendingAction action = std::exchange(pending_action_, PendingAction::none);
-    if (action == PendingAction::show) {
+    switch (action) {
+    case PendingAction::show: {
         const std::shared_ptr<Control> target = pending_target_.lock();
         const std::string item_id = std::exchange(pending_item_, std::string{});
         pending_target_.reset();
         if (target) show_now(target, item_id, keyboard_initiated_);
-    } else if (action == PendingAction::auto_hide) {
-        close_overlay(true);
+        return;
     }
+    case PendingAction::auto_hide:
+        close_overlay(true);
+        return;
+    case PendingAction::none:
+        // The timer fired with nothing pending.
+        return;
+    }
+    // An action outside the enumeration does nothing.
+    return;
 }
 
 // -- overlay -------------------------------------------------------------------

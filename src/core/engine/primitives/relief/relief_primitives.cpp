@@ -1,5 +1,7 @@
 #include "relief_primitives.hpp"
 
+#include "../kernel/pixel_kernel.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -15,47 +17,6 @@
 
 namespace gui_forms::engine_primitives {
 namespace {
-
-// -- shared kernel -------------------------------------------------------------
-
-// A premultiplied colour in [0, 1] per channel.
-struct Unit final {
-    double red{};
-    double green{};
-    double blue{};
-    double alpha{};
-};
-
-// `colour` (straight alpha) at `coverage`, premultiplied.
-Unit premultiply(Color colour, double coverage) noexcept {
-    const double alpha = static_cast<double>(colour.alpha) / 255.0 * coverage;
-    const Unit unit{static_cast<double>(colour.red) / 255.0 * alpha, static_cast<double>(colour.green) / 255.0 * alpha,
-                    static_cast<double>(colour.blue) / 255.0 * alpha, alpha};
-    return unit;
-}
-
-// Source-over of `source` onto `target`, both premultiplied.
-void blend_over(Unit& target, Unit source) noexcept {
-    const double keep = 1.0 - source.alpha;
-    target.red = source.red + target.red * keep;
-    target.green = source.green + target.green * keep;
-    target.blue = source.blue + target.blue * keep;
-    target.alpha = source.alpha + target.alpha * keep;
-}
-
-std::uint8_t to_byte(double value) noexcept {
-    const double clamped = std::clamp(value, 0.0, 1.0);
-    const double scaled = std::floor(clamped * 255.0 + 0.5);
-    const std::uint8_t byte = static_cast<std::uint8_t>(scaled);
-    return byte;
-}
-
-void store(const PartRasterView& destination, std::size_t offset, const Unit& unit) noexcept {
-    destination.pixels[offset] = to_byte(unit.red);
-    destination.pixels[offset + 1U] = to_byte(unit.green);
-    destination.pixels[offset + 2U] = to_byte(unit.blue);
-    destination.pixels[offset + 3U] = to_byte(unit.alpha);
-}
 
 // The colour a vertical gradient from `top` to `bottom` has at `t` in
 // [0, 1], each straight channel interpolated.
@@ -74,22 +35,6 @@ Color gradient_at(Color top, Color bottom, double t) noexcept {
                        static_cast<std::uint8_t>(std::floor(blue + 0.5)),
                        static_cast<std::uint8_t>(std::floor(alpha + 0.5))};
     return colour;
-}
-
-// The width of a line in device pixels at `scale` (§3.6, proposed):
-// max(1, round(min(scale, 2))).
-double keyline_width(double scale) noexcept {
-    const double rounded = std::floor(std::min(scale, 2.0) + 0.5);
-    const double width = std::max(1.0, rounded);
-    return width;
-}
-
-// How much of the pixel interval [pixel, pixel + 1) lies in [start, end).
-double interval_overlap(double pixel, double start, double end) noexcept {
-    const double low = std::max(pixel, start);
-    const double high = std::min(pixel + 1.0, end);
-    const double overlap = std::max(0.0, high - low);
-    return overlap;
 }
 
 Rect inset_box(Rect box, double amount) noexcept {
@@ -212,6 +157,51 @@ void fill_plate(const PlateLook& look, const PartRasterView& destination) noexce
 
 constexpr Color white{255, 255, 255, 255};
 
+// A plate's text slot insets (see relief_primitives.hpp), in logical units.
+Insets plate_content_insets(PartShape shape, Size logical, DeviceScale scale, double padding,
+                            double text_scale) noexcept {
+    const double line = keyline_width(scale.value) / scale.value;
+    // The plate's box: the part's less its bottom line (plate_box).
+    const double plate_height = std::max(0.0, logical.height - line);
+    const double half = std::min(logical.width, plate_height) * 0.5;
+    const bool across = logical.width >= plate_height;
+    // 1 - 1/sqrt(2): how far a rounded corner's arc lies inside its box's
+    // corner along each side, as a fraction of the radius.
+    constexpr double arc_fraction = 0.29289321881345247;
+    Insets rounding{};
+    switch (shape.kind) {
+    case PartShapeKind::rounded_rectangle: {
+        const double cut = std::clamp(shape.corner_radius, 0.0, half) * arc_fraction;
+        rounding = Insets{cut, cut, cut, cut};
+        break;
+    }
+    case PartShapeKind::circle: {
+        // The square inscribed in the centred circle.
+        const double cut = half * arc_fraction;
+        const double across_gap = (logical.width - half * 2.0) * 0.5;
+        const double down_gap = (plate_height - half * 2.0) * 0.5;
+        rounding = Insets{across_gap + cut, down_gap + cut, across_gap + cut, down_gap + cut};
+        break;
+    }
+    case PartShapeKind::pill:
+        rounding = across ? Insets{half, 0.0, half, 0.0} : Insets{0.0, half, 0.0, half};
+        break;
+    case PartShapeKind::cap_start:
+        rounding = across ? Insets{half, 0.0, 0.0, 0.0} : Insets{0.0, half, 0.0, 0.0};
+        break;
+    case PartShapeKind::cap_end:
+        rounding = across ? Insets{0.0, 0.0, half, 0.0} : Insets{0.0, 0.0, 0.0, half};
+        break;
+    case PartShapeKind::count:
+        break;
+    }
+    const double lines = line * 2.0;
+    const double side = padding * text_scale;
+    const Insets insets{rounding.left + lines + side, rounding.top + lines, rounding.right + lines + side,
+                        rounding.bottom + lines + line};
+    return insets;
+}
+
 // -- the pill plate --------------------------------------------------------------
 
 const PartRole plate_roles[] = {PartRole::face, PartRole::actuator, PartRole::thumb, PartRole::chip};
@@ -239,6 +229,7 @@ enum PillParameter : std::size_t {
     pill_disabled_border,
     pill_disabled_upper,
     pill_perimeter,
+    pill_text_padding,
     pill_parameter_count,
 };
 
@@ -263,6 +254,7 @@ const PrimitiveParameterDeclaration pill_parameters[] = {
     {"disabled_border", PrimitiveParameterKind::colour, 0.0, 0.0, 0.0, {143, 166, 196, 100}},
     {"disabled_upper_line", PrimitiveParameterKind::colour, 0.0, 0.0, 0.0, {255, 255, 255, 100}},
     {"perimeter", PrimitiveParameterKind::colour, 0.0, 0.0, 0.0, {33, 75, 129, 255}},
+    {"text_padding", PrimitiveParameterKind::number, 0.0, 32.0, 4.0, {}},
 };
 static_assert(std::size(pill_parameters) == pill_parameter_count, "one declaration per pill parameter");
 
@@ -287,6 +279,7 @@ enum GoldParameter : std::size_t {
     gold_upper,
     gold_left,
     gold_lower,
+    gold_text_padding,
     gold_parameter_count,
 };
 
@@ -301,6 +294,7 @@ const PrimitiveParameterDeclaration gold_parameters[] = {
     {"upper_line", PrimitiveParameterKind::colour, 0.0, 0.0, 0.0, {255, 255, 240, 255}},
     {"left_line", PrimitiveParameterKind::colour, 0.0, 0.0, 0.0, {255, 255, 240, 180}},
     {"lower_line", PrimitiveParameterKind::colour, 0.0, 0.0, 0.0, {160, 109, 28, 35}},
+    {"text_padding", PrimitiveParameterKind::number, 0.0, 32.0, 4.0, {}},
 };
 static_assert(std::size(gold_parameters) == gold_parameter_count, "one declaration per gold parameter");
 
@@ -320,6 +314,7 @@ enum WellParameter : std::size_t {
     well_border,
     well_inner_shade,
     well_outer_highlight,
+    well_text_padding,
     well_parameter_count,
 };
 
@@ -331,6 +326,7 @@ const PrimitiveParameterDeclaration well_parameters[] = {
     {"border", PrimitiveParameterKind::colour, 0.0, 0.0, 0.0, {148, 172, 200, 255}},
     {"inner_shade", PrimitiveParameterKind::colour, 0.0, 0.0, 0.0, {111, 142, 177, 75}},
     {"outer_highlight", PrimitiveParameterKind::colour, 0.0, 0.0, 0.0, {255, 255, 255, 225}},
+    {"text_padding", PrimitiveParameterKind::number, 0.0, 32.0, 2.0, {}},
 };
 static_assert(std::size(well_parameters) == well_parameter_count, "one declaration per well parameter");
 
@@ -396,6 +392,13 @@ PartShape PillPlatePrimitive::shape(const PrimitiveParameterBlock& parameters) c
     return logical;
 }
 
+Insets PillPlatePrimitive::content_insets(const PrimitiveParameterBlock& parameters, Size logical,
+                                          DeviceScale scale, double text_scale) const noexcept {
+    const Insets insets = plate_content_insets(shape(parameters), logical, scale,
+                                               number_at(parameters, pill_text_padding), text_scale);
+    return insets;
+}
+
 void PillPlatePrimitive::derive(const PrimitiveParameterBlock&, const PrimitiveTarget&, std::span<double>) const noexcept {}
 
 void PillPlatePrimitive::fill(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
@@ -456,6 +459,13 @@ PartShape GoldPlatePrimitive::shape(const PrimitiveParameterBlock& parameters) c
     return logical;
 }
 
+Insets GoldPlatePrimitive::content_insets(const PrimitiveParameterBlock& parameters, Size logical,
+                                          DeviceScale scale, double text_scale) const noexcept {
+    const Insets insets = plate_content_insets(shape(parameters), logical, scale,
+                                               number_at(parameters, gold_text_padding), text_scale);
+    return insets;
+}
+
 void GoldPlatePrimitive::derive(const PrimitiveParameterBlock&, const PrimitiveTarget&, std::span<double>) const noexcept {}
 
 void GoldPlatePrimitive::fill(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
@@ -488,6 +498,13 @@ const PrimitiveDescriptor& InsetWellPrimitive::descriptor() const noexcept {
 PartShape InsetWellPrimitive::shape(const PrimitiveParameterBlock& parameters) const noexcept {
     const PartShape logical = shape_from(parameters, well_shape, well_corner_radius, 1.0);
     return logical;
+}
+
+Insets InsetWellPrimitive::content_insets(const PrimitiveParameterBlock& parameters, Size logical,
+                                          DeviceScale scale, double text_scale) const noexcept {
+    const Insets insets = plate_content_insets(shape(parameters), logical, scale,
+                                               number_at(parameters, well_text_padding), text_scale);
+    return insets;
 }
 
 void InsetWellPrimitive::derive(const PrimitiveParameterBlock&, const PrimitiveTarget&, std::span<double>) const noexcept {}

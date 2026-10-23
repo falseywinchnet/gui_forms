@@ -281,22 +281,36 @@ HostDialogResult native_folder_dialog(HWND owner, std::uint64_t request_id,
     return {{}, request_id, std::move(value)};
 }
 
+// The MessageBox style flags for a button set.
+UINT message_button_style(HostMessageButtons buttons) noexcept {
+    switch (buttons) {
+    case HostMessageButtons::ok: return MB_OK;
+    case HostMessageButtons::ok_cancel: return MB_OKCANCEL;
+    case HostMessageButtons::yes_no: return MB_YESNO;
+    case HostMessageButtons::yes_no_cancel: return MB_YESNOCANCEL;
+    case HostMessageButtons::retry_cancel: return MB_RETRYCANCEL;
+    }
+    // A button set outside the enumeration shows OK alone.
+    return MB_OK;
+}
+
+// The MessageBox style flags for an icon; none for no icon.
+UINT message_icon_style(HostMessageIcon icon) noexcept {
+    switch (icon) {
+    case HostMessageIcon::information: return MB_ICONINFORMATION;
+    case HostMessageIcon::warning: return MB_ICONWARNING;
+    case HostMessageIcon::error: return MB_ICONERROR;
+    case HostMessageIcon::question: return MB_ICONQUESTION;
+    case HostMessageIcon::none: return 0U;
+    }
+    // An icon outside the enumeration shows none.
+    return 0U;
+}
+
 UINT native_message_style(const HostMessageDialogRequest& request) noexcept {
     UINT style = MB_APPLMODAL;
-    switch (request.buttons) {
-    case HostMessageButtons::ok: style |= MB_OK; break;
-    case HostMessageButtons::ok_cancel: style |= MB_OKCANCEL; break;
-    case HostMessageButtons::yes_no: style |= MB_YESNO; break;
-    case HostMessageButtons::yes_no_cancel: style |= MB_YESNOCANCEL; break;
-    case HostMessageButtons::retry_cancel: style |= MB_RETRYCANCEL; break;
-    }
-    switch (request.icon) {
-    case HostMessageIcon::information: style |= MB_ICONINFORMATION; break;
-    case HostMessageIcon::warning: style |= MB_ICONWARNING; break;
-    case HostMessageIcon::error: style |= MB_ICONERROR; break;
-    case HostMessageIcon::question: style |= MB_ICONQUESTION; break;
-    case HostMessageIcon::none: break;
-    }
+    style |= message_button_style(request.buttons);
+    style |= message_icon_style(request.icon);
     const bool second =
         (request.buttons == HostMessageButtons::ok_cancel &&
          request.default_choice == HostDialogChoice::cancel) ||
@@ -2227,7 +2241,38 @@ private:
         const std::uint8_t byte = gui_forms::detail::part_composite_opacity(opacity);
         static_cast<void>(gui_forms::detail::composite_part_raster(source, target, clip, byte));
     }
+    // Composites a part raster stretched over `destination`, whose corners
+    // go on the device pixels nearest them, with the shared blend's scaled
+    // sampling. A raster made for another scale is not drawn.
+    void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, const Rect destination,
+                                 const double opacity) override {
+        if (!raster || pixels_ == nullptr || width_ <= 0 || height_ <= 0) return;
+        if ((*raster).scale().value != scale_) return;
+        const int left = logical_x(destination.x);
+        const int top = logical_y(destination.y);
+        const int right = logical_x(destination.x + destination.width);
+        const int bottom = logical_y(destination.y + destination.height);
+        if (right <= left || bottom <= top) return;
+        GdiFlush();
+        const gui_forms::detail::TextCompositeTarget target = shared_composite_target();
+        const gui_forms::detail::TextCompositeClip clip = shared_composite_clip();
+        const DeviceExtent extent = (*raster).extent();
+        const gui_forms::detail::PartRasterSource source{.pixels = (*raster).pixels(), .width = extent.width,
+                                                         .height = extent.height,
+                                                         .row_bytes = (*raster).row_bytes(),
+                                                         .left = left,
+                                                         .top = top - row_origin_,
+                                                         .shown_width = static_cast<std::uint32_t>(right - left),
+                                                         .shown_height = static_cast<std::uint32_t>(bottom - top)};
+        const std::uint8_t byte = gui_forms::detail::part_composite_opacity(opacity);
+        static_cast<void>(gui_forms::detail::composite_part_raster(source, target, clip, byte));
+    }
 public:
+    // The shared blend for a group's composite.
+    static gui_forms::detail::PartCompositeBlend part_blend(const PaintGroupComposite composite) noexcept {
+        if (composite == PaintGroupComposite::plus) return gui_forms::detail::PartCompositeBlend::plus;
+        return gui_forms::detail::PartCompositeBlend::source_over;
+    }
     // Paint groups (Painter::begin_group). An isolated group draws into its
     // level's scratch rows (the group's clipped rows across the target's full
     // width), premultiplied and cleared to transparent, then composites them
@@ -2245,13 +2290,16 @@ public:
         GroupLevel& level = groups_[group_depth_];
         level.isolated = false;
         level.opacity = group.opacity;
+        level.composite = group.composite;
         save();
         clip_rect(group.bounds);
         const bool visible = group.opacity > 0.0;
         if (!visible) states_.back().clip = Rect{};
         level.state_depth = states_.size();
         group_depth_ = group_depth_ + 1U;
-        if (!visible || group.opacity >= 1.0 || pixels_ == nullptr || width_ <= 0) return;
+        const bool isolate =
+            group.opacity < 1.0 || group.isolated || group.composite != PaintGroupComposite::source_over;
+        if (!visible || !isolate || pixels_ == nullptr || width_ <= 0) return;
         const Rect clip = state().clip;
         const PixelRect area{std::clamp(static_cast<int>(std::floor(clip.x * scale_)), 0, width_),
                              std::clamp(static_cast<int>(std::floor(clip.y * scale_)), row_origin_, row_end_),
@@ -2312,7 +2360,8 @@ public:
         const gui_forms::detail::PartRasterSource source{.pixels = bytes,
             .width = static_cast<std::uint32_t>(columns), .height = static_cast<std::uint32_t>(rows),
             .row_bytes = static_cast<std::size_t>(width_) * 4U, .left = area.left,
-            .top = area.top - row_origin_, .order = gui_forms::detail::TextPixelOrder::bgra};
+            .top = area.top - row_origin_, .order = gui_forms::detail::TextPixelOrder::bgra,
+            .blend = part_blend(level.composite)};
         const gui_forms::detail::TextCompositeTarget target = shared_composite_target();
         const gui_forms::detail::TextCompositeClip clip = shared_composite_clip();
         const std::uint8_t byte = gui_forms::detail::part_composite_opacity(level.opacity);
@@ -2405,6 +2454,7 @@ private:
         bool isolated{};
         PixelRect device{};
         double opacity{};
+        PaintGroupComposite composite{PaintGroupComposite::source_over};
         std::size_t state_depth{};
         std::uint32_t* parent_pixels{};
         int parent_row_origin{};
@@ -2932,7 +2982,7 @@ public:
             services_.shutdown();
             if (options_.quit_thread_on_close) PostQuitMessage(0);
             return 0;
-        default: break;
+        default: break; // Every other message takes the default handling below.
         }
         return DefWindowProcW(hwnd_, message, wparam, lparam);
     }

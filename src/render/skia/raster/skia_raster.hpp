@@ -127,6 +127,9 @@ public:
     // addressed.
     void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin,
                           double opacity) override;
+    // As draw_part_raster, stretched over `destination` (E7r scale motion).
+    void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination,
+                                 double opacity) override;
     // Internal host seam: keep the coverage promise and sampled pixels in the
     // same read lease through rasterization, even during producer reconfigure.
     [[nodiscard]] bool draw_live_surface_frame(const LiveSurfaceFrame& frame,

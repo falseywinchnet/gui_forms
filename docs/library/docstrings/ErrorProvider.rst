@@ -62,8 +62,8 @@ Events
 error_changed
     Raised after a control's message changes, once the control's semantics
     and icon have been updated. It carries an `ErrorProviderChange` with the
-    control's stable ID, the new message and whether it is nonempty. Setting
-    the same message again raises nothing.
+    control's stable ID and the new message, which is empty when the error
+    was cleared. Setting the same message again raises nothing.
 right_to_left_changed
     Raised after `right_to_left` changes, with the new value.
 data_source_changed

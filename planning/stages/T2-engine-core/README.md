@@ -312,6 +312,225 @@ the plan left a number or a form open, E3 chose:
 7. **Ceremonial is a `Control` property** (`set_ceremonial`), inherited by
    descendants: accepted.
 
+## Decisions for E8c, the material primitive (owner direction, 2026-10-22)
+
+1. **A refused material falls back.** The `material` primitive refuses a part
+   whose material is missing or invalid, whose image fill is unavailable, or
+   whose estimated bake exceeds the bound. The part is then drawn by the
+   built-in recipe, and each refusal is counted once per part
+   (`engine_primitive_refusals` in the metrics snapshot). The bound and the
+   costs are set in one place, `material_bake_policy.hpp`.
+2. **Image fills are supported, never refused for being images.** No stock
+   theme uses them. Resampling is separable and done in premultiplied
+   colour. When an image is shrunk, its kernel is widened by the shrink
+   factor and the weights are normalized.
+   - **The filter is an open owner decision.** The candidates are
+     Mitchell–Netravali (B = C = 1/3) and the owner's convolution method
+     from Plan Paint. The owner may write an optimized `stx_conv` for the
+     latter.
+   - The filter is one named choice, `MaterialResamplingFilter`, selected in
+     one place (`material_resampling_filter` in `material_image.hpp`), so
+     that a convolution kernel can replace it without changing the
+     material's code.
+   - Mitchell–Netravali is the provisional implementation.
+   - Nothing may be imported or copied from Plan Paint, because GUI.Forms
+     depends on no sources outside its tree.
+3. **CSS inline images are named by resource.** An image is registered
+   once as a resource (a decoded PNG), and a material layer names it. This
+   is not built yet.
+4. **Bake cost and live cost are separate.** A material is baked once per
+   invalidation (state, size, scale or theme) and cached. Compositing it
+   afterwards is a blit, plus a group blend where one applies. The bake is
+   bounded at 4 ms on the reference machine, a quarter of a 60 Hz frame.
+   The owner has accepted that bound. Before E7r, the per-layer costs are
+   to be measured again on a quiet machine, recording the load at the time
+   of measurement.
+5. **Nothing rasterizes per frame.** The material reads no inputs. The
+   retained forms of E7's animated parameters, and slicing, are phase E7r
+   (after E8c, before E9).
+
+### E8c bake costs
+
+Measured with `gui_forms_engine_material_tests --measure`. Each figure is
+the median of nine bakes of a 240-unit square part at scale 1 (a 256 × 256
+destination including the outsets), minus the base material's bake, divided
+by the destination's pixels. The per-tap figure comes from a 64 × 64 image
+magnified and a 1024 × 1024 image shrunk over the same box. The decode
+figure comes from a 64 × 64 PNG.
+
+The build was Release (clang 22, -O2) on Windows 11, on an AMD EPYC 9354
+virtual machine with 8 logical CPUs. The runs were on 2026-10-22, while
+other builds held the CPUs at 88–97 % load. There were seven runs, and the
+table gives the minimum, median and maximum per pixel (per tap for
+`image_tap`, per source pixel for `image_decode`), in nanoseconds:
+
+| Cost | Min | Median | Max | Used |
+|---|---|---|---|---|
+| base (the square box) | 23.4 | 24.6 | 24.9 | 26 |
+| base, rounded box | 24.3 | 26.0 | 27.6 | (in base) |
+| solid fill | 7.5 | 9.2 | 22.8 | 10 |
+| linear fill | 12.0 | 14.7 | 18.1 | 15 |
+| radial fill | 17.3 | 21.1 | 29.0 | 22 |
+| each gradient stop past two | 0.22 | 0.24 | 0.37 | 0.5 |
+| outer shadow | 61.6 | 68.1 | 89.7 | 69 |
+| inset shadow | 55.7 | 59.1 | 82.4 | 60 |
+| border (rounded) | 22.4 | 25.4 | 39.1 | 26 |
+| border edge | 9.9 | 10.7 | 18.5 | 11 |
+| keyline | 7.4 | 12.3 | 17.2 | 13 |
+| image composite | −2.5 | 5.1 | 15.9 | 6 |
+| image tap | 3.4 | 3.9 | 4.3 | 4 |
+| image decode | −96 | −3.9 | 81 | 10 |
+
+The "used" column rounds each median up. The two image figures are below
+the noise at this workload: single runs measured below zero. They therefore
+carry conservative figures rather than measurements. The machine's load
+makes every figure pessimistic.
+
+What the bound admits:
+
+- A material with a shadow, a gradient, a border and a keyline costs about
+  150 ns per device pixel, so 4 ms admits about 26 000 pixels. That is a
+  100 × 24 button at scale 2, with its outsets.
+- A plain solid region costs about 36 ns per pixel, so 4 ms admits about
+  110 000 pixels, a region of roughly 320 × 320 at scale 1.
+- Larger parts are refused and drawn by the built-in recipe until E7r's
+  slice cache bakes a reference box once and composes larger parts from
+  its corners, edges and centre.
+
+## Decisions for E7r, the retained forms (owner, 2026-10-22)
+
+Nothing in the engine bakes per frame. The forms are: (a) a state change
+cross-fades its two baked faces through a group; (b) a moving scale stretches
+the cached raster and bakes sharp at rest; (c) animated parameters step
+through baked keyframes; (d) pointer and time inputs reuse those keyframes,
+and ambient effects loop through a bounded set of baked frames. Slicing
+assembles any size of a sliceable material from one reference bake.
+
+- **A. When keyframes bake: in idle time, and on demand.** The 10 keyframes
+  of an animated parameter bake in idle frames after the part first paints,
+  never all at once in one frame (first paint included). A transition or a
+  pointer move that reaches a keyframe not yet baked bakes only that one, the
+  first time it is reached. Idle bakes and on-demand bakes are counted
+  separately. The proof: once the idle bakes are done, a running transition
+  bakes nothing; before that, it bakes at most one keyframe per keyframe it
+  reaches for the first time.
+- **B. Where they are held: a shared 4 MB cache** for slice references and
+  keyframes, beside the 8 MB part cache.
+- **C. Stepping: to the nearest keyframe** (10 levels evenly spaced over the
+  parameter's declared range, the ends exact).
+- **D. Pointer inputs: option 1.** An animated parameter driven by the
+  pointer steps through the same 10 shared keyframes, so moving the pointer
+  bakes nothing once they are baked. No overlay seam is built until a real
+  primitive needs one.
+
+### What E7r built
+
+- **Slices.** `EnginePrimitive::slice_plan` declares, for each axis, whether
+  it slices. A material plans this from its arcs, border, keylines, edges
+  and shadows (3.5σ). An axis whose edges fall on fractional device pixels
+  is kept whole. One reference bake per (material, state, scale) serves
+  every size that slices, and the result is byte-identical to a whole bake.
+  Counters: `slice_bakes`, `slice_hits`, `slice_whole_fallbacks`,
+  `slice_axis_fallbacks`.
+- **Shared bakes.** Slice references and keyframes live in one LRU cache of
+  `shared_bake_budget_bytes` (4 MB), beside the 8 MB part cache. A theme
+  change clears it.
+- **(c) Keyframes.** `animated_keyframe_levels` is 10. While its transition
+  runs, or while the pointer drives it, a parameter steps to the nearest
+  level. The levels bake in idle frames: one keyframe per frame in which no
+  motion runs and nothing waits to be painted. They are queued on the first
+  paint and whenever the states change, at most `maximum_idle_keyframes`
+  (64) at a time. A level reached before it is baked bakes on demand.
+  Counters: `keyframe_idle_bakes`, `keyframe_demand_bakes`, `keyframe_hits`,
+  `idle_keyframes_queued`.
+- **(b) Scale.** While the scale moves, the part's raster at its own size
+  is stretched about its centre through `Painter::draw_part_raster_scaled`,
+  which samples bilinearly in the shared blend. At rest the part is baked
+  sharp at its scaled size.
+- **(a) Face cross-fade.** It is declared as the transition `face`, which
+  has a curve and no states. When the part's states change and its face
+  changes with them, the old face is drawn at 1 − t and the new one in a
+  `PaintGroupComposite::plus` group at t, both inside one isolated group.
+- **(d) Ambient effects.** The time is stepped to at most
+  `maximum_ambient_loop_frames` (24) frames per period, each a shared bake.
+  Pointer-driven parameters use the keyframes (D). No overlay seam exists.
+- **Proof.** `gui_forms_engine_retained_tests` runs opacity, scale, face
+  and an animated parameter together. Once the idle bakes are done, no
+  frame bakes while they run. The ribbon rise and fall in
+  `gui_forms_engine_motion_tests` bake nothing after the idle frames, and at
+  most one keyframe per frame before them.
+
+## E9, light (in progress)
+
+### Decisions for E9 (owner, 2026-10-22)
+
+- **E9-A, option 1: an overlay seam for sheen only.** The face is baked
+  once, and the sheen band once per (size, state, scale). The band is
+  composited at the pointer offset, clipped to the part's shape. Damage is
+  limited to the part's extent.
+- **E9-B, option 1: a cached backplane image.** The window keeps one per
+  requested region: the backplane plane alone, keyed to its damage
+  generation, read through a target borrow. Glass blurs within the 8 px
+  cap, and the cache follows E7r's rules.
+- **E9-C, option 1: no new primitives.** Gloss is a material preset. Glow is
+  one new material layer kind, soft and additive, bounded by the grant. Pop
+  is rule data only.
+
+### E9.1, the overlay shadow
+
+- **The primitive.** `overlay_shadow` (GIVEN E1-1) draws a `shadow` part
+  with the material kernel. The engine lends the theme's overlay shadow
+  layers, or the high-contrast ones, as a material of one transparent fill
+  and those outer shadows, at the part's corner radius (its own, else its
+  family recipe's). A theme that casts none draws nothing. A built-in rule
+  selects it for every shadow part, replacing `Painter::draw_box_shadow`, so
+  the shadow has the same bytes on every host. Its outsets are 32 logical
+  units. The damage outsets controls report are unchanged.
+- **Refusals.** It refuses an inset shadow, a shadow that reaches past 32
+  units (spread, offset and 3.5σ', plus two device pixels), and a bake over
+  the bound. A refused shadow is drawn by `draw_box_shadow` and counted.
+- **The kernel.** An outer shadow's rectangle integral is separable. The
+  kernel evaluates it once per column and once per row. The rounded edge's
+  integral is taken only within the shape's corner squares and outward
+  from them. Elsewhere the rounded shape is its rectangle, and a blurred
+  rectangle never exceeds the integral across its nearest edge. The bytes
+  are unchanged: every material reference hash still matches, and so does
+  the overlay shadow's. A solid fill of alpha 0 is not drawn, and the box's
+  coverage is not computed when no layer reads it.
+- **Proof.** `gui_forms_engine_light_tests` checks scales 1, 1.5 and 2. The
+  engine composites one raster and no box shadow, and the raster equals a
+  whole bake byte for byte, sliced or not. Its scale-1 hash is checked on
+  every CI platform. High contrast casts nothing. A shadow too wide falls
+  back, counted. `gui_forms_overlay_shadow_tests` sees the raster first in
+  each tooltip's and context menu's operations.
+
+### E9 shadow costs
+
+The outer shadow was measured again after the separable kernel, with
+`gui_forms_engine_material_tests --measure`. A new workload, `outer_corner`,
+measures the cost per pixel within a rounded shadow's corners. It uses a box
+rounded to a circle, where every pixel is a corner pixel. The figure is net
+of the separable cost.
+
+These two figures are **provisional** until the quiet-machine re-measure,
+which records the CPU load. The machine was the same, on 2026-10-22. The
+load was not sampled. It was lighter than in the E8c runs: the inset
+shadow, unchanged, measured 47.5–48.7 ns against 59.1 earlier. So each
+median is scaled by 1.25 and rounded up. There were seven runs, in
+nanoseconds per pixel:
+
+| Cost | Min | Median | Max | Used |
+|---|---|---|---|---|
+| outer shadow (separable) | 4.53 | 4.83 | 5.24 | 7 |
+| outer shadow, corner pixel | 20.98 | 21.71 | 22.02 | 28 |
+
+The estimate counts every pixel at `outer_shadow`. It adds `outer_corner`
+for each pixel within a rounded shadow's corner span on both axes: its
+radius plus its reach (3.5σ'), and one pixel, on each side.
+
+The overlay tooltip of 120 × 40 at scale 2 now bakes within the bound. It
+was refused at 1.5 and 2 under the old per-pixel cost of 69 ns.
+
 ## Open decisions (ask, do not decide)
 
 The proposed numbers (light angle 135°, overshoot 8 %, blur cap 8 px,

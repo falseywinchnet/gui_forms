@@ -602,45 +602,11 @@ ResponsiveTrackResolution ResponsiveTrackPanel::layout_children(
                 0.0, cell.width - horizontal_extent(item.margin));
             const double available_height = std::max(
                 0.0, cell.height - vertical_extent(item.margin));
-            double width = std::min(item.desired.width, available_width);
-            double height = std::min(item.desired.height, available_height);
-            double x = cell.x + item.margin.left;
-            double y = cell.y + item.margin.top;
-            switch ((*item.control).dock()) {
-            case DockStyle::fill:
-                width = available_width;
-                height = available_height;
-                break;
-            case DockStyle::top:
-                width = available_width;
-                break;
-            case DockStyle::bottom:
-                width = available_width;
-                y += available_height - height;
-                break;
-            case DockStyle::left:
-                height = available_height;
-                break;
-            case DockStyle::right:
-                x += available_width - width;
-                height = available_height;
-                break;
-            case DockStyle::none: {
-                const AnchorStyles anchor = (*item.control).anchor();
-                const bool left = has_anchor(anchor, AnchorStyles::left);
-                const bool right = has_anchor(anchor, AnchorStyles::right);
-                const bool top = has_anchor(anchor, AnchorStyles::top);
-                const bool bottom = has_anchor(anchor, AnchorStyles::bottom);
-                if (left && right) width = available_width;
-                else if (right) x += available_width - width;
-                else if (!left) x += (available_width - width) * 0.5;
-                if (top && bottom) height = available_height;
-                else if (bottom) y += available_height - height;
-                else if (!top) y += (available_height - height) * 0.5;
-                break;
-            }
-            }
-            set_child_layout(item.control, {x, y, width, height});
+            const Rect area{cell.x + item.margin.left, cell.y + item.margin.top,
+                            available_width, available_height};
+            const Rect placed = place_in_cell((*item.control).dock(), (*item.control).anchor(),
+                                              area, item.desired);
+            set_child_layout(item.control, placed);
         }
         if (committed_resolution_ != resolution) {
             committed_resolution_ = resolution;

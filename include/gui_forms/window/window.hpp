@@ -789,6 +789,14 @@ private:
     // Called by ThemeEngine::paint: the part's raster from its record's
     // cache (EnginePartTable::raster_for), on the paint in progress.
     [[nodiscard]] PartRasterResult engine_part_raster(PartRecordHandle handle, const PartRasterRequest& request);
+    // Called by ThemeEngine::paint for a part without a record: a raster
+    // for this paint only, assembled from the table's slice references when
+    // its primitive slices (EnginePartTable::raster_without_record).
+    [[nodiscard]] PartRasterResult engine_unkeyed_raster(const PartRasterRequest& request);
+    // Called by ThemeEngine::paint (E7r): queues the shared keyframe for
+    // `request` to bake in an idle frame (EnginePartTable::
+    // queue_idle_keyframe), and keeps an idle frame request while any wait.
+    void engine_queue_keyframe(const PartRasterRequest& request);
     // Where a part ThemeEngine::paint draws with `painter` lands (E6): the
     // control whose display chunk records it (the control being recorded,
     // which may paint on behalf of `control`, or else `control` itself), the

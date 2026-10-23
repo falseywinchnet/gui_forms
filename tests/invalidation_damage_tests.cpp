@@ -255,8 +255,7 @@ public:
             delivered.emplace_back("down");
             invalidate(invalidation::paint_only);
             break;
-        default:
-            break;
+        default: break; // The probe records only enter, move and down.
         }
         event.handled = true;
     }

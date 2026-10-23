@@ -21,6 +21,13 @@ namespace gui_forms::engine_primitives {
 //   draws outside its bounds and its geometry does not move between states;
 // - edges are anti-aliased by the shape's signed distance (shape_coverage),
 //   and every layer is blended premultiplied in double, quantized once.
+//
+// The plates and the well publish a text slot (content_insets): inside the
+// lines (two keylines on every side, and the bottom row), clear of the
+// shape's rounding (an end's whole radius along the long axis for a pill or
+// cap; r(1 - 1/sqrt 2) on every side for a rounded rectangle or circle,
+// which puts the slot's corners on the arcs), and `text_padding` times the
+// text scale further in at the left and right.
 
 // The pill plate (§3.5 "Pill plate", "Pressed", "Default", "Disabled";
 // Plan Paint `action_material`): a vertical tinted gradient face, one thin
@@ -34,6 +41,8 @@ class PillPlatePrimitive final : public EnginePrimitive {
 public:
     [[nodiscard]] const PrimitiveDescriptor& descriptor() const noexcept override;
     [[nodiscard]] PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept override;
+    [[nodiscard]] Insets content_insets(const PrimitiveParameterBlock& parameters, Size logical, DeviceScale scale,
+                                        double text_scale) const noexcept override;
 
 private:
     void derive(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
@@ -50,6 +59,8 @@ class GoldPlatePrimitive final : public EnginePrimitive {
 public:
     [[nodiscard]] const PrimitiveDescriptor& descriptor() const noexcept override;
     [[nodiscard]] PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept override;
+    [[nodiscard]] Insets content_insets(const PrimitiveParameterBlock& parameters, Size logical, DeviceScale scale,
+                                        double text_scale) const noexcept override;
 
 private:
     void derive(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
@@ -65,6 +76,8 @@ class InsetWellPrimitive final : public EnginePrimitive {
 public:
     [[nodiscard]] const PrimitiveDescriptor& descriptor() const noexcept override;
     [[nodiscard]] PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept override;
+    [[nodiscard]] Insets content_insets(const PrimitiveParameterBlock& parameters, Size logical, DeviceScale scale,
+                                        double text_scale) const noexcept override;
 
 private:
     void derive(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,

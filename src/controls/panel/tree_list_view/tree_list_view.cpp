@@ -1326,6 +1326,7 @@ void TreeListView::on_pointer(PointerEvent& event) {
         if (hit.zone == HitZone::row || hit.zone == HitZone::expander) choose_row(hit.index);
         return;
     }
+    // A press on no zone only takes focus.
     if (hit.zone == HitZone::divider) {
         resizing_column_ = hit.index;
         resize_start_x_ = local.x;

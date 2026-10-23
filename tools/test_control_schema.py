@@ -127,7 +127,7 @@ public:
         self.assertEqual(engine["budgets"]["operations_per_device_pixel"], 512)
         names = [primitive["name"] for primitive in engine["primitives"]]
         self.assertEqual(names, ["bulge", "dithered_bulge", "pill_plate", "gold_plate", "inset_well", "etched_divider",
-                                 "seam_line", "grip"])
+                                 "seam_line", "grip", "material", "overlay_shadow"])
         bulge = engine["primitives"][0]
         self.assertEqual(bulge["roles"], ["face"])
         amplitude = next(item for item in bulge["parameters"] if item["name"] == "amplitude")
@@ -172,7 +172,7 @@ public:
     def test_the_engine_lists_its_motion_caps(self) -> None:
         schema = cs.load_schema()
         engine = schema["engine"]
-        self.assertEqual(engine["transitions"]["engine_properties"], ["opacity"])
+        self.assertEqual(engine["transitions"]["engine_properties"], ["opacity", "scale", "face"])
         self.assertEqual(engine["ambient"]["maximum_frames_per_second"], 30)
         broken = json.loads(json.dumps(engine))
         broken["ambient"]["maximum_frames_per_second"] = 60

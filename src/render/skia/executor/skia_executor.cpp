@@ -267,15 +267,16 @@ void mark_hatch_pixel(std::array<SkColor, Count>& pixels,
 
 void apply_image_attributes(SkPaint& paint,
                             const ImageAttributesSnapshot& attributes) {
-    if (!attributes.has_color_matrix) return;
+    if (!attributes.color_matrix.has_value()) return;
+    const std::array<double, 25>& colors = *attributes.color_matrix;
     float matrix[20]{};
     for (std::size_t output = 0; output < 4U; ++output) {
         for (std::size_t input = 0; input < 4U; ++input) {
             matrix[output * 5U + input] = static_cast<float>(
-                attributes.color_matrix[input * 5U + output]);
+                colors[input * 5U + output]);
         }
         matrix[output * 5U + 4U] = static_cast<float>(
-            attributes.color_matrix[20U + output] * 255.0);
+            colors[20U + output] * 255.0);
     }
     paint.setColorFilter(SkColorFilters::Matrix(matrix));
 }
@@ -293,6 +294,21 @@ void configure_paint(SkPaint& paint, const GraphicsState& state) {
         SkBlendMode::kSrc : SkBlendMode::kSrcOver);
 }
 
+// The on/off lengths of a preset dash style for a pen `width` wide; none
+// for a solid line or a custom pattern (the pen's own).
+std::vector<SkScalar> preset_dash_pattern(DashStyle style, SkScalar width) {
+    switch (style) {
+    case DashStyle::dash: return {3.0F * width, width};
+    case DashStyle::dot: return {width, width};
+    case DashStyle::dash_dot: return {3.0F * width, width, width, width};
+    case DashStyle::dash_dot_dot: return {3.0F * width, width, width, width, width, width};
+    case DashStyle::solid: return {};
+    case DashStyle::custom: return {};
+    }
+    // A style outside the enumeration draws solid.
+    return {};
+}
+
 void configure_pen(SkPaint& paint, const PenSnapshot& pen,
                    const GraphicsState& state) {
     configure_paint(paint, state);
@@ -305,19 +321,8 @@ void configure_pen(SkPaint& paint, const PenSnapshot& pen,
         for (const double entry : pen.dash_pattern) {
             pattern.push_back(static_cast<SkScalar>(entry));
         }
-    } else if (pen.dash_style != DashStyle::solid) {
-        const SkScalar width = static_cast<SkScalar>(pen.width);
-        switch (pen.dash_style) {
-        case DashStyle::dash: pattern = {3.0F * width, width}; break;
-        case DashStyle::dot: pattern = {width, width}; break;
-        case DashStyle::dash_dot: pattern = {3.0F * width, width, width, width}; break;
-        case DashStyle::dash_dot_dot:
-            pattern = {3.0F * width, width, width, width, width, width};
-            break;
-        case DashStyle::solid:
-        case DashStyle::custom:
-            break;
-        }
+    } else {
+        pattern = preset_dash_pattern(pen.dash_style, static_cast<SkScalar>(pen.width));
     }
     if (pattern.size() >= 2U && pattern.size() % 2U == 0U) {
         paint.setPathEffect(SkDashPathEffect::Make(
@@ -951,6 +956,7 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
             case CommandKind::set_clip:
             case CommandKind::reset_clip:
             case CommandKind::set_quality:
+                // State commands: their effect is in command.state, applied above.
                 break;
             case CommandKind::clear:
                 (*canvas).clear(to_sk_color(command.color));

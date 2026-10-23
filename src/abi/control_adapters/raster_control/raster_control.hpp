@@ -171,15 +171,7 @@ public:
 
     void on_pointer(gui_forms::PointerEvent& event) override {
         const Rect absolute = absolute_bounds();
-        std::uint32_t kind = GF_EVENT_MOUSE_MOVE;
-        switch (event.action) {
-        case gui_forms::PointerAction::down: kind = GF_EVENT_MOUSE_DOWN; break;
-        case gui_forms::PointerAction::up: kind = GF_EVENT_MOUSE_UP; break;
-        case gui_forms::PointerAction::wheel: kind = GF_EVENT_MOUSE_WHEEL; break;
-        case gui_forms::PointerAction::enter: kind = GF_EVENT_MOUSE_ENTER; break;
-        case gui_forms::PointerAction::leave: kind = GF_EVENT_MOUSE_LEAVE; break;
-        case gui_forms::PointerAction::move: break;
-        }
+        const std::uint32_t kind = pointer_event_kind(event.action);
         pointer_input_.emit({
             kind,
             event.position.x - absolute.x,

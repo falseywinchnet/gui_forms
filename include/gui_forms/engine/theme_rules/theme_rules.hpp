@@ -151,6 +151,36 @@ struct RuleDeclaration final {
 // is opaque.
 inline constexpr std::string_view opacity_property = "opacity";
 
+// The engine's presentational scale (T2 GIVEN D5-1, E8): the part drawn at
+// this multiple of its size about its centre, within the overflow its
+// control grants (PartPaint::granted_overflow), its hit region and layout
+// unchanged. Like opacity it is no atom and no parameter; only a
+// transition sets it, and a part without one is drawn at 1. It is a
+// capability: the built-in rules never use it, and a part granted no
+// overflow never grows.
+inline constexpr std::string_view scale_property = "scale";
+inline constexpr double minimum_presentational_scale = 0.5;
+inline constexpr double maximum_presentational_scale = 2.0;
+
+// The engine's face cross-fade (E7r form a): when a primitive-drawn part's
+// face changes between discrete states (its raster is replaced), the old
+// face fades into the new over the transition's curve, each baked once and
+// blended through a paint group (old at 1 - t, new at t, added). The
+// transition names no states: it runs on every change of face. A change
+// while a fade runs fades from the face shown last to the new one; a face
+// of another size or scale does not fade. Like scale, no built-in rule
+// uses it.
+inline constexpr std::string_view face_property = "face";
+
+// What a transition moves: a primitive parameter, or one of the engine's
+// presentational properties.
+enum class PresentationProperty : std::uint8_t {
+    parameter,
+    opacity,
+    scale,
+    face,
+};
+
 // The most states one presentational state machine has, and the most
 // transitions one part runs.
 inline constexpr std::size_t maximum_presentation_states = 8;
@@ -272,6 +302,18 @@ struct ThemeRuleSheet final {
 // be bounded and is refused too.
 inline constexpr std::uint32_t maximum_operations_per_device_pixel = 512U;
 inline constexpr std::uint64_t maximum_animated_operations_per_frame = 4'000'000U;
+
+// Keyframes (E7r, owner 2026-10-22: 8 to 12). While an animated parameter's
+// transition runs, the part shows the nearest of this many levels evenly spaced
+// over the parameter's declared range, each baked once and shared; settled,
+// it shows its exact value. When a transition starts, the levels it will
+// pass are baked at once: at most this many bakes, each within the animated
+// budget above, so that none is baked while it runs.
+inline constexpr std::size_t animated_keyframe_levels = 10U;
+// The most frames in an ambient effect's loop (E7r): its time in the period
+// steps through at most this many, or its frame rate's count for one
+// period if fewer, each baked once, the first time it is shown, and shared.
+inline constexpr std::size_t maximum_ambient_loop_frames = 24U;
 
 enum class RuleDiagnosticKind : std::uint8_t {
     // The rule is set aside: it needs a newer engine than this one. Its
@@ -411,9 +453,10 @@ public:
         std::optional<double> enter_from{};
     };
 
-    // A checked transition: opacity, or the parameter at `parameter`.
+    // A checked transition: an engine property, or the parameter at
+    // `parameter`.
     struct CompiledTransition final {
-        bool opacity{};
+        PresentationProperty property{PresentationProperty::parameter};
         std::size_t parameter{};
         std::vector<CompiledPresentationState> states{};
         MotionCurve curve{};
@@ -433,8 +476,9 @@ public:
         // The inputs the part reads (E6): the primitive's declared inputs
         // and every input its expressions read, as expression input bits.
         std::uint64_t inputs_read{};
-        // The part's transitions (E7): its opacity's, whatever draws it,
-        // and its primitive's parameters', when a primitive does. They
+        // The part's transitions (E7): its opacity's and its scale's,
+        // whatever draws it, and its primitive's parameters', when a
+        // primitive does. They
         // belong to the compiled rules. `transition_count` are live.
         std::array<const CompiledTransition*, maximum_part_transitions> transitions{};
         std::size_t transition_count{};
