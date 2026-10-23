@@ -1430,9 +1430,7 @@ void SkiaRaster::end_group() {
                                           .height = static_cast<std::uint32_t>(height),
                                           .row_bytes = pixmap.rowBytes(), .left = level.device.left(),
                                           .top = level.device.top(), .order = detail::TextPixelOrder::rgba,
-                                          .blend = level.composite == PaintGroupComposite::plus
-                                                       ? detail::PartCompositeBlend::plus
-                                                       : detail::PartCompositeBlend::source_over};
+                                          .blend = detail::part_composite_blend(level.composite)};
     static_cast<void>(impl.composite_source(*parent, source, level.opacity));
 }
 

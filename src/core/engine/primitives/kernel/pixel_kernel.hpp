@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/engine/types/engine_types.hpp"
+#include "gui_forms/surface_material/colour_matrix/colour_matrix.hpp"
 #include "gui_forms/types/paint_types/paint_types.hpp"
 
 #include <cstddef>
@@ -27,6 +28,18 @@ struct Unit final {
 
 // Source-over of `source` onto `target`, both premultiplied.
 void blend_over(Unit& target, Unit source) noexcept;
+
+// `source` joined to `target` by multiply or screen (E9.6), both
+// premultiplied, as CSS's separable blend modes composite:
+// multiply gives s × (1 − αd) + d × (1 − αs) + s × d per colour channel,
+// screen gives s + d − s × d per channel; alpha is αs + αd − αs × αd.
+void blend_multiply(Unit& target, Unit source) noexcept;
+void blend_screen(Unit& target, Unit source) noexcept;
+
+// `pixel` (premultiplied) through `matrix` (E9.6): unpremultiplied, each
+// row applied and clamped to [0, 1], and premultiplied again. A pixel of
+// alpha 0 is read as transparent black.
+[[nodiscard]] Unit colour_filtered(const MaterialColourMatrix& matrix, Unit pixel) noexcept;
 
 // One channel quantized once: floor(clamp(v, 0, 1) × 255 + 0.5).
 [[nodiscard]] std::uint8_t to_byte(double value) noexcept;

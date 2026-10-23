@@ -51,6 +51,18 @@ struct MaterialBakeCosts final {
     // variant's colour. The variant's decode and resampling are not the
     // bake's (image_variant.hpp).
     double image{};
+    // Per device pixel of the destination, for each part filter (E9.6): the
+    // colour matrix, the drop shadow (its alpha blurred and composited) and
+    // the blur (every channel blurred). A box blur's cost per pixel does
+    // not depend on its radius, but it blurs an image grown by 3h on every
+    // side, which is not charged: on a small part with a wide blur the
+    // charge is low by that ratio, on a part far within the bound.
+    double colour_filter{};
+    double drop_shadow{};
+    double filter_blur{};
+    // Per device pixel, once for a material whose fills blend other than
+    // source-over (E9.6): gathering them into one face.
+    double fill_blend{};
 };
 
 // Measured by gui_forms_engine_material_tests --measure: for each layer
@@ -76,7 +88,10 @@ struct MaterialBakeCosts final {
 // 57 ns, as in the E8c runs, so unscaled. Each is the median of seven runs,
 // rounded up. border_pattern is per pixel of a dashed ring whose every
 // pixel is on an arc, its dearest; it is charged per destination pixel.
-// See "E9.6 G1 costs" there.
+// See "E9.6 G1 costs" there. colour_filter, drop_shadow, filter_blur and
+// fill_blend (E9.6 G2) are PROVISIONAL, measured the same way on 2026-10-23
+// at 96-97 % CPU load (sampled), the inset shadow at 59 ns, so unscaled;
+// see "E9.6 G2 costs" there.
 inline constexpr MaterialBakeCosts measured_material_costs{
     .base = 26.0,
     .solid = 10.0,
@@ -92,6 +107,10 @@ inline constexpr MaterialBakeCosts measured_material_costs{
     .border_edge = 11.0,
     .keyline = 13.0,
     .image = 6.0,
+    .colour_filter = 13.0,
+    .drop_shadow = 36.0,
+    .filter_blur = 55.0,
+    .fill_blend = 22.0,
 };
 
 } // namespace gui_forms::engine_primitives
