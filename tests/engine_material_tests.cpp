@@ -789,6 +789,8 @@ constexpr ImageCase image_cases[] = {
     {"tile", 0x7f68c692b6b84925ULL},
     {"nine_patch", 0x937e6be15e8d40fdULL},
     {"shrink", 0x55ad2e0e76d50405ULL},
+    {"tile_offset", 0xfeefd42810889d25ULL},
+    {"tile_anchor", 0x19ca1257e71e9bb5ULL},
 };
 
 void image_fills() {
@@ -841,6 +843,27 @@ void image_fills() {
     const std::array<std::uint8_t, 4> mean = shrunk.pixel(8U, 8U);
     require(mean[3] >= 126U && mean[3] <= 128U, "a shrunk image averages, at its opacity");
     hashes.push_back(raster_hash(shrunk));
+
+    // A positioned tiling (E9.6, CSS `background-position`): moved by (1, 2)
+    // units, one tile starts at the box's (1, 2), and the tiling runs back
+    // to the box's corner, so the corner shows the tile's (3, 2).
+    SurfaceMaterial offset_tile = tile;
+    offset_tile.fills.back().image_offset = Point{1.0, 2.0};
+    const TestRaster offset = draw(offset_tile, Size{16.0, 16.0}, 1.0, &registry);
+    require(offset.pixel(9U, 10U) == tiled.pixel(8U, 8U) && offset.pixel(14U, 13U) == tiled.pixel(13U, 11U),
+            "a tile moved by its offset starts there");
+    require(offset.pixel(8U, 8U) == tiled.pixel(11U, 10U), "the tiling runs back to the box's corner");
+    hashes.push_back(raster_hash(offset));
+
+    // Anchored at (1, 1) in an 18-unit box: one tile is flush with the
+    // box's bottom-right corner, 14 units in.
+    SurfaceMaterial anchor_tile = tile;
+    anchor_tile.fills.back().image_anchor = Point{1.0, 1.0};
+    const TestRaster anchored = draw(anchor_tile, Size{18.0, 18.0}, 1.0, &registry);
+    require(anchored.pixel(22U, 22U) == tiled.pixel(8U, 8U) && anchored.pixel(25U, 25U) == tiled.pixel(11U, 11U),
+            "a tile anchored at the end is flush with the box's end");
+    require(anchored.pixel(8U, 8U) == tiled.pixel(10U, 10U), "the anchored tiling runs back to the box's corner");
+    hashes.push_back(raster_hash(anchored));
 
     if (print_mode()) {
         for (std::size_t index = 0U; index < hashes.size(); ++index) {
@@ -1290,6 +1313,173 @@ void measure() {
 
 } // namespace
 
+// -- surface finish and mask (E9.6) -------------------------------------------------
+
+// The finish is derived from the face (owner, 2026-10-23): the first
+// fill's colours at 0, 0.5 and 1 rebuilt as the gloss's four stops, the
+// top half lifted by 0.25 f, the break darkened by 0.15 f and a shine of
+// alpha 176 f; the bake draws exactly the material it describes.
+void surface_finish() {
+    const Color face = Color::rgba(120, 160, 200);
+    SurfaceMaterial material = solid_material(face);
+    material.border = MaterialBorder{Color::rgba(40, 60, 90), 1.0};
+    material.corner_radius = 3.0;
+    require(finished_surface_material(material) == material, "a material without a finish is drawn as it is");
+    material.finish = 1.0;
+    require(valid_surface_material(material), "a finished solid face is valid");
+    const SurfaceMaterial finished = finished_surface_material(material);
+    require(finished.finish == 0.0 && finished.fills.size() == 1U &&
+                finished.fills.front().kind == MaterialFillKind::linear_gradient &&
+                finished.fills.front().stops.size() == 4U,
+            "a finish rebuilds the first fill as four stops");
+    const std::vector<GradientStop>& stops = finished.fills.front().stops;
+    // 120 + 135 / 4 = 153.75, 160 + 95 / 4 = 183.75, 200 + 55 / 4 = 213.75.
+    require(stops[0] == (GradientStop{0.0, Color::rgba(154, 184, 214)}) &&
+                stops[1] == (GradientStop{gloss_break_start, Color::rgba(154, 184, 214)}),
+            "the top half is lifted by a quarter towards white");
+    // 0.85 of 120, 160 and 200.
+    require(stops[2] == (GradientStop{gloss_break_end, Color::rgba(102, 136, 170)}) &&
+                stops[3] == (GradientStop{1.0, face}),
+            "the break is darkened by 0.15 and the bottom kept");
+    require(finished.keylines.size() == 1U && finished.keylines[0].edge == MaterialEdge::top &&
+                finished.keylines[0].color == Color::rgba(255, 255, 255, 176) && finished.keylines[0].width == 1.0 &&
+                finished.keylines[0].inset == 1.0,
+            "a shine of alpha 176 under the top, inside the border");
+    SurfaceMaterial half = material;
+    half.finish = 0.5;
+    const SurfaceMaterial half_finished = finished_surface_material(half);
+    require(half_finished.keylines[0].color.alpha == 88U &&
+                half_finished.fills.front().stops[2].color == Color::rgba(111, 148, 185),
+            "a half finish has half the shine and half the darkening");
+
+    // A gradient face is sampled at 0, 0.5 and 1: black to white has 128
+    // at its middle.
+    SurfaceMaterial graded = material;
+    graded.fills = {MaterialFillLayer::linear(Point{0.0, 0.0}, Point{1.0, 0.0},
+                                              std::vector<GradientStop>{{0.0, black}, {1.0, Color::rgba(255, 255, 255)}})};
+    const SurfaceMaterial graded_finished = finished_surface_material(graded);
+    const std::vector<GradientStop>& graded_stops = graded_finished.fills.front().stops;
+    require(graded_stops[0].color == Color::rgba(64, 64, 64) && graded_stops[1].color == Color::rgba(160, 160, 160) &&
+                graded_stops[2].color == Color::rgba(109, 109, 109) &&
+                graded_stops[3].color == Color::rgba(255, 255, 255),
+            "a gradient face's colours at 0, 0.5 and 1 are its finish's");
+
+    const Size logical{40.0, 20.0};
+    const TestRaster drawn = draw(material, logical, 1.0);
+    const TestRaster described = draw(finished, logical, 1.0);
+    require(raster_hash(drawn) == raster_hash(described), "the bake draws the material a finish describes");
+    SurfaceMaterial matte = material;
+    matte.finish = 0.0;
+    require(raster_hash(draw(matte, logical, 1.0)) != raster_hash(drawn), "a finish changes the face");
+    require(raster_hash(draw(graded, logical, 2.0)) == raster_hash(draw(graded_finished, logical, 2.0)),
+            "and so at scale 2, for a gradient face");
+
+    SurfaceMaterial refused = material;
+    refused.finish = 1.5;
+    require(!valid_surface_material(refused), "a finish past 1 is refused");
+    refused.finish = -0.25;
+    require(!valid_surface_material(refused), "a negative finish is refused");
+    refused = material;
+    refused.fills = {MaterialFillLayer::radial(Point{0.5, 0.5}, Size{0.5, 0.5},
+                                               std::vector<GradientStop>{{0.0, black}, {1.0, red}})};
+    require(!valid_surface_material(refused), "a finish needs a solid or linear first fill");
+    refused = material;
+    refused.keylines.assign(SurfaceMaterial::maximum_keylines, MaterialKeyline{});
+    require(!valid_surface_material(refused), "a finish needs room for its shine");
+}
+
+// The mask multiplies the whole finished raster, extended outward at its
+// edge value (owner, 2026-10-23), so a shadow fades with the face beside
+// it.
+void surface_mask() {
+    SurfaceMaterial material = solid_material(red);
+    MaterialShadow shadow{};
+    shadow.offset = Point{0.0, 2.0};
+    shadow.blur_radius = 4.0;
+    shadow.spread = 3.0;
+    shadow.color = Color::rgba(0, 0, 0, 160);
+    material.shadows.push_back(shadow);
+    // The face of a 20 × 20 part at scale 1 spans columns and rows 8 to 27.
+    const Size logical{20.0, 20.0};
+    const TestRaster plain = draw(material, logical, 1.0);
+
+    SurfaceMaterial halved = material;
+    halved.mask = MaterialFillLayer::solid(Color::rgba(0, 0, 0, 128));
+    require(valid_surface_material(halved), "a solid mask is valid");
+    const TestRaster half = draw(halved, logical, 1.0);
+    bool scaled = true;
+    for (std::uint32_t row = 0U; row < plain.extent.height; ++row) {
+        for (std::uint32_t column = 0U; column < plain.extent.width; ++column) {
+            for (std::size_t index = 0U; index < 4U; ++index) {
+                const double expected = channel(plain, column, row, index) * (128.0 / 255.0);
+                if (std::abs(channel(half, column, row, index) - expected) > 1.0) scaled = false;
+            }
+        }
+    }
+    require(scaled, "a solid mask scales every pixel, the shadow's too");
+
+    // Opaque at the top, clear at the bottom.
+    SurfaceMaterial faded = material;
+    faded.mask = MaterialFillLayer::linear(Point{0.0, 0.0}, Point{0.0, 1.0},
+                                           std::vector<GradientStop>{{0.0, black}, {1.0, clear}});
+    const TestRaster fade = draw(faded, logical, 1.0);
+    require(channel(plain, 18U, 31U, 3U) > 50 && fade.pixel(18U, 31U) == (std::array<std::uint8_t, 4>{0U, 0U, 0U, 0U}),
+            "below the box the mask extends at its clear bottom edge");
+    require(channel(plain, 18U, 6U, 3U) > 0 && fade.pixel(18U, 6U) == plain.pixel(18U, 6U),
+            "above the box it extends at its opaque top edge");
+    // Row 18's centre is 10.5 units into the box: the mask keeps 0.475.
+    const double beside = channel(plain, 5U, 18U, 3U) * 0.475;
+    require(channel(plain, 5U, 18U, 3U) > 50 && std::abs(channel(fade, 5U, 18U, 3U) - beside) <= 1.0,
+            "beside the box the shadow fades with the face");
+    require(std::abs(channel(fade, 18U, 18U, 3U) - 255.0 * 0.475) <= 1.0, "the face fades down the box");
+
+    // An image mask: a 2 × 1 image, opaque on its left, clear on its right.
+    ImageRegistry registry{};
+    const std::vector<std::byte> halves{std::byte{255}, std::byte{255}, std::byte{255}, std::byte{255},
+                                        std::byte{0},   std::byte{0},   std::byte{0},   std::byte{0}};
+    const ImageLoadResult loaded = registry.load_bgra32_premultiplied(2U, 1U, 8U, halves);
+    require(static_cast<bool>(loaded), "the mask image loads");
+    SurfaceMaterial imaged = material;
+    imaged.mask = MaterialFillLayer::stretched_image(loaded.image, Size{2.0, 1.0});
+    require(valid_surface_material(imaged), "an image mask is valid");
+    require(!material_primitive().accepts(recipe("button"), target_for(logical, 1.0, &imaged, nullptr)),
+            "an image mask without the window's images is refused");
+    const TestRaster masked = draw(imaged, logical, 1.0, &registry);
+    require(channel(masked, 9U, 18U, 3U) >= 240 && channel(masked, 26U, 18U, 3U) <= 15,
+            "the face is kept on the left and masked on the right");
+    require(channel(plain, 30U, 18U, 3U) > 50 && channel(masked, 30U, 18U, 3U) <= 15 &&
+                channel(plain, 5U, 18U, 3U) - channel(masked, 5U, 18U, 3U) <= 15,
+            "outside the box an image mask extends at its edge columns");
+
+    // An image mask whose variant is not lent leaves the part unmasked, and
+    // the table counts it: a backplane over a window without images.
+    BackplaneRegion region{};
+    region.extent = plain.extent;
+    region.scale = DeviceScale{1.0};
+    EnginePartTable table{};
+    TestRaster fallback = make_raster(logical, 1.0);
+    table.bake_backplane_material(imaged, logical, region, nullptr, fallback.view(), 1U);
+    require(table.cache_statistics().image_mask_fallbacks == 1U, "an unlent image mask is counted");
+    EnginePartTable plain_table{};
+    TestRaster unmasked = make_raster(logical, 1.0);
+    plain_table.bake_backplane_material(material, logical, region, nullptr, unmasked.view(), 1U);
+    require(raster_hash(fallback) == raster_hash(unmasked) && plain_table.cache_statistics().image_mask_fallbacks == 0U,
+            "and the part is drawn unmasked");
+    TestRaster lent_mask = make_raster(logical, 1.0);
+    table.bake_backplane_material(imaged, logical, region, &registry, lent_mask.view(), 2U);
+    require(table.cache_statistics().image_mask_fallbacks == 1U && raster_hash(lent_mask) != raster_hash(unmasked),
+            "a lent image mask masks, and is not counted");
+
+    SurfaceMaterial refused = material;
+    MaterialFillLayer pattern{};
+    pattern.kind = MaterialFillKind::procedural;
+    refused.mask = pattern;
+    require(!valid_surface_material(refused), "a procedural pattern is not a mask");
+    refused.mask = MaterialFillLayer::linear(Point{0.0, 0.0}, Point{0.0, 0.0},
+                                             std::vector<GradientStop>{{0.0, black}, {1.0, clear}});
+    require(!valid_surface_material(refused), "a mask is validated as a fill");
+}
+
 int main(int argc, char** argv) {
     if (argc > 1 && std::strcmp(argv[1], "--measure") == 0) {
         measure();
@@ -1306,6 +1496,8 @@ int main(int argc, char** argv) {
     glow_painter_path();
     glow_placements();
     gloss_preset();
+    surface_finish();
+    surface_mask();
     image_fills();
     image_variant_made_once();
     image_variant_outside_the_bound();

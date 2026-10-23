@@ -255,6 +255,66 @@ void append_drop_shadow(std::ostringstream& output,
     output << '}';
 }
 
+// One fill layer, of a material's fills or its mask.
+void append_fill(std::ostringstream& output, const MaterialFillLayer& fill) {
+    output << "{\"kind\":";
+    append_json_string(output, fill_kind_name(fill.kind));
+    output << ",\"coordinate_space\":";
+    append_json_string(output, coordinate_space_name(fill.coordinate_space));
+    output << ",\"angle_degrees\":" << fill.angle_degrees
+           << ",\"period_degrees\":" << fill.period_degrees
+           << ",\"color\":";
+    append_color(output, fill.color);
+    output << ",\"start\":";
+    append_point(output, fill.start);
+    output << ",\"end\":";
+    append_point(output, fill.end);
+    output << ",\"center\":";
+    append_point(output, fill.center);
+    output << ",\"radii\":";
+    append_size(output, fill.radii);
+    output << ",\"stops\":";
+    append_gradient_stops(output, fill.stops);
+    output << ",\"spread\":";
+    append_json_string(output, spread_name(fill.spread));
+    output << ",\"image_id\":" << fill.image.value
+           << ",\"image_pixel_size\":";
+    append_size(output, fill.image_pixel_size);
+    output << ",\"image_slice\":";
+    append_insets(output, fill.image_slice);
+    output << ",\"image_scale\":" << fill.image_scale
+           << ",\"opacity\":" << fill.opacity << ",\"image_mode\":";
+    append_json_string(output, image_mode_name(fill.image_mode));
+    output << ",\"blend\":";
+    append_json_string(output, blend_mode_name(fill.blend));
+    // A tiled image's position (E9.6), only for an image fill, so that
+    // other fills' snapshots are unchanged.
+    if (fill.kind == MaterialFillKind::image) {
+        output << ",\"image_anchor\":";
+        append_point(output, fill.image_anchor);
+        output << ",\"image_offset\":";
+        append_point(output, fill.image_offset);
+    }
+    // A procedural fill's parameters (E10), only for one, so that other
+    // fills' snapshots are unchanged.
+    if (fill.kind == MaterialFillKind::procedural) {
+        const ProceduralFill& pattern = fill.procedural;
+        output << ",\"procedural\":{\"pattern\":";
+        append_json_string(output, procedural_pattern_name(pattern.pattern));
+        output << ",\"seed\":" << pattern.seed << ",\"tile\":" << pattern.tile
+               << ",\"strength\":" << pattern.strength << ",\"ground\":";
+        append_color(output, pattern.ground);
+        output << ",\"figure\":";
+        append_color(output, pattern.figure);
+        output << ",\"accent\":";
+        append_color(output, pattern.accent);
+        output << ",\"bloom\":";
+        append_color(output, pattern.bloom);
+        output << '}';
+    }
+    output << '}';
+}
+
 void append_material(std::ostringstream& output,
                      const SurfaceMaterial& material) {
     output << "{\"corner_radius\":" << material.corner_radius
@@ -264,54 +324,7 @@ void append_material(std::ostringstream& output,
     for (std::size_t index = 0U; index < material.fills.size(); ++index) {
         if (index != 0U) output << ',';
         const MaterialFillLayer& fill = material.fills[index];
-        output << "{\"kind\":";
-        append_json_string(output, fill_kind_name(fill.kind));
-        output << ",\"coordinate_space\":";
-        append_json_string(output, coordinate_space_name(fill.coordinate_space));
-        output << ",\"angle_degrees\":" << fill.angle_degrees
-               << ",\"period_degrees\":" << fill.period_degrees
-               << ",\"color\":";
-        append_color(output, fill.color);
-        output << ",\"start\":";
-        append_point(output, fill.start);
-        output << ",\"end\":";
-        append_point(output, fill.end);
-        output << ",\"center\":";
-        append_point(output, fill.center);
-        output << ",\"radii\":";
-        append_size(output, fill.radii);
-        output << ",\"stops\":";
-        append_gradient_stops(output, fill.stops);
-        output << ",\"spread\":";
-        append_json_string(output, spread_name(fill.spread));
-        output << ",\"image_id\":" << fill.image.value
-               << ",\"image_pixel_size\":";
-        append_size(output, fill.image_pixel_size);
-        output << ",\"image_slice\":";
-        append_insets(output, fill.image_slice);
-        output << ",\"image_scale\":" << fill.image_scale
-               << ",\"opacity\":" << fill.opacity << ",\"image_mode\":";
-        append_json_string(output, image_mode_name(fill.image_mode));
-        output << ",\"blend\":";
-        append_json_string(output, blend_mode_name(fill.blend));
-        // A procedural fill's parameters (E10), only for one, so that other
-        // fills' snapshots are unchanged.
-        if (fill.kind == MaterialFillKind::procedural) {
-            const ProceduralFill& pattern = fill.procedural;
-            output << ",\"procedural\":{\"pattern\":";
-            append_json_string(output, procedural_pattern_name(pattern.pattern));
-            output << ",\"seed\":" << pattern.seed << ",\"tile\":" << pattern.tile
-                   << ",\"strength\":" << pattern.strength << ",\"ground\":";
-            append_color(output, pattern.ground);
-            output << ",\"figure\":";
-            append_color(output, pattern.figure);
-            output << ",\"accent\":";
-            append_color(output, pattern.accent);
-            output << ",\"bloom\":";
-            append_color(output, pattern.bloom);
-            output << '}';
-        }
-        output << '}';
+        append_fill(output, fill);
     }
     output << "],\"shadows\":[";
     for (std::size_t index = 0U; index < material.shadows.size(); ++index) {
@@ -360,7 +373,15 @@ void append_material(std::ostringstream& output,
     append_colour_filter(output, material.colour_filter);
     output << ",\"drop_shadow\":";
     append_drop_shadow(output, material.drop_shadow);
-    output << ",\"filter_blur\":" << material.filter_blur << '}';
+    output << ",\"filter_blur\":" << material.filter_blur;
+    // A finish and a mask (E9.6), only when set, so that other materials'
+    // snapshots are unchanged.
+    if (material.finish != 0.0) output << ",\"finish\":" << material.finish;
+    if (material.mask) {
+        output << ",\"mask\":";
+        append_fill(output, *material.mask);
+    }
+    output << '}';
 }
 
 void append_operation(std::ostringstream& output,

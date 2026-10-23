@@ -74,7 +74,8 @@ bool material_reads_images(const SurfaceMaterial& material) noexcept {
     for (const MaterialFillLayer& layer : material.fills) {
         if (layer.kind == MaterialFillKind::image) return true;
     }
-    return false;
+    const bool image_mask = material.mask && (*material.mask).kind == MaterialFillKind::image;
+    return image_mask;
 }
 
 // Whether a material primitive's lent material, and the images it reads,
@@ -564,6 +565,7 @@ void EnginePartTable::bake_backplane_material(const SurfaceMaterial& material, c
     if (awaited) unrecorded_awaited_ = true;
     request.target.variants = &lent;
     engine_primitives::bake_material_region(material, request.target, region.origin, image);
+    count_image_mask_fallback(request, lent);
 }
 
 std::optional<std::uint64_t> EnginePartTable::lend_image_variants(const PartRasterRequest& request,
@@ -616,6 +618,19 @@ std::optional<std::uint64_t> EnginePartTable::lend_image_variants(const PartRast
         hold_variant(asked, made, paint_sequence);
     }
     return awaited;
+}
+
+void EnginePartTable::count_image_mask_fallback(const PartRasterRequest& request,
+                                                const LentImageVariants& lent) noexcept {
+    if (request.primitive == nullptr || lent.layers[image_mask_variant_layer]) return;
+    std::array<ImageVariantRequest, maximum_image_variants> wanted{};
+    const std::size_t asked_count = (*request.primitive).image_variants(request.parameters, request.target, wanted);
+    const std::size_t count = std::min(asked_count, wanted.size());
+    for (std::size_t index = 0U; index < count; ++index) {
+        if (wanted[index].layer != image_mask_variant_layer) continue;
+        statistics_.image_mask_fallbacks = statistics_.image_mask_fallbacks + 1U;
+        return;
+    }
 }
 
 void EnginePartTable::hold_variant(const ImageVariantRequest& asked, const std::shared_ptr<PartRaster>& made,
@@ -728,6 +743,7 @@ std::shared_ptr<PartRaster> EnginePartTable::shared_bake(const PartRasterRequest
     const RasterOutcome outcome = primitive.rasterize(request.parameters, target, preparation, (*baked).view());
     if (outcome != RasterOutcome::painted && outcome != RasterOutcome::empty) return nullptr;
     statistics_.bakes = statistics_.bakes + 1U;
+    count_image_mask_fallback(request, lent);
     if (use == SharedUse::idle_keyframe) {
         statistics_.keyframe_idle_bakes = statistics_.keyframe_idle_bakes + 1U;
     } else if (keyframe) {
@@ -865,6 +881,7 @@ RasterOutcome EnginePartTable::draw(const PartRasterRequest& request, PrimitiveP
     }
     if (outcome == RasterOutcome::painted || outcome == RasterOutcome::empty) {
         statistics_.bakes = statistics_.bakes + 1U;
+        count_image_mask_fallback(request, lent);
     }
     return outcome;
 }

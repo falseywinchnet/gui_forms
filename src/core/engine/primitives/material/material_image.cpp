@@ -76,9 +76,11 @@ std::uint32_t segment_pixel(const AxisSegment& segment, double centre, std::uint
     return pixel;
 }
 
+// `anchor` and `offset` are the fill's position along the axis
+// (MaterialFillLayer::image_anchor and image_offset).
 ImageAxisPlacement placement_along(const MaterialFillLayer& fill, double box_start, double box_length, double scale,
                                    double source_length, double slice_start, double slice_end,
-                                   double declared_length) noexcept {
+                                   double declared_length, double anchor, double offset) noexcept {
     ImageAxisPlacement placement{};
     placement.mode = fill.image_mode;
     placement.start = box_start;
@@ -87,6 +89,9 @@ ImageAxisPlacement placement_along(const MaterialFillLayer& fill, double box_sta
     // Source pixels per logical unit: the fill's image scale.
     const double device_per_source = scale / fill.image_scale;
     placement.tile_length = declared_length * device_per_source;
+    // At the default position (0, 0) this is the box's start exactly.
+    const double room = box_length - placement.tile_length;
+    placement.tile_origin = box_start + room * anchor + offset * scale;
     placement.slice_start = slice_start;
     placement.slice_end = slice_end;
     double near = slice_start * device_per_source;
@@ -161,7 +166,7 @@ ImageAxisPlacement image_placement_across(const MaterialFillLayer& fill, double 
                                           double scale, double source_width) noexcept {
     const ImageAxisPlacement placement =
         placement_along(fill, box_start, box_length, scale, source_width, fill.image_slice.left,
-                        fill.image_slice.right, fill.image_pixel_size.width);
+                        fill.image_slice.right, fill.image_pixel_size.width, fill.image_anchor.x, fill.image_offset.x);
     return placement;
 }
 
@@ -169,7 +174,8 @@ ImageAxisPlacement image_placement_down(const MaterialFillLayer& fill, double bo
                                         double scale, double source_height) noexcept {
     const ImageAxisPlacement placement =
         placement_along(fill, box_start, box_length, scale, source_height, fill.image_slice.top,
-                        fill.image_slice.bottom, fill.image_pixel_size.height);
+                        fill.image_slice.bottom, fill.image_pixel_size.height, fill.image_anchor.y,
+                        fill.image_offset.y);
     return placement;
 }
 
@@ -204,11 +210,12 @@ void map_image_variant(const ImageAxisPlacement& placement, const std::uint32_t 
     map.assign(outputs, 0U);
     const double pixels = static_cast<double>(variant_length);
     if (placement.mode == MaterialImageMode::tile) {
-        // Each centre's place within its tile.
+        // Each centre's place within its tile, counted from where one tile
+        // starts.
         const double tile = placement.tile_length;
         if (!(tile > 0.0)) return;
         for (std::uint32_t output = 0U; output < outputs; ++output) {
-            const double along = static_cast<double>(output) + 0.5 - placement.start;
+            const double along = static_cast<double>(output) + 0.5 - placement.tile_origin;
             const double within = along - tile * std::floor(along / tile);
             const double index = std::clamp(std::floor(within * pixels / tile), 0.0, pixels - 1.0);
             map[output] = static_cast<std::uint32_t>(index);

@@ -1,4 +1,5 @@
 #include "gui_forms/theme.hpp"
+#include "gui_forms/surface_material/presets/material_presets.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -30,6 +31,16 @@ bool bounded_coordinate(Point point, MaterialCoordinateSpace space) noexcept {
     const double bound = space == MaterialCoordinateSpace::normalized
         ? 16.0 : 1'000'000.0;
     return std::abs(point.x) <= bound && std::abs(point.y) <= bound;
+}
+
+// An image fill's position (E9.6): its anchor within [0, 1] on each axis
+// and its offset within ±4096 logical units.
+bool valid_image_position(const MaterialFillLayer& fill) noexcept {
+    const Point anchor = fill.image_anchor;
+    const Point offset = fill.image_offset;
+    const bool anchored = finite(anchor) && anchor.x >= 0.0 && anchor.x <= 1.0 && anchor.y >= 0.0 && anchor.y <= 1.0;
+    const bool offset_bounded = finite(offset) && std::abs(offset.x) <= 4096.0 && std::abs(offset.y) <= 4096.0;
+    return anchored && offset_bounded;
 }
 
 bool valid_material_border(const MaterialBorder& border) noexcept {
@@ -231,9 +242,27 @@ void paint_tiled_image(Painter& painter, Rect bounds,
                        const MaterialFillLayer& fill) {
     const double tile_width = fill.image_pixel_size.width / fill.image_scale;
     const double tile_height = fill.image_pixel_size.height / fill.image_scale;
+    const bool placed = fill.image_anchor != Point{} || fill.image_offset != Point{};
+    if (!placed) {
+        painter.fill_image_pattern(
+            fill.image, fill.image_pixel_size, bounds,
+            {tile_width, tile_height}, ImagePatternWrap::tile, fill.opacity);
+        return;
+    }
+    // A positioned tiling (E9.6): the pattern starts at the tile's corner
+    // moved back by whole tiles to cover the box, clipped to the box.
+    const double origin_x = bounds.x + (bounds.width - tile_width) * fill.image_anchor.x + fill.image_offset.x;
+    const double origin_y = bounds.y + (bounds.height - tile_height) * fill.image_anchor.y + fill.image_offset.y;
+    const double back_x = std::ceil((origin_x - bounds.x) / tile_width) * tile_width;
+    const double back_y = std::ceil((origin_y - bounds.y) / tile_height) * tile_height;
+    const Rect covered{origin_x - back_x, origin_y - back_y, bounds.right() - (origin_x - back_x),
+                       bounds.bottom() - (origin_y - back_y)};
+    painter.save();
+    painter.clip_rect(bounds);
     painter.fill_image_pattern(
-        fill.image, fill.image_pixel_size, bounds,
+        fill.image, fill.image_pixel_size, covered,
         {tile_width, tile_height}, ImagePatternWrap::tile, fill.opacity);
+    painter.restore();
 }
 
 void paint_nine_patch(Painter& painter, Rect bounds,
@@ -493,8 +522,20 @@ ControlVisualRecipe derived_high_contrast(const ControlVisualRecipe& ordinary, C
     return result;
 }
 
+// A text shadow (E9.6): its offset within ±maximum_text_shadow_offset and
+// its blur within [0, maximum_text_shadow_blur].
+bool valid_text_shadow(const std::optional<ControlTextShadow>& shadow) noexcept {
+    if (!shadow) return true;
+    const Point offset = (*shadow).offset;
+    const double blur = (*shadow).blur_radius;
+    const bool placed = finite(offset) && std::abs(offset.x) <= maximum_text_shadow_offset &&
+                        std::abs(offset.y) <= maximum_text_shadow_offset;
+    const bool blurred = std::isfinite(blur) && blur >= 0.0 && blur <= maximum_text_shadow_blur;
+    return placed && blurred;
+}
+
 bool valid_recipe(const ControlVisualRecipe& value) noexcept {
-    return valid_surface_material(value.material) &&
+    return valid_surface_material(value.material) && valid_text_shadow(value.text_shadow) &&
            std::isfinite(value.focus_width) && value.focus_width >= 0.0 &&
            value.focus_width <= 16.0 && std::isfinite(value.focus_offset) &&
            value.focus_offset >= -64.0 && value.focus_offset <= 64.0 &&
@@ -617,6 +658,131 @@ ControlStateRecipes ControlStateRecipes::from_parts(
     return result;
 }
 
+namespace {
+
+// One fill layer, of the material's fills or its mask, in its kind.
+bool valid_fill_layer(const MaterialFillLayer& fill) noexcept {
+    if (fill.coordinate_space != MaterialCoordinateSpace::normalized &&
+        fill.coordinate_space != MaterialCoordinateSpace::logical) {
+        return false;
+    }
+    if (fill.blend != MaterialBlendMode::normal && fill.blend != MaterialBlendMode::multiply &&
+        fill.blend != MaterialBlendMode::screen) {
+        return false;
+    }
+    switch (fill.kind) {
+    case MaterialFillKind::solid:
+        if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+            fill.spread != GradientSpreadMode::pad) return false;
+        break;
+    case MaterialFillKind::linear_gradient:
+        if (fill.spread != GradientSpreadMode::pad &&
+            fill.spread != GradientSpreadMode::repeat &&
+            fill.spread != GradientSpreadMode::reflect) {
+            return false;
+        }
+        if (fill.linear_geometry != MaterialLinearGeometry::endpoints &&
+            fill.linear_geometry != MaterialLinearGeometry::css_angle) {
+            return false;
+        }
+        if (fill.linear_geometry == MaterialLinearGeometry::css_angle) {
+            if (fill.coordinate_space != MaterialCoordinateSpace::normalized ||
+                !std::isfinite(fill.angle_degrees) ||
+                std::abs(fill.angle_degrees) > 360'000.0 ||
+                !valid_gradient_stops(fill.stops)) return false;
+        } else if (!bounded_coordinate(fill.start, fill.coordinate_space) ||
+                   !bounded_coordinate(fill.end, fill.coordinate_space) ||
+                   fill.start == fill.end ||
+                   !valid_gradient_stops(fill.stops)) {
+            return false;
+        }
+        break;
+    case MaterialFillKind::radial_gradient: {
+        if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+            (fill.spread != GradientSpreadMode::pad &&
+             fill.spread != GradientSpreadMode::repeat &&
+             fill.spread != GradientSpreadMode::reflect)) return false;
+        if (!bounded_coordinate(fill.center, fill.coordinate_space) ||
+            !finite(fill.radii) || fill.radii.width <= 0.0 ||
+            fill.radii.height <= 0.0 ||
+            !valid_gradient_stops(fill.stops)) {
+            return false;
+        }
+        const double bound = fill.coordinate_space ==
+                MaterialCoordinateSpace::normalized
+            ? 16.0 : 1'000'000.0;
+        if (fill.radii.width > bound || fill.radii.height > bound) {
+            return false;
+        }
+        break;
+    }
+    case MaterialFillKind::image:
+        if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+            fill.image.value == 0U || !finite(fill.image_pixel_size) ||
+            fill.image_pixel_size.width <= 0.0 ||
+            fill.image_pixel_size.height <= 0.0 ||
+            std::floor(fill.image_pixel_size.width) !=
+                fill.image_pixel_size.width ||
+            std::floor(fill.image_pixel_size.height) !=
+                fill.image_pixel_size.height ||
+            fill.image_pixel_size.width > 32768.0 ||
+            fill.image_pixel_size.height > 32768.0 ||
+            !finite(fill.image_slice) || fill.image_slice.left < 0.0 ||
+            fill.image_slice.top < 0.0 || fill.image_slice.right < 0.0 ||
+            fill.image_slice.bottom < 0.0 ||
+            fill.image_slice.left + fill.image_slice.right >
+                fill.image_pixel_size.width ||
+            fill.image_slice.top + fill.image_slice.bottom >
+                fill.image_pixel_size.height ||
+            !std::isfinite(fill.image_scale) || fill.image_scale < 0.125 ||
+            fill.image_scale > 8.0 || !std::isfinite(fill.opacity) ||
+            fill.opacity < 0.0 || fill.opacity > 1.0 ||
+            !valid_image_position(fill)) {
+            return false;
+        }
+        if (fill.image_mode != MaterialImageMode::stretch &&
+            fill.image_mode != MaterialImageMode::tile &&
+            fill.image_mode != MaterialImageMode::nine_patch) {
+            return false;
+        }
+        if (fill.image_mode != MaterialImageMode::nine_patch &&
+            fill.image_slice != Insets{}) {
+            return false;
+        }
+        break;
+    case MaterialFillKind::conic_gradient:
+        // The from-angle is bounded like a CSS linear angle; the period
+        // is a positive part of one turn.
+        if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+            (fill.spread != GradientSpreadMode::pad &&
+             fill.spread != GradientSpreadMode::repeat &&
+             fill.spread != GradientSpreadMode::reflect) ||
+            !bounded_coordinate(fill.center, fill.coordinate_space) ||
+            !std::isfinite(fill.angle_degrees) ||
+            std::abs(fill.angle_degrees) > 360'000.0 ||
+            !std::isfinite(fill.period_degrees) ||
+            fill.period_degrees <= 0.0 || fill.period_degrees > 360.0 ||
+            !valid_gradient_stops(fill.stops)) {
+            return false;
+        }
+        break;
+    case MaterialFillKind::procedural:
+        if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+            fill.spread != GradientSpreadMode::pad ||
+            !valid_procedural_fill(fill.procedural) ||
+            !std::isfinite(fill.opacity) || fill.opacity < 0.0 ||
+            fill.opacity > 1.0) {
+            return false;
+        }
+        break;
+    default:
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
 bool valid_surface_material(const SurfaceMaterial& material) noexcept {
     if (material.fills.empty() ||
         material.fills.size() > SurfaceMaterial::maximum_fill_layers ||
@@ -662,121 +828,21 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
     const double reach = filter_reach(material);
     if (reach < 0.0 || reach > SurfaceMaterial::maximum_filter_reach) return false;
     for (const MaterialFillLayer& fill : material.fills) {
-        if (fill.coordinate_space != MaterialCoordinateSpace::normalized &&
-            fill.coordinate_space != MaterialCoordinateSpace::logical) {
-            return false;
-        }
-        if (fill.blend != MaterialBlendMode::normal && fill.blend != MaterialBlendMode::multiply &&
-            fill.blend != MaterialBlendMode::screen) {
-            return false;
-        }
-        switch (fill.kind) {
-        case MaterialFillKind::solid:
-            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
-                fill.spread != GradientSpreadMode::pad) return false;
-            break;
-        case MaterialFillKind::linear_gradient:
-            if (fill.spread != GradientSpreadMode::pad &&
-                fill.spread != GradientSpreadMode::repeat &&
-                fill.spread != GradientSpreadMode::reflect) {
-                return false;
-            }
-            if (fill.linear_geometry != MaterialLinearGeometry::endpoints &&
-                fill.linear_geometry != MaterialLinearGeometry::css_angle) {
-                return false;
-            }
-            if (fill.linear_geometry == MaterialLinearGeometry::css_angle) {
-                if (fill.coordinate_space != MaterialCoordinateSpace::normalized ||
-                    !std::isfinite(fill.angle_degrees) ||
-                    std::abs(fill.angle_degrees) > 360'000.0 ||
-                    !valid_gradient_stops(fill.stops)) return false;
-            } else if (!bounded_coordinate(fill.start, fill.coordinate_space) ||
-                       !bounded_coordinate(fill.end, fill.coordinate_space) ||
-                       fill.start == fill.end ||
-                       !valid_gradient_stops(fill.stops)) {
-                return false;
-            }
-            break;
-        case MaterialFillKind::radial_gradient: {
-            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
-                (fill.spread != GradientSpreadMode::pad &&
-                 fill.spread != GradientSpreadMode::repeat &&
-                 fill.spread != GradientSpreadMode::reflect)) return false;
-            if (!bounded_coordinate(fill.center, fill.coordinate_space) ||
-                !finite(fill.radii) || fill.radii.width <= 0.0 ||
-                fill.radii.height <= 0.0 ||
-                !valid_gradient_stops(fill.stops)) {
-                return false;
-            }
-            const double bound = fill.coordinate_space ==
-                    MaterialCoordinateSpace::normalized
-                ? 16.0 : 1'000'000.0;
-            if (fill.radii.width > bound || fill.radii.height > bound) {
-                return false;
-            }
-            break;
-        }
-        case MaterialFillKind::image:
-            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
-                fill.image.value == 0U || !finite(fill.image_pixel_size) ||
-                fill.image_pixel_size.width <= 0.0 ||
-                fill.image_pixel_size.height <= 0.0 ||
-                std::floor(fill.image_pixel_size.width) !=
-                    fill.image_pixel_size.width ||
-                std::floor(fill.image_pixel_size.height) !=
-                    fill.image_pixel_size.height ||
-                fill.image_pixel_size.width > 32768.0 ||
-                fill.image_pixel_size.height > 32768.0 ||
-                !finite(fill.image_slice) || fill.image_slice.left < 0.0 ||
-                fill.image_slice.top < 0.0 || fill.image_slice.right < 0.0 ||
-                fill.image_slice.bottom < 0.0 ||
-                fill.image_slice.left + fill.image_slice.right >
-                    fill.image_pixel_size.width ||
-                fill.image_slice.top + fill.image_slice.bottom >
-                    fill.image_pixel_size.height ||
-                !std::isfinite(fill.image_scale) || fill.image_scale < 0.125 ||
-                fill.image_scale > 8.0 || !std::isfinite(fill.opacity) ||
-                fill.opacity < 0.0 || fill.opacity > 1.0) {
-                return false;
-            }
-            if (fill.image_mode != MaterialImageMode::stretch &&
-                fill.image_mode != MaterialImageMode::tile &&
-                fill.image_mode != MaterialImageMode::nine_patch) {
-                return false;
-            }
-            if (fill.image_mode != MaterialImageMode::nine_patch &&
-                fill.image_slice != Insets{}) {
-                return false;
-            }
-            break;
-        case MaterialFillKind::conic_gradient:
-            // The from-angle is bounded like a CSS linear angle; the period
-            // is a positive part of one turn.
-            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
-                (fill.spread != GradientSpreadMode::pad &&
-                 fill.spread != GradientSpreadMode::repeat &&
-                 fill.spread != GradientSpreadMode::reflect) ||
-                !bounded_coordinate(fill.center, fill.coordinate_space) ||
-                !std::isfinite(fill.angle_degrees) ||
-                std::abs(fill.angle_degrees) > 360'000.0 ||
-                !std::isfinite(fill.period_degrees) ||
-                fill.period_degrees <= 0.0 || fill.period_degrees > 360.0 ||
-                !valid_gradient_stops(fill.stops)) {
-                return false;
-            }
-            break;
-        case MaterialFillKind::procedural:
-            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
-                fill.spread != GradientSpreadMode::pad ||
-                !valid_procedural_fill(fill.procedural) ||
-                !std::isfinite(fill.opacity) || fill.opacity < 0.0 ||
-                fill.opacity > 1.0) {
-                return false;
-            }
-            break;
-        default:
-            return false;
-        }
+        if (!valid_fill_layer(fill)) return false;
+    }
+    // A finish (E9.6) rebuilds a solid or linear first fill and adds one
+    // keyline.
+    if (!std::isfinite(material.finish) || material.finish < 0.0 || material.finish > 1.0) return false;
+    if (material.finish > 0.0) {
+        const MaterialFillKind first = material.fills.front().kind;
+        const bool derivable = first == MaterialFillKind::solid || first == MaterialFillKind::linear_gradient;
+        if (!derivable || material.keylines.size() >= SurfaceMaterial::maximum_keylines) return false;
+    }
+    // A mask (E9.6) is a solid, gradient or image layer; a procedural
+    // pattern is not a mask.
+    if (material.mask) {
+        const MaterialFillLayer& mask = *material.mask;
+        if (mask.kind == MaterialFillKind::procedural || !valid_fill_layer(mask)) return false;
     }
     return true;
 }
@@ -786,6 +852,12 @@ void paint_surface_material(Painter& painter, Rect bounds,
     // Material replay deliberately stays in authored order; recording painters
     // retain these calls while terminal CPU painters realize the same sequence.
     if (bounds.empty() || !valid_surface_material(material)) return;
+    // A finished material (E9.6) draws as the material it describes.
+    if (material.finish > 0.0) {
+        const SurfaceMaterial finished = finished_surface_material(material);
+        paint_surface_material(painter, bounds, finished);
+        return;
+    }
     for (const MaterialShadow& shadow : material.shadows) {
         if (!shadow.inset) {
             painter.draw_box_shadow(

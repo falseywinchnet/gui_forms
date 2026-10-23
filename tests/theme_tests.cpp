@@ -6,6 +6,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 #include <type_traits>
@@ -179,6 +180,45 @@ void test_structural_tokens_are_validated_atomically() {
             "invalid structural typography must be rejected before publication");
 }
 
+// A text shadow (E9.6, CSS `text-shadow`) is recipe data: a theme carries
+// it to the resolved recipe, and one past its bounds is refused whole.
+void test_text_shadow_is_bounded_recipe_data() {
+    ControlTextShadow shadow{};
+    shadow.offset = Point{0.0, 1.0};
+    shadow.blur_radius = 2.0;
+    shadow.color = Color::rgba(0, 0, 0, 96);
+    std::unique_ptr<ThemeDefinition> definition = professional_definition();
+    (*definition).id = "text-shadow";
+    ControlVisualRecipe& recipe =
+        (*definition).roles[static_cast<std::size_t>(ControlVisualRole::button)]
+            .ordinary[static_cast<std::size_t>(ControlSurfaceState::normal)];
+    recipe.text_shadow = shadow;
+    require(valid_control_visual_recipe(recipe), "a bounded text shadow is valid");
+    const std::shared_ptr<const Theme> theme = Theme::create(*definition);
+    const ControlVisualRecipe& resolved = (*theme).resolve(ControlVisualRole::button, ControlVisualContext{});
+    require(resolved.text_shadow == std::optional<ControlTextShadow>{shadow},
+            "the theme carries the shadow to the resolved recipe");
+
+    ControlVisualRecipe blurred = recipe;
+    (*blurred.text_shadow).blur_radius = maximum_text_shadow_blur + 1.0;
+    require(!valid_control_visual_recipe(blurred), "a blur past its bound is refused");
+    ControlVisualRecipe moved = recipe;
+    (*moved.text_shadow).offset = Point{maximum_text_shadow_offset + 1.0, 0.0};
+    require(!valid_control_visual_recipe(moved), "an offset past its bound is refused");
+    ControlVisualRecipe unknown = recipe;
+    (*unknown.text_shadow).offset = Point{std::numeric_limits<double>::quiet_NaN(), 0.0};
+    require(!valid_control_visual_recipe(unknown), "a non-finite offset is refused");
+
+    recipe.text_shadow = (*blurred.text_shadow);
+    bool rejected{};
+    try {
+        static_cast<void>(Theme::create(*definition));
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected, "a theme with an unbounded text shadow is refused");
+}
+
 void test_window_theme_replacement_and_control_inheritance_are_atomic() {
     std::shared_ptr<gui_forms::Panel> root = make_control<Panel>(StableId("theme.root"));
     std::shared_ptr<gui_forms::Button> child = make_control<Button>(StableId("theme.child"), "Apply");
@@ -339,6 +379,7 @@ int main() {
     try {
         test_default_theme_has_complete_state_matrix();
         test_structural_tokens_are_validated_atomically();
+        test_text_shadow_is_bounded_recipe_data();
         test_window_theme_replacement_and_control_inheritance_are_atomic();
         test_button_routes_hover_and_status_through_theme_recipes();
         test_editor_selection_menu_and_progress_roles_reach_stock_controls();

@@ -37,4 +37,22 @@ struct GlossColours final {
 // outside [0, 4096].
 [[nodiscard]] SurfaceMaterial gloss_material(const GlossColours& colours, double corner_radius);
 
+// The surface finish's constants (E9.6, owner 2026-10-23), provisional
+// until the owner's eye at the gate: at finish f, the face's top half is
+// lifted towards white by finish_lift * f, the colour just below the break
+// is darkened by finish_break_darkening * f, and the shine keyline's alpha
+// is finish_shine_alpha * f.
+inline constexpr double finish_lift = 0.25;
+inline constexpr double finish_break_darkening = 0.15;
+inline constexpr double finish_shine_alpha = 176.0;
+
+// The material `material.finish` describes, with a finish of 0 (E9.6):
+// the first fill's colours at 0, 0.5 and 1 along it (a solid fill's colour
+// throughout) are rebuilt as the gloss's four vertical stops, keeping the
+// fill's blend mode, its top half lifted and its break darkened, and a white shine keyline is added
+// under the top edge, inside the border. A material whose finish is 0 is
+// returned as it is. `material` must be valid (valid_surface_material);
+// gloss_material is unchanged and is not finish 1 over its colours.
+[[nodiscard]] SurfaceMaterial finished_surface_material(const SurfaceMaterial& material);
+
 } // namespace gui_forms

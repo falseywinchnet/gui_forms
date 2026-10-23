@@ -5,6 +5,7 @@
 #include <array>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace gui_forms {
 
@@ -32,7 +33,13 @@ void MaterialPanel::on_attached_to_window() {
 void MaterialPanel::validate_window_images(
     const SurfaceMaterial& material) const {
     if (window() == nullptr) return;
-    for (const MaterialFillLayer& fill : material.fills) {
+    // The fills, then an image mask (E9.6).
+    std::vector<const MaterialFillLayer*> layers{};
+    layers.reserve(material.fills.size() + 1U);
+    for (const MaterialFillLayer& fill : material.fills) layers.push_back(&fill);
+    if (material.mask) layers.push_back(&*material.mask);
+    for (const MaterialFillLayer* layer : layers) {
+        const MaterialFillLayer& fill = *layer;
         if (fill.kind != MaterialFillKind::image) continue;
         const std::optional<ImageResourceView> resource = (*window()).image_resources().find(fill.image);
         if (!resource ||

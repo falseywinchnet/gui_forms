@@ -350,6 +350,10 @@ struct RasterCacheStatistics final {
     std::uint64_t backplane_hits{};
     std::size_t backplane_images{};
     std::uint64_t backplane_skipped_commands{};
+    // Bakes whose image mask's variant was asked for and not lent (E9.6):
+    // the part, or the backplane region, was drawn unmasked, as the
+    // built-in path draws it.
+    std::uint64_t image_mask_fallbacks{};
 };
 
 // One backplane image's region (E9-B): `extent` device pixels at `scale`,
@@ -646,6 +650,10 @@ private:
     // generation when a pattern was not lent, else none.
     std::optional<std::uint64_t> lend_image_variants(const PartRasterRequest& request,
                                                      std::uint64_t paint_sequence, LentImageVariants& lent);
+    // Counts a bake of `request` whose primitive asked for an image mask's
+    // variant (image_mask_variant_layer) that `lent` does not hold: it was
+    // drawn unmasked (E9.6).
+    void count_image_mask_fallback(const PartRasterRequest& request, const LentImageVariants& lent) noexcept;
     // Queues `asked`, a procedural pattern, unless it is queued already or
     // the queue is full.
     void queue_pattern(const ImageVariantRequest& asked);
