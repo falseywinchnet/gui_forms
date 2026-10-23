@@ -13,6 +13,15 @@ This directory holds the template that CI fills (`record.template.md`) and,
 once a run has passed on all four platforms, that run's filled record
 (`record.md`) and comparison (`comparison.json`).
 
+## Sealed record
+
+`record.md` and `comparison.json` come from CI run 39910508309, on #280's
+test merge commit `5a87ab47` (PR head `9422ea57` merged onto main
+`773e54b6`). All four hosts ran: 12 primitives, 144 images, each with the same
+hash on every host, and every idle counter at 0. That run seals parts 1
+and 2. Parts 3 and 4 rest on the tests listed below, which pass in the same
+run's native and sanitizer jobs.
+
 ## How the evidence is made
 
 `tests/engine_gate_tests.cpp` (CTest `gui_forms_engine_gate_tests`) covers
