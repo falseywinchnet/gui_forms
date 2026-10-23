@@ -81,9 +81,12 @@ struct ResolvedShadow final {
     // A glow (MaterialGlow): an outer shadow at no offset whose colour is
     // added to what lies beneath it rather than composited over it.
     bool additive{};
+    // An over glow: its coverage is kept while the outer layers are
+    // evaluated and added after the face's layers, within the box.
+    bool over{};
 };
 
-// The outer shadows, then the glows over them.
+// The outer shadows, then the glows (under and over).
 constexpr std::size_t maximum_outer = SurfaceMaterial::maximum_shadows + SurfaceMaterial::maximum_glows;
 
 // The glow's reach is within the material's outsets, so that the
@@ -341,6 +344,7 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
         resolved.inverse_sigma = inverse_sigma_of(glow.blur_radius, scale);
         resolved.colour = glow.color;
         resolved.additive = true;
+        resolved.over = glow.placement == MaterialGlowPlacement::over;
         resolved.shape = Rect{box.x - spread, box.y - spread, box.width + spread * 2.0, box.height + spread * 2.0};
         resolved.radius = radius + spread;
         if (resolved.shape.width <= 0.0 || resolved.shape.height <= 0.0) continue;
@@ -381,7 +385,11 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
     }
     const bool clip_keylines = radius > 0.0;
     for (const MaterialKeyline& keyline : material.keylines) add_keyline(look, keyline, scale, clip_keylines);
-    look.reads_inside = look.fill_count > 0U || look.inset_count > 0U || look.border;
+    bool over_glows = false;
+    for (std::size_t index = 0U; index < look.outer_count; ++index) {
+        if (look.outer[index].over) over_glows = true;
+    }
+    look.reads_inside = look.fill_count > 0U || look.inset_count > 0U || look.border || over_glows;
     for (std::size_t index = 0U; index < look.band_count; ++index) {
         if (look.bands[index].clipped) look.reads_inside = true;
     }
@@ -658,6 +666,8 @@ Unit material_pixel(const MaterialLook& look, const MaterialImages& images, cons
     const double centre_x = static_cast<double>(x) + 0.5;
     const double centre_y = static_cast<double>(y) + 0.5;
     const bool cached = !integrals.across.empty();
+    // The over glows' coverage, by their index among the outer layers.
+    std::array<double, maximum_outer> over_coverage{};
     for (std::size_t index = 0U; index < look.outer_count; ++index) {
         const ResolvedShadow& shadow = look.outer[index];
         double coverage = 0.0;
@@ -673,7 +683,9 @@ Unit material_pixel(const MaterialLook& look, const MaterialImages& images, cons
             coverage = outer_coverage(shadow, across_integral(shadow, centre_x), down_integral(shadow, centre_y),
                                       corner_column, corner_row, centre_x, centre_y);
         }
-        if (shadow.additive) {
+        if (shadow.over) {
+            over_coverage[index] = coverage;
+        } else if (shadow.additive) {
             add_light(result, premultiply(shadow.colour, coverage));
         } else {
             blend_over(result, premultiply(shadow.colour, coverage));
@@ -704,6 +716,14 @@ Unit material_pixel(const MaterialLook& look, const MaterialImages& images, cons
         const double down = interval_overlap(py, band.band.y, band.band.bottom());
         const double clip = band.clipped ? inside : 1.0;
         blend_over(result, premultiply(band.colour, across * down * clip));
+    }
+    // Over glows: light added to the finished face, within the box.
+    if (inside > 0.0) {
+        for (std::size_t index = 0U; index < look.outer_count; ++index) {
+            const ResolvedShadow& shadow = look.outer[index];
+            if (!shadow.over) continue;
+            add_light(result, premultiply(shadow.colour, over_coverage[index] * inside));
+        }
     }
     return result;
 }

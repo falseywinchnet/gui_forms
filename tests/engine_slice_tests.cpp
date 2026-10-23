@@ -127,6 +127,13 @@ SurfaceMaterial layered_material(bool single_edges) {
     glow.blur_radius = 2.0;
     glow.spread = 1.0;
     material.glows.push_back(glow);
+    // And an over glow, light added within the face.
+    MaterialGlow over{};
+    over.color = Color{255, 255, 255, 60};
+    over.blur_radius = 1.5;
+    over.spread = 0.0;
+    over.placement = MaterialGlowPlacement::over;
+    material.glows.push_back(over);
     if (single_edges) {
         // Single edges are square-cornered.
         material.corner_radius = 0.0;

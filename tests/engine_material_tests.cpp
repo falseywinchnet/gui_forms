@@ -482,12 +482,129 @@ void glow_painter_path() {
     SurfaceMaterial material = solid_material(red);
     material.shadows.push_back(MaterialShadow{Point{0.0, 2.0}, 2.0, 0.0, black_half, false});
     material.glows.push_back(glow_of(white_half, 1.5, 1.0));
+    MaterialGlow over = glow_of(Color{255, 230, 160, 120}, 1.0, 0.5);
+    over.placement = MaterialGlowPlacement::over;
+    material.glows.push_back(over);
     LayerLog log{};
     paint_surface_material(log, Rect{0.0, 0.0, 20.0, 10.0}, material);
-    require(log.events == "ssf", "the built-in path draws the shadow, then the glow, then the fill");
-    require(log.last_offset == Point{} && log.last_blur == 1.5 && log.last_spread == 1.0 &&
-                log.last_colour == white_half,
-            "the glow is a shadow at no offset");
+    require(log.events == "ssfs",
+            "the built-in path draws the shadow, then the under glow, then the fill, then the over glow");
+    require(log.last_offset == Point{} && log.last_blur == 1.0 && log.last_spread == 0.5 &&
+                log.last_colour == over.color,
+            "a glow is a shadow at no offset");
+}
+
+// The placement renders, composited over a light and a dark background:
+// under at scale 1 and 2, then over at scale 1 and 2, on light then dark.
+constexpr std::uint64_t expected_placement_hashes[] = {
+    0x0f3ae684d4e8100dULL, 0x4fc42117b38dd90dULL, 0x999d7ff17719265dULL, 0xbdb82f9208181255ULL,
+    0xaa82d4e2f77eac6dULL, 0xcd4eeb80a672cd0dULL, 0x9e179e75dc7bdc35ULL, 0x456f89ad26938a6dULL};
+
+// `raster` composited source-over onto an opaque `background`: its
+// premultiplied colour plus the background times one less its alpha.
+TestRaster over_background(const TestRaster& raster, Color background) {
+    TestRaster composite = raster;
+    const std::array<std::uint32_t, 3> under{background.red, background.green, background.blue};
+    for (std::uint32_t row = 0U; row < raster.extent.height; ++row) {
+        for (std::uint32_t column = 0U; column < raster.extent.width; ++column) {
+            const std::size_t offset =
+                static_cast<std::size_t>(row) * raster.row_bytes + static_cast<std::size_t>(column) * 4U;
+            const std::uint32_t keep = 255U - raster.bytes[offset + 3U];
+            for (std::size_t lane = 0U; lane < 3U; ++lane) {
+                const std::uint32_t shown = raster.bytes[offset + lane] + (under[lane] * keep + 127U) / 255U;
+                composite.bytes[offset + lane] = static_cast<std::uint8_t>(std::min(shown, 255U));
+            }
+            composite.bytes[offset + 3U] = 255U;
+        }
+    }
+    return composite;
+}
+
+MaterialGlow placed_glow(MaterialGlowPlacement placement) {
+    MaterialGlow glow = glow_of(Color{255, 230, 160, 120}, 2.0, 1.0);
+    glow.placement = placement;
+    return glow;
+}
+
+// A rounded mid-blue face with one glow of `placement`.
+SurfaceMaterial placed_material(MaterialGlowPlacement placement) {
+    SurfaceMaterial material = solid_material(Color{70, 110, 170, 255});
+    material.corner_radius = 4.0;
+    material.glows.push_back(placed_glow(placement));
+    return material;
+}
+
+constexpr Color light_background{244, 244, 245, 255};
+constexpr Color dark_background{30, 34, 40, 255};
+
+void glow_placements() {
+    const Size logical{40.0, 20.0};
+    const SurfaceMaterial plain = solid_material(Color{70, 110, 170, 255});
+    SurfaceMaterial rounded_plain = plain;
+    rounded_plain.corner_radius = 4.0;
+    const SurfaceMaterial under = placed_material(MaterialGlowPlacement::under);
+    const SurfaceMaterial over = placed_material(MaterialGlowPlacement::over);
+    const TestRaster bare = draw(rounded_plain, logical, 1.0);
+    const TestRaster halo = draw(under, logical, 1.0);
+    const TestRaster lit = draw(over, logical, 1.0);
+
+    // Under: a halo the face covers. The face's middle is unchanged and
+    // the halo shows just outside it, over the dark background most.
+    require(halo.pixel(28U, 18U) == bare.pixel(28U, 18U), "an under glow leaves the face as it was");
+    require(halo.pixel(28U, 7U)[3] > 0U && bare.pixel(28U, 7U)[3] == 0U, "and lies just outside it");
+    const TestRaster halo_dark = over_background(halo, dark_background);
+    const TestRaster bare_dark = over_background(bare, dark_background);
+    require(channel(halo_dark, 28U, 7U, 0U) > channel(bare_dark, 28U, 7U, 0U) + 20,
+            "on a dark background the halo brightens the surround");
+
+    // Over: light added to the face within its shape; nothing outside it.
+    require(channel(lit, 28U, 18U, 0U) > channel(bare, 28U, 18U, 0U) + 20 &&
+                channel(lit, 28U, 18U, 3U) == 255,
+            "an over glow brightens the face");
+    for (std::uint32_t column = 0U; column < lit.extent.width; ++column) {
+        require(lit.pixel(column, 7U) == bare.pixel(column, 7U) && lit.pixel(column, 28U) == bare.pixel(column, 28U),
+                "and adds nothing outside it");
+    }
+    require(lit.pixel(8U, 8U) == bare.pixel(8U, 8U), "nor in its rounded corner");
+    const TestRaster lit_light = over_background(lit, light_background);
+    const TestRaster bare_light = over_background(bare, light_background);
+    require(lit_light.pixel(4U, 4U) == bare_light.pixel(4U, 4U), "on a light background the surround is unchanged");
+
+    // Both share the reach cap; an over glow needs no outset.
+    SurfaceMaterial farthest = over;
+    farthest.glows[0] = glow_of(white_half, 2.0, 4.0);
+    farthest.glows[0].placement = MaterialGlowPlacement::over;
+    require(valid_surface_material(farthest), "an over glow reaching 8 units is valid");
+    const Insets none = surface_material_visual_outsets(farthest);
+    require(none.left == 0.0 && none.top == 0.0 && none.right == 0.0 && none.bottom == 0.0,
+            "an over glow adds no visual outsets");
+    SurfaceMaterial too_far = farthest;
+    too_far.glows[0].spread = 4.5;
+    require(!valid_surface_material(too_far), "an over glow reaching past 8 units is invalid");
+    SurfaceMaterial unplaced = over;
+    unplaced.glows[0].placement = static_cast<MaterialGlowPlacement>(7U);
+    require(!valid_surface_material(unplaced), "a placement outside the enumeration is invalid");
+
+    // Byte-stable renders of both placements over both backgrounds.
+    const SurfaceMaterial* const placed[] = {&under, &over};
+    const Color backgrounds[] = {light_background, dark_background};
+    const double scales[] = {1.0, 2.0};
+    const char* const names[] = {"under_light_1", "under_light_2", "under_dark_1", "under_dark_2",
+                                 "over_light_1",  "over_light_2",  "over_dark_1",  "over_dark_2"};
+    bool all_match = true;
+    std::size_t position = 0U;
+    for (const SurfaceMaterial* const material : placed) {
+        for (const Color background : backgrounds) {
+            for (const double scale : scales) {
+                const TestRaster shown = over_background(draw(*material, logical, scale), background);
+                const bool matches =
+                    reference_matches(shown, names[position], expected_placement_hashes[position]);
+                all_match = all_match && matches;
+                position = position + 1U;
+            }
+        }
+    }
+    require(all_match, "both placements match their reference images on both backgrounds");
 }
 
 void gloss_preset() {
@@ -1149,6 +1266,7 @@ int main(int argc, char** argv) {
     keylines_and_inset_shadow();
     glows();
     glow_painter_path();
+    glow_placements();
     gloss_preset();
     image_fills();
     image_variant_made_once();

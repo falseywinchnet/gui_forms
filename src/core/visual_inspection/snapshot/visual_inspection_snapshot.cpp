@@ -234,7 +234,9 @@ void append_material(std::ostringstream& output,
         output << "{\"color\":";
         append_color(output, glow.color);
         output << ",\"blur_radius\":" << glow.blur_radius
-               << ",\"spread\":" << glow.spread << '}';
+               << ",\"spread\":" << glow.spread << ",\"placement\":";
+        append_json_string(output, glow.placement == MaterialGlowPlacement::over ? "over" : "under");
+        output << '}';
     }
     output << "],\"border\":";
     append_border(output, material.border);
