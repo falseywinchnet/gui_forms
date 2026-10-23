@@ -69,8 +69,14 @@ is never turned off (accessibility round A3).
   the UI thread; Invoke posts through `Window::begin_invoke`. A stale element
   answers `UIA_E_ELEMENTNOTAVAILABLE`. Tests
   `tests/windows_accessibility_uia_provider_tests.cpp` and, over the whole
-  Gallery, `tests/windows_accessibility_uia_gallery_tests.cpp`. No
-  TextPattern yet.
+  Gallery, `tests/windows_accessibility_uia_gallery_tests.cpp`.
+  TextPattern and TextPattern2 for a control's own text box
+  (`windows_text_automation.cpp`, on the A-T1 core): UTF-8 ranges,
+  grapheme characters, the control's words, visual lines and paragraphs,
+  Select through `Window::set_semantic_text_selection`, and the
+  TextSelectionChanged and TextChanged events; tests
+  `tests/windows_accessibility_uia_text_tests.cpp`, and the Gallery client
+  compares each text box's text and selection offsets.
 - **Linux.** ATK/AT-SPI in `src/host/linux/accessibility/`. A fixture
   (`tests/linux_accessibility_fixture.cpp`, built when ATK and X11 are found)
   and a Python AT-SPI client (`tests/linux_accessibility_client.py`) exist

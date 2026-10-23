@@ -1170,6 +1170,22 @@ Enumerations
 
    .. cpp:enumerator:: off_boundary
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: SemanticTextUnit
+
+   ``#include <gui_forms/semantics/types/semantic_types.hpp>``
+
+   .. cpp:enumerator:: character
+
+   .. cpp:enumerator:: word
+
+   .. cpp:enumerator:: line
+
+   .. cpp:enumerator:: paragraph
+
+   .. cpp:enumerator:: document
+
 Functions, constants and aliases
 --------------------------------
 
@@ -1212,6 +1228,12 @@ Functions, constants and aliases
 .. cpp:function:: const char* semantic_orientation_name(SemanticOrientation orientation) noexcept
 
 .. cpp:function:: const char* semantic_text_result_name(SemanticTextResult result) noexcept
+
+.. cpp:function:: const char* semantic_text_unit_name(SemanticTextUnit unit) noexcept
+
+.. cpp:function:: void fill_semantic_text_boundaries(const SemanticTextLayout& layout, std::string_view value, SemanticTextUnit unit, std::vector<Utf8Offset>& boundaries)
+
+   Fills ``boundaries`` with the offsets in ``value`` at which ``unit`` starts or ends, ascending and distinct, from ``layout`` (Window::semantic_text_layout of the node whose value is ``value``): always 0 and the end of the text, which coincide for empty text (one boundary). Characters are bounded by each grapheme's start and end, so a line break, which is no grapheme, counts as one character; words by the layout's word starts; lines by each visual line's start (a line runs to the next line's start, so it holds its break); paragraphs after each line feed. The text between two adjacent boundaries is one unit. Replaces what ``boundaries`` held, reusing its storage. Throws std::bad_alloc when memory runs out, leaving ``boundaries`` unspecified.
 
 .. cpp:function:: const char* semantic_state_name(SemanticState state) noexcept
 
