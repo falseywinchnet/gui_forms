@@ -34,7 +34,19 @@ bool bounded_coordinate(Point point, MaterialCoordinateSpace space) noexcept {
 
 bool valid_material_border(const MaterialBorder& border) noexcept {
     return std::isfinite(border.width) && border.width > 0.0 &&
-           border.width <= 64.0;
+           border.width <= 64.0 &&
+           (border.style == MaterialBorderStyle::solid ||
+            border.style == MaterialBorderStyle::dashed ||
+            border.style == MaterialBorderStyle::dotted);
+}
+
+bool valid_corner(double radius) noexcept {
+    return std::isfinite(radius) && radius >= 0.0 && radius <= 4096.0;
+}
+
+bool valid_corner_radii(const MaterialCornerRadii& radii) noexcept {
+    return valid_corner(radii.top_left) && valid_corner(radii.top_right) &&
+           valid_corner(radii.bottom_right) && valid_corner(radii.bottom_left);
 }
 
 bool valid_material_shadow(const MaterialShadow& shadow) noexcept {
@@ -449,7 +461,7 @@ HighContrastColours high_contrast_colours(ControlSurfaceState state) noexcept {
 }
 
 // One state's derived record: the ordinary record's geometry and cues (its
-// corner radius, edge width, focus and default rings, offsets) kept, its
+// corner radii, edge width, focus and default rings, offsets) kept, its
 // material rebuilt as one solid plate inside one solid edge, so that every
 // gradient, image, keyline, per-edge border, shadow and glow is dropped.
 ControlVisualRecipe derived_high_contrast(const ControlVisualRecipe& ordinary, Color plate, Color edge,
@@ -460,6 +472,7 @@ ControlVisualRecipe derived_high_contrast(const ControlVisualRecipe& ordinary, C
     material.fills = {MaterialFillLayer::solid(plate)};
     material.border = MaterialBorder{edge, edge_width};
     material.corner_radius = ordinary.material.corner_radius;
+    material.corner_radii = ordinary.material.corner_radii;
     result.material = std::move(material);
     result.text = text;
     result.glyph = text;
@@ -526,12 +539,23 @@ void paint_fill_layer(Painter& painter, Rect bounds, const MaterialFillLayer& fi
             fill.spread);
         return;
     case MaterialFillKind::radial_gradient:
+        // The Painter has no spread for a radial gradient, so a repeating
+        // radial gradient draws padded here (documented on MaterialFillKind).
         painter.fill_radial_gradient(
             bounds, resolve_point(fill.center, fill.coordinate_space, bounds),
             resolve_radii(fill.radii, fill.coordinate_space, bounds), fill.stops);
         return;
     case MaterialFillKind::image:
         paint_image_fill(painter, bounds, fill);
+        return;
+    case MaterialFillKind::conic_gradient:
+        // The Painter has no conic gradient; its first stop stands in
+        // (documented on MaterialFillKind). Validation guarantees a stop.
+        if (clipped) {
+            painter.fill_rounded_rect(bounds, corner_radius, fill.stops.front().color);
+        } else {
+            painter.fill_rect(bounds, fill.stops.front().color);
+        }
         return;
     case MaterialFillKind::procedural: {
         // The painter path never generates a pattern (E10): it draws the
@@ -596,6 +620,12 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
     if (!material.border_edges.empty() && material.corner_radius != 0.0) {
         return false;
     }
+    // Single edges are square-cornered, as with corner_radius.
+    if (material.corner_radii &&
+        (!valid_corner_radii(*material.corner_radii) ||
+         !material.border_edges.empty())) {
+        return false;
+    }
     const std::optional<MaterialBorder>* edge_borders[]{
         &material.border_edges.top,
         &material.border_edges.right,
@@ -648,7 +678,9 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
             break;
         case MaterialFillKind::radial_gradient: {
             if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
-                fill.spread != GradientSpreadMode::pad) return false;
+                (fill.spread != GradientSpreadMode::pad &&
+                 fill.spread != GradientSpreadMode::repeat &&
+                 fill.spread != GradientSpreadMode::reflect)) return false;
             if (!bounded_coordinate(fill.center, fill.coordinate_space) ||
                 !finite(fill.radii) || fill.radii.width <= 0.0 ||
                 fill.radii.height <= 0.0 ||
@@ -693,6 +725,22 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
             }
             if (fill.image_mode != MaterialImageMode::nine_patch &&
                 fill.image_slice != Insets{}) {
+                return false;
+            }
+            break;
+        case MaterialFillKind::conic_gradient:
+            // The from-angle is bounded like a CSS linear angle; the period
+            // is a positive part of one turn.
+            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+                (fill.spread != GradientSpreadMode::pad &&
+                 fill.spread != GradientSpreadMode::repeat &&
+                 fill.spread != GradientSpreadMode::reflect) ||
+                !bounded_coordinate(fill.center, fill.coordinate_space) ||
+                !std::isfinite(fill.angle_degrees) ||
+                std::abs(fill.angle_degrees) > 360'000.0 ||
+                !std::isfinite(fill.period_degrees) ||
+                fill.period_degrees <= 0.0 || fill.period_degrees > 360.0 ||
+                !valid_gradient_stops(fill.stops)) {
                 return false;
             }
             break;

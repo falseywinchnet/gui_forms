@@ -75,6 +75,7 @@ public:
     [[nodiscard]] const PrimitiveDescriptor& descriptor() const noexcept override;
     [[nodiscard]] std::optional<ControlVisualRole> theme_material(
         const PrimitiveParameterBlock& parameters) const noexcept override;
+    [[nodiscard]] PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept override;
     [[nodiscard]] bool accepts(const PrimitiveParameterBlock& parameters,
                                const PrimitiveTarget& target) const noexcept override;
     // One variant per image fill, of the material's box (material_image.hpp).
@@ -97,9 +98,12 @@ private:
 
 // The estimated bake of `material` for `target`, in nanoseconds on the
 // reference machine (material_bake_policy.hpp), into a destination of the
-// box grown by `outset` logical units on every side.
+// box grown by `outset` logical units on every side, drawn with the
+// material primitive's `shape` (E9.6). Every other caller draws the
+// material's rounded rectangle, the default.
 [[nodiscard]] double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                                            double outset = material_outset) noexcept;
+                                            double outset = material_outset,
+                                            PartShapeKind shape = PartShapeKind::rounded_rectangle) noexcept;
 
 // How a raster of `extent` for `target` is assembled from slices (E7r): an
 // axis is sliced unless a gradient runs along it (varies), the box does
@@ -110,7 +114,8 @@ private:
 // single edges, and each shadow's offset, spread, arc and 3.5 σ', where Φ
 // is exactly 0 or 1.
 [[nodiscard]] PrimitiveSlicePlan material_slice_plan(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                                                     DeviceExtent extent, double outset = material_outset) noexcept;
+                                                     DeviceExtent extent, double outset = material_outset,
+                                                     PartShapeKind shape = PartShapeKind::rounded_rectangle) noexcept;
 
 // The kernel alone: draws `material` for `target` into every pixel of
 // `destination`, without accepts()'s checks or bound. The caller has
@@ -119,7 +124,8 @@ private:
 // starts `outset` logical units in. The bake measurement uses it to time
 // materials past the bound.
 void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                   const PartRasterView& destination, double outset = material_outset) noexcept;
+                   const PartRasterView& destination, double outset = material_outset,
+                   PartShapeKind shape = PartShapeKind::rounded_rectangle) noexcept;
 
 // The kernel over one region of a box: `material` for a box of
 // target.logical_size at the target's scale whose top-left corner is the

@@ -56,7 +56,7 @@ Theme engine 0.2 (T2): the primitives a theme's rules may select, the atoms each
 | `etched_divider` | 0.2 | `divider` | none | 32 | `shade_line`, `light_line` |
 | `seam_line` | 0.2 | `seam` | none | 16 | `line` |
 | `grip` | 0.2 | `grip` | none | 16 | `dot` |
-| `material` | 0.2 | `region`, `face`, `actuator`, `well`, `track`, `thumb`, `chip` | `hot`, `pressed`, `captured`, `selected`, `checked`, `current`, `open`, `active_tool`, `focus_visible`, `preselect`, `disabled`, `unavailable` | 512 | `recipe` |
+| `material` | 0.2 | `region`, `face`, `actuator`, `well`, `track`, `thumb`, `chip` | `hot`, `pressed`, `captured`, `selected`, `checked`, `current`, `open`, `active_tool`, `focus_visible`, `preselect`, `disabled`, `unavailable` | 512 | `recipe`, `shape` |
 | `overlay_shadow` | 0.2 | `shadow` | none | 512 | none |
 | `sheen` | 0.2 | `sheen` | none | 16 | `colour`, `width`, `rest` |
 | `glass` | 0.2 | `region`, `face`, `well` | none | 48 | `blur`, `tint`, `corner` |

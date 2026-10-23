@@ -124,10 +124,32 @@ void test_sine_cosine() {
             "beyond 2^20, infinities and NaN give NaN");
 }
 
+void test_arctangent() {
+    require(engine_arctangent2(0.0, 0.0) == 0.0 && engine_arctangent2(0.0, -1.0) == std::atan2(0.0, -1.0) &&
+                engine_arctangent2(1.0, 0.0) == std::atan2(1.0, 0.0) &&
+                engine_arctangent2(-1.0, 0.0) == std::atan2(-1.0, 0.0),
+            "the axes are exact");
+    for (int step = 0; step < 100000; ++step) {
+        const double angle = static_cast<double>(step) * 6.2831853 / 100000.0 - 3.14159265;
+        const EngineSineCosine turned = engine_sine_cosine(angle);
+        const double radius = 0.001 + static_cast<double>(step % 97) * 13.7;
+        const double y = turned.sine * radius;
+        const double x = turned.cosine * radius;
+        require(std::fabs(engine_arctangent2(y, x) - std::atan2(y, x)) <= 4e-15,
+                "the arctangent within its bound all round");
+    }
+    const double infinite = std::numeric_limits<double>::infinity();
+    require(std::fabs(engine_arctangent2(infinite, infinite) - std::atan2(infinite, infinite)) <= 4e-15 &&
+                std::fabs(engine_arctangent2(1.0, -infinite) - std::atan2(1.0, -infinite)) <= 4e-15,
+            "infinite arguments follow atan2");
+    require(std::isnan(engine_arctangent2(std::numeric_limits<double>::quiet_NaN(), 1.0)), "NaN gives NaN");
+}
+
 // The bits of fixed tables, the same on every host. The expected values were
 // produced on Windows x64 and are checked by every CI platform.
 constexpr std::uint64_t expected_table_hash = 0xa2d6d4ebca4d01adULL;
 constexpr std::uint64_t expected_trigonometry_hash = 0x04da5e7f92123dc0ULL;
+constexpr std::uint64_t expected_arctangent_hash = 0xee893c02aeb8d0f6ULL;
 
 void test_identity() {
     BitHash hash{};
@@ -144,7 +166,13 @@ void test_identity() {
         trigonometry.add(angle.sine);
         trigonometry.add(angle.cosine);
     }
+    BitHash arctangent{};
+    for (int step = 1; step <= 512; ++step) {
+        const double t = static_cast<double>(step) / 512.0;
+        arctangent.add(engine_arctangent2(t * 7.0 - 3.5, 2.0 - t * 4.0));
+    }
     if (print_mode()) {
+        std::cout << "engine arctangent table hash 0x" << std::hex << arctangent.value << std::dec << '\n';
         std::cout << "engine math table hash 0x" << std::hex << hash.value << std::dec << '\n';
         std::cout << "engine sine and cosine table hash 0x" << std::hex << trigonometry.value << std::dec << '\n';
         return;
@@ -152,6 +180,7 @@ void test_identity() {
     require(hash.value == expected_table_hash, "the math table has the same bits on every host");
     require(trigonometry.value == expected_trigonometry_hash,
             "the sine and cosine table has the same bits on every host");
+    require(arctangent.value == expected_arctangent_hash, "the arctangent table has the same bits on every host");
 }
 
 } // namespace
@@ -161,6 +190,7 @@ int main() {
     test_exponential();
     test_power();
     test_sine_cosine();
+    test_arctangent();
     test_identity();
     std::cout << "engine math tests passed\n";
     return 0;

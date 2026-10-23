@@ -47,12 +47,15 @@ const AnatomyState material_states[] = {
 
 enum MaterialParameter : std::size_t {
     material_recipe,
+    material_shape,
     material_parameter_count,
 };
 
-// The default recipe is the button's (position 3).
+// The default recipe is the button's (position 3). The shape (E9.6) is the
+// box's outline; a rounded rectangle takes its radii from the material.
 const PrimitiveParameterDeclaration material_parameters[] = {
     {"recipe", PrimitiveParameterKind::choice, 0.0, 0.0, 3.0, {}, false, recipe_names},
+    {"shape", PrimitiveParameterKind::choice, 0.0, 0.0, 0.0, {}, false, part_shape_names},
 };
 static_assert(std::size(material_parameters) == material_parameter_count, "one declaration per material parameter");
 
@@ -72,8 +75,10 @@ const PrimitiveDescriptor material_descriptor{
 
 struct ResolvedShadow final {
     // The shadow's rectangle (an outer shadow's shape, an inset shadow's
-    // hole), its corner radius, and 1 / σ'.
+    // hole), the outline drawn in it, the largest of its corners' radii
+    // (where it differs from the rectangle: see beyond_straight), and 1 / σ'.
     Rect shape{};
+    PartShape outline{};
     double radius{};
     double inverse_sigma{};
     Color colour{};
@@ -105,6 +110,10 @@ struct ResolvedFill final {
     double step_y{};
     double inverse_radius_x{};
     double inverse_radius_y{};
+    // A conic gradient's centre is the origin; t is the turn clockwise from
+    // up past `from_turn` (in [0, 1)), times the turns to one period.
+    double from_turn{};
+    double periods_per_turn{1.0};
     GradientSpreadMode spread{GradientSpreadMode::pad};
     // Borrowed from the material for the bake.
     std::span<const GradientStop> stops{};
@@ -120,6 +129,27 @@ struct ResolvedBand final {
 };
 
 constexpr std::size_t maximum_bands = 4U + SurfaceMaterial::maximum_keylines;
+
+constexpr double quarter_turn = 3.14159265358979323846264338327950288 * 0.5;
+
+// A dashed or dotted border's path (E9.6): the border's centre line, half
+// its width inside the box, walked clockwise from the end of the top-left
+// corner (from the top, for a circle). `starts` holds the arc length at
+// which each of the line's eight pieces begins: the top edge, the top-right
+// arc, the right edge, the bottom-right arc, the bottom edge, the
+// bottom-left arc, the left edge and the top-left arc. `period` is one dash
+// and its gap (or one dot and its gap), stretched so that a whole number go
+// round; `dash` is a dash's length.
+struct BorderPath final {
+    MaterialBorderStyle style{MaterialBorderStyle::solid};
+    bool circle{};
+    Rect line{};
+    PartCornerRadii radii{};
+    std::array<double, 8> starts{};
+    double period{};
+    double dash{};
+    double width{};
+};
 
 struct MaterialLook final {
     Rect box{};
@@ -144,6 +174,7 @@ struct MaterialLook final {
     Color border_colour{};
     Rect border_inner{};
     PartShape border_inner_shape{};
+    BorderPath border_path{};
     // The border's single edges, then the keylines.
     std::array<ResolvedBand, maximum_bands> bands{};
     std::size_t band_count{};
@@ -195,6 +226,72 @@ double material_radius(const SurfaceMaterial& material, const PrimitiveTarget& t
     const double logical = target.corner_radius ? std::max(0.0, *target.corner_radius) : material.corner_radius;
     const double radius = logical * target.scale.value;
     return radius;
+}
+
+// The material's outline in device pixels (E9.6). A uniform outline is
+// the rounded rectangle of one radius that every material had before E9.6;
+// its layers keep that arithmetic exactly. Otherwise it is the parameter's
+// shape: a rounded rectangle with the material's four corners, a pill, a
+// circle or a capped end.
+struct MaterialOutline final {
+    PartShapeKind kind{PartShapeKind::rounded_rectangle};
+    bool uniform{true};
+    double radius{};
+    PartCornerRadii corners{};
+};
+
+MaterialOutline material_outline(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                                 PartShapeKind kind) noexcept {
+    MaterialOutline outline{};
+    outline.kind = kind;
+    outline.radius = material_radius(material, target);
+    // A part's own radius overrides the material's corners.
+    const bool own_radius = target.corner_radius.has_value();
+    if (kind == PartShapeKind::rounded_rectangle && (own_radius || !material.corner_radii)) return outline;
+    outline.uniform = false;
+    if (kind == PartShapeKind::rounded_rectangle) {
+        const double scale = target.scale.value;
+        const MaterialCornerRadii& corners = *material.corner_radii;
+        outline.corners = PartCornerRadii{corners.top_left * scale, corners.top_right * scale,
+                                          corners.bottom_right * scale, corners.bottom_left * scale};
+    }
+    return outline;
+}
+
+// The outline drawn in `rect`, its corners grown by `by` device pixels (a
+// negative `by` shrinks them; a pill's, a circle's and a cap's follow the
+// rectangle), and the largest of its drawn corners' radii. A circle's
+// largest radius is half the rectangle's longer side, so that every pixel
+// beyond its straight parts (there are none) is measured.
+struct GrownOutline final {
+    PartShape shape{};
+    double radius{};
+};
+
+GrownOutline grown(const MaterialOutline& outline, Rect rect, double by) noexcept {
+    GrownOutline result{};
+    if (outline.uniform) {
+        result.radius = std::max(0.0, outline.radius + by);
+        result.shape = rounded(result.radius);
+        return result;
+    }
+    result.shape.kind = outline.kind;
+    if (outline.kind == PartShapeKind::circle) {
+        result.radius = std::max(rect.width, rect.height) * 0.5;
+        return result;
+    }
+    if (outline.kind == PartShapeKind::rounded_rectangle) {
+        const PartCornerRadii& corners = outline.corners;
+        result.shape.per_corner = true;
+        result.shape.corners =
+            PartCornerRadii{std::max(0.0, corners.top_left + by), std::max(0.0, corners.top_right + by),
+                            std::max(0.0, corners.bottom_right + by), std::max(0.0, corners.bottom_left + by)};
+    }
+    const PartCornerRadii drawn = part_corner_radii(result.shape, rect);
+    const double top = std::max(drawn.top_left, drawn.top_right);
+    const double bottom = std::max(drawn.bottom_right, drawn.bottom_left);
+    result.radius = std::max(top, bottom);
+    return result;
 }
 
 Point resolved_point(Point point, MaterialCoordinateSpace space, Rect box, double scale) noexcept {
@@ -263,6 +360,14 @@ ResolvedFill resolve_fill(const MaterialFillLayer& layer, Rect box, double scale
         if (radius_x > 0.0) fill.inverse_radius_x = 1.0 / radius_x;
         if (radius_y > 0.0) fill.inverse_radius_y = 1.0 / radius_y;
     }
+    if (layer.kind == MaterialFillKind::conic_gradient) {
+        const Point centre = resolved_point(layer.center, layer.coordinate_space, box, scale);
+        const double turns = layer.angle_degrees / 360.0;
+        fill.origin_x = centre.x;
+        fill.origin_y = centre.y;
+        fill.from_turn = turns - std::floor(turns);
+        fill.periods_per_turn = 360.0 / layer.period_degrees;
+    }
     return fill;
 }
 
@@ -301,16 +406,56 @@ void add_keyline(MaterialLook& look, const MaterialKeyline& keyline, double scal
     }
 }
 
+// A dashed or dotted border's path in `box`, `width` device pixels wide; a
+// solid one where the line has no length.
+BorderPath border_path(MaterialBorderStyle style, const MaterialOutline& outline, Rect box, double width) noexcept {
+    BorderPath path{};
+    if (style == MaterialBorderStyle::solid) return path;
+    const double half = width * 0.5;
+    path.line = Rect{box.x + half, box.y + half, box.width - width, box.height - width};
+    if (path.line.width <= 0.0 || path.line.height <= 0.0) return path;
+    double length = 0.0;
+    if (outline.kind == PartShapeKind::circle && !outline.uniform) {
+        path.circle = true;
+        length = std::min(path.line.width, path.line.height) * 0.5 * quarter_turn * 4.0;
+    } else {
+        const GrownOutline line = grown(outline, path.line, -half);
+        const PartCornerRadii radii = part_corner_radii(line.shape, path.line);
+        const Rect& at = path.line;
+        path.radii = radii;
+        path.starts[1] = (at.right() - radii.top_right) - (at.x + radii.top_left);
+        path.starts[2] = path.starts[1] + quarter_turn * radii.top_right;
+        path.starts[3] = path.starts[2] + (at.bottom() - radii.bottom_right) - (at.y + radii.top_right);
+        path.starts[4] = path.starts[3] + quarter_turn * radii.bottom_right;
+        path.starts[5] = path.starts[4] + (at.right() - radii.bottom_right) - (at.x + radii.bottom_left);
+        path.starts[6] = path.starts[5] + quarter_turn * radii.bottom_left;
+        path.starts[7] = path.starts[6] + (at.bottom() - radii.bottom_left) - (at.y + radii.top_left);
+        length = path.starts[7] + quarter_turn * radii.top_left;
+    }
+    // A dash of three widths and a gap of two; a dot one width across, one
+    // every two widths.
+    const bool dashed = style == MaterialBorderStyle::dashed;
+    const double natural = dashed ? width * 5.0 : width * 2.0;
+    const double count = std::max(1.0, std::floor(length / natural + 0.5));
+    path.style = style;
+    path.width = width;
+    path.period = length / count;
+    path.dash = dashed ? path.period * 0.6 : 0.0;
+    return path;
+}
+
 // The look with the box's top-left corner at `box_origin`, in the
 // destination's device pixels.
 MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                             Point box_origin) noexcept {
+                             Point box_origin, PartShapeKind kind) noexcept {
     const double scale = target.scale.value;
     MaterialLook look{};
     look.box = Rect{box_origin.x, box_origin.y, target.logical_size.width * scale,
                     target.logical_size.height * scale};
-    const double radius = material_radius(material, target);
-    look.box_shape = rounded(radius);
+    const MaterialOutline outline = material_outline(material, target, kind);
+    const GrownOutline drawn = grown(outline, look.box, 0.0);
+    const double radius = drawn.radius;
+    look.box_shape = drawn.shape;
     const Rect box = look.box;
     // A centre at least half a pixel inside the straight edges, and clear of
     // the corners' radius along the other axis, has a signed distance of at
@@ -328,7 +473,9 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
         if (!shadow.inset) {
             resolved.shape = Rect{box.x + offset_x - spread, box.y + offset_y - spread, box.width + spread * 2.0,
                                   box.height + spread * 2.0};
-            resolved.radius = std::max(0.0, radius + spread);
+            const GrownOutline grown_outline = grown(outline, resolved.shape, spread);
+            resolved.outline = grown_outline.shape;
+            resolved.radius = grown_outline.radius;
             if (resolved.shape.width <= 0.0 || resolved.shape.height <= 0.0) continue;
             look.outer[look.outer_count] = resolved;
             look.outer_count = look.outer_count + 1U;
@@ -336,7 +483,9 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
         }
         resolved.shape = Rect{box.x + offset_x + spread, box.y + offset_y + spread, box.width - spread * 2.0,
                               box.height - spread * 2.0};
-        resolved.radius = std::max(0.0, radius - spread);
+        const GrownOutline hole = grown(outline, resolved.shape, -spread);
+        resolved.outline = hole.shape;
+        resolved.radius = hole.radius;
         resolved.solid = resolved.shape.width <= 0.0 || resolved.shape.height <= 0.0;
         look.inset[look.inset_count] = resolved;
         look.inset_count = look.inset_count + 1U;
@@ -349,7 +498,11 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
         resolved.additive = true;
         resolved.over = glow.placement == MaterialGlowPlacement::over;
         resolved.shape = Rect{box.x - spread, box.y - spread, box.width + spread * 2.0, box.height + spread * 2.0};
-        resolved.radius = radius + spread;
+        // A uniform glow of negative spread may have a negative radius: as
+        // zero, it bounds nothing (outer_coverage).
+        const GrownOutline grown_outline = grown(outline, resolved.shape, spread);
+        resolved.outline = grown_outline.shape;
+        resolved.radius = outline.uniform ? radius + spread : grown_outline.radius;
         if (resolved.shape.width <= 0.0 || resolved.shape.height <= 0.0) continue;
         look.outer[look.outer_count] = resolved;
         look.outer_count = look.outer_count + 1U;
@@ -367,7 +520,8 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
         look.border_colour = (*material.border).color;
         look.border_inner = Rect{box.x + width, box.y + width, std::max(0.0, box.width - width * 2.0),
                                  std::max(0.0, box.height - width * 2.0)};
-        look.border_inner_shape = rounded(std::max(0.0, radius - width));
+        look.border_inner_shape = grown(outline, look.border_inner, -width).shape;
+        look.border_path = border_path((*material.border).style, outline, box, width);
     }
     const MaterialBorderEdges& edges = material.border_edges;
     if (edges.top) {
@@ -399,9 +553,10 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
     return look;
 }
 
-MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget& target, double outset) noexcept {
+MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget& target, double outset,
+                          PartShapeKind kind) noexcept {
     const Rect box = material_box(target, outset);
-    const MaterialLook look = resolve_look_at(material, target, Point{box.x, box.y});
+    const MaterialLook look = resolve_look_at(material, target, Point{box.x, box.y}, kind);
     return look;
 }
 
@@ -537,7 +692,7 @@ double down_integral(const ResolvedShadow& shadow, double centre_y) noexcept {
 // negative, so the minimum would be the product.
 double rounded_bound(const ResolvedShadow& shadow, double product, double centre_x, double centre_y) noexcept {
     if (product <= 0.0) return product;
-    const double distance = shape_signed_distance(rounded(shadow.radius), shadow.shape, Point{centre_x, centre_y});
+    const double distance = shape_signed_distance(shadow.outline, shadow.shape, Point{centre_x, centre_y});
     const double edge = gaussian_integral(-distance * shadow.inverse_sigma);
     const double coverage = std::min(product, edge);
     return coverage;
@@ -669,8 +824,19 @@ Unit fill_colour(const ResolvedFill& fill, const MaterialImages& images, std::si
         const double across = (centre_x - fill.origin_x) * fill.inverse_radius_x;
         const double down = (centre_y - fill.origin_y) * fill.inverse_radius_y;
         const double t = std::sqrt(across * across + down * down);
-        const Unit radial = premultiply_straight(stop_colour(fill.stops, std::min(t, 1.0)), coverage);
+        const Unit radial = premultiply_straight(stop_colour(fill.stops, spread_position(t, fill.spread)), coverage);
         return radial;
+    }
+    case MaterialFillKind::conic_gradient: {
+        // The angle clockwise from up, with y growing downward, as a turn
+        // past the from-angle in [0, 1).
+        constexpr double inverse_whole_turn = 1.0 / (2.0 * 3.14159265358979323846264338327950288);
+        const double angle = engine_arctangent2(centre_x - fill.origin_x, fill.origin_y - centre_y);
+        const double turn = angle * inverse_whole_turn - fill.from_turn;
+        const double past = turn - std::floor(turn);
+        const double t = past * fill.periods_per_turn;
+        const Unit conic = premultiply_straight(stop_colour(fill.stops, spread_position(t, fill.spread)), coverage);
+        return conic;
     }
     case MaterialFillKind::image: {
         const MaterialImageLayer& layer = images.layers[fill.image];
@@ -714,6 +880,87 @@ void add_light(Unit& target, Unit light) noexcept {
 bool centre_within(Rect band, double x, double y) noexcept {
     const bool within = x >= band.x && x <= band.right() && y >= band.y && y <= band.bottom();
     return within;
+}
+
+// The arc length along a border's path (BorderPath) of the point on it
+// nearest to (x, y).
+double path_position(const BorderPath& path, double x, double y) noexcept {
+    const Rect& line = path.line;
+    const double dx = x - (line.x + line.width * 0.5);
+    const double dy = y - (line.y + line.height * 0.5);
+    if (path.circle) {
+        // Clockwise from up, with y growing downward.
+        const double angle = engine_arctangent2(dx, -dy);
+        const double turned = angle < 0.0 ? angle + quarter_turn * 4.0 : angle;
+        const double position = turned * std::min(line.width, line.height) * 0.5;
+        return position;
+    }
+    const PartCornerRadii& radii = path.radii;
+    const bool left = dx < 0.0;
+    const bool top = dy < 0.0;
+    double radius = 0.0;
+    if (left) {
+        radius = top ? radii.top_left : radii.bottom_left;
+    } else {
+        radius = top ? radii.top_right : radii.bottom_right;
+    }
+    const double qx = std::fabs(dx) - (line.width * 0.5 - radius);
+    const double qy = std::fabs(dy) - (line.height * 0.5 - radius);
+    if (qx > 0.0 && qy > 0.0) {
+        // On the quadrant's arc: the angle about its centre, clockwise from
+        // where the arc begins.
+        const double ax = x - (left ? line.x + radius : line.right() - radius);
+        const double ay = y - (top ? line.y + radius : line.bottom() - radius);
+        double angle = 0.0;
+        std::size_t piece = 0U;
+        if (top && !left) {
+            angle = engine_arctangent2(ax, -ay);
+            piece = 1U;
+        } else if (!top && !left) {
+            angle = engine_arctangent2(ay, ax);
+            piece = 3U;
+        } else if (!top && left) {
+            angle = engine_arctangent2(-ax, ay);
+            piece = 5U;
+        } else {
+            angle = engine_arctangent2(-ay, -ax);
+            piece = 7U;
+        }
+        const double position = path.starts[piece] + std::clamp(angle, 0.0, quarter_turn) * radius;
+        return position;
+    }
+    if (qy >= qx) {
+        const double along_top = x - (line.x + radii.top_left);
+        const double along_bottom = path.starts[4] + (line.right() - radii.bottom_right) - x;
+        const double position = top ? along_top : along_bottom;
+        return position;
+    }
+    const double along_right = path.starts[2] + y - (line.y + radii.top_right);
+    const double along_left = path.starts[6] + (line.bottom() - radii.bottom_left) - y;
+    const double position = left ? along_left : along_right;
+    return position;
+}
+
+// How much of a border's ring, covering `ring` of pixel (x, y), its dashes
+// or dots cover: a dash by the pixel's span along the path (one device
+// pixel) within it, a dot by the pixel's distance from its centre.
+double patterned_ring(const MaterialLook& look, double ring, double x, double y) noexcept {
+    const BorderPath& path = look.border_path;
+    const double position = path_position(path, x, y);
+    const double phase = position - std::floor(position / path.period) * path.period;
+    if (path.style == MaterialBorderStyle::dashed) {
+        // This dash, and the next one where the pixel spans the period's end.
+        const double here = interval_overlap(phase - 0.5, 0.0, path.dash);
+        const double next = interval_overlap(phase - 0.5, path.period, path.period + path.dash);
+        const double covered = std::min(1.0, here + next) * ring;
+        return covered;
+    }
+    const double along = phase - path.period * 0.5;
+    const double across = shape_signed_distance(look.box_shape, look.box, Point{x, y}) + path.width * 0.5;
+    const double distance = std::sqrt(along * along + across * across) - path.width * 0.5;
+    const double dot = std::clamp(0.5 - distance, 0.0, 1.0);
+    const double covered = std::min(dot, ring);
+    return covered;
 }
 
 // How much of pixel (x, y) the box covers.
@@ -771,7 +1018,10 @@ Unit material_pixel(const MaterialLook& look, const MaterialImages& images, cons
         }
         if (look.border) {
             const double inner = shape_coverage(look.border_inner_shape, look.border_inner, 1.0, x, y);
-            blend_over(result, premultiply(look.border_colour, std::max(0.0, inside - inner)));
+            const double ring = std::max(0.0, inside - inner);
+            const bool patterned = look.border_path.style != MaterialBorderStyle::solid && ring > 0.0;
+            const double drawn = patterned ? patterned_ring(look, ring, centre_x, centre_y) : ring;
+            blend_over(result, premultiply(look.border_colour, drawn));
         }
     }
     const double px = static_cast<double>(x);
@@ -870,7 +1120,7 @@ double corner_pixels(const MaterialLook& look, DeviceExtent extent) noexcept {
 } // namespace
 
 double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                              double outset) noexcept {
+                              double outset, PartShapeKind shape) noexcept {
     const MaterialBakeCosts& costs = measured_material_costs;
     const DeviceExtent extent = destination_extent(target, outset);
     double per_pixel = costs.base;
@@ -885,6 +1135,9 @@ double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTa
             break;
         case MaterialFillKind::radial_gradient:
             per_pixel = per_pixel + costs.radial + extra_stops(layer) * costs.gradient_stop;
+            break;
+        case MaterialFillKind::conic_gradient:
+            per_pixel = per_pixel + costs.conic + extra_stops(layer) * costs.gradient_stop;
             break;
         case MaterialFillKind::image:
             // Compositing the prepared variant only: its resampling is not
@@ -905,6 +1158,9 @@ double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTa
     // A glow is an outer shadow's kernel with an addition for its blend.
     per_pixel = per_pixel + static_cast<double>(material.glows.size()) * costs.outer_shadow;
     if (material.border) per_pixel = per_pixel + costs.border;
+    if (material.border && (*material.border).style != MaterialBorderStyle::solid) {
+        per_pixel = per_pixel + costs.border_pattern;
+    }
     const MaterialBorderEdges& edges = material.border_edges;
     const double edge_count = static_cast<double>(edges.top.has_value()) + static_cast<double>(edges.right.has_value()) +
                               static_cast<double>(edges.bottom.has_value()) +
@@ -912,7 +1168,7 @@ double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTa
     per_pixel = per_pixel + edge_count * costs.border_edge;
     per_pixel = per_pixel + static_cast<double>(material.keylines.size()) * costs.keyline;
     const double pixels = static_cast<double>(extent.width) * static_cast<double>(extent.height);
-    const double corners = corner_pixels(resolve_look(material, target, outset), extent);
+    const double corners = corner_pixels(resolve_look(material, target, outset, shape), extent);
     const double estimate = pixels * per_pixel + corners * costs.outer_corner;
     return estimate;
 }
@@ -965,13 +1221,20 @@ void band_reach(AxisReach& reach, MaterialEdge edge, double inset, double width,
 }
 
 AxisReach axis_reach(const SurfaceMaterial& material, const PrimitiveTarget& target, bool across,
-                     double outset) noexcept {
+                     double outset, PartShapeKind kind) noexcept {
     const double scale = target.scale.value;
-    const double radius = material_radius(material, target);
+    // The largest corner stands for all four: the reach is at least it. A
+    // corner is drawn at most half the box's shorter side, so a larger
+    // uniform radius reaches no further (and no pixel differs).
+    const MaterialOutline outline = material_outline(material, target, kind);
+    const Rect box = material_box(target, outset);
+    const double largest = grown(outline, box, 0.0).radius;
+    const double radius = std::min(largest, std::min(box.width, box.height) * 0.5);
     AxisReach reach{};
+    // A dashed or dotted border changes all the way round.
+    if (material.border && (*material.border).style != MaterialBorderStyle::solid) reach.varies = true;
     // The box's own edge, and its corners' arcs.
     reach_at_least(reach, radius + 1.0, radius + 1.0, radius * 2.0 + 1.0);
-    const Rect box = material_box(target, outset);
     for (const MaterialFillLayer& layer : material.fills) {
         if (layer.kind == MaterialFillKind::solid) continue;
         if (layer.kind != MaterialFillKind::linear_gradient) {
@@ -1077,10 +1340,10 @@ AxisPlan plan_axis(const AxisReach& reach, double logical, double scale, std::ui
 } // namespace
 
 PrimitiveSlicePlan material_slice_plan(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                                       DeviceExtent extent, double outset) noexcept {
+                                       DeviceExtent extent, double outset, PartShapeKind shape) noexcept {
     const double scale = target.scale.value;
-    const AxisReach across_reach = axis_reach(material, target, true, outset);
-    const AxisReach down_reach = axis_reach(material, target, false, outset);
+    const AxisReach across_reach = axis_reach(material, target, true, outset, shape);
+    const AxisReach down_reach = axis_reach(material, target, false, outset, shape);
     const AxisPlan across = plan_axis(across_reach, target.logical_size.width, scale, extent.width, outset);
     const AxisPlan down = plan_axis(down_reach, target.logical_size.height, scale, extent.height, outset);
     PrimitiveSlicePlan plan{};
@@ -1094,6 +1357,16 @@ PrimitiveSlicePlan material_slice_plan(const SurfaceMaterial& material, const Pr
 
 // -- MaterialPrimitive -------------------------------------------------------------
 
+namespace {
+
+PartShapeKind shape_kind(const PrimitiveParameterBlock& parameters) noexcept {
+    const double position = parameters.values[material_shape].number;
+    const PartShapeKind kind = static_cast<PartShapeKind>(static_cast<std::uint8_t>(position));
+    return kind;
+}
+
+} // namespace
+
 const PrimitiveDescriptor& MaterialPrimitive::descriptor() const noexcept {
     return material_descriptor;
 }
@@ -1105,7 +1378,16 @@ std::optional<ControlVisualRole> MaterialPrimitive::theme_material(
     return role;
 }
 
-bool MaterialPrimitive::accepts(const PrimitiveParameterBlock&, const PrimitiveTarget& target) const noexcept {
+PartShape MaterialPrimitive::shape(const PrimitiveParameterBlock& parameters) const noexcept {
+    // A rounded rectangle's radii are the material's, which the parameters
+    // do not hold: its hit region is the box, as before E9.6.
+    PartShape outline{};
+    outline.kind = shape_kind(parameters);
+    return outline;
+}
+
+bool MaterialPrimitive::accepts(const PrimitiveParameterBlock& parameters,
+                                const PrimitiveTarget& target) const noexcept {
     if (target.material == nullptr) return false;
     const SurfaceMaterial& material = *target.material;
     if (!valid_surface_material(material)) return false;
@@ -1123,21 +1405,23 @@ bool MaterialPrimitive::accepts(const PrimitiveParameterBlock&, const PrimitiveT
         if (target.images == nullptr || !material_image_available(*target.images, layer)) return false;
     }
     // A part assembled from slices bakes only its reference.
+    const PartShapeKind kind = shape_kind(parameters);
     const PrimitiveSlicePlan plan =
-        material_slice_plan(material, target, destination_extent(target, material_outset), material_outset);
+        material_slice_plan(material, target, destination_extent(target, material_outset), material_outset, kind);
     const bool sliced =
         plan.across.outcome == SliceAxisOutcome::sliced || plan.down.outcome == SliceAxisOutcome::sliced;
     PrimitiveTarget baked = target;
     if (sliced) baked.logical_size = plan.reference_size;
-    const double estimate = material_bake_estimate(material, baked, material_outset);
+    const double estimate = material_bake_estimate(material, baked, material_outset, kind);
     const bool within = estimate <= maximum_material_bake_nanoseconds;
     return within;
 }
 
-PrimitiveSlicePlan MaterialPrimitive::slice_plan(const PrimitiveParameterBlock&, const PrimitiveTarget& target,
-                                                 DeviceExtent extent) const noexcept {
+PrimitiveSlicePlan MaterialPrimitive::slice_plan(const PrimitiveParameterBlock& parameters,
+                                                 const PrimitiveTarget& target, DeviceExtent extent) const noexcept {
     if (target.material == nullptr) return PrimitiveSlicePlan{};
-    const PrimitiveSlicePlan plan = material_slice_plan(*target.material, target, extent, material_outset);
+    const PrimitiveSlicePlan plan =
+        material_slice_plan(*target.material, target, extent, material_outset, shape_kind(parameters));
     return plan;
 }
 
@@ -1168,10 +1452,10 @@ std::size_t MaterialPrimitive::image_variants(const PrimitiveParameterBlock&, co
 
 void MaterialPrimitive::derive(const PrimitiveParameterBlock&, const PrimitiveTarget&, std::span<double>) const noexcept {}
 
-void MaterialPrimitive::fill(const PrimitiveParameterBlock&, const PrimitiveTarget& target, std::span<const double>,
-                             const PartRasterView& destination) const noexcept {
+void MaterialPrimitive::fill(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
+                             std::span<const double>, const PartRasterView& destination) const noexcept {
     // accepts() has passed: the target lends a valid material.
-    bake_material(*target.material, target, destination, material_outset);
+    bake_material(*target.material, target, destination, material_outset, shape_kind(parameters));
 }
 
 namespace {
@@ -1197,14 +1481,15 @@ void bake_look(const SurfaceMaterial& material, const PrimitiveTarget& target, c
 } // namespace
 
 void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                   const PartRasterView& destination, double outset) noexcept {
-    const MaterialLook look = resolve_look(material, target, outset);
+                   const PartRasterView& destination, double outset, PartShapeKind shape) noexcept {
+    const MaterialLook look = resolve_look(material, target, outset, shape);
     bake_look(material, target, look, destination);
 }
 
 void bake_material_region(const SurfaceMaterial& material, const PrimitiveTarget& target, Point device_origin,
                           const PartRasterView& destination) noexcept {
-    const MaterialLook look = resolve_look_at(material, target, Point{-device_origin.x, -device_origin.y});
+    const MaterialLook look =
+        resolve_look_at(material, target, Point{-device_origin.x, -device_origin.y}, PartShapeKind::rounded_rectangle);
     bake_look(material, target, look, destination);
 }
 

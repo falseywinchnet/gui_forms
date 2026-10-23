@@ -100,6 +100,37 @@ MaterialFillLayer MaterialFillLayer::radial(
     return radial(origin, radius, copy_stops(values, value_count), space);
 }
 
+MaterialFillLayer MaterialFillLayer::repeating_radial(
+    Point origin, Size radius, std::vector<GradientStop> values,
+    MaterialCoordinateSpace space) {
+    MaterialFillLayer result = radial(origin, radius, std::move(values), space);
+    result.spread = GradientSpreadMode::repeat;
+    return result;
+}
+
+MaterialFillLayer MaterialFillLayer::conic(
+    Point origin, double from_degrees, std::vector<GradientStop> values,
+    MaterialCoordinateSpace space) {
+    MaterialFillLayer result;
+    result.kind = MaterialFillKind::conic_gradient;
+    result.coordinate_space = space;
+    result.center = origin;
+    result.angle_degrees = from_degrees;
+    result.period_degrees = 360.0;
+    result.stops = std::move(values);
+    result.spread = GradientSpreadMode::pad;
+    return result;
+}
+
+MaterialFillLayer MaterialFillLayer::repeating_conic(
+    Point origin, double from_degrees, double period,
+    std::vector<GradientStop> values, MaterialCoordinateSpace space) {
+    MaterialFillLayer result = conic(origin, from_degrees, std::move(values), space);
+    result.period_degrees = period;
+    result.spread = GradientSpreadMode::repeat;
+    return result;
+}
+
 MaterialFillLayer MaterialFillLayer::stretched_image(
     ImageId value, Size pixel_size, double value_opacity) {
     MaterialFillLayer result;

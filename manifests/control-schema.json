@@ -197,7 +197,8 @@
         "cost": {"per_device_pixel": 512, "fixed": 64, "preparation_per_device_pixel": 0},
         "outsets": [8, 8, 8, 8],
         "parameters": [
-          {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"], "default": "button", "animated": false}
+          {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"], "default": "button", "animated": false},
+          {"name": "shape", "kind": "choice", "choices": ["rounded_rectangle", "pill", "circle", "cap_start", "cap_end"], "default": "rounded_rectangle", "animated": false}
         ]
       },
       {
