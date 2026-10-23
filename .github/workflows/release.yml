@@ -99,11 +99,11 @@ jobs:
     steps:
       # The same layout as native.yml (sources at gui_forms/, build three levels
       # down) so the compiler cache native.yml publishes matches these objects.
-      # The tree native.yml built and tested (a pull request's head, not the
-      # merge commit), so its objects match and packages name that revision.
+      # The tree native.yml built and tested and this run's workflow files come
+      # from (a pull request's test merge commit, or the pushed commit), so its
+      # objects match and packages name that revision.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: gui_forms
       - uses: actions/setup-python@v5
         with:
@@ -308,7 +308,7 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then extra="--runtime $GUI_FORMS_LLVM_RUNTIME"; fi
           if [ "$RUNNER_OS" = Windows ]; then extra="--runtime-dir /clang64/bin"; fi
           python gui_forms/tools/package_programs.py --platform "${{ matrix.platform }}" --build-dir "$BUILD_DIR" \
-            --version "$RELEASE_VERSION" --out dist --revision "${{ github.event.pull_request.head.sha || github.sha }}" $extra
+            --version "$RELEASE_VERSION" --out dist --revision "${{ github.sha }}" $extra
       - name: Install and launch the packaged programs
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
