@@ -789,6 +789,18 @@ shape; filters and blend; finish, mask and position; motion.
   gradient as its first stop, a repeating radial gradient padded, the
   material's `corner_radius`, and every border solid. A theme that needs
   them selects the `material` primitive for the part.
+- **Slicing reach clamps the radius.** A corner is drawn at most half the
+  box's shorter side, so the slice reach takes the largest corner radius
+  clamped to that half. Before, a uniform radius past it (say 32 on a part
+  32 high) reached its full length and made the reference needlessly
+  long. No pixel changes, and the slice tests prove the assembled bytes.
+  A radius-32 part 120 × 32 at scale 2 of the layered test material now
+  slices and is accepted (it was estimated at 4.35 ms and refused). The
+  shadows' corner test still uses the unclamped radius, so such a part
+  evaluates more corner pixels than a pill, and its estimate counts them.
+  A layered part 120 × 64 at scale 1.5 (a pill or a radius of 32), at
+  4.09 ms against the 4 ms bound, is the case to re-check after the
+  quiet-machine re-measure.
 - **A uniform material is unchanged.** A material without per-corner radii,
   drawn as a rounded rectangle, keeps its exact arithmetic: every reference
   image of `gui_forms_engine_material_tests` is unchanged.

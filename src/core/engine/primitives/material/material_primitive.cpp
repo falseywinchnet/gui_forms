@@ -1131,15 +1131,18 @@ void band_reach(AxisReach& reach, MaterialEdge edge, double inset, double width,
 AxisReach axis_reach(const SurfaceMaterial& material, const PrimitiveTarget& target, bool across,
                      double outset, PartShapeKind kind) noexcept {
     const double scale = target.scale.value;
-    // The largest corner stands for all four: the reach is at least it.
+    // The largest corner stands for all four: the reach is at least it. A
+    // corner is drawn at most half the box's shorter side, so a larger
+    // uniform radius reaches no further (and no pixel differs).
     const MaterialOutline outline = material_outline(material, target, kind);
-    const double radius = grown(outline, material_box(target, outset), 0.0).radius;
+    const Rect box = material_box(target, outset);
+    const double largest = grown(outline, box, 0.0).radius;
+    const double radius = std::min(largest, std::min(box.width, box.height) * 0.5);
     AxisReach reach{};
     // A dashed or dotted border changes all the way round.
     if (material.border && (*material.border).style != MaterialBorderStyle::solid) reach.varies = true;
     // The box's own edge, and its corners' arcs.
     reach_at_least(reach, radius + 1.0, radius + 1.0, radius * 2.0 + 1.0);
-    const Rect box = material_box(target, outset);
     for (const MaterialFillLayer& layer : material.fills) {
         if (layer.kind == MaterialFillKind::solid) continue;
         if (layer.kind != MaterialFillKind::linear_gradient) {

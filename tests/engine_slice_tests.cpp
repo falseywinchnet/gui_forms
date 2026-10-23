@@ -230,6 +230,11 @@ void assembly_equals_whole_bake() {
     corners.corner_radii = MaterialCornerRadii{6.0, 0.0, 3.0, 1.5};
     SliceCount pill{};
     const SurfaceMaterial plain = layered_material(false);
+    // A uniform radius past half the shorter side reaches only as far as
+    // that half, as a pill does.
+    SliceCount round_ended{};
+    SurfaceMaterial generous = layered_material(false);
+    generous.corner_radius = 32.0;
     for (const double scale : scales) {
         for (const double width : widths) {
             for (const double height : heights) {
@@ -237,11 +242,20 @@ void assembly_equals_whole_bake() {
                 // A tall pill's round ends are all corner pixels, and at
                 // 64 high it exceeds the bake bound.
                 if (height <= 40.0) compare_assembly(plain, Size{width, height}, scale, pill, "pill");
+                // At 40 high its unclamped radius still marks every pixel as a
+                // corner pixel of its shadows (outer_coverage), which the
+                // estimate counts: a dearer bake than the pill's.
+                if (height <= 24.0) compare_assembly(generous, Size{width, height}, scale, round_ended);
             }
         }
     }
     require(cornered.across > 0U && cornered.down > 0U, "four corners slice on both axes");
     require(pill.across > 0U, "a pill slices along its length");
+    require(round_ended.across > 0U, "a radius past half the height slices along the length");
+    // The case that was refused before the clamp: radius 32, 32 high, at 2.
+    SliceCount large{};
+    compare_assembly(generous, Size{120.0, 32.0}, 2.0, large);
+    require(large.across == 1U, "a radius-32 part 32 high at scale 2 slices and is within the bake bound");
 }
 
 // -- the fallbacks -----------------------------------------------------------------
