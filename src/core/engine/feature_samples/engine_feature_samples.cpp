@@ -436,8 +436,7 @@ void use_moving_faces(ThemeDefinition& definition) {
 }
 
 // Four timed easings: opacity smoothstep, translate_x ease, translate_y
-// overshoot, and the face's cross-fade linear. No scale: a stretched part
-// shows its new face at once, without the fade.
+// overshoot, and the face's cross-fade linear.
 void motion_timed_easings(const FeatureSampleInputs&, ThemeDefinition& definition) {
     use_moving_faces(definition);
     ThemeRule rule = material_rule("motion_timed_easings", "rounded_rectangle");
@@ -454,12 +453,17 @@ void motion_timed_easings(const FeatureSampleInputs&, ThemeDefinition& definitio
     definition.rules.rules.push_back(rule);
 }
 
-// The presentational scale, on the exponential approach.
+// The presentational scale on the exponential approach, with the face's
+// cross-fade: a pop, both faces stretched while the scale moves.
 void motion_scale_approach(const FeatureSampleInputs&, ThemeDefinition& definition) {
     use_moving_faces(definition);
     ThemeRule rule = material_rule("motion_scale_approach", "rounded_rectangle");
     rule.transitions.push_back(hot_transition(
         scale_property, 1.06, 1.0, MotionCurve::timed(milliseconds(200), MotionEasing::exponential_approach)));
+    PropertyTransition fade{};
+    fade.property = std::string(face_property);
+    fade.curve = MotionCurve::timed(milliseconds(160), MotionEasing::linear);
+    rule.transitions.push_back(fade);
     definition.rules.rules.push_back(rule);
 }
 
