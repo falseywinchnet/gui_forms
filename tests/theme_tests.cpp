@@ -19,17 +19,20 @@ void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
 }
 
-// A ThemeDefinition is some 105 KB and is never passed by value (see
-// theme_types.hpp). Theme::create must keep reading it by reference: a
-// by-value parameter put a copy on every caller's frame, and with the
+// Copying a ThemeDefinition copies every role recipe (some 100 KB, held out
+// of line), so it is passed by reference (theme_types.hpp). Theme::create
+// must keep reading it so: when the recipes were inline, its by-value
+// parameter put a 105 KB copy on every caller's frame, and with the
 // sanitizer's unshared slots this test overflowed a 1 MB stack.
 static_assert(std::is_same_v<decltype(&Theme::create),
                              std::shared_ptr<const Theme> (*)(const ThemeDefinition&)>,
               "Theme::create must take its definition by const reference");
+// The role recipes are held out of line, so the definition itself stays a
+// small value (568 bytes with clang64 on Windows x64; 105,392 with the
+// recipes inline).
+static_assert(sizeof(ThemeDefinition) <= 2048U, "ThemeDefinition must hold its role recipes out of line");
 
-// The professional definition, built on the heap: `new` from the returned
-// value initializes the heap object directly, where std::make_unique would
-// first materialize the value on this test's frame.
+// The professional definition, held on the heap for a test to edit.
 std::unique_ptr<ThemeDefinition> professional_definition() {
     std::unique_ptr<ThemeDefinition> definition(
         new ThemeDefinition(windows_professional_theme_definition()));
