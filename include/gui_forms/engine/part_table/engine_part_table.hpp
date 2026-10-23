@@ -185,6 +185,9 @@ struct EnginePartRecord final {
     std::uint64_t inputs_read{};
     std::string painted_by{};
     Rect extent{};
+    // Whether the part's last paint sampled the window's backplane (E9-B):
+    // backplane damage within its extent repaints it.
+    bool reads_backplane{};
     // When the part entered the states it was last painted in, on the
     // window's motion clock; time_in_state counts from it.
     FrameTime state_entered{};
@@ -323,6 +326,30 @@ struct RasterCacheStatistics final {
     std::uint64_t image_variant_bakes{};
     std::uint64_t image_variant_hits{};
     std::size_t image_variants{};
+    // The window's backplane images (E9-B, owner 2026-10-22): made, lent
+    // from those held, and held now; and the backplane commands their
+    // making skipped. The core bakes a backplane image from the window's
+    // backplane material and the backplane plane's engine part rasters
+    // alone (option 1), so text and other commands drawn in the backplane
+    // plane are absent from glass; each one is counted here every time an
+    // image is made over it.
+    std::uint64_t backplane_bakes{};
+    std::uint64_t backplane_hits{};
+    std::size_t backplane_images{};
+    std::uint64_t backplane_skipped_commands{};
+};
+
+// One backplane image's region (E9-B): `extent` device pixels at `scale`,
+// its top-left pixel at `origin` in the window's device pixels (the
+// window's logical origin times the scale; possibly fractional).
+struct BackplaneRegion final {
+    Point origin{};
+    DeviceExtent extent{};
+    DeviceScale scale{};
+
+    friend bool operator==(const BackplaneRegion& left, const BackplaneRegion& right) noexcept {
+        return left.origin == right.origin && left.extent == right.extent && left.scale == right.scale;
+    }
 };
 
 // The most bytes of cached rasters one window keeps (GIVEN F2-1: 8 MB).
@@ -446,6 +473,34 @@ public:
     // control's ID cannot be copied, std::bad_alloc propagates and the
     // record is unchanged.
     void note_paint(PartRecordHandle handle, std::uint64_t inputs_read, std::string_view painted_by, Rect extent);
+    // Records whether a part's last paint sampled the window's backplane
+    // (E9-B), so that backplane damage under it repaints it. A stale handle
+    // does nothing.
+    void note_backplane_reader(PartRecordHandle handle, bool reads) noexcept;
+
+    // The backplane image held for `region` at the backplane's damage
+    // `generation`, or null; one that is held is marked used by
+    // `paint_sequence` and counted a hit. Images of an earlier generation
+    // are dropped first.
+    [[nodiscard]] std::shared_ptr<const PartRaster> held_backplane(const BackplaneRegion& region,
+                                                                   std::uint64_t generation,
+                                                                   std::uint64_t paint_sequence);
+    // Holds `image`, just made for `region` at `generation` with
+    // `skipped` backplane commands left out, within the shared budget
+    // (least recently used evicted first; an image larger than the budget
+    // is counted but not held). Allocation failure propagates as
+    // std::bad_alloc and holds nothing.
+    void hold_backplane(const BackplaneRegion& region, std::uint64_t generation,
+                        const std::shared_ptr<const PartRaster>& image, std::uint64_t skipped,
+                        std::uint64_t paint_sequence);
+    // Draws the window's backplane `material` over `region` into `image`
+    // (E9-B), for a window of `window_size` logical units whose images are
+    // `images` (null for none): the material kernel over that region of
+    // the window's box, with the material's image variants lent as for a
+    // part. Nothing is drawn when the material is invalid.
+    void bake_backplane_material(const SurfaceMaterial& material, Size window_size, const BackplaneRegion& region,
+                                 const ImageRegistry* images, const PartRasterView& image,
+                                 std::uint64_t paint_sequence);
     // Whether any live record reads any input of `inputs`, from the
     // table's reader counts, without a scan.
     [[nodiscard]] bool reads_any(std::uint64_t inputs) const noexcept;
@@ -527,6 +582,8 @@ private:
     void clear_shared_bakes() noexcept;
     // Drops every image variant.
     void clear_image_variants() noexcept;
+    // Drops every backplane image.
+    void clear_backplanes() noexcept;
 
     // An image variant held: what it is (its layer unused), and the paint
     // that last used it.
@@ -567,6 +624,16 @@ private:
     // image_variant_revision_ (none before the first).
     std::vector<HeldImageVariant> image_variants_;
     std::optional<std::uint64_t> image_variant_revision_{};
+    // A backplane image held: its region, and the paint that last used it.
+    struct HeldBackplane final {
+        BackplaneRegion region{};
+        std::shared_ptr<const PartRaster> raster{};
+        std::uint64_t last_used{};
+    };
+    // The backplane images, in no order; one for each glass part's region
+    // in use, so lookups scan them. All made at backplane_generation_.
+    std::vector<HeldBackplane> backplanes_;
+    std::uint64_t backplane_generation_{};
     // Keyframes waiting for idle frames, oldest first; each a request kept
     // as a cached raster's description, its raster null.
     std::deque<CachedPartRaster> idle_keyframes_;

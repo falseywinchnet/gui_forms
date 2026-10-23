@@ -285,10 +285,14 @@ void add_keyline(MaterialLook& look, const MaterialKeyline& keyline, double scal
     }
 }
 
-MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget& target, double outset) noexcept {
+// The look with the box's top-left corner at `box_origin`, in the
+// destination's device pixels.
+MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                             Point box_origin) noexcept {
     const double scale = target.scale.value;
     MaterialLook look{};
-    look.box = material_box(target, outset);
+    look.box = Rect{box_origin.x, box_origin.y, target.logical_size.width * scale,
+                    target.logical_size.height * scale};
     const double radius = material_radius(material, target);
     look.box_shape = rounded(radius);
     const Rect box = look.box;
@@ -359,6 +363,12 @@ MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget
     for (std::size_t index = 0U; index < look.band_count; ++index) {
         if (look.bands[index].clipped) look.reads_inside = true;
     }
+    return look;
+}
+
+MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget& target, double outset) noexcept {
+    const Rect box = material_box(target, outset);
+    const MaterialLook look = resolve_look_at(material, target, Point{box.x, box.y});
     return look;
 }
 
@@ -1010,9 +1020,10 @@ void MaterialPrimitive::fill(const PrimitiveParameterBlock&, const PrimitiveTarg
     bake_material(*target.material, target, destination, material_outset);
 }
 
-void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                   const PartRasterView& destination, double outset) noexcept {
-    const MaterialLook look = resolve_look(material, target, outset);
+namespace {
+
+void bake_look(const SurfaceMaterial& material, const PrimitiveTarget& target, const MaterialLook& look,
+               const PartRasterView& destination) noexcept {
     MaterialImages images{};
     prepare_images(material, target, look, destination.extent, images);
     const std::size_t width = destination.extent.width;
@@ -1027,6 +1038,20 @@ void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& targe
             store(destination, start + static_cast<std::size_t>(column) * part_raster_bytes_per_pixel, pixel);
         }
     }
+}
+
+} // namespace
+
+void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                   const PartRasterView& destination, double outset) noexcept {
+    const MaterialLook look = resolve_look(material, target, outset);
+    bake_look(material, target, look, destination);
+}
+
+void bake_material_region(const SurfaceMaterial& material, const PrimitiveTarget& target, Point device_origin,
+                          const PartRasterView& destination) noexcept {
+    const MaterialLook look = resolve_look_at(material, target, Point{-device_origin.x, -device_origin.y});
+    bake_look(material, target, look, destination);
 }
 
 } // namespace gui_forms::engine_primitives

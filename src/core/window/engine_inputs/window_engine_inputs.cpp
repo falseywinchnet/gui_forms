@@ -126,6 +126,29 @@ void Window::damage_engine_readers(std::uint64_t inputs, bool hot_only) {
     if (damage.parts > 0U) metrics_.record_engine_input_damage(damage.parts, damage.area);
 }
 
+void Window::damage_backplane_readers(const Rect* damage) {
+    backplane_generation_ = backplane_generation_ + 1U;
+    EngineDamage damaged{};
+    for (std::size_t slot = 0; slot < engine_parts_.slot_count(); ++slot) {
+        const EnginePartRecord* const record = engine_parts_.record_in_slot(slot);
+        if (record == nullptr || !(*record).reads_backplane) continue;
+        if (damage != nullptr) {
+            const Control::Ptr recorded_by = find((*record).painted_by);
+            if (!recorded_by || (*recorded_by).window_ != this) continue;
+            const Rect bounds = absolute_bounds_of(*recorded_by);
+            const Rect extent{bounds.x + (*record).extent.x, bounds.y + (*record).extent.y, (*record).extent.width,
+                              (*record).extent.height};
+            if (Rect::intersection(extent, *damage).empty()) continue;
+        }
+        static_cast<void>(damage_engine_part(*record, damaged));
+    }
+    if (damaged.parts > 0U) metrics_.record_engine_input_damage(damaged.parts, damaged.area);
+}
+
+void Window::note_engine_backplane_reader(PartRecordHandle handle, bool reads) noexcept {
+    engine_parts_.note_backplane_reader(handle, reads);
+}
+
 void Window::damage_published_readers(std::string_view name) {
     if (!engine_parts_.reads_any(published_input_bits)) return;
     EngineDamage damage{};

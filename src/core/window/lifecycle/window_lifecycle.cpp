@@ -187,6 +187,8 @@ void Window::apply_theme(const std::shared_ptr<const Theme>& theme) {
     // Another theme draws parts differently: no cached part raster is
     // current.
     engine_parts_.invalidate_rasters();
+    // The window's backplane material may differ (E9-B).
+    damage_backplane_readers(nullptr);
     // Themes include structural spacing/geometry/type tokens as well as paint
     // recipes, so replacement must remeasure and re-hit-test inherited content.
     mark_subtree_dirty(*root_, invalidation::conservative_subtree);
@@ -209,6 +211,8 @@ void Window::set_active(bool active) {
     if (active_ == active) return;
     if (!active && host_services_ != nullptr) { (*host_services_).revoke_cursor_interaction(); }
     active_ = active;
+    // The window's backplane material follows activation (E9-B).
+    damage_backplane_readers(nullptr);
     mark_subtree_dirty(*root_, Dirty::style | Dirty::paint | Dirty::semantics);
     for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
         if (const Control::Ptr overlay = (*popup).popup()) {
