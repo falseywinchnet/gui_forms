@@ -157,6 +157,63 @@ double engine_power(double base, double exponent) noexcept {
     return power;
 }
 
+namespace {
+
+constexpr double quarter_pi = 7.85398163397448309616e-01;
+constexpr double tangent_eighth_pi = 4.14213562373095048802e-01;
+constexpr double whole_pi = 3.14159265358979323846e+00;
+constexpr double right_angle = 1.57079632679489661923e+00;
+
+// The terms of the arctangent's series past the first, w^(2k+1) / (2k+1)
+// with alternating signs, for |w| ≤ 0.2: the first term left out is
+// w^27 / 27, below 2^-66.
+constexpr int arctangent_terms = 13;
+
+// arctan(z) for z in [0, 1].
+double arctangent_of_unit(double z) noexcept {
+    // Past tan(π/8), arctan z = π/4 + arctan((z − 1) / (z + 1)), whose
+    // argument lies in (−0.172, 0].
+    double base = 0.0;
+    double w = z;
+    if (z > tangent_eighth_pi) {
+        base = quarter_pi;
+        w = (z - 1.0) / (z + 1.0);
+    }
+    // The half-angle formula: arctan w = 2 arctan(w / (1 + √(1 + w²))),
+    // whose argument has magnitude at most 0.199.
+    const double half = w / (1.0 + std::sqrt(1.0 + w * w));
+    const double square = half * half;
+    double power = half;
+    double series = 0.0;
+    for (int term = 0; term < arctangent_terms; ++term) {
+        const double odd = static_cast<double>(term * 2 + 1);
+        const double contribution = power / odd;
+        series = (term % 2 == 0) ? series + contribution : series - contribution;
+        power = power * square;
+    }
+    const double angle = base + series * 2.0;
+    return angle;
+}
+
+} // namespace
+
+double engine_arctangent2(double y, double x) noexcept {
+    if (std::isnan(x) || std::isnan(y)) return std::numeric_limits<double>::quiet_NaN();
+    if (y == 0.0) return x < 0.0 ? whole_pi : 0.0;
+    if (x == 0.0) return y < 0.0 ? -right_angle : right_angle;
+    const double across = std::fabs(x);
+    const double down = std::fabs(y);
+    // Both infinite: the diagonal.
+    const bool both_infinite = std::isinf(across) && std::isinf(down);
+    const bool steep = down > across;
+    const double ratio = both_infinite ? 1.0 : (steep ? across / down : down / across);
+    double angle = arctangent_of_unit(ratio);
+    if (steep) angle = right_angle - angle;
+    if (x < 0.0) angle = whole_pi - angle;
+    if (y < 0.0) angle = -angle;
+    return angle;
+}
+
 EngineSineCosine engine_sine_cosine(double x) noexcept {
     EngineSineCosine result{};
     if (!(std::fabs(x) <= largest_angle)) {

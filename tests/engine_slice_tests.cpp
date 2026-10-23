@@ -63,10 +63,15 @@ DeviceExtent material_extent(Size logical, double scale) {
     return extent;
 }
 
-PartRasterRequest request_for(const SurfaceMaterial& material, Size logical, double scale) {
+// The button recipe drawn with `shape`, one of part_shape_names (E9.6).
+PartRasterRequest request_for(const SurfaceMaterial& material, Size logical, double scale,
+                              std::string_view shape = "rounded_rectangle") {
     PartRasterRequest request{};
     request.primitive = &material_primitive();
     request.parameters = button_recipe();
+    const PrimitiveDescriptor& descriptor = material_primitive().descriptor();
+    require(set_choice_parameter(request.parameters, descriptor, "shape", shape) == ParameterAssignment::assigned,
+            "a shape is a choice");
     request.target.logical_size = logical;
     request.target.scale = DeviceScale{scale};
     request.target.material = &material;
@@ -78,7 +83,9 @@ PartRasterRequest request_for(const SurfaceMaterial& material, Size logical, dou
 std::shared_ptr<PartRaster> whole_bake(const PartRasterRequest& request) {
     std::shared_ptr<PartRaster> raster = PartRaster::create(request.extent, request.target.scale);
     require(raster != nullptr, "the whole raster is made");
-    engine_primitives::bake_material(*request.target.material, request.target, (*raster).view());
+    const PartShapeKind shape = material_primitive().shape(request.parameters).kind;
+    engine_primitives::bake_material(*request.target.material, request.target, (*raster).view(),
+                                     engine_primitives::material_outset, shape);
     return raster;
 }
 
@@ -157,9 +164,13 @@ struct SliceCount final {
     std::size_t parts{};
 };
 
-void compare_assembly(const SurfaceMaterial& material, Size logical, double scale, SliceCount& count) {
-    const PartRasterRequest request = request_for(material, logical, scale);
-    require(material_primitive().accepts(request.parameters, request.target), "the material accepts the part");
+void compare_assembly(const SurfaceMaterial& material, Size logical, double scale, SliceCount& count,
+                      std::string_view shape = "rounded_rectangle") {
+    const PartRasterRequest request = request_for(material, logical, scale, shape);
+    if (!material_primitive().accepts(request.parameters, request.target)) {
+        std::cerr << shape << ' ' << logical.width << " x " << logical.height << " at " << scale << '\n';
+        require(false, "the material accepts the part");
+    }
     const PrimitiveSlicePlan plan =
         material_primitive().slice_plan(request.parameters, request.target, request.extent);
     require(plan.slices, "the material slices");
@@ -212,6 +223,25 @@ void assembly_equals_whole_bake() {
         for (const double width : widths) compare_assembly(glossy, Size{width, 24.0}, scale, gloss);
     }
     require(gloss.across > 0U && gloss.down == 0U, "the gloss slices across only");
+    // Four different corners (E9.6) slice as one radius does, by the
+    // largest; so does a pill, along its long axis.
+    SliceCount cornered{};
+    SurfaceMaterial corners = layered_material(false);
+    corners.corner_radii = MaterialCornerRadii{6.0, 0.0, 3.0, 1.5};
+    SliceCount pill{};
+    const SurfaceMaterial plain = layered_material(false);
+    for (const double scale : scales) {
+        for (const double width : widths) {
+            for (const double height : heights) {
+                compare_assembly(corners, Size{width, height}, scale, cornered);
+                // A tall pill's round ends are all corner pixels, and at
+                // 64 high it exceeds the bake bound.
+                if (height <= 40.0) compare_assembly(plain, Size{width, height}, scale, pill, "pill");
+            }
+        }
+    }
+    require(cornered.across > 0U && cornered.down > 0U, "four corners slice on both axes");
+    require(pill.across > 0U, "a pill slices along its length");
 }
 
 // -- the fallbacks -----------------------------------------------------------------

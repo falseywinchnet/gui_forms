@@ -16,7 +16,8 @@ namespace gui_forms {
 //   2^-1000 to 2^1000;
 // - engine_power: relative error at most 2^-49 · (1 + |exponent · ln base|)
 //   for results in the same range;
-// - engine_sine_cosine: absolute error at most 2^-50 for |x| ≤ 2^20.
+// - engine_sine_cosine: absolute error at most 2^-50 for |x| ≤ 2^20;
+// - engine_arctangent2: absolute error at most 2^-48.
 // The tests check them against the host library with a margin.
 
 // Natural logarithm of `x`. Requires x > 0 and finite; returns NaN for
@@ -43,5 +44,13 @@ struct EngineSineCosine final {
     double cosine{};
 };
 [[nodiscard]] EngineSineCosine engine_sine_cosine(double x) noexcept;
+
+// The angle of the point (x, y) from the positive x axis, in radians in
+// [−π, π], as std::atan2(y, x) (E9.6's conic gradient). Exact cases: (0, 0)
+// gives 0, and a point on an axis gives 0, ±π/2 or π. NaN in either
+// argument gives NaN. The ratio of the smaller to the larger magnitude is
+// reduced twice (by π/4 and by the half-angle formula) to at most 0.2,
+// where a 13-term series converges past 2^-60.
+[[nodiscard]] double engine_arctangent2(double y, double x) noexcept;
 
 } // namespace gui_forms

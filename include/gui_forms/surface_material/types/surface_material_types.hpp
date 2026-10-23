@@ -9,12 +9,45 @@
 
 namespace gui_forms {
 
+// A border's line (E9.6): CSS `solid`, `dashed` or `dotted`. A dash is
+// three widths long with a gap of two; a dot is a round dot one width
+// across, one every two widths. Each runs along the border's centre line
+// from the top-left corner's end, clockwise, and its period is stretched
+// so that a whole number of dashes or dots goes round. The engine's
+// material primitive draws them on a uniform border; the built-in path,
+// paint_surface_material, draws every border solid, and so does the
+// engine on a single edge (MaterialBorderEdges).
+enum class MaterialBorderStyle : std::uint8_t {
+    solid,
+    dashed,
+    dotted,
+};
+
 struct MaterialBorder final {
     Color color{Color::rgba(76, 94, 111)};
     double width{1.0};
+    MaterialBorderStyle style{MaterialBorderStyle::solid};
     friend constexpr bool operator==(const MaterialBorder& left,
                                      const MaterialBorder& right) noexcept {
-        return left.color == right.color && left.width == right.width;
+        return left.color == right.color && left.width == right.width &&
+               left.style == right.style;
+    }
+};
+
+// A material's four corner radii (E9.6, CSS `border-*-radius`), in logical
+// units: top-left, top-right, bottom-right and bottom-left. Each is drawn
+// at most half the box's shorter side.
+struct MaterialCornerRadii final {
+    double top_left{};
+    double top_right{};
+    double bottom_right{};
+    double bottom_left{};
+    friend constexpr bool operator==(const MaterialCornerRadii& left,
+                                     const MaterialCornerRadii& right) noexcept {
+        return left.top_left == right.top_left &&
+               left.top_right == right.top_right &&
+               left.bottom_right == right.bottom_right &&
+               left.bottom_left == right.bottom_left;
     }
 };
 struct MaterialShadow final {
@@ -102,6 +135,11 @@ struct SurfaceMaterial final {
     MaterialBorderEdges border_edges;
     std::vector<MaterialKeyline> keylines;
     double corner_radius{};
+    // Corners that differ (E9.6): when present they replace corner_radius
+    // in the engine's material primitive. The built-in path,
+    // paint_surface_material, rounds every corner by corner_radius, so a
+    // theme sets that to the radius the fallback should draw.
+    std::optional<MaterialCornerRadii> corner_radii;
     [[nodiscard]] static SurfaceMaterial from_parts(
         const MaterialFillLayer* fills, std::size_t fill_count,
         const MaterialShadow* shadows, std::size_t shadow_count,
@@ -123,13 +161,15 @@ struct SurfaceMaterial final {
         left.glows == right.glows &&
         left.border == right.border && left.border_edges == right.border_edges &&
         left.keylines == right.keylines &&
-        left.corner_radius == right.corner_radius)) {
+        left.corner_radius == right.corner_radius &&
+        left.corner_radii == right.corner_radii)) {
         return left.fills == right.fills && left.shadows == right.shadows &&
                left.glows == right.glows &&
                left.border == right.border &&
                left.border_edges == right.border_edges &&
                left.keylines == right.keylines &&
-               left.corner_radius == right.corner_radius;
+               left.corner_radius == right.corner_radius &&
+               left.corner_radii == right.corner_radii;
     }
 };
 

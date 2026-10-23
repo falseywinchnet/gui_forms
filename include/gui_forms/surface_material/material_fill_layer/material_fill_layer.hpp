@@ -8,8 +8,18 @@
 
 namespace gui_forms {
 
+// A conic gradient (E9.6) sweeps its stops clockwise about `center`,
+// starting `angle_degrees` from up (CSS `from`), over `period_degrees` of
+// the turn: 360 for `conic-gradient`, less for `repeating-conic-gradient`
+// with spread `repeat`. A radial gradient repeats or reflects its stops
+// past its radii with spread `repeat` or `reflect` (E9.6).
+//
+// The engine's material primitive draws both exactly. The built-in path,
+// paint_surface_material, draws a repeating radial gradient padded and a
+// conic gradient as a solid of its first stop: a theme that needs them
+// selects the material primitive for the part.
 enum class MaterialFillKind : std::uint8_t {
-    solid, linear_gradient, radial_gradient, image,
+    solid, linear_gradient, radial_gradient, image, conic_gradient,
 };
 enum class MaterialImageMode : std::uint8_t {
     stretch, tile, nine_patch,
@@ -41,6 +51,7 @@ struct MaterialFillLayer final {
     double image_scale{1.0};
     double opacity{1.0};
     MaterialImageMode image_mode{MaterialImageMode::stretch};
+    double period_degrees{360.0};
 
     [[nodiscard]] static MaterialFillLayer solid(Color color);
     [[nodiscard]] static MaterialFillLayer linear(
@@ -73,6 +84,16 @@ struct MaterialFillLayer final {
         Point center, Size radii, const GradientStop* stops,
         std::size_t stop_count,
         MaterialCoordinateSpace space = MaterialCoordinateSpace::normalized);
+    [[nodiscard]] static MaterialFillLayer repeating_radial(
+        Point center, Size radii, std::vector<GradientStop> stops,
+        MaterialCoordinateSpace space = MaterialCoordinateSpace::normalized);
+    [[nodiscard]] static MaterialFillLayer conic(
+        Point center, double from_degrees, std::vector<GradientStop> stops,
+        MaterialCoordinateSpace space = MaterialCoordinateSpace::normalized);
+    [[nodiscard]] static MaterialFillLayer repeating_conic(
+        Point center, double from_degrees, double period_degrees,
+        std::vector<GradientStop> stops,
+        MaterialCoordinateSpace space = MaterialCoordinateSpace::normalized);
     [[nodiscard]] static MaterialFillLayer stretched_image(
         ImageId image, Size pixel_size, double opacity = 1.0);
     [[nodiscard]] static MaterialFillLayer tiled_image(
@@ -96,7 +117,8 @@ struct MaterialFillLayer final {
         left.image_pixel_size == right.image_pixel_size &&
         left.image_slice == right.image_slice &&
         left.image_scale == right.image_scale &&
-        left.opacity == right.opacity && left.image_mode == right.image_mode)) {
+        left.opacity == right.opacity && left.image_mode == right.image_mode &&
+        left.period_degrees == right.period_degrees)) {
         return left.kind == right.kind &&
                left.coordinate_space == right.coordinate_space &&
                left.linear_geometry == right.linear_geometry &&
@@ -109,7 +131,8 @@ struct MaterialFillLayer final {
                left.image_slice == right.image_slice &&
                left.image_scale == right.image_scale &&
                left.opacity == right.opacity &&
-               left.image_mode == right.image_mode;
+               left.image_mode == right.image_mode &&
+               left.period_degrees == right.period_degrees;
     }
 };
 

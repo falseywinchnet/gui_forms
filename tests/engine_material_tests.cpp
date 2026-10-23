@@ -191,8 +191,8 @@ int channel(const TestRaster& raster, std::uint32_t column, std::uint32_t row, s
 
 void choices_are_the_recipe_roles() {
     const PrimitiveDescriptor& descriptor = material_primitive().descriptor();
-    require(descriptor.parameters.size() == 1U && descriptor.parameters[0].name == "recipe",
-            "the material has one parameter, its recipe");
+    require(descriptor.parameters.size() == 2U && descriptor.parameters[0].name == "recipe",
+            "the material's first parameter is its recipe (its shape is E9.6's)");
     const std::span<const std::string_view> choices = descriptor.parameters[0].choices;
     require(choices.size() == static_cast<std::size_t>(ControlVisualRole::count), "one choice per recipe role");
     for (std::size_t index = 0U; index < choices.size(); ++index) {
@@ -1073,6 +1073,8 @@ void measure() {
     linear_many.fills.push_back(MaterialFillLayer::linear(Point{0.0, 0.0}, Point{1.0, 1.0}, thirty_two, 32U));
     SurfaceMaterial radial = base;
     radial.fills.push_back(MaterialFillLayer::radial(Point{0.5, 0.5}, Size{0.5, 0.5}, two, 2U));
+    SurfaceMaterial conic = base;
+    conic.fills.push_back(MaterialFillLayer::conic(Point{0.5, 0.5}, 0.0, std::vector<GradientStop>(two, two + 2)));
     // Shadows wide enough that most pixels evaluate their integrals.
     SurfaceMaterial outer = base;
     outer.shadows.push_back(MaterialShadow{Point{0.0, 2.0}, 64.0, 0.0, black, false});
@@ -1089,6 +1091,15 @@ void measure() {
     rounded_base.corner_radius = 8.0;
     SurfaceMaterial border = rounded_base;
     border.border = MaterialBorder{blue, 1.0};
+    // A dashed border's pattern (E9.6), past the solid ring's cost, per
+    // pixel of the ring, at its dearest: a border 64 wide on a box rounded
+    // to a circle, so that every ring pixel is on an arc. The ring lies
+    // between radii 120 and 56.
+    SurfaceMaterial thick = round_box;
+    thick.border = MaterialBorder{blue, 64.0};
+    SurfaceMaterial dashed = thick;
+    (*dashed.border).style = MaterialBorderStyle::dashed;
+    const double ring_pixels = 3.14159265358979323846 * (120.0 * 120.0 - 56.0 * 56.0);
     SurfaceMaterial edge = base;
     edge.border_edges.top = MaterialBorder{blue, 1.0};
     SurfaceMaterial keyline = base;
@@ -1107,12 +1118,15 @@ void measure() {
     const double per_pixel_linear = (median_bake_nanoseconds(linear, nullptr) - base_time) / pixels;
     const double per_pixel_many = (median_bake_nanoseconds(linear_many, nullptr) - base_time) / pixels;
     const double per_pixel_radial = (median_bake_nanoseconds(radial, nullptr) - base_time) / pixels;
+    const double per_pixel_conic = (median_bake_nanoseconds(conic, nullptr) - base_time) / pixels;
     const double rounded_time = median_bake_nanoseconds(rounded_base, nullptr);
     const double per_pixel_outer = (median_bake_nanoseconds(outer, nullptr) - rounded_time) / pixels;
     const double round_time = median_bake_nanoseconds(round_box, nullptr);
     const double per_pixel_corner = (median_bake_nanoseconds(outer_round, nullptr) - round_time) / pixels - per_pixel_outer;
     const double per_pixel_inset = (median_bake_nanoseconds(inset, nullptr) - rounded_time) / pixels;
     const double per_pixel_border = (median_bake_nanoseconds(border, nullptr) - rounded_time) / pixels;
+    const double per_pixel_pattern =
+        (median_bake_nanoseconds(dashed, nullptr) - median_bake_nanoseconds(thick, nullptr)) / ring_pixels;
     const double per_pixel_edge = (median_bake_nanoseconds(edge, nullptr) - base_time) / pixels;
     const double per_pixel_keyline = (median_bake_nanoseconds(keyline, nullptr) - base_time) / pixels;
     const double per_pixel_image = (median_bake_nanoseconds(imaged, &registry) - base_time) / pixels;
@@ -1123,11 +1137,13 @@ void measure() {
     std::cout << "solid " << per_pixel_solid << '\n';
     std::cout << "linear " << per_pixel_linear << '\n';
     std::cout << "radial " << per_pixel_radial << '\n';
+    std::cout << "conic " << per_pixel_conic << '\n';
     std::cout << "gradient_stop " << (per_pixel_many - per_pixel_linear) / 30.0 << '\n';
     std::cout << "outer_shadow " << per_pixel_outer << '\n';
     std::cout << "outer_corner " << per_pixel_corner << '\n';
     std::cout << "inset_shadow " << per_pixel_inset << '\n';
     std::cout << "border " << per_pixel_border << '\n';
+    std::cout << "border_pattern " << per_pixel_pattern << '\n';
     std::cout << "border_edge " << per_pixel_edge << '\n';
     std::cout << "keyline " << per_pixel_keyline << '\n';
     std::cout << "image " << per_pixel_image << '\n';

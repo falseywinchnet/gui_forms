@@ -33,6 +33,7 @@ struct MaterialBakeCosts final {
     double solid{};
     double linear{};
     double radial{};
+    double conic{};
     // Per device pixel, for each gradient stop past the first two.
     double gradient_stop{};
     // Per device pixel, for each outer shadow: its separable integrals.
@@ -42,6 +43,8 @@ struct MaterialBakeCosts final {
     double outer_corner{};
     double inset_shadow{};
     double border{};
+    // Per device pixel, for a dashed or dotted border, past a solid one's.
+    double border_pattern{};
     double border_edge{};
     double keyline{};
     // Per device pixel, for each image fill: compositing its prepared
@@ -68,16 +71,24 @@ struct MaterialBakeCosts final {
 // inset shadow: 48 ns against 59). Each is the median of seven runs scaled
 // by 1.25 (that ratio) and rounded up; see "E9 shadow costs" there. The
 // quiet-machine re-measure, with the load recorded, replaces every figure.
+// conic and border_pattern (E9.6) are PROVISIONAL too: measured on the same
+// machine on 2026-10-22 at 100 % CPU load (sampled), the inset shadow at
+// 57 ns, as in the E8c runs, so unscaled. Each is the median of seven runs,
+// rounded up. border_pattern is per pixel of a dashed ring whose every
+// pixel is on an arc, its dearest; it is charged per destination pixel.
+// See "E9.6 G1 costs" there.
 inline constexpr MaterialBakeCosts measured_material_costs{
     .base = 26.0,
     .solid = 10.0,
     .linear = 15.0,
     .radial = 22.0,
+    .conic = 52.0,
     .gradient_stop = 0.5,
     .outer_shadow = 7.0,
     .outer_corner = 28.0,
     .inset_shadow = 60.0,
     .border = 26.0,
+    .border_pattern = 54.0,
     .border_edge = 11.0,
     .keyline = 13.0,
     .image = 6.0,

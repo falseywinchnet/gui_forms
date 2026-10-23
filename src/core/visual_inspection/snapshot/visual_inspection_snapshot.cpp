@@ -109,6 +109,7 @@ const char* fill_kind_name(MaterialFillKind kind) noexcept {
     case MaterialFillKind::linear_gradient: return "linear_gradient";
     case MaterialFillKind::radial_gradient: return "radial_gradient";
     case MaterialFillKind::image: return "image";
+    case MaterialFillKind::conic_gradient: return "conic_gradient";
     }
     return "unknown";
 }
@@ -169,6 +170,15 @@ const char* material_edge_name(MaterialEdge edge) noexcept {
     return "unknown";
 }
 
+const char* border_style_name(MaterialBorderStyle value) noexcept {
+    switch (value) {
+    case MaterialBorderStyle::solid: return "solid";
+    case MaterialBorderStyle::dashed: return "dashed";
+    case MaterialBorderStyle::dotted: return "dotted";
+    }
+    return "unknown";
+}
+
 void append_border(std::ostringstream& output,
                    const std::optional<MaterialBorder>& border) {
     if (!border) {
@@ -177,13 +187,29 @@ void append_border(std::ostringstream& output,
     }
     output << "{\"color\":";
     append_color(output, (*border).color);
-    output << ",\"width\":" << (*border).width << '}';
+    output << ",\"width\":" << (*border).width << ",\"style\":";
+    append_json_string(output, border_style_name((*border).style));
+    output << '}';
+}
+
+void append_corner_radii(std::ostringstream& output,
+                         const std::optional<MaterialCornerRadii>& radii) {
+    if (!radii) {
+        output << "null";
+        return;
+    }
+    output << "{\"top_left\":" << (*radii).top_left
+           << ",\"top_right\":" << (*radii).top_right
+           << ",\"bottom_right\":" << (*radii).bottom_right
+           << ",\"bottom_left\":" << (*radii).bottom_left << '}';
 }
 
 void append_material(std::ostringstream& output,
                      const SurfaceMaterial& material) {
     output << "{\"corner_radius\":" << material.corner_radius
-           << ",\"fills\":[";
+           << ",\"corner_radii\":";
+    append_corner_radii(output, material.corner_radii);
+    output << ",\"fills\":[";
     for (std::size_t index = 0U; index < material.fills.size(); ++index) {
         if (index != 0U) output << ',';
         const MaterialFillLayer& fill = material.fills[index];
@@ -192,6 +218,7 @@ void append_material(std::ostringstream& output,
         output << ",\"coordinate_space\":";
         append_json_string(output, coordinate_space_name(fill.coordinate_space));
         output << ",\"angle_degrees\":" << fill.angle_degrees
+               << ",\"period_degrees\":" << fill.period_degrees
                << ",\"color\":";
         append_color(output, fill.color);
         output << ",\"start\":";
