@@ -1027,6 +1027,74 @@ down row by row with a row of window sums, and the shadow blurs its alpha
 alone. Every byte is unchanged: the glass reference and the G2 references
 pass before and after.
 
+### E9.6 G3, finish, mask and position (rows 5, 9, 11 and 12)
+
+- **Surface finish (row 9).** `SurfaceMaterial::finish` in [0, 1], one
+  parameter from matte to gloss (owner, 2026-10-23, option 1: derived
+  from the face). `finished_surface_material` is the material a finish
+  describes, with a finish of 0:
+  - the first fill's colours at 0, 0.5 and 1 along it (a solid's colour
+    throughout) are rebuilt as the gloss's four vertical stops, at 0,
+    `gloss_break_start`, `gloss_break_end` and 1, keeping the fill's
+    blend mode;
+  - at finish f the top half lifts towards white by `finish_lift` × f
+    (0.25), the colour below the break darkens by
+    `finish_break_darkening` × f (0.15), and a white shine keyline of
+    alpha `finish_shine_alpha` × f (176) is added under the top edge,
+    inside the border.
+
+  The three constants are **provisional**, for the owner's eye at the
+  gate. A finish above 0 needs a solid or linear first fill and room for
+  one more keyline. Both paths draw the derived material: the bake derives
+  it once per bake, estimate and slice plan, outside the pixel loop.
+  `gloss_material` keeps its exact bytes and is not finish 1 over its
+  colours.
+- **Mask (row 12).** `SurfaceMaterial::mask`, an optional fill layer:
+  solid, linear, radial, conic or image, validated as a fill; a procedural
+  pattern is not a mask. Its alpha (an image's times its opacity)
+  multiplies the whole finished raster, after the part filters, so the
+  outer shadows, glows, drop shadow and blur fade with the face beside
+  them. Outside the box it extends at its edge value (owner, 2026-10-23,
+  option 3): a gradient is evaluated at the pixel centre moved into the
+  box, and an image's maps repeat their edge columns and rows. An image
+  mask's variant is made as a fill's is and lent in the ninth slot
+  (`maximum_image_variants` is 9); without it the part is drawn unmasked.
+  A mask varies along an axis as a fill
+  does, for slicing. The built-in path draws the material unmasked.
+- **Image position (row 11, CSS `background-position`).** A tiled image
+  fill's `image_anchor` places one tile's corner at that fraction of the
+  room the box leaves around one tile (CSS percentages: 0 the box's left
+  or top, 1 a tile flush with its right or bottom), moved by
+  `image_offset` logical units; the tiling runs on from there both ways.
+  An anchor outside [0, 1] or an offset past 4096 is invalid. The engine
+  applies it when the variant's maps are filled; the built-in path draws
+  the pattern from whole tiles back, clipped to the box. The default
+  position draws the bytes it drew before.
+- **Text shadow (row 5).** `ControlVisualRecipe::text_shadow`, an optional
+  `ControlTextShadow` (offset within ±16, blur radius within [0, 8],
+  colour), validated with the recipe and never drawn. The text stage
+  (M4/M9) draws it under the glyphs with a first-party blur.
+- **Cost.** A mask is charged a fill's evaluation of its kind and one
+  solid fill's cost for its multiplication; no new measured cost. A
+  finish is charged as the material it describes.
+- **Inspection.** The snapshot reports an image fill's `image_anchor` and
+  `image_offset`, and a material's `finish` and `mask` when set, so other
+  snapshots are unchanged.
+- **Proof.** `gui_forms_engine_material_tests`:
+  - the finish's stops, shine and half finish over a solid and a
+    gradient face, the bake of a finished material against the material
+    it describes at scale 1 and 2, and its validation;
+  - a solid mask scaling every pixel, a fade's clear and opaque edges
+    extended past the box with the shadow beside it, an image mask kept
+    on its left and extended past its right, and the mask's validation;
+  - a tiling moved by an offset and one anchored at the end, by chosen
+    pixels and reference hashes; the default tiling's hash is unchanged.
+
+  `gui_forms_material_tests`: the built-in path's positioned pattern and
+  its clip, a finished face's four stops, and the position's validation.
+  `gui_forms_theme_tests`: a text shadow carried to the resolved recipe,
+  and its bounds.
+
 ## Open decisions (ask, do not decide)
 
 The proposed numbers (light angle 135°, overshoot 8 %, blur cap 8 px,

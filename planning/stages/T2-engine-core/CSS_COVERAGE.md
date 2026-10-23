@@ -76,7 +76,7 @@ decision.
 | `box-shadow` (outer: offset, blur, spread, colour), up to 4 | `MaterialShadow`, `inset = false` | present | |
 | `box-shadow: inset` | `MaterialShadow`, `inset = true` | present | |
 | a popup's cast shadow | `overlay_shadow` primitive with the theme's overlay layers (E9.1) | present | |
-| `text-shadow` | none | missing | A text shadow on the text role (offset, blur, colour), drawn under the text slot's glyphs. The blur must be first-party so it is identical on every host. It belongs with the engine's text slots: E9.6 for the data and the slot, and the text stage (M4/M9) for the glyph coverage |
+| `text-shadow` | `ControlVisualRecipe::text_shadow` (`ControlTextShadow`: offset, blur radius, colour), validated data that is never drawn | present (data: E9.6 G3, #291) | The text stage (M4/M9) draws it under the text slot's glyphs, with a first-party blur so it is identical on every host |
 
 ## 4. Opacity
 
@@ -124,9 +124,9 @@ blurs the backplane, not the part.
 
 | CSS | Engine carrier | Status | Smallest addition |
 |---|---|---|---|
-| gloss | `gloss_material(GlossColours, radius)` preset (E9.4): a four-stop break at 0.48 to 0.52, a 1-unit shine and a border | present (as a preset) | |
+| gloss | `gloss_material(GlossColours, radius)` preset (E9.4): a four-stop break at 0.48 to 0.52, a 1-unit shine and a border | present (as a preset) | The preset keeps its exact bytes; it is not finish 1 over its colours |
 | matte | a plain gradient or solid material | present (as authored) | |
-| `surface-finish` from matte to gloss as one parameter | none | missing | `SurfaceMaterial::finish` in [0, 1] (owner: one parameter, not separate presets). The bake derives the finish from the material's base gradient: 0 is the material as authored; above 0 it sharpens the mid-face break (the gap from 0.48–0.52 scaled towards the authored stops), lifts the top half's luminance and adds the shine keyline at an alpha proportional to the finish. `gloss_material` becomes finish 1 over its colours, and the preset stays a convenience. E9.6 |
+| `surface-finish` from matte to gloss as one parameter | `SurfaceMaterial::finish` in [0, 1], drawn as `finished_surface_material`: the first fill (solid or linear) sampled at 0, 0.5 and 1 and rebuilt as the gloss's four stops; at finish f the top half lifts by 0.25 f, the break darkens by 0.15 f and a shine keyline of alpha 176 f is added (owner, 2026-10-23) | present (E9.6 G3, #291) | The three constants are provisional, for the owner's eye at the gate. Both paths draw it |
 
 ## 9. Light effects
 
@@ -145,7 +145,7 @@ blurs the backplane, not the part.
 |---|---|---|---|
 | `background-image: url()` naming a theme resource | `MaterialFillLayer` image fill by `ImageId` | present (by id) | Names: a theme names a resource, and the collection's manifest resolves it to an `ImageId` at load. This is E8c decision 3, not built yet. It is T3 work on the engine's existing id, with no new engine code |
 | `background-size`, `background-repeat` | `MaterialImageMode` stretch, tile and nine-patch; `image_scale` | present | |
-| `background-position` | none for images (gradients place by coordinates) | missing | An image origin offset on the image fill, applied when the variant's maps are filled; E9.6 |
+| `background-position` | a tiled image fill's `image_anchor` (fractions of the room the box leaves around one tile, as CSS percentages) plus `image_offset` (logical units); gradients place by coordinates | present (E9.6 G3, #291) | A stretched image and a nine-patch cover the box, so they have no position |
 | sized image faces | CONV variants (`image_variant`): one per (resource, device size, scale), made outside the bake | present | |
 | image formats | the resource registry decodes PNG today. CNG is the native resource format and PNG is for interop (owner direction); CNG's codec is in `stx_cng` | present (PNG); CNG wiring follows the intake | |
 
@@ -154,8 +154,8 @@ blurs the backplane, not the part.
 | CSS | Engine carrier | Status | Smallest addition |
 |---|---|---|---|
 | `clip-path` | not admitted as geometry. The engine owns shape and hit region (design language §12.3; T3 brief). The `shape` parameters are the admitted form | present (as shape parameters) | |
-| `mask-image` (an alpha mask) | none | missing | A `mask` image layer: an image fill whose alpha multiplies the box's coverage rather than compositing colour. It reuses the CONV variants and the image maps; E9.6 |
-| `mask-image: linear-gradient()` (a fade-out) | none | missing | The same mask layer kind with a gradient source; E9.6 |
+| `mask-image` (an alpha mask) | `SurfaceMaterial::mask`, an image fill whose alpha (times its opacity) multiplies the whole finished raster after the part filters, extended outward at its edge value so that shadows fade with the face beside them (owner, 2026-10-23); its variant is the bake's ninth | present (E9.6 G3, #291) | The built-in path draws the material unmasked |
+| `mask-image: linear-gradient()` (a fade-out) | the same `mask`, a solid, linear, radial or conic layer | present (E9.6 G3, #291) | |
 
 ## 12. Presentational transforms
 
