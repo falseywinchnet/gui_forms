@@ -2648,31 +2648,25 @@ void Window::acknowledge_paint_wake_if_damage_drained() noexcept {
 void Window::touch_paint() noexcept {
     ++content_revision_;
     if (content_revision_ == 0U) ++content_revision_;
-    if (in_paint_) {
-        dirty_after_render_ = true;
-        paint_lease_state_ = PaintLeaseState::rendering_dirty;
-    } else {
-        paint_lease_state_ = occluded_ ? PaintLeaseState::occluded_dirty
-                                       : PaintLeaseState::dirty_queued;
-    }
+    if (in_paint_) dirty_after_render_ = true;
     request_paint_wake();
 }
 
-void Window::update_paint_lease_state() noexcept {
+PaintLeaseState Window::paint_lease_state() const noexcept {
     if (in_paint_) {
-        paint_lease_state_ = dirty_after_render_
+        const PaintLeaseState rendering = dirty_after_render_
             ? PaintLeaseState::rendering_dirty
             : PaintLeaseState::rendering;
-    } else if (occluded_ && paint_pending()) {
-        paint_lease_state_ = PaintLeaseState::occluded_dirty;
-    } else if (paint_pending() || rendered_revision_ < content_revision_) {
-        paint_lease_state_ = PaintLeaseState::dirty_queued;
-    } else if (presented_revision_ < rendered_revision_) {
-        paint_lease_state_ = PaintLeaseState::ready;
-    } else {
-        paint_lease_state_ = PaintLeaseState::clean;
-        dirty_after_render_ = false;
+        return rendering;
     }
+    const bool owed = paint_pending();
+    if (owed && occluded_) return PaintLeaseState::occluded_dirty;
+    if (owed) return PaintLeaseState::dirty_queued;
+    // Nothing owed. A content revision past the rendered one changed nothing
+    // a paint can reach (a control outside the client area), so it is not
+    // queued; what remains is whether the last render has been presented.
+    if (presented_revision_ < rendered_revision_) return PaintLeaseState::ready;
+    return PaintLeaseState::clean;
 }
 
 void Window::add_subtree_damage(const Control::Ptr& control) {
