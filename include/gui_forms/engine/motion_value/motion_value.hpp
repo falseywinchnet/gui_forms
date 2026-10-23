@@ -276,7 +276,8 @@ public:
     MotionStart animate_to(double target);
     // A timed move from where the value stands now through `stops` to
     // `target` (E9.6): each stop's offset is a fraction of the duration,
-    // strictly increasing within (0, 1). It always starts a move. Refused,
+    // strictly increasing within (0, 1). It starts a new move even toward
+    // the target already set. Refused,
     // the value unchanged, for a curve that is not timed, more than
     // maximum_motion_stops stops, an offset out of order or out of range,
     // or a value or target that is not finite. While it runs, animate_to

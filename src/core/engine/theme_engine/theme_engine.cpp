@@ -175,6 +175,7 @@ struct PropertyRange final {
     double maximum{1.0};
 };
 
+// Whether `property` is one of the presentational translations (E9.6).
 bool translates(PresentationProperty property) noexcept {
     const bool translation =
         property == PresentationProperty::translate_x || property == PresentationProperty::translate_y;
