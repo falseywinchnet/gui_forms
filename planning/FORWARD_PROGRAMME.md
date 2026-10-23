@@ -135,6 +135,13 @@ Gate: a metrics differential for each mapped family (advance widths, line
 metrics, line breaks on a fixed corpus) against the reference face, within a
 recorded tolerance; licences recorded in `assets/fonts/ATTRIBUTION.md`.
 
+Today (2026-10-23): the owner accepted the stage plan (stage brief decisions 4
+to 14). The measurement tool, `tools/font_metrics_differential`, has had its
+first run against the Windows reference fonts
+(`results/2026-10-23-f1-metrics-harness`). Carlito and Cousine match their
+references' advances and line breaks exactly. The downloads of Arimo, Tinos
+and Selawik await the owner's approval, and the substitution table is next.
+
 ## 4. The theming spine
 
 ### T1. Anatomy: articulated controls and one schema

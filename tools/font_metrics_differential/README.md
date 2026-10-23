@@ -1,0 +1,68 @@
+# Font metrics differential (stage F)
+
+This tool measures a reference face and a candidate substitute, and compares
+them under the tolerance of the mapping's class. It is the measurement behind
+stage F's gate (`planning/stages/F-font-substitution/README.md`, owner
+decisions 8 and 9 of 2026-10-23).
+
+```text
+gui_forms_font_metrics_differential --reference <face.ttf> --candidate <face.ttf>
+    --class metric_compatible|nearest --corpus <corpus.txt> --out <report.json> [--gdi]
+```
+
+The exit status is 0 when the mapping's gate passes and 1 when it does not.
+It is 2 when an input is rejected or the measurement fails, and then no report
+is written. The tool is built with the text engine
+(`GUI_FORMS_ENABLE_HARFBUZZ_TEXT`). The executable sits at the build tree's
+root as `gui_forms_font_metrics_differential`.
+
+## What it measures
+
+For each face:
+
+- **Facts from FreeType**, in font units: family, version, SHA-256, units per
+  em, weight class, the `hhea`, `OS/2` typo and win vertical metrics, and the
+  advance of every code point in U+0020..007E and U+00A0..017F.
+- **The bundled engine's measurements** at 11, 12, 13, 16, 22 and 24 px (8.25,
+  9, 10 and 12 pt at 96 dpi, and 11 and 12 px at scale 2). The engine is the
+  one GUI.Forms shapes with: HarfBuzz over FreeType, unhinted advances
+  (ADR-004). It records the line metrics (ascent, descent, gap), the width of
+  every corpus string, and the greedy line breaks of every corpus paragraph at
+  20, 35 and 60 ems.
+- **GDI's measurements**, with `--gdi` on Windows: `tmAscent`, `tmDescent`,
+  `tmHeight`, the leadings and `GetTextExtentPoint32W` widths, at the same
+  sizes. The face's own bytes are added privately (`AddFontMemResourceEx`),
+  so a candidate need not be installed. `GetFontData` then proves that GDI
+  measured exactly the file (`bytes_match_file`).
+
+## The criteria (owner decision 8)
+
+| Criterion | `metric_compatible` | `nearest` |
+|---|---|---|
+| Advances | identical in ems (integer cross-multiplication) for every code point both faces map | recorded |
+| Line breaks | identical for every paragraph, width and size | recorded |
+| Line height | the candidate's engine line height within 1 px of GDI's reference `tmHeight` at every size; `not_measured` without GDI, or when GDI did not measure the reference file's own bytes | recorded |
+| Line width | recorded | the mean corpus string-width deviation within 5% at every size |
+
+The gate passes when no gated criterion is `failed` or `not_measured`.
+
+The report also records evidence that is not gated:
+
+- GDI's width deviation between the two faces.
+- Each face's engine-versus-GDI width deviation, which shows how far unhinted
+  advances sit from GDI's hinted ones.
+- GDI's heights for both faces.
+
+## Rules
+
+- Reference fonts are oracles. They are read by path (for example from
+  `C:\Windows\Fonts`), and only their file name, version, size and SHA-256
+  reach the report. Never commit a Microsoft font file.
+- The corpus (`corpus/forms_latin_v1.txt`) is versioned. Changing a line
+  changes every recorded result, so add a new version instead of editing one.
+- Inputs are validated whole before measurement starts. That covers the
+  corpus encoding and sections, and the sfnt table directory with the tables
+  the measurement reads. Collections (`ttcf`) are refused.
+
+`tests/font_metrics_differential_tests.cpp` covers the kernel with bundled
+faces only, so CI never needs a Microsoft font.

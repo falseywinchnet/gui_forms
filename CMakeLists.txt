@@ -366,6 +366,35 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     endif()
     set_target_properties(gui_forms_text_engine PROPERTIES
         POSITION_INDEPENDENT_CODE ON)
+
+    # Stage F's metrics differential (tools/font_metrics_differential): the
+    # bundled engine's measurements of two faces, a GDI oracle on Windows, and
+    # the comparison under a mapping's tolerance.
+    add_library(gui_forms_font_metrics_differential STATIC
+        tools/font_metrics_differential/differential_inputs.cpp
+        tools/font_metrics_differential/engine_measurement.cpp
+        tools/font_metrics_differential/differential_compare.cpp
+        tools/font_metrics_differential/differential_report.cpp
+    )
+    if(WIN32)
+        target_sources(gui_forms_font_metrics_differential PRIVATE
+            tools/font_metrics_differential/gdi_oracle_windows.cpp)
+        target_link_libraries(gui_forms_font_metrics_differential PRIVATE gdi32)
+    else()
+        target_sources(gui_forms_font_metrics_differential PRIVATE
+            tools/font_metrics_differential/gdi_oracle_unavailable.cpp)
+    endif()
+    target_include_directories(gui_forms_font_metrics_differential
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools/font_metrics_differential)
+    target_link_libraries(gui_forms_font_metrics_differential
+        PUBLIC gui_forms_core
+        PRIVATE gui_forms_text_engine freetype)
+    add_executable(gui_forms_font_metrics_differential_tool
+        tools/font_metrics_differential/font_metrics_differential_main.cpp)
+    set_target_properties(gui_forms_font_metrics_differential_tool PROPERTIES
+        OUTPUT_NAME gui_forms_font_metrics_differential)
+    target_link_libraries(gui_forms_font_metrics_differential_tool PRIVATE
+        gui_forms_font_metrics_differential)
 endif()
 
 if(GUI_FORMS_BUILD_PREPARED_TEXT)
@@ -2464,6 +2493,11 @@ if(GUI_FORMS_BUILD_TESTS)
         add_executable(gui_forms_bounded_shape_tests tests/bounded_shape_tests.cpp)
         target_link_libraries(gui_forms_bounded_shape_tests PRIVATE gui_forms_text_engine)
         add_test(NAME gui_forms_bounded_shape_tests COMMAND gui_forms_bounded_shape_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        add_executable(gui_forms_font_metrics_differential_tests tests/font_metrics_differential_tests.cpp)
+        target_link_libraries(gui_forms_font_metrics_differential_tests PRIVATE gui_forms_font_metrics_differential)
+        add_test(NAME gui_forms_font_metrics_differential_tests COMMAND gui_forms_font_metrics_differential_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/font_metrics_differential/corpus/forms_latin_v1.txt")
 
         add_executable(gui_forms_bounded_shape_workspace_tests tests/bounded_shape_workspace_tests.cpp)
         target_link_libraries(gui_forms_bounded_shape_workspace_tests PRIVATE gui_forms_text_engine)

@@ -1,8 +1,9 @@
 # Stage F: font substitution for requested families
 
 Release: 0.2 Verified. Depends on: nothing. Feeds R, S and H.
-Status 2026-10-12: not started. Authority: `planning/FORWARD_PROGRAMME.md`
-§3 F.
+Status 2026-10-23: started. The plan's eleven decisions are accepted (below);
+F1, the measurement tool, is in progress. Authority:
+`planning/FORWARD_PROGRAMME.md` §3 F.
 
 Read [the shared brief](../README.md) first.
 
@@ -103,3 +104,51 @@ corpus, sizes, tolerance and results under `results/`.
 - `planning/interview/GUI_FORMS_INTERVIEW_LEDGER.md` GF004
 - `assets/fonts/ATTRIBUTION.md`
 - `planning/DESIGN_LANGUAGE_SPECIFICATION.md` §6.1
+
+## Plan
+
+F0, the plan, is accepted. F1 builds the measurement tool
+(`tools/font_metrics_differential/`) and needs no new faces. F2 adds the
+substitution table and fixes the silent host-font substitution (decision 10).
+F3 adds the approved faces. F4 records the gate.
+
+## Owner decisions, 2026-10-23
+
+The owner accepted every recommendation of the F0 plan.
+
+4. **Microsoft Sans Serif** maps to **Arimo**. Arial, Arimo's metric target,
+   shares 284 of 319 Latin advances with it.
+5. **Tahoma** maps to whichever of Arimo and Selawik shows the smaller corpus
+   line-width deviation in F1's measurement. Both are recorded, and no face is
+   added for Tahoma.
+6. **Downloads.** Arimo, Tinos and Selawik are requested. Each download still
+   needs the owner's approval with its exact file, pinned source, size and
+   licence.
+7. **Missing styles** (Selawik has no italic) resolve to the nearest style of
+   the mapped family, reported as style-substituted. There is no synthetic
+   bold or oblique.
+8. **Tolerance.** A `metric_compatible` mapping has identical advances in font
+   units over the corpus coverage, identical line breaks, and a line height
+   within 1 px of the GDI oracle. A `nearest` mapping has a mean corpus
+   line-width deviation within 5% at every size; its line breaks and line
+   height are recorded but not gated.
+9. **Oracle.** Widths come from the bundled engine on both faces; vertical
+   metrics come from GDI, whose view the authors of Windows Forms programs
+   saw. The GDI extents are recorded as evidence. Calibri's own `hhea` table
+   differs from what GDI reports for it, so FreeType's reading of the
+   reference file is not the vertical oracle.
+10. **Unmapped families** (refines decision 2). Host bytes are accepted only
+    when the face the host selected has the requested name. Otherwise the
+    family resolves to the content face and the result reports `substituted`.
+    Today the Windows path registers whatever face GDI selects under the
+    requested name, which silently uses an arbitrary host font; F2 fixes it.
+11. **Generic names.** The table maps `sans-serif` to Carlito (the content
+    role), `serif` to Tinos and `monospace` to Cousine (the monospace role),
+    plus aliases such as "MS Sans Serif", "Helvetica" and the Segoe UI weight
+    names.
+12. **Table form.** A versioned JSON data file is generated into a fixed
+    record array at build time, so C# and Web.Forms read the same file.
+13. **Body face (M9)** stays open. Carlito is Calibri's substitute whatever M9
+    decides.
+14. **Portsmouth Mono** is the Consolas target only, registered under its own
+    family. Cousine remains the monospace role face (design language §6.1).
