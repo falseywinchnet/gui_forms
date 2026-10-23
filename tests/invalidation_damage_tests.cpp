@@ -16,6 +16,10 @@ namespace {
 
 using namespace gui_forms;
 
+// Each test holds its window on the heap. main inlines every test, and
+// the sanitizer build gives each inlined local its own stack slot, so
+// windows held on the stack add up to a frame of 74 KB in main.
+
 void require(bool condition, const char* message) {
     if (!condition) {
         throw std::runtime_error(message);
@@ -468,7 +472,8 @@ void test_damage_take_commits_layout_generated_geometry_damage() {
     (*root).add_child(left);
     (*root).add_child(top);
     (*root).add_child(fill);
-    Window window(root, {300.0, 180.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{300.0, 180.0});
+    Window& window = *held_window;
     window.perform_layout();
     NullPainter painter;
     DamageRegion initial = window.take_damage();
@@ -498,7 +503,8 @@ void test_reentrant_layout_is_bounded() {
     std::shared_ptr<ReentrantLayoutControl> root =
         make_control<ReentrantLayoutControl>(StableId("typed.reentrant"));
     (*root).set_requested_bounds({0.0, 0.0, 100.0, 80.0});
-    Window window(root, {100.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{100.0, 80.0});
+    Window& window = *held_window;
     window.reset_activity_metrics();
 
     window.perform_layout();
@@ -609,7 +615,8 @@ void test_exclusive_paint_lease_defers_reentry_and_tracks_release() {
         make_control<TransactionPaintControl>(StableId("paint.lease"));
     (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     (*root).request_nested_paint = true;
-    Window window(root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{120.0, 80.0});
+    Window& window = *held_window;
     NullPainter painter;
     const DamageRegion damage = window.take_damage();
     window.paint(painter, damage.bounds());
@@ -640,7 +647,8 @@ void test_paint_touch_during_render_survives_current_lease() {
         make_control<TransactionPaintControl>(StableId("paint.touch"));
     (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     (*root).invalidate_during_paint = true;
-    Window window(root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{120.0, 80.0});
+    Window& window = *held_window;
     NullPainter painter;
     const DamageRegion damage = window.take_damage();
     window.paint(painter, damage.bounds());
@@ -658,7 +666,8 @@ void test_failed_candidate_preserves_damage_and_never_replays_partial_commands()
         make_control<TransactionPaintControl>(StableId("paint.failure"));
     (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     (*root).throw_during_paint = true;
-    Window window(root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{120.0, 80.0});
+    Window& window = *held_window;
     NullPainter painter;
     const DamageRegion initial = window.take_damage();
     bool failed = false;
@@ -686,7 +695,8 @@ void test_retained_input_waits_for_lease_and_compacts_move_pressure() {
     (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     (*root).set_focusable(true);
     (*root).inject_pressure_during_next_paint = true;
-    Window window(root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{120.0, 80.0});
+    Window& window = *held_window;
     NullPainter painter;
     const DamageRegion initial = window.take_damage();
     window.paint(painter, initial.bounds());
@@ -729,7 +739,8 @@ void test_retained_input_is_abandoned_when_paint_owner_retires() {
     (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     (*root).set_focusable(true);
     (*root).dispose_during_next_paint = true;
-    Window window(root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{120.0, 80.0});
+    Window& window = *held_window;
     NullPainter painter;
     const DamageRegion initial = window.take_damage();
     window.paint(painter, initial.bounds());
@@ -755,7 +766,8 @@ void test_retained_input_fault_does_not_drop_later_events() {
     (*root).set_focusable(true);
     (*root).inject_pressure_during_next_paint = true;
     (*root).throw_on_key = true;
-    Window window(root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{120.0, 80.0});
+    Window& window = *held_window;
     NullPainter painter;
     const DamageRegion initial = window.take_damage();
     window.paint(painter, initial.bounds());
@@ -776,7 +788,8 @@ void test_semantic_action_waits_for_paint_lease_release() {
         make_control<DeferredInputPaintControl>(StableId("paint.semantic"));
     (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     (*root).inject_semantic_during_next_paint = true;
-    Window window(root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{120.0, 80.0});
+    Window& window = *held_window;
     NullPainter painter;
     const DamageRegion initial = window.take_damage();
     window.paint(painter, initial.bounds());
@@ -806,7 +819,8 @@ void test_slow_replay_pressure_coalesces_to_latest_state_and_exact_receipt() {
         make_control<ReplayPressureControl>(StableId("paint.pressure"));
     (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     (*root).set_focusable(true);
-    Window window(root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{120.0, 80.0});
+    Window& window = *held_window;
     std::uint64_t wake_calls{};
     window.set_paint_wake_handler(
         test_support::IncrementCounter<std::uint64_t>(wake_calls));
@@ -862,7 +876,8 @@ void test_resize_during_backend_replay_withholds_stale_receipt() {
     std::shared_ptr<ReplayPressureControl> root =
         make_control<ReplayPressureControl>(StableId("paint.epoch"));
     (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    Window window(root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{120.0, 80.0});
+    Window& window = *held_window;
     NullPainter initial_painter;
     const DamageRegion initial_damage = window.take_damage();
     const std::optional<PaintReceipt> initial = window.paint(initial_painter, initial_damage.bounds());
@@ -895,7 +910,8 @@ void test_occluded_mutation_storm_has_one_exposure_wake() {
     std::shared_ptr<ReplayPressureControl> root =
         make_control<ReplayPressureControl>(StableId("paint.occlusion"));
     (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    Window window(root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{120.0, 80.0});
+    Window& window = *held_window;
     NullPainter painter;
     const std::optional<PaintReceipt> initial = window.paint(painter, window.take_damage().bounds());
     require(initial.has_value() && window.notify_presented(*initial),
@@ -932,7 +948,8 @@ void test_backend_replay_fault_and_retirement_never_issue_receipt() {
     std::shared_ptr<ReplayPressureControl> fault_root =
         make_control<ReplayPressureControl>(StableId("paint.backend-fault"));
     (*fault_root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    Window fault_window(fault_root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_fault_window = std::make_unique<Window>(fault_root, Size{120.0, 80.0});
+    Window& fault_window = *held_fault_window;
     const DamageRegion fault_damage = fault_window.take_damage();
     ReplayBoundaryPainter faulting;
     faulting.throw_after_boundary = true;
@@ -955,7 +972,8 @@ void test_backend_replay_fault_and_retirement_never_issue_receipt() {
     std::shared_ptr<ReplayPressureControl> retiring_root =
         make_control<ReplayPressureControl>(StableId("paint.backend-retire"));
     (*retiring_root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    Window retiring_window(retiring_root, {120.0, 80.0});
+    const std::unique_ptr<Window> held_retiring_window = std::make_unique<Window>(retiring_root, Size{120.0, 80.0});
+    Window& retiring_window = *held_retiring_window;
     const DamageRegion retiring_damage = retiring_window.take_damage();
     ReplayBoundaryPainter retiring;
     retiring.on_first_command =
@@ -982,7 +1000,8 @@ void test_buffering_styles_are_retained_compatibility_facts() {
                 (*control).has_style(ControlStyles::optimized_double_buffer),
             "DoubleBuffered must retain both compatible buffering bits");
     (*control).set_style(ControlStyles::resize_redraw, true);
-    Window window(control, {40.0, 30.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(control, Size{40.0, 30.0});
+    Window& window = *held_window;
     require((*control).double_buffered() &&
                 (*control).has_style(ControlStyles::resize_redraw),
             "control styles must survive attachment and handle-equivalent lifetime");

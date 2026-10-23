@@ -10,6 +10,7 @@
 // prints the observed table instead of checking it.
 
 #include "gui_forms/control.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "gui_forms/controls/panel/panel.hpp"
 #include "gui_forms/engine.hpp"
 #include "gui_forms/theme.hpp"
@@ -326,7 +327,8 @@ public:
 };
 
 void test_engine_hit_region() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "engine-relief-test";
     std::vector<RuleDeclaration> pill{};
     pill.push_back(RuleDeclaration::choice_value("shape", "pill"));

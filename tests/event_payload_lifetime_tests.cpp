@@ -1,4 +1,5 @@
 #include "gui_forms/gui_forms.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "support/named_callbacks.hpp"
 
 #include <array>
@@ -222,7 +223,8 @@ void test_semantic_feedback_record_outlives_a_nested_emission() {
 // -- Window theme ----------------------------------------------------------
 
 std::shared_ptr<const Theme> theme_named(const char* id) {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = id;
     std::shared_ptr<const Theme> theme = Theme::create(definition);
     return theme;
