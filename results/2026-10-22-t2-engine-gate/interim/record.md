@@ -1,7 +1,10 @@
-# T2 engine gate record
+# T2 engine gate record: interim, 12 primitives, run 39910508309
+
+Interim, not the seal: E9.6 and E10 are still adding primitives, and the
+sealing run follows once they merge.
 
 Filled by `python tools/engine_gate.py compare` in the `engine-gate` job of
-`native.yml`. See `README.md` in this directory for how the evidence is made
+`native.yml`. See `../README.md` for how the evidence is made
 and for the tests behind parts 3 and 4 of the gate.
 
 - **Commit:** `5a87ab47fd08a534111431f24c4f0c5a2bc09eca`

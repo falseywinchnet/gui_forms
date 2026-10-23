@@ -9,18 +9,21 @@ parts:
 3. a part whose cost cannot be bounded falls back to the built-in recipe;
 4. reduced motion disables motion primitives.
 
-This directory holds the template that CI fills (`record.template.md`) and,
-once a run has passed on all four platforms, that run's filled record
-(`record.md`) and comparison (`comparison.json`).
+This directory holds the template that CI fills (`record.template.md`) and
+an interim record (`interim/`). The sealed record (`record.md` and
+`comparison.json`) will come from a run on main after the last T2 primitive
+lands, in its own pull request.
 
-## Sealed record
+## Interim record, 12 primitives, run 39910508309
 
-`record.md` and `comparison.json` come from CI run 39910508309, on #280's
-test merge commit `5a87ab47` (PR head `9422ea57` merged onto main
-`773e54b6`). All four hosts ran: 12 primitives, 144 images, each with the same
-hash on every host, and every idle counter at 0. That run seals parts 1
-and 2. Parts 3 and 4 rest on the tests listed below, which pass in the same
-run's native and sanitizer jobs.
+`interim/record.md` and `interim/comparison.json` come from CI run
+39910508309, on #280's test merge commit `5a87ab47` (PR head `9422ea57`
+merged onto main `773e54b6`). All four hosts ran: 12 primitives and 144
+images, each with the same hash on every host, and every idle counter at 0.
+
+It is not the gate's seal. The gate covers every primitive, and E9.6
+(G1-G4) and E10 are still adding primitives. The sealing run follows once
+they merge.
 
 ## How the evidence is made
 
