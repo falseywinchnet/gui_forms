@@ -491,6 +491,12 @@ SemanticDescriptor MaskedTextBox::semantic_descriptor() const {
     descriptor.name = accessible_name();
     // The value is what the field shows: prompts and literals in place.
     descriptor.value = provider_.length() == 0U ? text() : provider_.display_text();
+    // The editor shows the value, so its selection and caret index it; they
+    // are forwarded only while the two agree.
+    if (editor_ && (*editor_).text() == descriptor.value) {
+        const SemanticDescriptor editing = (*editor_).semantic_descriptor();
+        descriptor.text_selection = editing.text_selection;
+    }
     descriptor.description = accessible_description();
     descriptor.actions = {SemanticAction::focus};
     if (read_only_) {
@@ -515,6 +521,25 @@ bool MaskedTextBox::on_semantic_action(SemanticAction action, std::string_view v
         return focused;
     }
     return Panel::on_semantic_action(action, value);
+}
+
+bool MaskedTextBox::editor_shows_published_value() const {
+    if (!editor_) return false;
+    const std::string published = provider_.length() == 0U ? text() : provider_.display_text();
+    const bool same = (*editor_).text() == published;
+    return same;
+}
+
+SemanticTextResult MaskedTextBox::on_semantic_text_layout(SemanticTextLayout& layout) {
+    if (!editor_shows_published_value()) return SemanticTextResult::no_text;
+    const SemanticTextResult result = (*editor_).on_semantic_text_layout(layout);
+    return result;
+}
+
+SemanticTextResult MaskedTextBox::on_set_semantic_text_selection(SemanticTextSelection selection) {
+    if (!editor_shows_published_value()) return SemanticTextResult::no_text;
+    const SemanticTextResult result = (*editor_).on_set_semantic_text_selection(selection);
+    return result;
 }
 
 // -- anatomy -----------------------------------------------------------------------

@@ -411,6 +411,7 @@ private:
     [[nodiscard]] std::size_t end_realized(const Layout& placed) const noexcept;
     [[nodiscard]] Rect row_bounds(const Layout& placed, std::size_t row) const noexcept;
     [[nodiscard]] Rect column_cell(const Layout& placed, std::size_t column) const noexcept;
+    void append_row_cells(const Layout& placed, std::size_t row, SemanticNode& row_node) const;
     [[nodiscard]] bool column_visible(const Layout& placed, std::size_t column) const noexcept;
     [[nodiscard]] std::size_t visible_column_count(const Layout& placed) const noexcept;
     // The `position`th visible column, counted in display order.

@@ -850,6 +850,10 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     NSTimer* _tooltipTimer;
     std::uint64_t _lastSemanticGeneration;
     std::uint64_t _accessibilityCacheGeneration;
+    // Whether the last published tree held a live region: a semantic change
+    // then republishes the tree at once, so that a changed announcement is
+    // posted when it changes rather than when a client next reads.
+    BOOL _publishesLiveRegion;
     std::uint64_t _nativeCallbackFaults;
     BOOL _initialHostOccluded;
     std::uint64_t _scheduledWakeCount;
@@ -987,6 +991,29 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 - (BOOL)performNodeAction:(SemanticAction)action value:(NSString*)value;
 @end
 
+// Asks VoiceOver to speak a live region's latest announcement (DK-51) at
+// medium priority, the polite setting the other hosts publish. Posted to the
+// view's window, or to the application while the view has none.
+static void announce_live_region(GUIFormsView* owner, const std::string& text) {
+    NSString* const announcement = native_string(text);
+    NSDictionary* const info = @{
+        NSAccessibilityAnnouncementKey : announcement,
+        NSAccessibilityPriorityKey : @(NSAccessibilityPriorityMedium),
+    };
+    NSWindow* const window = owner == nil ? nil : [owner window];
+    const id target = window != nil ? static_cast<id>(window) : static_cast<id>(NSApp);
+    NSAccessibilityPostNotificationWithUserInfo(target, NSAccessibilityAnnouncementRequestedNotification, info);
+}
+
+// Whether `node` or a node below it is a live region.
+static bool contains_live_region(const SemanticNode& node) {
+    if (node.role == SemanticRole::live_region) return true;
+    for (const SemanticNode& child : node.children) {
+        if (contains_live_region(child)) return true;
+    }
+    return false;
+}
+
 @implementation GUIFormsAccessibilityElement
 
 // The children are set by reconcile_accessibility_element, which keys them.
@@ -1007,12 +1034,17 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     return self;
 }
 
+// A live region whose name changed to a new, non-empty announcement posts
+// it (a new element announces nothing, as on the other hosts).
 - (void)updateWithNode:(const SemanticNode&)node
                  owner:(GUIFormsView*)owner
                 parent:(id)parent {
+    const bool announce = node.role == SemanticRole::live_region && !node.name.empty() &&
+                          node.name != _node.name;
     _owner = owner;
     _node = node;
     self.accessibilityParent = parent;
+    if (announce) announce_live_region(owner, node.name);
 }
 
 - (void)setSemanticChildren:(NSArray*)children {
@@ -1085,7 +1117,10 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     return static_cast<NSInteger>(*_node.level - 1);
 }
 // A row's, cell's or header's place in its table, counting from zero, and a
-// table's size.
+// table's size. A node without an index does not publish the attribute
+// (isAccessibilitySelectorAllowed:): AppKit would otherwise send the
+// no-range value, {NSNotFound, 0}, which reaches a client as a location of
+// LONG_MAX rather than kCFNotFound.
 - (NSRange)accessibilityRowIndexRange {
     if (!_node.row_index || *_node.row_index == 0) return NSMakeRange(NSNotFound, 0);
     return NSMakeRange(static_cast<NSUInteger>(*_node.row_index - 1), 1);
@@ -1230,6 +1265,12 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     }
     if (selector == @selector(accessibilityPerformDecrement)) {
         return semantic_has_action(_node, SemanticAction::decrement);
+    }
+    if (selector == @selector(accessibilityRowIndexRange)) {
+        return _node.row_index && *_node.row_index != 0 ? YES : NO;
+    }
+    if (selector == @selector(accessibilityColumnIndexRange)) {
+        return _node.column_index && *_node.column_index != 0 ? YES : NO;
     }
     return [super isAccessibilitySelectorAllowed:selector];
 }
@@ -1434,6 +1475,7 @@ void post_perform_close(NSWindow* window) {
         _transparentFullSizeContent = transparentFullSizeContent;
         _windowDragRegionIds = std::move(windowDragRegionIds);
         _semanticAccessibilityChildren = nil;
+        _publishesLiveRegion = NO;
         _semanticAccessibilityElements = [[NSMutableDictionary alloc] init];
         _semanticAccessibilityElementsByStableId = [[NSMutableDictionary alloc] init];
         _markedText = [[NSMutableAttributedString alloc] init];
@@ -1672,6 +1714,7 @@ void post_perform_close(NSWindow* window) {
     }
     NSMutableArray* result = [[NSMutableArray alloc]
         initWithCapacity:snapshot.roots.size()];
+    bool live_region = false;
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* next =
         [[NSMutableDictionary alloc] initWithCapacity:snapshot.node_count];
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* byStableId =
@@ -1680,7 +1723,9 @@ void post_perform_close(NSWindow* window) {
         GUIFormsAccessibilityElement* element = reconcile_accessibility_element(
             node, self, self, 0U, _semanticAccessibilityElements, next, byStableId);
         [result addObject:element];
+        if (contains_live_region(node)) live_region = true;
     }
+    _publishesLiveRegion = live_region ? YES : NO;
     _semanticAccessibilityElements = next;
     _semanticAccessibilityElementsByStableId = byStableId;
     _semanticAccessibilityChildren = [result copy];
@@ -1923,6 +1968,8 @@ void post_perform_close(NSWindow* window) {
             _lastSemanticGeneration = semanticGeneration;
             _semanticAccessibilityChildren = nil;
             _accessibilityCacheGeneration = 0;
+            // Republishing posts a changed live region's announcement now.
+            if (_publishesLiveRegion == YES) static_cast<void>([self accessibilityChildren]);
             NSAccessibilityPostNotification(
                 self, NSAccessibilityLayoutChangedNotification);
         }

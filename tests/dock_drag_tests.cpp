@@ -667,6 +667,11 @@ void keyboard_reaches_every_target() {
     window.perform_layout();
     require(site.drag_target().has_value() && !site.drag_announcement().empty(),
             "it starts on a target and announces it");
+    const std::vector<SemanticNode> announced = site.semantic_virtual_children();
+    require(!announced.empty() && announced.back().stable_id == "site.announcements" &&
+                announced.back().role == SemanticRole::live_region &&
+                announced.back().name == site.drag_announcement(),
+            "the announcement is the name of the site's live region");
     std::set<TargetKey> planned{};
     for (const DockDropTarget& target : site.drag_targets()) planned.insert(key_of(target));
     // The pointer: a dense grid over the window.

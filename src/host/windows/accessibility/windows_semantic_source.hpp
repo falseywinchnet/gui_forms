@@ -104,8 +104,8 @@ bool parent_semantic_location(SemanticNode&&, const SemanticLocation&,
 [[nodiscard]] bool semantic_has_action(const SemanticNode& node, SemanticAction action) noexcept;
 
 // Whether `role` is checked and unchecked by a press: a check box or a
-// checked list's item. (A toggle button is a button; the tree has no flag
-// for one that is off.)
+// checked list's item. (A toggle button is a button that publishes the
+// checkable state.)
 [[nodiscard]] bool checkable_role(SemanticRole role) noexcept;
 
 // A new BSTR holding `value` as UTF-16, which the caller frees. Empty text

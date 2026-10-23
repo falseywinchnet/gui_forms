@@ -432,6 +432,7 @@ std::vector<SemanticNode> MenuStrip::semantic_virtual_children() const {
         node.role = SemanticRole::menu_bar_item;
         node.name = use_mnemonic_
             ? menu_display_text(items_[index].text) : items_[index].text;
+        if (use_mnemonic_) node.access_key = mnemonic_access_key(items_[index].text);
         node.bounds = {absolute.x + bounds[index].x, absolute.y + bounds[index].y,
                        bounds[index].width, bounds[index].height};
         node.states = SemanticState::visible | SemanticState::focusable;

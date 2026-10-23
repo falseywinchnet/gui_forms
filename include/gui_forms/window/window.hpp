@@ -723,6 +723,23 @@ public:
     // active focus scope.
     bool perform_semantic_action(RuntimeId control, std::string_view virtual_child,
                                  SemanticAction action, std::string_view value = {});
+    // Fills `layout` (caller-owned storage, emptied first and reused) with
+    // the text layout of the control with runtime identity `control`: its
+    // visual lines, graphemes and word starts, built only now (owner
+    // decision A-T1, 12.13). Text is published on a control's own node,
+    // never on a virtual child. UI thread only, and not deferred: during
+    // paint it answers during_paint and the host asks again. A runtime
+    // identity no attached control holds answers stale_identity (interview
+    // GF017). Reading changes no text, selection or scroll position.
+    [[nodiscard]] SemanticTextResult semantic_text_layout(RuntimeId control, SemanticTextLayout& layout);
+    // Moves the text selection of the control with runtime identity
+    // `control` (A-T1); focus does not move. Refused as semantic_text_layout
+    // refuses, and also for a control outside the active focus scope
+    // (outside_focus_scope) or an offset off a grapheme boundary
+    // (off_boundary); a refusal changes nothing. A done change reaches hosts
+    // through the next snapshot's text_selection field.
+    [[nodiscard]] SemanticTextResult set_semantic_text_selection(RuntimeId control,
+                                                                 SemanticTextSelection selection);
 
 private:
     friend class HostSession;
@@ -1180,6 +1197,11 @@ private:
                                           bool explicit_request) const;
     [[nodiscard]] bool has_popup_paint_dirty() const noexcept;
     [[nodiscard]] bool has_plane_damage() const noexcept;
+    // Whether a paint is owed: a change during the last render, a control
+    // or popup whose paint is dirty, or damage on any plane. Derived each
+    // time, so taking damage (any overload) or painting cannot leave a stale
+    // flag behind that keeps the window asking for frames.
+    [[nodiscard]] bool paint_pending() const noexcept;
     void collect_visible_overlay_rectangles(
         const Control::Ptr& control, std::vector<Rect>& rectangles) const;
     [[nodiscard]] static std::vector<Rect> subtract_rectangle(
@@ -1220,7 +1242,6 @@ private:
     std::shared_ptr<detail::DispatcherState> dispatcher_state_;
     std::uint64_t update_depth_{};
     bool layout_dirty_{true};
-    bool paint_dirty_{true};
     bool hit_test_dirty_{true};
     bool in_layout_{};
     bool in_paint_{};

@@ -299,9 +299,11 @@ void navigation_and_cancel() {
     require(!(*dialog).shown() && recorder.results.back().button_id == "custom", "close names its result");
 
     const SemanticDescriptor descriptor = (*dialog).semantic_descriptor();
-    require(descriptor.role == SemanticRole::group && descriptor.exposed, "a dialog is a named group");
+    require(descriptor.role == SemanticRole::dialog && descriptor.exposed && !descriptor.modal,
+            "a closed dialog is a dialog, not modal");
 
     require((*dialog).show(root), "the dialog shows before disposal");
+    require((*dialog).semantic_descriptor().modal, "a shown dialog is modal");
     const std::size_t results = recorder.results.size();
     (*dialog).dispose();
     require(recorder.results.size() == results && !(*dialog).shown(), "a disposed dialog closes without an event");

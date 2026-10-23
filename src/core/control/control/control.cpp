@@ -302,6 +302,28 @@ MnemonicText parse_mnemonic_text(std::string_view text) {
     return result;
 }
 
+std::string mnemonic_access_key(std::string_view text) {
+    for (std::size_t offset = 0U; offset < text.size();) {
+        if (text[offset] != '&') {
+            std::size_t length{};
+            static_cast<void>(decode_utf8_scalar(text, offset, length));
+            offset += length;
+            continue;
+        }
+        if (offset + 1U < text.size() && text[offset + 1U] == '&') {
+            offset += 2U;
+            continue;
+        }
+        ++offset;
+        if (offset >= text.size()) break;
+        std::size_t length{};
+        static_cast<void>(decode_utf8_scalar(text, offset, length));
+        const std::string key(text.substr(offset, length));
+        return key;
+    }
+    return {};
+}
+
 bool is_mnemonic(char32_t character, std::string_view text) noexcept {
     if (character == U'&') return false;
     for (std::size_t offset = 0U; offset < text.size();) {
@@ -2561,6 +2583,12 @@ bool Control::on_semantic_action(SemanticAction action, std::string_view) {
 bool Control::on_semantic_child_action(std::string_view, SemanticAction,
                                        std::string_view) {
     return false;
+}
+SemanticTextResult Control::on_semantic_text_layout(SemanticTextLayout&) {
+    return SemanticTextResult::no_text;
+}
+SemanticTextResult Control::on_set_semantic_text_selection(SemanticTextSelection) {
+    return SemanticTextResult::no_text;
 }
 void Control::on_drag_preview(DragEvent&) {}
 void Control::on_drag(DragEvent&) {}

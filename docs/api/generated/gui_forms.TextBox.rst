@@ -333,7 +333,9 @@ gui_forms::TextBox
    The control publishes the accessibility role ``text_box``. Its name is the
    accessible name only, so give every box one with ``set_accessible_name``; the
    placeholder becomes the description, not the name. The value is the text, or
-   empty when masked, together with the protected-content state. It reports
+   empty when masked, together with the protected-content state. The box also
+   publishes whether it is multiline and, unless masked, its selection as an
+   anchor and a caret. It reports
    read-only when :cpp:func:`read_only <gui_forms::TextBox::read_only>` is true, and otherwise offers a set-value action,
    which replaces the whole text as one undoable edit within :cpp:func:`maximum_length <gui_forms::TextBox::maximum_length>`.
    A box that suggests also publishes that it opens a popup, and the expanded
@@ -791,6 +793,12 @@ gui_forms::TextBox
    .. cpp:function:: void on_frame(FrameTime now) override
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: SemanticTextResult on_semantic_text_layout(SemanticTextLayout& layout) override
+
+      The layout as painted: one line for a single-line box, the visual (wrapped) lines for a multiline one; graphemes at their painted positions after scrolling; word starts by next_word_boundary (the Ctrl+Right rule). A password box publishes no text: no_text.
+
+   .. cpp:function:: SemanticTextResult on_set_semantic_text_selection(SemanticTextSelection selection) override
 
    .. cpp:function:: bool on_semantic_action(SemanticAction action, std::string_view value) override
 

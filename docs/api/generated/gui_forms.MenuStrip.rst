@@ -138,7 +138,8 @@ gui_forms::MenuStrip
 
    The strip publishes the accessibility role ``menu_bar``, named "Application
    menu" unless it has an accessible name. Each visible top-level item is a
-   child with the role ``menu_bar_item``, named by its text without the ``&``,
+   child with the role ``menu_bar_item``, named by its text without the ``&``, with
+   the character after the ``&`` as its access key,
    reporting the selected, expanded and focused states and offering the focus,
    press, expand and collapse actions. Press and expand open the menu, and
    collapse closes it.

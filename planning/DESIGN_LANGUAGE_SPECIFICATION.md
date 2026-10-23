@@ -1009,21 +1009,56 @@ as far as their APIs allow:
 - UI Automation: tree, tree item, table, data item (rows and cells),
   header item, data grid (a tree grid), pane with IsDialog (a dialog),
   status bar and group with a polite LiveSetting (a live region); Level,
-  AccessKey ("Alt+key"), CanSelectMultiple, SmallChange and LargeChange.
+  AccessKey ("Alt+key"), CanSelectMultiple, SmallChange and LargeChange;
+  the Grid pattern on a node with row and column counts and the GridItem
+  pattern on one with row and column indices (from zero, spanning one row
+  and one column); LiveRegionChanged when a live region's name changes to
+  a new announcement.
 - ATK: tree, tree item, table, table row, table cell, column and row
   header, tree table, dialog and status bar roles (a live region is a
   panel with the "live" and "container-live" attributes); the checkable,
   multiselectable, modal and single- or multi-line states; the "level",
   "rowindex", "colindex", "rowcount" and "colcount" attributes; the access
   key as the default action's key binding "<Alt>key"; the small step as
-  the value's increment.
+  the value's increment; the "announcement" signal (AT-SPI
+  object:announcement, ATK 2.46 and later) when a live region's name
+  changes to a new announcement.
 - AppKit: outline (a tree and a tree grid), row (a tree item, with the
   outline-row subrole, and a table row), table and cell roles; a dialog, a
   status bar and a live region are groups with WebKit's subroles
   (AXApplicationDialog, AXApplicationStatus, AXApplicationLog); the
   disclosure level, row and column index ranges and counts, modal, and a
-  multi-line text box as a text area. AppKit has no access-key or step
-  attribute.
+  multi-line text box as a text area; the announcement-requested
+  notification, at medium priority, when a live region's name changes to
+  a new announcement. AppKit has no access-key or step attribute.
+
+The owner settled how the controls bridge the vocabulary on 2026-10-22
+(stage A, the seven gaps of part 2): a DataGridView cell publishes `cell`
+with its row and column whatever its kind, its kind's behaviour staying on
+it as states and actions (a toggle, a value, a choice, a press); a column
+header that does something when clicked (an ObjectView header that sorts)
+publishes `press`; CorrespondenceView stays a list, since it shows no real
+columns (a view that does would be a table); a control that draws row
+headers (DataGridView) publishes them, first in their rows; the ribbon's
+keyboard letters, its mnemonics (it has no KeyTips, RB-16), are its tabs'
+and commands' access keys; live regions are announced on all three hosts
+as above; and a range publishes a large step only when it really has one
+(NumericUpDown has none).
+
+Editable text (A-T1, A-T2) is read and selected through two window queries
+rather than node fields: `Window::semantic_text_layout` returns a text
+node's visual lines, graphemes (with their boxes in client coordinates) and
+the control's own word starts; `Window::set_semantic_text_selection` moves
+its selection, refusing stale identities, calls during paint, targets
+outside the active focus scope and offsets off a grapheme boundary. TextBox
+(single-line and multiline) answers both, MaskedTextBox through its editor;
+a password box answers neither. On ATK (A-L3) the Text interface counts
+characters and converts to and from the core's UTF-8 offsets: the caret and
+one selection, read from `text_selection` and set through the window; the
+string at an offset by character (its grapheme), word, visual line and
+paragraph, with sentences unsupported; character boxes and the character
+at a point; and text-insert, text-remove, text-caret-moved and
+text-selection-changed when a published text node changes.
 
 ## 9. Motion, effects and sound
 

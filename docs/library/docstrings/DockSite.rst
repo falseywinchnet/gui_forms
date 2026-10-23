@@ -104,7 +104,9 @@ drag_stamp
     The stamp's rectangle while dragging or settling.
 drag_announcement
     What the drag announces ("Output: dock left of Properties"), also the
-    site's semantic description while the drag runs.
+    name of the site's last semantic child, a `live_region` with the ID
+    ``<site>.announcements`` that UI Automation announces when its name
+    changes.
 drag_threshold : default ``4``
     How far, in logical units along either axis, a caption press moves
     before it drags; outside 1 to 64 throws `std::out_of_range`.

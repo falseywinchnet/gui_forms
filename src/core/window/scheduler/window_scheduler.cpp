@@ -9,7 +9,7 @@
 namespace gui_forms {
 
 bool Window::needs_frame() const noexcept {
-    return paint_dirty_;
+    return paint_pending();
 }
 
 std::optional<FrameTime> Window::next_wake() const noexcept {
@@ -206,7 +206,7 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
             (*request).deadline = now + (*request).interval;
             // Idle: no motion runs and nothing waits to be painted. One
             // keyframe per idle frame, so that none stalls a frame.
-            if (motion_clock_.armed() || paint_dirty_) continue;
+            if (motion_clock_.armed() || paint_pending()) continue;
             const bool waiting = engine_parts_.bake_idle_keyframe(&image_resources(), paint_leases_completed_);
             if (!waiting) (*request).disconnect();
             continue;
@@ -307,7 +307,7 @@ void Window::set_occluded(bool occluded, FrameTime transition_time) {
         // Ambient effects stopped while hidden resume with their parts'
         // next paint (E7).
         resume_engine_ambient();
-        if (paint_dirty_) request_paint_wake();
+        if (paint_pending()) request_paint_wake();
     }
     update_paint_lease_state();
     update_frame_schedule_metrics();

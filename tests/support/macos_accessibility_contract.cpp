@@ -83,6 +83,12 @@ std::string expected_ax_value(const SemanticNode& node) {
     return node.value;
 }
 
+std::string expected_ax_range(const std::optional<std::size_t>& index) {
+    if (!index || *index == 0U) return {};
+    const std::string range = std::to_string(*index - 1U) + "+1";
+    return range;
+}
+
 AccessibilityProjection expected_ax_projection(const SemanticNode& node) {
     AccessibilityProjection expected;
     // A text box whose text runs over several lines is a text area.
@@ -109,6 +115,12 @@ AccessibilityProjection expected_ax_projection(const SemanticNode& node) {
     expected.value_settable = has_semantic_action(node, SemanticAction::set_value);
     expected.selected_settable = has_semantic_action(node, SemanticAction::select);
     expected.close_action = has_semantic_action(node, SemanticAction::close);
+    expected.disclosure_level = node.level && *node.level != 0U ? static_cast<long long>(*node.level - 1U) : 0;
+    expected.row_range = expected_ax_range(node.row_index);
+    expected.column_range = expected_ax_range(node.column_index);
+    expected.row_count = node.row_count ? static_cast<long long>(*node.row_count) : 0;
+    expected.column_count = node.column_count ? static_cast<long long>(*node.column_count) : 0;
+    expected.modal = node.modal;
     return expected;
 }
 

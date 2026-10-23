@@ -410,6 +410,9 @@ void ListBox::on_focus_changed(bool focused) {
 SemanticDescriptor ListBox::semantic_descriptor() const {
     SemanticDescriptor descriptor;
     descriptor.role = SemanticRole::list;
+    if (selection_mode_ == ListSelectionMode::multiple_extended) {
+        descriptor.states |= SemanticState::multiselectable;
+    }
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
     if (const std::optional<std::size_t> selected = selected_index()) {

@@ -1205,7 +1205,16 @@ void ObjectView::on_focus_changed(bool focused) {
 
 SemanticDescriptor ObjectView::semantic_descriptor() const {
     SemanticDescriptor descriptor{};
-    descriptor.role = SemanticRole::list;
+    // The details view with columns is a table (12.13), sized by every item
+    // and every column, realized or not; the other views are lists.
+    if (has_details_columns()) {
+        descriptor.role = SemanticRole::table;
+        descriptor.row_count = items_.size();
+        descriptor.column_count = details_columns_.size();
+    } else {
+        descriptor.role = SemanticRole::list;
+    }
+    if (selection_mode_ == ObjectSelectionMode::multiple) descriptor.states |= SemanticState::multiselectable;
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
     descriptor.value = selected_ids_.size() <= 1U
@@ -1220,30 +1229,30 @@ std::vector<SemanticNode> ObjectView::semantic_virtual_children() const {
     const std::size_t first = top_row_ * columns();
     const std::size_t end = std::min(items_.size(),
         (top_row_ + visible_row_count()) * columns());
-    nodes.reserve(end - std::min(first, end));
+    const bool table = has_details_columns();
+    nodes.reserve(end - std::min(first, end) + (table ? details_columns_.size() : 0U));
     const Rect absolute = absolute_bounds();
+    if (table) append_column_headers(nodes);
     for (std::size_t index = first; index < end; ++index) {
         const ObjectViewItem& item = items_[index];
         const Rect local = item_bounds(index);
         SemanticNode node{};
         node.stable_id = item.stable_id;
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
-        node.role = SemanticRole::list_item;
         // Only the visible items are described; their positions still count
         // the whole collection.
-        node.position_in_set = index + 1U;
-        node.set_size = items_.size();
+        if (table) {
+            node.role = SemanticRole::row;
+            node.row_index = index + 1U;
+            append_row_cells(index, node);
+        } else {
+            node.role = SemanticRole::list_item;
+            node.position_in_set = index + 1U;
+            node.set_size = items_.size();
+        }
         node.name = item.name;
         node.value = item.secondary_text;
         node.description = item.description;
-        if (has_details_columns()) {
-            for (std::size_t column = 0U; column < details_columns_.size(); ++column) {
-                if (!node.description.empty()) node.description.append("; ");
-                node.description.append(details_columns_[column].label);
-                node.description.append(": ");
-                node.description.append(item.cells[column].text);
-            }
-        }
         node.bounds = {absolute.x + local.x, absolute.y + local.y,
                        local.width, local.height};
         node.states = SemanticState::visible | SemanticState::focusable;
@@ -1257,11 +1266,75 @@ std::vector<SemanticNode> ObjectView::semantic_virtual_children() const {
     return nodes;
 }
 
+// The details view's column headers whose extent meets the header band (the
+// realized columns), in column order. A sortable column's header offers
+// press, which sorts as clicking it does (owner decision, stage A gap 2);
+// the others do nothing when clicked and offer no action.
+void ObjectView::append_column_headers(std::vector<SemanticNode>& nodes) const {
+    const Rect absolute = absolute_bounds();
+    const Rect band{4.0, 2.0, std::max(0.0, local_bounds().width - 8.0), header_height()};
+    const std::string view_id(stable_id().value());
+    for (std::size_t column = 0U; column < details_columns_.size(); ++column) {
+        const Rect bounds = Rect::intersection(column_bounds(column), band);
+        if (bounds.empty()) continue;
+        const ObjectDetailsColumn& definition = details_columns_[column];
+        SemanticNode node{};
+        node.stable_id = view_id + ".column." + definition.id.value;
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
+        node.role = SemanticRole::column_header;
+        node.column_index = column + 1U;
+        node.name = definition.label;
+        if (!details_sort_.column.value.empty() && definition.id == details_sort_.column) {
+            node.value = details_sort_.direction == ObjectSortDirection::ascending ? "ascending" : "descending";
+        }
+        node.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
+        node.states = SemanticState::visible;
+        if (effectively_enabled()) node.states |= SemanticState::enabled;
+        if (definition.sortable) node.actions = {SemanticAction::press};
+        nodes.push_back(std::move(node));
+    }
+}
+
+// A details row's cells, one per column whose extent meets the body (the
+// realized columns). A cell has no actions of its own; its row takes them.
+void ObjectView::append_row_cells(std::size_t index, SemanticNode& row_node) const {
+    const ObjectViewItem& item = items_[index];
+    const Rect absolute = absolute_bounds();
+    const Rect line = item_bounds(index);
+    const double header = header_height();
+    const Rect body{4.0, 2.0 + header, std::max(0.0, local_bounds().width - 8.0),
+                    std::max(0.0, local_bounds().height - header - 4.0)};
+    const bool enabled = effectively_enabled() && item.enabled;
+    for (std::size_t column = 0U; column < details_columns_.size(); ++column) {
+        const Rect extent = column_bounds(column);
+        const Rect cell_rect{extent.x, line.y, extent.width, line.height};
+        const Rect bounds = Rect::intersection(cell_rect, body);
+        if (bounds.empty()) continue;
+        const ObjectDetailsCell& value = item.cells[column];
+        SemanticNode cell{};
+        cell.stable_id = item.stable_id + ".cell." + details_columns_[column].id.value;
+        cell.runtime_id = virtual_semantic_runtime_id(cell.stable_id);
+        cell.role = SemanticRole::cell;
+        cell.name = details_columns_[column].label;
+        cell.value = value.text;
+        cell.row_index = index + 1U;
+        cell.column_index = column + 1U;
+        cell.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
+        cell.states = SemanticState::visible;
+        if (enabled && value.availability == ObjectCellAvailability::available) cell.states |= SemanticState::enabled;
+        row_node.children.push_back(std::move(cell));
+    }
+}
+
 bool ObjectView::on_semantic_child_action(std::string_view id,
                                           SemanticAction action,
                                           std::string_view) {
     const std::optional<std::size_t> index = item_index(id);
-    if (!index || (action != SemanticAction::focus &&
+    if (!index) {
+        const bool pressed = press_column_header(id, action);
+        return pressed;
+    }
+    if ((action != SemanticAction::focus &&
                    action != SemanticAction::select &&
                    action != SemanticAction::press &&
                    action != SemanticAction::show_menu)) return false;
@@ -1288,6 +1361,29 @@ bool ObjectView::on_semantic_child_action(std::string_view id,
     return true;
 }
 
+
+// A press sent to a sortable column header's node: the header takes focus,
+// as a click gives it, and requests the sort the click would. False for any
+// other node or action, a column that does not sort, or a disabled view.
+bool ObjectView::press_column_header(std::string_view id, SemanticAction action) {
+    if (action != SemanticAction::press || !has_details_columns() || !effectively_enabled()) return false;
+    const std::string prefix = std::string(stable_id().value()) + ".column.";
+    if (id.compare(0U, prefix.size(), prefix) != 0) return false;
+    const ObjectColumnId column_id{std::string(id.substr(prefix.size()))};
+    const std::optional<std::size_t> column = column_index(column_id);
+    if (!column || !details_columns_[*column].sortable) return false;
+    const Control::Ptr lifetime = shared_from_this();
+    if (window() != nullptr) {
+        const bool accepted = (*window()).request_focus(lifetime);
+        if (!accepted) return false;
+    }
+    if (!is_alive() || !has_details_columns() || *column >= details_columns_.size()) return false;
+    header_focused_ = true;
+    focused_column_ = *column;
+    reveal_header();
+    request_header_sort(*column);
+    return true;
+}
 
 bool ObjectView::has_details_columns() const noexcept {
     const bool result = view_mode_ == ObjectViewMode::details && !details_columns_.empty();

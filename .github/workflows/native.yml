@@ -83,11 +83,14 @@ jobs:
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
+      # One tree per job: a pull_request run takes its workflow files from the
+      # test merge commit (refs/pull/N/merge), so the job checks out that same
+      # commit (the default ref), never the head alone, whose older tree may
+      # lack tools main's workflow calls. A push checks out the pushed commit.
       # The whole history, so a pull request's changed paths are taken from its
       # merge base (tools/change_selection.py).
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: gui_forms
           fetch-depth: 0
       - uses: actions/setup-python@v5
@@ -120,14 +123,15 @@ jobs:
           echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
       # Line tables by default; [sanitizer-full-g] in the head commit's message
       # selects -g for a hunt (tools/ci_build.py --debug-info). The checkout is
-      # the head commit itself (the pushed commit, or a pull request's head
-      # rather than its merge commit), so `git log -1` reads that message on
-      # push and pull_request events alike.
+      # a pull request's merge commit, so the message is read from the head
+      # commit by name (the full history holds it); a push reads its own.
       - name: Choose the sanitizer debug information
         id: debug-info
+        env:
+          HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           mode=lines
-          if git -C gui_forms log -1 --format=%B | grep -qF '[sanitizer-full-g]'; then
+          if git -C gui_forms log -1 --format=%B "$HEAD_COMMIT" | grep -qF '[sanitizer-full-g]'; then
             mode=full
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
@@ -255,9 +259,12 @@ jobs:
       run:
         shell: ${{ matrix.shell }}
     steps:
+      # One tree per job: a pull_request run takes its workflow files from the
+      # test merge commit (refs/pull/N/merge), so the job checks out that same
+      # commit (the default ref), never the head alone, whose older tree may
+      # lack tools main's workflow calls. A push checks out the pushed commit.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: gui_forms
       - uses: actions/setup-python@v5
         with:

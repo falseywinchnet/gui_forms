@@ -200,7 +200,7 @@ void status_strip() {
     require((*status).overflow_item_ids().empty(), "a status strip never overflows");
     (*status).set_sizing_grip(false);
     require(!(*status).parts().sizing_grip.present, "the sizing grip can be hidden");
-    require((*status).semantic_descriptor().role == SemanticRole::group, "a status strip is a named group");
+    require((*status).semantic_descriptor().role == SemanticRole::status_bar, "a status strip is a status bar");
 }
 
 

@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <climits>
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
@@ -126,6 +127,32 @@ bool bool_attribute(AXUIElementRef element, CFStringRef attribute) {
     return false;
 }
 
+// A number attribute, or 0 when the element has none.
+long long integer_attribute(AXUIElementRef element, CFStringRef attribute) {
+    CfValue value;
+    if (copy_attribute(element, attribute, value) != kAXErrorSuccess || value.get() == nullptr) return 0;
+    if (CFGetTypeID(value.get()) != CFNumberGetTypeID()) return 0;
+    long long number = 0;
+    CFNumberGetValue(static_cast<CFNumberRef>(value.get()), kCFNumberLongLongType, &number);
+    return number;
+}
+
+// A range attribute as "location+length", or "" when the element has none
+// or its location is kCFNotFound.
+std::string range_attribute(AXUIElementRef element, CFStringRef attribute) {
+    CfValue value;
+    if (copy_attribute(element, attribute, value) != kAXErrorSuccess || value.get() == nullptr) return {};
+    if (CFGetTypeID(value.get()) != AXValueGetTypeID()) return {};
+    CFRange range = CFRangeMake(kCFNotFound, 0);
+    if (!AXValueGetValue(static_cast<AXValueRef>(value.get()), kAXValueTypeCFRange, &range)) return {};
+    // No range: kCFNotFound, or AppKit's NSNotFound (LONG_MAX), which an
+    // NSRange of {NSNotFound, 0} becomes on its way through AXValue.
+    if (range.location == kCFNotFound || range.location == LONG_MAX) return {};
+    const std::string text = std::to_string(static_cast<long long>(range.location)) + "+" +
+                             std::to_string(static_cast<long long>(range.length));
+    return text;
+}
+
 std::string value_attribute(AXUIElementRef element) {
     CfValue value;
     if (copy_attribute(element, kAXValueAttribute, value) != kAXErrorSuccess || value.get() == nullptr) return {};
@@ -191,6 +218,12 @@ AccessibilityProjection published_projection(AXUIElementRef element) {
     published.focus_settable = settable(element, kAXFocusedAttribute);
     published.value_settable = settable(element, kAXValueAttribute);
     published.selected_settable = settable(element, kAXSelectedAttribute);
+    published.disclosure_level = integer_attribute(element, kAXDisclosureLevelAttribute);
+    published.row_range = range_attribute(element, kAXRowIndexRangeAttribute);
+    published.column_range = range_attribute(element, kAXColumnIndexRangeAttribute);
+    published.row_count = integer_attribute(element, kAXRowCountAttribute);
+    published.column_count = integer_attribute(element, kAXColumnCountAttribute);
+    published.modal = bool_attribute(element, kAXModalAttribute);
     return published;
 }
 
@@ -247,6 +280,20 @@ SemanticNode node_from_json(NSDictionary* object) {
     node.value = ns_text(object[@"value"]);
     node.description = ns_text(object[@"description"]);
     node.numeric_value = ns_number(object[@"numeric_value"]);
+    // The stage A fields the AX projection reads (12.13); null in the dump
+    // is no value.
+    const std::optional<double> level = ns_number(object[@"level"]);
+    if (level) node.level = static_cast<std::size_t>(*level);
+    const std::optional<double> row_index = ns_number(object[@"row_index"]);
+    if (row_index) node.row_index = static_cast<std::size_t>(*row_index);
+    const std::optional<double> column_index = ns_number(object[@"column_index"]);
+    if (column_index) node.column_index = static_cast<std::size_t>(*column_index);
+    const std::optional<double> row_count = ns_number(object[@"row_count"]);
+    if (row_count) node.row_count = static_cast<std::size_t>(*row_count);
+    const std::optional<double> column_count = ns_number(object[@"column_count"]);
+    if (column_count) node.column_count = static_cast<std::size_t>(*column_count);
+    node.modal = ns_number(object[@"modal"]).value_or(0.0) != 0.0;
+    node.multiline = ns_number(object[@"multiline"]).value_or(0.0) != 0.0;
     node.minimum_value = ns_number(object[@"minimum_value"]);
     node.maximum_value = ns_number(object[@"maximum_value"]);
     const std::optional<double> states = ns_number(object[@"states"]);
@@ -466,6 +513,13 @@ private:
         return false;
     }
 
+    bool number(const std::string& owner, const std::string& id, const char* field, long long expected,
+                long long published) {
+        if (expected == published) return true;
+        add(owner, id, field, std::to_string(expected), std::to_string(published));
+        return false;
+    }
+
     bool compare_projection(const std::string& owner, const std::string& id,
                             const AccessibilityProjection& expected,
                             const AccessibilityProjection& published) {
@@ -487,6 +541,12 @@ private:
         same = flag(owner, id, "AXValue settable", expected.value_settable, published.value_settable) && same;
         same = flag(owner, id, "AXSelected settable", expected.selected_settable, published.selected_settable) && same;
         same = flag(owner, id, "Close action", expected.close_action, published.close_action) && same;
+        same = number(owner, id, "AXDisclosureLevel", expected.disclosure_level, published.disclosure_level) && same;
+        same = text(owner, id, "AXRowIndexRange", expected.row_range, published.row_range) && same;
+        same = text(owner, id, "AXColumnIndexRange", expected.column_range, published.column_range) && same;
+        same = number(owner, id, "AXRowCount", expected.row_count, published.row_count) && same;
+        same = number(owner, id, "AXColumnCount", expected.column_count, published.column_count) && same;
+        same = flag(owner, id, "AXModal", expected.modal, published.modal) && same;
         return same;
     }
 

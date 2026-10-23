@@ -133,8 +133,9 @@ gui_forms::ScrollBar
    when a thumb drag ends.
 
    The bar is published to accessibility with the role ``scroll_bar``, its
-   value as text and as a number with the range, and the focus, increment,
-   decrement (by the small change) and set-value actions. Accessibility actions
+   value as text and as a number with the range, the small and large change
+   as its steps, and the focus, increment, decrement (by the small change) and
+   set-value actions. Accessibility actions
    raise ``scroll`` like other input; a set-value outside the range is clamped.
 
    .. rubric:: Examples

@@ -172,8 +172,8 @@ gui_forms::DateTimePicker
    character, and other characters are copied unchanged.
 
    The control publishes the accessibility role ``date_picker``, with the
-   formatted value as its value, the state :cpp:enumerator:`SemanticState::checked <gui_forms::SemanticState::checked>` when the
-   check box is shown and checked, and :cpp:enumerator:`SemanticState::expanded <gui_forms::SemanticState::expanded>` while the
+   formatted value as its value, the state :cpp:enumerator:`SemanticState::checkable <gui_forms::SemanticState::checkable>` when the
+   check box is shown and :cpp:enumerator:`SemanticState::checked <gui_forms::SemanticState::checked>` when it is also checked, and :cpp:enumerator:`SemanticState::expanded <gui_forms::SemanticState::expanded>` while the
    calendar is open. It supports :cpp:enumerator:`SemanticAction::increment <gui_forms::SemanticAction::increment>` and
    :cpp:enumerator:`SemanticAction::decrement <gui_forms::SemanticAction::decrement>`, which step one day;
    :cpp:enumerator:`SemanticAction::set_value <gui_forms::SemanticAction::set_value>`, which takes an ISO date such as ``2026-12-24``,

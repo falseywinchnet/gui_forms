@@ -108,7 +108,8 @@ gui_forms::CheckBox
    ``clicked``. Setting the current state again raises nothing.
 
    The control publishes the accessibility role ``check_box``, with the value
-   :cpp:func:`checked <gui_forms::CheckBox::checked>`, ``unchecked`` or ``mixed``.
+   :cpp:func:`checked <gui_forms::CheckBox::checked>`, ``unchecked`` or ``mixed`` and the state ``checkable``. With
+   ``use_mnemonic``, the character after the ``&`` in its text is its access key.
 
    .. rubric:: Examples
 

@@ -406,6 +406,7 @@ SemanticDescriptor DateTimePicker::semantic_descriptor() const {
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
     descriptor.value = formatted_value();
+    if (show_check_box_) descriptor.states |= SemanticState::checkable;
     if (show_check_box_ && checked_) descriptor.states |= SemanticState::checked;
     if (dropped_down_) descriptor.states |= SemanticState::expanded;
     descriptor.actions = {SemanticAction::focus, SemanticAction::increment,

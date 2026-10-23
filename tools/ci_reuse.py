@@ -71,6 +71,27 @@ def matching_receipt(receipt: dict[str, Any], identity: dict[str, Any], run_id: 
     return valid
 
 
+def merge_of_head(repository: str, receipt: dict[str, Any], run: dict[str, Any]) -> bool:
+    """Whether the receipt's revision is a merge of the producer run's head with the receipt's tree.
+
+    A pull request's native job checks out the test merge commit, whose
+    tree differs from the head's when the branch is behind its base. The
+    run names only its head, so the recorded revision must be a commit that
+    has that head as a parent and the claimed tree.
+    """
+    revision: Any = receipt.get('revision')
+    if not isinstance(revision, str) or not revision:
+        return False
+    commit: dict[str, Any] = api('repos/' + repository + '/git/commits/' + revision)
+    if commit['tree']['sha'] != receipt.get('tree'):
+        return False
+    parent: dict[str, Any]
+    for parent in commit.get('parents', []):
+        if parent.get('sha') == run['head_sha']:
+            return True
+    return False
+
+
 def receipt_from_zip(data: bytes, digest: str) -> dict[str, Any]:
     if 'sha256:' + hashlib.sha256(data).hexdigest() != digest:
         raise ValueError('Validation artifact digest mismatch')
@@ -107,9 +128,12 @@ def lookup(identity: dict[str, Any], wait_seconds: int) -> bool:
                 origin: dict[str, Any] = artifact['workflow_run']
                 if origin['head_repository_id'] != origin['repository_id']:
                     continue
+                # The run's head carries the tree when the producer checked out
+                # the head or an up-to-date branch's merge commit; otherwise the
+                # receipt's merge revision is checked below (merge_of_head). An
+                # inputs artifact only makes this lookup wait for its producer.
                 commit: dict[str, Any] = api('repos/' + repository + '/git/commits/' + run['head_sha'])
-                if commit['tree']['sha'] != identity['tree']:
-                    continue
+                head_tree: bool = commit['tree']['sha'] == identity['tree']
                 jobs: list[dict[str, Any]] = api(prefix + 'runs/' + str(producer) + '/jobs?per_page=100')['jobs']
                 native: list[dict[str, Any]] = []
                 job: dict[str, Any]
@@ -127,6 +151,8 @@ def lookup(identity: dict[str, Any], wait_seconds: int) -> bool:
                     ['gh', 'api', prefix + 'artifacts/' + str(artifact['id']) + '/zip', '--allow-escape-sequences'])
                 receipt: dict[str, Any] = receipt_from_zip(data, artifact.get('digest', ''))
                 if not matching_receipt(receipt, identity, producer):
+                    continue
+                if not head_tree and not merge_of_head(repository, receipt, run):
                     continue
                 payload: dict[str, Any] = api(prefix + 'artifacts/' + str(receipt['artifact_id']))
                 if (payload['expired'] or payload['workflow_run']['id'] != producer

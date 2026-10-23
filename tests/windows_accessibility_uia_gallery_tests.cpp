@@ -267,15 +267,20 @@ struct ExpectedPatterns final {
     bool range_value{};
     bool value{};
     bool expand_collapse{};
+    // A table or tree grid publishes its size; a cell its row and column.
+    bool grid{};
+    bool grid_item{};
 };
 
 bool expects_toggle(const SemanticNode& node) noexcept {
     if (is_check_role(node.role)) return true;
     if (node.role == SemanticRole::radio_button) return false;
-    // A toggle button publishes checked (or mixed) only while it is on.
-    const bool on = has_semantic_state(node.states, SemanticState::checked) ||
-                    has_semantic_state(node.states, SemanticState::mixed);
-    const bool toggles = on && has_action(node, SemanticAction::press);
+    // A toggle button or a checkable menu item publishes checkable whether
+    // or not it is on.
+    const bool can_check = has_semantic_state(node.states, SemanticState::checkable) ||
+                           has_semantic_state(node.states, SemanticState::checked) ||
+                           has_semantic_state(node.states, SemanticState::mixed);
+    const bool toggles = can_check && has_action(node, SemanticAction::press);
     return toggles;
 }
 
@@ -296,6 +301,8 @@ ExpectedPatterns expected_patterns(const SemanticNode& node) noexcept {
     patterns.range_value = node.numeric_value.has_value();
     patterns.value = !node.numeric_value.has_value() &&
                      (has_action(node, SemanticAction::set_value) || node.role == SemanticRole::text_box);
+    patterns.grid = node.row_count.has_value() && node.column_count.has_value();
+    patterns.grid_item = node.row_index.has_value() && node.column_index.has_value();
     patterns.expand_collapse = has_action(node, SemanticAction::expand) ||
                                has_action(node, SemanticAction::collapse) ||
                                has_action(node, SemanticAction::show_menu);
@@ -690,6 +697,17 @@ int integer_property(IUIAutomationElement& element, PROPERTYID property) {
     return result;
 }
 
+// A Boolean property, or false when the element reports none.
+bool boolean_property(IUIAutomationElement& element, PROPERTYID property) {
+    VARIANT value;
+    VariantInit(&value);
+    const HRESULT status = element.GetCurrentPropertyValue(property, &value);
+    bool result = false;
+    if (SUCCEEDED(status) && value.vt == VT_BOOL) result = value.boolVal == VARIANT_TRUE;
+    VariantClear(&value);
+    return result;
+}
+
 LONG device_coordinate(double logical, double scale) noexcept {
     const LONG device = static_cast<LONG>(std::lround(logical * scale));
     return device;
@@ -711,7 +729,7 @@ void compare_patterns(PageWalk& walk, IUIAutomationElement& element, const Expec
         bool wanted;
         const char* name;
     };
-    const std::array<Offer, 7> table{{
+    const std::array<Offer, 9> table{{
         {UIA_InvokePatternId, patterns.invoke, "Invoke pattern"},
         {UIA_TogglePatternId, patterns.toggle, "Toggle pattern"},
         {UIA_SelectionItemPatternId, patterns.selection_item, "SelectionItem pattern"},
@@ -719,6 +737,8 @@ void compare_patterns(PageWalk& walk, IUIAutomationElement& element, const Expec
         {UIA_RangeValuePatternId, patterns.range_value, "RangeValue pattern"},
         {UIA_ValuePatternId, patterns.value, "Value pattern"},
         {UIA_ExpandCollapsePatternId, patterns.expand_collapse, "ExpandCollapse pattern"},
+        {UIA_GridPatternId, patterns.grid, "Grid pattern"},
+        {UIA_GridItemPatternId, patterns.grid_item, "GridItem pattern"},
     }};
     for (const Offer& offer : table) {
         const bool offered = offers(element, offer.id);
@@ -782,6 +802,85 @@ void compare_patterns(PageWalk& walk, IUIAutomationElement& element, const Expec
                              std::to_string(maximum) + "]",
                          matched);
         }
+        // The steps (12.13); zero for a node that publishes none.
+        double small = 0.0;
+        double large = 0.0;
+        static_cast<void>((*range.get()).get_CurrentSmallChange(&small));
+        static_cast<void>((*range.get()).get_CurrentLargeChange(&large));
+        const double wanted_small = node.small_step.value_or(0.0);
+        const double wanted_large = node.large_step.value_or(0.0);
+        if (small != wanted_small || large != wanted_large) {
+            add_mismatch(walk, expected, "SmallChange/LargeChange",
+                         std::to_string(wanted_small) + "/" + std::to_string(wanted_large),
+                         std::to_string(small) + "/" + std::to_string(large), matched);
+        }
+    }
+    ComReference<IUIAutomationSelectionPattern> selection;
+    if (patterns.selection && element_pattern(element, UIA_SelectionPatternId, selection)) {
+        BOOL multiple = FALSE;
+        static_cast<void>((*selection.get()).get_CurrentCanSelectMultiple(&multiple));
+        const bool wanted = has_semantic_state(node.states, SemanticState::multiselectable);
+        if ((multiple == TRUE) != wanted) {
+            add_mismatch(walk, expected, "CanSelectMultiple", bool_text(wanted), bool_text(multiple == TRUE),
+                         matched);
+        }
+    }
+    ComReference<IUIAutomationGridPattern> grid;
+    if (patterns.grid && element_pattern(element, UIA_GridPatternId, grid)) {
+        int rows = 0;
+        int columns = 0;
+        static_cast<void>((*grid.get()).get_CurrentRowCount(&rows));
+        static_cast<void>((*grid.get()).get_CurrentColumnCount(&columns));
+        const int wanted_rows = static_cast<int>(*node.row_count);
+        const int wanted_columns = static_cast<int>(*node.column_count);
+        if (rows != wanted_rows || columns != wanted_columns) {
+            add_mismatch(walk, expected, "RowCount/ColumnCount",
+                         std::to_string(wanted_rows) + "/" + std::to_string(wanted_columns),
+                         std::to_string(rows) + "/" + std::to_string(columns), matched);
+        }
+    }
+    ComReference<IUIAutomationGridItemPattern> grid_item;
+    if (patterns.grid_item && element_pattern(element, UIA_GridItemPatternId, grid_item)) {
+        int row = -1;
+        int column = -1;
+        static_cast<void>((*grid_item.get()).get_CurrentRow(&row));
+        static_cast<void>((*grid_item.get()).get_CurrentColumn(&column));
+        // UI Automation counts from zero; the tree from one.
+        const int wanted_row = static_cast<int>(*node.row_index) - 1;
+        const int wanted_column = static_cast<int>(*node.column_index) - 1;
+        if (row != wanted_row || column != wanted_column) {
+            add_mismatch(walk, expected, "Row/Column",
+                         std::to_string(wanted_row) + "/" + std::to_string(wanted_column),
+                         std::to_string(row) + "/" + std::to_string(column), matched);
+        }
+    }
+}
+
+// The stage A properties (12.13): Level, AccessKey ("Alt+" and the
+// mnemonic), IsDialog and LiveSetting (polite for a live region).
+void compare_vocabulary_properties(PageWalk& walk, IUIAutomationElement& element, const ExpectedNode& expected,
+                                   bool& matched) {
+    const SemanticNode& node = expected.node;
+    const int level = integer_property(element, UIA_LevelPropertyId);
+    const int wanted_level = node.level ? static_cast<int>(*node.level) : 0;
+    if (level != wanted_level) {
+        add_mismatch(walk, expected, "Level", std::to_string(wanted_level), std::to_string(level), matched);
+    }
+    BstrOwner key;
+    static_cast<void>(element.get_CurrentAccessKey(key.receive()));
+    const std::string wanted_key = node.access_key.empty() ? std::string{} : "Alt+" + node.access_key;
+    if (key.utf8() != wanted_key) {
+        add_mismatch(walk, expected, "AccessKey", wanted_key, key.utf8(), matched);
+    }
+    const bool dialog = boolean_property(element, UIA_IsDialogPropertyId);
+    const bool wanted_dialog = node.role == SemanticRole::dialog;
+    if (dialog != wanted_dialog) {
+        add_mismatch(walk, expected, "IsDialog", bool_text(wanted_dialog), bool_text(dialog), matched);
+    }
+    const int live = integer_property(element, UIA_LiveSettingPropertyId);
+    const int wanted_live = node.role == SemanticRole::live_region ? static_cast<int>(Polite) : 0;
+    if (live != wanted_live) {
+        add_mismatch(walk, expected, "LiveSetting", std::to_string(wanted_live), std::to_string(live), matched);
     }
 }
 
@@ -950,6 +1049,7 @@ void compare_element(PageWalk& walk, IUIAutomationElement& element, const Expect
                          std::to_string(position) + "/" + std::to_string(size), matched);
         }
         compare_patterns(walk, element, expected, matched);
+        compare_vocabulary_properties(walk, element, expected, matched);
         if (node.role == SemanticRole::tab) compare_controller(walk, element, expected, matched);
         const std::vector<int> identity = runtime_id(element);
         if (identity.empty() || !walk.runtime_ids.insert(identity).second) {

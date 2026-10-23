@@ -419,6 +419,8 @@ private:
     [[nodiscard]] Rect item_bounds(const Layout& placed, std::size_t index) const noexcept;
     [[nodiscard]] Rect column_cell(const Layout& placed, std::size_t column) const noexcept;
     [[nodiscard]] bool column_visible(const Layout& placed, std::size_t column) const noexcept;
+    void append_row_cells(const Layout& placed, std::size_t index, const ListViewItem& item,
+                          SemanticNode& row_node) const;
     [[nodiscard]] std::size_t visible_column_count(const Layout& placed) const noexcept;
     [[nodiscard]] std::size_t visible_column(const Layout& placed, std::size_t position) const noexcept;
     [[nodiscard]] ItemParts item_parts(const Layout& placed, std::size_t index, Rect clip) const;
