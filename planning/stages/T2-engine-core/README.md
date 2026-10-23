@@ -665,8 +665,8 @@ assembles any size of a sliceable material from one reference bake.
     adds no visual outsets.
   - *Stock rules.* The proposed stock rules for both are in the design
     language, §9.3 item 3, for the owner's review, and stock looks are
-    unchanged. The M105 question (a glow on the default button beside its
-    perimeter) is in §12.2.
+    unchanged. The owner admitted the default button's over glow beside its
+    perimeter (2026-10-22). M105 now says glow is never the only signal.
   - *Proof.* `engine_material_tests`:
     - an under glow leaves the face unchanged and brightens a dark
       surround;
