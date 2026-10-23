@@ -88,12 +88,13 @@ description (control, part role, bounds, states, content).
    language requires (§3.5, §4.2–§4.6, §9.3): pill plate, bulge, dithered
    bulge, inset well, pressed, gold active plate, default perimeter,
    disabled, etched divider, seam, actuator, gloss (four-stop with a hard
-   break), glow, sheen, pop, translucency, reflection, glass (bounded blur
+   break), glow, sheen, pop, translucency, glass (bounded blur
    sampling only the backplane, radius at most 8 logical px, proposed),
    procedural materials (felt, wood grain, paper fibre, pinstripe, brushed
    metal, fresco with blooms) generated per display scale and cached.
    PlaySuite's gloss, lift and rings are capability requirements (§12.3),
-   not defaults.
+   not defaults. Reflection moved to T5, beside full-fidelity glass (owner,
+   2026-10-22).
 3. **Inputs as engine-set custom properties**: pointer position relative to
    the part (`--pointer-x`, `--pointer-y`), hover, press, focus, value, time
    since state entry, display and text scale, density, accessibility flags,
@@ -500,6 +501,17 @@ assembles any size of a sliceable material from one reference bake.
 - **E9-C, option 1: no new primitives.** Gloss is a material preset. Glow is
   one new material layer kind, soft and additive, bounded by the grant. Pop
   is rule data only.
+
+- **E9.6 (owner, 2026-10-22).** It is a T2 effects follow-up that covers
+  the CSS coverage inventory's missing rows (`CSS_COVERAGE.md`) except
+  reflection: rows 1 to 9 and 11 to 14.
+  - `text-shadow` (row 5) is data on the text slot only. Its glyph
+    coverage belongs to the text stage.
+  - Reflection (row 10) moves to T5, beside full-fidelity glass, and is
+    removed from E9.
+  - It is built as separable PRs on main, each stacked at most two deep:
+    fills and shape; filters and blend; finish, mask and position;
+    motion.
 
 ### E9.1, the overlay shadow
 

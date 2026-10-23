@@ -1,7 +1,16 @@
 # T2 closing gate check: CSS coverage
 
-Date: 2026-10-22. Status: inventory for the owner's review. It changes no
-engine behaviour; the rows marked missing are proposals until reviewed.
+Date: 2026-10-22. Status: reviewed by the owner on 2026-10-22. It changes
+no engine behaviour.
+
+**Owner decisions, 2026-10-22.** E9.6 builds every missing row except
+reflection: rows 1 to 9 and 11 to 14 of "Missing rows, by stage".
+- `text-shadow` (row 5) is data on the text slot only. Its glyph coverage
+  belongs to the text stage.
+- Reflection (row 10) moves to T5, beside full-fidelity glass, and is
+  removed from T2's E9.
+- E9.6 is built as separable PRs on main, each stacked at most two deep:
+  fills and shape; filters and blend; finish, mask and position; motion.
 
 ## Why
 
@@ -23,7 +32,7 @@ admit and says what carries it in the engine today.
   - *missing*: nothing carries it. The "Smallest addition" column then
     proposes the least engine change and the stage that owns it.
 - **Stages named for additions**:
-  - *E9.6*: a proposed T2 effects follow-up, after E9, before the gate;
+  - *E9.6*: the T2 effects follow-up the owner admitted, after E9 and before the gate;
   - *E10*, *E11*: the existing plan;
   - *T3*: parser only (no engine change);
   - *T5*: the host, which owns the backplane renderer upgrade.
@@ -127,7 +136,7 @@ blurs the backplane, not the part.
 | glow `over` (other emphasis) | `MaterialGlow`, `MaterialGlowPlacement::over`; clipped to the face | present (#278) | |
 | sheen (`radial-gradient` at `--pointer-x`) | `sheen` primitive behind the overlay seam (E9.2) | present | T3 maps the scenario's pointer-following gradient to the sheen's parameters, not to a per-frame gradient |
 | pop | rule data: `scale` and `face` transitions with the hot or selected recipe (E9.5, #274) | present | |
-| reflection (T2 plan E9) | none | missing | A bounded copy of the part's own raster or of the backplane, mirrored within the grant, faded by a linear alpha. It is a primitive the E9-C decision did not cover; ask the owner whether it stays in T2 (E9.6) or is dropped |
+| reflection (formerly in T2 plan E9) | none | moved to T5 | A bounded copy of the part's own raster or of the backplane, mirrored within the grant, faded by a linear alpha. Owner, 2026-10-22: it moves to T5, beside full-fidelity glass |
 | translucency (T2 plan E9) | colour alpha, layer and part opacity; glass for frosted | present (by composition) | |
 
 ## 10. Image layers
@@ -190,21 +199,21 @@ These are only presentational: hit region and layout are unchanged.
 
 ## Missing rows, by stage
 
-E9.6, a T2 effects follow-up before the gate (each item is small and
-independent):
+E9.6, a T2 effects follow-up before the gate. Each item is small and
+independent. The owner admitted all of them except row 10:
 
 1. `repeating-radial-gradient`: the repeat spread on radial fills.
 2. `conic-gradient`: a conic fill kind and a deterministic `atan2`.
 3. Per-corner radii on the material's rounded shape, and the `shape`
    choice on the material primitive.
 4. Dashed and dotted borders, if wanted.
-5. `text-shadow` on the text slot (data and slot here; glyph coverage in
-   the text stage).
+5. `text-shadow` on the text slot: data only. Its glyph coverage belongs
+   to the text stage.
 6. The colour-matrix filters on parts, and on glass's backdrop.
 7. `filter: blur()` and an alpha `drop-shadow()` on a part's own raster.
 8. `multiply` and `screen` group composites, and per-layer blend modes.
 9. `surface-finish` as one matte-to-gloss parameter.
-10. Reflection, or a decision to drop it from T2.
+10. Reflection: moved to T5 (owner, 2026-10-22). Not in E9.6.
 11. `background-position` for image fills.
 12. A `mask` layer kind: image or gradient alpha.
 13. An animated presentational `translate`.

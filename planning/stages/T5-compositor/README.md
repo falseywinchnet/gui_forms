@@ -46,6 +46,10 @@ host cannot provide it.
    starting or stopping, or a Windows transparency setting toggled.
 4. The presented framebuffer carries correct premultiplied alpha where the
    window is non-opaque.
+5. Reflection (moved from T2's E9, owner 2026-10-22): a bounded copy of a
+   part's own content or of the backplane within its grant. It sits beside
+   full-fidelity glass, the host `render_backplane` upgrade behind T2's
+   backplane borrow.
 
 ## How
 
