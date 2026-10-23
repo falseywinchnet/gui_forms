@@ -197,7 +197,7 @@ struct MaterialLook final {
 };
 
 // An image mask's variant slot (E9.6), after the fills'.
-constexpr std::size_t mask_layer = maximum_image_variants - 1U;
+constexpr std::size_t mask_layer = image_mask_variant_layer;
 static_assert(mask_layer == SurfaceMaterial::maximum_fill_layers, "one variant per fill, then the mask's");
 
 // The material a bake draws (E9.6): for a finish above 0, the material it

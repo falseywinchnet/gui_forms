@@ -1058,7 +1058,11 @@ pass before and after.
   option 3): a gradient is evaluated at the pixel centre moved into the
   box, and an image's maps repeat their edge columns and rows. An image
   mask's variant is made as a fill's is and lent in the ninth slot
-  (`maximum_image_variants` is 9); without it the part is drawn unmasked.
+  (`maximum_image_variants` is 9). An image mask whose variant is not
+  lent leaves the part unmasked, as the built-in path draws it, and the
+  window's engine counters count it
+  (`RasterCacheStatistics::image_mask_fallbacks`, coordinator
+  2026-10-23), as they count the other fallbacks.
   A mask varies along an axis as a fill
   does, for slicing. The built-in path draws the material unmasked.
 - **Image position (row 11, CSS `background-position`).** A tiled image
@@ -1079,7 +1083,8 @@ pass before and after.
   finish is charged as the material it describes.
 - **Inspection.** The snapshot reports an image fill's `image_anchor` and
   `image_offset`, and a material's `finish` and `mask` when set, so other
-  snapshots are unchanged.
+  snapshots are unchanged. The engine counters report
+  `image_mask_fallbacks`.
 - **Proof.** `gui_forms_engine_material_tests`:
   - the finish's stops, shine and half finish over a solid and a
     gradient face, the bake of a finished material against the material

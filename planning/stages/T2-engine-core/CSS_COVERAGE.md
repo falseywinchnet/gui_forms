@@ -154,7 +154,7 @@ blurs the backplane, not the part.
 | CSS | Engine carrier | Status | Smallest addition |
 |---|---|---|---|
 | `clip-path` | not admitted as geometry. The engine owns shape and hit region (design language §12.3; T3 brief). The `shape` parameters are the admitted form | present (as shape parameters) | |
-| `mask-image` (an alpha mask) | `SurfaceMaterial::mask`, an image fill whose alpha (times its opacity) multiplies the whole finished raster after the part filters, extended outward at its edge value so that shadows fade with the face beside them (owner, 2026-10-23); its variant is the bake's ninth | present (E9.6 G3, #291) | The built-in path draws the material unmasked |
+| `mask-image` (an alpha mask) | `SurfaceMaterial::mask`, an image fill whose alpha (times its opacity) multiplies the whole finished raster after the part filters, extended outward at its edge value so that shadows fade with the face beside them (owner, 2026-10-23); its variant is the bake's ninth | present (E9.6 G3, #291) | The built-in path draws the material unmasked, as the engine does (counted in `image_mask_fallbacks`) when an image mask's variant is not lent |
 | `mask-image: linear-gradient()` (a fade-out) | the same `mask`, a solid, linear, radial or conic layer | present (E9.6 G3, #291) | |
 
 ## 12. Presentational transforms

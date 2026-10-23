@@ -1451,6 +1451,25 @@ void surface_mask() {
                 channel(plain, 5U, 18U, 3U) - channel(masked, 5U, 18U, 3U) <= 15,
             "outside the box an image mask extends at its edge columns");
 
+    // An image mask whose variant is not lent leaves the part unmasked, and
+    // the table counts it: a backplane over a window without images.
+    BackplaneRegion region{};
+    region.extent = plain.extent;
+    region.scale = DeviceScale{1.0};
+    EnginePartTable table{};
+    TestRaster fallback = make_raster(logical, 1.0);
+    table.bake_backplane_material(imaged, logical, region, nullptr, fallback.view(), 1U);
+    require(table.cache_statistics().image_mask_fallbacks == 1U, "an unlent image mask is counted");
+    EnginePartTable plain_table{};
+    TestRaster unmasked = make_raster(logical, 1.0);
+    plain_table.bake_backplane_material(material, logical, region, nullptr, unmasked.view(), 1U);
+    require(raster_hash(fallback) == raster_hash(unmasked) && plain_table.cache_statistics().image_mask_fallbacks == 0U,
+            "and the part is drawn unmasked");
+    TestRaster lent_mask = make_raster(logical, 1.0);
+    table.bake_backplane_material(imaged, logical, region, &registry, lent_mask.view(), 2U);
+    require(table.cache_statistics().image_mask_fallbacks == 1U && raster_hash(lent_mask) != raster_hash(unmasked),
+            "a lent image mask masks, and is not counted");
+
     SurfaceMaterial refused = material;
     MaterialFillLayer pattern{};
     pattern.kind = MaterialFillKind::procedural;

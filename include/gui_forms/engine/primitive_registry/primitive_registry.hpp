@@ -199,6 +199,7 @@ enum class ParameterAssignment : std::uint8_t {
 // (SurfaceMaterial::maximum_fill_layers), then one for an image mask
 // (E9.6), whose `layer` is maximum_image_variants - 1.
 inline constexpr std::size_t maximum_image_variants = 9U;
+inline constexpr std::size_t image_mask_variant_layer = maximum_image_variants - 1U;
 
 // One sized variant of an image resource: the image resampled to `extent`
 // device pixels, for display `scale`. A nine-patch's fixed segments are

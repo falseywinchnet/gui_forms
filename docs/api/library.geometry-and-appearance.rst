@@ -2809,6 +2809,10 @@ Types
 
    .. cpp:member:: std::uint64_t backplane_skipped_commands
 
+   .. cpp:member:: std::uint64_t image_mask_fallbacks
+
+      Bakes whose image mask's variant was asked for and not lent (E9.6): the part, or the backplane region, was drawn unmasked, as the built-in path draws it.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: Rect
@@ -4541,6 +4545,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_image_variants
 
    The most image variants one bake uses: one per fill layer (SurfaceMaterial::maximum_fill_layers), then one for an image mask (E9.6), whose ``layer`` is maximum_image_variants - 1. Value: ``9U``.
+
+.. cpp:var:: constexpr std::size_t image_mask_variant_layer
+
+   Value: ``maximum_image_variants - 1U``.
 
 .. cpp:var:: constexpr std::size_t maximum_registered_primitives
 
