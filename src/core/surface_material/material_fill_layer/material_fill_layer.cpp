@@ -161,4 +161,13 @@ MaterialFillLayer MaterialFillLayer::nine_patch(
     return result;
 }
 
+MaterialFillLayer MaterialFillLayer::procedural_pattern(
+    const ProceduralFill& pattern, double value_opacity) {
+    MaterialFillLayer result;
+    result.kind = MaterialFillKind::procedural;
+    result.procedural = pattern;
+    result.opacity = value_opacity;
+    return result;
+}
+
 } // namespace gui_forms

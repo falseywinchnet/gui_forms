@@ -36,6 +36,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_ci_sanitizer_seed.py
           python3 -B -m unittest discover -s tools -p test_publish_cache.py
           python3 -B -m unittest discover -s tools -p test_windows_toolchain.py
+          python3 -B -m unittest discover -s tools -p test_stack_frames.py
           python3 -B -m unittest discover -s tools -p test_control_registry.py
           python3 tools/control_registry.py check
           python3 tools/control_registry.py emit-cpp --check
@@ -191,6 +192,15 @@ jobs:
             selection="--changed-from $CHANGED_FROM"
           fi
           xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/ci_build.py --jobs 4 --sanitize $selection
+      # No first-party function may need a stack frame over 256 KB under the
+      # sanitizers: AddressSanitizer's redzones grew test mains to hundreds of KB
+      # on Windows, and a chain of them overflowed theme_tests' 1 MB main
+      # thread (#283). Reads the prologues of the objects this run built, so
+      # a narrowed pull-request build checks the areas it changed. Runs after
+      # a failed test too: an overflow fails as a crash, which this names.
+      - name: Check stack frames
+        if: ${{ !cancelled() }}
+        run: python gui_forms/tools/stack_frames.py check --tree .build/native-linux-x64/gui-forms-sanitize --jobs 4 --top 15
       - name: Report cache statistics
         if: always()
         run: ccache --show-stats --verbose

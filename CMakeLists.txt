@@ -158,6 +158,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/primitives/material/image_variant.cpp
     src/core/engine/primitives/material/material_primitive.cpp
     src/core/engine/primitives/material/overlay_shadow_primitive.cpp
+    src/core/engine/primitives/procedural/procedural_pattern.cpp
     src/core/engine/primitives/light/sheen_primitive.cpp
     src/core/engine/primitives/light/glass_primitive.cpp
     src/core/window/backplane/backplane_composite.cpp
@@ -2290,6 +2291,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_material_tests tests/engine_material_tests.cpp)
     target_link_libraries(gui_forms_engine_material_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_material_tests COMMAND gui_forms_engine_material_tests)
+    add_executable(gui_forms_engine_procedural_tests tests/engine_procedural_tests.cpp)
+    target_link_libraries(gui_forms_engine_procedural_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_procedural_tests COMMAND gui_forms_engine_procedural_tests)
     add_executable(gui_forms_engine_slice_tests tests/engine_slice_tests.cpp)
     target_link_libraries(gui_forms_engine_slice_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_slice_tests COMMAND gui_forms_engine_slice_tests)

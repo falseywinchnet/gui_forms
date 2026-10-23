@@ -47,8 +47,24 @@ Color Panel::background() const noexcept {
     const ControlVisualRecipe& recipe = effective_theme().resolve(
         visual_role_, visual_context());
     const MaterialFillLayer& fill = recipe.material.fills.front();
-    return fill.kind == MaterialFillKind::solid ? fill.color
-                                                : fill.stops.front().color;
+    switch (fill.kind) {
+    case MaterialFillKind::solid:
+        return fill.color;
+    case MaterialFillKind::linear_gradient:
+    case MaterialFillKind::radial_gradient:
+    case MaterialFillKind::conic_gradient:
+        if (fill.stops.empty()) return fill.color;
+        return fill.stops.front().color;
+    case MaterialFillKind::image:
+        // An image has no one colour: the layer's colour, as before any
+        // image is drawn. (Reading stops.front() here was undefined: an
+        // image fill has no stops.)
+        return fill.color;
+    case MaterialFillKind::procedural:
+        return fill.procedural.ground;
+    }
+    // A kind outside the enumeration: the layer's colour.
+    return fill.color;
 }
 
 void Panel::clear_background() {

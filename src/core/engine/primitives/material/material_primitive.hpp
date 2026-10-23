@@ -20,7 +20,10 @@ namespace gui_forms::engine_primitives {
 // 2. fills, clipped to the box (rounded by the material's corner radius, or
 //    the part's own when it sets one): solid; linear (endpoints, or a CSS
 //    angle through engine_sine_cosine), padded, repeated or reflected;
-//    radial, padded; and images (see material_image.hpp), at their opacity;
+//    radial, padded; images (see material_image.hpp) and procedural
+//    patterns (E10, procedural_pattern.hpp: a tile repeated from the box's
+//    first device pixel, or the fresco over the box; the fill's ground
+//    until the engine lends the pattern), at their opacity;
 // 3. inset shadows, inside the box;
 // 4. the border, a ring inside the box's edge;
 // 5. the border's single edges;
@@ -54,8 +57,10 @@ namespace gui_forms::engine_primitives {
 // Refusals (accepts). The primitive draws nothing, and the engine draws the
 // part with the built-in recipe and counts the refusal, when the target
 // lends no material, the material is not valid, an image fill's image is
-// not in the window's resources with its declared pixel size, or the
-// material's estimated bake exceeds the bound of material_bake_policy.hpp.
+// not in the window's resources with its declared pixel size, a
+// procedural fill's pattern would take longer to generate than that bound
+// or hold more than maximum_procedural_pattern_bytes, or the material's
+// estimated bake exceeds the bound of material_bake_policy.hpp.
 // An image fill whose pixels cannot be decoded or stored at bake time is
 // drawn as nothing; the other layers are drawn.
 // How far the material primitive draws outside the part's box, in logical

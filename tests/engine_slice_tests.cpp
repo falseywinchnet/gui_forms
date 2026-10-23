@@ -237,7 +237,12 @@ void assembly_equals_whole_bake() {
     SurfaceMaterial corners = layered_material(false);
     corners.corner_radii = MaterialCornerRadii{6.0, 0.0, 3.0, 1.5};
     SliceCount pill{};
-    const SurfaceMaterial plain = layered_material(false);
+    // The layered material less its over glow (its last glow), so that a
+    // pill 40 high stays within the bake bound at every scale.
+    SurfaceMaterial plain = layered_material(false);
+    require(!plain.glows.empty() && plain.glows.back().placement == MaterialGlowPlacement::over,
+            "the layered material's last glow is its over glow");
+    plain.glows.pop_back();
     // A uniform radius past half the shorter side reaches only as far as
     // that half, as a pill does.
     SliceCount round_ended{};
@@ -247,10 +252,9 @@ void assembly_equals_whole_bake() {
         for (const double width : widths) {
             for (const double height : heights) {
                 compare_assembly(corners, Size{width, height}, scale, cornered);
-                // A tall pill's round ends are all corner pixels: at 64 high,
-                // and at 40 high and scale 2 with the layered material's over
-                // glow, it exceeds the bake bound.
-                if (height <= 24.0) compare_assembly(plain, Size{width, height}, scale, pill, "pill");
+                // A tall pill's round ends are all corner pixels, and at
+                // 64 high it exceeds the bake bound.
+                if (height <= 40.0) compare_assembly(plain, Size{width, height}, scale, pill, "pill");
                 // At 40 high its unclamped radius still marks every pixel as a
                 // corner pixel of its shadows (outer_coverage), which the
                 // estimate counts: a dearer bake than the pill's.
@@ -260,6 +264,12 @@ void assembly_equals_whole_bake() {
     }
     require(cornered.across > 0U && cornered.down > 0U, "four corners slice on both axes");
     require(pill.across > 0U, "a pill slices along its length");
+    // With its over glow the layered material is dearer: a pill of it 40
+    // high at scale 2 is past the bake bound and refused.
+    const SurfaceMaterial glowing = layered_material(false);
+    const PartRasterRequest heavy = request_for(glowing, Size{76.0, 40.0}, 2.0, "pill");
+    require(!material_primitive().accepts(heavy.parameters, heavy.target),
+            "the heavier material's pill past the bound is refused");
     require(round_ended.across > 0U, "a radius past half the height slices along the length");
     // The case that was refused before the clamp: radius 32, 32 high, at 2.
     SliceCount large{};

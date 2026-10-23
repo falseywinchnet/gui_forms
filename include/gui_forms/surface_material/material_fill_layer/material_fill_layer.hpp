@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui_forms/surface_material/procedural_fill/procedural_fill.hpp"
 #include "gui_forms/types.hpp"
 
 #include <cstddef>
@@ -33,6 +34,8 @@ enum class MaterialBlendMode : std::uint8_t {
 
 enum class MaterialFillKind : std::uint8_t {
     solid, linear_gradient, radial_gradient, image, conic_gradient,
+    // A built-in pattern generated per display scale (E10): `procedural`.
+    procedural,
 };
 enum class MaterialImageMode : std::uint8_t {
     stretch, tile, nine_patch,
@@ -66,6 +69,8 @@ struct MaterialFillLayer final {
     MaterialImageMode image_mode{MaterialImageMode::stretch};
     double period_degrees{360.0};
     MaterialBlendMode blend{MaterialBlendMode::normal};
+    // Read only by a procedural fill, with `opacity`.
+    ProceduralFill procedural{};
 
     [[nodiscard]] static MaterialFillLayer solid(Color color);
     [[nodiscard]] static MaterialFillLayer linear(
@@ -118,6 +123,8 @@ struct MaterialFillLayer final {
         ImageId image, Size pixel_size, Insets source_slice,
         double source_pixels_per_logical_pixel = 1.0,
         double opacity = 1.0);
+    [[nodiscard]] static MaterialFillLayer procedural_pattern(
+        const ProceduralFill& pattern, double opacity = 1.0);
     friend bool operator==(const MaterialFillLayer& left,
                            const MaterialFillLayer& right) noexcept(noexcept(
         left.kind == right.kind &&
@@ -133,7 +140,8 @@ struct MaterialFillLayer final {
         left.image_scale == right.image_scale &&
         left.opacity == right.opacity && left.image_mode == right.image_mode &&
         left.period_degrees == right.period_degrees &&
-        left.blend == right.blend)) {
+        left.blend == right.blend &&
+        left.procedural == right.procedural)) {
         return left.kind == right.kind &&
                left.coordinate_space == right.coordinate_space &&
                left.linear_geometry == right.linear_geometry &&
@@ -148,7 +156,8 @@ struct MaterialFillLayer final {
                left.opacity == right.opacity &&
                left.image_mode == right.image_mode &&
                left.period_degrees == right.period_degrees &&
-               left.blend == right.blend;
+               left.blend == right.blend &&
+               left.procedural == right.procedural;
     }
 };
 

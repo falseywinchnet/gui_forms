@@ -90,6 +90,27 @@ bool valid_material_glow(const MaterialGlow& glow) noexcept {
     return valid;
 }
 
+// A procedural fill's parameters (E10): a built-in pattern, a finite tile
+// within [minimum_procedural_tile, maximum_procedural_tile], and a finite
+// strength in [0, 1].
+bool valid_procedural_fill(const ProceduralFill& fill) noexcept {
+    switch (fill.pattern) {
+    case ProceduralPattern::felt:
+    case ProceduralPattern::wood_grain:
+    case ProceduralPattern::paper_fibre:
+    case ProceduralPattern::pinstripe:
+    case ProceduralPattern::brushed_metal:
+    case ProceduralPattern::fresco: {
+        const bool valid = std::isfinite(fill.tile) && fill.tile >= minimum_procedural_tile &&
+                           fill.tile <= maximum_procedural_tile && std::isfinite(fill.strength) &&
+                           fill.strength >= 0.0 && fill.strength <= 1.0;
+        return valid;
+    }
+    }
+    // A pattern outside the enumeration is not built in.
+    return false;
+}
+
 // An overlay shadow: at most SurfaceMaterial::maximum_shadows valid layers,
 // none of them inset (an overlay shadow falls outside its surface).
 bool valid_overlay_shadow(const std::vector<MaterialShadow>& layers) noexcept {
@@ -550,6 +571,19 @@ void paint_fill_layer(Painter& painter, Rect bounds, const MaterialFillLayer& fi
             painter.fill_rect(bounds, fill.stops.front().color);
         }
         return;
+    case MaterialFillKind::procedural: {
+        // The painter path never generates a pattern (E10): it draws the
+        // fill's ground, as the engine does until the pattern is ready.
+        Color ground = fill.procedural.ground;
+        const double alpha = static_cast<double>(ground.alpha) * std::clamp(fill.opacity, 0.0, 1.0);
+        ground.alpha = static_cast<std::uint8_t>(std::floor(alpha + 0.5));
+        if (clipped) {
+            painter.fill_rounded_rect(bounds, corner_radius, ground);
+        } else {
+            painter.fill_rect(bounds, ground);
+        }
+        return;
+    }
     }
     // A kind outside the enumeration paints nothing.
     return;
@@ -728,6 +762,15 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
                 !std::isfinite(fill.period_degrees) ||
                 fill.period_degrees <= 0.0 || fill.period_degrees > 360.0 ||
                 !valid_gradient_stops(fill.stops)) {
+                return false;
+            }
+            break;
+        case MaterialFillKind::procedural:
+            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+                fill.spread != GradientSpreadMode::pad ||
+                !valid_procedural_fill(fill.procedural) ||
+                !std::isfinite(fill.opacity) || fill.opacity < 0.0 ||
+                fill.opacity > 1.0) {
                 return false;
             }
             break;
@@ -1017,22 +1060,8 @@ ThemeDefinition windows_professional_theme_definition() {
     return result;
 }
 
-namespace {
-
-// Makes the default theme from a definition built on the heap. `new` from
-// the returned value initializes the heap object directly (std::make_unique
-// would first materialize a 105 KB temporary on this frame).
-std::shared_ptr<const Theme> make_default_theme() {
-    const std::unique_ptr<const ThemeDefinition> definition(
-        new ThemeDefinition(windows_professional_theme_definition()));
-    std::shared_ptr<const Theme> theme = Theme::create(*definition);
-    return theme;
-}
-
-} // namespace
-
 std::shared_ptr<const Theme> default_theme() {
-    static const std::shared_ptr<const Theme> value = make_default_theme();
+    static const std::shared_ptr<const Theme> value = Theme::create(windows_professional_theme_definition());
     return value;
 }
 
