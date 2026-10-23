@@ -4,8 +4,11 @@
 #include "gui_forms/event/delegate/delegate.hpp"
 #include "gui_forms/scheduler/types/scheduler_types.hpp"
 
+#include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <span>
 
 namespace gui_forms {
 
@@ -79,7 +82,37 @@ enum class MotionEasing : std::uint8_t {
     // 8 %, at p = 0.6, then settling at 1. An engine capability for loud
     // themes; the default theme does not use it.
     overshoot,
+    // CSS cubic-bezier(x1, y1, x2, y2) (E9.6), the curve's control points
+    // in MotionCurve::bezier: the curve's y where its x is p. Its x is
+    // solved by 40 bisections, so every host gives the same value.
+    cubic_bezier,
+    // CSS steps(n) (E9.6): n levels of 1/n, held between jumps
+    // (MotionCurve::steps and step_position).
+    steps,
 };
+
+// Where steps(n) jumps (CSS jump-end and jump-start): at the end of each
+// of its n intervals, so that it starts at 0; or at the start, so that it
+// starts at 1/n. Either ends at 1.
+enum class MotionStepPosition : std::uint8_t { end, start };
+
+// The most levels steps() takes.
+inline constexpr std::uint32_t maximum_motion_steps = 32U;
+
+// One intermediate stop of a timed move (E9.6, multi-stop @keyframes): the
+// value passes `value` at `offset` of the move's duration, 0 < offset < 1.
+// Between stops the move is eased by its curve's easing.
+struct MotionStop final {
+    double offset{};
+    double value{};
+
+    friend bool operator==(const MotionStop& left, const MotionStop& right) noexcept {
+        return left.offset == right.offset && left.value == right.value;
+    }
+};
+
+// The most stops one move passes.
+inline constexpr std::size_t maximum_motion_stops = 4U;
 
 // How a value moves. Make it with the named factories, which keep the
 // fields that belong together consistent.
@@ -94,21 +127,47 @@ struct MotionCurve final {
     // spring only: the overshoot of a move from rest, as a fraction of the
     // distance, from 0 (critically damped) to maximum_motion_overshoot.
     double overshoot{};
+    // timed with cubic_bezier: x1, y1, x2, y2. Each x is clamped to [0, 1]
+    // and each y to [−maximum_motion_overshoot, 1 + maximum_motion_overshoot],
+    // so the curve overshoots by at most 8 %; a non-finite point is the
+    // linear curve's.
+    std::array<double, 4> bezier{0.0, 0.0, 1.0, 1.0};
+    // timed with steps: the levels, clamped to [1, maximum_motion_steps],
+    // and where they jump.
+    std::uint32_t steps{1U};
+    MotionStepPosition step_position{MotionStepPosition::end};
+    // Every curve (E9.6, CSS transition-delay): how long a move holds the
+    // value still before it starts, at no velocity. Clamped to [0, the
+    // ceiling less the duration], so that a delayed move still ends within
+    // motion_duration_ceiling.
+    FrameInterval delay{};
 
     [[nodiscard]] static MotionCurve timed(FrameInterval duration, MotionEasing easing) noexcept;
+    [[nodiscard]] static MotionCurve cubic_bezier(FrameInterval duration, double x1, double y1, double x2,
+                                                  double y2) noexcept;
+    [[nodiscard]] static MotionCurve stepped(FrameInterval duration, std::uint32_t steps,
+                                             MotionStepPosition position = MotionStepPosition::end) noexcept;
     [[nodiscard]] static MotionCurve follow(FrameInterval time_constant = follow_time_constant) noexcept;
     [[nodiscard]] static MotionCurve spring(FrameInterval response, double overshoot = 0.0) noexcept;
     [[nodiscard]] static MotionCurve decay(FrameInterval time_constant) noexcept;
+    // This curve with `delay` before each move, clamped as `delay` is.
+    [[nodiscard]] MotionCurve delayed(FrameInterval delay) const noexcept;
 
     friend bool operator==(const MotionCurve& left, const MotionCurve& right) noexcept {
         return left.kind == right.kind && left.duration == right.duration && left.easing == right.easing &&
-               left.overshoot == right.overshoot;
+               left.overshoot == right.overshoot && left.bezier == right.bezier && left.steps == right.steps &&
+               left.step_position == right.step_position && left.delay == right.delay;
     }
 };
 
 // The eased progress for `progress` in [0, 1] (clamped), for tests and for
-// later engine transitions.
+// later engine transitions. cubic_bezier and steps take their defaults
+// here: the linear curve and one step; motion_curve_easing reads a curve's
+// own.
 [[nodiscard]] double motion_easing(MotionEasing easing, double progress) noexcept;
+// The eased progress of a timed `curve` (its easing with its control points
+// or steps) for `progress` in [0, 1] (clamped).
+[[nodiscard]] double motion_curve_easing(const MotionCurve& curve, double progress) noexcept;
 
 // Why a listener is told of a step.
 enum class MotionStepCause : std::uint8_t {
@@ -215,6 +274,14 @@ public:
     // to rest at the target. If the clock's record or its frame request
     // cannot be made, the exception propagates and the value is unchanged.
     MotionStart animate_to(double target);
+    // A timed move from where the value stands now through `stops` to
+    // `target` (E9.6): each stop's offset is a fraction of the duration,
+    // strictly increasing within (0, 1). It always starts a move. Refused,
+    // the value unchanged, for a curve that is not timed, more than
+    // maximum_motion_stops stops, an offset out of order or out of range,
+    // or a value or target that is not finite. While it runs, animate_to
+    // the same target leaves it running.
+    MotionStart animate_through(std::span<const MotionStop> stops, double target);
     // decay only: launches the value at `velocity` (value units per second);
     // it comes to rest where friction stops it.
     MotionStart fling(double velocity);
@@ -260,10 +327,18 @@ private:
         double damped{};
         // timed: the duration in seconds.
         double seconds{};
+        // The delay before the move starts (MotionCurve::delay), kept in
+        // clock ticks so that the move's end is measured exactly: a delayed
+        // move ends on the frame at its delay plus its duration.
+        FrameInterval delay{};
+        // timed: the stops the move passes, `stop_count` of them live.
+        std::array<MotionStop, maximum_motion_stops> stops{};
+        std::size_t stop_count{};
     };
 
     // The position and velocity of a segment `elapsed` seconds after its
-    // start, and whether a timed segment has run its duration.
+    // move started (after its delay), and whether a timed segment has run
+    // its duration.
     struct Sample final {
         double position{};
         double velocity{};

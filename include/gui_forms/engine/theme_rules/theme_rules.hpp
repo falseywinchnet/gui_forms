@@ -172,6 +172,18 @@ inline constexpr double maximum_presentational_scale = 2.0;
 // uses it.
 inline constexpr std::string_view face_property = "face";
 
+// The engine's presentational translation (E9.6, CSS `translate`): the
+// part drawn moved by this many logical units across or down, within the
+// overflow its control grants, its hit region, layout and text slot
+// unchanged. The part's raster is composited at the offset, so a move
+// bakes nothing. Like scale it is no atom and no parameter; only a
+// transition sets it, a part without one rests at 0, and a part granted
+// no overflow (beyond what its scale uses) never moves. A machine's values
+// lie within ±maximum_presentational_translate; the grant clamps further.
+inline constexpr std::string_view translate_x_property = "translate_x";
+inline constexpr std::string_view translate_y_property = "translate_y";
+inline constexpr double maximum_presentational_translate = 32.0;
+
 // What a transition moves: a primitive parameter, or one of the engine's
 // presentational properties.
 enum class PresentationProperty : std::uint8_t {
@@ -179,12 +191,15 @@ enum class PresentationProperty : std::uint8_t {
     opacity,
     scale,
     face,
+    translate_x,
+    translate_y,
 };
 
 // The most states one presentational state machine has, and the most
-// transitions one part runs.
+// transitions one part runs: opacity, scale, face and both translations,
+// with room for a parameter.
 inline constexpr std::size_t maximum_presentation_states = 8;
-inline constexpr std::size_t maximum_part_transitions = 4;
+inline constexpr std::size_t maximum_part_transitions = 6;
 
 // One state of a part's presentational state machine (E7; design language
 // §9.6). The machine is in the first of its states whose `when` states the
@@ -198,6 +213,16 @@ inline constexpr std::size_t maximum_part_transitions = 4;
 // T2 GIVEN C2-1). Otherwise every move starts from the value shown, so a
 // transition retargets and never restarts.
 //
+// `stops` (E9.6, multi-stop @keyframes), at most maximum_motion_stops,
+// make the move into this state pass each stop's value at its offset of
+// the duration, offsets strictly increasing within (0, 1), values within
+// the property's range; they need a timed curve. They play when the move
+// into the state begins: on entering it from another state, or on
+// appearing in it from `enter_from`. A part that appears in the state
+// without an entry value stands at its target, as before. An animated
+// parameter shows each stop at its nearest keyframe level, as any moving
+// value (E7r).
+//
 // The machine is presentational only: it reads the published states and
 // writes nothing back, so it can neither create an observable state nor
 // delay behaviour.
@@ -205,9 +230,11 @@ struct PresentationState final {
     std::vector<AnatomyState> when{};
     double target{};
     std::optional<double> enter_from{};
+    std::vector<MotionStop> stops{};
 
     friend bool operator==(const PresentationState& left, const PresentationState& right) noexcept {
-        return left.when == right.when && left.target == right.target && left.enter_from == right.enter_from;
+        return left.when == right.when && left.target == right.target && left.enter_from == right.enter_from &&
+               left.stops == right.stops;
     }
 };
 
@@ -351,7 +378,8 @@ enum class RuleDiagnosticKind : std::uint8_t {
     // not a number; or it has no states or more than
     // maximum_presentation_states, a state outside the vocabulary, or a
     // target or entry value that is not finite or outside the property's
-    // range. A rule with more than maximum_part_transitions keeps the first.
+    // range; or a state's stops are too many, out of order, outside the
+    // property's range, or on a curve that is not timed. A rule with more than maximum_part_transitions keeps the first.
     transition_property_unknown,
     transition_property_not_animated,
     transition_invalid,
@@ -451,6 +479,7 @@ public:
         AnatomyStateSet when{};
         double target{};
         std::optional<double> enter_from{};
+        std::vector<MotionStop> stops{};
     };
 
     // A checked transition: an engine property, or the parameter at

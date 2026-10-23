@@ -168,17 +168,29 @@ std::optional<std::size_t> machine_state(const CompiledTransition& transition, A
 }
 
 // A property's range: [0, 1] for opacity and face, the presentational
-// scale's for scale, the parameter's declared range otherwise.
+// scale's for scale, ±maximum_presentational_translate for a translation,
+// the parameter's declared range otherwise.
 struct PropertyRange final {
     double minimum{};
     double maximum{1.0};
 };
+
+bool translates(PresentationProperty property) noexcept {
+    const bool translation =
+        property == PresentationProperty::translate_x || property == PresentationProperty::translate_y;
+    return translation;
+}
 
 PropertyRange property_range(const CompiledTransition& transition, const PrimitiveDescriptor* descriptor) noexcept {
     PropertyRange range{};
     if (transition.property == PresentationProperty::scale) {
         range.minimum = minimum_presentational_scale;
         range.maximum = maximum_presentational_scale;
+        return range;
+    }
+    if (translates(transition.property)) {
+        range.minimum = -maximum_presentational_translate;
+        range.maximum = maximum_presentational_translate;
         return range;
     }
     if (transition.property == PresentationProperty::opacity || transition.property == PresentationProperty::face ||
@@ -192,8 +204,10 @@ PropertyRange property_range(const CompiledTransition& transition, const Primiti
 }
 
 // The value a property rests at when the part's states match no machine
-// state: its cascade value, or 1 for opacity and scale.
+// state: its cascade value, 0 for a translation, or 1 for opacity and
+// scale.
 double rest_value(const CompiledTransition& transition, const PrimitiveParameterBlock& parameters) noexcept {
+    if (translates(transition.property)) return 0.0;
     if (transition.property != PresentationProperty::parameter) return 1.0;
     const double value = parameters.values[transition.parameter].number;
     return value;
@@ -202,11 +216,13 @@ double rest_value(const CompiledTransition& transition, const PrimitiveParameter
 // The engine properties a part is shown with this paint, and what its
 // transitions did: whether its scale is still moving, and by parameter
 // position the bits of the parameters it transitions and of those still
-// moving.
+// moving. `translation` is the move its machines want, in logical units,
+// before the grant clamps it.
 struct PresentedProperties final {
     double opacity{1.0};
     double scale{1.0};
     bool scale_moving{false};
+    Point translation{};
     // The part's face cross-fade (E7r form a), when it has one and a
     // record: its value, 1 when settled. The paint starts it.
     MotionValue* face{};
@@ -219,8 +235,8 @@ std::uint32_t parameter_bit(std::size_t parameter) noexcept {
     return bit;
 }
 
-// Shows a transition's value: the part's opacity or scale, or its
-// parameter, clamped to the property's range.
+// Shows a transition's value: the part's opacity, scale or translation,
+// or its parameter, clamped to the property's range.
 void show_value(const CompiledTransition& transition, double value, PropertyRange range,
                 PrimitiveParameterBlock& parameters, PresentedProperties& presented) noexcept {
     const double raised = std::max(value, range.minimum);
@@ -233,14 +249,25 @@ void show_value(const CompiledTransition& transition, double value, PropertyRang
         presented.scale = shown;
         return;
     }
+    if (transition.property == PresentationProperty::translate_x) {
+        presented.translation.x = shown;
+        return;
+    }
+    if (transition.property == PresentationProperty::translate_y) {
+        presented.translation.y = shown;
+        return;
+    }
     parameters.values[transition.parameter].number = shown;
 }
 
 // The logical extent the settled condition measures a property's value
 // against (MotionValue::set_extent): one unit of the value spans 255
 // device pixels over the property's range, so that a value settles within
-// half an 8-bit step of its range.
-double settle_extent(PropertyRange range, double scale) noexcept {
+// half an 8-bit step of its range. A translation is a distance in logical
+// units, so one unit spans one logical unit: it settles within half a
+// device pixel.
+double settle_extent(const CompiledTransition& transition, PropertyRange range, double scale) noexcept {
+    if (translates(transition.property)) return 1.0;
     const double span = range.maximum - range.minimum;
     const double extent = 255.0 / (span * scale);
     return extent;
@@ -300,7 +327,7 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
                 channel.state.reset();
                 channel.value.emplace(*sources.owner, transition.curve, 1.0);
                 MotionValue& made = *channel.value;
-                static_cast<void>(made.set_extent(settle_extent(range, (*sources.window).scale())));
+                static_cast<void>(made.set_extent(settle_extent(transition, range, (*sources.window).scale())));
                 made.set_listener(MotionListener::bind<PartMotion, &PartMotion::on_step>(*motion));
             } else {
                 (*channel.value).set_curve(transition.curve);
@@ -309,7 +336,15 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
             continue;
         }
         std::optional<double> entry{};
-        if (state) entry = transition.states[*state].enter_from;
+        std::span<const MotionStop> stops{};
+        if (state) {
+            entry = transition.states[*state].enter_from;
+            stops = transition.states[*state].stops;
+        }
+        // Whether the move into the state begins this paint, so that its
+        // stops (E9.6) play: on appearing from an entry value, or on a
+        // change of state.
+        bool entering = false;
         if (!channel.value) {
             // The part appears in its state: at the state's entry value if
             // it has one, else at its target.
@@ -319,17 +354,23 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
             const double initial = entry ? *entry : target;
             channel.value.emplace(*sources.owner, transition.curve, initial);
             MotionValue& made = *channel.value;
-            static_cast<void>(made.set_extent(settle_extent(range, (*sources.window).scale())));
+            static_cast<void>(made.set_extent(settle_extent(transition, range, (*sources.window).scale())));
             made.set_listener(MotionListener::bind<PartMotion, &PartMotion::on_step>(*motion));
+            entering = entry.has_value();
         } else {
             (*channel.value).set_curve(transition.curve);
             if (channel.state != state) {
                 channel.state = state;
                 if (entry) (*channel.value).jump_to(*entry);
+                entering = true;
             }
         }
         MotionValue& value = *channel.value;
-        static_cast<void>(value.animate_to(target));
+        if (entering && !stops.empty()) {
+            static_cast<void>(value.animate_through(stops, target));
+        } else {
+            static_cast<void>(value.animate_to(target));
+        }
         show_value(transition, value.current(), range, parameters, presented);
         if (transition.property == PresentationProperty::scale && !value.settled()) presented.scale_moving = true;
         if (transition.property == PresentationProperty::parameter) {
@@ -463,10 +504,12 @@ bool step_to_keyframes(const PrimitiveDescriptor& descriptor, std::uint32_t step
     return shared;
 }
 
-// Whether the part's transitions include its scale.
-bool scales(const CompiledThemeRules::Resolution& resolution) noexcept {
+// Whether the part's transitions can draw it into its granted overflow:
+// its scale or a translation.
+bool draws_in_overflow(const CompiledThemeRules::Resolution& resolution) noexcept {
     for (std::size_t index = 0; index < resolution.transition_count; ++index) {
-        if ((*resolution.transitions[index]).property == PresentationProperty::scale) return true;
+        const PresentationProperty property = (*resolution.transitions[index]).property;
+        if (property == PresentationProperty::scale || translates(property)) return true;
     }
     return false;
 }
@@ -519,6 +562,28 @@ PartPaint scaled_part(const PartPaint& part, double scale) noexcept {
     const double granted = std::min(scale, granted_scale(part.bounds, part.granted_overflow));
     if (granted != 1.0) shown.bounds = scaled_about_centre(part.bounds, granted);
     return shown;
+}
+
+// The presentational translation (E9.6) the part is drawn with: `wanted`,
+// clamped on each axis to the overflow its control grants beyond what its
+// bounds, at `shown_scale` about their centre, take. The part as drawn so
+// stays within its extent; a side granted no overflow, or one the scale
+// takes, admits no move toward it.
+Point granted_translation(const PartPaint& part, double shown_scale, Point wanted) noexcept {
+    const double grown_across = (shown_scale - 1.0) * part.bounds.width * 0.5;
+    const double grown_down = (shown_scale - 1.0) * part.bounds.height * 0.5;
+    const double left = std::max(0.0, part.granted_overflow.left - grown_across);
+    const double right = std::max(0.0, part.granted_overflow.right - grown_across);
+    const double up = std::max(0.0, part.granted_overflow.top - grown_down);
+    const double down = std::max(0.0, part.granted_overflow.bottom - grown_down);
+    const Point granted{std::clamp(wanted.x, -left, right), std::clamp(wanted.y, -up, down)};
+    return granted;
+}
+
+// `bounds` moved by `offset`.
+Rect moved_by(Rect bounds, Point offset) noexcept {
+    const Rect moved{bounds.x + offset.x, bounds.y + offset.y, bounds.width, bounds.height};
+    return moved;
 }
 
 // Whether the part's primitive stands behind the overlay seam (E9-A) and
@@ -710,8 +775,9 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
             // reads it.
             if (follows_pointer(resolution, part, reduced_motion)) inputs_read = inputs_read | pointer_inputs();
         }
-        // A part that scales may draw anywhere in its granted overflow.
-        if (scales(resolution)) {
+        // A part that scales or translates may draw anywhere in its granted
+        // overflow.
+        if (draws_in_overflow(resolution)) {
             outsets.left = outsets.left + part.granted_overflow.left;
             outsets.top = outsets.top + part.granted_overflow.top;
             outsets.right = outsets.right + part.granted_overflow.right;
@@ -733,7 +799,9 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         if (kept != nullptr) stop_ambient(*window, *kept, *record);
         PrimitiveParameterBlock unused{};
         const PresentedProperties presented = run_transitions(resolution, transitions, nullptr, unused);
-        const PartPaint shown = scaled_part(part, presented.scale);
+        PartPaint shown = scaled_part(part, presented.scale);
+        const double shown_scale = std::min(presented.scale, granted_scale(part.bounds, part.granted_overflow));
+        shown.bounds = moved_by(shown.bounds, granted_translation(part, shown_scale, presented.translation));
         paint_built_in(painter, control, shown, presented.opacity);
         return;
     }
@@ -825,6 +893,13 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
             shown = part;
         }
     }
+    // The part as drawn moves by its translation (E9.6), within the overflow
+    // its scale as shown leaves; its raster is composited at the offset, so
+    // that the move bakes nothing. Its hit region and text slot stay put.
+    const bool at_own_size = shown.bounds == part.bounds;
+    const double shown_scale = at_own_size ? 1.0 : granted;
+    const Point moved = granted_translation(part, shown_scale, presented.translation);
+    shown.bounds = moved_by(shown.bounds, moved);
     // A primitive that draws a theme material borrows the material of its
     // recipe role for the part's state (E8-1), the part's own corner radius
     // and the window's images, for this paint only.
@@ -908,7 +983,7 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         const double pointer_x = inputs[input_slot(EngineInput::pointer_x)];
         OverlayPlacement placement{};
         placement.face = shown.bounds;
-        placement.granted = shown.bounds == part.bounds ? 1.0 : granted;
+        placement.granted = shown_scale;
         placement.stretched = stretched;
         placement.pointer_x = pointer_x;
         placement.reduced_motion = reduced_motion;
@@ -952,8 +1027,9 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
                            part.bounds.height + outsets.top + outsets.bottom};
         const double granted = std::min(presented.scale, granted_scale(part.bounds, part.granted_overflow));
         const Point centre{part.bounds.x + part.bounds.width * 0.5, part.bounds.y + part.bounds.height * 0.5};
-        const Rect destination{centre.x + (covered.x - centre.x) * granted, centre.y + (covered.y - centre.y) * granted,
-                               covered.width * granted, covered.height * granted};
+        const Rect destination{centre.x + (covered.x - centre.x) * granted + moved.x,
+                               centre.y + (covered.y - centre.y) * granted + moved.y, covered.width * granted,
+                               covered.height * granted};
         painter.draw_part_raster_scaled(raster, destination, opacity);
         return;
     }

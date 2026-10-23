@@ -38,22 +38,91 @@ double seconds_of(FrameInterval interval) noexcept {
     return seconds;
 }
 
+// A control point's coordinate clamped to [low, high]; `fallback` when it
+// is not finite.
+double clamped_point(double value, double low, double high, double fallback) noexcept {
+    if (!std::isfinite(value)) return fallback;
+    const double clamped = std::clamp(value, low, high);
+    return clamped;
+}
+
 MotionCurve normalized(MotionCurve curve) noexcept {
     if (curve.duration < FrameInterval::zero()) curve.duration = FrameInterval::zero();
     if (curve.duration > motion_duration_ceiling) curve.duration = motion_duration_ceiling;
     if (!(curve.overshoot > 0.0)) curve.overshoot = 0.0;
     if (curve.overshoot > maximum_motion_overshoot) curve.overshoot = maximum_motion_overshoot;
+    const double low = -maximum_motion_overshoot;
+    const double high = 1.0 + maximum_motion_overshoot;
+    curve.bezier[0] = clamped_point(curve.bezier[0], 0.0, 1.0, 0.0);
+    curve.bezier[1] = clamped_point(curve.bezier[1], low, high, 0.0);
+    curve.bezier[2] = clamped_point(curve.bezier[2], 0.0, 1.0, 1.0);
+    curve.bezier[3] = clamped_point(curve.bezier[3], low, high, 1.0);
+    curve.steps = std::clamp(curve.steps, 1U, maximum_motion_steps);
+    if (curve.step_position != MotionStepPosition::start) curve.step_position = MotionStepPosition::end;
+    const FrameInterval room = motion_duration_ceiling - curve.duration;
+    if (curve.delay < FrameInterval::zero()) curve.delay = FrameInterval::zero();
+    if (curve.delay > room) curve.delay = room;
     return curve;
 }
+
+// One coordinate of the cubic Bézier from 0 through `first` and `second`
+// to 1, at parameter t.
+double bezier_coordinate(double first, double second, double t) noexcept {
+    const double u = 1.0 - t;
+    const double value = 3.0 * u * u * t * first + 3.0 * u * t * t * second + t * t * t;
+    return value;
+}
+
+// Its derivative in t.
+double bezier_derivative(double first, double second, double t) noexcept {
+    const double u = 1.0 - t;
+    const double value = 3.0 * u * u * first + 6.0 * u * t * (second - first) + 3.0 * t * t * (1.0 - second);
+    return value;
+}
+
+// The parameter t at which the curve's x is `progress`. x rises with t,
+// its control points being within [0, 1], so 40 bisections find t within
+// 2^-40 on every host.
+double bezier_parameter(const std::array<double, 4>& points, double progress) noexcept {
+    double low = 0.0;
+    double high = 1.0;
+    for (int step = 0; step < 40; ++step) {
+        const double middle = (low + high) * 0.5;
+        if (bezier_coordinate(points[0], points[2], middle) < progress) {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    const double t = (low + high) * 0.5;
+    return t;
+}
+
+double bezier_easing(const std::array<double, 4>& points, double progress) noexcept {
+    const double t = bezier_parameter(points, progress);
+    const double eased = bezier_coordinate(points[1], points[3], t);
+    return eased;
+}
+
+double steps_easing(std::uint32_t steps, MotionStepPosition position, double progress) noexcept {
+    const double levels = static_cast<double>(steps);
+    double level = std::floor(progress * levels);
+    if (position == MotionStepPosition::start) level = level + 1.0;
+    const double eased = std::min(level, levels) / levels;
+    return eased;
+}
+
+// The linear Bézier and one step: motion_easing's defaults.
+constexpr std::array<double, 4> linear_bezier{0.0, 0.0, 1.0, 1.0};
 
 bool admissible(double value) noexcept {
     const bool fits = std::isfinite(value) && std::fabs(value) <= largest_motion_magnitude;
     return fits;
 }
 
-// d/dp of motion_easing, for a timed move's velocity.
-double easing_slope(MotionEasing easing, double p) noexcept {
-    switch (easing) {
+// d/dp of motion_curve_easing, for a timed move's velocity.
+double easing_slope(const MotionCurve& curve, double p) noexcept {
+    switch (curve.easing) {
     case MotionEasing::smoothstep: {
         const double slope = 6.0 * p * (1.0 - p);
         return slope;
@@ -79,6 +148,17 @@ double easing_slope(MotionEasing easing, double p) noexcept {
         const double slope = 3.0 * (overshoot_back + 1.0) * u * u + 2.0 * overshoot_back * u;
         return slope;
     }
+    case MotionEasing::cubic_bezier: {
+        // dy/dx = y'(t) / x'(t); where x stands still (a vertical tangent)
+        // the slope is reported as 0, so no velocity is infinite.
+        const double t = bezier_parameter(curve.bezier, p);
+        const double across = bezier_derivative(curve.bezier[0], curve.bezier[2], t);
+        if (!(across > 1e-12)) return 0.0;
+        const double slope = bezier_derivative(curve.bezier[1], curve.bezier[3], t) / across;
+        return slope;
+    }
+    case MotionEasing::steps:
+        return 0.0;
     }
     return 1.0;
 }
@@ -113,6 +193,34 @@ MotionCurve MotionCurve::timed(FrameInterval duration, MotionEasing easing) noex
     curve.kind = MotionKind::timed;
     curve.duration = duration;
     curve.easing = easing;
+    const MotionCurve result = normalized(curve);
+    return result;
+}
+
+MotionCurve MotionCurve::cubic_bezier(FrameInterval duration, double x1, double y1, double x2, double y2) noexcept {
+    MotionCurve curve{};
+    curve.kind = MotionKind::timed;
+    curve.duration = duration;
+    curve.easing = MotionEasing::cubic_bezier;
+    curve.bezier = std::array<double, 4>{x1, y1, x2, y2};
+    const MotionCurve result = normalized(curve);
+    return result;
+}
+
+MotionCurve MotionCurve::stepped(FrameInterval duration, std::uint32_t steps, MotionStepPosition position) noexcept {
+    MotionCurve curve{};
+    curve.kind = MotionKind::timed;
+    curve.duration = duration;
+    curve.easing = MotionEasing::steps;
+    curve.steps = steps;
+    curve.step_position = position;
+    const MotionCurve result = normalized(curve);
+    return result;
+}
+
+MotionCurve MotionCurve::delayed(FrameInterval delay) const noexcept {
+    MotionCurve curve = *this;
+    curve.delay = delay;
     const MotionCurve result = normalized(curve);
     return result;
 }
@@ -172,8 +280,31 @@ double motion_easing(MotionEasing easing, double progress) noexcept {
         const double eased = 1.0 + (overshoot_back + 1.0) * u * u * u + overshoot_back * u * u;
         return eased;
     }
+    case MotionEasing::cubic_bezier: {
+        const double eased = bezier_easing(linear_bezier, p);
+        return eased;
+    }
+    case MotionEasing::steps: {
+        const double eased = steps_easing(1U, MotionStepPosition::end, p);
+        return eased;
+    }
     }
     return p;
+}
+
+double motion_curve_easing(const MotionCurve& curve, double progress) noexcept {
+    if (!(progress > 0.0)) return 0.0;
+    if (progress >= 1.0) return 1.0;
+    if (curve.easing == MotionEasing::cubic_bezier) {
+        const double eased = bezier_easing(curve.bezier, progress);
+        return eased;
+    }
+    if (curve.easing == MotionEasing::steps) {
+        const double eased = steps_easing(curve.steps, curve.step_position, progress);
+        return eased;
+    }
+    const double eased = motion_easing(curve.easing, progress);
+    return eased;
 }
 
 // -- segments --------------------------------------------------------------------
@@ -187,6 +318,9 @@ MotionValue::Segment MotionValue::make_segment(const MotionCurve& curve, FrameTi
     segment.target = target;
     segment.curve = curve;
     segment.seconds = seconds_of(curve.duration);
+    segment.delay = curve.delay;
+    // A delayed move holds the value still, so it starts at no velocity.
+    if (segment.delay > FrameInterval::zero()) segment.origin_velocity = 0.0;
     if (segment.seconds <= 0.0) return segment;
     if (curve.kind == MotionKind::follow || curve.kind == MotionKind::decay) {
         segment.rate = 1.0 / segment.seconds;
@@ -213,8 +347,11 @@ MotionValue::Segment MotionValue::make_segment(const MotionCurve& curve, FrameTi
 // - spring, critically damped: g = (A + Bt) e^(−ωt), B = v₀ + ωA;
 // - spring, under-damped: g = e^(−at)(A cos ω_d t + C sin ω_d t), a = ζω,
 //   C = (v₀ + aA) / ω_d;
-// - timed: origin + (target − origin) · easing(t / duration).
-MotionValue::Sample MotionValue::evaluate(const Segment& segment, double elapsed) noexcept {
+// - timed: origin + (target − origin) · easing(t / duration), or, through
+//   stops, the same between the stops on either side of t / duration.
+// The time t counts from the end of the delay (state_at holds the value at
+// its origin before it).
+MotionValue::Sample MotionValue::evaluate(const Segment& segment, double moved) noexcept {
     Sample sample{};
     sample.position = segment.target;
     if (segment.seconds <= 0.0) {
@@ -224,31 +361,50 @@ MotionValue::Sample MotionValue::evaluate(const Segment& segment, double elapsed
     const double gap = segment.origin - segment.target;
     switch (segment.curve.kind) {
     case MotionKind::timed: {
-        if (elapsed >= segment.seconds) {
+        if (moved >= segment.seconds) {
             sample.elapsed_all = true;
             return sample;
         }
-        const double progress = elapsed / segment.seconds;
-        const double travel = segment.target - segment.origin;
-        sample.position = segment.origin + travel * motion_easing(segment.curve.easing, progress);
-        sample.velocity = travel * easing_slope(segment.curve.easing, progress) / segment.seconds;
+        const double progress = moved / segment.seconds;
+        // The piece of the move `progress` lies in: from the last stop
+        // passed (or the origin) to the next (or the target).
+        double from_offset = 0.0;
+        double from_value = segment.origin;
+        double to_offset = 1.0;
+        double to_value = segment.target;
+        for (std::size_t index = 0U; index < segment.stop_count; ++index) {
+            const MotionStop& stop = segment.stops[index];
+            if (stop.offset <= progress) {
+                from_offset = stop.offset;
+                from_value = stop.value;
+                continue;
+            }
+            to_offset = stop.offset;
+            to_value = stop.value;
+            break;
+        }
+        const double span = to_offset - from_offset;
+        const double local = (progress - from_offset) / span;
+        const double travel = to_value - from_value;
+        sample.position = from_value + travel * motion_curve_easing(segment.curve, local);
+        sample.velocity = travel * easing_slope(segment.curve, local) / (span * segment.seconds);
         return sample;
     }
     case MotionKind::follow:
     case MotionKind::decay: {
-        const double factor = engine_exponential(-segment.rate * elapsed);
+        const double factor = engine_exponential(-segment.rate * moved);
         sample.position = segment.target + gap * factor;
         sample.velocity = -segment.rate * gap * factor;
         return sample;
     }
     case MotionKind::spring: {
-        const double envelope = engine_exponential(-segment.rate * elapsed);
+        const double envelope = engine_exponential(-segment.rate * moved);
         // Beyond e^-745 the envelope is zero: the spring stands at its target.
         if (envelope == 0.0) return sample;
         if (segment.damped == 0.0) {
             const double omega = segment.natural;
             const double b = segment.origin_velocity + omega * gap;
-            const double linear = gap + b * elapsed;
+            const double linear = gap + b * moved;
             sample.position = segment.target + linear * envelope;
             sample.velocity = (b - omega * linear) * envelope;
             return sample;
@@ -256,7 +412,7 @@ MotionValue::Sample MotionValue::evaluate(const Segment& segment, double elapsed
         const double a = segment.rate;
         const double w = segment.damped;
         const double c = (segment.origin_velocity + a * gap) / w;
-        const EngineSineCosine phase = engine_sine_cosine(w * elapsed);
+        const EngineSineCosine phase = engine_sine_cosine(w * moved);
         const double oscillation = gap * phase.cosine + c * phase.sine;
         sample.position = segment.target + envelope * oscillation;
         const double cosine_part = (c * w - a * gap) * phase.cosine;
@@ -302,9 +458,16 @@ MotionValue::Sample MotionValue::state_at(FrameTime now) const noexcept {
         rest.elapsed_all = true;
         return rest;
     }
-    const double since = seconds_of(now - segment_.start);
-    const double elapsed = std::max(0.0, since);
-    const Sample sample = evaluate(segment_, elapsed);
+    // During a delay the value stands still at its origin. The delay is
+    // taken off in clock ticks, so the move's time is exact.
+    const FrameInterval since = now - segment_.start;
+    if (segment_.delay > FrameInterval::zero() && since < segment_.delay) {
+        Sample held{};
+        held.position = segment_.origin;
+        return held;
+    }
+    const double moved = std::max(0.0, seconds_of(since - segment_.delay));
+    const Sample sample = evaluate(segment_, moved);
     return sample;
 }
 
@@ -318,7 +481,7 @@ MotionStart MotionValue::begin(const Segment& next, double position, double velo
         return MotionStart::detached;
     }
     MotionClock& clock = (*window).motion_clock();
-    if (clock.suppressed() || next.seconds <= 0.0) {
+    if (clock.suppressed() || (next.seconds <= 0.0 && next.delay <= FrameInterval::zero())) {
         if (clock_ != nullptr) (*clock_).release(*this);
         segment_ = next;
         moving_ = true;
@@ -343,6 +506,26 @@ MotionStart MotionValue::animate_to(double target) {
     const FrameTime now = window != nullptr ? (*window).motion_clock().now() : FrameTime{};
     const Sample here = state_at(now);
     const Segment next = make_segment(curve_, now, here.position, here.velocity, target);
+    const MotionStart started = begin(next, here.position, here.velocity);
+    return started;
+}
+
+MotionStart MotionValue::animate_through(std::span<const MotionStop> stops, double target) {
+    if (curve_.kind != MotionKind::timed || stops.size() > maximum_motion_stops || !admissible(target)) {
+        return MotionStart::refused;
+    }
+    double previous = 0.0;
+    for (const MotionStop& stop : stops) {
+        const bool ordered = stop.offset > previous && stop.offset < 1.0;
+        if (!ordered || !admissible(stop.value)) return MotionStart::refused;
+        previous = stop.offset;
+    }
+    const Window* const window = (*owner_).attached_window();
+    const FrameTime now = window != nullptr ? (*window).motion_clock().now() : FrameTime{};
+    const Sample here = state_at(now);
+    Segment next = make_segment(curve_, now, here.position, here.velocity, target);
+    std::copy(stops.begin(), stops.end(), next.stops.begin());
+    next.stop_count = stops.size();
     const MotionStart started = begin(next, here.position, here.velocity);
     return started;
 }
