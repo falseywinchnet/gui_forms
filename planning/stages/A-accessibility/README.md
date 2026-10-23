@@ -55,6 +55,13 @@ is never turned off (accessibility round A3).
   `gui_forms_macos_accessibility_client_tests` (and its Gallery variant),
   against the contract in `tests/support/macos_accessibility_contract.cpp`;
   the stock-control fixture is `tests/support/stock_control_fixture.cpp`.
+  A control's own text box publishes AppKit's text attributes on the A-T1
+  core (AXNumberOfCharacters, AXSelectedTextRange, which a client may set,
+  AXSelectedText, AXVisibleCharacterRange, AXInsertionPointLineNumber) and
+  the parameterized ones (AXStringForRange, AXAttributedStringForRange,
+  AXBoundsForRange, AXRangeForLine, AXLineForIndex, AXRangeForPosition,
+  AXRangeForIndex, AXStyleRangeForIndex), in UTF-16 code units, and posts
+  AXValueChanged and AXSelectedTextChanged; both tests check them.
 - **Windows.** MSAA (`IAccessible`) in
   `src/host/windows/accessibility/windows_accessibility.cpp`. Test
   `tests/windows_accessibility_tests.cpp`, registered in `CMakeLists.txt` as
