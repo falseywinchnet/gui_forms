@@ -275,6 +275,19 @@ std::uint32_t alpha_at(const PartRaster& raster, std::uint32_t column, std::uint
     return alpha;
 }
 
+// Whether the frame drew `old_face` and `new_face` both stretched over the
+// same rectangle: the cross-fade composing with the moving scale.
+bool both_faces_stretched(const RasterLog& painter, const std::shared_ptr<const PartRaster>& old_face,
+                          const std::shared_ptr<const PartRaster>& new_face) {
+    for (const RasterDraw& first : painter.draws) {
+        if (!first.stretched || first.raster != old_face) continue;
+        for (const RasterDraw& second : painter.draws) {
+            if (second.stretched && second.raster == new_face && second.destination == first.destination) return true;
+        }
+    }
+    return false;
+}
+
 void pop_is_rule_data() {
     require(builtin_primitive_registry().primitives().size() == 12U, "the pop adds no primitive");
     const ThemeRule rule = pop_rule();
@@ -314,6 +327,7 @@ void hover_pops_within_the_grant() {
 
     std::size_t frames = 0U;
     std::size_t stretched = 0U;
+    std::size_t blended = 0U;
     for (int step = 0; step < 40 && window.motion_clock().armed(); ++step) {
         made.time.time += milliseconds(16);
         static_cast<void>(window.poll_frame_schedule(made.time.time));
@@ -328,9 +342,11 @@ void hover_pops_within_the_grant() {
             const double factor = draw.destination.width / 76.0;
             require(factor > 1.0 - 1e-9 && factor <= popped_scale + 1e-9, "the face grows towards its pop");
         }
+        if (both_faces_stretched(made.painter, rest, raised)) blended = blended + 1U;
         frames = frames + 1U;
     }
     require(frames >= 3U && stretched >= 3U, "the pop spans frames, stretching the face");
+    require(blended >= 1U, "mid-pop, the face cross-fade composites both faces stretched over one rectangle");
     require(!window.motion_clock().armed(), "the pop settles");
 
     // At rest it is baked sharp once at its popped size, and the clock stops.

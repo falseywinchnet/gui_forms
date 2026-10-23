@@ -15,11 +15,31 @@ Primitives (from `builtin_primitive_registry()`): {{primitives}}
 {{image_count}} images: each primitive at scales 1, 1.25, 1.5 and 2, at rest,
 hot and pressed.
 
+Feature samples (from `engine_samples::builtin_feature_samples()`):
+{{samples}}
+
+{{sample_image_count}} sample images: each sample at scales 1, 1.25, 1.5 and
+2, at rest; a pointer sample also at the pointer; a motion sample also 32,
+80, 144 and 224 ms after its part turns hot, and once it has settled. A
+sample image hashes the part rasters and every command the window gave the
+painter (geometry, opacity, colour and paint group), so a scale, a
+translation, a cross-fade or a blend shows in it.
+
 {{host_table}}
 
 ### Differences
 
 {{differences}}
+
+### The census: each feature and the first sample drawing it
+
+The test requires every value of the engine's vocabulary (fill kinds,
+spreads, image modes, procedural patterns, blends, shapes, border styles,
+glow placements, keyline edges, presentational properties, curves, easings
+and step positions) and the features that are no enumeration in at least
+one sample.
+
+{{feature_table}}
 
 ## Parts 2 and 4: the window counters
 

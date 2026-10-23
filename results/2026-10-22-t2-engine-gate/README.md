@@ -22,8 +22,10 @@ merged onto main `773e54b6`). All four hosts ran: 12 primitives and 144
 images, each with the same hash on every host, and every idle counter at 0.
 
 It is not the gate's seal. The gate covers every primitive, and E9.6
-(G1-G4) and E10 are still adding primitives. The sealing run follows once
-they merge.
+(G1-G4) and E10 were still adding features then. Those features are layers
+and parameters of the registered primitives rather than primitives, so the
+gate now draws them through the feature samples too (below); the sealing
+run follows.
 
 ## How the evidence is made
 
@@ -39,6 +41,45 @@ registration on.
   every part raster composited. A second window must draw the same bytes.
   The manifest also records the window's other drawing calls and the
   engine's refusals.
+- **Feature samples (part 1, the features).** Most of the engine's
+  features are layers and parameters of a primitive, not primitives, so a
+  primitive drawn with its defaults does not show them: conic and repeating
+  fills, per-corner radii and shapes, dashed and dotted borders, colour
+  filters, part blur, drop shadows, blends, the finish, masks, image
+  position, the six procedural patterns, glow placements, glass's colour
+  filter, the sheen at the pointer, and motion. Each sample in
+  `engine_samples::builtin_feature_samples()`
+  (`src/core/engine/feature_samples/`) is a theme that draws the same part
+  with some of them; the test draws every listed sample, as it draws every
+  registered primitive, at the four scales:
+  - at rest, once the window has settled (procedural patterns generated,
+    idle keyframes baked);
+  - a pointer sample also with its part hot and the pointer over it;
+  - a motion sample also 32, 80, 144 and 224 ms after its part turns hot,
+    and once it has settled.
+
+  A sample image's hash covers the part rasters and every command the window
+  gave the painter, with its geometry, opacity, colour and paint group, so
+  that a scale, a translation, a cross-fade or a blend shows in it. The test
+  also requires of each sample: its theme compiles cleanly; nothing is
+  refused, every image mask is drawn and every procedural pattern is
+  generated; every image composites a part raster; a driven sample's images
+  show its drive; a cross-fade shows both faces in some frame; no two samples
+  draw alike at a scale; a second window draws the same images; and its
+  window, once settled, runs no frame.
+- **The census.** The test reads the themes the samples write and requires
+  every feature of the engine's vocabulary in at least one sample: every
+  value of the fill kinds, spreads, image modes, coordinate spaces, linear
+  geometries, procedural patterns, fill and part blends, shapes, border
+  styles, glow placements, keyline edges, presentational properties, curve
+  kinds, easings and step positions, and the features that are no
+  enumeration (fill opacity, image position, border edges, corner radii,
+  outer and inset shadows, colour filter, drop shadow, part blur, finish,
+  solid, gradient and image masks, glass's colour filter, the sheen at the
+  pointer, motion delay and keyframe stops). The names are switches built
+  with `-Werror=switch`: a value added to one of those enumerations fails
+  the build until it is named, and the test until a sample draws it. A
+  fling's decay curve is no transition's curve and is left to its own tests.
 - **Idle frames (part 2).** After each primitive's window has settled,
   including its idle keyframe bakes, 125 polls of 16 ms (two seconds) must
   show:
@@ -46,8 +87,9 @@ registration on.
   - no new `scheduled_frame_requests`, `paint_passes`,
     `motion_clock_ticks` or `engine_ambient_frames`.
 
-  The same is checked for the ribbon after its rise has been driven on, off,
-  on and off again, while it was still moving.
+  The same is checked for each feature sample's window, and for the ribbon
+  after its rise has been driven on, off, on and off again, while it was
+  still moving.
 - **Reduced motion, on the ribbon (part 4).** Under reduced motion, hovering
   the ribbon runs no motion clock tick, and the rise jumps to its end.
 
@@ -55,15 +97,19 @@ With `GUI_FORMS_ENGINE_GATE_MANIFEST=<file>` the test writes a manifest
 (`engine-gate-<platform>.tsv`):
 - `primitive` rows: name, state, scale, rasters, other drawing calls,
   refusals, hash;
+- a `samples` row (how many are listed) and `sample` rows: name, primitive,
+  frame, scale, rasters, other drawing calls, refusals, hash;
+- `feature` rows: each feature of the census and the first sample drawing
+  it;
 - `counter` rows: the idle and reduced-motion counters.
 
 Each native CI job sets that variable, and its evidence artifact
 (`gui-forms-evidence-<platform>`) carries the file. The `engine-gate` job in
 `native.yml` downloads the four artifacts and runs
 `python tools/engine_gate.py compare`. That fails on any hash that differs
-between hosts, any primitive missing on one host, or any non-zero idle
-counter, and uploads the filled record as the `t2-engine-gate-record`
-artifact.
+between hosts, any primitive, sample or feature missing on one host, or any
+non-zero idle counter, and uploads the filled record as the
+`t2-engine-gate-record` artifact.
 
 A native job that promoted (a push to main) or reused an earlier
 validation of the same tree runs no test. It carries the validation run's

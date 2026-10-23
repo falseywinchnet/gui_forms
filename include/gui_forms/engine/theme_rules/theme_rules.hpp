@@ -167,9 +167,12 @@ inline constexpr double maximum_presentational_scale = 2.0;
 // face fades into the new over the transition's curve, each baked once and
 // blended through a paint group (old at 1 - t, new at t, added). The
 // transition names no states: it runs on every change of face. A change
-// while a fade runs fades from the face shown last to the new one; a face
-// of another size or scale does not fade. Like scale, no built-in rule
-// uses it.
+// while a fade runs fades from the face shown last to the new one. The
+// two faces' rasters must have the same pixel extent and display scale:
+// a new face baked at another size (such as a part resting at a popped
+// size) replaces the old one without a fade. The presentational scale
+// does not stop a fade: while it moves, both faces are stretched over the
+// same rectangle (E7r form b). Like scale, no built-in rule uses it.
 inline constexpr std::string_view face_property = "face";
 
 // The engine's presentational translation (E9.6, CSS `translate`): the

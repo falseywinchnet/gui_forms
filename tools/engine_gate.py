@@ -4,11 +4,14 @@
 Each native CI job runs gui_forms_engine_gate_tests with
 GUI_FORMS_ENGINE_GATE_MANIFEST set, which writes engine-gate-<platform>.tsv.
 That file lists every registered primitive's reference-image hashes (four
-scales, three states) and the window counters of the idle checks.
+scales, three states), every feature sample's image hashes (four scales,
+and the frames of its drive), the census of features with the sample that
+draws each, and the window counters of the idle checks.
 
 `compare` finds those manifests under --evidence, at any depth (the native
 jobs' evidence artifacts). It checks that every host lists the same
-primitives with the same hashes, and that every idle counter is zero. It
+primitives, samples and features with the same hashes, and that every idle
+counter is zero. It
 then writes the comparison as JSON and as the record filled from
 results/2026-10-22-t2-engine-gate/record.template.md.
 
@@ -44,12 +47,18 @@ TEMPLATE: Path = ROOT / 'results/2026-10-22-t2-engine-gate/record.template.md'
 
 
 class Manifest:
-    """One host's manifest: primitive rows keyed by (name, state, scale), and counters."""
+    """One host's manifest: primitive rows keyed by (name, state, scale), sample rows keyed by
+    (name, frame, scale), the census of features, and counters."""
 
     def __init__(self) -> None:
         self.registry: int = 0
         # (name, state, scale) -> (rasters, painter_calls, refusals, hash)
         self.images: dict[tuple[str, str, str], tuple[str, str, str, str]] = {}
+        self.sample_count: int = 0
+        # (name, frame, scale) -> (primitive, rasters, painter_calls, refusals, hash)
+        self.samples: dict[tuple[str, str, str], tuple[str, str, str, str, str]] = {}
+        # feature -> the first sample drawing it
+        self.features: dict[str, str] = {}
         self.counters: dict[str, int] = {}
 
 
@@ -72,6 +81,17 @@ def parse_manifest(text: str) -> Manifest:
             if key in manifest.images:
                 raise ValueError(f'line {number}: {key} is listed twice')
             manifest.images[key] = (fields[4], fields[5], fields[6], fields[7])
+        elif fields[0] == 'samples' and len(fields) == 2:
+            manifest.sample_count = int(fields[1])
+        elif fields[0] == 'sample' and len(fields) == 9:
+            sample_key: tuple[str, str, str] = (fields[1], fields[3], fields[4])
+            if sample_key in manifest.samples:
+                raise ValueError(f'line {number}: sample {sample_key} is listed twice')
+            manifest.samples[sample_key] = (fields[2], fields[5], fields[6], fields[7], fields[8])
+        elif fields[0] == 'feature' and len(fields) == 3:
+            if fields[1] in manifest.features:
+                raise ValueError(f'line {number}: feature {fields[1]} is listed twice')
+            manifest.features[fields[1]] = fields[2]
         elif fields[0] == 'counter' and len(fields) == 3:
             manifest.counters[fields[1]] = int(fields[2])
         else:
@@ -94,30 +114,64 @@ def find_manifests(evidence: Path) -> dict[str, Path]:
     return found
 
 
+def host_values(manifests: dict[str, Manifest], platforms: list[str], table: str, key: object) -> dict:
+    """Each host's row under key in one of its tables ('images', 'samples', 'features'), as a list, or None."""
+    values: dict[str, list[str] | None] = {}
+    platform: str
+    for platform in platforms:
+        row: tuple[str, ...] | str | None = getattr(manifests[platform], table).get(key)
+        if row is None:
+            values[platform] = None
+        elif isinstance(row, str):
+            values[platform] = [row]
+        else:
+            values[platform] = list(row)
+    return values
+
+
+def differs(values: dict[str, list[str] | None]) -> bool:
+    distinct: list = []
+    value: list[str] | None
+    for value in values.values():
+        if value not in distinct:
+            distinct.append(value)
+    return len(distinct) > 1
+
+
 def compare(manifests: dict[str, Manifest], required: tuple[str, ...]) -> dict:
     """The comparison: every difference between hosts, every non-zero idle counter, missing hosts."""
     platforms: list[str] = sorted(manifests)
     keys: set[tuple[str, str, str]] = set()
+    sample_keys: set[tuple[str, str, str]] = set()
+    features: set[str] = set()
     platform: str
     for platform in platforms:
         keys.update(manifests[platform].images)
+        sample_keys.update(manifests[platform].samples)
+        features.update(manifests[platform].features)
     differences: list[dict] = []
     key: tuple[str, str, str]
+    values: dict[str, list[str] | None]
     for key in sorted(keys):
-        values: dict[str, list[str] | None] = {}
-        for platform in platforms:
-            row: tuple[str, str, str, str] | None = manifests[platform].images.get(key)
-            values[platform] = list(row) if row is not None else None
-        distinct: list = []
-        value: list[str] | None
-        for value in values.values():
-            if value not in distinct:
-                distinct.append(value)
-        if len(distinct) > 1:
-            differences.append({'primitive': key[0], 'state': key[1], 'scale': key[2], 'hosts': values})
+        values = host_values(manifests, platforms, 'images', key)
+        if differs(values):
+            differences.append({'kind': 'primitive', 'primitive': key[0], 'state': key[1], 'scale': key[2],
+                                'hosts': values})
+    for key in sorted(sample_keys):
+        values = host_values(manifests, platforms, 'samples', key)
+        if differs(values):
+            differences.append({'kind': 'sample', 'sample': key[0], 'frame': key[1], 'scale': key[2],
+                                'hosts': values})
+    feature: str
+    for feature in sorted(features):
+        values = host_values(manifests, platforms, 'features', feature)
+        if differs(values):
+            differences.append({'kind': 'feature', 'feature': feature, 'hosts': values})
     registries: dict[str, int] = {}
+    sample_counts: dict[str, int] = {}
     for platform in platforms:
         registries[platform] = manifests[platform].registry
+        sample_counts[platform] = manifests[platform].sample_count
     busy_counters: list[dict] = []
     for platform in platforms:
         name: str
@@ -129,16 +183,24 @@ def compare(manifests: dict[str, Manifest], required: tuple[str, ...]) -> dict:
     for key in sorted(keys):
         if key[0] not in primitives:
             primitives.append(key[0])
+    samples: list[str] = []
+    for key in sorted(sample_keys):
+        if key[0] not in samples:
+            samples.append(key[0])
     missing: list[str] = []
     for platform in required:
         if platform not in manifests:
             missing.append(platform)
     distinct_registries: set[int] = set(registries.values())
+    distinct_sample_counts: set[int] = set(sample_counts.values())
+    counts_agree: bool = len(distinct_registries) <= 1 and len(distinct_sample_counts) <= 1
     result: dict = {
         'platforms': platforms, 'missing': missing, 'primitives': primitives, 'images': len(keys),
+        'samples': samples, 'sample_images': len(sample_keys), 'features': sorted(features),
         'registry': registries, 'registry_agrees': len(distinct_registries) <= 1,
+        'sample_counts': sample_counts, 'sample_counts_agree': len(distinct_sample_counts) <= 1,
         'differences': differences, 'busy_idle_counters': busy_counters,
-        'identical': not differences and len(distinct_registries) <= 1,
+        'identical': not differences and counts_agree,
     }
     return result
 
@@ -191,8 +253,10 @@ def minority_hosts(hosts: dict[str, list[str] | None]) -> list[str]:
 
 
 def host_table(result: dict, manifests: dict[str, Manifest]) -> str:
-    """A Markdown table: per host, the primitives, the images and whether they match every other host."""
-    rows: list[str] = ['| Host | Registered primitives | Images | Matches every other host |', '|---|---:|---:|---|']
+    """A Markdown table: per host, the primitives, the images, the samples, their images and whether
+    they match every other host."""
+    rows: list[str] = ['| Host | Registered primitives | Images | Feature samples | Sample images '
+                       '| Matches every other host |', '|---|---:|---:|---:|---:|---|']
     differing: set[str] = set()
     difference: dict
     for difference in result['differences']:
@@ -201,9 +265,11 @@ def host_table(result: dict, manifests: dict[str, Manifest]) -> str:
         verdict: str = 'yes'
         if platform in differing:
             verdict = 'no (see differences)'
-        rows.append(f'| {platform} | {manifests[platform].registry} | {len(manifests[platform].images)} | {verdict} |')
+        manifest: Manifest = manifests[platform]
+        rows.append(f'| {platform} | {manifest.registry} | {len(manifest.images)} | {manifest.sample_count} '
+                    f'| {len(manifest.samples)} | {verdict} |')
     for platform in result['missing']:
-        rows.append(f'| {platform} | - | - | no manifest (validation reused, or the job did not run) |')
+        rows.append(f'| {platform} | - | - | - | - | no manifest (validation reused, or the job did not run) |')
     return '\n'.join(rows)
 
 
@@ -213,9 +279,27 @@ def difference_list(result: dict) -> str:
     lines: list[str] = []
     difference: dict
     for difference in result['differences']:
-        lines.append(f"- `{difference['primitive']}` {difference['state']} at {difference['scale']}: "
-                     + json.dumps(difference['hosts'], sort_keys=True))
+        hosts: str = json.dumps(difference['hosts'], sort_keys=True)
+        if difference['kind'] == 'sample':
+            lines.append(f"- sample `{difference['sample']}` {difference['frame']} at {difference['scale']}: {hosts}")
+        elif difference['kind'] == 'feature':
+            lines.append(f"- feature `{difference['feature']}`: {hosts}")
+        else:
+            lines.append(f"- `{difference['primitive']}` {difference['state']} at {difference['scale']}: {hosts}")
     return '\n'.join(lines)
+
+
+def feature_table(manifests: dict[str, Manifest]) -> str:
+    """A Markdown table of the census: each feature and the first sample drawing it (the first host's; the
+    hosts are compared)."""
+    if not manifests:
+        return 'None: no host ran.'
+    first: Manifest = manifests[sorted(manifests)[0]]
+    rows: list[str] = ['| Feature | First sample drawing it |', '|---|---|']
+    feature: str
+    for feature in sorted(first.features):
+        rows.append(f'| `{feature}` | `{first.features[feature]}` |')
+    return '\n'.join(rows)
 
 
 def fill_record(template: str, result: dict, manifests: dict[str, Manifest], commit: str, run: str) -> str:
@@ -231,10 +315,17 @@ def fill_record(template: str, result: dict, manifests: dict[str, Manifest], com
     primitive: str
     for primitive in result['primitives']:
         quoted.append('`' + primitive + '`')
+    quoted_samples: list[str] = []
+    sample: str
+    for sample in result['samples']:
+        quoted_samples.append('`' + sample + '`')
     values: dict[str, str] = {
         'commit': commit, 'run': run, 'verdict': verdict,
         'primitives': ', '.join(quoted),
         'image_count': str(result['images']),
+        'samples': ', '.join(quoted_samples),
+        'sample_image_count': str(result['sample_images']),
+        'feature_table': feature_table(manifests),
         'host_table': host_table(result, manifests),
         'differences': difference_list(result),
         'counter_table': counter_table(manifests),
@@ -348,6 +439,7 @@ def main(argv: list[str] | None = None) -> int:
     record: str = fill_record(TEMPLATE.read_text(encoding='utf-8'), result, manifests, args.commit, args.run)
     (args.out / 'record.md').write_text(record, encoding='utf-8')
     print(f"engine gate: {len(manifests)} hosts, {result['images']} images, "
+          f"{result['sample_images']} sample images, {len(result['features'])} features, "
           f"{len(result['differences'])} differences, {len(result['busy_idle_counters'])} busy idle counters, "
           f"missing {result['missing']}")
     failed: bool = not result['identical'] or bool(result['busy_idle_counters']) or bool(result['missing'])

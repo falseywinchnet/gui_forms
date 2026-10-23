@@ -1022,19 +1022,33 @@ void ThemeEngine::paint_planned(Painter& painter, const Control& control, const 
     }
     // A face that changed from one discrete state to another cross-fades
     // (form a): the old face at 1 - t and the new one added at t, in one
-    // isolated group at the part's opacity.
+    // isolated group at the part's opacity. The two faces have the same
+    // extent (fades_between), so while the scale moves (form b) both are
+    // stretched over the same rectangle and the fade composes with the pop.
     std::shared_ptr<const PartRaster> fading_from{};
     if (kept != nullptr) fading_from = note_face(*kept, presented.face, raster, part.states);
     // The raster covers the part grown by its primitive's outsets; stretched,
     // that rectangle is scaled about the part's centre as its bounds are.
     const Insets outsets = descriptor.outsets;
-    if (fading_from && !stretched) {
+    Rect stretched_to{};
+    if (stretched) {
+        const Rect covered{part.bounds.x - outsets.left, part.bounds.y - outsets.top,
+                           part.bounds.width + outsets.left + outsets.right,
+                           part.bounds.height + outsets.top + outsets.bottom};
+        const double granted = std::min(presented.scale, granted_scale(part.bounds, part.granted_overflow));
+        const Point centre{part.bounds.x + part.bounds.width * 0.5, part.bounds.y + part.bounds.height * 0.5};
+        stretched_to = Rect{centre.x + (covered.x - centre.x) * granted + moved.x,
+                            centre.y + (covered.y - centre.y) * granted + moved.y, covered.width * granted,
+                            covered.height * granted};
+    }
+    if (fading_from) {
         const double fade = std::clamp((*presented.face).current(), 0.0, 1.0);
         const Point origin{shown.bounds.x - outsets.left, shown.bounds.y - outsets.top};
         const DeviceExtent covered = (*raster).extent();
         const double device_scale = (*raster).scale().value;
-        const Rect bounds{origin.x, origin.y, static_cast<double>(covered.width) / device_scale,
-                          static_cast<double>(covered.height) / device_scale};
+        Rect bounds{origin.x, origin.y, static_cast<double>(covered.width) / device_scale,
+                    static_cast<double>(covered.height) / device_scale};
+        if (stretched) bounds = stretched_to;
         PaintGroup whole{};
         whole.bounds = bounds;
         whole.opacity = opacity;
@@ -1044,23 +1058,23 @@ void ThemeEngine::paint_planned(Painter& painter, const Control& control, const 
         added.opacity = fade;
         added.composite = PaintGroupComposite::plus;
         painter.begin_group(whole);
-        painter.draw_part_raster(fading_from, origin, 1.0 - fade);
+        if (stretched) {
+            painter.draw_part_raster_scaled(fading_from, stretched_to, 1.0 - fade);
+        } else {
+            painter.draw_part_raster(fading_from, origin, 1.0 - fade);
+        }
         painter.begin_group(added);
-        painter.draw_part_raster(raster, origin, 1.0);
+        if (stretched) {
+            painter.draw_part_raster_scaled(raster, stretched_to, 1.0);
+        } else {
+            painter.draw_part_raster(raster, origin, 1.0);
+        }
         painter.end_group();
         painter.end_group();
         return;
     }
     if (stretched) {
-        const Rect covered{part.bounds.x - outsets.left, part.bounds.y - outsets.top,
-                           part.bounds.width + outsets.left + outsets.right,
-                           part.bounds.height + outsets.top + outsets.bottom};
-        const double granted = std::min(presented.scale, granted_scale(part.bounds, part.granted_overflow));
-        const Point centre{part.bounds.x + part.bounds.width * 0.5, part.bounds.y + part.bounds.height * 0.5};
-        const Rect destination{centre.x + (covered.x - centre.x) * granted + moved.x,
-                               centre.y + (covered.y - centre.y) * granted + moved.y, covered.width * granted,
-                               covered.height * granted};
-        painter.draw_part_raster_scaled(raster, destination, opacity);
+        painter.draw_part_raster_scaled(raster, stretched_to, opacity);
         return;
     }
     painter.draw_part_raster(raster, Point{shown.bounds.x - outsets.left, shown.bounds.y - outsets.top}, opacity);
