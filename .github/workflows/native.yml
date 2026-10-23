@@ -50,6 +50,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_state_machines.py
           python3 -B -m unittest discover -s tools -p test_ci_build.py
           python3 -B -m unittest discover -s tools -p test_engine_gate.py
+          python3 -B -m unittest discover -s tools -p test_ci_cache.py
           python3 -B -m unittest discover -s tools -p test_change_selection.py
           python3 -B -m unittest discover -s tools -p test_native_tests.py
           python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv stx_cng fuzz
@@ -123,6 +124,9 @@ jobs:
           echo "CCACHE_BASEDIR=$PWD" >> "$GITHUB_ENV"
           echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
           echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+          # Before the cache is restored: tools/ci_cache.py evict keeps the
+          # entries used after this moment.
+          echo "GUI_FORMS_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
       # Line tables by default; [sanitizer-full-g] in the head commit's message
       # selects -g for a hunt (tools/ci_build.py --debug-info). The checkout is
       # a pull request's merge commit, so the message is read from the head
@@ -218,6 +222,12 @@ jobs:
             gui-sanitize-ccache.tar.sha256
           compression-level: 0
           retention-days: 7
+      # The saved cache is this build's working set, not every generation up
+      # to CCACHE_MAXSIZE (planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1). A
+      # push to main builds everything, so the set is complete.
+      - name: Keep only the compiler cache entries this build used
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: python gui_forms/tools/ci_cache.py evict --since "$GUI_FORMS_JOB_START"
       - uses: actions/cache/save@v4
         if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
@@ -455,6 +465,9 @@ jobs:
           echo "CCACHE_BASEDIR=$cache_base" >> "$GITHUB_ENV"
           echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
           echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          # Before the cache is restored: tools/ci_cache.py evict keeps the
+          # entries used after this moment.
+          echo "GUI_FORMS_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/cache/restore@v4
         id: objects
         if: steps.promotion.outputs.reused != 'true' && (steps.reuse.outputs.reused != 'true')
@@ -566,8 +579,10 @@ jobs:
       - name: Audit installed macOS binary minimums
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'macOS' && steps.reuse.outputs.reused != 'true')
         run: python gui_forms/tools/audit_macos_minimum.py .build/native-macos-arm64/gui-forms-sdk .build/native-macos-arm64/installed-reference-examples
+      # Only main saves dependencies: a pull request's copy could be restored
+      # by no other ref and held 0.5 GB of the 10 GB.
       - uses: actions/cache/save@v4
-        if: steps.promotion.outputs.reused != 'true' && (always() && steps.reuse.outputs.reused != 'true' && steps.dependencies.outputs.cache-primary-key != '' && steps.dependencies.outputs.cache-hit != 'true')
+        if: steps.promotion.outputs.reused != 'true' && (always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.reuse.outputs.reused != 'true' && steps.dependencies.outputs.cache-primary-key != '' && steps.dependencies.outputs.cache-hit != 'true')
         with:
           path: |
             gui_forms/third_party/skia
@@ -580,6 +595,14 @@ jobs:
       - name: Report cache statistics
         if: steps.promotion.outputs.reused != 'true' && (always())
         run: ccache --show-stats --verbose
+      # The saved cache, and the consumer archive below, hold this build's
+      # working set, not every generation up to CCACHE_MAXSIZE
+      # (planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1). Only after a build
+      # that passed on main: it builds everything, so the set is complete. A
+      # job that reused a validation compiled nothing and keeps its cache.
+      - name: Keep only the compiler cache entries this build used
+        if: success() && steps.promotion.outputs.reused != 'true' && steps.reuse.outputs.reused != 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: python gui_forms/tools/ci_cache.py evict --since "$GUI_FORMS_JOB_START"
       # Only main saves object caches: pull requests seed from validated
       # archives (ci_promote.py seed), and their per-tree entries evicted the
       # dependency caches from the repository's 10 GB.
@@ -690,3 +713,23 @@ jobs:
     permissions:
       contents: write
       actions: read
+
+  # After every job that saves a cache on a push to main: delete the entries
+  # each new save superseded, keeping the newest of each family
+  # (tools/ci_cache.py prune; planning/BUILD_SIZE_PLAN_2026-10-23.md, step 2).
+  # Runs when a saving job failed too, since the others saved. The only job
+  # with actions: write.
+  cache-prune:
+    needs: [sanitizers, native, programs]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Delete superseded cache generations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B tools/ci_cache.py prune --ref refs/heads/main --apply
