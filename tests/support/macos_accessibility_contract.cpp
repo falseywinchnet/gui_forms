@@ -1,6 +1,21 @@
 #include "macos_accessibility_contract.hpp"
 
+#include <algorithm>
+
 namespace gui_forms::test_support {
+
+std::size_t expected_utf16_units(std::string_view text, std::size_t bytes) {
+    const std::size_t end = std::min(bytes, text.size());
+    std::size_t units = 0U;
+    for (std::size_t index = 0U; index < end; ++index) {
+        const unsigned char byte = static_cast<unsigned char>(text[index]);
+        // A continuation byte adds nothing; a four-byte sequence's lead
+        // starts a surrogate pair.
+        if ((byte & 0xC0U) == 0x80U) continue;
+        units += byte >= 0xF0U ? 2U : 1U;
+    }
+    return units;
+}
 
 const char* expected_ax_role(SemanticRole role) {
     switch (role) {
@@ -121,6 +136,17 @@ AccessibilityProjection expected_ax_projection(const SemanticNode& node) {
     expected.row_count = node.row_count ? static_cast<long long>(*node.row_count) : 0;
     expected.column_count = node.column_count ? static_cast<long long>(*node.column_count) : 0;
     expected.modal = node.modal;
+    const bool text_ranges = node.role == SemanticRole::text_box && node.text_selection.has_value() &&
+                             !has_semantic_state(node.states, SemanticState::protected_content);
+    if (text_ranges) {
+        const SemanticTextSelection selection = *node.text_selection;
+        const std::size_t low = std::min(selection.anchor.value(), selection.caret.value());
+        const std::size_t high = std::max(selection.anchor.value(), selection.caret.value());
+        const std::size_t start = expected_utf16_units(node.value, low);
+        const std::size_t end = expected_utf16_units(node.value, high);
+        expected.character_count = static_cast<long long>(expected_utf16_units(node.value, node.value.size()));
+        expected.selected_text_range = std::to_string(start) + "+" + std::to_string(end - start);
+    }
     return expected;
 }
 

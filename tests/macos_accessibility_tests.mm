@@ -23,7 +23,8 @@
 // semantic node it projects, performs each control's default action through
 // its element and observes the change, and checks that an element held past
 // its control's removal refuses actions, and that items whose stable ids two
-// trees repeat each reach their own tree. It runs in process, so it needs no
+// trees repeat each reach their own tree, and reads and sets a text box's
+// text attributes (A-T1). It runs in process, so it needs no
 // Accessibility permission (CI); the out-of-process AXUIElement client is
 // macos_accessibility_client_tests.
 
@@ -115,6 +116,10 @@ Projection published_projection(id element) {
     published.row_count = static_cast<long long>([element accessibilityRowCount]);
     published.column_count = static_cast<long long>([element accessibilityColumnCount]);
     published.modal = [element isAccessibilityModal];
+    if (selector_allowed(element, @selector(accessibilitySelectedTextRange))) {
+        published.character_count = static_cast<long long>([element accessibilityNumberOfCharacters]);
+        published.selected_text_range = range_text([element accessibilitySelectedTextRange]);
+    }
     return published;
 }
 
@@ -259,6 +264,10 @@ private:
         same = compare_text(owner, id, "AXColumnCount", std::to_string(expected.column_count),
                             std::to_string(published.column_count)) && same;
         same = compare_flag(owner, id, "AXModal", expected.modal, published.modal) && same;
+        same = compare_text(owner, id, "AXNumberOfCharacters", std::to_string(expected.character_count),
+                            std::to_string(published.character_count)) && same;
+        same = compare_text(owner, id, "AXSelectedTextRange", expected.selected_text_range,
+                            published.selected_text_range) && same;
         return same;
     }
 
@@ -504,6 +513,130 @@ void check_repeated_item_identities(StockControlFixture& fixture, gui_forms::Win
 }
 
 // ---------------------------------------------------------------------------
+// Editable text (A-T1): a text box's text attributes and parameterized
+// attributes, read and set through the NSAccessibility protocol, against
+// the model. The single-line box's text holds a combining sequence: "Cafe",
+// U+0301 and " au lait" are 13 UTF-16 code units and 14 bytes, and bytes 3
+// to 6 (units 3 to 5) are one composed character.
+
+constexpr const char* single_line_text = "Cafe\xCC\x81 au lait";
+constexpr const char* two_line_text = "First line\nSecond line";
+
+void expect_text(Report& report, bool condition, const std::string& what) {
+    if (!condition) report.failures.push_back("text ranges: " + what);
+}
+
+bool same_range(NSRange range, NSUInteger location, NSUInteger length) {
+    const bool same = range.location == location && range.length == length;
+    return same;
+}
+
+void check_single_line_text(gui_forms::TextBox& box, id element, Report& report) {
+    expect_text(report, [element accessibilityNumberOfCharacters] == 13,
+                "AXNumberOfCharacters counts UTF-16 code units");
+    box.select(gui_forms::Utf8Offset(1U), gui_forms::Utf8Offset(6U));
+    expect_text(report, same_range([element accessibilitySelectedTextRange], 1U, 4U),
+                "AXSelectedTextRange is the model's selection in UTF-16 code units, " +
+                    range_text([element accessibilitySelectedTextRange]));
+    NSString* const selected = [element accessibilitySelectedText];
+    expect_text(report, selected != nil && [selected isEqualToString:[NSString stringWithUTF8String:"afe\xCC\x81"]],
+                "AXSelectedText is the selected text");
+    [element setAccessibilitySelectedTextRange:NSMakeRange(6U, 3U)];
+    const gui_forms::TextSelection set = box.selection();
+    expect_text(report, set.anchor.value() == 7U && set.caret.value() == 10U,
+                "setting AXSelectedTextRange selects the model's bytes, anchored at the range's start");
+    NSString* const word = [element accessibilityStringForRange:NSMakeRange(6U, 2U)];
+    expect_text(report, word != nil && [word isEqualToString:@"au"], "AXStringForRange");
+    expect_text(report, [element accessibilityStringForRange:NSMakeRange(14U, 1U)] == nil,
+                "AXStringForRange refuses a range past the text's end");
+    expect_text(report, same_range([element accessibilityRangeForIndex:4], 3U, 2U),
+                "AXRangeForIndex gives the whole composed character");
+    expect_text(report, same_range([element accessibilityStyleRangeForIndex:0], 0U, 13U),
+                "AXStyleRangeForIndex gives the one style run");
+    expect_text(report, [element accessibilityLineForIndex:5] == 0, "AXLineForIndex on a single line");
+    expect_text(report, same_range([element accessibilityRangeForLine:0], 0U, 13U), "AXRangeForLine 0");
+    expect_text(report, [element accessibilityInsertionPointLineNumber] == 0, "AXInsertionPointLineNumber");
+    expect_text(report, same_range([element accessibilityVisibleCharacterRange], 0U, 13U),
+                "AXVisibleCharacterRange covers the text it shows");
+    const NSRect letter = [element accessibilityFrameForRange:NSMakeRange(1U, 1U)];
+    expect_text(report, letter.size.width > 0.0 && letter.size.height > 0.0 &&
+                            NSContainsRect([element accessibilityFrame], letter),
+                "AXBoundsForRange gives a character's box within the element");
+    const NSRect caret = [element accessibilityFrameForRange:NSMakeRange(1U, 0U)];
+    expect_text(report, caret.size.width > 0.0 && caret.size.width <= 1.5 && caret.size.height > 0.0,
+                "AXBoundsForRange of an empty range is the caret's box");
+    const NSPoint middle = NSMakePoint(NSMidX(letter), NSMidY(letter));
+    expect_text(report, same_range([element accessibilityRangeForPosition:middle], 1U, 1U),
+                "AXRangeForPosition gives the character under the point");
+}
+
+void check_two_line_text(gui_forms::TextBox& box, id element, Report& report) {
+    expect_text(report, [element accessibilityNumberOfCharacters] == 22, "a multiline box's AXNumberOfCharacters");
+    expect_text(report, same_range([element accessibilityRangeForLine:0], 0U, 11U),
+                "a line runs through its break");
+    expect_text(report, same_range([element accessibilityRangeForLine:1], 11U, 11U), "AXRangeForLine 1");
+    expect_text(report, [element accessibilityLineForIndex:10] == 0 && [element accessibilityLineForIndex:12] == 1,
+                "AXLineForIndex: a break belongs to the line it ends");
+    expect_text(report, same_range([element accessibilityRangeForIndex:10], 10U, 1U),
+                "a line break is one composed character");
+    box.select(gui_forms::Utf8Offset(15U), gui_forms::Utf8Offset(15U));
+    expect_text(report, [element accessibilityInsertionPointLineNumber] == 1,
+                "AXInsertionPointLineNumber follows the caret");
+    const NSRect first = [element accessibilityFrameForRange:NSMakeRange(0U, 1U)];
+    const NSRect second = [element accessibilityFrameForRange:NSMakeRange(11U, 1U)];
+    // Screen coordinates rise upwards, so the second line lies lower.
+    expect_text(report, first.size.height > 0.0 && second.size.height > 0.0 && NSMaxY(second) <= NSMinY(first) + 0.5,
+                "the second line's box lies below the first's");
+}
+
+void check_text_ranges(StockControlFixture& fixture, gui_forms::Window& window, NSView* view, Report& report) {
+    std::shared_ptr<gui_forms::TextBox> single =
+        gui_forms::make_control<gui_forms::TextBox>(gui_forms::StableId("text.single"));
+    std::shared_ptr<gui_forms::TextBox> multi =
+        gui_forms::make_control<gui_forms::TextBox>(gui_forms::StableId("text.multi"));
+    std::shared_ptr<gui_forms::TextBox> password =
+        gui_forms::make_control<gui_forms::TextBox>(gui_forms::StableId("text.password"));
+    (*single).set_requested_bounds({10.0, 10.0, 260.0, 26.0});
+    (*single).set_text(single_line_text);
+    (*multi).set_requested_bounds({10.0, 50.0, 260.0, 80.0});
+    (*multi).set_multiline(true);
+    (*multi).set_text(two_line_text);
+    (*password).set_requested_bounds({10.0, 140.0, 260.0, 26.0});
+    (*password).set_use_system_password_character(true);
+    (*password).set_text("secret");
+    (*fixture.root).add_child(single);
+    (*fixture.root).add_child(multi);
+    (*fixture.root).add_child(password);
+    window.perform_layout();
+    id single_element = find_element([view accessibilityChildren], @"text.single");
+    id multi_element = find_element([view accessibilityChildren], @"text.multi");
+    id password_element = find_element([view accessibilityChildren], @"text.password");
+    if (single_element == nil || multi_element == nil || password_element == nil) {
+        report.failures.push_back("text ranges: the three text boxes must be published");
+    } else {
+        expect_text(report, selector_allowed(single_element, @selector(accessibilityStringForRange:)) &&
+                                selector_allowed(single_element, @selector(setAccessibilitySelectedTextRange:)),
+                    "a text box publishes the text attributes and their setter");
+        expect_text(report, !selector_allowed(password_element, @selector(accessibilitySelectedTextRange)) &&
+                                !selector_allowed(password_element, @selector(accessibilityStringForRange:)),
+                    "a password box publishes no text attributes");
+        check_single_line_text(*single, single_element, report);
+        check_two_line_text(*multi, multi_element, report);
+        static_cast<void>((*fixture.root).remove_child((*single).runtime_id()));
+        window.perform_layout();
+        static_cast<void>([view accessibilityChildren]);
+        [single_element setAccessibilitySelectedTextRange:NSMakeRange(0U, 1U)];
+        expect_text(report, [single_element accessibilityNumberOfCharacters] == 0 &&
+                                [single_element accessibilityStringForRange:NSMakeRange(0U, 1U)] == nil,
+                    "a removed text box's element reads no text");
+        std::cout << "text ranges: single-line, multiline and password boxes checked\n";
+    }
+    static_cast<void>((*fixture.root).remove_child((*multi).runtime_id()));
+    static_cast<void>((*fixture.root).remove_child((*password).runtime_id()));
+    window.perform_layout();
+}
+
+// ---------------------------------------------------------------------------
 
 void print_report(const StockControlFixture& fixture, const Report& report) {
     for (const StockControlEntry& entry : fixture.controls) {
@@ -581,6 +714,7 @@ void walk_and_close(void* context) {
         compare_window(*state.fixture, window, view, state.report, "after-actions");
         check_stale_element(*state.fixture, view, state.report);
         check_repeated_item_identities(*state.fixture, window, view, state.report);
+        check_text_ranges(*state.fixture, window, view, state.report);
     }
     state.ran = true;
     state.request_close();
