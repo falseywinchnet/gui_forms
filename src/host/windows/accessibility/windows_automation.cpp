@@ -1,5 +1,7 @@
 #include "windows_automation.hpp"
 
+#include "windows_text_automation.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <charconv>
@@ -134,6 +136,8 @@ bool supports_pattern(const SemanticNode& node, PATTERNID pattern) noexcept {
     case UIA_ExpandCollapsePatternId: return expand_collapse_pattern(node);
     case UIA_GridPatternId: return grid_pattern(node);
     case UIA_GridItemPatternId: return grid_item_pattern(node);
+    case UIA_TextPatternId:
+    case UIA_TextPattern2Id: return text_pattern(node);
     default: return false;
     }
 }
@@ -296,7 +300,8 @@ class UiaElement final : public IRawElementProviderSimple,
                          public ISelectionItemProvider,
                          public ISelectionProvider,
                          public IGridProvider,
-                         public IGridItemProvider {
+                         public IGridItemProvider,
+                         public ITextProvider2 {
 public:
     UiaElement(std::shared_ptr<SemanticSource> source, SemanticElementId id) noexcept
         : source_(std::move(source)), id_(id) {}
@@ -360,7 +365,10 @@ public:
     HRESULT STDMETHODCALLTYPE get_IsSelected(BOOL* out) override;
     HRESULT STDMETHODCALLTYPE get_SelectionContainer(IRawElementProviderSimple** out) override;
 
-    // ISelectionProvider.
+    // ISelectionProvider and ITextProvider, which share GetSelection: a
+    // text node's ranges (windows_text_automation.hpp), else the selected
+    // items. No node offers both patterns, since a text box has no
+    // selectable children.
     HRESULT STDMETHODCALLTYPE GetSelection(SAFEARRAY** out) override;
     HRESULT STDMETHODCALLTYPE get_CanSelectMultiple(BOOL* out) override;
     HRESULT STDMETHODCALLTYPE get_IsSelectionRequired(BOOL* out) override;
@@ -377,6 +385,18 @@ public:
     HRESULT STDMETHODCALLTYPE get_RowSpan(int* out) override;
     HRESULT STDMETHODCALLTYPE get_ColumnSpan(int* out) override;
     HRESULT STDMETHODCALLTYPE get_ContainingGrid(IRawElementProviderSimple** out) override;
+
+    // ITextProvider and ITextProvider2 (windows_text_automation.hpp). Text
+    // holds no embedded objects or annotations.
+    HRESULT STDMETHODCALLTYPE GetVisibleRanges(SAFEARRAY** out) override;
+    HRESULT STDMETHODCALLTYPE RangeFromChild(IRawElementProviderSimple* child,
+                                             ITextRangeProvider** out) override;
+    HRESULT STDMETHODCALLTYPE RangeFromPoint(UiaPoint point, ITextRangeProvider** out) override;
+    HRESULT STDMETHODCALLTYPE get_DocumentRange(ITextRangeProvider** out) override;
+    HRESULT STDMETHODCALLTYPE get_SupportedTextSelection(SupportedTextSelection* out) override;
+    HRESULT STDMETHODCALLTYPE RangeFromAnnotation(IRawElementProviderSimple* annotation,
+                                                  ITextRangeProvider** out) override;
+    HRESULT STDMETHODCALLTYPE GetCaretRange(BOOL* active, ITextRangeProvider** out) override;
 
 private:
     ~UiaElement() = default;
@@ -395,6 +415,8 @@ private:
                            PROPERTYID property, VARIANT* out) noexcept;
     HRESULT controller_for(const SemanticNode& client, const SemanticNode& tab,
                            VARIANT* out) noexcept;
+    // ISelectionProvider::GetSelection for the located node.
+    HRESULT item_selection(const SemanticLocation& self, SAFEARRAY** out) noexcept;
 
     std::atomic<ULONG> references_{1U};
     std::shared_ptr<SemanticSource> source_;
@@ -487,6 +509,10 @@ HRESULT STDMETHODCALLTYPE UiaElement::QueryInterface(REFIID iid, void** out) {
         *out = static_cast<IGridProvider*>(this);
     } else if (iid == IID_IGridItemProvider) {
         *out = static_cast<IGridItemProvider*>(this);
+    } else if (iid == IID_ITextProvider) {
+        *out = static_cast<ITextProvider*>(this);
+    } else if (iid == IID_ITextProvider2) {
+        *out = static_cast<ITextProvider2*>(this);
     } else {
         return E_NOINTERFACE;
     }
@@ -1047,8 +1073,16 @@ HRESULT STDMETHODCALLTYPE UiaElement::GetSelection(SAFEARRAY** out) {
     *out = nullptr;
     SemanticNode client;
     SemanticLocation self;
-    const HRESULT status = resolve_pattern(UIA_SelectionPatternId, client, self);
+    const HRESULT status = resolve(client, self);
     if (FAILED(status)) return status;
+    if (self.parent != nullptr && text_pattern(*self.node)) {
+        return text_selection_ranges(source_, id_, out);
+    }
+    if (self.parent == nullptr || !selection_pattern(*self.node)) return invalid_operation;
+    return item_selection(self, out);
+}
+
+HRESULT UiaElement::item_selection(const SemanticLocation& self, SAFEARRAY** out) noexcept {
     const std::vector<SemanticNode>& children = (*self.node).children;
     ULONG count = 0U;
     for (const SemanticNode& child : children) {
@@ -1075,6 +1109,45 @@ HRESULT STDMETHODCALLTYPE UiaElement::GetSelection(SAFEARRAY** out) {
     }
     *out = array;
     return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::GetVisibleRanges(SAFEARRAY** out) {
+    return text_visible_ranges(source_, id_, out);
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::RangeFromChild(IRawElementProviderSimple*,
+                                                     ITextRangeProvider** out) {
+    if (out != nullptr) *out = nullptr;
+    return E_INVALIDARG;
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::RangeFromPoint(UiaPoint point, ITextRangeProvider** out) {
+    return text_range_from_point(source_, id_, point, out);
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::get_DocumentRange(ITextRangeProvider** out) {
+    return text_document_range(source_, id_, out);
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::get_SupportedTextSelection(SupportedTextSelection* out) {
+    if (out == nullptr) return E_INVALIDARG;
+    *out = SupportedTextSelection_None;
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_pattern(UIA_TextPatternId, client, self);
+    if (FAILED(status)) return status;
+    *out = SupportedTextSelection_Single;
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::RangeFromAnnotation(IRawElementProviderSimple*,
+                                                          ITextRangeProvider** out) {
+    if (out != nullptr) *out = nullptr;
+    return E_INVALIDARG;
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::GetCaretRange(BOOL* active, ITextRangeProvider** out) {
+    return text_caret_range(source_, id_, active, out);
 }
 
 HRESULT STDMETHODCALLTYPE UiaElement::get_CanSelectMultiple(BOOL* out) {
@@ -1327,6 +1400,7 @@ void raise_node_changes(const std::shared_ptr<SemanticSource>& source, SemanticE
         set_bool(&new_value, enabled_after);
         raise_property_change(source, id, UIA_IsEnabledPropertyId, old_value, new_value);
     }
+    raise_text_changes(source, id, before, after);
 }
 
 } // namespace

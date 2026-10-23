@@ -1,7 +1,8 @@
 // The two on-demand text queries of owner decision A-T1 (design language
 // 12.13): Window::semantic_text_layout and Window::set_semantic_text_selection,
 // answered by TextBox (single-line and multiline) and forwarded by
-// MaskedTextBox, with their refusals.
+// MaskedTextBox, with their refusals; and the unit boundaries hosts move
+// by (fill_semantic_text_boundaries).
 
 #include "gui_forms/gui_forms.hpp"
 #include "headless_host.hpp"
@@ -129,6 +130,57 @@ void multiline_layout() {
     require(layout.lines[1].bounds.y - layout.lines[0].bounds.y == 20.0 &&
                 layout.graphemes[2].bounds.y == layout.lines[1].bounds.y,
             "lines are a line height apart");
+}
+
+// Whether `boundaries` holds exactly `expected`, in order.
+bool boundaries_are(const std::vector<Utf8Offset>& boundaries, const std::vector<std::size_t>& expected) {
+    if (boundaries.size() != expected.size()) return false;
+    for (std::size_t index = 0U; index < expected.size(); ++index) {
+        if (boundaries[index].value() != expected[index]) return false;
+    }
+    return true;
+}
+
+void unit_boundaries() {
+    const std::shared_ptr<TextBox> field = make_control<TextBox>(StableId("notes"));
+    Metrics metrics;
+    // The window borrows the metrics provider, so it is destroyed first.
+    Window window(field, {200.0, 100.0});
+    (*field).set_requested_bounds({0.0, 0.0, 200.0, 100.0});
+    (*field).set_multiline(true);
+    window.set_text_metrics_provider(&metrics);
+    window.perform_layout();
+    // "e" and U+0301 are one grapheme, bytes 3 to 6.
+    const std::string value = "Cafe\xCC\x81 x\nyz";
+    (*field).set_text(value);
+    SemanticTextLayout layout;
+    require(window.semantic_text_layout((*field).runtime_id(), layout) == SemanticTextResult::done,
+            "the box answers a layout query");
+    std::vector<Utf8Offset> boundaries;
+    fill_semantic_text_boundaries(layout, value, SemanticTextUnit::character, boundaries);
+    require(boundaries_are(boundaries, {0U, 1U, 2U, 3U, 6U, 7U, 8U, 9U, 10U, 11U}),
+            "characters are graphemes, and the line break between them is one character");
+    fill_semantic_text_boundaries(layout, value, SemanticTextUnit::word, boundaries);
+    require(boundaries.front().value() == 0U && boundaries.back().value() == 11U && boundaries.size() >= 3U,
+            "words run from 0 to the end through the word starts");
+    fill_semantic_text_boundaries(layout, value, SemanticTextUnit::line, boundaries);
+    require(boundaries_are(boundaries, {0U, 9U, 11U}), "a line runs to the next line's start");
+    fill_semantic_text_boundaries(layout, value, SemanticTextUnit::paragraph, boundaries);
+    require(boundaries_are(boundaries, {0U, 9U, 11U}), "a paragraph ends after its line feed");
+    fill_semantic_text_boundaries(layout, value, SemanticTextUnit::document, boundaries);
+    require(boundaries_are(boundaries, {0U, 11U}), "the document is one unit");
+    // A layout of longer text than the value: offsets past its end are no
+    // boundaries of it.
+    fill_semantic_text_boundaries(layout, std::string_view(value).substr(0U, 7U), SemanticTextUnit::character,
+                                  boundaries);
+    require(boundaries_are(boundaries, {0U, 1U, 2U, 3U, 6U, 7U}), "boundaries stop at the value's end");
+    (*field).set_text("");
+    require(window.semantic_text_layout((*field).runtime_id(), layout) == SemanticTextResult::done,
+            "an empty box answers a layout query");
+    fill_semantic_text_boundaries(layout, "", SemanticTextUnit::word, boundaries);
+    require(boundaries_are(boundaries, {0U}), "empty text has one boundary");
+    require(std::string_view(semantic_text_unit_name(SemanticTextUnit::paragraph)) == "paragraph",
+            "units have names");
 }
 
 void selection_and_boundaries() {
@@ -292,6 +344,7 @@ int main() {
         single_line_layout_and_words();
         multiline_layout();
         selection_and_boundaries();
+        unit_boundaries();
         refusals();
         during_paint();
         masked_text_box_forwards();

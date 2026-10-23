@@ -1115,6 +1115,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         src/host/windows/accessibility/windows_accessibility.cpp
         src/host/windows/accessibility/windows_semantic_source.cpp
         src/host/windows/accessibility/windows_automation.cpp
+        src/host/windows/accessibility/windows_text_automation.cpp
         src/host/windows/services/windows_clipboard_image.cpp
         src/host/windows/services/windows_notify_icons.cpp
         src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -1940,6 +1941,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/accessibility/windows_accessibility.cpp
                 src/host/windows/accessibility/windows_semantic_source.cpp
                 src/host/windows/accessibility/windows_automation.cpp
+                src/host/windows/accessibility/windows_text_automation.cpp
                 src/host/windows/services/windows_clipboard_image.cpp
                 src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -1961,6 +1963,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/accessibility/windows_accessibility.cpp
                 src/host/windows/accessibility/windows_semantic_source.cpp
                 src/host/windows/accessibility/windows_automation.cpp
+                src/host/windows/accessibility/windows_text_automation.cpp
                 src/host/windows/services/windows_clipboard_image.cpp
                 src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -1983,6 +1986,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     src/host/windows/accessibility/windows_accessibility.cpp
                     src/host/windows/accessibility/windows_semantic_source.cpp
                     src/host/windows/accessibility/windows_automation.cpp
+                    src/host/windows/accessibility/windows_text_automation.cpp
                     src/host/windows/services/windows_clipboard_image.cpp
                     src/host/windows/services/windows_notify_icons.cpp
                     src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -3732,6 +3736,17 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_windows_accessibility_uia_provider_tests
         COMMAND gui_forms_windows_accessibility_uia_provider_tests)
     set_tests_properties(gui_forms_windows_accessibility_uia_provider_tests PROPERTIES TIMEOUT 60)
+    # Stage A, A-W3: UI Automation's TextPattern read through IUIAutomation
+    # from a client thread.
+    add_executable(gui_forms_windows_accessibility_uia_text_tests
+        tests/windows_accessibility_uia_text_tests.cpp)
+    target_compile_definitions(gui_forms_windows_accessibility_uia_text_tests PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+    target_link_libraries(gui_forms_windows_accessibility_uia_text_tests PRIVATE
+        gui_forms_controls gui_forms_host_windows uiautomationcore ole32 oleaut32 uuid)
+    add_test(NAME gui_forms_windows_accessibility_uia_text_tests
+        COMMAND gui_forms_windows_accessibility_uia_text_tests)
+    set_tests_properties(gui_forms_windows_accessibility_uia_text_tests PROPERTIES TIMEOUT 60)
     # Stage A, A-W1: an MSAA client enumerates every Gallery page in a real
     # Win32 window and performs each control's default action.
     if(TARGET gui_forms_gallery_model)

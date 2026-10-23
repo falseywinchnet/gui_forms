@@ -173,6 +173,17 @@ enum class SemanticTextResult : std::uint8_t {
     off_boundary,
 };
 
+// The units a host moves through a text node by (A-T2): a grapheme, a word
+// by the control's own rule, a visual line, a paragraph (a logical line with
+// its break) and the whole text. Sentences are not supported.
+enum class SemanticTextUnit : std::uint8_t {
+    character,
+    word,
+    line,
+    paragraph,
+    document,
+};
+
 // The position of an element among its siblings of one set (a list's items,
 // a strip's buttons) and the set's size, both counting from one, and whether
 // the element opens a popup (a menu, a list or a dialog) when activated.
@@ -272,6 +283,21 @@ struct SemanticSnapshot final {
 [[nodiscard]] const char* semantic_action_name(SemanticAction action) noexcept;
 [[nodiscard]] const char* semantic_orientation_name(SemanticOrientation orientation) noexcept;
 [[nodiscard]] const char* semantic_text_result_name(SemanticTextResult result) noexcept;
+[[nodiscard]] const char* semantic_text_unit_name(SemanticTextUnit unit) noexcept;
+
+// Fills `boundaries` with the offsets in `value` at which `unit` starts or
+// ends, ascending and distinct, from `layout` (Window::semantic_text_layout
+// of the node whose value is `value`): always 0 and the end of the text,
+// which coincide for empty text (one boundary). Characters are bounded by
+// each grapheme's start and end, so a line break, which is no grapheme,
+// counts as one character; words by the layout's word starts; lines by each
+// visual line's start (a line runs to the next line's start, so it holds
+// its break); paragraphs after each line feed. The text between two
+// adjacent boundaries is one unit. Replaces what `boundaries` held, reusing
+// its storage. Throws std::bad_alloc when memory runs out, leaving
+// `boundaries` unspecified.
+void fill_semantic_text_boundaries(const SemanticTextLayout& layout, std::string_view value,
+                                   SemanticTextUnit unit, std::vector<Utf8Offset>& boundaries);
 // The name of one state bit (`state` holds exactly one of semantic_states).
 [[nodiscard]] const char* semantic_state_name(SemanticState state) noexcept;
 // The node fields the vocabulary admits, by name, for the schema export.
