@@ -331,9 +331,12 @@ ThemeRule material_rule() {
 }
 
 // The professional theme with every button state's material one
-// procedural fill.
+// procedural fill. The definition is held on the heap: a ThemeDefinition is
+// some 105 KB and is never kept on a test's stack (theme_types.hpp); `new`
+// from the returned value builds it there directly.
 std::shared_ptr<const Theme> procedural_theme(const ProceduralFill& fill) {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held(new ThemeDefinition(windows_professional_theme_definition()));
+    ThemeDefinition& definition = *held;
     definition.id = "engine-procedural-test";
     SurfaceMaterial material{};
     material.fills.clear();
