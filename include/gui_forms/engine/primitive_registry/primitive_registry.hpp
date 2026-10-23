@@ -3,6 +3,7 @@
 #include "gui_forms/anatomy/types/anatomy_types.hpp"
 #include "gui_forms/engine/part_shape/part_shape.hpp"
 #include "gui_forms/engine/types/engine_types.hpp"
+#include "gui_forms/surface_material/procedural_fill/procedural_fill.hpp"
 #include "gui_forms/types/geometry/geometry.hpp"
 #include "gui_forms/types/paint_types/paint_types.hpp"
 
@@ -205,6 +206,13 @@ inline constexpr std::size_t maximum_image_variants = 8U;
 // variant, both zero for a stretched or tiled image, which is resampled
 // whole. `layer` is the fill layer the variant serves, by index among the
 // material's fills; it is not part of what the variant is.
+//
+// A procedural fill's pattern (E10) is asked for the same way, with
+// `procedural` set and no image: the pattern generated at `scale` and
+// `extent`, never resampled. The engine never generates one inside a
+// paint: a bake whose pattern is not ready is lent none, and the fill draws
+// its ground; the pattern is generated in an idle frame and the parts that
+// drew the ground are repainted.
 struct ImageVariantRequest final {
     std::size_t layer{};
     ImageId image{};
@@ -214,6 +222,7 @@ struct ImageVariantRequest final {
     Insets source_slice{};
     std::array<std::uint32_t, 4> fixed{};
     DeviceScale scale{};
+    std::optional<ProceduralFill> procedural{};
 };
 
 // The variants lent for one bake, by fill layer; null where none is lent.

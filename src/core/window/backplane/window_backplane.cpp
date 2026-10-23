@@ -40,6 +40,7 @@ Window::EngineBackplane Window::engine_backplane(Point raster_origin, DeviceExte
     const SurfaceMaterial& material = (*theme_).resolve(ControlVisualRole::window, context).material;
     engine_parts_.bake_backplane_material(material, client_size_, region, &image_resources(), image,
                                           paint_leases_completed_);
+    if (engine_parts_.patterns_waiting()) arm_engine_idle();
     // Then the backplane plane's engine part rasters over it.
     std::uint64_t skipped = 0U;
     const double width = static_cast<double>(region.extent.width) / scale.value;
