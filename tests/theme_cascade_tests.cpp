@@ -9,6 +9,7 @@
 // a primitive's raster for keyed and unkeyed parts.
 
 #include "gui_forms/control.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "gui_forms/engine.hpp"
 #include "gui_forms/theme.hpp"
 #include "gui_forms/window.hpp"
@@ -378,22 +379,23 @@ public:
     Point last_origin{};
 };
 
-ThemeDefinition bulge_theme() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+std::unique_ptr<ThemeDefinition> bulge_theme() {
+    std::unique_ptr<ThemeDefinition> held = test_support::professional_definition();
+    ThemeDefinition& definition = *held;
     definition.id = "cascade-test";
     RuleSelector faces{};
     faces.role = PartRole::face;
     definition.rules.rules.push_back(rule("faces", CascadeLevel::theme_sheet, faces, bulge(0.5)));
-    return definition;
+    return held;
 }
 
 void paint_path() {
     std::shared_ptr<Control> control = make_control<Control>(StableId("painted"));
     Window window(control, Size{400.0, 300.0});
-    std::shared_ptr<const Theme> plain = Theme::create(windows_professional_theme_definition());
+    std::shared_ptr<const Theme> plain = Theme::create(*test_support::professional_definition());
     require((*plain).engine().rules().rule_count() == (*plain).engine().rules().built_in_rule_count(),
             "the professional theme has no rules of its own, only the engine's built-in ones (E7)");
-    std::shared_ptr<const Theme> theme = Theme::create(bulge_theme());
+    std::shared_ptr<const Theme> theme = Theme::create(*bulge_theme());
     require((*theme).engine().rules().rule_count() == (*theme).engine().rules().built_in_rule_count() + 1U &&
                 (*theme).engine().rules().diagnostics().empty(),
             "a theme's rules compile when it is made");

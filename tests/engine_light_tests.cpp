@@ -14,6 +14,7 @@
 // the scale moves, baked at the scaled size once it rests.
 
 #include "gui_forms/gui_forms.hpp"
+#include "support/theme_definition_heap.hpp"
 
 #include "../src/core/engine/primitives/material/material_primitive.hpp"
 #include "../src/core/engine/primitives/light/sheen_primitive.hpp"
@@ -183,7 +184,8 @@ constexpr std::uint64_t expected_shadow_hash = 0x12c9cfd27f7ea098ULL;
 
 void overlay_shadow_is_an_engine_primitive(bool printing) {
     require(builtin_primitive_registry().find("overlay_shadow") != nullptr, "the overlay shadow is registered");
-    const ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    const ThemeDefinition& definition = *held_definition;
     const double scales[] = {1.0, 1.5, 2.0};
     for (const double scale : scales) {
         std::unique_ptr<Fixture> fixture = make_fixture(definition, scale);
@@ -209,7 +211,8 @@ void overlay_shadow_is_an_engine_primitive(bool printing) {
 }
 
 void high_contrast_casts_none() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     std::unique_ptr<Fixture> fixture = make_fixture(definition, 1.0);
     Fixture& made = *fixture;
     PresentationSettings settings = (*made.window).presentation_settings();
@@ -223,7 +226,8 @@ void high_contrast_casts_none() {
 }
 
 void too_wide_falls_back() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.overlay_shadow = {MaterialShadow{.offset = {2.0, 4.0}, .blur_radius = 24.0, .spread = 0.0,
                                                 .color = Color::rgba(20, 30, 42, 64), .inset = false}};
     std::unique_ptr<Fixture> fixture = make_fixture(definition, 1.0);
@@ -292,7 +296,8 @@ PropertyTransition grow(double hot_scale) {
 // A sheen theme; with `hot_scale` above 1 the part pops while hot, within
 // a granted overflow of 10 on every side.
 std::unique_ptr<SheenFixture> make_sheen(double scale, bool reduced_motion, double hot_scale = 1.0) {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "engine-light-sheen";
     ThemeRule rule{};
     rule.label = "sheen";

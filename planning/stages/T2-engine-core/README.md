@@ -88,12 +88,13 @@ description (control, part role, bounds, states, content).
    language requires (§3.5, §4.2–§4.6, §9.3): pill plate, bulge, dithered
    bulge, inset well, pressed, gold active plate, default perimeter,
    disabled, etched divider, seam, actuator, gloss (four-stop with a hard
-   break), glow, sheen, pop, translucency, reflection, glass (bounded blur
+   break), glow, sheen, pop, translucency, glass (bounded blur
    sampling only the backplane, radius at most 8 logical px, proposed),
    procedural materials (felt, wood grain, paper fibre, pinstripe, brushed
    metal, fresco with blooms) generated per display scale and cached.
    PlaySuite's gloss, lift and rings are capability requirements (§12.3),
-   not defaults.
+   not defaults. Reflection moved to T5, beside full-fidelity glass (owner,
+   2026-10-22).
 3. **Inputs as engine-set custom properties**: pointer position relative to
    the part (`--pointer-x`, `--pointer-y`), hover, press, focus, value, time
    since state entry, display and text scale, density, accessibility flags,
@@ -168,6 +169,11 @@ description (control, part role, bounds, states, content).
   implement them as primitives with reference images.
 
 ## Gate
+
+The closing gate check (owner, 2026-10-22) also needs the CSS coverage
+inventory, `CSS_COVERAGE.md`, to be reviewed. It lists every CSS visual
+property T3 admits, with its engine carrier and its status, and proposes the
+smallest engine addition for each missing row.
 
 A reference-image test per primitive on all three hosts with identical
 pixels; the window counters report zero frames once inputs stop and every
@@ -473,7 +479,7 @@ assembles any size of a sliceable material from one reference bake.
   `gui_forms_engine_motion_tests` bake nothing after the idle frames, and at
   most one keyframe per frame before them.
 
-## E9, light (in progress)
+## E9, light
 
 ### Decisions for E9 (owner, 2026-10-22)
 
@@ -495,6 +501,17 @@ assembles any size of a sliceable material from one reference bake.
 - **E9-C, option 1: no new primitives.** Gloss is a material preset. Glow is
   one new material layer kind, soft and additive, bounded by the grant. Pop
   is rule data only.
+
+- **E9.6 (owner, 2026-10-22).** It is a T2 effects follow-up that covers
+  the CSS coverage inventory's missing rows (`CSS_COVERAGE.md`) except
+  reflection: rows 1 to 9 and 11 to 14.
+  - `text-shadow` (row 5) is data on the text slot only. Its glyph
+    coverage belongs to the text stage.
+  - Reflection (row 10) moves to T5, beside full-fidelity glass, and is
+    removed from E9.
+  - It is built as separable PRs on main, each stacked at most two deep:
+    fills and shape; filters and blend; finish, mask and position;
+    motion.
 
 ### E9.1, the overlay shadow
 
@@ -651,6 +668,32 @@ assembles any size of a sliceable material from one reference bake.
   - *Cost.* Each glow is costed as an outer shadow (`outer_shadow`, and
     `outer_corner` at its rounded corners), since it runs the same kernel.
   - *Inspection.* The visual-inspection snapshot lists the glows.
+- **Placement (owner, E9.4 follow-up).** `MaterialGlow::placement` is
+  `under` (the halo above, for the current selection) or `over` (light for
+  other emphasis, such as the default button):
+  - *Over, in the bake.* Its coverage, the blurred grown box, is
+    evaluated with the outer layers' cached integrals. It is then added
+    over the finished face, after the keylines, times the box's coverage,
+    so nothing outside the face changes.
+  - *Over, on the built-in path.* `paint_surface_material` draws it last
+    as a shadow at no offset, clipped to the face. That is source-over,
+    not added.
+  - *Both.* The same reach cap applies to both placements. An over glow
+    adds no visual outsets.
+  - *Stock rules.* The proposed stock rules for both are in the design
+    language, §9.3 item 3, for the owner's review, and stock looks are
+    unchanged. The owner admitted the default button's over glow beside its
+    perimeter (2026-10-22). M105 now says glow is never the only signal.
+  - *Proof.* `engine_material_tests`:
+    - an under glow leaves the face unchanged and brightens a dark
+      surround;
+    - an over glow brightens the face and adds nothing outside it;
+    - the cap and the placement's validity;
+    - the built-in order;
+    - byte-stable renders of both placements over a light and a dark
+      background at scales 1 and 2 (eight hashes).
+    An over glow in the layered slice material assembles to the whole
+    bake's bytes.
 - **Proof.** `gui_forms_engine_material_tests`:
   - the glow lies outside the box and under the face, and fades within
     its reach;
@@ -665,6 +708,46 @@ assembles any size of a sliceable material from one reference bake.
 
   `gui_forms_engine_slice_tests`: a glow in the layered material, and the
   gloss, assemble from slices to the whole bake's bytes.
+
+### E9.5, pop as rule data, and the proof (E9-C)
+
+- **No engine change.** A pop (§9.3 item 1) is a theme's data alone:
+  - the material primitive draws the face from the theme's recipe for the
+    part's family, so the hot and selected recipes carry the risen look: a
+    brighter fill, a deeper shadow and a glow (E9.4);
+  - a `scale` transition grows the part while it is hot, selected or
+    focus-visible, within the overflow its control grants (E8b);
+  - a `face` cross-fade blends the resting and risen faces (E7r form a).
+  No built-in rule pops anything.
+- **Proof.** `gui_forms_engine_pop_tests` pops the middle of three gloss
+  tiles to 1.08 within a grant of 4:
+  - the theme compiles cleanly and the registry still holds 12
+    primitives;
+  - the risen face's shadow is deeper below it, and it glows above its top;
+  - the change bakes at most the risen face and the face to stretch;
+  - while the pop moves, nothing is baked; only the popped part is painted,
+    within its grant and its material's outsets; the face is stretched
+    towards the popped scale;
+  - at rest it is baked sharp once at its popped size, and the window then
+    runs no frames;
+  - the neighbours keep their bounds;
+  - selection pops it as hover does;
+  - reduced motion jumps to the popped size without stretching;
+  - a part granted no overflow never grows.
+- **E9 as a whole.** Every light effect follows E7r's retained forms:
+  - shadow, gloss, glow and glass are baked once per state, size and scale;
+  - sheen composites one band baked once;
+  - pop stretches cached rasters.
+  Each effect's suite shows that nothing is baked while it moves or
+  follows the pointer, and that damage stays within the part. The
+  per-primitive reference hashes are:
+  - overlay shadow 0x12c9cfd27f7ea098;
+  - sheen band 0xd4c2e5fcf3e31bf5;
+  - glass kernel 0x748e797fedc763e5;
+  - glow 0x047bc7d0bde0012d and 0xda184a1654d76385;
+  - gloss 0x4507eda3b5101fcb and 0xce445232e6045c6d.
+  CI checks them on every platform. The quiet-machine re-measure of the
+  bake costs is still open.
 
 ### E9 shadow costs
 

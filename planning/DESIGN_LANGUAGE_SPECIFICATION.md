@@ -242,7 +242,7 @@ Windows 95 appearance family M101–M105 accepted in full):
 | etched semantic groupings | M022 |
 | visibly mechanical spinner actuators attached to their field | M025 |
 | disabled loses contrast and depth without disappearing | M104 |
-| default action marked by a second dark perimeter, not colour, glow or pulse | M105; V116 R |
+| default action marked by a second dark perimeter; colour, glow or pulse may accompany it but is never the only signal (owner, 2026-10-22) | M105; V116 R |
 | deeper instruments inside shallower command structure | M066, M033 |
 | window and plane shadows only where they establish real layering | M051; DNA-F06 |
 | one surface may combine recessed content, inset instruments and flat tinted actions | M026; owner revision 4 |
@@ -1101,7 +1101,32 @@ text-selection-changed when a published text node changes.
 2. **Sheen.** A specular band following the pointer within the part; it redraws
    only when the pointer moves, within its own extent (owner direction; §2.6).
 3. **Glow.** A soft coloured emission bounded by the part's grant (owner
-   direction; VISUAL §7); never the default-action cue (M105).
+   direction; VISUAL §7); never the only default-action signal (M105, as
+   amended 2026-10-22).
+   - **Placement (owner, 2026-10-22).** A glow lies `under` the face, a
+     halo that the face covers, or `over` it, light added to the face and
+     clipped to its shape. Both share one reach cap: spread plus twice the
+     blur, at most 8 logical units, the material's outsets. An over glow
+     lies within the face and needs no overflow of its own.
+     - `under` marks the current selection, such as a selected tab or the
+       item under arrow-key focus.
+     - `over` marks other emphasis, such as the default button.
+   - **Stock rules (proposed, for the owner's review).** No stock look
+     changes until they are reviewed.
+     1. *Current selection, under.* A selected page tab, and the current
+        item of a list, tree or grid while keyboard focus is visible. The
+        glow is in the accent's lightest ramp colour at alpha 72, with
+        blur 2 and spread 0 (reach 4). It is part of the selected or
+        current recipe, so it enters with the face cross-fade and never
+        animates on its own.
+     2. *Default button, over.* White at alpha 40, with blur 3 and spread
+        0 (reach 6), over the plate. It is drawn beside the second dark
+        perimeter, never in place of it: the perimeter stays the
+        default-action cue (M105, V116 R). Admitted by the owner,
+        2026-10-22 (§12.2).
+     3. *Nowhere else by default.* High contrast drops every glow, since
+        its recipes are rebuilt as solid plates. The Classic family
+        carries none.
 4. **Translucency, glass, reflection** follow §4.6.
 5. Gloss, lift and rings are engine capabilities; no theme must carry them
    globally (§12.3). All effects render on the CPU and are bounded deliberately
@@ -1346,6 +1371,12 @@ bit tweaked to look nicer" than its references (owner direction).
 ### 12.2 Questions for the owner
 
 None open. New questions are added here as they arise.
+
+- **Answered, 2026-10-22: glow on the default button.** M105 said the
+  default action is marked by a second dark perimeter, "not colour, glow
+  or pulse". The owner admitted the over glow beside the perimeter, and the
+  perimeter stays the cue. M105 now says colour, glow or pulse may
+  accompany the perimeter but is never the only signal (§3.1, §9.3 item 3).
 
 ### 12.3 Owner decisions, 2026-10-12
 

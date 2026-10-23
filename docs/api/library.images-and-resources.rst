@@ -18,6 +18,8 @@ Types
      - The image registry and the theme of an application (stage DK decision 8), shared by every Window constructed with it.
    * - :cpp:class:`ImageLoadResult <gui_forms::ImageLoadResult>`
      - ImageLoadResult couples a stable nonzero image identity to a closed registry error.
+   * - :cpp:class:`ImageMetadata <gui_forms::ImageMetadata>`
+     - What every resource reports, whatever its encoding.
    * - :cpp:class:`ImageRegistry <gui_forms::ImageRegistry>`
      - ImageRegistry is the renderer-neutral generational identity store for validated PNG and premultiplied BGRA resources, with bounded per-image/global quotas, in-place live updates, rectangular patches, stale-ID rejection, and structured telemetry.
    * - :cpp:class:`ImageRegistryLimits <gui_forms::ImageRegistryLimits>`
@@ -99,6 +101,24 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ImageMetadata final
+
+   ``#include <gui_forms/resources/types/image_resource_types.hpp>``
+
+   What every resource reports, whatever its encoding. decoded_byte_count is width * height * 4, the size of its 8-bit four-channel pixels.
+
+   .. cpp:member:: std::uint32_t width
+
+   .. cpp:member:: std::uint32_t height
+
+   .. cpp:member:: ImageAlpha alpha
+
+      Default: ``{ImageAlpha::straight}``.
+
+   .. cpp:member:: std::uint64_t decoded_byte_count
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:class:: ImageRegistry final
 
    ``#include <gui_forms/resources/image_registry/image_registry.hpp>``
@@ -134,6 +154,10 @@ Types
 
    .. rubric:: Methods
 
+   .. cpp:function:: ImageLoadResult load_image(std::span<const std::byte> encoded)
+
+      Admits an encoded image file, CNG or PNG, chosen by its signature: its framing is validated (validate_png, or the CNG framing check) and its dimensions held to the limits. A file of neither format is invalid_signature.
+
    .. cpp:function:: ImageLoadResult load_png(std::span<const std::byte> encoded)
 
       Validates PNG structure and limits, owns encoded bytes, and allocates a generational slot only after the candidate is complete.
@@ -141,6 +165,10 @@ Types
    .. cpp:function:: ImageLoadResult load_bgra32_premultiplied(std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes, std::span<const std::byte> pixels)
 
       Validates dimensions, stride, byte extent, and quotas before owning one raw BGRA resource.
+
+   .. cpp:function:: ImageLoadResult replace_image(ImageId image, std::span<const std::byte> encoded)
+
+      Replaces an image's contents with an encoded file, as load_image admits it; a refusal leaves the image unchanged.
 
    .. cpp:function:: ImageLoadResult replace_png(ImageId image, std::span<const std::byte> encoded)
 
@@ -244,11 +272,15 @@ Types
 
       Default: ``{ImageResourceEncoding::png}``.
 
-   .. cpp:member:: PngMetadata metadata
+   .. cpp:member:: ImageMetadata metadata
 
    .. cpp:member:: std::span<const std::byte> encoded
 
+      The encoded file (png, cng) or the pixels (bgra32_premultiplied).
+
    .. cpp:member:: std::uint64_t row_bytes
+
+      Bytes per row: of the pixels, or of the file's unfiltered samples.
 
    .. cpp:member:: std::uint64_t content_hash
 
@@ -304,6 +336,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: ImageAlpha
+
+   ``#include <gui_forms/resources/types/image_resource_types.hpp>``
+
+   .. cpp:enumerator:: opaque
+
+   .. cpp:enumerator:: straight
+
+   .. cpp:enumerator:: premultiplied
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: ImageResourceEncoding
 
    ``#include <gui_forms/resources/types/image_resource_types.hpp>``
@@ -311,6 +355,8 @@ Enumerations
    .. cpp:enumerator:: png
 
    .. cpp:enumerator:: bgra32_premultiplied
+
+   .. cpp:enumerator:: cng
 
 .. cpp:namespace:: gui_forms
 
@@ -371,6 +417,10 @@ Enumerations
    .. cpp:enumerator:: stale_image_id
 
    .. cpp:enumerator:: allocation_failed
+
+   .. cpp:enumerator:: invalid_image_header
+
+   .. cpp:enumerator:: invalid_image_data
 
 .. cpp:namespace:: gui_forms
 

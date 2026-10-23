@@ -9,6 +9,7 @@
 // the references.
 
 #include "gui_forms/control.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "gui_forms/controls/panel/panel.hpp"
 #include "gui_forms/engine.hpp"
 #include "gui_forms/surface_material/presets/material_presets.hpp"
@@ -134,6 +135,13 @@ SurfaceMaterial layered_material(bool single_edges) {
     glow.blur_radius = 2.0;
     glow.spread = 1.0;
     material.glows.push_back(glow);
+    // And an over glow, light added within the face.
+    MaterialGlow over{};
+    over.color = Color{255, 255, 255, 60};
+    over.blur_radius = 1.5;
+    over.spread = 0.0;
+    over.placement = MaterialGlowPlacement::over;
+    material.glows.push_back(over);
     if (single_edges) {
         // Single edges are square-cornered.
         material.corner_radius = 0.0;
@@ -188,7 +196,7 @@ void compare_assembly(const SurfaceMaterial& material, Size logical, double scal
 }
 
 void assembly_equals_whole_bake() {
-    const std::shared_ptr<const Theme> theme = Theme::create(windows_professional_theme_definition());
+    const std::shared_ptr<const Theme> theme = Theme::create(*test_support::professional_definition());
     const ControlSurfaceState states[] = {ControlSurfaceState::normal, ControlSurfaceState::hot,
                                           ControlSurfaceState::pressed};
     const double scales[] = {1.0, 1.25, 1.5, 2.0};
@@ -376,7 +384,8 @@ void twenty_buttons_one_bake() {
         (*root).add_child(pad);
     }
     Window window(root, Size{400.0, 860.0});
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "engine-slice-test";
     definition.rules.rules.push_back(sliced_rule());
     window.set_theme(Theme::create(definition));

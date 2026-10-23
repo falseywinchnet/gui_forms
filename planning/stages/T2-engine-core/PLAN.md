@@ -315,7 +315,7 @@ Tests:
 - Sheen, a specular reflection that follows the pointer, never a moving light.
 - Pop.
 - Translucency.
-- Reflection, a bounded copy of the part's own content or of the backplane within its grant.
+- Reflection moved to T5, beside full-fidelity glass (owner, 2026-10-22).
 - Glass, a bounded blur of radius at most 8 logical px that samples only the backplane, cached against the backplane's damage generation.
 - The overlay shadow (GIVEN E1-1): an engine primitive with the first-party blur, identical on every host, keeping `ThemeDefinition::overlay_shadow`'s two layers, their damage outsets and the high-contrast rule (none). It replaces `paint_part`'s `shadow` role path through `Painter::draw_box_shadow`.
 

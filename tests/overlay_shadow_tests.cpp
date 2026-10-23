@@ -8,6 +8,7 @@
 // rect grown by its outsets, not the host's box shadow.
 
 #include "gui_forms/gui_forms.hpp"
+#include "support/theme_definition_heap.hpp"
 
 #include "../src/core/engine/primitives/material/overlay_shadow_primitive.hpp"
 
@@ -52,7 +53,8 @@ public:
 constexpr Color marker_face = Color::rgba(201, 222, 243);
 
 std::shared_ptr<const Theme> marked_theme() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "overlay-shadow-marked";
     ControlRoleRecipes& tool_tip = definition.roles[static_cast<std::size_t>(ControlVisualRole::tool_tip)];
     for (ControlVisualRecipe& recipe : tool_tip.ordinary) {

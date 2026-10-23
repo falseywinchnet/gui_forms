@@ -107,10 +107,11 @@ own PR and gate; no production decoder has switched. This addition does not chan
 
 ### A. Accessibility verified on every host
 
-Today: the semantic tree exists; macOS (NSAccessibility), Windows (MSAA) and
-Linux (ATK/AT-SPI) publish it; only Windows has a registered test; no host
-advertises `HostCapability::accessibility`; there is no UI Automation provider
-and no text-range exposure.
+Today (2026-10-22): macOS (NSAccessibility), Windows (MSAA and UI
+Automation) and Linux (ATK/AT-SPI) publish the semantic tree and editable
+text ranges; a client test on each host reads the Gallery through its own
+API (results under `results/2026-10-*-a-*`); every native host advertises
+`HostCapability::accessibility`.
 
 Work: register tests that query each host's own accessibility API (AX on
 macOS, MSAA and UI Automation on Windows, AT-SPI on Linux) for every stock

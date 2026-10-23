@@ -1,4 +1,5 @@
 #include "gui_forms/composition_controls.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "gui_forms/window.hpp"
 #include "support/named_callbacks.hpp"
 
@@ -162,14 +163,15 @@ void test_card_selection_behavior_is_explicit_and_ordered() {
 }
 
 void test_card_theme_status_and_outsets_are_reusable() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "shadow-card";
     ControlVisualRecipe& invalid = definition
         .roles[static_cast<std::size_t>(ControlVisualRole::card)]
         .ordinary[static_cast<std::size_t>(ControlSurfaceState::invalid)];
     invalid.material.shadows = {
         {{2.0, 3.0}, 4.0, 1.0, Color::rgba(20, 30, 40, 90)}};
-    const std::shared_ptr<const Theme> theme = Theme::create(std::move(definition));
+    const std::shared_ptr<const Theme> theme = Theme::create(definition);
     std::shared_ptr<gui_forms::Card> card = make_control<Card>(StableId("card.theme"));
     (*card).set_theme_override(theme);
     (*card).set_visual_status(ControlVisualStatus::invalid);
@@ -181,7 +183,8 @@ void test_card_theme_status_and_outsets_are_reusable() {
 }
 
 void test_compositions_follow_structural_theme_tokens_until_overridden() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "structural-composition";
     definition.structure.spacing.medium = 9.0;
     definition.structure.spacing.large = 15.0;
@@ -196,7 +199,7 @@ void test_compositions_follow_structural_theme_tokens_until_overridden() {
     definition.structure.geometry.content_minimum = 260.0;
     definition.structure.geometry.compact_breakpoint = 780.0;
     const std::shared_ptr<const Theme> theme =
-        Theme::create(std::move(definition));
+        Theme::create(definition);
 
     std::shared_ptr<gui_forms::Card> card = make_control<Card>(StableId("card.structural-theme"));
     (*card).set_theme_override(theme);
