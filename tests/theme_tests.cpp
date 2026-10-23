@@ -5,8 +5,10 @@
 #include <exception>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -15,6 +17,23 @@ using namespace gui_forms;
 
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
+}
+
+// A ThemeDefinition is some 105 KB and is never passed by value (see
+// theme_types.hpp). Theme::create must keep reading it by reference: a
+// by-value parameter put a copy on every caller's frame, and with the
+// sanitizer's unshared slots this test overflowed a 1 MB stack.
+static_assert(std::is_same_v<decltype(&Theme::create),
+                             std::shared_ptr<const Theme> (*)(const ThemeDefinition&)>,
+              "Theme::create must take its definition by const reference");
+
+// The professional definition, built on the heap: `new` from the returned
+// value initializes the heap object directly, where std::make_unique would
+// first materialize the value on this test's frame.
+std::unique_ptr<ThemeDefinition> professional_definition() {
+    std::unique_ptr<ThemeDefinition> definition(
+        new ThemeDefinition(windows_professional_theme_definition()));
+    return definition;
 }
 
 Color first_fill(const ControlVisualRecipe& recipe) {
@@ -132,24 +151,24 @@ void test_default_theme_has_complete_state_matrix() {
 }
 
 void test_structural_tokens_are_validated_atomically() {
-    ThemeDefinition invalid = windows_professional_theme_definition();
-    invalid.id = "invalid-structure";
-    invalid.structure.spacing.large = invalid.structure.spacing.xsmall;
+    std::unique_ptr<ThemeDefinition> invalid = professional_definition();
+    (*invalid).id = "invalid-structure";
+    (*invalid).structure.spacing.large = (*invalid).structure.spacing.xsmall;
     bool rejected{};
     try {
-        static_cast<void>(Theme::create(invalid));
+        static_cast<void>(Theme::create(*invalid));
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
     require(rejected,
             "unordered structural spacing tokens must be rejected");
 
-    invalid = windows_professional_theme_definition();
-    invalid.structure.typography.title.size =
+    invalid = professional_definition();
+    (*invalid).structure.typography.title.size =
         std::numeric_limits<double>::quiet_NaN();
     rejected = false;
     try {
-        static_cast<void>(Theme::create(std::move(invalid)));
+        static_cast<void>(Theme::create(*invalid));
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
@@ -166,15 +185,15 @@ void test_window_theme_replacement_and_control_inheritance_are_atomic() {
     window.perform_layout();
     static_cast<void>(window.take_damage());
 
-    ThemeDefinition custom_definition = windows_professional_theme_definition();
-    custom_definition.id = "test-atomic";
-    ControlVisualRecipe& custom_normal = custom_definition
+    std::unique_ptr<ThemeDefinition> custom_definition = professional_definition();
+    (*custom_definition).id = "test-atomic";
+    ControlVisualRecipe& custom_normal = (*custom_definition)
         .roles[static_cast<std::size_t>(ControlVisualRole::button)]
         .ordinary[static_cast<std::size_t>(ControlSurfaceState::normal)];
     custom_normal.material.fills = {
         MaterialFillLayer::solid(Color::rgba(10, 20, 30))};
     const std::shared_ptr<const Theme> custom =
-        Theme::create(std::move(custom_definition));
+        Theme::create(*custom_definition);
 
     unsigned changes{};
     SubscriptionToken token = window.theme_changed().subscribe(
@@ -255,7 +274,8 @@ void test_editor_selection_menu_and_progress_roles_reach_stock_controls() {
     constexpr Color menu_color = Color::rgba(71, 97, 119);
     constexpr Color progress_track = Color::rgba(89, 113, 137);
     constexpr Color progress_fill = Color::rgba(107, 131, 157);
-    ThemeDefinition definition = windows_professional_theme_definition();
+    std::unique_ptr<ThemeDefinition> held_definition = professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "stock-role-routing";
     set_solid_recipe(definition, ControlVisualRole::editor,
                      ControlSurfaceState::normal, false, editor_color);
@@ -294,7 +314,7 @@ void test_editor_selection_menu_and_progress_roles_reach_stock_controls() {
     (*root).add_child(progress);
     (*root).add_child(menu);
     Window window(root, {300.0, 144.0});
-    window.set_theme(Theme::create(std::move(definition)));
+    window.set_theme(Theme::create(definition));
     window.perform_layout();
     PointerEvent hover{PointerAction::move, PointerButton::none,
                        {20.0, 120.0}};

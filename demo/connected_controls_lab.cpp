@@ -156,7 +156,7 @@ std::shared_ptr<const Theme> pearl_theme() {
             recipes.selected[index] = pearl_recipe(state, true);
         }
     }
-    return Theme::create(std::move(definition));
+    return Theme::create(definition);
 }
 
 template <typename ButtonType>

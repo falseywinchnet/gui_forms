@@ -275,6 +275,11 @@ struct ThemeStructureTokens final {
     return layers;
 }
 
+// A theme's whole authored description. It is large (some 105 KB: twelve
+// role families of nine-state recipe tables), so it is passed by reference
+// and held on the heap, never passed by value or kept on a thread's stack
+// beside others: where stack slots are not reused (sanitizer builds), a few
+// copies in one call chain exhaust a Windows thread's 1 MB stack.
 struct ThemeDefinition final {
     std::string id{"windows-professional"};
     BasicControlStyle compatibility;

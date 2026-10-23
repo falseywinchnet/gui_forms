@@ -224,7 +224,7 @@ void test_semantic_feedback_record_outlives_a_nested_emission() {
 std::shared_ptr<const Theme> theme_named(const char* id) {
     ThemeDefinition definition = windows_professional_theme_definition();
     definition.id = id;
-    std::shared_ptr<const Theme> theme = Theme::create(std::move(definition));
+    std::shared_ptr<const Theme> theme = Theme::create(definition);
     return theme;
 }
 

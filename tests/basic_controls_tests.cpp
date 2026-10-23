@@ -1264,7 +1264,7 @@ void test_label_inherits_theme_typography_until_explicitly_overridden() {
         .ordinary[static_cast<std::size_t>(ControlSurfaceState::normal)].text =
         themed_text;
     std::shared_ptr<gui_forms::Label> label = make_control<Label>(StableId("label.theme"), "Heading");
-    (*label).set_theme_override(Theme::create(std::move(definition)));
+    (*label).set_theme_override(Theme::create(definition));
     (*label).set_text_style_role(TextStyleRole::heading);
     require(!(*label).has_font_override() &&
                 (*label).font() == FontSpec{FontRole::control, 17.0, 650, false,

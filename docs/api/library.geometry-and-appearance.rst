@@ -2774,7 +2774,7 @@ Types
 
    .. rubric:: Methods
 
-   .. cpp:function:: static std::shared_ptr<const Theme> create(ThemeDefinition definition)
+   .. cpp:function:: static std::shared_ptr<const Theme> create(const ThemeDefinition& definition)
 
       Validates bounded identity, every ordinary/selected/high-contrast recipe, and ordered finite structural tokens before publishing shared immutable ownership.
 
