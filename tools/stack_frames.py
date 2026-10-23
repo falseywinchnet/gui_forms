@@ -52,11 +52,20 @@ tree's build.ninja must first be regenerated, a dry run shows nothing past
 the regeneration, so objects older than their sources are not told apart;
 the check says so. Without ninja or build.ninja every object is read.
 
-The exit status is 0 when no frame is over the limit, 1 when one is, and 2
-when the tree holds no first-party object or the disassembler fails.
+A tree built by tools/ci_build.py has a build record beside it
+(<tree>.record.json). When it says the run built nothing (a change
+selection that no test reads, as for a documentation-only change), there
+is nothing to check and the check passes, saying so. A tree whose build
+should have made objects but holds none is an error.
+
+The exit status is 0 when no frame is over the limit or nothing was built,
+1 when a frame is over the limit, and 2 when the tree holds no first-party
+object although something was built (or no record says otherwise) or the
+disassembler fails.
 """
 from __future__ import annotations
 import argparse
+import json
 from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
 import os
@@ -65,6 +74,8 @@ import re
 import shutil
 import subprocess
 import sys
+
+import ci_build
 
 DEFAULT_LIMIT: int = 256 * 1024
 # Instructions read from each function's start: enough for 8 pushes, a
@@ -712,6 +723,24 @@ def ninja_output(ninja: str, tree: Path, arguments: list[str]) -> str | None:
     return completed.stdout
 
 
+def read_build_record(tree: Path) -> dict[str, str] | None:
+    """The record ci_build.py wrote beside tree, or None when there is none or it cannot be read."""
+    path: Path = ci_build.build_record_path(tree)
+    if not path.is_file():
+        return None
+    try:
+        record: object = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(record, dict):
+        return None
+    built: object = record.get('built')
+    reason: object = record.get('reason')
+    if not isinstance(built, str) or not isinstance(reason, str):
+        return None
+    return {'built': built, 'reason': reason}
+
+
 def find_disassembler(requested: str) -> str | None:
     """The disassembler to run: the requested one, else llvm-objdump, else objdump."""
     if requested:
@@ -734,13 +763,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--top', type=int, default=10, help='how many of the deepest frames to print')
     parser.add_argument('--report', type=Path, help=f'write every frame of at least {REPORT_FROM} bytes as TSV')
     args: argparse.Namespace = parser.parse_args(argv)
+    record: dict[str, str] | None = read_build_record(args.tree)
+    if record is not None and record['built'] == ci_build.BUILT_NOTHING:
+        print(f"stack frames: no objects built ({record['reason']}); nothing to check")
+        return 0
     objdump: str | None = find_disassembler(args.objdump)
     if objdump is None:
         print('stack frames: no llvm-objdump or objdump on PATH', file=sys.stderr)
         return 2
     found: list[Path] = first_party_objects(args.tree)
     if not found:
-        print(f'stack frames: no first-party object under {args.tree}', file=sys.stderr)
+        built_what: str = ''
+        if record is not None:
+            built_what = f" although this run built {record['reason']}"
+        print(f'stack frames: no first-party object under {args.tree}{built_what}', file=sys.stderr)
         return 2
     listing: str | None = None
     dry_run: str | None = None

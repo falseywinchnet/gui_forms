@@ -411,6 +411,27 @@ def changed_tests_listing(changed: list[str], listing: dict) -> dict | None:
     return {'tests': change_selection.selected_tests(listing, selection)}
 
 
+# What the last build_toolkit call built into a tree, beside the tree as
+# <tree>.record.json: {"built": BUILT_NOTHING | BUILT_SELECTED | BUILT_EVERYTHING,
+# "reason": text}. Removed when a call starts, so a call that fails leaves
+# none. tools/stack_frames.py reads it: a run that built nothing (a change
+# selection no test reads) has no objects to check.
+BUILT_NOTHING: str = 'nothing'
+BUILT_SELECTED: str = 'selected'
+BUILT_EVERYTHING: str = 'everything'
+
+
+def build_record_path(toolkit: Path) -> Path:
+    return toolkit.with_name(toolkit.name + '.record.json')
+
+
+def write_build_record(toolkit: Path, built: str, reason: str) -> None:
+    record: dict[str, str] = {'built': built, 'reason': reason}
+    path: Path = build_record_path(toolkit)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record) + '\n', encoding='utf-8')
+
+
 def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False,
                   sanitize: bool = False, tests: str = '', test_jobs: int = 1,
                   debug_info: str = 'lines', skip_labels: str = '', changed_from: str = '') -> None:
@@ -432,14 +453,16 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     of tools/test_areas.json) and the build to what they read; when no
     changed path is read by any test, nothing is configured, built or run.
     """
+    toolkit: Path = build / ('gui-forms-sanitize' if sanitize else 'gui-forms')
+    build_record_path(toolkit).unlink(missing_ok=True)
     changed: list[str] = []
     if changed_from:
         changed = change_selection.changed_paths(ROOT / 'gui_forms', changed_from)
         if not change_selection.any_path_read(changed, change_selection.load_rules()):
-            print(f'no test reads the {len(changed)} paths changed since {changed_from}; nothing to build or run',
-                  flush=True)
+            reason: str = f'no test reads the {len(changed)} paths changed since {changed_from}'
+            print(reason + '; nothing to build or run', flush=True)
+            write_build_record(toolkit, BUILT_NOTHING, reason)
             return
-    toolkit: Path = build / ('gui-forms-sanitize' if sanitize else 'gui-forms')
     options: list[str] = []
     gallery_option: str = 'ON' if gallery else 'OFF'
     miniaudio: Path = toolkit / '_deps/gui_forms_miniaudio-src'
@@ -501,8 +524,9 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
             if changed_listing is not None:
                 listing = changed_listing
                 if not listing['tests']:
-                    print(f'no test is affected by the paths changed since {changed_from}; nothing to build or run',
-                          flush=True)
+                    unaffected: str = f'no test is affected by the paths changed since {changed_from}'
+                    print(unaffected + '; nothing to build or run', flush=True)
+                    write_build_record(toolkit, BUILT_NOTHING, unaffected)
                     return
                 names: list[str] = []
                 test: dict
@@ -513,11 +537,14 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         targets = selected_test_targets(toolkit, listing)
     if targets is None:
         run('cmake', '--build', toolkit, '--parallel', jobs)
+        write_build_record(toolkit, BUILT_EVERYTHING, 'the whole tree')
     elif targets:
         print(f'{len(targets)} build outputs serve the selected tests', flush=True)
         run('cmake', '--build', toolkit, '--parallel', jobs, '--target', *targets)
+        write_build_record(toolkit, BUILT_SELECTED, f'{len(targets)} build outputs of the selected tests')
     else:
         print('the selected tests read no build output; nothing to build', flush=True)
+        write_build_record(toolkit, BUILT_NOTHING, 'the selected tests read no build output')
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
     if sanitize:
         run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
