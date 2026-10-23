@@ -623,6 +623,46 @@ void image_variant_made_once() {
     require(cleared.image_variants == 0U && cleared.shared_bytes == 0U, "a theme change drops the variants");
 }
 
+// Making a variant is preparation, not bake (owner, 2026-10-22): the bake
+// bound counts the composite alone, so a large image, which takes far
+// longer to resample than the bound allows, is accepted and baked.
+void image_variant_outside_the_bound() {
+    ImageRegistry registry{};
+    // 1024 × 1024 premultiplied grey at half alpha.
+    const std::vector<std::byte> large(1024U * 1024U * 4U, std::byte{0x80});
+    const ImageLoadResult loaded = registry.load_bgra32_premultiplied(1024U, 1024U, 4096U, large);
+    const std::vector<std::byte> small(4U * 4U * 4U, std::byte{0x80});
+    const ImageLoadResult tiny = registry.load_bgra32_premultiplied(4U, 4U, 16U, small);
+    require(static_cast<bool>(loaded) && static_cast<bool>(tiny), "the images load");
+    SurfaceMaterial shrunk = solid_material(clear);
+    shrunk.fills.push_back(MaterialFillLayer::stretched_image(loaded.image, Size{1024.0, 1024.0}));
+    SurfaceMaterial magnified = solid_material(clear);
+    magnified.fills.push_back(MaterialFillLayer::stretched_image(tiny.image, Size{4.0, 4.0}));
+    const Size logical{240.0, 240.0};
+    const double shrunk_estimate =
+        engine_primitives::material_bake_estimate(shrunk, target_for(logical, 1.0, &shrunk, &registry));
+    const double magnified_estimate =
+        engine_primitives::material_bake_estimate(magnified, target_for(logical, 1.0, &magnified, &registry));
+    require(shrunk_estimate == magnified_estimate, "the image's size does not enter the bake estimate");
+    require(shrunk_estimate <= engine_primitives::maximum_material_bake_nanoseconds, "the composite is within the bound");
+
+    PartRasterRequest request{};
+    request.primitive = &material_primitive();
+    request.parameters = recipe("button");
+    request.target = target_for(logical, 1.0, &shrunk, &registry);
+    request.extent = make_raster(logical, 1.0).extent;
+    require(material_primitive().accepts(request.parameters, request.target), "the large image face is accepted");
+    EnginePartTable table{};
+    const PartRasterResult baked = table.raster_without_record(request, 1U);
+    require(baked.raster != nullptr && baked.status == PartRasterStatus::uncached, "the large image face bakes");
+    require(table.cache_statistics().image_variant_bakes == 1U, "its variant is made on first need");
+    // The interior shows the image's grey at half alpha.
+    const PartRaster& raster = *baked.raster;
+    const std::size_t centre = 128U * raster.row_bytes() + 128U * 4U;
+    require(raster.pixels()[centre + 3U] == 0x80U && raster.pixels()[centre] == 0x80U,
+            "the shrunk image keeps its colour");
+}
+
 // -- reference images: the professional theme's button ---------------------------
 
 struct ReferenceCase final {
@@ -943,6 +983,7 @@ int main(int argc, char** argv) {
     keylines_and_inset_shadow();
     image_fills();
     image_variant_made_once();
+    image_variant_outside_the_bound();
     reference_images();
     engine_draws_the_material();
     engine_counts_refusals();

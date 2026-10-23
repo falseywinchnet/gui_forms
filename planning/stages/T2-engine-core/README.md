@@ -623,7 +623,9 @@ variant is prepared by CONV, and the bake only composites it.
   hashes, updated (stretch, PNG equal to BGRA, tile, nine-patch, shrink);
   `image_variant_made_once`: two bakes make one variant and reuse it, the
   table's bake matches the primitive's byte for byte, a new image revision
-  makes it again, and a theme change drops it.
+  makes it again, and a theme change drops it; `image_variant_outside_the_bound`:
+  a 1024 × 1024 image on a 240-unit part has the same estimate as a 4 × 4
+  one, is accepted and bakes, its variant made on first need.
 
 ## Open decisions (ask, do not decide)
 
