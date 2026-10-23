@@ -2290,6 +2290,13 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_engine_light_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_light_tests COMMAND gui_forms_engine_light_tests)
 
+    # T2's gate evidence (E11): every registered primitive's reference images
+    # and the idle-frame counters, written as a manifest that CI compares
+    # across hosts (tools/engine_gate.py).
+    add_executable(gui_forms_engine_gate_tests tests/engine_gate_tests.cpp)
+    target_link_libraries(gui_forms_engine_gate_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_gate_tests COMMAND gui_forms_engine_gate_tests)
+
     add_executable(gui_forms_damage_clip_tests tests/damage_clip_tests.cpp)
     target_link_libraries(gui_forms_damage_clip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_damage_clip_tests COMMAND gui_forms_damage_clip_tests)
