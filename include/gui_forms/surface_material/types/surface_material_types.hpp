@@ -157,6 +157,18 @@ struct SurfaceMaterial final {
     // paint_surface_material, rounds every corner by corner_radius, so a
     // theme sets that to the radius the fallback should draw.
     std::optional<MaterialCornerRadii> corner_radii;
+    // The surface finish (E9.6, CSS coverage row 9), from 0, the material
+    // as authored, to 1, a full gloss derived from its first fill
+    // (finished_surface_material, which both paths draw). A finish above 0
+    // needs a solid or linear first fill and room for one more keyline.
+    double finish{};
+    // An alpha mask (E9.6, CSS `mask-image`): a solid, gradient or image
+    // fill whose alpha, times its opacity for an image, multiplies the
+    // whole finished part, its shadows and glows included; outside the box
+    // it extends at its edge value, so that a shadow fades with the face
+    // beside it. The engine's material primitive draws it; the built-in
+    // path, paint_surface_material, draws the material unmasked.
+    std::optional<MaterialFillLayer> mask;
     [[nodiscard]] static SurfaceMaterial from_parts(
         const MaterialFillLayer* fills, std::size_t fill_count,
         const MaterialShadow* shadows, std::size_t shadow_count,
@@ -179,14 +191,16 @@ struct SurfaceMaterial final {
         left.border == right.border && left.border_edges == right.border_edges &&
         left.keylines == right.keylines &&
         left.corner_radius == right.corner_radius &&
-        left.corner_radii == right.corner_radii)) {
+        left.corner_radii == right.corner_radii && left.finish == right.finish &&
+        left.mask == right.mask)) {
         return left.fills == right.fills && left.shadows == right.shadows &&
                left.glows == right.glows &&
                left.border == right.border &&
                left.border_edges == right.border_edges &&
                left.keylines == right.keylines &&
                left.corner_radius == right.corner_radius &&
-               left.corner_radii == right.corner_radii;
+               left.corner_radii == right.corner_radii &&
+               left.finish == right.finish && left.mask == right.mask;
     }
 };
 

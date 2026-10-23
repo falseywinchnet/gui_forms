@@ -196,8 +196,9 @@ enum class ParameterAssignment : std::uint8_t {
 // composites it. A fill whose variant is not lent draws nothing.
 
 // The most image variants one bake uses: one per fill layer
-// (SurfaceMaterial::maximum_fill_layers).
-inline constexpr std::size_t maximum_image_variants = 8U;
+// (SurfaceMaterial::maximum_fill_layers), then one for an image mask
+// (E9.6), whose `layer` is maximum_image_variants - 1.
+inline constexpr std::size_t maximum_image_variants = 9U;
 
 // One sized variant of an image resource: the image resampled to `extent`
 // device pixels, for display `scale`. A nine-patch's fixed segments are
@@ -205,7 +206,8 @@ inline constexpr std::size_t maximum_image_variants = 8U;
 // (left, top, right, bottom) and `fixed` their device lengths in the
 // variant, both zero for a stretched or tiled image, which is resampled
 // whole. `layer` is the fill layer the variant serves, by index among the
-// material's fills; it is not part of what the variant is.
+// material's fills (an image mask's is maximum_image_variants - 1); it is
+// not part of what the variant is.
 //
 // A procedural fill's pattern (E10) is asked for the same way, with
 // `procedural` set and no image: the pattern generated at `scale` and

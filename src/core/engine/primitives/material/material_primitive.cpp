@@ -9,6 +9,7 @@
 #include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/engine/part_shape/part_shape.hpp"
 #include "gui_forms/surface_material/painting/surface_material_painting.hpp"
+#include "gui_forms/surface_material/presets/material_presets.hpp"
 
 #include <algorithm>
 #include <array>
@@ -17,6 +18,7 @@
 #include <cstdint>
 #include <memory>
 #include <new>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -178,7 +180,32 @@ struct MaterialLook final {
     // The border's single edges, then the keylines.
     std::array<ResolvedBand, maximum_bands> bands{};
     std::size_t band_count{};
+    // An alpha mask (E9.6), evaluated at each pixel centre moved into the
+    // box, so that outside the box it extends at its edge value; an image
+    // mask's variant is MaterialImages' mask_layer.
+    bool masked{};
+    ResolvedFill mask{};
 };
+
+// An image mask's variant slot (E9.6), after the fills'.
+constexpr std::size_t mask_layer = maximum_image_variants - 1U;
+static_assert(mask_layer == SurfaceMaterial::maximum_fill_layers, "one variant per fill, then the mask's");
+
+// The material a bake draws (E9.6): for a finish above 0, the material it
+// describes (finished_surface_material), made into `storage`, which the
+// caller keeps through its use; any other material as it is. Storage that
+// cannot be allocated leaves the material drawn unfinished: the bakes are
+// noexcept and still write every pixel.
+const SurfaceMaterial& baked_material(const SurfaceMaterial& material,
+                                      std::optional<SurfaceMaterial>& storage) noexcept {
+    if (!(material.finish > 0.0)) return material;
+    try {
+        storage = finished_surface_material(material);
+    } catch (const std::bad_alloc&) {
+        return material;
+    }
+    return *storage;
+}
 
 // A colour in straight alpha, each channel in [0, 255].
 struct Straight final {
@@ -514,6 +541,11 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
         look.fills[look.fill_count].image = index;
         look.fill_count = look.fill_count + 1U;
     }
+    if (material.mask) {
+        look.mask = resolve_fill(*material.mask, box, scale);
+        look.mask.image = mask_layer;
+        look.masked = true;
+    }
     if (material.border) {
         const double width = (*material.border).width * scale;
         look.border = true;
@@ -574,7 +606,7 @@ struct MaterialImageLayer final {
 };
 
 struct MaterialImages final {
-    std::array<MaterialImageLayer, SurfaceMaterial::maximum_fill_layers> layers{};
+    std::array<MaterialImageLayer, maximum_image_variants> layers{};
 };
 
 // Maps a procedural fill's lent pattern onto the destination (E10): a
@@ -620,10 +652,56 @@ void map_pattern(const ProceduralFill& pattern, Rect box, double scale, const Pa
     }
 }
 
-// Maps each image fill's lent variant, and each procedural fill's lent
-// pattern, onto the destination. Storage that cannot be allocated leaves
-// that layer without a variant: fill() is noexcept and still writes every
-// pixel.
+// Maps image layer `layer`'s lent variant, the variant slot `index`'s,
+// onto the destination. A variant made for another size is not mapped, and
+// storage that cannot be allocated leaves `mapped` without a variant.
+void map_image(const MaterialFillLayer& layer, std::size_t index, Rect box, double scale, const PartRaster& variant,
+               DeviceExtent extent, MaterialImageLayer& mapped) noexcept {
+    const ImageVariantRequest wanted = image_variant_request(layer, index, box, scale);
+    if (!(variant.extent() == wanted.extent)) return;
+    try {
+        std::vector<std::uint32_t> map{};
+        const ImageAxisPlacement across =
+            image_placement_across(layer, box.x, box.width, scale, layer.image_pixel_size.width);
+        map_image_variant(across, wanted.extent.width, wanted.fixed[0], wanted.fixed[2], extent.width, map);
+        mapped.columns.resize(map.size());
+        for (std::size_t column = 0U; column < map.size(); ++column) {
+            mapped.columns[column] = static_cast<std::size_t>(map[column]) * part_raster_bytes_per_pixel;
+        }
+        const ImageAxisPlacement down =
+            image_placement_down(layer, box.y, box.height, scale, layer.image_pixel_size.height);
+        map_image_variant(down, wanted.extent.height, wanted.fixed[1], wanted.fixed[3], extent.height, map);
+        mapped.rows.resize(map.size());
+        for (std::size_t row = 0U; row < map.size(); ++row) {
+            mapped.rows[row] = static_cast<std::size_t>(map[row]) * variant.row_bytes();
+        }
+        mapped.variant = &variant;
+    } catch (const std::bad_alloc&) {
+        mapped = MaterialImageLayer{};
+    }
+}
+
+// Gives a map's outputs whose centres lie before `start` the entry of the
+// first output whose centre does not, and those past `end` the last such
+// output's: a mask extends outward at its edge value (E9.6).
+void extend_at_box(std::vector<std::size_t>& map, double start, double end) noexcept {
+    if (map.empty()) return;
+    const double last_output = static_cast<double>(map.size() - 1U);
+    const double first = std::clamp(std::ceil(start - 0.5), 0.0, last_output);
+    const double last = std::clamp(std::floor(end - 0.5), 0.0, last_output);
+    if (first > last) return;
+    const std::size_t first_index = static_cast<std::size_t>(first);
+    const std::size_t last_index = static_cast<std::size_t>(last);
+    const std::size_t first_entry = map[first_index];
+    const std::size_t last_entry = map[last_index];
+    for (std::size_t output = 0U; output < first_index; ++output) map[output] = first_entry;
+    for (std::size_t output = last_index + 1U; output < map.size(); ++output) map[output] = last_entry;
+}
+
+// Maps each image fill's lent variant, each procedural fill's lent
+// pattern and an image mask's lent variant onto the destination. Storage
+// that cannot be allocated leaves that layer without a variant: fill() is
+// noexcept and still writes every pixel.
 void prepare_images(const SurfaceMaterial& material, const PrimitiveTarget& target, const MaterialLook& look,
                     DeviceExtent extent, MaterialImages& images) noexcept {
     if (target.variants == nullptr) return;
@@ -638,31 +716,16 @@ void prepare_images(const SurfaceMaterial& material, const PrimitiveTarget& targ
             map_pattern(layer.procedural, look.box, scale, variant, extent, images.layers[index]);
             continue;
         }
-        const ImageVariantRequest wanted = image_variant_request(layer, index, look.box, scale);
-        // A variant made for another size is not composited.
-        if (!(variant.extent() == wanted.extent)) continue;
-        MaterialImageLayer& mapped = images.layers[index];
-        try {
-            std::vector<std::uint32_t> map{};
-            const ImageAxisPlacement across =
-                image_placement_across(layer, look.box.x, look.box.width, scale, layer.image_pixel_size.width);
-            map_image_variant(across, wanted.extent.width, wanted.fixed[0], wanted.fixed[2], extent.width, map);
-            mapped.columns.resize(map.size());
-            for (std::size_t column = 0U; column < map.size(); ++column) {
-                mapped.columns[column] = static_cast<std::size_t>(map[column]) * part_raster_bytes_per_pixel;
-            }
-            const ImageAxisPlacement down =
-                image_placement_down(layer, look.box.y, look.box.height, scale, layer.image_pixel_size.height);
-            map_image_variant(down, wanted.extent.height, wanted.fixed[1], wanted.fixed[3], extent.height, map);
-            mapped.rows.resize(map.size());
-            for (std::size_t row = 0U; row < map.size(); ++row) {
-                mapped.rows[row] = static_cast<std::size_t>(map[row]) * variant.row_bytes();
-            }
-            mapped.variant = &variant;
-        } catch (const std::bad_alloc&) {
-            mapped = MaterialImageLayer{};
-        }
+        map_image(layer, index, look.box, scale, variant, extent, images.layers[index]);
     }
+    if (!material.mask || (*material.mask).kind != MaterialFillKind::image) return;
+    const std::shared_ptr<const PartRaster>& lent_mask = (*target.variants).layers[mask_layer];
+    if (!lent_mask) return;
+    MaterialImageLayer& mask = images.layers[mask_layer];
+    map_image(*material.mask, mask_layer, look.box, scale, *lent_mask, extent, mask);
+    if (mask.variant == nullptr) return;
+    extend_at_box(mask.columns, look.box.x, look.box.right());
+    extend_at_box(mask.rows, look.box.y, look.box.bottom());
 }
 
 // -- the pixel ---------------------------------------------------------------------
@@ -973,7 +1036,7 @@ double box_coverage(const MaterialLook& look, std::int64_t x, std::int64_t y, do
     return coverage;
 }
 
-Unit material_pixel(const MaterialLook& look, const MaterialImages& images, const OuterIntegrals& integrals,
+Unit unmasked_pixel(const MaterialLook& look, const MaterialImages& images, const OuterIntegrals& integrals,
                     std::int64_t x, std::int64_t y) noexcept {
     Unit result{};
     const double centre_x = static_cast<double>(x) + 0.5;
@@ -1044,6 +1107,29 @@ Unit material_pixel(const MaterialLook& look, const MaterialImages& images, cons
     return result;
 }
 
+// The mask's alpha at pixel (x, y) (E9.6): its centre moved into the box,
+// so that outside the box the mask extends at its edge value (an image
+// mask's maps are extended so, extend_at_box). A mask without its variant
+// keeps nothing, as an image fill without one draws nothing.
+double mask_alpha(const MaterialLook& look, const MaterialImages& images, std::int64_t x, std::int64_t y) noexcept {
+    const Rect& box = look.box;
+    const double centre_x = std::max(box.x, std::min(static_cast<double>(x) + 0.5, box.right()));
+    const double centre_y = std::max(box.y, std::min(static_cast<double>(y) + 0.5, box.bottom()));
+    const Unit sampled = fill_colour(look.mask, images, static_cast<std::size_t>(x), static_cast<std::size_t>(y),
+                                     centre_x, centre_y, 1.0);
+    return sampled.alpha;
+}
+
+// Pixel (x, y) of the finished part, multiplied by the mask's alpha.
+Unit material_pixel(const MaterialLook& look, const MaterialImages& images, const OuterIntegrals& integrals,
+                    std::int64_t x, std::int64_t y) noexcept {
+    const Unit unmasked = unmasked_pixel(look, images, integrals, x, y);
+    if (!look.masked) return unmasked;
+    const double kept = mask_alpha(look, images, x, y);
+    const Unit masked{unmasked.red * kept, unmasked.green * kept, unmasked.blue * kept, unmasked.alpha * kept};
+    return masked;
+}
+
 // -- the bake estimate -------------------------------------------------------------
 
 DeviceExtent destination_extent(const PrimitiveTarget& target, double outset) noexcept {
@@ -1058,6 +1144,39 @@ double extra_stops(const MaterialFillLayer& layer) noexcept {
     const double stops = static_cast<double>(layer.stops.size());
     const double extra = std::max(0.0, stops - 2.0);
     return extra;
+}
+
+// One fill layer's estimated cost per pixel, in nanoseconds.
+double fill_cost(const MaterialFillLayer& layer, const MaterialBakeCosts& costs) noexcept {
+    switch (layer.kind) {
+    case MaterialFillKind::solid: {
+        // A solid fill of alpha 0 is not drawn (resolve_look).
+        const double solid = layer.color.alpha != 0U ? costs.solid : 0.0;
+        return solid;
+    }
+    case MaterialFillKind::linear_gradient: {
+        const double linear = costs.linear + extra_stops(layer) * costs.gradient_stop;
+        return linear;
+    }
+    case MaterialFillKind::radial_gradient: {
+        const double radial = costs.radial + extra_stops(layer) * costs.gradient_stop;
+        return radial;
+    }
+    case MaterialFillKind::conic_gradient: {
+        const double conic = costs.conic + extra_stops(layer) * costs.gradient_stop;
+        return conic;
+    }
+    case MaterialFillKind::image:
+        // Compositing the prepared variant only: its resampling is not
+        // the bake's (owner, 2026-10-22).
+        return costs.image;
+    case MaterialFillKind::procedural:
+        // Compositing the generated pattern, as an image's variant is
+        // composited; its generation is an idle frame's, bounded apart
+        // (procedural_generation_estimate).
+        return costs.image;
+    }
+    return 0.0;
 }
 
 } // namespace
@@ -1119,39 +1238,16 @@ double corner_pixels(const MaterialLook& look, DeviceExtent extent) noexcept {
 
 } // namespace
 
-double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTarget& target,
+double material_bake_estimate(const SurfaceMaterial& authored, const PrimitiveTarget& target,
                               double outset, PartShapeKind shape) noexcept {
+    std::optional<SurfaceMaterial> finished{};
+    const SurfaceMaterial& material = baked_material(authored, finished);
     const MaterialBakeCosts& costs = measured_material_costs;
     const DeviceExtent extent = destination_extent(target, outset);
     double per_pixel = costs.base;
-    for (const MaterialFillLayer& layer : material.fills) {
-        switch (layer.kind) {
-        case MaterialFillKind::solid:
-            // A solid fill of alpha 0 is not drawn (resolve_look).
-            if (layer.color.alpha != 0U) per_pixel = per_pixel + costs.solid;
-            break;
-        case MaterialFillKind::linear_gradient:
-            per_pixel = per_pixel + costs.linear + extra_stops(layer) * costs.gradient_stop;
-            break;
-        case MaterialFillKind::radial_gradient:
-            per_pixel = per_pixel + costs.radial + extra_stops(layer) * costs.gradient_stop;
-            break;
-        case MaterialFillKind::conic_gradient:
-            per_pixel = per_pixel + costs.conic + extra_stops(layer) * costs.gradient_stop;
-            break;
-        case MaterialFillKind::image:
-            // Compositing the prepared variant only: its resampling is not
-            // the bake's (owner, 2026-10-22).
-            per_pixel = per_pixel + costs.image;
-            break;
-        case MaterialFillKind::procedural:
-            // Compositing the generated pattern, as an image's variant is
-            // composited; its generation is an idle frame's, bounded apart
-            // (procedural_generation_estimate).
-            per_pixel = per_pixel + costs.image;
-            break;
-        }
-    }
+    for (const MaterialFillLayer& layer : material.fills) per_pixel = per_pixel + fill_cost(layer, costs);
+    // A mask (E9.6) is a fill's evaluation and one multiplication.
+    if (material.mask) per_pixel = per_pixel + fill_cost(*material.mask, costs) + costs.solid;
     for (const MaterialShadow& shadow : material.shadows) {
         per_pixel = per_pixel + (shadow.inset ? costs.inset_shadow : costs.outer_shadow);
     }
@@ -1220,6 +1316,17 @@ void band_reach(AxisReach& reach, MaterialEdge edge, double inset, double width,
     }
 }
 
+// Whether a fill layer's colour changes along the axis: a solid's never, a
+// linear gradient's when it runs along it, every other kind's always.
+bool fill_varies(const MaterialFillLayer& layer, Rect box, double scale, bool across) noexcept {
+    if (layer.kind == MaterialFillKind::solid) return false;
+    if (layer.kind != MaterialFillKind::linear_gradient) return true;
+    const ResolvedFill fill = resolve_fill(layer, box, scale);
+    const double step = across ? fill.step_x : fill.step_y;
+    const bool varies = step != 0.0;
+    return varies;
+}
+
 AxisReach axis_reach(const SurfaceMaterial& material, const PrimitiveTarget& target, bool across,
                      double outset, PartShapeKind kind) noexcept {
     const double scale = target.scale.value;
@@ -1236,15 +1343,10 @@ AxisReach axis_reach(const SurfaceMaterial& material, const PrimitiveTarget& tar
     // The box's own edge, and its corners' arcs.
     reach_at_least(reach, radius + 1.0, radius + 1.0, radius * 2.0 + 1.0);
     for (const MaterialFillLayer& layer : material.fills) {
-        if (layer.kind == MaterialFillKind::solid) continue;
-        if (layer.kind != MaterialFillKind::linear_gradient) {
-            reach.varies = true;
-            continue;
-        }
-        const ResolvedFill fill = resolve_fill(layer, box, scale);
-        const double step = across ? fill.step_x : fill.step_y;
-        if (step != 0.0) reach.varies = true;
+        if (fill_varies(layer, box, scale, across)) reach.varies = true;
     }
+    // A mask (E9.6) varies as a fill does.
+    if (material.mask && fill_varies(*material.mask, box, scale, across)) reach.varies = true;
     for (const MaterialShadow& shadow : material.shadows) {
         const double spread = shadow.spread * scale;
         const double offset = (across ? shadow.offset.x : shadow.offset.y) * scale;
@@ -1339,8 +1441,10 @@ AxisPlan plan_axis(const AxisReach& reach, double logical, double scale, std::ui
 
 } // namespace
 
-PrimitiveSlicePlan material_slice_plan(const SurfaceMaterial& material, const PrimitiveTarget& target,
+PrimitiveSlicePlan material_slice_plan(const SurfaceMaterial& authored, const PrimitiveTarget& target,
                                        DeviceExtent extent, double outset, PartShapeKind shape) noexcept {
+    std::optional<SurfaceMaterial> finished{};
+    const SurfaceMaterial& material = baked_material(authored, finished);
     const double scale = target.scale.value;
     const AxisReach across_reach = axis_reach(material, target, true, outset, shape);
     const AxisReach down_reach = axis_reach(material, target, false, outset, shape);
@@ -1404,6 +1508,9 @@ bool MaterialPrimitive::accepts(const PrimitiveParameterBlock& parameters,
         if (layer.kind != MaterialFillKind::image) continue;
         if (target.images == nullptr || !material_image_available(*target.images, layer)) return false;
     }
+    if (material.mask && (*material.mask).kind == MaterialFillKind::image) {
+        if (target.images == nullptr || !material_image_available(*target.images, *material.mask)) return false;
+    }
     // A part assembled from slices bakes only its reference.
     const PartShapeKind kind = shape_kind(parameters);
     const PrimitiveSlicePlan plan =
@@ -1447,6 +1554,12 @@ std::size_t MaterialPrimitive::image_variants(const PrimitiveParameterBlock&, co
         requests[count] = image_variant_request(layer, index, box, target.scale.value);
         count = count + 1U;
     }
+    // An image mask's variant (E9.6), in its own slot.
+    const bool image_mask = material.mask && (*material.mask).kind == MaterialFillKind::image;
+    if (image_mask && count < requests.size()) {
+        requests[count] = image_variant_request(*material.mask, mask_layer, box, target.scale.value);
+        count = count + 1U;
+    }
     return count;
 }
 
@@ -1480,14 +1593,18 @@ void bake_look(const SurfaceMaterial& material, const PrimitiveTarget& target, c
 
 } // namespace
 
-void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& target,
+void bake_material(const SurfaceMaterial& authored, const PrimitiveTarget& target,
                    const PartRasterView& destination, double outset, PartShapeKind shape) noexcept {
+    std::optional<SurfaceMaterial> finished{};
+    const SurfaceMaterial& material = baked_material(authored, finished);
     const MaterialLook look = resolve_look(material, target, outset, shape);
     bake_look(material, target, look, destination);
 }
 
-void bake_material_region(const SurfaceMaterial& material, const PrimitiveTarget& target, Point device_origin,
+void bake_material_region(const SurfaceMaterial& authored, const PrimitiveTarget& target, Point device_origin,
                           const PartRasterView& destination) noexcept {
+    std::optional<SurfaceMaterial> finished{};
+    const SurfaceMaterial& material = baked_material(authored, finished);
     const MaterialLook look =
         resolve_look_at(material, target, Point{-device_origin.x, -device_origin.y}, PartShapeKind::rounded_rectangle);
     bake_look(material, target, look, destination);

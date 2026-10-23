@@ -484,6 +484,20 @@ void test_image_materials_retain_crop_tile_and_nine_patch() {
             "a positioned tiling is clipped to its box");
     (*panel).set_material(material);
 
+    // A finished material (E9.6) draws as the material it describes on the
+    // built-in path too: its four stops, and its shine.
+    SurfaceMaterial finished_face;
+    finished_face.fills = {MaterialFillLayer::solid(Color::rgba(100, 140, 200))};
+    finished_face.finish = 1.0;
+    (*panel).set_material(finished_face);
+    window.perform_layout();
+    RichPainter finish_painter;
+    window.paint(finish_painter, {0.0, 0.0, 10.0, 6.0});
+    require(finish_painter.linear_fills + finish_painter.spread_linear_fills == 1U &&
+                finish_painter.last_stop_count == 4U,
+            "a finished face draws its four-stop gradient");
+    (*panel).set_material(material);
+
     SurfaceMaterial invalid_position = material;
     invalid_position.fills.front().image_anchor = Point{1.5, 0.0};
     bool position_rejected{};
