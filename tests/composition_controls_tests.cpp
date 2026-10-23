@@ -1,4 +1,5 @@
 #include "gui_forms/composition_controls.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "gui_forms/window.hpp"
 #include "support/named_callbacks.hpp"
 
@@ -162,7 +163,8 @@ void test_card_selection_behavior_is_explicit_and_ordered() {
 }
 
 void test_card_theme_status_and_outsets_are_reusable() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "shadow-card";
     ControlVisualRecipe& invalid = definition
         .roles[static_cast<std::size_t>(ControlVisualRole::card)]
@@ -181,7 +183,8 @@ void test_card_theme_status_and_outsets_are_reusable() {
 }
 
 void test_compositions_follow_structural_theme_tokens_until_overridden() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "structural-composition";
     definition.structure.spacing.medium = 9.0;
     definition.structure.spacing.large = 15.0;

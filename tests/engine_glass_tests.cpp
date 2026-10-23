@@ -7,6 +7,7 @@
 // Run with --print to print the reference hash instead of checking it.
 
 #include "gui_forms/gui_forms.hpp"
+#include "support/theme_definition_heap.hpp"
 
 #include "../src/core/engine/primitives/light/glass_primitive.hpp"
 
@@ -232,8 +233,9 @@ struct GlassFixture final {
     RasterWatch painter{};
 };
 
-ThemeDefinition glass_theme(double blur) {
-    ThemeDefinition definition = windows_professional_theme_definition();
+std::unique_ptr<ThemeDefinition> glass_theme(double blur) {
+    std::unique_ptr<ThemeDefinition> held = test_support::professional_definition();
+    ThemeDefinition& definition = *held;
     definition.id = "engine-glass";
     ThemeRule rule{};
     rule.label = "glass";
@@ -241,7 +243,7 @@ ThemeDefinition glass_theme(double blur) {
     rule.declarations.push_back(RuleDeclaration::primitive("glass"));
     rule.declarations.push_back(RuleDeclaration::number_value("blur", blur));
     definition.rules.rules.push_back(rule);
-    return definition;
+    return held;
 }
 
 // The backdrop covers window x 60 to 180; the glass lies at 20 to 120.
@@ -262,7 +264,7 @@ std::unique_ptr<GlassFixture> make_glass(double blur, bool covered) {
     (*made.root).add_child(made.pane);
     made.window = std::make_unique<Window>(made.root, Size{240.0, 160.0});
     Window& window = *made.window;
-    window.set_theme(Theme::create(glass_theme(blur)));
+    window.set_theme(Theme::create(*glass_theme(blur)));
     window.perform_layout();
     window.paint(made.painter);
     static_cast<void>(window.take_damage());
