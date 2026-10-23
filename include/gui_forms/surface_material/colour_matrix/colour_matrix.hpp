@@ -6,6 +6,13 @@
 
 namespace gui_forms {
 
+namespace detail {
+// The identity colour matrix's entries, row-major: MaterialColourMatrix's
+// default. Held here so that its declaration reads on one line.
+inline constexpr std::array<double, 20> identity_colour_entries{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+                                                               0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
+} // namespace detail
+
 // A colour filter (E9.6; CSS `filter` and `backdrop-filter` colour
 // functions): a 4 × 5 matrix on straight (not premultiplied) colour with
 // each channel in [0, 1]. Its rows give red, green, blue and alpha; its
@@ -20,8 +27,7 @@ struct MaterialColourMatrix final {
     static constexpr std::size_t rows = 4U;
     static constexpr std::size_t columns = 5U;
     // Row-major: values[row × 5 + column]. The identity by default.
-    std::array<double, rows * columns> values{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                              0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
+    std::array<double, rows * columns> values{detail::identity_colour_entries};
 
     // Each amount is clamped as CSS clamps it: brightness, contrast and
     // saturate to at least 0; grayscale, sepia, invert and opacity to

@@ -1464,9 +1464,9 @@ Types
 
       Default: ``5U``.
 
-   .. cpp:member:: std::array<double, rows * columns> values{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+   .. cpp:member:: std::array<double, rows * columns> values
 
-      Row-major: values[row × 5 + column]. The identity by default.
+      Row-major: values[row × 5 + column]. The identity by default. Default: ``{detail::identity_colour_entries}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2920,7 +2920,7 @@ Types
 
    .. cpp:member:: MaterialColourFilter colour_filter
 
-      The part filters (E9.6, CSS ``filter``), applied to the baked raster in this order: the colour filter to each pixel, then the drop shadow beneath, then the blur over the whole. A theme's filter list lowers to that order. The engine's material primitive draws them; the built-in path, paint_surface_material, draws none of them.
+      The part filters (E9.6, CSS ``filter``), applied to the baked raster in this order: the colour filter to each pixel, then the drop shadow beneath, then the blur over the whole. A theme's filter list lowers to that order. The engine's material primitive draws them; the built-in path, paint_surface_material, draws none of them, and the window's backplane image draws only the colour filter.
 
    .. cpp:member:: std::optional<MaterialDropShadow> drop_shadow
 
