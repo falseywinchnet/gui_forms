@@ -651,6 +651,32 @@ assembles any size of a sliceable material from one reference bake.
   - *Cost.* Each glow is costed as an outer shadow (`outer_shadow`, and
     `outer_corner` at its rounded corners), since it runs the same kernel.
   - *Inspection.* The visual-inspection snapshot lists the glows.
+- **Placement (owner, E9.4 follow-up).** `MaterialGlow::placement` is
+  `under` (the halo above, for the current selection) or `over` (light for
+  other emphasis, such as the default button):
+  - *Over, in the bake.* Its coverage, the blurred grown box, is
+    evaluated with the outer layers' cached integrals. It is then added
+    over the finished face, after the keylines, times the box's coverage,
+    so nothing outside the face changes.
+  - *Over, on the built-in path.* `paint_surface_material` draws it last
+    as a shadow at no offset, clipped to the face. That is source-over,
+    not added.
+  - *Both.* The same reach cap applies to both placements. An over glow
+    adds no visual outsets.
+  - *Stock rules.* The proposed stock rules for both are in the design
+    language, §9.3 item 3, for the owner's review, and stock looks are
+    unchanged. The M105 question (a glow on the default button beside its
+    perimeter) is in §12.2.
+  - *Proof.* `engine_material_tests`:
+    - an under glow leaves the face unchanged and brightens a dark
+      surround;
+    - an over glow brightens the face and adds nothing outside it;
+    - the cap and the placement's validity;
+    - the built-in order;
+    - byte-stable renders of both placements over a light and a dark
+      background at scales 1 and 2 (eight hashes).
+    An over glow in the layered slice material assembles to the whole
+    bake's bytes.
 - **Proof.** `gui_forms_engine_material_tests`:
   - the glow lies outside the box and under the face, and fades within
     its reach;

@@ -31,24 +31,41 @@ struct MaterialShadow final {
                left.inset == right.inset;
     }
 };
-// A soft coloured emission around the material's box (E9-C): the box grown
-// by `spread` on every side and blurred by `blur_radius` (σ = blur_radius /
-// 2, as a shadow's), centred on the box. The engine's material bake adds
-// it, as light, to the outer shadows beneath it, and draws the fills over
-// it; paint_surface_material composites it as an outer shadow at no offset,
-// which differs only where it lies over a shadow. Its reach, spread + 2 ×
-// blur_radius (where its blur is below one 8-bit step), is at most
-// SurfaceMaterial::maximum_glow_reach, so that it stays within the part's
-// granted overflow.
+// Where a glow lies in its material (owner, E9.4 follow-up):
+// - `under`: a halo beneath the face, which the fills cover; it marks the
+//   current selection, such as a selected tab or the item under arrow-key
+//   focus;
+// - `over`: light added over the face, clipped to the face's shape; it
+//   marks other emphasis, such as the default button (never in place of
+//   the default action's perimeter, M105).
+enum class MaterialGlowPlacement : std::uint8_t { under, over };
+
+// A soft coloured emission of the material's box (E9-C): the box grown by
+// `spread` on every side and blurred by `blur_radius` (σ = blur_radius / 2,
+// as a shadow's), centred on the box. The engine's material bake adds it
+// as light, each premultiplied channel at most 1:
+// - `under`, to the outer shadows beneath it, with the fills drawn over
+//   it. paint_surface_material composites it as an outer shadow at no
+//   offset after the outer shadows, which differs only where it lies over
+//   a shadow.
+// - `over`, to the finished face (after its keylines), within the box's
+//   coverage. paint_surface_material composites it as an outer shadow at no
+//   offset, clipped to the face, after the keylines; that is source-over,
+//   not added, so the built-in path's over glow is the dimmer of the two.
+// Its reach, spread + 2 × blur_radius (where its blur is below one 8-bit
+// step), is at most SurfaceMaterial::maximum_glow_reach in both
+// placements, so that an under glow stays within the part's granted
+// overflow; an over glow lies within the box and needs no overflow.
 struct MaterialGlow final {
     Color color{Color::rgba(255, 255, 255, 96)};
     double blur_radius{2.0};
     double spread{};
+    MaterialGlowPlacement placement{MaterialGlowPlacement::under};
     friend constexpr bool operator==(const MaterialGlow& left,
                                      const MaterialGlow& right) noexcept {
         return left.color == right.color &&
                left.blur_radius == right.blur_radius &&
-               left.spread == right.spread;
+               left.spread == right.spread && left.placement == right.placement;
     }
 };
 enum class MaterialEdge : std::uint8_t { top, right, bottom, left };

@@ -52,10 +52,14 @@ double glow_reach(const MaterialGlow& glow) noexcept {
 }
 
 // A glow within the granted overflow (E9-C): a blur and a spread of zero
-// or more whose reach is at most SurfaceMaterial::maximum_glow_reach.
+// or more whose reach is at most SurfaceMaterial::maximum_glow_reach, under
+// or over the face.
 bool valid_material_glow(const MaterialGlow& glow) noexcept {
-    const bool valid = std::isfinite(glow.blur_radius) && std::isfinite(glow.spread) && glow.blur_radius >= 0.0 &&
-                       glow.spread >= 0.0 && glow_reach(glow) <= SurfaceMaterial::maximum_glow_reach;
+    const bool placed =
+        glow.placement == MaterialGlowPlacement::under || glow.placement == MaterialGlowPlacement::over;
+    const bool valid = placed && std::isfinite(glow.blur_radius) && std::isfinite(glow.spread) &&
+                       glow.blur_radius >= 0.0 && glow.spread >= 0.0 &&
+                       glow_reach(glow) <= SurfaceMaterial::maximum_glow_reach;
     return valid;
 }
 
@@ -670,9 +674,10 @@ void paint_surface_material(Painter& painter, Rect bounds,
                 shadow.blur_radius, shadow.spread, shadow.color);
         }
     }
-    // Glows over the outer shadows, under the fills; composited as a shadow
-    // at no offset (the engine's bake adds them, MaterialGlow).
+    // Under glows over the outer shadows, under the fills; composited as a
+    // shadow at no offset (the engine's bake adds them, MaterialGlow).
     for (const MaterialGlow& glow : material.glows) {
+        if (glow.placement != MaterialGlowPlacement::under) continue;
         painter.draw_box_shadow(bounds, material.corner_radius, Point{},
                                 glow.blur_radius, glow.spread, glow.color);
     }
@@ -735,11 +740,22 @@ void paint_surface_material(Painter& painter, Rect bounds,
     if (!material.keylines.empty() && material.corner_radius > 0.0) {
         painter.restore();
     }
+    // Over glows last, clipped to the face.
+    for (const MaterialGlow& glow : material.glows) {
+        if (glow.placement != MaterialGlowPlacement::over) continue;
+        painter.save();
+        painter.clip_rounded_rect(bounds, material.corner_radius);
+        painter.draw_box_shadow(bounds, material.corner_radius, Point{},
+                                glow.blur_radius, glow.spread, glow.color);
+        painter.restore();
+    }
 }
 
 Insets surface_material_visual_outsets(const SurfaceMaterial& material) noexcept {
     Insets result = box_shadow_visual_outsets(material.shadows);
     for (const MaterialGlow& glow : material.glows) {
+        // An over glow lies within the box.
+        if (glow.placement != MaterialGlowPlacement::under) continue;
         const double reach = glow_reach(glow);
         result.left = std::max(result.left, reach);
         result.top = std::max(result.top, reach);

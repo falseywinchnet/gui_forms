@@ -1102,6 +1102,29 @@ text-selection-changed when a published text node changes.
    only when the pointer moves, within its own extent (owner direction; §2.6).
 3. **Glow.** A soft coloured emission bounded by the part's grant (owner
    direction; VISUAL §7); never the default-action cue (M105).
+   - **Placement (owner, 2026-10-22).** A glow lies `under` the face, a
+     halo that the face covers, or `over` it, light added to the face and
+     clipped to its shape. Both share one reach cap: spread plus twice the
+     blur, at most 8 logical units, the material's outsets. An over glow
+     lies within the face and needs no overflow of its own.
+     - `under` marks the current selection, such as a selected tab or the
+       item under arrow-key focus.
+     - `over` marks other emphasis, such as the default button.
+   - **Stock rules (proposed, for the owner's review).** No stock look
+     changes until they are reviewed.
+     1. *Current selection, under.* A selected page tab, and the current
+        item of a list, tree or grid while keyboard focus is visible. The
+        glow is in the accent's lightest ramp colour at alpha 72, with
+        blur 2 and spread 0 (reach 4). It is part of the selected or
+        current recipe, so it enters with the face cross-fade and never
+        animates on its own.
+     2. *Default button, over.* White at alpha 40, with blur 3 and spread
+        0 (reach 6), over the plate. It is drawn beside the second dark
+        perimeter, never in place of it: the perimeter stays the
+        default-action cue (M105, V116 R). See §12.2.
+     3. *Nowhere else by default.* High contrast drops every glow, since
+        its recipes are rebuilt as solid plates. The Classic family
+        carries none.
 4. **Translucency, glass, reflection** follow §4.6.
 5. Gloss, lift and rings are engine capabilities; no theme must carry them
    globally (§12.3). All effects render on the CPU and are bounded deliberately
@@ -1345,7 +1368,18 @@ bit tweaked to look nicer" than its references (owner direction).
 
 ### 12.2 Questions for the owner
 
-None open. New questions are added here as they arise.
+1. **Glow on the default button (E9.4 follow-up, 2026-10-22).** §3.1
+   records "default action marked by a second dark perimeter, not colour,
+   glow or pulse" (M105; V116 R), and §9.3 item 3 says glow is never the
+   default-action cue. The owner named `over` glow for emphasis "such as
+   the default button". The proposal in §9.3 item 3 reconciles the two:
+   the glow is added beside the perimeter, and the perimeter stays the
+   cue, so the default button is still found without the glow (grayscale,
+   high contrast). Options:
+   1. Admit the over glow beside the perimeter, as proposed
+      (recommended).
+   2. Keep the default button glow-free, and use over glow only for other
+      emphasis.
 
 ### 12.3 Owner decisions, 2026-10-12
 
