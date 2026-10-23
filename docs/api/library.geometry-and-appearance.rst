@@ -42,6 +42,8 @@ Types
      - The resolved recipe owns no renderer object.
    * - :cpp:class:`ControlRoleRecipes <gui_forms::ControlRoleRecipes>`
      - ControlRoleRecipes stores complete ordinary, selected, high-contrast, and high-contrast-selected recipes across the closed surface-state axis.
+   * - :cpp:class:`ControlRoleTable <gui_forms::ControlRoleTable>`
+     - The recipes of every control visual role, indexed by ControlVisualRole, held out of line.
    * - :cpp:class:`ControlStateRecipes <gui_forms::ControlStateRecipes>`
      -  
    * - :cpp:class:`ControlVisualContext <gui_forms::ControlVisualContext>`
@@ -570,6 +572,41 @@ Types
    .. cpp:member:: std::array<ControlVisualRecipe, control_surface_state_count> high_contrast
 
    .. cpp:member:: std::array<ControlVisualRecipe, control_surface_state_count> high_contrast_selected
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: ControlRoleTable final
+
+   ``#include <gui_forms/theme/types/theme_types.hpp>``
+
+   The recipes of every control visual role, indexed by ControlVisualRole, held out of line. They are most of a theme's description (one family of four state tables per role, some 100 KB), so holding them on the heap keeps a ThemeDefinition small enough to be an ordinary value. The table always holds exactly one family per role: it is made with default recipes, and a copy copies every recipe. Moving copies too (no move operations are declared), so a moved-from table still holds its recipes rather than none.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: ControlRoleTable()
+
+      Allocates the families, value-initialized in place on the heap.
+
+   .. cpp:function:: ControlRoleTable(const ControlRoleTable& other)
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: Families::const_iterator begin() const noexcept
+
+   .. cpp:function:: Families::const_iterator end() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static constexpr std::size_t size() noexcept
+
+   .. cpp:function:: Families::iterator begin() noexcept
+
+   .. cpp:function:: Families::iterator end() noexcept
+
+   .. cpp:type:: Families = std::array<ControlRoleRecipes, control_visual_role_count>
 
 .. cpp:namespace:: gui_forms
 
@@ -2804,7 +2841,7 @@ Types
 
    .. cpp:member:: BasicControlStyle compatibility
 
-   .. cpp:member:: std::array<ControlRoleRecipes, control_visual_role_count> roles
+   .. cpp:member:: ControlRoleTable roles
 
    .. cpp:member:: ThemeStructureTokens structure
 

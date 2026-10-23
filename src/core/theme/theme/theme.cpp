@@ -948,22 +948,8 @@ ThemeDefinition windows_professional_theme_definition() {
     return result;
 }
 
-namespace {
-
-// Makes the default theme from a definition built on the heap. `new` from
-// the returned value initializes the heap object directly (std::make_unique
-// would first materialize a 105 KB temporary on this frame).
-std::shared_ptr<const Theme> make_default_theme() {
-    const std::unique_ptr<const ThemeDefinition> definition(
-        new ThemeDefinition(windows_professional_theme_definition()));
-    std::shared_ptr<const Theme> theme = Theme::create(*definition);
-    return theme;
-}
-
-} // namespace
-
 std::shared_ptr<const Theme> default_theme() {
-    static const std::shared_ptr<const Theme> value = make_default_theme();
+    static const std::shared_ptr<const Theme> value = Theme::create(windows_professional_theme_definition());
     return value;
 }
 
