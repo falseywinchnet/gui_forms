@@ -238,7 +238,7 @@ void assembly_equals_whole_bake() {
     corners.corner_radii = MaterialCornerRadii{6.0, 0.0, 3.0, 1.5};
     SliceCount pill{};
     // The layered material less its over glow (its last glow), so that a
-    // pill 40 high stays within the bake bound at every scale.
+    // pill 40 high stays within the bake budget at every scale.
     SurfaceMaterial plain = layered_material(false);
     require(!plain.glows.empty() && plain.glows.back().placement == MaterialGlowPlacement::over,
             "the layered material's last glow is its over glow");
@@ -253,11 +253,11 @@ void assembly_equals_whole_bake() {
             for (const double height : heights) {
                 compare_assembly(corners, Size{width, height}, scale, cornered);
                 // A tall pill's round ends are all corner pixels, and at
-                // 64 high it exceeds the bake bound.
+                // 64 high it exceeds the bake budget.
                 if (height <= 40.0) compare_assembly(plain, Size{width, height}, scale, pill, "pill");
                 // At 40 high its unclamped radius still marks every pixel as a
                 // corner pixel of its shadows (outer_coverage), which the
-                // estimate counts: a dearer bake than the pill's.
+                // bake effort counts: a dearer bake than the pill's.
                 if (height <= 24.0) compare_assembly(generous, Size{width, height}, scale, round_ended);
             }
         }
@@ -265,27 +265,32 @@ void assembly_equals_whole_bake() {
     require(cornered.across > 0U && cornered.down > 0U, "four corners slice on both axes");
     require(pill.across > 0U, "a pill slices along its length");
     // With its over glow the layered material is dearer: a pill of it 80
-    // high at scale 2 is past the bake bound and refused (at the costs
-    // measured on a quiet machine, 2026-10-23; at 64 high it is too).
+    // high at scale 2 is past the bake budget and refused. At 64 high it
+    // is refused too, with or without its over glow.
     const SurfaceMaterial glowing = layered_material(false);
     const PartRasterRequest heavy = request_for(glowing, Size{76.0, 80.0}, 2.0, "pill");
     require(!material_primitive().accepts(heavy.parameters, heavy.target),
-            "the heavier material's pill past the bound is refused");
+            "the heavier material's pill past the budget is refused");
+    const PartRasterRequest heavy_short = request_for(glowing, Size{76.0, 64.0}, 2.0, "pill");
+    const PartRasterRequest plain_tall = request_for(plain, Size{76.0, 64.0}, 2.0, "pill");
+    require(!material_primitive().accepts(heavy_short.parameters, heavy_short.target) &&
+                !material_primitive().accepts(plain_tall.parameters, plain_tall.target),
+            "a pill 64 high at scale 2 is past the budget, with or without the over glow");
     // The re-check after the quiet-machine re-measure (E9.6 G1): a 120 x 64
-    // part at scale 1.5, a pill or a radius of 32, estimated at 4.09 ms
-    // before, is within the bound (3.1 ms; 3.5 with the over glow).
+    // part at scale 1.5, a pill or a radius of 32, is within the bake
+    // budget (README, "Bake effort").
     const PartRasterRequest long_pill = request_for(plain, Size{120.0, 64.0}, 1.5, "pill");
     const PartRasterRequest long_round = request_for(generous, Size{120.0, 64.0}, 1.5);
     const PartRasterRequest glowing_pill = request_for(glowing, Size{120.0, 64.0}, 1.5, "pill");
     require(material_primitive().accepts(long_pill.parameters, long_pill.target) &&
                 material_primitive().accepts(long_round.parameters, long_round.target) &&
                 material_primitive().accepts(glowing_pill.parameters, glowing_pill.target),
-            "a 120 x 64 part at scale 1.5 is within the bake bound");
+            "a 120 x 64 part at scale 1.5 is within the bake budget");
     require(round_ended.across > 0U, "a radius past half the height slices along the length");
     // The case that was refused before the clamp: radius 32, 32 high, at 2.
     SliceCount large{};
     compare_assembly(generous, Size{120.0, 32.0}, 2.0, large);
-    require(large.across == 1U, "a radius-32 part 32 high at scale 2 slices and is within the bake bound");
+    require(large.across == 1U, "a radius-32 part 32 high at scale 2 slices and is within the bake budget");
     // The part filters (E9.6) carry every change further in by their
     // reach, so the corners grow by it: sliced, the part still has the
     // whole bake's bytes.

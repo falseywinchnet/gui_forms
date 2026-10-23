@@ -1,8 +1,8 @@
 // The material primitive (T2 plan, phase E8; owner decision E8-1 (a) and the
 // owner's direction of 2026-10-22): its `recipe` choices are the theme's
 // recipe roles in enum order; it refuses a target without a valid material,
-// with an image fill whose image is not available, or whose estimated bake
-// exceeds the bound, and the engine then draws the built-in recipe and
+// with an image fill whose image is not available, or whose bake effort
+// exceeds the bake budget, and the engine then draws the built-in recipe and
 // counts the refusal; it draws a material's fills, shadows, border, edges
 // and keylines where paint_surface_material puts them, its outer shadows
 // within its outsets; image fills are resampled with the selected filter
@@ -15,9 +15,12 @@
 // order, checked by every CI platform. GUI_FORMS_ENGINE_IDENTITY_PRINT=1
 // prints the observed table instead of checking it.
 //
-// `--measure` prints the bake costs of material_bake_policy.hpp instead of
-// testing: the median of nine bakes of a 256 × 256 part at scale 1 for each
-// layer alone over the base material, in nanoseconds per device pixel.
+// `--measure` prints, instead of testing, what the effort weights of
+// material_bake_policy.hpp are chosen from: the median of nine bakes of a
+// 256 × 256 part at scale 1 for each layer alone over the base material,
+// per device pixel, as its time and as its ratio to a solid layer's times
+// the solid layer's weight. A measurement only chooses the weights'
+// relative sizes; it never decides acceptance.
 
 #include "gui_forms/control.hpp"
 #include "support/theme_definition_heap.hpp"
@@ -242,15 +245,15 @@ void refusals() {
             "an image fill whose image is missing is refused");
 
     // A plain material is accepted at a modest size. A huge one whose
-    // whole bake passes the bound is still accepted when it slices (E7r),
+    // whole bake passes the budget is still accepted when it slices (E7r),
     // since only its reference is baked; one that cannot slice, such as a
     // radial gradient, is refused.
     const SurfaceMaterial plain = solid_material(red);
     require(primitive.accepts(parameters, target_for(logical, 1.0, &plain)), "a solid material is accepted");
     const Size huge{4000.0, 4000.0};
-    require(engine_primitives::material_bake_estimate(plain, target_for(huge, 1.0, &plain)) >
-                engine_primitives::maximum_material_bake_nanoseconds,
-            "a 4000 by 4000 part is over the bake bound");
+    require(engine_primitives::material_bake_effort(plain, target_for(huge, 1.0, &plain)) >
+                engine_primitives::maximum_material_bake_effort,
+            "a 4000 by 4000 part is over the bake budget");
     require(primitive.accepts(parameters, target_for(huge, 1.0, &plain)), "and is accepted, since it slices");
     SurfaceMaterial radial = plain;
     const std::vector<GradientStop> radial_stops{GradientStop{0.0, red}, GradientStop{1.0, blue}};
@@ -931,9 +934,9 @@ void image_variant_made_once() {
 }
 
 // Making a variant is preparation, not bake (owner, 2026-10-22): the bake
-// bound counts the composite alone, so a large image, which takes far
-// longer to resample than the bound allows, is accepted and baked.
-void image_variant_outside_the_bound() {
+// budget counts the composite alone, so a large image, which takes far
+// more effort to resample than the budget allows, is accepted and baked.
+void image_variant_outside_the_budget() {
     ImageRegistry registry{};
     // 1024 × 1024 premultiplied grey at half alpha.
     const std::vector<std::byte> large(1024U * 1024U * 4U, std::byte{0x80});
@@ -946,12 +949,12 @@ void image_variant_outside_the_bound() {
     SurfaceMaterial magnified = solid_material(clear);
     magnified.fills.push_back(MaterialFillLayer::stretched_image(tiny.image, Size{4.0, 4.0}));
     const Size logical{240.0, 240.0};
-    const double shrunk_estimate =
-        engine_primitives::material_bake_estimate(shrunk, target_for(logical, 1.0, &shrunk, &registry));
-    const double magnified_estimate =
-        engine_primitives::material_bake_estimate(magnified, target_for(logical, 1.0, &magnified, &registry));
-    require(shrunk_estimate == magnified_estimate, "the image's size does not enter the bake estimate");
-    require(shrunk_estimate <= engine_primitives::maximum_material_bake_nanoseconds, "the composite is within the bound");
+    const engine_primitives::BakeEffort shrunk_effort =
+        engine_primitives::material_bake_effort(shrunk, target_for(logical, 1.0, &shrunk, &registry));
+    const engine_primitives::BakeEffort magnified_effort =
+        engine_primitives::material_bake_effort(magnified, target_for(logical, 1.0, &magnified, &registry));
+    require(shrunk_effort == magnified_effort, "the image's size does not enter the bake effort");
+    require(shrunk_effort <= engine_primitives::maximum_material_bake_effort, "the composite is within the budget");
 
     PartRasterRequest request{};
     request.primitive = &material_primitive();
@@ -1165,7 +1168,7 @@ void engine_counts_refusals() {
 // -- measuring the bake costs ------------------------------------------------------
 
 // The median of nine bakes of `material` on a 240-unit square part at
-// scale 1, through the kernel alone, so that materials past the bound can
+// scale 1, through the kernel alone, so that materials past the budget can
 // be timed too.
 double median_bake_nanoseconds(const SurfaceMaterial& material, const ImageRegistry* images) {
     const Size logical{240.0, 240.0};
@@ -1195,6 +1198,13 @@ std::vector<std::byte> noise_pixels(std::size_t size) {
         pixels[index] = static_cast<std::byte>(value);
     }
     return pixels;
+}
+
+// Prints one measured figure: its time per pixel, and the effort weight
+// it suggests, its ratio to the solid layer's times the solid weight.
+void print_measure(const char* name, double per_pixel, double solid_per_pixel) {
+    const double weight = per_pixel / solid_per_pixel * engine_primitives::material_effort_weights.solid;
+    std::cout << name << ' ' << per_pixel << " ns, weight " << weight << '\n';
 }
 
 void measure() {
@@ -1302,29 +1312,31 @@ void measure() {
     const double per_pixel_mask_linear = (median_bake_nanoseconds(linear_masked, nullptr) - base_time) / pixels;
     const double per_pixel_mask_image = (median_bake_nanoseconds(image_masked, &registry) - base_time) / pixels;
 
+    // Time per pixel, then the weight it suggests: the ratio to a solid
+    // layer's, times the solid layer's weight.
     std::cout << std::fixed << std::setprecision(3);
-    std::cout << "base " << base_time / pixels << '\n';
-    std::cout << "rounded_base " << rounded_time / pixels << '\n';
-    std::cout << "solid " << per_pixel_solid << '\n';
-    std::cout << "linear " << per_pixel_linear << '\n';
-    std::cout << "radial " << per_pixel_radial << '\n';
-    std::cout << "conic " << per_pixel_conic << '\n';
-    std::cout << "gradient_stop " << (per_pixel_many - per_pixel_linear) / 30.0 << '\n';
-    std::cout << "outer_shadow " << per_pixel_outer << '\n';
-    std::cout << "outer_corner " << per_pixel_corner << '\n';
-    std::cout << "inset_shadow " << per_pixel_inset << '\n';
-    std::cout << "border " << per_pixel_border << '\n';
-    std::cout << "border_pattern " << per_pixel_pattern << '\n';
-    std::cout << "border_edge " << per_pixel_edge << '\n';
-    std::cout << "keyline " << per_pixel_keyline << '\n';
-    std::cout << "image " << per_pixel_image << '\n';
-    std::cout << "colour_filter " << per_pixel_colour_filter << '\n';
-    std::cout << "drop_shadow " << per_pixel_drop_shadow << '\n';
-    std::cout << "filter_blur " << per_pixel_filter_blur << '\n';
-    std::cout << "fill_blend " << per_pixel_blend << '\n';
-    std::cout << "mask " << per_pixel_mask << '\n';
-    std::cout << "mask_linear_measured " << per_pixel_mask_linear << '\n';
-    std::cout << "mask_image_measured " << per_pixel_mask_image << '\n';
+    print_measure("base", base_time / pixels, per_pixel_solid);
+    print_measure("rounded_base", rounded_time / pixels, per_pixel_solid);
+    print_measure("solid", per_pixel_solid, per_pixel_solid);
+    print_measure("linear", per_pixel_linear, per_pixel_solid);
+    print_measure("radial", per_pixel_radial, per_pixel_solid);
+    print_measure("conic", per_pixel_conic, per_pixel_solid);
+    print_measure("gradient_stop", (per_pixel_many - per_pixel_linear) / 30.0, per_pixel_solid);
+    print_measure("outer_shadow", per_pixel_outer, per_pixel_solid);
+    print_measure("outer_corner", per_pixel_corner, per_pixel_solid);
+    print_measure("inset_shadow", per_pixel_inset, per_pixel_solid);
+    print_measure("border", per_pixel_border, per_pixel_solid);
+    print_measure("border_pattern", per_pixel_pattern, per_pixel_solid);
+    print_measure("border_edge", per_pixel_edge, per_pixel_solid);
+    print_measure("keyline", per_pixel_keyline, per_pixel_solid);
+    print_measure("image", per_pixel_image, per_pixel_solid);
+    print_measure("colour_filter", per_pixel_colour_filter, per_pixel_solid);
+    print_measure("drop_shadow", per_pixel_drop_shadow, per_pixel_solid);
+    print_measure("filter_blur", per_pixel_filter_blur, per_pixel_solid);
+    print_measure("fill_blend", per_pixel_blend, per_pixel_solid);
+    print_measure("mask", per_pixel_mask, per_pixel_solid);
+    print_measure("mask_linear_measured", per_pixel_mask_linear, per_pixel_solid);
+    print_measure("mask_image_measured", per_pixel_mask_image, per_pixel_solid);
 }
 
 // -- surface finish and mask (E9.6) -------------------------------------------------
@@ -1516,7 +1528,7 @@ int main(int argc, char** argv) {
     surface_mask();
     image_fills();
     image_variant_made_once();
-    image_variant_outside_the_bound();
+    image_variant_outside_the_budget();
     reference_images();
     engine_draws_the_material();
     engine_counts_refusals();

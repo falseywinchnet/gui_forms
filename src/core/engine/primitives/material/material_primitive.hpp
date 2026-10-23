@@ -2,6 +2,7 @@
 
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
 #include "gui_forms/surface_material/types/surface_material_types.hpp"
+#include "material_bake_policy.hpp"
 
 #include <span>
 
@@ -58,9 +59,9 @@ namespace gui_forms::engine_primitives {
 // part with the built-in recipe and counts the refusal, when the target
 // lends no material, the material is not valid, an image fill's image is
 // not in the window's resources with its declared pixel size, a
-// procedural fill's pattern would take longer to generate than that bound
-// or hold more than maximum_procedural_pattern_bytes, or the material's
-// estimated bake exceeds the bound of material_bake_policy.hpp.
+// procedural fill's pattern would take more effort to generate than that
+// budget or hold more than maximum_procedural_pattern_bytes, or the
+// material's bake effort exceeds the budget of material_bake_policy.hpp.
 // An image fill whose pixels cannot be decoded or stored at bake time is
 // drawn as nothing; the other layers are drawn.
 // How far the material primitive draws outside the part's box, in logical
@@ -96,14 +97,13 @@ private:
 // The recipe roles' names, the `recipe` choices, in ControlVisualRole order.
 [[nodiscard]] std::span<const std::string_view> material_recipe_names() noexcept;
 
-// The estimated bake of `material` for `target`, in nanoseconds on the
-// reference machine (material_bake_policy.hpp), into a destination of the
-// box grown by `outset` logical units on every side, drawn with the
-// material primitive's `shape` (E9.6). Every other caller draws the
-// material's rounded rectangle, the default.
-[[nodiscard]] double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                                            double outset = material_outset,
-                                            PartShapeKind shape = PartShapeKind::rounded_rectangle) noexcept;
+// The bake effort of `material` for `target` (material_bake_policy.hpp),
+// into a destination of the box grown by `outset` logical units on every
+// side, drawn with the material primitive's `shape` (E9.6). Every other
+// caller draws the material's rounded rectangle, the default.
+[[nodiscard]] BakeEffort material_bake_effort(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                                              double outset = material_outset,
+                                              PartShapeKind shape = PartShapeKind::rounded_rectangle) noexcept;
 
 // How a raster of `extent` for `target` is assembled from slices (E7r): an
 // axis is sliced unless a gradient runs along it (varies), the box does
