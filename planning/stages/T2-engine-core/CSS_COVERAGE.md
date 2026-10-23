@@ -48,8 +48,8 @@ decision.
 | `linear-gradient()`, angle or endpoints, any stop count | `MaterialFillLayer::linear`, `linear_css_angle` | present | |
 | `repeating-linear-gradient()` | `MaterialFillLayer::repeating_linear` | present | |
 | `radial-gradient()`, centre and radii | `MaterialFillLayer::radial` | present | |
-| `repeating-radial-gradient()` | none | missing | Apply the layer's `GradientSpreadMode::repeat` to radial fills too. The bake reads `spread` for linear fills only today; E9.6 |
-| `conic-gradient()`, `repeating-conic-gradient()` | none | missing | A `conic_gradient` fill kind: t from the angle about a centre, with a deterministic engine `atan2` beside `engine_math`'s sine and cosine; E9.6 |
+| `repeating-radial-gradient()` | `MaterialFillLayer::repeating_radial`: the `repeat` and `reflect` spreads on radial fills | present (E9.6 G1, #281) | |
+| `conic-gradient()`, `repeating-conic-gradient()` | `MaterialFillKind::conic_gradient` (`conic`, `repeating_conic`), the angle from the deterministic `engine_arctangent2` | present (E9.6 G1, #281) | The built-in path draws its first stop; a theme that needs it selects the material primitive |
 | layered `background` (up to 8 layers) | `SurfaceMaterial::fills`, `maximum_fill_layers` = 8 | present | |
 | layer opacity | `MaterialFillLayer::opacity`, colour alpha | present | |
 | procedural backgrounds (felt, wood grain, paper fibre, pinstripe, brushed metal, fresco) | engine functions in `background` | planned (E10) | |
@@ -61,10 +61,10 @@ decision.
 | `border` (uniform width and colour) | `SurfaceMaterial::border` | present | |
 | `border-top` and the other single edges | `MaterialBorderEdges` (square-cornered) | present | |
 | inner highlight and lowlight lines | `MaterialKeyline` (edge, width, inset), up to 8 | present | |
-| `border-style: dashed`, `dotted`, `double`, `groove`, `ridge` | none (solid only) | missing | `double`, `groove` and `ridge` are keyline pairs, so T3 can lower them with no engine change. `dashed` and `dotted` need a dash pattern on the border, the period in device pixels. E9.6, if the owner wants them |
+| `border-style: dashed`, `dotted`, `double`, `groove`, `ridge` | `MaterialBorderStyle` solid, dashed and dotted on the material primitive (a whole number of dashes or dots round the centre line) | present (dashed and dotted: E9.6 G1, #281) | `double`, `groove` and `ridge` are keyline pairs, so T3 lowers them with no engine change. The built-in path draws every border solid |
 | `border-radius`, one value | `SurfaceMaterial::corner_radius` | present | |
-| `border-radius`, per corner or elliptical | none | missing | Four radii on the material's rounded shape (`PartShape`). The kernel's signed distance takes a radius per quadrant. E9.6 |
-| shape keywords (circle, pill, caps) | `PartShapeKind`, the relief primitives' `shape` choice | present | Not on the material primitive yet. Give it the same `shape` choice; E9.6 |
+| `border-radius`, per corner or elliptical | `SurfaceMaterial::corner_radii` (`MaterialCornerRadii`), circular per corner | present (per corner: E9.6 G1, #281) | Elliptical corners are not proposed |
+| shape keywords (circle, pill, caps) | `PartShapeKind`, the `shape` choice on the relief primitives and on the material primitive | present (material: E9.6 G1, #281) | |
 | `outline`, `outline-offset` (focus) | `ControlVisualRecipe::focus_ring`, `focus_width`, `focus_offset` | present | |
 | the default action's perimeter | `ControlVisualRecipe::default_ring`, `default_width` | present | |
 | `border-image` | nine-patch image fill (`MaterialImageMode::nine_patch`) | present (as a fill) | |
@@ -88,15 +88,16 @@ decision.
 
 ## 5. Filter functions
 
-None of the filters exists as a post-process on a part's raster. Glass (§6)
-blurs the backplane, not the part.
+The part filters are post-processes on a part's raster, applied in the
+order colour filter, drop shadow, blur (E9.6 G2). The material primitive
+draws them; the built-in path draws none.
 
 | CSS | Engine carrier | Status | Smallest addition |
 |---|---|---|---|
-| `filter: brightness()`, `contrast()`, `saturate()`, `grayscale()`, `sepia()`, `invert()` | none | missing | One colour-matrix step at the end of the material bake: a 4 × 5 matrix in premultiplied colour, composed from the listed functions at compile time, one multiply per pixel, costed in `material_bake_policy.hpp`. E9.6 |
-| `filter: hue-rotate()` | none | missing | The same matrix (hue rotation is linear in RGB); E9.6 |
-| `filter: blur()` on the part itself | none | missing | A separable integer box blur over the part's raster: glass's kernel, with the margin taken from the part's outsets and capped at 8. E9.6 |
-| `filter: drop-shadow()` | `box-shadow` for box-shaped parts | missing for other shapes | Box-shaped parts: T3 lowers it to an outer `MaterialShadow`, with no engine change. A shadow of a part's own alpha (a glyph or an irregular shape) needs a blur of the baked alpha, the part-blur kernel above; E9.6 |
+| `filter: brightness()`, `contrast()`, `saturate()`, `grayscale()`, `sepia()`, `invert()` | `SurfaceMaterial::colour_filter`, a `MaterialColourMatrix` (4 × 5, straight colour) composed with `then` | present (E9.6 G2, #285) | |
+| `filter: hue-rotate()` | `MaterialColourMatrix::hue_rotate`, through `engine_sine_cosine` | present (E9.6 G2, #285) | |
+| `filter: blur()` on the part itself | `SurfaceMaterial::filter_blur`: three integer box passes (the shared `kernel/box_blur`), reach within the outsets | present (E9.6 G2, #285) | |
+| `filter: drop-shadow()` | `SurfaceMaterial::drop_shadow` (`MaterialDropShadow`): the raster's own alpha blurred, moved and drawn beneath it; `box-shadow` for box-shaped parts | present (E9.6 G2, #285) | T3 may still lower a box-shaped part's to an outer `MaterialShadow` |
 | `filter: url()` | not admitted | | Themes are data only, with no external references (T3, RC004) |
 
 ## 6. Backdrop
@@ -106,7 +107,7 @@ blurs the backplane, not the part.
 | `backdrop-filter: blur()` | `glass` primitive (E9.3): three integer box passes, blur 0 to 8, over the backplane image | present | |
 | a backdrop tint (the usual `background-color` over the blur) | glass's `tint` parameter | present | |
 | backdrop rounded clip | glass's `corner`, or the part's own radius | present | |
-| `backdrop-filter: brightness()`, `saturate()` and the other colour filters | none | missing | The colour matrix of §5, applied by glass to the blurred backplane before the tint; E9.6. Decided (coordinator, 2026-10-22): glass gains a `recipe` choice, and the recipe material's `colour_filter` is the matrix. T3 lowers the backdrop-filter's colour functions by composing them into one matrix in source order. |
+| `backdrop-filter: brightness()`, `saturate()` and the other colour filters | glass's `recipe` choice: the recipe material's `colour_filter` applied to the blurred backplane before the tint (coordinator, 2026-10-22) | present (E9.6 G2, #285) | T3 lowers the backdrop-filter's colour functions by composing them into one matrix in source order |
 | what the backdrop contains | the backplane plane only: the window's backplane material and the backplane-plane engine part rasters. Text and app-drawn backplane commands are skipped and counted (owner, E9-B option 1) | present | A host `render_backplane` that replays the whole plane is T5's upgrade behind the same borrow |
 | a backdrop of other controls | not admitted | | Glass samples the backplane, never the control plane (design language §4.6 rule 3) |
 
@@ -116,8 +117,8 @@ blurs the backplane, not the part.
 |---|---|---|---|
 | `mix-blend-mode: normal` | `PaintGroupComposite::source_over` | present | |
 | `mix-blend-mode: plus-lighter` | `PaintGroupComposite::plus` (the face cross-fade uses it) | present | |
-| `mix-blend-mode: multiply`, `screen`, `overlay`, `darken`, `lighten` and the rest | none | missing | `multiply` and `screen` first: two more `PaintGroupComposite` values in the shared CPU blend, which every painter already routes through. The separable modes follow the same pattern; the non-separable ones (`hue`, `saturation`, `color`, `luminosity`) are not proposed. E9.6 |
-| `background-blend-mode` (between a material's own layers) | none (layers composite source-over; glows add) | missing | A blend mode per fill layer, using the same blend functions inside the material bake; E9.6 |
+| `mix-blend-mode: multiply`, `screen`, `overlay`, `darken`, `lighten` and the rest | `multiply` and `screen`: the rule property `blend` (`PartBlend`), drawn through a `PaintGroupComposite` group in the shared CPU blend | present (multiply and screen: E9.6 G2, #285) | The other separable modes follow the same pattern; the non-separable ones (`hue`, `saturation`, `color`, `luminosity`) are not proposed |
+| `background-blend-mode` (between a material's own layers) | `MaterialFillLayer::blend` (`MaterialBlendMode` normal, multiply, screen) inside the material bake | present (E9.6 G2, #285) | |
 | `isolation: isolate` | paint groups (`PaintGroup::isolated`) | present | |
 
 ## 8. Surface finish
