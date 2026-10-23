@@ -40,10 +40,17 @@ The AArch64 forms are checked against listings of cross-compiled objects
 for Linux and macOS; no CI job builds an AArch64 sanitizer tree yet.
 
 First-party objects are the build tree's *.o and *.obj files inside a CMake
-target directory (`<target>.dir`) and outside third_party/. Run it after a
-build: a narrowed build (ci_build.py --changed-from or --tests) leaves only
-the objects it built, and an incremental tree may still hold objects of
-removed sources.
+target directory (`<target>.dir`) and outside third_party/. Only current
+objects are read. A long-lived tree also holds stale ones: objects no
+target builds any more (a removed source or target), and objects older
+than their sources (a narrowed build, ci_build.py --changed-from or
+--tests, left them unbuilt). Ninja names both: `ninja -t targets all` lists
+every object the build makes, and a dry run (`ninja -n -v`) prints the
+compile command, with its `-o` object, of each one out of date. Stale
+objects are counted and listed apart and never fail the check. When the
+tree's build.ninja must first be regenerated, a dry run shows nothing past
+the regeneration, so objects older than their sources are not told apart;
+the check says so. Without ninja or build.ninja every object is read.
 
 The exit status is 0 when no frame is over the limit, 1 when one is, and 2
 when the tree holds no first-party object or the disassembler fails.
@@ -64,6 +71,8 @@ DEFAULT_LIMIT: int = 256 * 1024
 # probed or two-part frame, a probe loop and the sanitizer's first stores.
 MAX_PROLOGUE: int = 64
 REPORT_FROM: int = 64 * 1024
+# Stale objects named in the report; the rest are counted.
+STALE_SHOWN: int = 20
 # Objects per disassembler run.
 BATCH: int = 16
 DISASSEMBLY: list[str] = ['-d', '-r', '-C', '--no-show-raw-insn']
@@ -610,6 +619,99 @@ def first_party_objects(tree: Path) -> list[Path]:
     return found
 
 
+class ObjectChoice:
+    """The objects to read, and the stale ones set aside, with why."""
+
+    def __init__(self) -> None:
+        self.current: list[Path] = []
+        # Objects no target of the build makes any more.
+        self.orphaned: list[Path] = []
+        # Objects the build makes but would rebuild: older than their sources.
+        self.out_of_date: list[Path] = []
+        # What could not be told, for the report ('' when everything could).
+        self.note: str = ''
+
+
+def listed_objects(listing: str) -> set[str]:
+    """The object outputs of a `ninja -t targets all` listing (`path: rule` lines), relative to the tree."""
+    objects: set[str] = set()
+    line: str
+    for line in listing.splitlines():
+        separator: int = line.rfind(': ')
+        if separator <= 0:
+            continue
+        output: str = line[:separator].replace('\\', '/')
+        if output.endswith('.o') or output.endswith('.obj'):
+            objects.add(output)
+    return objects
+
+
+DRY_RUN_OBJECT: re.Pattern[str] = re.compile(r'(?:^|\s)-o\s+(\S+)')
+
+
+def pending_objects(dry_run: str, tree: Path) -> set[str] | None:
+    """The objects a `ninja -n -v` dry run would compile, relative to the tree.
+
+    None when the dry run stops at regenerating build.ninja, which hides
+    every later edge.
+    """
+    if '--regenerate-during-build' in dry_run:
+        return None
+    objects: set[str] = set()
+    match: re.Match[str]
+    for match in DRY_RUN_OBJECT.finditer(dry_run):
+        output: str = match.group(1).strip('"').replace('\\', '/')
+        if not (output.endswith('.o') or output.endswith('.obj')):
+            continue
+        if Path(output).is_absolute():
+            output = Path(os.path.relpath(output, tree)).as_posix()
+        objects.add(output)
+    return objects
+
+
+def choose_objects(tree: Path, objects: list[Path], listing: str | None, dry_run: str | None) -> ObjectChoice:
+    """Split the tree's first-party objects into current and stale ones.
+
+    listing is `ninja -t targets all`'s output and dry_run `ninja -n -v`'s;
+    None when ninja could not give it.
+    """
+    choice: ObjectChoice = ObjectChoice()
+    if listing is None:
+        choice.current = list(objects)
+        choice.note = 'no ninja listing of the build; every object read'
+        return choice
+    built: set[str] = listed_objects(listing)
+    pending: set[str] | None = None
+    if dry_run is None:
+        choice.note = 'no ninja dry run; objects older than their sources not told apart'
+    else:
+        pending = pending_objects(dry_run, tree)
+        if pending is None:
+            choice.note = ('build.ninja needs regenerating; objects older than their sources '
+                           'not told apart (build the tree first)')
+    path: Path
+    for path in objects:
+        relative: str = path.relative_to(tree).as_posix()
+        if relative not in built:
+            choice.orphaned.append(path)
+        elif pending is not None and relative in pending:
+            choice.out_of_date.append(path)
+        else:
+            choice.current.append(path)
+    return choice
+
+
+def ninja_output(ninja: str, tree: Path, arguments: list[str]) -> str | None:
+    """Ninja's standard output for a run in tree, or None when it fails."""
+    command: list[str] = [ninja, '-C', str(tree)]
+    command.extend(arguments)
+    completed: subprocess.CompletedProcess[str] = subprocess.run(
+        command, capture_output=True, text=True, errors='replace', check=False)
+    if completed.returncode != 0:
+        return None
+    return completed.stdout
+
+
 def find_disassembler(requested: str) -> str | None:
     """The disassembler to run: the requested one, else llvm-objdump, else objdump."""
     if requested:
@@ -636,10 +738,37 @@ def main(argv: list[str] | None = None) -> int:
     if objdump is None:
         print('stack frames: no llvm-objdump or objdump on PATH', file=sys.stderr)
         return 2
-    objects: list[Path] = first_party_objects(args.tree)
-    if not objects:
+    found: list[Path] = first_party_objects(args.tree)
+    if not found:
         print(f'stack frames: no first-party object under {args.tree}', file=sys.stderr)
         return 2
+    listing: str | None = None
+    dry_run: str | None = None
+    ninja: str | None = shutil.which('ninja')
+    if ninja is not None and (args.tree / 'build.ninja').is_file():
+        listing = ninja_output(ninja, args.tree, ['-t', 'targets', 'all'])
+        dry_run = ninja_output(ninja, args.tree, ['-n', '-v'])
+    choice: ObjectChoice = choose_objects(args.tree, found, listing, dry_run)
+    objects: list[Path] = choice.current
+    stale: list[tuple[Path, str]] = []
+    path: Path
+    for path in choice.orphaned:
+        stale.append((path, 'no target builds it'))
+    for path in choice.out_of_date:
+        stale.append((path, 'older than its sources'))
+    if choice.note:
+        print('stack frames: ' + choice.note)
+    if stale:
+        print(f'stack frames: stale objects not read: {len(stale)} ({len(choice.orphaned)} that no target builds, '
+              f'{len(choice.out_of_date)} older than their sources)')
+        entry: tuple[Path, str]
+        for entry in stale[:STALE_SHOWN]:
+            print(f'  {entry[0].relative_to(args.tree).as_posix()}  ({entry[1]})')
+        if len(stale) > STALE_SHOWN:
+            print(f'  ... and {len(stale) - STALE_SHOWN} more')
+    if not objects:
+        print('stack frames: no current first-party object to read')
+        return 0
     batches: list[list[Path]] = []
     start: int
     for start in range(0, len(objects), BATCH):
@@ -686,7 +815,7 @@ def main(argv: list[str] | None = None) -> int:
             print('  ' + error, file=sys.stderr)
         return 2
     if over:
-        print(f'stack frames: {len(over)} functions have a frame over {args.limit} bytes:')
+        print(f'stack frames: functions with a frame over {args.limit} bytes: {len(over)}')
         for row in over:
             print(f'  {row[0]} bytes  {row[1]}  [{row[2]}]')
         return 1
