@@ -108,9 +108,11 @@ corpus, sizes, tolerance and results under `results/`.
 ## Plan
 
 F0, the plan, is accepted. F1 builds the measurement tool
-(`tools/font_metrics_differential/`) and needs no new faces. F2 adds the
-substitution table and fixes the silent host-font substitution (decision 10).
-F3 adds the approved faces. F4 records the gate.
+(`tools/font_metrics_differential/`) and needs no new faces. F3 commits the
+approved faces as files. F2 adds the substitution table, registers and
+packages F3's faces, and fixes the silent host-font substitution
+(decision 10). F4 reruns the measurement from the bundled copies and records
+the gate with its named exceptions (decisions 16 and 17).
 
 ## Owner decisions, 2026-10-23
 
@@ -154,3 +156,18 @@ The owner accepted every recommendation of the F0 plan.
     decides.
 14. **Portsmouth Mono** is the Consolas target only, registered under its own
     family. Cousine remains the monospace role face (design language §6.1).
+
+## Owner decisions, 2026-10-23 (from F1's measurements)
+
+15. **Segoe UI maps to Selawik, classed `nearest`.** Selawik shares only a few
+    advances with Segoe UI (3 of 291 for Semibold), so it cannot be
+    `metric_compatible`; its corpus lines are 1 to 3 px shorter.
+16. **All of Tahoma maps to Selawik** (refines decision 5). Regular is within
+    the `nearest` tolerance (-1.0%). Tahoma Bold is -7.0% against Selawik Bold
+    (Arimo Bold is -6.0%); it is a named exception in F4's gate rather than a
+    reason to split the family.
+17. **Named exceptions for the small misses.** Arimo Bold's µ (1229 against
+    Arial Bold's 1180 units), Arimo Bold Italic's line breaks (4 of 90
+    paragraph sets) and Carlito Bold Italic's line breaks (2 of 90, from
+    kerning) are named exceptions in F4's gate. Those styles stay
+    `metric_compatible`.
