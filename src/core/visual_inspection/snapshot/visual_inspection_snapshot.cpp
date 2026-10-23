@@ -254,6 +254,14 @@ void append_material(std::ostringstream& output,
         output << ",\"image_scale\":" << fill.image_scale
                << ",\"opacity\":" << fill.opacity << ",\"image_mode\":";
         append_json_string(output, image_mode_name(fill.image_mode));
+        // A tiled image's position (E9.6), only for an image fill, so that
+        // other fills' snapshots are unchanged.
+        if (fill.kind == MaterialFillKind::image) {
+            output << ",\"image_anchor\":";
+            append_point(output, fill.image_anchor);
+            output << ",\"image_offset\":";
+            append_point(output, fill.image_offset);
+        }
         // A procedural fill's parameters (E10), only for one, so that other
         // fills' snapshots are unchanged.
         if (fill.kind == MaterialFillKind::procedural) {

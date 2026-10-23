@@ -40,7 +40,8 @@ struct MaterialImagePixels final {
 // pixels along the axis. A nine-patch's `slice_start` and `slice_end` are
 // the source pixels of its two fixed segments and `destination_start` and
 // `destination_end` their device lengths; a tile's `tile_length` is one
-// tile's device length.
+// tile's device length and `tile_origin` where one tile starts (the
+// fill's position, E9.6).
 struct ImageAxisPlacement final {
     MaterialImageMode mode{MaterialImageMode::stretch};
     double start{};
@@ -51,6 +52,7 @@ struct ImageAxisPlacement final {
     double destination_start{};
     double destination_end{};
     double tile_length{};
+    double tile_origin{};
 };
 
 // The placement of `fill`'s image across and down a box (device pixels) at

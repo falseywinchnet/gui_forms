@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -68,6 +69,23 @@ struct ControlVisualContext final {
                left.high_contrast == right.high_contrast;
     }
 };
+// A text shadow (E9.6, CSS `text-shadow`): the text's glyphs, moved by
+// `offset` logical units, blurred by `blur_radius` (the shadows'
+// blur-radius convention, 0 to maximum_text_shadow_blur) and drawn in
+// `color` under the glyphs. Data only in T2: the theme carries it, and the
+// text stage (M4/M9) draws it, with a first-party blur so that it is the
+// same on every host.
+inline constexpr double maximum_text_shadow_blur = 8.0;
+inline constexpr double maximum_text_shadow_offset = 16.0;
+struct ControlTextShadow final {
+    Point offset{};
+    double blur_radius{};
+    Color color{Color::rgba(0, 0, 0, 0)};
+
+    friend bool operator==(const ControlTextShadow& left, const ControlTextShadow& right) noexcept {
+        return left.offset == right.offset && left.blur_radius == right.blur_radius && left.color == right.color;
+    }
+};
 struct ControlVisualRecipe final {
     SurfaceMaterial material;
     Color text{Color::rgba(27, 39, 51)};
@@ -81,6 +99,8 @@ struct ControlVisualRecipe final {
     double default_width{2.0};
     Point visual_offset{};
     Point pressed_content_offset{1.0, 1.0};
+    // The shadow under the recipe's text, if any (E9.6, data only).
+    std::optional<ControlTextShadow> text_shadow{};
     friend bool operator==(const ControlVisualRecipe& left,
                            const ControlVisualRecipe& right) noexcept(noexcept(
         left.material == right.material && left.text == right.text &&
@@ -92,7 +112,8 @@ struct ControlVisualRecipe final {
         left.authored_focus_outline == right.authored_focus_outline &&
         left.default_width == right.default_width &&
         left.visual_offset == right.visual_offset &&
-        left.pressed_content_offset == right.pressed_content_offset)) {
+        left.pressed_content_offset == right.pressed_content_offset &&
+        left.text_shadow == right.text_shadow)) {
         return left.material == right.material && left.text == right.text &&
                left.muted_text == right.muted_text &&
                left.glyph == right.glyph &&
@@ -103,7 +124,8 @@ struct ControlVisualRecipe final {
                left.authored_focus_outline == right.authored_focus_outline &&
                left.default_width == right.default_width &&
                left.visual_offset == right.visual_offset &&
-               left.pressed_content_offset == right.pressed_content_offset;
+               left.pressed_content_offset == right.pressed_content_offset &&
+               left.text_shadow == right.text_shadow;
     }
 };
 

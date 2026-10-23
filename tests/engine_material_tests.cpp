@@ -789,6 +789,8 @@ constexpr ImageCase image_cases[] = {
     {"tile", 0x7f68c692b6b84925ULL},
     {"nine_patch", 0x937e6be15e8d40fdULL},
     {"shrink", 0x55ad2e0e76d50405ULL},
+    {"tile_offset", 0xfeefd42810889d25ULL},
+    {"tile_anchor", 0x19ca1257e71e9bb5ULL},
 };
 
 void image_fills() {
@@ -841,6 +843,27 @@ void image_fills() {
     const std::array<std::uint8_t, 4> mean = shrunk.pixel(8U, 8U);
     require(mean[3] >= 126U && mean[3] <= 128U, "a shrunk image averages, at its opacity");
     hashes.push_back(raster_hash(shrunk));
+
+    // A positioned tiling (E9.6, CSS `background-position`): moved by (1, 2)
+    // units, one tile starts at the box's (1, 2), and the tiling runs back
+    // to the box's corner, so the corner shows the tile's (3, 2).
+    SurfaceMaterial offset_tile = tile;
+    offset_tile.fills.back().image_offset = Point{1.0, 2.0};
+    const TestRaster offset = draw(offset_tile, Size{16.0, 16.0}, 1.0, &registry);
+    require(offset.pixel(9U, 10U) == tiled.pixel(8U, 8U) && offset.pixel(14U, 13U) == tiled.pixel(13U, 11U),
+            "a tile moved by its offset starts there");
+    require(offset.pixel(8U, 8U) == tiled.pixel(11U, 10U), "the tiling runs back to the box's corner");
+    hashes.push_back(raster_hash(offset));
+
+    // Anchored at (1, 1) in an 18-unit box: one tile is flush with the
+    // box's bottom-right corner, 14 units in.
+    SurfaceMaterial anchor_tile = tile;
+    anchor_tile.fills.back().image_anchor = Point{1.0, 1.0};
+    const TestRaster anchored = draw(anchor_tile, Size{18.0, 18.0}, 1.0, &registry);
+    require(anchored.pixel(22U, 22U) == tiled.pixel(8U, 8U) && anchored.pixel(25U, 25U) == tiled.pixel(11U, 11U),
+            "a tile anchored at the end is flush with the box's end");
+    require(anchored.pixel(8U, 8U) == tiled.pixel(10U, 10U), "the anchored tiling runs back to the box's corner");
+    hashes.push_back(raster_hash(anchored));
 
     if (print_mode()) {
         for (std::size_t index = 0U; index < hashes.size(); ++index) {

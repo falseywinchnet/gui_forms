@@ -465,6 +465,46 @@ void test_image_materials_retain_crop_tile_and_nine_patch() {
                 painter.image_patterns.front().wrap == ImagePatternWrap::tile,
             "tiled image material must retain one exact-period pattern command");
 
+    // A positioned tiling (E9.6): one tile's corner at (6 * 0.5 + 1, 2 * 1)
+    // = (4, 2), so the pattern starts a whole tile back from there, at
+    // (0, -2), clipped to the box.
+    SurfaceMaterial positioned = material;
+    positioned.fills.front().image_anchor = Point{0.5, 1.0};
+    positioned.fills.front().image_offset = Point{1.0, 0.0};
+    (*panel).set_material(positioned);
+    window.perform_layout();
+    painter.image_patterns.clear();
+    const unsigned clips_before = painter.clips;
+    window.paint(painter, {0.0, 0.0, 10.0, 6.0});
+    require(painter.image_patterns.size() == 1U &&
+                painter.image_patterns.front().destination == Rect{0.0, -2.0, 10.0, 8.0} &&
+                painter.image_patterns.front().logical_tile_size == Size{4.0, 4.0},
+            "a positioned tiling starts whole tiles back from its tile");
+    require(painter.clips > clips_before && painter.last_clip == Rect{0.0, 0.0, 10.0, 6.0},
+            "a positioned tiling is clipped to its box");
+    (*panel).set_material(material);
+
+    SurfaceMaterial invalid_position = material;
+    invalid_position.fills.front().image_anchor = Point{1.5, 0.0};
+    bool position_rejected{};
+    try {
+        (*panel).set_material(std::move(invalid_position));
+    } catch (const std::invalid_argument&) {
+        position_rejected = true;
+    }
+    require(position_rejected && (*panel).material() == material,
+            "an anchor outside [0, 1] is rejected atomically");
+    invalid_position = material;
+    invalid_position.fills.front().image_offset = Point{0.0, 5000.0};
+    position_rejected = false;
+    try {
+        (*panel).set_material(std::move(invalid_position));
+    } catch (const std::invalid_argument&) {
+        position_rejected = true;
+    }
+    require(position_rejected && (*panel).material() == material,
+            "an offset past 4096 units is rejected atomically");
+
     SurfaceMaterial invalid = material;
     invalid.fills.front().image_slice = {3.0, 0.0, 3.0, 0.0};
     bool rejected{};

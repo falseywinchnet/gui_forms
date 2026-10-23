@@ -54,6 +54,15 @@ struct MaterialFillLayer final {
     double image_scale{1.0};
     double opacity{1.0};
     MaterialImageMode image_mode{MaterialImageMode::stretch};
+    // A tiled image's position (E9.6, CSS `background-position`): one tile's
+    // top-left corner lies at `image_anchor` of the room the box leaves
+    // around one tile (fractions in [0, 1] across and down, as CSS
+    // percentages: 0 the box's left or top, 1 a tile flush with its right
+    // or bottom) plus `image_offset` in logical units, and the tiling runs
+    // on from there both ways. Read in tile mode only: a stretched image
+    // and a nine-patch cover the box.
+    Point image_anchor{};
+    Point image_offset{};
     double period_degrees{360.0};
     // Read only by a procedural fill, with `opacity`.
     ProceduralFill procedural{};
@@ -125,6 +134,7 @@ struct MaterialFillLayer final {
         left.image_slice == right.image_slice &&
         left.image_scale == right.image_scale &&
         left.opacity == right.opacity && left.image_mode == right.image_mode &&
+        left.image_anchor == right.image_anchor && left.image_offset == right.image_offset &&
         left.period_degrees == right.period_degrees &&
         left.procedural == right.procedural)) {
         return left.kind == right.kind &&
@@ -140,6 +150,8 @@ struct MaterialFillLayer final {
                left.image_scale == right.image_scale &&
                left.opacity == right.opacity &&
                left.image_mode == right.image_mode &&
+               left.image_anchor == right.image_anchor &&
+               left.image_offset == right.image_offset &&
                left.period_degrees == right.period_degrees &&
                left.procedural == right.procedural;
     }
