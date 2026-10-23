@@ -1,6 +1,21 @@
 #include "macos_accessibility_contract.hpp"
 
+#include <algorithm>
+
 namespace gui_forms::test_support {
+
+std::size_t expected_utf16_units(std::string_view text, std::size_t bytes) {
+    const std::size_t end = std::min(bytes, text.size());
+    std::size_t units = 0U;
+    for (std::size_t index = 0U; index < end; ++index) {
+        const unsigned char byte = static_cast<unsigned char>(text[index]);
+        // A continuation byte adds nothing; a four-byte sequence's lead
+        // starts a surrogate pair.
+        if ((byte & 0xC0U) == 0x80U) continue;
+        units += byte >= 0xF0U ? 2U : 1U;
+    }
+    return units;
+}
 
 const char* expected_ax_role(SemanticRole role) {
     switch (role) {
@@ -83,6 +98,12 @@ std::string expected_ax_value(const SemanticNode& node) {
     return node.value;
 }
 
+std::string expected_ax_range(const std::optional<std::size_t>& index) {
+    if (!index || *index == 0U) return {};
+    const std::string range = std::to_string(*index - 1U) + "+1";
+    return range;
+}
+
 AccessibilityProjection expected_ax_projection(const SemanticNode& node) {
     AccessibilityProjection expected;
     // A text box whose text runs over several lines is a text area.
@@ -109,6 +130,23 @@ AccessibilityProjection expected_ax_projection(const SemanticNode& node) {
     expected.value_settable = has_semantic_action(node, SemanticAction::set_value);
     expected.selected_settable = has_semantic_action(node, SemanticAction::select);
     expected.close_action = has_semantic_action(node, SemanticAction::close);
+    expected.disclosure_level = node.level && *node.level != 0U ? static_cast<long long>(*node.level - 1U) : 0;
+    expected.row_range = expected_ax_range(node.row_index);
+    expected.column_range = expected_ax_range(node.column_index);
+    expected.row_count = node.row_count ? static_cast<long long>(*node.row_count) : 0;
+    expected.column_count = node.column_count ? static_cast<long long>(*node.column_count) : 0;
+    expected.modal = node.modal;
+    const bool text_ranges = node.role == SemanticRole::text_box && node.text_selection.has_value() &&
+                             !has_semantic_state(node.states, SemanticState::protected_content);
+    if (text_ranges) {
+        const SemanticTextSelection selection = *node.text_selection;
+        const std::size_t low = std::min(selection.anchor.value(), selection.caret.value());
+        const std::size_t high = std::max(selection.anchor.value(), selection.caret.value());
+        const std::size_t start = expected_utf16_units(node.value, low);
+        const std::size_t end = expected_utf16_units(node.value, high);
+        expected.character_count = static_cast<long long>(expected_utf16_units(node.value, node.value.size()));
+        expected.selected_text_range = std::to_string(start) + "+" + std::to_string(end - start);
+    }
     return expected;
 }
 

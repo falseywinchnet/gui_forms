@@ -1,8 +1,13 @@
 #include "gui_forms/engine/part_table/engine_part_table.hpp"
 
+#include "../primitives/material/image_variant.hpp"
+#include "../primitives/material/material_primitive.hpp"
 #include "gui_forms/resources/image_registry/image_registry.hpp"
+#include "gui_forms/surface_material/painting/surface_material_painting.hpp"
 #include "gui_forms/window/window.hpp"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -11,6 +16,9 @@
 
 namespace gui_forms {
 namespace {
+
+// The material kernel, for the window's backplane material (E9-B).
+const engine_primitives::MaterialPrimitive backplane_material{};
 
 // One field of a lookup text: its byte length, a colon, its bytes.
 void append_field(std::string& text, std::string_view field) {
@@ -89,6 +97,11 @@ bool describes(const CachedPartRaster& cached, const PartRasterRequest& request)
     if (!(cached.target.states == read)) return false;
     if (!same_read_inputs(*request.primitive, cached.target, request.target)) return false;
     if (!same_parameters(cached.parameters, request.parameters)) return false;
+    // A part that samples the backplane (E9-B) is current only over the
+    // same backplane: its region and its damage generation.
+    if (cached.target.backplane_generation != request.target.backplane_generation) return false;
+    if (cached.target.backplane_margin != request.target.backplane_margin) return false;
+    if (!(cached.target.backplane_origin == request.target.backplane_origin)) return false;
     const bool same = same_material(cached, request.target);
     return same;
 }
@@ -98,6 +111,15 @@ bool answers(const CachedPartRaster& cached, const PartRasterRequest& request) n
     if (!cached.raster) return false;
     const bool held = describes(cached, request);
     return held;
+}
+
+// Whether `held` is the variant `asked` names (the layer it serves aside).
+bool same_variant(const ImageVariantRequest& held, const ImageVariantRequest& asked) noexcept {
+    const bool same = held.image == asked.image && held.source_width == asked.source_width &&
+                      held.source_height == asked.source_height && held.extent == asked.extent &&
+                      held.source_slice == asked.source_slice && held.fixed == asked.fixed &&
+                      held.scale == asked.scale;
+    return same;
 }
 
 // Records in `cached` what drew `raster` for `request`, with the lent
@@ -111,6 +133,8 @@ void keep_request(CachedPartRaster& cached, const PartRasterRequest& request, st
     cached.target.states = read_states_of(*request.primitive, request.target);
     cached.target.material = nullptr;
     cached.target.images = nullptr;
+    cached.target.variants = nullptr;
+    cached.target.backplane = nullptr;
     cached.material = std::move(material);
     cached.image_revision = image_revision;
     cached.extent = request.extent;
@@ -393,22 +417,169 @@ void EnginePartTable::clear_shared_bakes() noexcept {
     shared_bakes_.clear();
     statistics_.shared_rasters = 0U;
     statistics_.shared_bytes = 0U;
+    image_variants_.clear();
+    statistics_.image_variants = 0U;
+    backplanes_.clear();
+    statistics_.backplane_images = 0U;
+}
+
+void EnginePartTable::clear_backplanes() noexcept {
+    for (const HeldBackplane& held : backplanes_) {
+        statistics_.shared_bytes = statistics_.shared_bytes - (*held.raster).pixels().size();
+    }
+    backplanes_.clear();
+    statistics_.backplane_images = 0U;
+}
+
+void EnginePartTable::clear_image_variants() noexcept {
+    for (const HeldImageVariant& held : image_variants_) {
+        statistics_.shared_bytes = statistics_.shared_bytes - (*held.raster).pixels().size();
+    }
+    image_variants_.clear();
+    statistics_.image_variants = 0U;
 }
 
 void EnginePartTable::make_shared_room(const std::size_t incoming) noexcept {
-    while (!shared_bakes_.empty() && statistics_.shared_bytes + incoming > shared_bake_budget_bytes) {
-        // The least recently used; ties go to the earlier entry.
-        std::size_t oldest = 0U;
+    while (statistics_.shared_bytes + incoming > shared_bake_budget_bytes) {
+        // The least recently used of each list; ties go to the earlier
+        // entry, and between the lists to the shared bake, then the image
+        // variant.
+        std::size_t oldest_bake = 0U;
         for (std::size_t index = 1U; index < shared_bakes_.size(); ++index) {
-            if (shared_bakes_[index].last_used < shared_bakes_[oldest].last_used) oldest = index;
+            if (shared_bakes_[index].last_used < shared_bakes_[oldest_bake].last_used) oldest_bake = index;
         }
-        statistics_.shared_bytes = statistics_.shared_bytes - (*shared_bakes_[oldest].cached.raster).pixels().size();
-        statistics_.shared_rasters = statistics_.shared_rasters - 1U;
+        std::size_t oldest_variant = 0U;
+        for (std::size_t index = 1U; index < image_variants_.size(); ++index) {
+            if (image_variants_[index].last_used < image_variants_[oldest_variant].last_used) oldest_variant = index;
+        }
+        std::size_t oldest_backplane = 0U;
+        for (std::size_t index = 1U; index < backplanes_.size(); ++index) {
+            if (backplanes_[index].last_used < backplanes_[oldest_backplane].last_used) oldest_backplane = index;
+        }
+        const std::uint64_t never = std::numeric_limits<std::uint64_t>::max();
+        const std::uint64_t bake_used = shared_bakes_.empty() ? never : shared_bakes_[oldest_bake].last_used;
+        const std::uint64_t variant_used = image_variants_.empty() ? never : image_variants_[oldest_variant].last_used;
+        const std::uint64_t backplane_used = backplanes_.empty() ? never : backplanes_[oldest_backplane].last_used;
+        if (shared_bakes_.empty() && image_variants_.empty() && backplanes_.empty()) return;
         statistics_.shared_evictions = statistics_.shared_evictions + 1U;
         // Order does not matter: move the last entry into the hole. A part
         // using the evicted raster keeps it alive until it draws again.
-        if (oldest + 1U != shared_bakes_.size()) shared_bakes_[oldest] = std::move(shared_bakes_.back());
-        shared_bakes_.pop_back();
+        if (!shared_bakes_.empty() && bake_used <= variant_used && bake_used <= backplane_used) {
+            statistics_.shared_bytes = statistics_.shared_bytes - (*shared_bakes_[oldest_bake].cached.raster).pixels().size();
+            statistics_.shared_rasters = statistics_.shared_rasters - 1U;
+            if (oldest_bake + 1U != shared_bakes_.size()) shared_bakes_[oldest_bake] = std::move(shared_bakes_.back());
+            shared_bakes_.pop_back();
+            continue;
+        }
+        if (!image_variants_.empty() && variant_used <= backplane_used) {
+            statistics_.shared_bytes = statistics_.shared_bytes - (*image_variants_[oldest_variant].raster).pixels().size();
+            statistics_.image_variants = statistics_.image_variants - 1U;
+            if (oldest_variant + 1U != image_variants_.size()) {
+                image_variants_[oldest_variant] = std::move(image_variants_.back());
+            }
+            image_variants_.pop_back();
+            continue;
+        }
+        statistics_.shared_bytes = statistics_.shared_bytes - (*backplanes_[oldest_backplane].raster).pixels().size();
+        statistics_.backplane_images = statistics_.backplane_images - 1U;
+        if (oldest_backplane + 1U != backplanes_.size()) backplanes_[oldest_backplane] = std::move(backplanes_.back());
+        backplanes_.pop_back();
+    }
+}
+
+std::shared_ptr<const PartRaster> EnginePartTable::held_backplane(const BackplaneRegion& region,
+                                                                  const std::uint64_t generation,
+                                                                  const std::uint64_t paint_sequence) {
+    if (generation != backplane_generation_) {
+        clear_backplanes();
+        backplane_generation_ = generation;
+        return nullptr;
+    }
+    for (HeldBackplane& held : backplanes_) {
+        if (!(held.region == region)) continue;
+        held.last_used = paint_sequence;
+        statistics_.backplane_hits = statistics_.backplane_hits + 1U;
+        return held.raster;
+    }
+    return nullptr;
+}
+
+void EnginePartTable::hold_backplane(const BackplaneRegion& region, const std::uint64_t generation,
+                                     const std::shared_ptr<const PartRaster>& image, const std::uint64_t skipped,
+                                     const std::uint64_t paint_sequence) {
+    statistics_.backplane_bakes = statistics_.backplane_bakes + 1U;
+    statistics_.backplane_skipped_commands = statistics_.backplane_skipped_commands + skipped;
+    if (generation != backplane_generation_) {
+        clear_backplanes();
+        backplane_generation_ = generation;
+    }
+    const std::size_t bytes = (*image).pixels().size();
+    if (bytes > shared_bake_budget_bytes) return;
+    backplanes_.reserve(backplanes_.size() + 1U);
+    // Commit: nothing below allocates.
+    make_shared_room(bytes);
+    backplanes_.push_back(HeldBackplane{region, image, paint_sequence});
+    statistics_.backplane_images = statistics_.backplane_images + 1U;
+    statistics_.shared_bytes = statistics_.shared_bytes + bytes;
+}
+
+void EnginePartTable::bake_backplane_material(const SurfaceMaterial& material, const Size window_size,
+                                              const BackplaneRegion& region, const ImageRegistry* images,
+                                              const PartRasterView& image, const std::uint64_t paint_sequence) {
+    if (!valid_surface_material(material)) return;
+    // The window's box as a material part's target; the material kernel
+    // draws the region of it the image covers.
+    PartRasterRequest request{};
+    request.primitive = &backplane_material;
+    request.target.logical_size = window_size;
+    request.target.scale = region.scale;
+    request.target.material = &material;
+    request.target.images = images;
+    LentImageVariants lent{};
+    lend_image_variants(request, paint_sequence, lent);
+    request.target.variants = &lent;
+    engine_primitives::bake_material_region(material, request.target, region.origin, image);
+}
+
+void EnginePartTable::lend_image_variants(const PartRasterRequest& request, const std::uint64_t paint_sequence,
+                                          LentImageVariants& lent) {
+    if (request.target.images == nullptr) return;
+    const ImageRegistry& images = *request.target.images;
+    std::array<ImageVariantRequest, maximum_image_variants> wanted{};
+    const std::size_t asked_count = (*request.primitive).image_variants(request.parameters, request.target, wanted);
+    const std::size_t count = std::min(asked_count, wanted.size());
+    if (count == 0U) return;
+    const std::uint64_t revision = images.snapshot().revision;
+    if (!image_variant_revision_ || *image_variant_revision_ != revision) {
+        clear_image_variants();
+        image_variant_revision_ = revision;
+    }
+    for (std::size_t index = 0U; index < count; ++index) {
+        const ImageVariantRequest& asked = wanted[index];
+        if (asked.layer >= lent.layers.size()) continue;
+        std::size_t found = image_variants_.size();
+        for (std::size_t held = 0U; held < image_variants_.size(); ++held) {
+            if (same_variant(image_variants_[held].request, asked)) found = held;
+        }
+        if (found != image_variants_.size()) {
+            image_variants_[found].last_used = paint_sequence;
+            statistics_.image_variant_hits = statistics_.image_variant_hits + 1U;
+            lent.layers[asked.layer] = image_variants_[found].raster;
+            continue;
+        }
+        const std::shared_ptr<PartRaster> made = engine_primitives::make_image_variant(images, asked);
+        if (!made) continue;
+        statistics_.image_variant_bakes = statistics_.image_variant_bakes + 1U;
+        lent.layers[asked.layer] = made;
+        // A variant larger than the whole budget is lent but not held.
+        const std::size_t bytes = (*made).pixels().size();
+        if (bytes > shared_bake_budget_bytes) continue;
+        image_variants_.reserve(image_variants_.size() + 1U);
+        // Commit: nothing below allocates.
+        make_shared_room(bytes);
+        image_variants_.push_back(HeldImageVariant{asked, made, paint_sequence});
+        statistics_.image_variants = statistics_.image_variants + 1U;
+        statistics_.shared_bytes = statistics_.shared_bytes + bytes;
     }
 }
 
@@ -434,12 +605,16 @@ std::shared_ptr<PartRaster> EnginePartTable::shared_bake(const PartRasterRequest
     const EnginePrimitive& primitive = *request.primitive;
     std::shared_ptr<PartRaster> baked = PartRaster::create(request.extent, request.target.scale);
     if (!baked) return nullptr;
+    // The image variants, lent for the bake.
+    LentImageVariants lent{};
+    lend_image_variants(request, paint_sequence, lent);
+    PrimitiveTarget target = request.target;
+    target.variants = &lent;
     PrimitivePreparation preparation{};
-    if (primitive.prepare(request.parameters, request.target, preparation) != PreparationOutcome::prepared) {
+    if (primitive.prepare(request.parameters, target, preparation) != PreparationOutcome::prepared) {
         return nullptr;
     }
-    const RasterOutcome outcome = primitive.rasterize(request.parameters, request.target, preparation,
-                                                      (*baked).view());
+    const RasterOutcome outcome = primitive.rasterize(request.parameters, target, preparation, (*baked).view());
     if (outcome != RasterOutcome::painted && outcome != RasterOutcome::empty) return nullptr;
     statistics_.bakes = statistics_.bakes + 1U;
     if (use == SharedUse::idle_keyframe) {
@@ -557,14 +732,19 @@ RasterOutcome EnginePartTable::draw(const PartRasterRequest& request, PrimitiveP
         assemble_slices(*held, plan, destination);
         return RasterOutcome::painted;
     }
-    RasterOutcome outcome = primitive.rasterize(request.parameters, request.target, preparation, destination);
+    // The image variants, lent for the bake.
+    LentImageVariants lent{};
+    lend_image_variants(request, paint_sequence, lent);
+    PrimitiveTarget target = request.target;
+    target.variants = &lent;
+    RasterOutcome outcome = primitive.rasterize(request.parameters, target, preparation, destination);
     if (outcome == RasterOutcome::stale_preparation) {
         PrimitivePreparation prepared{};
-        if (primitive.prepare(request.parameters, request.target, prepared) != PreparationOutcome::prepared) {
+        if (primitive.prepare(request.parameters, target, prepared) != PreparationOutcome::prepared) {
             return RasterOutcome::invalid_target;
         }
         preparation = prepared;
-        outcome = primitive.rasterize(request.parameters, request.target, preparation, destination);
+        outcome = primitive.rasterize(request.parameters, target, preparation, destination);
     }
     if (outcome == RasterOutcome::painted || outcome == RasterOutcome::empty) {
         statistics_.bakes = statistics_.bakes + 1U;
@@ -685,6 +865,12 @@ void EnginePartTable::count_readers(const std::uint64_t old_inputs, const std::u
         if ((old_inputs & bit) != 0U) readers_[position] = readers_[position] - 1U;
         if ((inputs & bit) != 0U) readers_[position] = readers_[position] + 1U;
     }
+}
+
+void EnginePartTable::note_backplane_reader(const PartRecordHandle handle, const bool reads) noexcept {
+    EnginePartRecord* const found = record(handle);
+    if (found == nullptr) return;
+    (*found).reads_backplane = reads;
 }
 
 void EnginePartTable::note_paint(const PartRecordHandle handle, const std::uint64_t inputs_read,

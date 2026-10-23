@@ -46,6 +46,12 @@ Types
      - SemanticNode is the immutable snapshot form of one exposed control, with exact runtime/stable identity, bounds, values, states, actions, and children.
    * - :cpp:class:`SemanticSnapshot <gui_forms::SemanticSnapshot>`
      - SemanticSnapshot is an immutable generation-tagged forest of exact retained accessibility nodes with counted topology.
+   * - :cpp:class:`SemanticTextGrapheme <gui_forms::SemanticTextGrapheme>`
+     - One grapheme of a text node's layout: its UTF-8 range in the node's value, the index of its visual line in SemanticTextLayout::lines, and its box.
+   * - :cpp:class:`SemanticTextLayout <gui_forms::SemanticTextLayout>`
+     - The layout of a text node (owner decision A-T1, 12.13), built only when a host asks through Window::semantic_text_layout.
+   * - :cpp:class:`SemanticTextLine <gui_forms::SemanticTextLine>`
+     - One visual line of a text node's layout: the UTF-8 range of the node's value it shows (without the line break that ends it) and its box.
    * - :cpp:class:`SemanticTextSelection <gui_forms::SemanticTextSelection>`
      - The selection and caret of a node's text (owner decision A-T1, 12.13), as UTF-8 byte offsets into the node's value, on grapheme boundaries; with nothing selected the anchor and the caret are the same offset.
    * - :cpp:class:`TextInputEvent <gui_forms::TextInputEvent>`
@@ -746,6 +752,53 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: SemanticTextGrapheme final
+
+   ``#include <gui_forms/semantics/types/semantic_types.hpp>``
+
+   One grapheme of a text node's layout: its UTF-8 range in the node's value, the index of its visual line in SemanticTextLayout::lines, and its box. A line break is not a grapheme of any line.
+
+   .. cpp:member:: TextRange<Utf8Offset> range
+
+   .. cpp:member:: LineIndex line
+
+   .. cpp:member:: Rect bounds
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: SemanticTextLayout final
+
+   ``#include <gui_forms/semantics/types/semantic_types.hpp>``
+
+   The layout of a text node (owner decision A-T1, 12.13), built only when a host asks through Window::semantic_text_layout. Lines and graphemes are in text order. ``word_starts`` are the offsets at which the control's own word rule stops (its Ctrl+Left and Ctrl+Right), ascending: 0, each word start, and the end of the text; empty for empty text. Sentences are not reported (A-T2).
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void clear() noexcept
+
+      Empties the three lists and keeps their storage for the next query.
+
+   .. cpp:member:: std::vector<SemanticTextLine> lines
+
+   .. cpp:member:: std::vector<SemanticTextGrapheme> graphemes
+
+   .. cpp:member:: std::vector<Utf8Offset> word_starts
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: SemanticTextLine final
+
+   ``#include <gui_forms/semantics/types/semantic_types.hpp>``
+
+   One visual line of a text node's layout: the UTF-8 range of the node's value it shows (without the line break that ends it) and its box. Boxes are in window client coordinates, as node bounds are, and may lie outside the node's bounds when the text is scrolled.
+
+   .. cpp:member:: TextRange<Utf8Offset> range
+
+   .. cpp:member:: Rect bounds
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: SemanticTextSelection final
 
    ``#include <gui_forms/semantics/types/semantic_types.hpp>``
@@ -1099,6 +1152,40 @@ Enumerations
 
    .. cpp:enumerator:: multiselectable
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: SemanticTextResult
+
+   ``#include <gui_forms/semantics/types/semantic_types.hpp>``
+
+   .. cpp:enumerator:: done
+
+   .. cpp:enumerator:: stale_identity
+
+   .. cpp:enumerator:: during_paint
+
+   .. cpp:enumerator:: outside_focus_scope
+
+   .. cpp:enumerator:: no_text
+
+   .. cpp:enumerator:: off_boundary
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: SemanticTextUnit
+
+   ``#include <gui_forms/semantics/types/semantic_types.hpp>``
+
+   .. cpp:enumerator:: character
+
+   .. cpp:enumerator:: word
+
+   .. cpp:enumerator:: line
+
+   .. cpp:enumerator:: paragraph
+
+   .. cpp:enumerator:: document
+
 Functions, constants and aliases
 --------------------------------
 
@@ -1139,6 +1226,14 @@ Functions, constants and aliases
 .. cpp:function:: const char* semantic_action_name(SemanticAction action) noexcept
 
 .. cpp:function:: const char* semantic_orientation_name(SemanticOrientation orientation) noexcept
+
+.. cpp:function:: const char* semantic_text_result_name(SemanticTextResult result) noexcept
+
+.. cpp:function:: const char* semantic_text_unit_name(SemanticTextUnit unit) noexcept
+
+.. cpp:function:: void fill_semantic_text_boundaries(const SemanticTextLayout& layout, std::string_view value, SemanticTextUnit unit, std::vector<Utf8Offset>& boundaries)
+
+   Fills ``boundaries`` with the offsets in ``value`` at which ``unit`` starts or ends, ascending and distinct, from ``layout`` (Window::semantic_text_layout of the node whose value is ``value``): always 0 and the end of the text, which coincide for empty text (one boundary). Characters are bounded by each grapheme's start and end, so a line break, which is no grapheme, counts as one character; words by the layout's word starts; lines by each visual line's start (a line runs to the next line's start, so it holds its break); paragraphs after each line feed. The text between two adjacent boundaries is one unit. Replaces what ``boundaries`` held, reusing its storage. Throws std::bad_alloc when memory runs out, leaving ``boundaries`` unspecified.
 
 .. cpp:function:: const char* semantic_state_name(SemanticState state) noexcept
 

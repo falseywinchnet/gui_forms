@@ -498,6 +498,7 @@ class Comparer:
             text: str = atspi.Text.get_text(obj, 0, -1) or ''
             if text != node['value']:
                 self.mismatch(where, 'text ' + repr(text) + ', expected ' + repr(node['value']))
+            self.compare_text_selection(obj, node, where)
         attributes: dict[str, str] = obj.get_attributes() or {}
         if node['position_in_set'] is not None and node['set_size'] is not None:
             if attributes.get('posinset') != str(node['position_in_set']) or attributes.get('setsize') != str(node['set_size']):
@@ -525,6 +526,30 @@ class Comparer:
         if node['controlled_panel'] != '' and node['controlled_panel'] in ids:
             self.compare_controller(obj, node, where)
 
+    def compare_text_selection(self, obj: Any, node: dict[str, Any], where: str) -> None:
+        """The caret and the selection of a text node (A-L3), in characters,
+        against text_selection in UTF-8 bytes (0 and none without one)."""
+        atspi: ModuleType = self.atspi
+        selection: dict[str, int] | None = node['text_selection']
+        encoded: bytes = node['value'].encode('utf-8')
+        wanted_caret: int = 0
+        wanted_range: tuple[int, int] | None = None
+        if selection is not None:
+            anchor: int = len(encoded[:selection['anchor']].decode('utf-8'))
+            wanted_caret = len(encoded[:selection['caret']].decode('utf-8'))
+            if anchor != wanted_caret:
+                wanted_range = (min(anchor, wanted_caret), max(anchor, wanted_caret))
+        caret: int = atspi.Text.get_caret_offset(obj)
+        if caret != wanted_caret:
+            self.mismatch(where, 'caret ' + str(caret) + ', expected ' + str(wanted_caret))
+        count: int = atspi.Text.get_n_selections(obj)
+        published: tuple[int, int] | None = None
+        if count == 1:
+            span: Any = atspi.Text.get_selection(obj, 0)
+            published = (span.start_offset, span.end_offset)
+        if count > 1 or published != wanted_range:
+            self.mismatch(where, 'selection ' + str(published) + ' of ' + str(count) + ', expected ' + str(wanted_range))
+
     def compare_value(self, obj: Any, node: dict[str, Any], where: str) -> None:
         atspi: ModuleType = self.atspi
         if node['numeric_value'] is not None:
@@ -537,6 +562,11 @@ class Comparer:
                 if minimum != node['minimum_value'] or maximum != node['maximum_value']:
                     self.mismatch(where, 'range ' + repr(minimum) + '..' + repr(maximum) + ', expected ' +
                                   repr(node['minimum_value']) + '..' + repr(node['maximum_value']))
+            # The small step is the value's increment (12.13); zero without one.
+            step: float = atspi.Value.get_minimum_increment(obj)
+            wanted_step: float = 0.0 if node['small_step'] is None else node['small_step']
+            if step != wanted_step:
+                self.mismatch(where, 'increment ' + repr(step) + ', expected ' + repr(wanted_step))
         if self.value_text:
             text: str = atspi.Value.get_text(obj) or ''
             if text != node['value']:

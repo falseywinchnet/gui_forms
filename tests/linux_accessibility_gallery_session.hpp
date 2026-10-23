@@ -128,6 +128,13 @@ inline void append_node(std::ostringstream& stream, const SemanticNode& node) {
     append_string(stream, node.access_key);
     stream << ",\"small_step\":";
     append_number(stream, node.small_step);
+    stream << ",\"text_selection\":";
+    if (node.text_selection) {
+        stream << "{\"anchor\":" << (*node.text_selection).anchor.value() << ",\"caret\":"
+               << (*node.text_selection).caret.value() << '}';
+    } else {
+        stream << "null";
+    }
     stream << ",\"multiline\":" << (node.multiline ? "true" : "false");
     stream << ",\"states\":" << static_cast<std::uint32_t>(node.states) << ",\"actions\":[";
     for (std::size_t index = 0; index < node.actions.size(); ++index) {

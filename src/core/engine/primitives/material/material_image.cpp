@@ -17,94 +17,63 @@
 namespace gui_forms::engine_primitives {
 namespace {
 
-// Mitchell–Netravali's cubic, B = C = 1/3 (provisional; see
-// material_image.hpp).
-double mitchell_netravali(double x) noexcept {
-    const double a = std::abs(x);
-    if (a < 1.0) {
-        const double inner = ((7.0 * a - 12.0) * a * a + 16.0 / 3.0) / 6.0;
-        return inner;
-    }
-    if (a < 2.0) {
-        const double outer = (((-7.0 / 3.0 * a + 12.0) * a - 20.0) * a + 32.0 / 3.0) / 6.0;
-        return outer;
-    }
-    return 0.0;
-}
-
-// The image's view when it is in the registry with the fill's declared
-// pixel size.
-std::optional<ImageResourceView> matching_view(const ImageRegistry& registry, const MaterialFillLayer& fill) noexcept {
-    const std::optional<ImageResourceView> view = registry.find(fill.image);
+// The image's view when it is in the registry at `width` × `height` pixels.
+std::optional<ImageResourceView> matching_view(const ImageRegistry& registry, ImageId image, std::uint32_t width,
+                                               std::uint32_t height) noexcept {
+    const std::optional<ImageResourceView> view = registry.find(image);
     if (!view) return std::nullopt;
-    const double width = static_cast<double>((*view).metadata.width);
-    const double height = static_cast<double>((*view).metadata.height);
-    if (width != fill.image_pixel_size.width || height != fill.image_pixel_size.height) return std::nullopt;
-    if ((*view).metadata.width == 0U || (*view).metadata.height == 0U) return std::nullopt;
+    if ((*view).metadata.width != width || (*view).metadata.height != height) return std::nullopt;
+    if (width == 0U || height == 0U) return std::nullopt;
     return view;
 }
 
-// One segment of an axis: output centres in [destination_start,
-// destination_end) map onto source pixels [source_start, source_end).
+// A declared pixel length as a count: 0 unless it is a whole number in
+// range.
+std::uint32_t pixel_count(double declared) noexcept {
+    if (!(declared >= 1.0) || declared > static_cast<double>(maximum_part_raster_side)) return 0U;
+    if (std::floor(declared) != declared) return 0U;
+    const std::uint32_t count = static_cast<std::uint32_t>(declared);
+    return count;
+}
+
+// A device length rounded to whole pixels, at least 1 and at most the
+// largest raster side.
+std::uint32_t variant_length(double length) noexcept {
+    const double bounded = std::clamp(std::round(length), 1.0, static_cast<double>(maximum_part_raster_side));
+    const std::uint32_t pixels = static_cast<std::uint32_t>(bounded);
+    return pixels;
+}
+
+// A fixed segment's device length rounded to whole pixels, within `room`.
+std::uint32_t fixed_length(double length, std::uint32_t room) noexcept {
+    const double rounded = std::clamp(std::round(length), 0.0, static_cast<double>(room));
+    const std::uint32_t pixels = static_cast<std::uint32_t>(rounded);
+    return pixels;
+}
+
+// One segment of an axis: destination centres in [destination_start,
+// destination_end) map onto variant pixels [variant_start, variant_end).
 struct AxisSegment final {
     double destination_start{};
     double destination_end{};
-    double source_start{};
-    double source_end{};
+    std::uint32_t variant_start{};
+    std::uint32_t variant_end{};
 };
 
-// The shrink factor of a segment: source pixels per output pixel, at least 1.
-double shrink_factor(double source_length, double destination_length) noexcept {
-    if (!(destination_length > 0.0)) return 1.0;
-    const double factor = std::max(1.0, source_length / destination_length);
-    return factor;
-}
-
-// Appends the taps of one output pixel whose centre maps to source
-// coordinate `u` (in source pixels), the kernel widened by `factor`, and
-// normalizes their weights. Taps fall in [low, high) of the source; `wrap`
-// wraps them over [0, high) instead of clamping.
-void append_taps(double u, double factor, std::uint32_t low, std::uint32_t high, bool wrap, ResampleAxis& axis) {
-    const std::size_t begin = axis.weight.size();
-    const MaterialResamplingFilter filter = material_resampling_filter;
-    const double reach = resampling_filter_reach(filter) * factor;
-    const std::int64_t first = static_cast<std::int64_t>(std::floor(u - reach - 0.5));
-    const std::int64_t last = static_cast<std::int64_t>(std::ceil(u + reach - 0.5));
-    const std::int64_t length = static_cast<std::int64_t>(high);
-    double sum = 0.0;
-    for (std::int64_t position = first; position <= last; ++position) {
-        const double weight = resampling_filter_weight(filter, (static_cast<double>(position) + 0.5 - u) / factor);
-        if (weight == 0.0) continue;
-        std::int64_t index = position;
-        if (wrap) {
-            index = index % length;
-            if (index < 0) index = index + length;
-        } else {
-            index = std::clamp<std::int64_t>(index, static_cast<std::int64_t>(low), length - 1);
-        }
-        axis.source.push_back(static_cast<std::uint32_t>(index));
-        axis.weight.push_back(weight);
-        sum = sum + weight;
+// The variant pixel a destination centre `centre` shows within `segment`,
+// in [0, variant_length).
+std::uint32_t segment_pixel(const AxisSegment& segment, double centre, std::uint32_t variant_length) noexcept {
+    const double destination_length = segment.destination_end - segment.destination_start;
+    const std::uint32_t pixels = segment.variant_end - segment.variant_start;
+    double index = static_cast<double>(segment.variant_start);
+    if (destination_length > 0.0 && pixels > 0U) {
+        const double along = (centre - segment.destination_start) * static_cast<double>(pixels) / destination_length;
+        const double last = static_cast<double>(pixels - 1U);
+        index = index + std::clamp(std::floor(along), 0.0, last);
     }
-    // The kernel's weights at unit spacing sum to about 1 for any u, never 0.
-    if (!(sum > 0.0)) return;
-    for (std::size_t tap = begin; tap < axis.weight.size(); ++tap) axis.weight[tap] = axis.weight[tap] / sum;
-}
-
-double unit_channel(std::uint8_t value) noexcept {
-    const double channel = static_cast<double>(value) / 255.0;
-    return channel;
-}
-
-// A resampled colour made valid: alpha in [0, 1], each colour channel in
-// [0, alpha].
-Unit valid_premultiplied(Unit colour) noexcept {
-    Unit valid{};
-    valid.alpha = std::clamp(colour.alpha, 0.0, 1.0);
-    valid.red = std::clamp(colour.red, 0.0, valid.alpha);
-    valid.green = std::clamp(colour.green, 0.0, valid.alpha);
-    valid.blue = std::clamp(colour.blue, 0.0, valid.alpha);
-    return valid;
+    const double bounded = std::min(index, static_cast<double>(variant_length - 1U));
+    const std::uint32_t pixel = static_cast<std::uint32_t>(bounded);
+    return pixel;
 }
 
 ImageAxisPlacement placement_along(const MaterialFillLayer& fill, double box_start, double box_length, double scale,
@@ -136,19 +105,20 @@ ImageAxisPlacement placement_along(const MaterialFillLayer& fill, double box_sta
 } // namespace
 
 bool material_image_available(const ImageRegistry& registry, const MaterialFillLayer& fill) noexcept {
-    const bool available = matching_view(registry, fill).has_value();
+    const std::uint32_t width = pixel_count(fill.image_pixel_size.width);
+    const std::uint32_t height = pixel_count(fill.image_pixel_size.height);
+    const bool available = matching_view(registry, fill.image, width, height).has_value();
     return available;
 }
 
-bool read_material_image(const ImageRegistry& registry, const MaterialFillLayer& fill, MaterialImagePixels& pixels) {
+bool read_material_image(const ImageRegistry& registry, const ImageId image, const std::uint32_t width,
+                         const std::uint32_t height, MaterialImagePixels& pixels) {
     pixels.bytes.clear();
     pixels.width = 0U;
     pixels.height = 0U;
-    const std::optional<ImageResourceView> found = matching_view(registry, fill);
+    const std::optional<ImageResourceView> found = matching_view(registry, image, width, height);
     if (!found) return false;
     const ImageResourceView& view = *found;
-    const std::uint32_t width = view.metadata.width;
-    const std::uint32_t height = view.metadata.height;
     const std::size_t row_bytes = static_cast<std::size_t>(width) * 4U;
     // The registry bounds an image's sides (4096 by default) and pixels, so
     // the product fits; checked anyway, as the decoder's storage is sized
@@ -203,77 +173,60 @@ ImageAxisPlacement image_placement_down(const MaterialFillLayer& fill, double bo
     return placement;
 }
 
-double resampling_filter_reach(MaterialResamplingFilter filter) noexcept {
-    switch (filter) {
-    case MaterialResamplingFilter::mitchell_netravali:
-        return 2.0;
+ImageVariantRequest image_variant_request(const MaterialFillLayer& fill, const std::size_t layer, const Rect box,
+                                          const double scale) noexcept {
+    ImageVariantRequest request{};
+    request.layer = layer;
+    request.image = fill.image;
+    request.source_width = pixel_count(fill.image_pixel_size.width);
+    request.source_height = pixel_count(fill.image_pixel_size.height);
+    request.scale = DeviceScale{scale};
+    const ImageAxisPlacement across = image_placement_across(fill, box.x, box.width, scale, fill.image_pixel_size.width);
+    const ImageAxisPlacement down = image_placement_down(fill, box.y, box.height, scale, fill.image_pixel_size.height);
+    if (fill.image_mode == MaterialImageMode::tile) {
+        request.extent = DeviceExtent{variant_length(across.tile_length), variant_length(down.tile_length)};
+        return request;
     }
-    return 2.0;
+    request.extent = DeviceExtent{variant_length(across.length), variant_length(down.length)};
+    if (fill.image_mode != MaterialImageMode::nine_patch) return request;
+    request.source_slice = fill.image_slice;
+    const std::uint32_t left = fixed_length(across.destination_start, request.extent.width);
+    const std::uint32_t top = fixed_length(down.destination_start, request.extent.height);
+    const std::uint32_t right = fixed_length(across.destination_end, request.extent.width - left);
+    const std::uint32_t bottom = fixed_length(down.destination_end, request.extent.height - top);
+    request.fixed = std::array<std::uint32_t, 4>{left, top, right, bottom};
+    return request;
 }
 
-double resampling_filter_weight(MaterialResamplingFilter filter, double x) noexcept {
-    switch (filter) {
-    case MaterialResamplingFilter::mitchell_netravali:
-        return mitchell_netravali(x);
-    }
-    return 0.0;
-}
-
-double image_axis_taps(const ImageAxisPlacement& placement) noexcept {
-    double factor = 1.0;
-    switch (placement.mode) {
-    case MaterialImageMode::stretch:
-        factor = shrink_factor(placement.source_length, placement.length);
-        break;
-    case MaterialImageMode::tile:
-        factor = shrink_factor(placement.source_length, placement.tile_length);
-        break;
-    case MaterialImageMode::nine_patch: {
-        const double middle_source = placement.source_length - placement.slice_start - placement.slice_end;
-        const double middle_destination =
-            placement.length - placement.destination_start - placement.destination_end;
-        factor = std::max(shrink_factor(placement.slice_start, placement.destination_start),
-                          shrink_factor(placement.slice_end, placement.destination_end));
-        factor = std::max(factor, shrink_factor(middle_source, middle_destination));
-        break;
-    }
-    }
-    const double reach = resampling_filter_reach(material_resampling_filter);
-    const double taps = 2.0 * reach * factor + 2.0;
-    return taps;
-}
-
-void plan_resample_axis(const ImageAxisPlacement& placement, std::uint32_t outputs, ResampleAxis& axis) {
-    axis.first.assign(static_cast<std::size_t>(outputs) + 1U, 0U);
-    axis.source.clear();
-    axis.weight.clear();
-    const std::uint32_t source_pixels = static_cast<std::uint32_t>(placement.source_length);
+void map_image_variant(const ImageAxisPlacement& placement, const std::uint32_t variant_length,
+                       const std::uint32_t fixed_start, const std::uint32_t fixed_end, const std::uint32_t outputs,
+                       std::vector<std::uint32_t>& map) {
+    map.assign(outputs, 0U);
+    const double pixels = static_cast<double>(variant_length);
     if (placement.mode == MaterialImageMode::tile) {
-        // Each output centre's place within its tile; taps wrap, so tiles
-        // join without a seam.
+        // Each centre's place within its tile.
         const double tile = placement.tile_length;
-        const double factor = shrink_factor(placement.source_length, tile);
+        if (!(tile > 0.0)) return;
         for (std::uint32_t output = 0U; output < outputs; ++output) {
             const double along = static_cast<double>(output) + 0.5 - placement.start;
             const double within = along - tile * std::floor(along / tile);
-            const double u = within * placement.source_length / tile;
-            append_taps(u, factor, 0U, source_pixels, true, axis);
-            axis.first[output + 1U] = static_cast<std::uint32_t>(axis.source.size());
+            const double index = std::clamp(std::floor(within * pixels / tile), 0.0, pixels - 1.0);
+            map[output] = static_cast<std::uint32_t>(index);
         }
         return;
     }
     // The segments, in order along the axis; a stretch has one.
     std::array<AxisSegment, 3> segments{};
     std::size_t segment_count = 1U;
-    segments[0] = AxisSegment{placement.start, placement.start + placement.length, 0.0, placement.source_length};
+    const double end = placement.start + placement.length;
+    segments[0] = AxisSegment{placement.start, end, 0U, variant_length};
     if (placement.mode == MaterialImageMode::nine_patch) {
         const double near_end = placement.start + placement.destination_start;
-        const double far_start = placement.start + placement.length - placement.destination_end;
-        const double middle_source_end = placement.source_length - placement.slice_end;
-        segments[0] = AxisSegment{placement.start, near_end, 0.0, placement.slice_start};
-        segments[1] = AxisSegment{near_end, far_start, placement.slice_start, middle_source_end};
-        segments[2] = AxisSegment{far_start, placement.start + placement.length, middle_source_end,
-                                  placement.source_length};
+        const double far_start = end - placement.destination_end;
+        const std::uint32_t middle_end = variant_length - fixed_end;
+        segments[0] = AxisSegment{placement.start, near_end, 0U, fixed_start};
+        segments[1] = AxisSegment{near_end, far_start, fixed_start, middle_end};
+        segments[2] = AxisSegment{far_start, end, middle_end, variant_length};
         segment_count = 3U;
     }
     for (std::uint32_t output = 0U; output < outputs; ++output) {
@@ -285,59 +238,7 @@ void plan_resample_axis(const ImageAxisPlacement& placement, std::uint32_t outpu
         for (std::size_t index = 1U; index < segment_count; ++index) {
             if (centre >= segments[index].destination_start) chosen = index;
         }
-        const AxisSegment& segment = segments[chosen];
-        const double destination_length = segment.destination_end - segment.destination_start;
-        const double source_length = segment.source_end - segment.source_start;
-        if (destination_length > 0.0 && source_length >= 1.0) {
-            const double u =
-                segment.source_start + (centre - segment.destination_start) * source_length / destination_length;
-            const double factor = shrink_factor(source_length, destination_length);
-            const std::uint32_t low = static_cast<std::uint32_t>(segment.source_start);
-            const std::uint32_t high = static_cast<std::uint32_t>(segment.source_end);
-            append_taps(u, factor, low, high, false, axis);
-        }
-        axis.first[output + 1U] = static_cast<std::uint32_t>(axis.source.size());
-    }
-}
-
-void resample_material_image(const MaterialImagePixels& pixels, const ResampleAxis& across, const ResampleAxis& down,
-                             std::vector<Unit>& scratch, std::vector<Unit>& resampled) {
-    const std::size_t columns = across.first.size() - 1U;
-    const std::size_t rows = down.first.size() - 1U;
-    const std::size_t source_rows = pixels.height;
-    const std::size_t source_row_bytes = static_cast<std::size_t>(pixels.width) * 4U;
-    scratch.assign(source_rows * columns, Unit{});
-    resampled.assign(rows * columns, Unit{});
-    // Across: every source row to the output columns.
-    for (std::size_t source_row = 0U; source_row < source_rows; ++source_row) {
-        const std::size_t row_start = source_row * source_row_bytes;
-        for (std::size_t column = 0U; column < columns; ++column) {
-            Unit sum{};
-            for (std::uint32_t tap = across.first[column]; tap < across.first[column + 1U]; ++tap) {
-                const std::size_t offset = row_start + static_cast<std::size_t>(across.source[tap]) * 4U;
-                const double weight = across.weight[tap];
-                sum.red = sum.red + unit_channel(pixels.bytes[offset]) * weight;
-                sum.green = sum.green + unit_channel(pixels.bytes[offset + 1U]) * weight;
-                sum.blue = sum.blue + unit_channel(pixels.bytes[offset + 2U]) * weight;
-                sum.alpha = sum.alpha + unit_channel(pixels.bytes[offset + 3U]) * weight;
-            }
-            scratch[source_row * columns + column] = sum;
-        }
-    }
-    // Down: the output rows from the resampled source rows.
-    for (std::size_t row = 0U; row < rows; ++row) {
-        for (std::size_t column = 0U; column < columns; ++column) {
-            Unit sum{};
-            for (std::uint32_t tap = down.first[row]; tap < down.first[row + 1U]; ++tap) {
-                const Unit& part = scratch[static_cast<std::size_t>(down.source[tap]) * columns + column];
-                const double weight = down.weight[tap];
-                sum.red = sum.red + part.red * weight;
-                sum.green = sum.green + part.green * weight;
-                sum.blue = sum.blue + part.blue * weight;
-                sum.alpha = sum.alpha + part.alpha * weight;
-            }
-            resampled[row * columns + column] = valid_premultiplied(sum);
-        }
+        map[output] = segment_pixel(segments[chosen], centre, variant_length);
     }
 }
 

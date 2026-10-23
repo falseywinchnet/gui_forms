@@ -384,6 +384,10 @@ void semantics_and_region() {
                 clipboard.children[0].set_size == std::size_t{4U} &&
                 clipboard.children[4].name == "Clipboard dialog launcher",
             "commands carry split roles, popups and positions; the launcher is a button");
+    require(nodes[1].children[0].access_key == "H" && nodes[1].children[1].access_key == "I" &&
+                clipboard.children[2].name == "Copy" && clipboard.children[2].access_key == "C" &&
+                clipboard.children[1].access_key.empty(),
+            "a tab's or a command's mnemonic is its access key; a command without one has none");
     require((*ribbon).on_semantic_child_action("ribbon.tab.insert", SemanticAction::select, {}) &&
                 (*ribbon).selected_tab() == std::size_t{1U},
             "selecting a tab node selects the tab");

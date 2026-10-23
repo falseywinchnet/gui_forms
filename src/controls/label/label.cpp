@@ -513,6 +513,9 @@ SemanticDescriptor Label::semantic_descriptor() const {
         ? (use_mnemonic_ ? parse_mnemonic_text(text_).display_text : text_)
         : accessible_name();
     descriptor.description = accessible_description();
+    // The mnemonic moves the focus to the next control; the label publishes
+    // it, as a Win32 static control does.
+    if (use_mnemonic_) descriptor.access_key = mnemonic_access_key(text_);
     descriptor.exposed = !descriptor.name.empty();
     return descriptor;
 }

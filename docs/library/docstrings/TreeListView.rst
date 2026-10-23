@@ -182,13 +182,15 @@ the asterisk expands everything under the current node. Control with Left
 or Right scrolls the columns sideways. Enter activates. Typing the first
 letters of a node's text selects the next row that starts with them.
 
-The view publishes the accessibility role `list`; there is no tree,
-tree-grid or table role yet. Its children are the visible column headers (as
-`button`, whose press sorts) and the visible rows as `list_item`, with the
-level and each cell named in the description, the position among the
-siblings and the sibling count in `position_in_set` and `set_size`, and the
-expanded state. Rows offer the focus, select, press, and expand or collapse
-actions.
+The view publishes the accessibility role `tree_grid`, with the shown row
+count and the column count. Its children are the visible column headers, as
+`column_header` with their column index (counting from 1; a press sorts),
+and the visible rows as `tree_item`, with their level (1 for a root), their
+row index among the shown rows, the position among the siblings and the
+sibling count in `position_in_set` and `set_size`, and the expanded state.
+Each row holds a `cell` per visible column, named and valued with the cell
+text. Rows offer the focus, select, press, and expand or collapse actions;
+cells offer none.
 
 Not supported yet: multiple selection, check boxes, label editing, owner
 drawing, a virtual node source, an insertion mark while a header is

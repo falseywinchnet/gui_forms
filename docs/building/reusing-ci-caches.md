@@ -21,6 +21,16 @@ Two commits with the same tree, such as a pull request head and the merge that
 lands it unchanged, are the same input. A new runner image is a new compiler
 identity even when the `clang` binary is unchanged.
 
+Every job checks out the commit its workflow files come from. For a pull
+request, that is the test merge commit (`refs/pull/N/merge`); for a push, the
+pushed commit. Jobs used to check out a pull request's head while running the
+merge commit's workflow, and when `main` had added a tool that its workflow
+calls, a branch behind `main` failed on the missing file. An up-to-date
+branch's merge commit has the head's tree, so reuse is unchanged there. For a
+branch that is behind, the receipt records the merge commit. `ci_reuse.py`
+accepts it only if that commit has the producer run's head as a parent and
+has the claimed tree (`merge_of_head`).
+
 ## What a native job tries, in order
 
 | Step | When | Result |

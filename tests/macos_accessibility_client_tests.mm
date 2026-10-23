@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <climits>
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
@@ -31,8 +32,10 @@
 // app writes to its dump. In the fixture it performs each control's default
 // action through AXUIElementPerformAction or an attribute setter and
 // observes the change through the dump, and checks that an element held
-// past its control's disposal returns an error (interview GF017). In the
-// Gallery it presses every page's navigation row and compares each page.
+// past its control's disposal returns an error (interview GF017), and reads
+// a text box's parameterized text attributes and sets its AXSelectedTextRange
+// (A-T1). In the Gallery it presses every page's navigation row and compares
+// each page.
 //
 // An AX client needs the Accessibility permission. Without it the test
 // prints "unsupported" and exits with 77, which ctest reports as skipped; it
@@ -126,6 +129,32 @@ bool bool_attribute(AXUIElementRef element, CFStringRef attribute) {
     return false;
 }
 
+// A number attribute, or 0 when the element has none.
+long long integer_attribute(AXUIElementRef element, CFStringRef attribute) {
+    CfValue value;
+    if (copy_attribute(element, attribute, value) != kAXErrorSuccess || value.get() == nullptr) return 0;
+    if (CFGetTypeID(value.get()) != CFNumberGetTypeID()) return 0;
+    long long number = 0;
+    CFNumberGetValue(static_cast<CFNumberRef>(value.get()), kCFNumberLongLongType, &number);
+    return number;
+}
+
+// A range attribute as "location+length", or "" when the element has none
+// or its location is kCFNotFound.
+std::string range_attribute(AXUIElementRef element, CFStringRef attribute) {
+    CfValue value;
+    if (copy_attribute(element, attribute, value) != kAXErrorSuccess || value.get() == nullptr) return {};
+    if (CFGetTypeID(value.get()) != AXValueGetTypeID()) return {};
+    CFRange range = CFRangeMake(kCFNotFound, 0);
+    if (!AXValueGetValue(static_cast<AXValueRef>(value.get()), kAXValueTypeCFRange, &range)) return {};
+    // No range: kCFNotFound, or AppKit's NSNotFound (LONG_MAX), which an
+    // NSRange of {NSNotFound, 0} becomes on its way through AXValue.
+    if (range.location == kCFNotFound || range.location == LONG_MAX) return {};
+    const std::string text = std::to_string(static_cast<long long>(range.location)) + "+" +
+                             std::to_string(static_cast<long long>(range.length));
+    return text;
+}
+
 std::string value_attribute(AXUIElementRef element) {
     CfValue value;
     if (copy_attribute(element, kAXValueAttribute, value) != kAXErrorSuccess || value.get() == nullptr) return {};
@@ -191,6 +220,14 @@ AccessibilityProjection published_projection(AXUIElementRef element) {
     published.focus_settable = settable(element, kAXFocusedAttribute);
     published.value_settable = settable(element, kAXValueAttribute);
     published.selected_settable = settable(element, kAXSelectedAttribute);
+    published.disclosure_level = integer_attribute(element, kAXDisclosureLevelAttribute);
+    published.row_range = range_attribute(element, kAXRowIndexRangeAttribute);
+    published.column_range = range_attribute(element, kAXColumnIndexRangeAttribute);
+    published.row_count = integer_attribute(element, kAXRowCountAttribute);
+    published.column_count = integer_attribute(element, kAXColumnCountAttribute);
+    published.modal = bool_attribute(element, kAXModalAttribute);
+    published.character_count = integer_attribute(element, kAXNumberOfCharactersAttribute);
+    published.selected_text_range = range_attribute(element, kAXSelectedTextRangeAttribute);
     return published;
 }
 
@@ -247,6 +284,28 @@ SemanticNode node_from_json(NSDictionary* object) {
     node.value = ns_text(object[@"value"]);
     node.description = ns_text(object[@"description"]);
     node.numeric_value = ns_number(object[@"numeric_value"]);
+    // The stage A fields the AX projection reads (12.13); null in the dump
+    // is no value.
+    const std::optional<double> level = ns_number(object[@"level"]);
+    if (level) node.level = static_cast<std::size_t>(*level);
+    const std::optional<double> row_index = ns_number(object[@"row_index"]);
+    if (row_index) node.row_index = static_cast<std::size_t>(*row_index);
+    const std::optional<double> column_index = ns_number(object[@"column_index"]);
+    if (column_index) node.column_index = static_cast<std::size_t>(*column_index);
+    const std::optional<double> row_count = ns_number(object[@"row_count"]);
+    if (row_count) node.row_count = static_cast<std::size_t>(*row_count);
+    const std::optional<double> column_count = ns_number(object[@"column_count"]);
+    if (column_count) node.column_count = static_cast<std::size_t>(*column_count);
+    node.modal = ns_number(object[@"modal"]).value_or(0.0) != 0.0;
+    node.multiline = ns_number(object[@"multiline"]).value_or(0.0) != 0.0;
+    NSDictionary* selection = object[@"text_selection"];
+    if ([selection isKindOfClass:[NSDictionary class]]) {
+        const double anchor = ns_number(selection[@"anchor"]).value_or(0.0);
+        const double caret = ns_number(selection[@"caret"]).value_or(0.0);
+        node.text_selection = gui_forms::SemanticTextSelection{
+            .anchor = gui_forms::Utf8Offset(static_cast<std::size_t>(anchor)),
+            .caret = gui_forms::Utf8Offset(static_cast<std::size_t>(caret))};
+    }
     node.minimum_value = ns_number(object[@"minimum_value"]);
     node.maximum_value = ns_number(object[@"maximum_value"]);
     const std::optional<double> states = ns_number(object[@"states"]);
@@ -466,6 +525,13 @@ private:
         return false;
     }
 
+    bool number(const std::string& owner, const std::string& id, const char* field, long long expected,
+                long long published) {
+        if (expected == published) return true;
+        add(owner, id, field, std::to_string(expected), std::to_string(published));
+        return false;
+    }
+
     bool compare_projection(const std::string& owner, const std::string& id,
                             const AccessibilityProjection& expected,
                             const AccessibilityProjection& published) {
@@ -487,6 +553,15 @@ private:
         same = flag(owner, id, "AXValue settable", expected.value_settable, published.value_settable) && same;
         same = flag(owner, id, "AXSelected settable", expected.selected_settable, published.selected_settable) && same;
         same = flag(owner, id, "Close action", expected.close_action, published.close_action) && same;
+        same = number(owner, id, "AXDisclosureLevel", expected.disclosure_level, published.disclosure_level) && same;
+        same = text(owner, id, "AXRowIndexRange", expected.row_range, published.row_range) && same;
+        same = text(owner, id, "AXColumnIndexRange", expected.column_range, published.column_range) && same;
+        same = number(owner, id, "AXRowCount", expected.row_count, published.row_count) && same;
+        same = number(owner, id, "AXColumnCount", expected.column_count, published.column_count) && same;
+        same = flag(owner, id, "AXModal", expected.modal, published.modal) && same;
+        same = number(owner, id, "AXNumberOfCharacters", expected.character_count, published.character_count) && same;
+        same = text(owner, id, "AXSelectedTextRange", expected.selected_text_range,
+                    published.selected_text_range) && same;
         return same;
     }
 
@@ -651,6 +726,108 @@ Dump check_stale_element(const std::string& path, AXUIElementRef application, Du
     if (read == kAXErrorSuccess) report.failures.push_back("stale element: reading the disposed control's role succeeded");
     if (press == kAXErrorSuccess) report.failures.push_back("stale element: pressing the disposed control succeeded");
     if (!alive) report.failures.push_back("stale element: the app died");
+    return after;
+}
+
+// ---------------------------------------------------------------------------
+// Editable text (A-T1): the fixture's text box through AX's parameterized
+// text attributes, and AXSelectedTextRange set through AX and observed in
+// the dump.
+
+// A parameterized attribute of `element` for a CFRange, a CFIndex or a
+// CGPoint parameter (an AXValue or a CFNumber), into `value`.
+AXError copy_parameterized(AXUIElementRef element, CFStringRef attribute, CFTypeRef parameter, CfValue& value) {
+    return AXUIElementCopyParameterizedAttributeValue(element, attribute, parameter, value.receive());
+}
+
+// `value` as a CFRange, or {kCFNotFound, 0} when it is none.
+CFRange range_value(const CfValue& value) {
+    CFRange range = CFRangeMake(kCFNotFound, 0);
+    if (value.get() == nullptr || CFGetTypeID(value.get()) != AXValueGetTypeID()) return range;
+    if (!AXValueGetValue(static_cast<AXValueRef>(value.get()), kAXValueTypeCFRange, &range)) {
+        range = CFRangeMake(kCFNotFound, 0);
+    }
+    return range;
+}
+
+// Whether a byte is ASCII (std::all_of's predicate).
+struct IsAsciiByte final {
+    bool operator()(char byte) const noexcept { return static_cast<unsigned char>(byte) < 0x80U; }
+};
+
+bool is_range(CFRange range, CFIndex location, CFIndex length) {
+    const bool same = range.location == location && range.length == length;
+    return same;
+}
+
+Dump check_text_ranges(const std::string& path, AXUIElementRef application, Dump dump, Report& report) {
+    dump = settled_dump(path);
+    AxElement surface = find_surface(application);
+    AxElement field = find_identified(surface.get(), "text_box");
+    const SemanticNode* node = find_semantic_node(dump.snapshot.roots, "text_box");
+    if (field.get() == nullptr || node == nullptr || !(*node).text_selection) {
+        report.failures.push_back("text ranges: the fixture's text box is not published with a selection");
+        return dump;
+    }
+    const std::string value = (*node).value;
+    const bool ascii = std::all_of(value.begin(), value.end(), IsAsciiByte{});
+    const CFIndex units = static_cast<CFIndex>(gui_forms::test_support::expected_utf16_units(value, value.size()));
+    if (!ascii || units < 2) {
+        report.failures.push_back("text ranges: the fixture's text box must hold at least two ASCII characters");
+        return dump;
+    }
+    CFRange whole = CFRangeMake(0, units);
+    CfValue whole_range(AXValueCreate(kAXValueTypeCFRange, &whole));
+    CfValue text;
+    const AXError read = copy_parameterized(field.get(), kAXStringForRangeParameterizedAttribute, whole_range.get(), text);
+    const bool text_read = read == kAXErrorSuccess && text.get() != nullptr &&
+                           CFGetTypeID(text.get()) == CFStringGetTypeID() &&
+                           utf8(static_cast<CFStringRef>(text.get())) == value;
+    if (!text_read) report.failures.push_back("text ranges: AXStringForRange over the whole text is not the value");
+    CFRange first = CFRangeMake(0, 1);
+    CfValue first_range(AXValueCreate(kAXValueTypeCFRange, &first));
+    CfValue bounds;
+    CGRect box = CGRectZero;
+    const AXError bounded = copy_parameterized(field.get(), kAXBoundsForRangeParameterizedAttribute, first_range.get(), bounds);
+    const bool boxed = bounded == kAXErrorSuccess && bounds.get() != nullptr &&
+                       CFGetTypeID(bounds.get()) == AXValueGetTypeID() &&
+                       AXValueGetValue(static_cast<AXValueRef>(bounds.get()), kAXValueTypeCGRect, &box) &&
+                       box.size.width > 0.0 && box.size.height > 0.0;
+    if (!boxed) report.failures.push_back("text ranges: AXBoundsForRange gives no box for the first character");
+    int zero = 0;
+    CfValue line_zero(CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &zero));
+    CfValue line_range;
+    static_cast<void>(copy_parameterized(field.get(), kAXRangeForLineParameterizedAttribute, line_zero.get(), line_range));
+    if (!is_range(range_value(line_range), 0, units)) {
+        report.failures.push_back("text ranges: AXRangeForLine 0 is not the whole single line");
+    }
+    CfValue index_range;
+    static_cast<void>(copy_parameterized(field.get(), kAXRangeForIndexParameterizedAttribute, line_zero.get(), index_range));
+    if (!is_range(range_value(index_range), 0, 1)) {
+        report.failures.push_back("text ranges: AXRangeForIndex 0 is not the first character");
+    }
+    if (boxed) {
+        CGPoint middle = CGPointMake(CGRectGetMidX(box), CGRectGetMidY(box));
+        CfValue position(AXValueCreate(kAXValueTypeCGPoint, &middle));
+        CfValue hit;
+        static_cast<void>(copy_parameterized(field.get(), kAXRangeForPositionParameterizedAttribute, position.get(), hit));
+        if (!is_range(range_value(hit), 0, 1)) {
+            report.failures.push_back("text ranges: AXRangeForPosition at the first character's middle misses it");
+        }
+    }
+    CFRange wanted = CFRangeMake(1, 1);
+    CfValue wanted_range(AXValueCreate(kAXValueTypeCFRange, &wanted));
+    const AXError set = AXUIElementSetAttributeValue(field.get(), kAXSelectedTextRangeAttribute, wanted_range.get());
+    Dump after = wait_for_new_dump(path, dump, 1500);
+    const SemanticNode* changed = find_semantic_node(after.snapshot.roots, "text_box");
+    const bool selected = set == kAXErrorSuccess && changed != nullptr && (*changed).text_selection &&
+                          (*(*changed).text_selection).anchor.value() == 1U &&
+                          (*(*changed).text_selection).caret.value() == 2U;
+    if (!selected) {
+        report.failures.push_back("text ranges: setting AXSelectedTextRange {1, 1} (AX error " +
+                                  std::to_string(static_cast<int>(set)) + ") did not select byte 1 to 2");
+    }
+    report.notes.push_back("text ranges: the text box's parameterized attributes and selection checked");
     return after;
 }
 
@@ -824,6 +1001,7 @@ int run(const Options& options) {
         AxElement after_surface = find_surface(application.get());
         compare_surface(dump, after_surface.get(), report, "after-actions");
         dump = check_stale_element(options.dump, application.get(), dump, report);
+        dump = check_text_ranges(options.dump, application.get(), dump, report);
     }
     close_app(application.get(), dump.pid);
     print_report(report);

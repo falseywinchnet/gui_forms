@@ -723,6 +723,23 @@ public:
     // active focus scope.
     bool perform_semantic_action(RuntimeId control, std::string_view virtual_child,
                                  SemanticAction action, std::string_view value = {});
+    // Fills `layout` (caller-owned storage, emptied first and reused) with
+    // the text layout of the control with runtime identity `control`: its
+    // visual lines, graphemes and word starts, built only now (owner
+    // decision A-T1, 12.13). Text is published on a control's own node,
+    // never on a virtual child. UI thread only, and not deferred: during
+    // paint it answers during_paint and the host asks again. A runtime
+    // identity no attached control holds answers stale_identity (interview
+    // GF017). Reading changes no text, selection or scroll position.
+    [[nodiscard]] SemanticTextResult semantic_text_layout(RuntimeId control, SemanticTextLayout& layout);
+    // Moves the text selection of the control with runtime identity
+    // `control` (A-T1); focus does not move. Refused as semantic_text_layout
+    // refuses, and also for a control outside the active focus scope
+    // (outside_focus_scope) or an offset off a grapheme boundary
+    // (off_boundary); a refusal changes nothing. A done change reaches hosts
+    // through the next snapshot's text_selection field.
+    [[nodiscard]] SemanticTextResult set_semantic_text_selection(RuntimeId control,
+                                                                 SemanticTextSelection selection);
 
 private:
     friend class HostSession;
@@ -795,6 +812,29 @@ private:
     // and where it was drawn (EnginePartTable::note_paint).
     void note_engine_paint(PartRecordHandle handle, std::uint64_t inputs_read, const Control& painted_by,
                            Rect extent);
+    // The window's backplane under a part (E9-B): `image` covers a raster
+    // of `extent` device pixels whose top-left corner lies at
+    // `raster_origin` (window logical units) at `scale`, grown by `margin`
+    // device pixels on every side; `origin` is its top-left pixel in the
+    // window's device pixels and `generation` the backplane's damage
+    // generation it was made at. Held in the engine table's shared cache
+    // per region (EnginePartTable::held_backplane) and made on first need:
+    // the window's backplane material, then the backplane plane's engine
+    // part rasters (option 1; everything else is skipped and counted).
+    // `image` is null when no image can be made.
+    struct EngineBackplane final {
+        std::shared_ptr<const PartRaster> image{};
+        Point origin{};
+        std::uint64_t generation{};
+    };
+    [[nodiscard]] EngineBackplane engine_backplane(Point raster_origin, DeviceExtent extent, DeviceScale scale,
+                                                   std::uint32_t margin);
+    // Called by ThemeEngine::paint for a keyed part: whether its paint
+    // sampled the backplane (EnginePartTable::note_backplane_reader).
+    void note_engine_backplane_reader(PartRecordHandle handle, bool reads) noexcept;
+    // The backplane's damage generation (E9-B): advanced by every damage
+    // to the backplane plane, a theme change and an activation change.
+    [[nodiscard]] std::uint64_t backplane_generation() const noexcept { return backplane_generation_; }
     // The pointer's window position for the engine's pointer inputs, or
     // none while it is outside the window.
     [[nodiscard]] const std::optional<Point>& engine_pointer() const noexcept { return engine_pointer_; }
@@ -804,6 +844,15 @@ private:
     // counts it in the metrics.
     void damage_engine_readers(std::uint64_t inputs, bool hot_only);
     void damage_published_readers(std::string_view name);
+    // Advances the backplane's damage generation and invalidates the extent
+    // of every keyed part that sampled the backplane within `damage`
+    // (window logical units), or every such part when `damage` is null.
+    void damage_backplane_readers(const Rect* damage);
+    // Composites the backplane-plane display chunks of `control` and its
+    // subtree, clipped to `clip` (window logical units), into `image`
+    // covering `region`; adds the commands skipped to `skipped`.
+    void composite_backplane_subtree(const Control::Ptr& control, Rect clip, const BackplaneRegion& region,
+                                     const PartRasterView& image, std::uint64_t& skipped) const;
     struct EngineDamage final {
         std::uint64_t parts{};
         double area{};
@@ -944,7 +993,10 @@ private:
     void request_paint_wake() noexcept;
     void acknowledge_paint_wake_if_damage_drained() noexcept;
     void touch_paint() noexcept;
-    void update_paint_lease_state() noexcept;
+    // The paint lease's state, derived from the facts each time (in paint,
+    // a change during render, occlusion, what is owed, the revisions), so
+    // it can never report a queued paint with nothing to paint.
+    [[nodiscard]] PaintLeaseState paint_lease_state() const noexcept;
     // A semantic action that arrived during paint. `owner` is zero for one
     // named by stable identity alone; otherwise it is the publishing
     // control's runtime identity and `stable_id` the virtual child (empty for
@@ -1146,8 +1198,15 @@ private:
         bool explicit_request);
     [[nodiscard]] Rect plane_paint_bounds(std::size_t index, Rect rectangle,
                                           bool explicit_request) const;
-    [[nodiscard]] bool has_popup_paint_dirty() const noexcept;
     [[nodiscard]] bool has_plane_damage() const noexcept;
+    // Whether a paint is owed: a change during the last render, or damage on
+    // any plane. Damage is clipped to the client area and recorded for every
+    // visible change, so it is what a paint can discharge. A control's own
+    // paint-dirty mark is not owed: it only rebuilds the control's chunk when
+    // a paint next reaches it, and a control outside the client area or a
+    // viewport is never reached. Derived each time, so no overload of
+    // take_damage, paint or a dirty mark can leave it stale.
+    [[nodiscard]] bool paint_pending() const noexcept;
     void collect_visible_overlay_rectangles(
         const Control::Ptr& control, std::vector<Rect>& rectangles) const;
     [[nodiscard]] static std::vector<Rect> subtract_rectangle(
@@ -1177,6 +1236,8 @@ private:
     // window is registered with them from construction to destruction.
     std::shared_ptr<ApplicationResources> resources_;
     std::uint64_t display_generation_{};
+    // The backplane's damage generation (E9-B); starts at 1.
+    std::uint64_t backplane_generation_{1U};
     using FrameRequestList =
         std::vector<std::shared_ptr<detail::ScheduledFrameRequest>>;
     FrameRequestList frame_requests_;
@@ -1186,11 +1247,9 @@ private:
     std::shared_ptr<detail::DispatcherState> dispatcher_state_;
     std::uint64_t update_depth_{};
     bool layout_dirty_{true};
-    bool paint_dirty_{true};
     bool hit_test_dirty_{true};
     bool in_layout_{};
     bool in_paint_{};
-    PaintLeaseState paint_lease_state_{PaintLeaseState::dirty_queued};
     std::uint64_t content_revision_{1U};
     std::uint64_t rendered_revision_{};
     std::uint64_t presented_revision_{};

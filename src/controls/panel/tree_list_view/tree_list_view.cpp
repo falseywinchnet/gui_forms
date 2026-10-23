@@ -1537,12 +1537,15 @@ void TreeListView::on_focus_changed(bool focused) {
 
 SemanticDescriptor TreeListView::semantic_descriptor() const {
     SemanticDescriptor descriptor{};
-    // There is no tree, tree-grid or table role yet (the matrix and P35.7
-    // defer tree roles to stage A): the view is a list whose items describe
-    // their level and cells, as TreeView's and ListView's do.
-    descriptor.role = SemanticRole::list;
+    // A tree grid (12.13): its rows are tree items, each holding a cell per
+    // column. The size counts every shown row and every column, realized or
+    // not.
+    const Layout placed = layout();
+    descriptor.role = SemanticRole::tree_grid;
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
+    descriptor.row_count = placed.shown_rows;
+    descriptor.column_count = column_order_.size();
     if (selected_node_) descriptor.value = nodes_[*selected_node_].text;
     descriptor.actions = {SemanticAction::focus};
     descriptor.exposed = true;
@@ -1555,15 +1558,15 @@ std::vector<SemanticNode> TreeListView::semantic_virtual_children() const {
     const Rect absolute = absolute_bounds();
     const std::string view_id(stable_id().value());
     const bool enabled = effectively_enabled();
-    // Column headers first, in display order. There is no column-header
-    // role: a header is a button whose press sorts.
+    // Column headers first, in display order; a header's press sorts.
     for (const std::size_t column : column_order_) {
         if (!column_visible(placed, column)) continue;
         const Rect bounds = Rect::intersection(column_cell(placed, column), placed.header);
         SemanticNode node{};
         node.stable_id = column_identity(view_id, columns_[column].stable_id);
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
-        node.role = SemanticRole::button;
+        node.role = SemanticRole::column_header;
+        node.column_index = column_position_[column] + 1U;
         node.name = columns_[column].text;
         if (sort_column_ == column && sort_order_ == TreeListSortOrder::ascending) node.value = "ascending";
         if (sort_column_ == column && sort_order_ == TreeListSortOrder::descending) node.value = "descending";
@@ -1581,17 +1584,11 @@ std::vector<SemanticNode> TreeListView::semantic_virtual_children() const {
         SemanticNode node{};
         node.stable_id = item.stable_id;
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
-        node.role = SemanticRole::list_item;
+        node.role = SemanticRole::tree_item;
         node.name = item.text;
-        // No level field exists: the level leads the description.
-        node.description = "level " + std::to_string(item.depth + 1U);
-        for (std::size_t position = 1; position < column_order_.size(); ++position) {
-            const std::size_t column = column_order_[position];
-            node.description.append("; ");
-            node.description.append(columns_[column].text);
-            node.description.append(": ");
-            node.description.append(column_text(item, column));
-        }
+        node.level = item.depth + 1U;
+        node.row_index = row + 1U;
+        append_row_cells(placed, row, node);
         const std::size_t slot = parent_[index] == no_index ? 0U : parent_[index] + 1U;
         node.position_in_set = sibling_position_[index] + 1U;
         node.set_size = child_begin_[slot + 1U] - child_begin_[slot];
@@ -1608,6 +1605,34 @@ std::vector<SemanticNode> TreeListView::semantic_virtual_children() const {
         children.push_back(std::move(node));
     }
     return children;
+}
+
+// A shown row's cells, one per column in display order, for the columns
+// whose extent meets the viewport (the realized columns). A cell has no
+// actions of its own; its row takes them.
+void TreeListView::append_row_cells(const Layout& placed, std::size_t row, SemanticNode& row_node) const {
+    const TreeListNode& item = nodes_[visible_[row]];
+    const Rect absolute = absolute_bounds();
+    const Rect line = row_bounds(placed, row);
+    const bool enabled = effectively_enabled() && item.enabled;
+    for (const std::size_t column : column_order_) {
+        const Rect extent = column_cell(placed, column);
+        const Rect cell_rect{extent.x, line.y, extent.width, line.height};
+        const Rect bounds = Rect::intersection(cell_rect, placed.viewport);
+        if (bounds.empty()) continue;
+        SemanticNode cell{};
+        cell.stable_id = item.stable_id + ".cell." + columns_[column].stable_id;
+        cell.runtime_id = virtual_semantic_runtime_id(cell.stable_id);
+        cell.role = SemanticRole::cell;
+        cell.name = columns_[column].text;
+        cell.value = std::string(column_text(item, column));
+        cell.row_index = row + 1U;
+        cell.column_index = column_position_[column] + 1U;
+        cell.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
+        cell.states = SemanticState::visible;
+        if (enabled) cell.states |= SemanticState::enabled;
+        row_node.children.push_back(std::move(cell));
+    }
 }
 
 bool TreeListView::on_semantic_child_action(std::string_view id, SemanticAction action, std::string_view) {

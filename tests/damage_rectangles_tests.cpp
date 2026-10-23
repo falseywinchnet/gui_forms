@@ -283,6 +283,91 @@ void availability_record_reports_the_declaration() {
            "the record serializes for diagnostics");
 }
 
+
+// A one-pixel RGBA PNG.
+constexpr std::array<std::uint8_t, 70> one_pixel_png{
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+    0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+    0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0xf8, 0xcf, 0xc0, 0xf0,
+    0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x56, 0xc7, 0x2f, 0x0d, 0x00, 0x00,
+    0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+};
+
+// Counts paint wakes: each one is a frame the window asks its host for.
+struct WakeCounter final {
+    std::shared_ptr<int> wakes = std::make_shared<int>(0);
+    void operator()() const { ++(*wakes); }
+};
+
+// Replacing a shared image damages every plane of the window without
+// dirtying any control's paint. Once the host takes all of that damage,
+// nothing is owed: the window must not keep asking for a frame. (A host
+// with no damage to draw never paints, so such a request stays pending
+// while the host is idle.)
+void taking_all_damage_leaves_no_frame_pending() {
+    Scene scene = make_scene();
+    Window window(scene.root, Size{400.0, 300.0});
+    const std::span<const std::byte, 70> png = std::as_bytes(std::span<const std::uint8_t, 70>(one_pixel_png));
+    const ImageLoadResult loaded = window.load_png(png);
+    expect(static_cast<bool>(loaded), "the fixture PNG loads");
+    window.perform_layout();
+    ClipTrackingPainter first(Rect{0.0, 0.0, 400.0, 300.0});
+    static_cast<void>(window.paint(first));
+    static_cast<void>(window.take_damage());
+    expect(!window.needs_frame(), "a painted window starts idle");
+
+    const ImageLoadResult replaced = window.replace_png(loaded.image, png);
+    expect(static_cast<bool>(replaced), "the image is replaced");
+    expect(window.needs_frame(), "the replacement asks for a frame");
+    const DamageRegion damage = window.take_damage();
+    expect(!damage.empty(), "the replacement leaves damage to take");
+    expect(!window.needs_frame(), "no frame is needed once every plane's damage is taken");
+    const WakeCounter counter;
+    window.set_paint_wake_handler(counter);
+    expect(*counter.wakes == 0, "installing a wake handler requests no frame");
+}
+
+
+// A control outside the client area changes in the same revision as a
+// visible one. Its damage is clipped away, so the paint never reaches it and
+// its own paint-dirty mark stays (it rebuilds when it is next painted). Once
+// the visible change is rendered and presented, nothing is owed: the lease is
+// clean and no frame is needed, although that control is still marked.
+void an_unreachable_dirty_control_owes_no_frame() {
+    Scene scene = make_scene();
+    std::shared_ptr<Panel> outside = make_control<Panel>(StableId("dp.outside"));
+    (*outside).set_bounds({500.0, 10.0, 40.0, 30.0});
+    (*scene.root).add_child(outside);
+    Window window(scene.root, Size{400.0, 300.0});
+    window.perform_layout();
+    ClipTrackingPainter first(Rect{0.0, 0.0, 400.0, 300.0});
+    const std::optional<PaintReceipt> initial = window.paint(first);
+    expect(initial.has_value(), "the first paint produces a receipt");
+    expect(window.notify_presented(*initial, 1000U), "the first receipt is presented");
+    expect(!window.needs_frame(), "a presented window starts idle");
+
+    (*scene.top_left).set_background(Color::rgba(200, 40, 40));
+    (*outside).set_background(Color::rgba(40, 200, 40));
+    window.flush();
+    expect(window.needs_frame(), "the visible change asks for a frame");
+    const DamageRegion damage = window.take_damage();
+    ClipTrackingPainter painter(Rect{0.0, 0.0, 400.0, 300.0});
+    const std::optional<PaintReceipt> receipt = window.paint(painter, damage.rectangles());
+    expect(receipt.has_value(), "the visible change paints");
+    expect(window.notify_presented(*receipt, 1000U), "the receipt is presented");
+
+    const PaintLeaseSnapshot lease = window.paint_lease_snapshot();
+    expect(lease.content_revision == lease.rendered_revision &&
+               lease.rendered_revision == lease.presented_revision,
+           "the change is rendered and presented");
+    expect(lease.state == PaintLeaseState::clean, "nothing owed leaves the lease clean");
+    expect(!window.needs_frame(), "nothing owed needs no frame");
+    const WakeCounter counter;
+    window.set_paint_wake_handler(counter);
+    expect(*counter.wakes == 0, "nothing owed requests no wake");
+}
+
 } // namespace
 
 int main() {
@@ -292,6 +377,8 @@ int main() {
     accumulated_damage_paints_as_rectangles();
     presentation_counters_record_copied_area();
     availability_record_reports_the_declaration();
+    taking_all_damage_leaves_no_frame_pending();
+    an_unreachable_dirty_control_owes_no_frame();
     std::cout << "gui_forms_damage_rectangles_tests: all tests passed\n";
     return EXIT_SUCCESS;
 }

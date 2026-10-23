@@ -62,7 +62,8 @@ focusable child. The box itself never takes focus. A hidden or disabled box
 ignores its mnemonic.
 
 The box is always published to accessibility as a `group`, named by its
-accessible name or else by the caption without its mnemonic marker.
+accessible name or else by the caption without its mnemonic marker; the
+character after the marker is its access key.
 
 Examples
 --------

@@ -4,6 +4,8 @@
 
 #include "gui_forms/gui_forms.hpp"
 
+#include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -38,7 +40,32 @@ struct AccessibilityProjection final {
     bool selected_settable{};
     // A custom action named "Close".
     bool close_action{};
+    // The stage A fields (12.13): AXDisclosureLevel (a tree item's depth from
+    // zero; 0 without one), AXRowIndexRange and AXColumnIndexRange as
+    // "location+length" counting from zero ("" without one), AXRowCount and
+    // AXColumnCount (0 without one), and AXModal.
+    long long disclosure_level{};
+    std::string row_range;
+    std::string column_range;
+    long long row_count{};
+    long long column_count{};
+    bool modal{};
+    // A text box's text ranges (A-T1): AXNumberOfCharacters, the text's
+    // length in UTF-16 code units, and AXSelectedTextRange as
+    // "location+length" in UTF-16 code units, the selection's low end
+    // first. 0 and "" for a node that publishes none: anything but a text
+    // box with a text selection, which the core publishes only on a
+    // control's own node and never for a password box (A-T2).
+    long long character_count{};
+    std::string selected_text_range;
 };
+
+// The UTF-16 code units of text[0, bytes) (the text is valid UTF-8).
+[[nodiscard]] std::size_t expected_utf16_units(std::string_view text, std::size_t bytes);
+
+// A one-row or one-column range from an index counting from one, as
+// AXRowIndexRange publishes it: "location+length", or "" without one.
+[[nodiscard]] std::string expected_ax_range(const std::optional<std::size_t>& index);
 
 [[nodiscard]] const char* expected_ax_role(SemanticRole role);
 // The subrole, or "" for none.

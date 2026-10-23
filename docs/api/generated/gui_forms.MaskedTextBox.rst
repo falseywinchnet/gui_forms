@@ -182,7 +182,8 @@ gui_forms::MaskedTextBox
    and there is no password character yet.
 
    The control publishes the accessibility role ``text_box`` with the field as
-   shown (prompts and literals in place) as its value, and the read-only state.
+   shown (prompts and literals in place) as its value, the read-only state, and
+   the editor's selection while the editor shows that value.
    :cpp:enumerator:`SemanticAction::set_value <gui_forms::SemanticAction::set_value>` goes through the mask as :cpp:func:`set_text <gui_forms::MaskedTextBox::set_text>` does and
    fails for text the mask refuses.
 
@@ -408,6 +409,12 @@ gui_forms::MaskedTextBox
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
    .. cpp:function:: bool on_semantic_action(SemanticAction action, std::string_view value) override
+
+   .. cpp:function:: SemanticTextResult on_semantic_text_layout(SemanticTextLayout& layout) override
+
+      Forwarded to the editor while it shows the published value (prompts and literals in place), so offsets index that value; no_text otherwise.
+
+   .. cpp:function:: SemanticTextResult on_set_semantic_text_selection(SemanticTextSelection selection) override
 
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
 

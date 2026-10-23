@@ -206,11 +206,9 @@ void Window::abandon_paint(
     for (std::size_t index = 0; index < painted_rectangles.size(); ++index) {
         add_damage_all_planes(painted_rectangles[index]);
     }
-    paint_dirty_ = true;
     dirty_after_render_ = true;
     in_paint_ = false;
     ++paint_leases_abandoned_;
-    update_paint_lease_state();
     update_display_cache_metrics();
     if (!root_ || !(*root_).is_alive()) {
         abandon_deferred_input();
@@ -226,21 +224,17 @@ Rect Window::plane_paint_bounds(std::size_t index, Rect rectangle,
     return plane;
 }
 
-bool Window::has_popup_paint_dirty() const noexcept {
-    for (const std::shared_ptr<detail::PopupAttachment>& popup : popups_) {
-        const Control::Ptr overlay = (*popup).popup();
-        if (overlay && has_dirty((*overlay).subtree_dirty_, Dirty::paint)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool Window::has_plane_damage() const noexcept {
     for (const DamageRegion& damage : plane_damage_) {
         if (!damage.empty()) return true;
     }
     return false;
+}
+
+bool Window::paint_pending() const noexcept {
+    if (dirty_after_render_) return true;
+    const bool damaged = has_plane_damage();
+    return damaged;
 }
 
 namespace {
@@ -379,16 +373,11 @@ std::optional<PaintReceipt> Window::paint_rectangles(
         // never re-enter application painting while the exclusive lease is held.
         ++reentrant_paint_requests_deferred_;
         dirty_after_render_ = true;
-        paint_dirty_ = true;
-        paint_lease_state_ = PaintLeaseState::rendering_dirty;
         add_damage_all_planes({0.0, 0.0, client_size_.width, client_size_.height});
         request_paint_wake();
         return std::nullopt;
     }
-    if (occluded_) {
-        paint_lease_state_ = PaintLeaseState::occluded_dirty;
-        return std::nullopt;
-    }
+    if (occluded_) return std::nullopt;
     ensure_layout(true);
 
     if (!(*root_).is_alive()) {
@@ -420,7 +409,6 @@ std::optional<PaintReceipt> Window::paint_rectangles(
     ++paint_leases_started_;
     in_paint_ = true;
     dirty_after_render_ = false;
-    paint_lease_state_ = PaintLeaseState::rendering;
     std::uint64_t visited_nodes = 0;
     std::uint64_t painted_controls = 0;
     std::uint64_t consumed_invalidations = 0;
@@ -542,12 +530,6 @@ std::optional<PaintReceipt> Window::paint_rectangles(
                           static_cast<std::uint64_t>(painted.size()), full_window);
     update_display_cache_metrics();
 
-    const bool popup_paint_dirty = has_popup_paint_dirty();
-    paint_dirty_ = dirty_after_render_ ||
-                   has_dirty((*root_).subtree_dirty_, Dirty::paint) ||
-                   popup_paint_dirty ||
-                   has_plane_damage();
-    update_paint_lease_state();
     schedule_deferred_input_drain();
     return PaintReceipt{lease_revision, lease_epoch};
 }
@@ -579,14 +561,12 @@ bool Window::notify_presented(PaintReceipt receipt,
     const bool monotonic = receipt.rendered_revision > presented_revision_;
     if (!current_epoch || !complete_revision || !monotonic) {
         ++presentation_receipts_rejected_;
-        update_paint_lease_state();
         return false;
     }
     presented_revision_ = receipt.rendered_revision;
     ++presentation_receipts_accepted_;
     metrics_.record_present(duration_nanoseconds, presented.device_pixels,
                             presented.rectangles);
-    update_paint_lease_state();
     return true;
 }
 
@@ -637,7 +617,7 @@ std::string PresentationAvailability::to_json() const {
 }
 
 PaintLeaseSnapshot Window::paint_lease_snapshot() const noexcept {
-    return {paint_lease_state_, content_revision_, rendered_revision_,
+    return {paint_lease_state(), content_revision_, rendered_revision_,
             presented_revision_, surface_epoch_, paint_leases_started_,
             paint_leases_completed_, paint_leases_abandoned_,
             reentrant_paint_requests_deferred_, paint_wakes_queued_,
@@ -880,7 +860,6 @@ Window::take_live_surface_presentations(const bool include_unchanged,
                     damaged = true;
                 }
                 if (damaged) {
-                    paint_dirty_ = true;
                     touch_paint();
                 }
             }
@@ -910,7 +889,7 @@ void Window::set_paint_wake_handler(std::function<void()> wake) {
     require_ui_thread("paint wake-handler mutation");
     paint_wake_handler_ = std::move(wake);
     paint_wake_pending_ = false;
-    if (paint_wake_handler_ && paint_dirty_ && !occluded_) {
+    if (paint_wake_handler_ && paint_pending() && !occluded_) {
         request_paint_wake();
     }
 }
@@ -942,10 +921,6 @@ DamageRegion Window::take_damage(PaintPlane plane) {
     const std::size_t index = paint_plane_index(plane);
     DamageRegion result = std::move(plane_damage_[index]);
     plane_damage_[index] = {};
-    const bool popup_paint_dirty = has_popup_paint_dirty();
-    paint_dirty_ = has_dirty((*root_).subtree_dirty_, Dirty::paint) ||
-                   popup_paint_dirty ||
-                   has_plane_damage();
     acknowledge_paint_wake_if_damage_drained();
     return result;
 }

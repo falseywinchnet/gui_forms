@@ -1351,6 +1351,12 @@ SemanticDescriptor TextBox::semantic_descriptor() const {
         ? placeholder_ : accessible_description();
     if (read_only_) descriptor.states |= SemanticState::read_only;
     if (password_protected()) descriptor.states |= SemanticState::protected_content;
+    // The selection and caret index the value (A-T1, 12.13); a password box
+    // publishes neither its text nor where in it the caret is.
+    if (!password_protected()) {
+        descriptor.text_selection = SemanticTextSelection{.anchor = selection_.anchor, .caret = selection_.caret};
+    }
+    descriptor.multiline = multiline_;
     descriptor.actions = {SemanticAction::focus};
     if (!read_only_) descriptor.actions.push_back(SemanticAction::set_value);
     // A suggesting box opens a list; it is expanded while the list is open.
@@ -1372,6 +1378,96 @@ bool TextBox::on_semantic_action(SemanticAction action, std::string_view value) 
     }
     const bool handled = Panel::on_semantic_action(action, value);
     return handled;
+}
+
+// -- editable text for hosts (A-T1) ------------------------------------------
+
+SemanticTextResult TextBox::on_semantic_text_layout(SemanticTextLayout& layout) {
+    if (password_protected()) return SemanticTextResult::no_text;
+    const std::size_t graphemes = store_.grapheme_count().value();
+    layout.graphemes.reserve(graphemes);
+    if (multiline_) {
+        // Builds the visual rows as painting would, when they are stale.
+        ensure_multiline_layout();
+        fill_multiline_text_layout(layout);
+    } else {
+        fill_single_line_text_layout(layout);
+    }
+    fill_word_starts(layout);
+    return SemanticTextResult::done;
+}
+
+SemanticTextResult TextBox::on_set_semantic_text_selection(SemanticTextSelection selection) {
+    if (password_protected()) return SemanticTextResult::no_text;
+    // A boundary lies within the text; one inside a combining sequence is
+    // not a boundary.
+    if (!store_.is_grapheme_boundary(selection.anchor) || !store_.is_grapheme_boundary(selection.caret)) {
+        return SemanticTextResult::off_boundary;
+    }
+    set_selection({selection.anchor, selection.caret});
+    return SemanticTextResult::done;
+}
+
+// The one line spans the text as last painted (estimated before the first
+// paint, as boundary_x is), scrolled by the horizontal offset; its height is
+// the selection band's.
+void TextBox::fill_single_line_text_layout(SemanticTextLayout& layout) const {
+    const Rect bounds = local_bounds();
+    const double origin = text_left_ - horizontal_offset_;
+    const double top = 3.0;
+    const double height = std::max(0.0, bounds.height - 6.0);
+    const Utf8Offset end = store_.utf8_size();
+    const double right = boundary_x(end);
+    const Rect line_box{origin, top, right, height};
+    layout.lines.push_back({.range = {Utf8Offset(0U), end}, .bounds = rectangle_to_window(line_box)});
+    Utf8Offset cursor(0U);
+    while (cursor != end) {
+        const Utf8Offset next = store_.next_grapheme_boundary(cursor);
+        const double left = boundary_x(cursor);
+        const double following = boundary_x(next);
+        const Rect box{origin + left, top, std::max(0.0, following - left), height};
+        layout.graphemes.push_back({.range = {cursor, next}, .line = LineIndex(0U), .bounds = rectangle_to_window(box)});
+        cursor = next;
+    }
+}
+
+// Each visual row's offsets are its grapheme boundaries, from the row's
+// start to its end (a wrapped row ends after its last space; a logical
+// line's break belongs to no row), with the prefix advance of each.
+void TextBox::fill_multiline_text_layout(SemanticTextLayout& layout) const {
+    const Point offset = scroll_offset();
+    const double origin = text_left_ - offset.x;
+    const std::size_t rows = visual_lines_.size();
+    layout.lines.reserve(rows);
+    for (std::size_t row = 0U; row < rows; ++row) {
+        const VisualLine& line = visual_lines_[row];
+        const double top = 4.0 + static_cast<double>(row) * line_height_ - offset.y;
+        const Utf8Offset start(line.offsets.front());
+        const Utf8Offset finish(line.offsets.back());
+        const Rect line_box{origin, top, line.positions.back(), line_height_};
+        layout.lines.push_back({.range = {start, finish}, .bounds = rectangle_to_window(line_box)});
+        const std::size_t boundaries = line.offsets.size();
+        for (std::size_t index = 1U; index < boundaries; ++index) {
+            const double left = line.positions[index - 1U];
+            const double right = line.positions[index];
+            const Rect box{origin + left, top, std::max(0.0, right - left), line_height_};
+            const TextRange<Utf8Offset> range{Utf8Offset(line.offsets[index - 1U]), Utf8Offset(line.offsets[index])};
+            layout.graphemes.push_back({.range = range, .line = LineIndex(row), .bounds = rectangle_to_window(box)});
+        }
+    }
+}
+
+// Ctrl+Left stops at 0 and at each word start; Ctrl+Right at each later
+// word start and at the end. Empty text has no words.
+void TextBox::fill_word_starts(SemanticTextLayout& layout) const {
+    const Utf8Offset end = store_.utf8_size();
+    if (end.value() == 0U) return;
+    Utf8Offset cursor(0U);
+    layout.word_starts.push_back(cursor);
+    while (cursor != end) {
+        cursor = next_word_boundary(cursor);
+        layout.word_starts.push_back(cursor);
+    }
 }
 
 void TextBox::on_detached_from_window() noexcept {

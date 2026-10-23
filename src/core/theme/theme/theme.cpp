@@ -44,6 +44,21 @@ bool valid_material_shadow(const MaterialShadow& shadow) noexcept {
            std::abs(shadow.offset.y) <= 4096.0;
 }
 
+// How far a glow reaches outside its box: its spread plus two blur radii,
+// four of its σ, past which its blur is below one 8-bit step.
+double glow_reach(const MaterialGlow& glow) noexcept {
+    const double reach = glow.spread + glow.blur_radius * 2.0;
+    return reach;
+}
+
+// A glow within the granted overflow (E9-C): a blur and a spread of zero
+// or more whose reach is at most SurfaceMaterial::maximum_glow_reach.
+bool valid_material_glow(const MaterialGlow& glow) noexcept {
+    const bool valid = std::isfinite(glow.blur_radius) && std::isfinite(glow.spread) && glow.blur_radius >= 0.0 &&
+                       glow.spread >= 0.0 && glow_reach(glow) <= SurfaceMaterial::maximum_glow_reach;
+    return valid;
+}
+
 // An overlay shadow: at most SurfaceMaterial::maximum_shadows valid layers,
 // none of them inset (an overlay shadow falls outside its surface).
 bool valid_overlay_shadow(const std::vector<MaterialShadow>& layers) noexcept {
@@ -404,7 +419,7 @@ HighContrastColours high_contrast_colours(ControlSurfaceState state) noexcept {
 // One state's derived record: the ordinary record's geometry and cues (its
 // corner radius, edge width, focus and default rings, offsets) kept, its
 // material rebuilt as one solid plate inside one solid edge, so that every
-// gradient, image, keyline, per-edge border and shadow is dropped.
+// gradient, image, keyline, per-edge border, shadow and glow is dropped.
 ControlVisualRecipe derived_high_contrast(const ControlVisualRecipe& ordinary, Color plate, Color edge,
                                           Color text) {
     ControlVisualRecipe result = ordinary;
@@ -523,6 +538,7 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
     if (material.fills.empty() ||
         material.fills.size() > SurfaceMaterial::maximum_fill_layers ||
         material.shadows.size() > SurfaceMaterial::maximum_shadows ||
+        material.glows.size() > SurfaceMaterial::maximum_glows ||
         material.keylines.size() > SurfaceMaterial::maximum_keylines ||
         !std::isfinite(material.corner_radius) ||
         material.corner_radius < 0.0 || material.corner_radius > 4096.0) {
@@ -546,6 +562,9 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
     }
     for (const MaterialShadow& shadow : material.shadows) {
         if (!valid_material_shadow(shadow)) return false;
+    }
+    for (const MaterialGlow& glow : material.glows) {
+        if (!valid_material_glow(glow)) return false;
     }
     for (const MaterialKeyline& keyline : material.keylines) {
         if (!valid_material_keyline(keyline)) return false;
@@ -651,6 +670,12 @@ void paint_surface_material(Painter& painter, Rect bounds,
                 shadow.blur_radius, shadow.spread, shadow.color);
         }
     }
+    // Glows over the outer shadows, under the fills; composited as a shadow
+    // at no offset (the engine's bake adds them, MaterialGlow).
+    for (const MaterialGlow& glow : material.glows) {
+        painter.draw_box_shadow(bounds, material.corner_radius, Point{},
+                                glow.blur_radius, glow.spread, glow.color);
+    }
     const bool clipped = material.corner_radius > 0.0;
     if (clipped) {
         painter.save();
@@ -713,7 +738,14 @@ void paint_surface_material(Painter& painter, Rect bounds,
 }
 
 Insets surface_material_visual_outsets(const SurfaceMaterial& material) noexcept {
-    const Insets result = box_shadow_visual_outsets(material.shadows);
+    Insets result = box_shadow_visual_outsets(material.shadows);
+    for (const MaterialGlow& glow : material.glows) {
+        const double reach = glow_reach(glow);
+        result.left = std::max(result.left, reach);
+        result.top = std::max(result.top, reach);
+        result.right = std::max(result.right, reach);
+        result.bottom = std::max(result.bottom, reach);
+    }
     return result;
 }
 

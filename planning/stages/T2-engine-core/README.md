@@ -325,8 +325,8 @@ the plan left a number or a form open, E3 chose:
    colour. When an image is shrunk, its kernel is widened by the shrink
    factor and the weights are normalized.
    - **The filter is decided (owner, 2026-10-22): stx_conv (CONV) prepares
-     face sizes; nothing resamples inside a bake.** It is built as its own
-     PR after E9.2.
+     face sizes; nothing resamples inside a bake.** Built as its own PR
+     after E9.2; see "CONV, image face variants" below.
      - *Preparation.* An image face's sized variant is produced by CONV
        through the internal seam `src/core/interpolation/interpolation.hpp`
        (`resample_image`, binary64, clamped to the valid premultiplied
@@ -392,10 +392,12 @@ table gives the minimum, median and maximum per pixel (per tap for
 | image tap | 3.4 | 3.9 | 4.3 | 4 |
 | image decode | −96 | −3.9 | 81 | 10 |
 
-The "used" column rounds each median up. The two image figures are below
+The "used" column rounds each median up. The three image figures are below
 the noise at this workload: single runs measured below zero. They therefore
 carry conservative figures rather than measurements. The machine's load
-makes every figure pessimistic.
+makes every figure pessimistic. Since CONV (below) the bake only composites
+a prepared variant: `image_tap` and `image_decode` are retired, and
+`--measure` reports only the composite.
 
 What the bound admits:
 
@@ -471,7 +473,7 @@ assembles any size of a sliceable material from one reference bake.
   `gui_forms_engine_motion_tests` bake nothing after the idle frames, and at
   most one keyframe per frame before them.
 
-## E9, light (in progress)
+## E9, light
 
 ### Decisions for E9 (owner, 2026-10-22)
 
@@ -483,6 +485,13 @@ assembles any size of a sliceable material from one reference bake.
   requested region: the backplane plane alone, keyed to its damage
   generation, read through a target borrow. Glass blurs within the 8 px
   cap, and the cache follows E7r's rules.
+  - **Who rasterizes it (owner, 2026-10-22, option 1).** The core bakes
+    the backplane image from the window's backplane material and the
+    backplane plane's engine part rasters. Text and other app-drawn
+    backplane commands are absent from glass. The commands it skips are
+    counted, so that it shows when glass omits something. Option 2, a host
+    `render_backplane` capability that replays the whole backplane plane,
+    is T5's upgrade behind the same borrow.
 - **E9-C, option 1: no new primitives.** Gloss is a material preset. Glow is
   one new material layer kind, soft and additive, bounded by the grant. Pop
   is rule data only.
@@ -552,6 +561,151 @@ assembles any size of a sliceable material from one reference bake.
     and bakes nothing, then rests baked at 29 × 36 device pixels, clipped
     to the popped face.
 
+### E9.3, glass over the backplane
+
+- **The borrow (E9-B).** A primitive that samples the backplane says so
+  through `EnginePrimitive::backplane_margin`: the device pixels its kernel
+  reads past the raster on every side. The engine then lends it
+  `PrimitiveTarget::backplane`, an image of the raster's extent grown by
+  that margin, with the backplane's damage generation and the image's
+  top-left pixel in window device space. The borrow lasts for that paint
+  only. A primitive that is lent no image, or one of another size, draws
+  without it.
+- **The image (owner, option 1).** `Window::engine_backplane` makes it on
+  first need. It bakes the window's backplane material over the region with
+  the material kernel (`bake_material_region`). It then composites the
+  backplane plane's `draw_part_raster` and `draw_part_raster_scaled`
+  commands over that, with nearest sampling, following saves, groups,
+  translations and clips. Every other command (text, app drawing) is
+  skipped and counted in `backplane_skipped_commands`. Option 2, a host
+  `render_backplane` that replays the whole plane, is T5's upgrade behind
+  the same borrow.
+- **The cache.** The engine table holds images per region (device origin,
+  extent and scale) at the window's backplane generation. An image from an
+  older generation is dropped when next asked for. Images share the 4 MB
+  budget and its least-recently-used order with shared bakes and image
+  variants. Counters: `backplane_bakes`, `backplane_hits`,
+  `backplane_images` and `backplane_skipped_commands`.
+- **Damage.** Damage to the backplane plane advances the generation and
+  damages every keyed part that sampled the backplane within it. A theme
+  change and an activation change advance it and damage every such part.
+  A part's record compares the generation, margin and origin, so moved or
+  stale glass is baked again. Glass is never shared or keyframed, since
+  its raster depends on where it lies. A part drawn in the backplane plane
+  never samples it, so glass cannot read itself.
+- **The kernel.** `glass` (roles region, face and well) blurs with three
+  integer box passes per axis. Each box is w = 2h + 1 wide, the odd integer
+  nearest √(4σ² + 1) for σ = blur × scale / 2, and each pass rounds once.
+  The margin is 3h. Its tint (default white at alpha 64) is composited
+  over the blur, and the result is clipped by the rounded-rect coverage:
+  `corner` (0 to 64), or the part's own radius when it has one. `blur` is
+  0 to 8 logical units, default 6. A rule asking for more is rejected when
+  the theme compiles (`parameter_out_of_range`), and the default applies.
+  No built-in rule selects glass.
+- **Proof.** `gui_forms_engine_glass_tests`:
+  - the kernel: the box sizes and margins, a uniform backplane unchanged,
+    the tint alone without a backplane, blurred stripes, and a backplane of
+    the wrong size unread; hash 0x748e797fedc763e5 at scale 1;
+  - glass over a backplane-plane part raster shows it, and shows the
+    window material elsewhere; one image is made and held, and the skipped
+    commands are counted;
+  - a control-plane cover under the glass leaves its bytes unchanged;
+  - control-plane damage keeps the image, and backplane damage away from
+    the glass bakes nothing; backplane damage under the glass makes its
+    image again, and the glass shows the change;
+  - a blur of 9 is rejected at compile and draws as the default blur.
+
+### E9.4, the gloss preset and the glow layer (E9-C)
+
+- **No new primitive.** Both are material data, baked by the `material`
+  primitive and painted by `paint_surface_material` on the built-in path.
+  No built-in theme carries either (§9.3 item 5).
+- **Gloss.** `gloss_material(GlossColours, corner_radius)`, in
+  `surface_material/presets/`, builds the §4.3 gloss from the ordinary
+  layers:
+  - one vertical gradient with stops at 0, 0.48, 0.52 and 1 (the hard
+    break: `above_break` to `below_break` within 4 % of the face's height);
+  - a 1-unit shine keyline under the top edge, inside the border, clipped
+    to the corners;
+  - and a 1-unit border.
+  A corner radius outside [0, 4096] is refused (`std::invalid_argument`).
+  Its vertical gradient slices across (E7r) like any other.
+- **Glow.** `MaterialGlow{color, blur_radius, spread}`, at most
+  `SurfaceMaterial::maximum_glows` (2) per material:
+  - *The shape.* The box grown by `spread` and blurred by `blur_radius`
+    (σ = blur / 2, as a shadow's), at no offset. Its corner radius is the
+    box's plus the spread.
+  - *Additive.* The engine bakes it with the outer shadow's separable
+    kernel. It then adds its premultiplied colour to the outer shadows
+    beneath it, each channel at most 1. The fills, inset shadows, border
+    and keylines are drawn over it, so it is a halo that the face covers.
+    `paint_surface_material` draws it as a shadow at no offset after the
+    outer shadows. That differs from the bake only where a glow lies over
+    a shadow, since adding light over nothing is compositing it.
+  - *Bounded by the grant.* Its reach, spread + 2 × blur (four σ, where
+    its blur is below one 8-bit step), is at most
+    `SurfaceMaterial::maximum_glow_reach`, 8 logical units: the material's
+    outsets, which a static assertion ties to it. A material whose glow
+    reaches further is invalid, so the primitive refuses it and the theme
+    rejects it. The built-in path's visual outsets include the reach.
+  - *Cost.* Each glow is costed as an outer shadow (`outer_shadow`, and
+    `outer_corner` at its rounded corners), since it runs the same kernel.
+  - *Inspection.* The visual-inspection snapshot lists the glows.
+- **Proof.** `gui_forms_engine_material_tests`:
+  - the glow lies outside the box and under the face, and fades within
+    its reach;
+  - its alpha adds to a shadow's beneath it, and the shadow does not
+    darken it;
+  - a reach of 8 is valid and fills the outsets; a reach past 8, a
+    negative blur and a third glow are invalid;
+  - the built-in path draws the shadow, then the glow, then the fill;
+  - the gloss's stops, shine and border, the step across the break and
+    the shine under the top border;
+  - reference hashes for both at scale 1 and 2.
+
+  `gui_forms_engine_slice_tests`: a glow in the layered material, and the
+  gloss, assemble from slices to the whole bake's bytes.
+
+### E9.5, pop as rule data, and the proof (E9-C)
+
+- **No engine change.** A pop (§9.3 item 1) is a theme's data alone:
+  - the material primitive draws the face from the theme's recipe for the
+    part's family, so the hot and selected recipes carry the risen look: a
+    brighter fill, a deeper shadow and a glow (E9.4);
+  - a `scale` transition grows the part while it is hot, selected or
+    focus-visible, within the overflow its control grants (E8b);
+  - a `face` cross-fade blends the resting and risen faces (E7r form a).
+  No built-in rule pops anything.
+- **Proof.** `gui_forms_engine_pop_tests` pops the middle of three gloss
+  tiles to 1.08 within a grant of 4:
+  - the theme compiles cleanly and the registry still holds 12
+    primitives;
+  - the risen face's shadow is deeper below it, and it glows above its top;
+  - the change bakes at most the risen face and the face to stretch;
+  - while the pop moves, nothing is baked; only the popped part is painted,
+    within its grant and its material's outsets; the face is stretched
+    towards the popped scale;
+  - at rest it is baked sharp once at its popped size, and the window then
+    runs no frames;
+  - the neighbours keep their bounds;
+  - selection pops it as hover does;
+  - reduced motion jumps to the popped size without stretching;
+  - a part granted no overflow never grows.
+- **E9 as a whole.** Every light effect follows E7r's retained forms:
+  - shadow, gloss, glow and glass are baked once per state, size and scale;
+  - sheen composites one band baked once;
+  - pop stretches cached rasters.
+  Each effect's suite shows that nothing is baked while it moves or
+  follows the pointer, and that damage stays within the part. The
+  per-primitive reference hashes are:
+  - overlay shadow 0x12c9cfd27f7ea098;
+  - sheen band 0xd4c2e5fcf3e31bf5;
+  - glass kernel 0x748e797fedc763e5;
+  - glow 0x047bc7d0bde0012d and 0xda184a1654d76385;
+  - gloss 0x4507eda3b5101fcb and 0xce445232e6045c6d.
+  CI checks them on every platform. The quiet-machine re-measure of the
+  bake costs is still open.
+
 ### E9 shadow costs
 
 The outer shadow was measured again after the separable kernel, with
@@ -578,6 +732,52 @@ radius plus its reach (3.5σ'), and one pixel, on each side.
 
 The overlay tooltip of 120 × 40 at scale 2 now bakes within the bound. It
 was refused at 1.5 and 2 under the old per-pixel cost of 69 ns.
+
+## CONV, image face variants
+
+The owner's decision of 2026-10-22 (E8c item 2): an image face's sized
+variant is prepared by CONV, and the bake only composites it.
+
+- **The seam.** `EnginePrimitive::image_variants` names the variants a
+  bake needs, one per image fill (`ImageVariantRequest`: the image, its
+  source size, the variant's device extent and scale, and a nine-patch's
+  source slices and fixed device lengths). The engine lends them in
+  `PrimitiveTarget::variants` (`LentImageVariants`). A fill whose variant
+  is not lent draws nothing.
+- **What a variant is.** A stretched or nine-patch image's variant is the
+  material box's size, rounded; a tile's is one tile. The material maps
+  each destination pixel's centre to the variant pixel it falls on,
+  proportionally within its nine-patch segment or its tile, so a variant
+  of the box's size composites one to one.
+- **Preparation.** `make_image_variant` (`src/core/engine/primitives/
+  material/image_variant.cpp`) resamples each axis through the
+  interpolation seam in binary64: `resample_line` with pixel-area sampling
+  when the axis shrinks, `interpolate_line_at` at the pixel centres,
+  (o + 0.5) × s / t − 0.5 clamped to the first and last pixel, when it
+  enlarges, and a copy when it keeps its length. This is the face study's
+  CONV centre composition; `resample_image` takes one sampling for both
+  axes, so it is not used. The vertical axis goes first when the height
+  shrinks. A nine-patch's nine regions are resampled apart. The colour is
+  then clamped to alpha and quantized once.
+- **The cache.** `EnginePartTable` holds the variants beside the shared
+  bakes, matched on everything but the fill layer. Their bytes count in
+  `shared_bytes` against `shared_bake_budget_bytes`, and eviction takes the
+  least recently used of both lists. A theme change (`invalidate_rasters`)
+  or a new revision of the window's images drops them. Counters:
+  `image_variant_bakes`, `image_variant_hits`, `image_variants`.
+- **When.** A variant is made on the first bake that needs it, a keyframe's
+  idle bake included, so an idle keyframe prepares its variant in the idle
+  frame. Otherwise it is made synchronously on first need.
+- **Removed.** Mitchell–Netravali, `MaterialResamplingFilter`, the tap
+  planner, and the `image_tap` and `image_decode` costs. The bake estimate
+  counts only the composite (`image`, 6 ns per pixel).
+- **Proof.** `gui_forms_engine_material_tests`: the image-fill reference
+  hashes, updated (stretch, PNG equal to BGRA, tile, nine-patch, shrink);
+  `image_variant_made_once`: two bakes make one variant and reuse it, the
+  table's bake matches the primitive's byte for byte, a new image revision
+  makes it again, and a theme change drops it; `image_variant_outside_the_bound`:
+  a 1024 × 1024 image on a 240-unit part has the same estimate as a 4 × 4
+  one, is accepted and bakes, its variant made on first need.
 
 ## Open decisions (ask, do not decide)
 

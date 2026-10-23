@@ -129,7 +129,8 @@ character-category data. The prompt is not hidden when the box loses focus,
 and there is no password character yet.
 
 The control publishes the accessibility role `text_box` with the field as
-shown (prompts and literals in place) as its value, and the read-only state.
+shown (prompts and literals in place) as its value, the read-only state, and
+the editor's selection while the editor shows that value.
 `SemanticAction::set_value` goes through the mask as `set_text` does and
 fails for text the mask refuses.
 
