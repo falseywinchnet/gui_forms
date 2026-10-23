@@ -11,6 +11,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+import ci_build
 import stack_frames
 
 WINDOWS_X64: str = '''
@@ -364,6 +365,35 @@ class StaleObjectTests(unittest.TestCase):
         self.assertEqual(choice.current, objects)
         self.assertEqual(choice.orphaned, [])
         self.assertIn('every object read', choice.note)
+
+
+class BuildRecordTests(unittest.TestCase):
+    """A run that built nothing has nothing to check; a run that built something must leave objects."""
+
+    def check(self, build: Path) -> int:
+        # The disassembler is never started: these trees hold no object.
+        return stack_frames.main(['check', '--tree', str(build / 'gui-forms-sanitize'), '--objdump', 'unused'])
+
+    def test_nothing_built_passes_without_a_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            build: Path = Path(scratch)
+            ci_build.write_build_record(build / 'gui-forms-sanitize', ci_build.BUILT_NOTHING,
+                                        'no test reads the 1 paths changed since origin/main')
+            self.assertEqual(self.check(build), 0)
+
+    def test_a_selection_that_built_but_left_no_object_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            build: Path = Path(scratch)
+            tree: Path = build / 'gui-forms-sanitize'
+            (tree / 'CMakeFiles').mkdir(parents=True)
+            ci_build.write_build_record(tree, ci_build.BUILT_SELECTED, '3 build outputs of the selected tests')
+            self.assertEqual(self.check(build), 2)
+
+    def test_an_empty_tree_without_a_record_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            build: Path = Path(scratch)
+            (build / 'gui-forms-sanitize').mkdir()
+            self.assertEqual(self.check(build), 2)
 
 if __name__ == '__main__':
     unittest.main()

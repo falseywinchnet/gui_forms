@@ -198,6 +198,8 @@ jobs:
       # thread (#283). Reads the prologues of the objects this run built, so
       # a narrowed pull-request build checks the areas it changed. Runs after
       # a failed test too: an overflow fails as a crash, which this names.
+      # A run that built nothing (a change no test reads, such as a
+      # documentation-only one) passes: ci_build.py's build record says so.
       - name: Check stack frames
         if: ${{ !cancelled() }}
         run: python gui_forms/tools/stack_frames.py check --tree .build/native-linux-x64/gui-forms-sanitize --jobs 4 --top 15
