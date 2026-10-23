@@ -812,6 +812,29 @@ private:
     // and where it was drawn (EnginePartTable::note_paint).
     void note_engine_paint(PartRecordHandle handle, std::uint64_t inputs_read, const Control& painted_by,
                            Rect extent);
+    // The window's backplane under a part (E9-B): `image` covers a raster
+    // of `extent` device pixels whose top-left corner lies at
+    // `raster_origin` (window logical units) at `scale`, grown by `margin`
+    // device pixels on every side; `origin` is its top-left pixel in the
+    // window's device pixels and `generation` the backplane's damage
+    // generation it was made at. Held in the engine table's shared cache
+    // per region (EnginePartTable::held_backplane) and made on first need:
+    // the window's backplane material, then the backplane plane's engine
+    // part rasters (option 1; everything else is skipped and counted).
+    // `image` is null when no image can be made.
+    struct EngineBackplane final {
+        std::shared_ptr<const PartRaster> image{};
+        Point origin{};
+        std::uint64_t generation{};
+    };
+    [[nodiscard]] EngineBackplane engine_backplane(Point raster_origin, DeviceExtent extent, DeviceScale scale,
+                                                   std::uint32_t margin);
+    // Called by ThemeEngine::paint for a keyed part: whether its paint
+    // sampled the backplane (EnginePartTable::note_backplane_reader).
+    void note_engine_backplane_reader(PartRecordHandle handle, bool reads) noexcept;
+    // The backplane's damage generation (E9-B): advanced by every damage
+    // to the backplane plane, a theme change and an activation change.
+    [[nodiscard]] std::uint64_t backplane_generation() const noexcept { return backplane_generation_; }
     // The pointer's window position for the engine's pointer inputs, or
     // none while it is outside the window.
     [[nodiscard]] const std::optional<Point>& engine_pointer() const noexcept { return engine_pointer_; }
@@ -821,6 +844,15 @@ private:
     // counts it in the metrics.
     void damage_engine_readers(std::uint64_t inputs, bool hot_only);
     void damage_published_readers(std::string_view name);
+    // Advances the backplane's damage generation and invalidates the extent
+    // of every keyed part that sampled the backplane within `damage`
+    // (window logical units), or every such part when `damage` is null.
+    void damage_backplane_readers(const Rect* damage);
+    // Composites the backplane-plane display chunks of `control` and its
+    // subtree, clipped to `clip` (window logical units), into `image`
+    // covering `region`; adds the commands skipped to `skipped`.
+    void composite_backplane_subtree(const Control::Ptr& control, Rect clip, const BackplaneRegion& region,
+                                     const PartRasterView& image, std::uint64_t& skipped) const;
     struct EngineDamage final {
         std::uint64_t parts{};
         double area{};
@@ -1199,6 +1231,8 @@ private:
     // window is registered with them from construction to destruction.
     std::shared_ptr<ApplicationResources> resources_;
     std::uint64_t display_generation_{};
+    // The backplane's damage generation (E9-B); starts at 1.
+    std::uint64_t backplane_generation_{1U};
     using FrameRequestList =
         std::vector<std::shared_ptr<detail::ScheduledFrameRequest>>;
     FrameRequestList frame_requests_;

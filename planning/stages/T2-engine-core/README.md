@@ -485,6 +485,13 @@ assembles any size of a sliceable material from one reference bake.
   requested region: the backplane plane alone, keyed to its damage
   generation, read through a target borrow. Glass blurs within the 8 px
   cap, and the cache follows E7r's rules.
+  - **Who rasterizes it (owner, 2026-10-22, option 1).** The core bakes
+    the backplane image from the window's backplane material and the
+    backplane plane's engine part rasters. Text and other app-drawn
+    backplane commands are absent from glass. The commands it skips are
+    counted, so that it shows when glass omits something. Option 2, a host
+    `render_backplane` capability that replays the whole backplane plane,
+    is T5's upgrade behind the same borrow.
 - **E9-C, option 1: no new primitives.** Gloss is a material preset. Glow is
   one new material layer kind, soft and additive, bounded by the grant. Pop
   is rule data only.
@@ -553,6 +560,60 @@ assembles any size of a sliceable material from one reference bake.
   - a pop to 1.2: the band stretches with the face while the scale moves
     and bakes nothing, then rests baked at 29 × 36 device pixels, clipped
     to the popped face.
+
+### E9.3, glass over the backplane
+
+- **The borrow (E9-B).** A primitive that samples the backplane says so
+  through `EnginePrimitive::backplane_margin`: the device pixels its kernel
+  reads past the raster on every side. The engine then lends it
+  `PrimitiveTarget::backplane`, an image of the raster's extent grown by
+  that margin, with the backplane's damage generation and the image's
+  top-left pixel in window device space. The borrow lasts for that paint
+  only. A primitive that is lent no image, or one of another size, draws
+  without it.
+- **The image (owner, option 1).** `Window::engine_backplane` makes it on
+  first need. It bakes the window's backplane material over the region with
+  the material kernel (`bake_material_region`). It then composites the
+  backplane plane's `draw_part_raster` and `draw_part_raster_scaled`
+  commands over that, with nearest sampling, following saves, groups,
+  translations and clips. Every other command (text, app drawing) is
+  skipped and counted in `backplane_skipped_commands`. Option 2, a host
+  `render_backplane` that replays the whole plane, is T5's upgrade behind
+  the same borrow.
+- **The cache.** The engine table holds images per region (device origin,
+  extent and scale) at the window's backplane generation. An image from an
+  older generation is dropped when next asked for. Images share the 4 MB
+  budget and its least-recently-used order with shared bakes and image
+  variants. Counters: `backplane_bakes`, `backplane_hits`,
+  `backplane_images` and `backplane_skipped_commands`.
+- **Damage.** Damage to the backplane plane advances the generation and
+  damages every keyed part that sampled the backplane within it. A theme
+  change and an activation change advance it and damage every such part.
+  A part's record compares the generation, margin and origin, so moved or
+  stale glass is baked again. Glass is never shared or keyframed, since
+  its raster depends on where it lies. A part drawn in the backplane plane
+  never samples it, so glass cannot read itself.
+- **The kernel.** `glass` (roles region, face and well) blurs with three
+  integer box passes per axis. Each box is w = 2h + 1 wide, the odd integer
+  nearest √(4σ² + 1) for σ = blur × scale / 2, and each pass rounds once.
+  The margin is 3h. Its tint (default white at alpha 64) is composited
+  over the blur, and the result is clipped by the rounded-rect coverage:
+  `corner` (0 to 64), or the part's own radius when it has one. `blur` is
+  0 to 8 logical units, default 6. A rule asking for more is rejected when
+  the theme compiles (`parameter_out_of_range`), and the default applies.
+  No built-in rule selects glass.
+- **Proof.** `gui_forms_engine_glass_tests`:
+  - the kernel: the box sizes and margins, a uniform backplane unchanged,
+    the tint alone without a backplane, blurred stripes, and a backplane of
+    the wrong size unread; hash 0x748e797fedc763e5 at scale 1;
+  - glass over a backplane-plane part raster shows it, and shows the
+    window material elsewhere; one image is made and held, and the skipped
+    commands are counted;
+  - a control-plane cover under the glass leaves its bytes unchanged;
+  - control-plane damage keeps the image, and backplane damage away from
+    the glass bakes nothing; backplane damage under the glass makes its
+    image again, and the glass shows the change;
+  - a blur of 9 is rejected at compile and draws as the default blur.
 
 ### E9 shadow costs
 

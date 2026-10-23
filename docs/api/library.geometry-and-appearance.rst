@@ -16,6 +16,8 @@ Types
 
    * - :cpp:class:`AmbientEffect <gui_forms::AmbientEffect>`
      - An ambient effect (E7): its part repaints as time passes, at most ``frames_per_second``, and reads time_in_state within one ``period`` (it wraps), so that the effect cycles.
+   * - :cpp:class:`BackplaneRegion <gui_forms::BackplaneRegion>`
+     - One backplane image's region (E9-B): ``extent`` device pixels at ``scale``, its top-left pixel at ``origin`` in the window's device pixels (the window's logical origin times the scale; possibly fractional).
    * - :cpp:class:`BasicControlStyle <gui_forms::BasicControlStyle>`
      - BasicControlStyle retains the compact compatibility palette used by callers that do not select full role recipes.
    * - :cpp:class:`CachedPartRaster <gui_forms::CachedPartRaster>`
@@ -232,6 +234,20 @@ Types
    .. cpp:member:: double frames_per_second
 
    .. cpp:member:: FrameInterval pose
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BackplaneRegion final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   One backplane image's region (E9-B): ``extent`` device pixels at ``scale``, its top-left pixel at ``origin`` in the window's device pixels (the window's logical origin times the scale; possibly fractional).
+
+   .. cpp:member:: Point origin
+
+   .. cpp:member:: DeviceExtent extent
+
+   .. cpp:member:: DeviceScale scale
 
 .. cpp:namespace:: gui_forms
 
@@ -823,6 +839,10 @@ Types
 
    .. cpp:member:: Rect extent
 
+   .. cpp:member:: bool reads_backplane
+
+      Whether the part's last paint sampled the window's backplane (E9-B): backplane damage within its extent repaints it.
+
    .. cpp:member:: FrameTime state_entered
 
       When the part entered the states it was last painted in, on the window's motion clock; time_in_state counts from it.
@@ -940,6 +960,22 @@ Types
 
       Records what a part's paint read and where it was drawn (E6; see EnginePartRecord::inputs_read). A stale handle does nothing. If the control's ID cannot be copied, std::bad_alloc propagates and the record is unchanged.
 
+   .. cpp:function:: void note_backplane_reader(PartRecordHandle handle, bool reads) noexcept
+
+      Records whether a part's last paint sampled the window's backplane (E9-B), so that backplane damage under it repaints it. A stale handle does nothing.
+
+   .. cpp:function:: std::shared_ptr<const PartRaster> held_backplane(const BackplaneRegion& region, std::uint64_t generation, std::uint64_t paint_sequence)
+
+      The backplane image held for ``region`` at the backplane's damage ``generation``, or null; one that is held is marked used by ``paint_sequence`` and counted a hit. Images of an earlier generation are dropped first.
+
+   .. cpp:function:: void hold_backplane(const BackplaneRegion& region, std::uint64_t generation, const std::shared_ptr<const PartRaster>& image, std::uint64_t skipped, std::uint64_t paint_sequence)
+
+      Holds ``image``, just made for ``region`` at ``generation`` with ``skipped`` backplane commands left out, within the shared budget (least recently used evicted first; an image larger than the budget is counted but not held). Allocation failure propagates as std::bad_alloc and holds nothing.
+
+   .. cpp:function:: void bake_backplane_material(const SurfaceMaterial& material, Size window_size, const BackplaneRegion& region, const ImageRegistry* images, const PartRasterView& image, std::uint64_t paint_sequence)
+
+      Draws the window's backplane ``material`` over ``region`` into ``image`` (E9-B), for a window of ``window_size`` logical units whose images are ``images`` (null for none): the material kernel over that region of the window's box, with the material's image variants lent as for a part. Nothing is drawn when the material is invalid.
+
    .. cpp:function:: bool reads_any(std::uint64_t inputs) const noexcept
 
       Whether any live record reads any input of ``inputs``, from the table's reader counts, without a scan.
@@ -995,6 +1031,10 @@ Types
    .. cpp:function:: virtual std::optional<PointerOverlay> pointer_overlay(const PrimitiveParameterBlock& parameters, Size part) const noexcept
 
       How the primitive is composited over a part of ``part`` size when it stands behind the overlay seam (PointerOverlay); none for a primitive drawn over the part's own box, unless the primitive says otherwise. ``parameters`` match the declarations.
+
+   .. cpp:function:: virtual std::optional<std::uint32_t> backplane_margin(const PrimitiveParameterBlock& parameters, DeviceScale scale) const noexcept
+
+      How many device pixels past the destination, on every side, the primitive reads the backplane at display ``scale`` (PrimitiveTarget:: backplane); none for a primitive that does not sample it, unless the primitive says otherwise. ``parameters`` match the declarations.
 
    .. cpp:function:: virtual std::size_t image_variants(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target, std::span<ImageVariantRequest> requests) const noexcept
 
@@ -2302,6 +2342,16 @@ Types
 
       Borrowed, as ``material`` is.
 
+   .. cpp:member:: const PartRaster* backplane
+
+   .. cpp:member:: std::uint32_t backplane_margin
+
+   .. cpp:member:: std::uint64_t backplane_generation
+
+   .. cpp:member:: Point backplane_origin
+
+      The backplane image's top-left pixel in the window's device pixels.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PropertyTransition final
@@ -2383,6 +2433,16 @@ Types
    .. cpp:member:: std::uint64_t image_variant_hits
 
    .. cpp:member:: std::size_t image_variants
+
+   .. cpp:member:: std::uint64_t backplane_bakes
+
+      The window's backplane images (E9-B, owner 2026-10-22): made, lent from those held, and held now; and the backplane commands their making skipped. The core bakes a backplane image from the window's backplane material and the backplane plane's engine part rasters alone (option 1), so text and other commands drawn in the backplane plane are absent from glass; each one is counted here every time an image is made over it.
+
+   .. cpp:member:: std::uint64_t backplane_hits
+
+   .. cpp:member:: std::size_t backplane_images
+
+   .. cpp:member:: std::uint64_t backplane_skipped_commands
 
 .. cpp:namespace:: gui_forms
 

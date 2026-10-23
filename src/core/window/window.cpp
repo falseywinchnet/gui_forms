@@ -2606,6 +2606,8 @@ void Window::add_damage(Rect damage, PaintPlane plane) {
     metrics_.record_damage_region(
         region.rectangle_count(), region.compaction_count() - compactions,
         region.collapse_count() - collapses);
+    // Glass over the damaged backplane shows it changed (E9-B).
+    if (plane == PaintPlane::backplane) damage_backplane_readers(&damage);
 }
 
 void Window::add_damage_all_planes(Rect damage) {
