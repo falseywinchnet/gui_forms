@@ -11,6 +11,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+import ci_build
 import stack_frames
 
 WINDOWS_X64: str = '''
@@ -299,6 +300,100 @@ class ObjectChoiceTests(unittest.TestCase):
                 found.append(path_found.relative_to(tree).as_posix())
             self.assertEqual(found, sorted(kept))
 
+
+
+TARGETS_LISTING: str = """CMakeFiles/gui_forms_core.dir/src/core/a.cpp.obj: CXX_COMPILER__gui_forms_core_unscanned_RelWithDebInfo
+CMakeFiles/gui_forms_core.dir/src/core/b.cpp.obj: CXX_COMPILER__gui_forms_core_unscanned_RelWithDebInfo
+CMakeFiles/gui_forms_core.dir/src/core/c.c.obj: C_COMPILER__gui_forms_core_unscanned_RelWithDebInfo
+gui_forms_theme_tests.exe: CXX_EXECUTABLE_LINKER__gui_forms_theme_tests_RelWithDebInfo
+all: phony
+"""
+
+DRY_RUN: str = """[1/3] ccache clang++ -DGUI -O1 -fsanitize=address -o CMakeFiles/gui_forms_core.dir/src/core/b.cpp.obj -c D:/src/core/b.cpp
+[2/3] ccache clang -O1 -o {tree}/CMakeFiles/gui_forms_core.dir/src/core/c.c.obj -c D:/src/core/c.c
+[3/3] clang++ -fsanitize=address CMakeFiles/gui_forms_core.dir/src/core/a.cpp.obj -o gui_forms_theme_tests.exe
+"""
+
+REGENERATING: str = """[0/1] cmake.exe --regenerate-during-build -SD:/src -BD:/build
+"""
+
+
+class StaleObjectTests(unittest.TestCase):
+    def objects(self, tree: Path, names: list[str]) -> list[Path]:
+        paths: list[Path] = []
+        name: str
+        for name in names:
+            paths.append(tree / ('CMakeFiles/gui_forms_core.dir/src/core/' + name))
+        return paths
+
+    def test_listing_names_object_outputs_only(self) -> None:
+        self.assertEqual(stack_frames.listed_objects(TARGETS_LISTING), {
+            'CMakeFiles/gui_forms_core.dir/src/core/a.cpp.obj', 'CMakeFiles/gui_forms_core.dir/src/core/b.cpp.obj',
+            'CMakeFiles/gui_forms_core.dir/src/core/c.c.obj'})
+
+    def test_dry_run_names_the_objects_it_would_compile(self) -> None:
+        # The second command names its object by an absolute path in the tree.
+        tree: Path = Path(tempfile.gettempdir()) / 'build'
+        pending: set[str] | None = stack_frames.pending_objects(DRY_RUN.replace('{tree}', tree.as_posix()), tree)
+        self.assertEqual(pending, {'CMakeFiles/gui_forms_core.dir/src/core/b.cpp.obj',
+                                   'CMakeFiles/gui_forms_core.dir/src/core/c.c.obj'})
+        self.assertIsNone(stack_frames.pending_objects(REGENERATING, Path('D:/build')))
+
+    def test_orphaned_and_out_of_date_objects_are_set_apart(self) -> None:
+        tree: Path = Path(tempfile.gettempdir()) / 'build'
+        objects: list[Path] = self.objects(tree, ['a.cpp.obj', 'b.cpp.obj', 'c.c.obj', 'removed.cpp.obj'])
+        choice: stack_frames.ObjectChoice = stack_frames.choose_objects(
+            tree, objects, TARGETS_LISTING, DRY_RUN.replace('{tree}', tree.as_posix()))
+        self.assertEqual(choice.current, self.objects(tree, ['a.cpp.obj']))
+        self.assertEqual(choice.out_of_date, self.objects(tree, ['b.cpp.obj', 'c.c.obj']))
+        self.assertEqual(choice.orphaned, self.objects(tree, ['removed.cpp.obj']))
+        self.assertEqual(choice.note, '')
+
+    def test_a_tree_needing_regeneration_still_sets_orphans_apart(self) -> None:
+        tree: Path = Path('D:/build')
+        objects: list[Path] = self.objects(tree, ['a.cpp.obj', 'b.cpp.obj', 'removed.cpp.obj'])
+        choice: stack_frames.ObjectChoice = stack_frames.choose_objects(tree, objects, TARGETS_LISTING,
+                                                                        REGENERATING)
+        self.assertEqual(choice.current, self.objects(tree, ['a.cpp.obj', 'b.cpp.obj']))
+        self.assertEqual(choice.orphaned, self.objects(tree, ['removed.cpp.obj']))
+        self.assertIn('regenerating', choice.note)
+
+    def test_without_ninja_every_object_is_read(self) -> None:
+        tree: Path = Path('D:/build')
+        objects: list[Path] = self.objects(tree, ['a.cpp.obj', 'removed.cpp.obj'])
+        choice: stack_frames.ObjectChoice = stack_frames.choose_objects(tree, objects, None, None)
+        self.assertEqual(choice.current, objects)
+        self.assertEqual(choice.orphaned, [])
+        self.assertIn('every object read', choice.note)
+
+
+class BuildRecordTests(unittest.TestCase):
+    """A run that built nothing has nothing to check; a run that built something must leave objects."""
+
+    def check(self, build: Path) -> int:
+        # The disassembler is never started: these trees hold no object.
+        return stack_frames.main(['check', '--tree', str(build / 'gui-forms-sanitize'), '--objdump', 'unused'])
+
+    def test_nothing_built_passes_without_a_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            build: Path = Path(scratch)
+            ci_build.write_build_record(build / 'gui-forms-sanitize', ci_build.BUILT_NOTHING,
+                                        'no test reads the 1 paths changed since origin/main')
+            self.assertEqual(self.check(build), 0)
+
+    def test_a_selection_that_built_but_left_no_object_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            build: Path = Path(scratch)
+            tree: Path = build / 'gui-forms-sanitize'
+            (tree / 'CMakeFiles').mkdir(parents=True)
+            ci_build.write_build_record(tree, ci_build.BUILT_SELECTED, '3 build outputs of the selected tests')
+            self.assertEqual(self.check(build), 2)
+
+    def test_an_empty_tree_without_a_record_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            build: Path = Path(scratch)
+            (build / 'gui-forms-sanitize').mkdir()
+            self.assertEqual(self.check(build), 2)
 
 if __name__ == '__main__':
     unittest.main()

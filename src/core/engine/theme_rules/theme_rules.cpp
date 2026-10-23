@@ -437,6 +437,21 @@ bool in_range(double value, double minimum, double maximum) noexcept {
     return inside;
 }
 
+// Whether a state's stops (E9.6) are usable: none, or at most
+// maximum_motion_stops on a timed curve, offsets strictly increasing
+// within (0, 1) and values within [minimum, maximum].
+bool usable_stops(const PresentationState& state, const MotionCurve& curve, double minimum, double maximum) noexcept {
+    if (state.stops.empty()) return true;
+    if (curve.kind != MotionKind::timed || state.stops.size() > maximum_motion_stops) return false;
+    double previous = 0.0;
+    for (const MotionStop& stop : state.stops) {
+        const bool ordered = std::isfinite(stop.offset) && stop.offset > previous && stop.offset < 1.0;
+        if (!ordered || !in_range(stop.value, minimum, maximum)) return false;
+        previous = stop.offset;
+    }
+    return true;
+}
+
 // Whether a machine's states are usable for a property ranging over
 // [minimum, maximum].
 bool usable_states(const PropertyTransition& transition, double minimum, double maximum) noexcept {
@@ -447,6 +462,7 @@ bool usable_states(const PropertyTransition& transition, double minimum, double 
         }
         if (!in_range(state.target, minimum, maximum)) return false;
         if (state.enter_from && !in_range(*state.enter_from, minimum, maximum)) return false;
+        if (!usable_stops(state, transition.curve, minimum, maximum)) return false;
     }
     return true;
 }
@@ -467,6 +483,11 @@ void CompiledThemeRules::add_transitions(std::vector<RuleDiagnostic>& diagnostic
             maximum = maximum_presentational_scale;
         } else if (transition.property == face_property) {
             made.property = PresentationProperty::face;
+        } else if (transition.property == translate_x_property || transition.property == translate_y_property) {
+            const bool across = transition.property == translate_x_property;
+            made.property = across ? PresentationProperty::translate_x : PresentationProperty::translate_y;
+            minimum = -maximum_presentational_translate;
+            maximum = maximum_presentational_translate;
         } else {
             if (compiled.primitive == nullptr) {
                 diagnostics.push_back(
@@ -513,7 +534,8 @@ void CompiledThemeRules::add_transitions(std::vector<RuleDiagnostic>& diagnostic
             for (const AnatomyState when : state.when) compiled_state.when.insert(when);
             compiled_state.target = state.target;
             compiled_state.enter_from = state.enter_from;
-            made.states.push_back(compiled_state);
+            compiled_state.stops = state.stops;
+            made.states.push_back(std::move(compiled_state));
         }
         made.curve = transition.curve;
         compiled.transitions.push_back(std::move(made));
@@ -657,6 +679,8 @@ void CompiledThemeRules::resolve_transitions(const PartFacts& facts, Resolution&
     const CompiledTransition* opacity = nullptr;
     const CompiledTransition* scale = nullptr;
     const CompiledTransition* face = nullptr;
+    const CompiledTransition* across = nullptr;
+    const CompiledTransition* down = nullptr;
     std::array<const CompiledTransition*, maximum_primitive_parameters> parameters{};
     const bool primitive = result.outcome == Outcome::primitive;
     for (const CompiledRule& rule : rules_) {
@@ -671,6 +695,10 @@ void CompiledThemeRules::resolve_transitions(const PartFacts& facts, Resolution&
                 scale = &transition;
             } else if (transition.property == PresentationProperty::face) {
                 face = &transition;
+            } else if (transition.property == PresentationProperty::translate_x) {
+                across = &transition;
+            } else if (transition.property == PresentationProperty::translate_y) {
+                down = &transition;
             } else if (same_primitive) {
                 parameters[transition.parameter] = &transition;
             }
@@ -687,6 +715,14 @@ void CompiledThemeRules::resolve_transitions(const PartFacts& facts, Resolution&
     }
     if (face != nullptr) {
         result.transitions[result.transition_count] = face;
+        result.transition_count = result.transition_count + 1U;
+    }
+    if (across != nullptr) {
+        result.transitions[result.transition_count] = across;
+        result.transition_count = result.transition_count + 1U;
+    }
+    if (down != nullptr) {
+        result.transitions[result.transition_count] = down;
         result.transition_count = result.transition_count + 1U;
     }
     for (std::size_t index = 0; index < result.parameters.count; ++index) {
