@@ -194,6 +194,9 @@ jobs:
           echo "CCACHE_BASEDIR=$cache_base" >> "$GITHUB_ENV"
           echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
           echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          # Before the cache is restored: tools/ci_cache.py evict keeps the
+          # entries used after this moment.
+          echo "GUI_FORMS_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
       # Objects: this workflow's own key first, then whatever native.yml saved for
       # the same compiler. Dependencies: native.yml's exact key (same fetch scripts).
       - uses: actions/cache/restore@v4
@@ -205,7 +208,9 @@ jobs:
             gui-programs-objects-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-
             gui-objects-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-
             gui-objects-v2-${{ matrix.platform }}-
-      - uses: actions/cache@v4
+      # Restored on every run, saved only on main (below): a pull request's
+      # copy could be restored by no other ref.
+      - uses: actions/cache/restore@v4
         id: dependencies
         with:
           path: |
@@ -271,7 +276,25 @@ jobs:
         if: always()
         run: ccache --show-stats --verbose
       # Only main saves (pull requests restore main's): per-PR entries evicted
-      # the dependency caches from the repository's 10 GB.
+      # the dependency caches from the repository's 10 GB. The dependencies
+      # are saved after the build, which fetched miniaudio's sources.
+      - uses: actions/cache/save@v4
+        if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.compile.outcome == 'success' && steps.dependencies.outputs.cache-hit != 'true'
+        with:
+          path: |
+            gui_forms/third_party/skia
+            gui_forms/third_party/harfbuzz
+            gui_forms/third_party/freetype
+            gui_forms/third_party/libunibreak
+            .build/native-${{ matrix.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
+            .build/native-${{ matrix.platform }}/skia
+          key: ${{ steps.dependencies.outputs.cache-primary-key }}
+      # The saved cache is this build's working set, not every generation up
+      # to CCACHE_MAXSIZE (planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1).
+      # The programs build compiles everything, so the set is complete.
+      - name: Keep only the compiler cache entries this build used
+        if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.objects.outputs.cache-hit != 'true'
+        run: python gui_forms/tools/ci_cache.py evict --since "$GUI_FORMS_JOB_START"
       - uses: actions/cache/save@v4
         if: always() && github.event_name != 'pull_request' && steps.compile.outcome == 'success' && steps.objects.outputs.cache-hit != 'true'
         with:
