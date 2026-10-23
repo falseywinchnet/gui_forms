@@ -247,9 +247,10 @@ void assembly_equals_whole_bake() {
         for (const double width : widths) {
             for (const double height : heights) {
                 compare_assembly(corners, Size{width, height}, scale, cornered);
-                // A tall pill's round ends are all corner pixels, and at
-                // 64 high it exceeds the bake bound.
-                if (height <= 40.0) compare_assembly(plain, Size{width, height}, scale, pill, "pill");
+                // A tall pill's round ends are all corner pixels: at 64 high,
+                // and at 40 high and scale 2 with the layered material's over
+                // glow, it exceeds the bake bound.
+                if (height <= 24.0) compare_assembly(plain, Size{width, height}, scale, pill, "pill");
                 // At 40 high its unclamped radius still marks every pixel as a
                 // corner pixel of its shadows (outer_coverage), which the
                 // estimate counts: a dearer bake than the pill's.
