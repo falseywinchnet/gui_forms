@@ -169,7 +169,7 @@ void test_card_theme_status_and_outsets_are_reusable() {
         .ordinary[static_cast<std::size_t>(ControlSurfaceState::invalid)];
     invalid.material.shadows = {
         {{2.0, 3.0}, 4.0, 1.0, Color::rgba(20, 30, 40, 90)}};
-    const std::shared_ptr<const Theme> theme = Theme::create(std::move(definition));
+    const std::shared_ptr<const Theme> theme = Theme::create(definition);
     std::shared_ptr<gui_forms::Card> card = make_control<Card>(StableId("card.theme"));
     (*card).set_theme_override(theme);
     (*card).set_visual_status(ControlVisualStatus::invalid);
@@ -196,7 +196,7 @@ void test_compositions_follow_structural_theme_tokens_until_overridden() {
     definition.structure.geometry.content_minimum = 260.0;
     definition.structure.geometry.compact_breakpoint = 780.0;
     const std::shared_ptr<const Theme> theme =
-        Theme::create(std::move(definition));
+        Theme::create(definition);
 
     std::shared_ptr<gui_forms::Card> card = make_control<Card>(StableId("card.structural-theme"));
     (*card).set_theme_override(theme);
