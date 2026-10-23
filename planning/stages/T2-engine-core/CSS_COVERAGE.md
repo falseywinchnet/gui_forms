@@ -106,7 +106,7 @@ blurs the backplane, not the part.
 | `backdrop-filter: blur()` | `glass` primitive (E9.3): three integer box passes, blur 0 to 8, over the backplane image | present | |
 | a backdrop tint (the usual `background-color` over the blur) | glass's `tint` parameter | present | |
 | backdrop rounded clip | glass's `corner`, or the part's own radius | present | |
-| `backdrop-filter: brightness()`, `saturate()` and the other colour filters | none | missing | The colour matrix of §5, applied by glass to the blurred backplane before the tint; E9.6 |
+| `backdrop-filter: brightness()`, `saturate()` and the other colour filters | none | missing | The colour matrix of §5, applied by glass to the blurred backplane before the tint; E9.6. Decided (coordinator, 2026-10-22): glass gains a `recipe` choice, and the recipe material's `colour_filter` is the matrix. T3 lowers the backdrop-filter's colour functions by composing them into one matrix in source order. |
 | what the backdrop contains | the backplane plane only: the window's backplane material and the backplane-plane engine part rasters. Text and app-drawn backplane commands are skipped and counted (owner, E9-B option 1) | present | A host `render_backplane` that replays the whole plane is T5's upgrade behind the same borrow |
 | a backdrop of other controls | not admitted | | Glass samples the backplane, never the control plane (design language §4.6 rule 3) |
 
