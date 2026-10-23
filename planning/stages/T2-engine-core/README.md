@@ -359,14 +359,17 @@ the plan left a number or a form open, E3 chose:
    invalidation (state, size, scale or theme) and cached. Compositing it
    afterwards is a blit, plus a group blend where one applies. The bake is
    bounded at 4 ms on the reference machine, a quarter of a 60 Hz frame.
-   The owner has accepted that bound. Before E7r, the per-layer costs are
-   to be measured again on a quiet machine, recording the load at the time
-   of measurement.
+   The owner has accepted that bound. The per-layer costs were measured
+   again on a quiet machine, with the load recorded, on 2026-10-23 ("Bake
+   costs on a quiet machine").
 5. **Nothing rasterizes per frame.** The material reads no inputs. The
    retained forms of E7's animated parameters, and slicing, are phase E7r
    (after E8c, before E9).
 
 ### E8c bake costs
+
+Superseded by "Bake costs on a quiet machine" (2026-10-23), which records
+the figures that replace these; kept as the record of the loaded runs.
 
 Measured with `gui_forms_engine_material_tests --measure`. Each figure is
 the median of nine bakes of a 240-unit square part at scale 1 (a 256 × 256
@@ -757,10 +760,11 @@ measures the cost per pixel within a rounded shadow's corners. It uses a box
 rounded to a circle, where every pixel is a corner pixel. The figure is net
 of the separable cost.
 
-These two figures are **provisional** until the quiet-machine re-measure,
-which records the CPU load. The machine was the same, on 2026-10-22. The
-load was not sampled. It was lighter than in the E8c runs: the inset
-shadow, unchanged, measured 47.5–48.7 ns against 59.1 earlier. So each
+These two figures were provisional until the quiet-machine re-measure,
+which replaces them ("Bake costs on a quiet machine"). The machine was
+the same, on 2026-10-22. The load was not sampled. It was lighter than
+in the E8c runs: the inset shadow, unchanged, measured 47.5–48.7 ns
+against 59.1 earlier. So each
 median is scaled by 1.25 and rounded up. There were seven runs, in
 nanoseconds per pixel:
 
@@ -822,7 +826,70 @@ variant is prepared by CONV, and the bake only composites it.
   a 1024 × 1024 image on a 240-unit part has the same estimate as a 4 × 4
   one, is accepted and bakes, its variant made on first need.
 
-## E9.6, the effects follow-up (in progress)
+## Bake costs on a quiet machine
+
+The per-layer costs were measured again on 2026-10-23 with nothing else
+running (no compiler, build or test processes, checked each run). Every
+figure before was taken under other builds' load and marked provisional;
+these replace them all (`material_bake_policy.hpp`). The machine and build
+are the E8c ones: Release (clang 22, -O2) on Windows 11, an AMD EPYC 9354
+virtual machine with 8 logical CPUs. One build made the measurement
+binary; seven runs of `gui_forms_engine_material_tests --measure` followed,
+each bracketed by three one-second samples of the total processor time.
+The load stayed at 2.1-8.3 % before and after every run, so no run was
+discarded. Each figure is per device pixel, in nanoseconds; "Before" is the
+constant it replaces, and "Used" rounds the median up (the stop cost to a
+tenth):
+
+| Cost | Min | Median | Max | Before | Used |
+|---|---|---|---|---|---|
+| base (the square box) | 17.25 | 17.53 | 17.75 | 26 | 18 |
+| base, rounded box | 17.38 | 17.74 | 19.27 | (in base) | (in base) |
+| solid fill | 4.55 | 4.79 | 6.46 | 10 | 5 |
+| linear fill | 11.72 | 12.02 | 12.56 | 15 | 13 |
+| radial fill | 14.13 | 14.32 | 14.82 | 22 | 15 |
+| conic fill | 45.31 | 45.63 | 46.55 | 52 | 46 |
+| each gradient stop past two | 0.145 | 0.161 | 0.182 | 0.5 | 0.2 |
+| outer shadow (separable) | 4.63 | 5.26 | 5.41 | 7 | 6 |
+| outer shadow, corner pixel | 26.90 | 27.71 | 28.54 | 28 | 28 |
+| inset shadow | 46.75 | 48.73 | 48.87 | 60 | 49 |
+| border (rounded) | 18.30 | 19.85 | 20.74 | 26 | 20 |
+| dashed pattern, per ring pixel on an arc | 36.77 | 38.29 | 40.37 | 54 | 39 |
+| border edge | 5.79 | 6.36 | 6.74 | 11 | 7 |
+| keyline | 5.78 | 6.09 | 6.58 | 13 | 7 |
+| image composite | 7.78 | 8.13 | 8.73 | 6 | 9 |
+| colour filter (sepia) | 15.28 | 15.70 | 16.16 | 13 | 16 |
+| drop shadow (blur 4) | 25.79 | 26.31 | 27.52 | 36 | 27 |
+| blur (5) | 46.41 | 47.10 | 47.14 | 55 | 48 |
+| fill blend | 26.75 | 27.18 | 27.80 | 22 | 28 |
+| mask pass (a solid mask, past a solid fill) | 6.30 | 8.22 | 9.19 | 10 (a solid fill's, G3) | 11 |
+| a linear mask, measured whole | 21.60 | 22.30 | 22.66 | | (13 + 11 = 24) |
+| an image mask, measured whole | 15.54 | 15.87 | 16.89 | | (9 + 11 = 20) |
+
+Most figures fell, as the load predicted. Three rose:
+- **The image composite** (6 to 9). It was below the noise under load, with
+  single runs below zero, so 6 was a conservative guess and not a
+  measurement. Quiet, it measures 7.8-8.7.
+- **The colour filter** (13 to 16) and **the fill blend** (22 to 28). These
+  were measured under 96-97 % load with wide spreads (6.2-15.5 and
+  19.1-23.5), and quiet they are tight (15.3-16.2 and 26.8-27.8). A
+  loaded virtual machine's timings are not uniformly pessimistic: the
+  cheap per-pixel steps measured low there.
+
+A mask is charged its kind's fill cost plus `mask`, 11. That is the solid
+mask's pass (8.2) rounded up far enough that a linear mask's charge (24)
+covers its measured 22.3. An image mask's charge, 20, is above its
+measured 15.9.
+
+**The 120 × 64 re-check passes.** The layered test material's 120 × 64 part
+at scale 1.5 was estimated at 4.09 ms against the 4 ms bound, a pill or a
+radius of 32, without its over glow (E9.6 G1). It is now 3.10 ms, and 3.52
+with the over glow, so all four are accepted and assemble from slices.
+`gui_forms_engine_slice_tests` asserts it. The heavier material's pill 40
+high at scale 2 is now accepted too, and the refusal assertion moved to 80
+high at scale 2 (64 high at scale 2 is refused as well).
+
+## E9.6, the effects follow-up
 
 The owner admitted rows 1 to 9 and 11 to 14 of `CSS_COVERAGE.md`'s "Missing
 rows" (2026-10-22). They are built as separable PRs on main: fills and
@@ -882,8 +949,9 @@ shape; filters and blend; finish, mask and position; motion.
   shadows' corner test still uses the unclamped radius, so such a part
   evaluates more corner pixels than a pill, and its estimate counts them.
   A layered part 120 × 64 at scale 1.5 (a pill or a radius of 32), at
-  4.09 ms against the 4 ms bound, is the case to re-check after the
-  quiet-machine re-measure.
+  4.09 ms against the 4 ms bound, was the case to re-check after the
+  quiet-machine re-measure: it is now 3.10 ms and accepted ("Bake costs
+  on a quiet machine").
 - **A uniform material is unchanged.** A material without per-corner radii,
   drawn as a rounded rectangle, keeps its exact arithmetic: every reference
   image of `gui_forms_engine_material_tests` is unchanged.
@@ -910,8 +978,9 @@ shape; filters and blend; finish, mask and position; motion.
 Measured with `gui_forms_engine_material_tests --measure` on the E8c
 machine, 2026-10-22, with the CPU load sampled at 100 % (other builds).
 The unchanged inset shadow measured 40.6–63.6 ns (median 56.9), as in the
-E8c runs, so the medians are used unscaled, rounded up. Both are
-**provisional** until the quiet-machine re-measure. Seven runs, in
+E8c runs, so the medians are used unscaled, rounded up. Both were
+provisional until the quiet-machine re-measure, which replaces them
+("Bake costs on a quiet machine"). Seven runs, in
 nanoseconds per pixel:
 
 | Cost | Min | Median | Max | Used |
@@ -1008,8 +1077,9 @@ estimate charges it per destination pixel, an upper bound.
 Measured with `gui_forms_engine_material_tests --measure` on the E8c
 machine, 2026-10-23, with the CPU load sampled at 96-97 % (other builds).
 The unchanged inset shadow measured 55.3-69.4 ns (median 58.7), as in the
-E8c runs, so the medians are used unscaled, rounded up. All four are
-**provisional** until the quiet-machine re-measure. Seven runs, in
+E8c runs, so the medians are used unscaled, rounded up. All four were
+provisional until the quiet-machine re-measure, which replaces them
+("Bake costs on a quiet machine"). Seven runs, in
 nanoseconds per pixel:
 
 | Cost | Min | Median | Max | Used |
@@ -1078,9 +1148,9 @@ pass before and after.
   `ControlTextShadow` (offset within ±16, blur radius within [0, 8],
   colour), validated with the recipe and never drawn. The text stage
   (M4/M9) draws it under the glyphs with a first-party blur.
-- **Cost.** A mask is charged a fill's evaluation of its kind and one
-  solid fill's cost for its multiplication; no new measured cost. A
-  finish is charged as the material it describes.
+- **Cost.** A mask is charged a fill's evaluation of its kind and its
+  pass, `mask` (measured on the quiet machine; see "Bake costs on a quiet
+  machine"). A finish is charged as the material it describes.
 - **Inspection.** The snapshot reports an image fill's `image_anchor` and
   `image_offset`, and a material's `finish` and `mask` when set, so other
   snapshots are unchanged. The engine counters report

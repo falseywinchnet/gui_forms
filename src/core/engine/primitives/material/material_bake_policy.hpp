@@ -63,54 +63,46 @@ struct MaterialBakeCosts final {
     // Per device pixel, once for a material whose fills blend other than
     // source-over (E9.6): gathering them into one face.
     double fill_blend{};
+    // Per device pixel, for a mask (E9.6): its pass over the finished
+    // raster, past evaluating the mask, which is charged as a fill of its
+    // kind.
+    double mask{};
 };
 
 // Measured by gui_forms_engine_material_tests --measure: for each layer
 // kind, the median of nine bakes of a 240-unit square part (a 256 × 256
 // destination with the outsets) at scale 1, less the median bake of the base
 // material, divided by the pixels; an image is a prepared variant of the
-// box composited (until 2026-10-22 it was resampled in the bake).
-// Release build (clang 22, -O2) on Windows 11, AMD EPYC 9354 virtual
-// machine with 8 logical CPUs, 2026-10-22, while other builds held the CPUs
-// at 88-97% load. Each figure is the median of seven runs, rounded up; the
-// load makes them pessimistic. image is below the noise at this workload
-// (single runs measured below zero), so it carries
-// a conservative upper figure rather than a measurement. The runs are
-// recorded in planning/stages/T2-engine-core/README.md, "E8c bake costs".
-// outer_shadow and outer_corner are PROVISIONAL: they were measured again
-// for E9's separable outer shadow, on the same machine on 2026-10-22, with
-// the CPU load not sampled (lighter than before, judged by the unchanged
-// inset shadow: 48 ns against 59). Each is the median of seven runs scaled
-// by 1.25 (that ratio) and rounded up; see "E9 shadow costs" there. The
-// quiet-machine re-measure, with the load recorded, replaces every figure.
-// conic and border_pattern (E9.6) are PROVISIONAL too: measured on the same
-// machine on 2026-10-22 at 100 % CPU load (sampled), the inset shadow at
-// 57 ns, as in the E8c runs, so unscaled. Each is the median of seven runs,
-// rounded up. border_pattern is per pixel of a dashed ring whose every
-// pixel is on an arc, its dearest; it is charged per destination pixel.
-// See "E9.6 G1 costs" there. colour_filter, drop_shadow, filter_blur and
-// fill_blend (E9.6 G2) are PROVISIONAL, measured the same way on 2026-10-23
-// at 96-97 % CPU load (sampled), the inset shadow at 59 ns, so unscaled;
-// see "E9.6 G2 costs" there.
+// box composited. Release build (clang 22, -O2) on Windows 11, AMD EPYC 9354
+// virtual machine with 8 logical CPUs, on a quiet machine (2026-10-23): no
+// other build running, the CPU load sampled before and after each run at
+// 2-9 %. Each figure is the median of seven runs, rounded up (gradient_stop
+// to a tenth). border_pattern is per pixel of a dashed ring whose every
+// pixel is on an arc, its dearest, and is charged per destination pixel.
+// mask is the pass of a solid mask past a solid fill's evaluation, rounded
+// up to cover a linear mask's measured pass. The runs, and the figures
+// they replace, are recorded in planning/stages/T2-engine-core/README.md,
+// "Bake costs on a quiet machine".
 inline constexpr MaterialBakeCosts measured_material_costs{
-    .base = 26.0,
-    .solid = 10.0,
-    .linear = 15.0,
-    .radial = 22.0,
-    .conic = 52.0,
-    .gradient_stop = 0.5,
-    .outer_shadow = 7.0,
+    .base = 18.0,
+    .solid = 5.0,
+    .linear = 13.0,
+    .radial = 15.0,
+    .conic = 46.0,
+    .gradient_stop = 0.2,
+    .outer_shadow = 6.0,
     .outer_corner = 28.0,
-    .inset_shadow = 60.0,
-    .border = 26.0,
-    .border_pattern = 54.0,
-    .border_edge = 11.0,
-    .keyline = 13.0,
-    .image = 6.0,
-    .colour_filter = 13.0,
-    .drop_shadow = 36.0,
-    .filter_blur = 55.0,
-    .fill_blend = 22.0,
+    .inset_shadow = 49.0,
+    .border = 20.0,
+    .border_pattern = 39.0,
+    .border_edge = 7.0,
+    .keyline = 7.0,
+    .image = 9.0,
+    .colour_filter = 16.0,
+    .drop_shadow = 27.0,
+    .filter_blur = 48.0,
+    .fill_blend = 28.0,
+    .mask = 11.0,
 };
 
 } // namespace gui_forms::engine_primitives

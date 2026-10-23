@@ -1266,6 +1266,15 @@ void measure() {
     require(static_cast<bool>(small_image), "the measured image loads");
     SurfaceMaterial imaged = base;
     imaged.fills.push_back(MaterialFillLayer::stretched_image(small_image.image, Size{64.0, 64.0}));
+    // A mask (E9.6): its pass over the finished raster, past evaluating a
+    // solid mask, which costs a solid fill's evaluation. A linear and an
+    // image mask are measured to check the charge of their kinds.
+    SurfaceMaterial solid_masked = base;
+    solid_masked.mask = MaterialFillLayer::solid(Color::rgba(0, 0, 0, 128));
+    SurfaceMaterial linear_masked = base;
+    linear_masked.mask = MaterialFillLayer::linear(Point{0.0, 0.0}, Point{0.0, 1.0}, two, 2U);
+    SurfaceMaterial image_masked = base;
+    image_masked.mask = MaterialFillLayer::stretched_image(small_image.image, Size{64.0, 64.0});
 
     const double per_pixel_solid = (median_bake_nanoseconds(solid, nullptr) - base_time) / pixels;
     const double per_pixel_linear = (median_bake_nanoseconds(linear, nullptr) - base_time) / pixels;
@@ -1288,6 +1297,10 @@ void measure() {
     const double per_pixel_filter_blur = (median_bake_nanoseconds(blurred, nullptr) - base_time) / pixels;
     const double solid_time = median_bake_nanoseconds(solid, nullptr);
     const double per_pixel_blend = (median_bake_nanoseconds(multiplied, nullptr) - solid_time) / pixels;
+    const double per_pixel_mask =
+        (median_bake_nanoseconds(solid_masked, nullptr) - base_time) / pixels - per_pixel_solid;
+    const double per_pixel_mask_linear = (median_bake_nanoseconds(linear_masked, nullptr) - base_time) / pixels;
+    const double per_pixel_mask_image = (median_bake_nanoseconds(image_masked, &registry) - base_time) / pixels;
 
     std::cout << std::fixed << std::setprecision(3);
     std::cout << "base " << base_time / pixels << '\n';
@@ -1309,9 +1322,10 @@ void measure() {
     std::cout << "drop_shadow " << per_pixel_drop_shadow << '\n';
     std::cout << "filter_blur " << per_pixel_filter_blur << '\n';
     std::cout << "fill_blend " << per_pixel_blend << '\n';
+    std::cout << "mask " << per_pixel_mask << '\n';
+    std::cout << "mask_linear_measured " << per_pixel_mask_linear << '\n';
+    std::cout << "mask_image_measured " << per_pixel_mask_image << '\n';
 }
-
-} // namespace
 
 // -- surface finish and mask (E9.6) -------------------------------------------------
 
@@ -1479,6 +1493,8 @@ void surface_mask() {
                                              std::vector<GradientStop>{{0.0, black}, {1.0, clear}});
     require(!valid_surface_material(refused), "a mask is validated as a fill");
 }
+
+} // namespace
 
 int main(int argc, char** argv) {
     if (argc > 1 && std::strcmp(argv[1], "--measure") == 0) {
