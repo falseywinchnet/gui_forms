@@ -227,6 +227,15 @@ void append_material(std::ostringstream& output,
         append_color(output, shadow.color);
         output << ",\"inset\":" << (shadow.inset ? "true" : "false") << '}';
     }
+    output << "],\"glows\":[";
+    for (std::size_t index = 0U; index < material.glows.size(); ++index) {
+        if (index != 0U) output << ',';
+        const MaterialGlow& glow = material.glows[index];
+        output << "{\"color\":";
+        append_color(output, glow.color);
+        output << ",\"blur_radius\":" << glow.blur_radius
+               << ",\"spread\":" << glow.spread << '}';
+    }
     output << "],\"border\":";
     append_border(output, material.border);
     output << ",\"border_edges\":{\"top\":";

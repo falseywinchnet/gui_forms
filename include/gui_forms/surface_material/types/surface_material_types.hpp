@@ -31,6 +31,26 @@ struct MaterialShadow final {
                left.inset == right.inset;
     }
 };
+// A soft coloured emission around the material's box (E9-C): the box grown
+// by `spread` on every side and blurred by `blur_radius` (σ = blur_radius /
+// 2, as a shadow's), centred on the box. The engine's material bake adds
+// it, as light, to the outer shadows beneath it, and draws the fills over
+// it; paint_surface_material composites it as an outer shadow at no offset,
+// which differs only where it lies over a shadow. Its reach, spread + 2 ×
+// blur_radius (where its blur is below one 8-bit step), is at most
+// SurfaceMaterial::maximum_glow_reach, so that it stays within the part's
+// granted overflow.
+struct MaterialGlow final {
+    Color color{Color::rgba(255, 255, 255, 96)};
+    double blur_radius{2.0};
+    double spread{};
+    friend constexpr bool operator==(const MaterialGlow& left,
+                                     const MaterialGlow& right) noexcept {
+        return left.color == right.color &&
+               left.blur_radius == right.blur_radius &&
+               left.spread == right.spread;
+    }
+};
 enum class MaterialEdge : std::uint8_t { top, right, bottom, left };
 
 // One ordered physical keyline. An inset of zero places the stroke immediately
@@ -70,9 +90,14 @@ struct SurfaceMaterial final {
     static constexpr std::size_t maximum_fill_layers = 8U;
     static constexpr std::size_t maximum_shadows = 4U;
     static constexpr std::size_t maximum_keylines = 8U;
+    static constexpr std::size_t maximum_glows = 2U;
+    // The farthest a glow reaches outside the box, in logical units: the
+    // engine material's granted overflow on every side.
+    static constexpr double maximum_glow_reach = 8.0;
     std::vector<MaterialFillLayer> fills{
         MaterialFillLayer::solid(Color::rgba(255, 255, 255))};
     std::vector<MaterialShadow> shadows;
+    std::vector<MaterialGlow> glows;
     std::optional<MaterialBorder> border;
     MaterialBorderEdges border_edges;
     std::vector<MaterialKeyline> keylines;
@@ -95,10 +120,12 @@ struct SurfaceMaterial final {
     friend bool operator==(const SurfaceMaterial& left,
                            const SurfaceMaterial& right) noexcept(noexcept(
         left.fills == right.fills && left.shadows == right.shadows &&
+        left.glows == right.glows &&
         left.border == right.border && left.border_edges == right.border_edges &&
         left.keylines == right.keylines &&
         left.corner_radius == right.corner_radius)) {
         return left.fills == right.fills && left.shadows == right.shadows &&
+               left.glows == right.glows &&
                left.border == right.border &&
                left.border_edges == right.border_edges &&
                left.keylines == right.keylines &&

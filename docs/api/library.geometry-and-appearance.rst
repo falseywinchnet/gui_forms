@@ -88,6 +88,8 @@ Types
      -  
    * - :cpp:class:`FontSpec <gui_forms::FontSpec>`
      - FontSpec carries logical role, size, weight, italic, and bounded letter-spacing inputs shared by measurement and painting.
+   * - :cpp:class:`GlossColours <gui_forms::GlossColours>`
+     - The colours of a gloss material, top to bottom.
    * - :cpp:class:`GradientStop <gui_forms::GradientStop>`
      - GradientStop pairs a normalized monotonic offset with a copied color for retained display-list safety.
    * - :cpp:class:`ImageId <gui_forms::ImageId>`
@@ -104,6 +106,8 @@ Types
      -  
    * - :cpp:class:`MaterialFillLayer <gui_forms::MaterialFillLayer>`
      - MaterialFillLayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity.
+   * - :cpp:class:`MaterialGlow <gui_forms::MaterialGlow>`
+     - A soft coloured emission around the material's box (E9-C): the box grown by ``spread`` on every side and blurred by ``blur_radius`` (σ = blur_radius / 2, as a shadow's), centred on the box.
    * - :cpp:class:`MaterialKeyline <gui_forms::MaterialKeyline>`
      - One ordered physical keyline.
    * - :cpp:class:`MaterialShadow <gui_forms::MaterialShadow>`
@@ -1224,6 +1228,38 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: GlossColours final
+
+   ``#include <gui_forms/surface_material/presets/material_presets.hpp>``
+
+   The colours of a gloss material, top to bottom. The defaults are a pale blue gloss.
+
+   .. cpp:member:: Color top
+
+      The gradient's four stops: at the top (0), just above the break (gloss_break_start), just below it (gloss_break_end) and at the bottom (1). Default: ``{Color::rgba(236, 244, 252)}``.
+
+   .. cpp:member:: Color above_break
+
+      Default: ``{Color::rgba(196, 218, 242)}``.
+
+   .. cpp:member:: Color below_break
+
+      Default: ``{Color::rgba(150, 186, 228)}``.
+
+   .. cpp:member:: Color bottom
+
+      Default: ``{Color::rgba(186, 214, 244)}``.
+
+   .. cpp:member:: Color shine
+
+      The 1-unit shine under the flat top, inside the border. Default: ``{Color::rgba(255, 255, 255, 176)}``.
+
+   .. cpp:member:: Color border
+
+      The 1-unit border around the face. Default: ``{Color::rgba(62, 96, 140)}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: GradientStop final
 
    ``#include <gui_forms/types/paint_types/paint_types.hpp>``
@@ -1446,6 +1482,24 @@ Types
    .. cpp:member:: MaterialImageMode image_mode
 
       Default: ``{MaterialImageMode::stretch}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaterialGlow final
+
+   ``#include <gui_forms/surface_material/types/surface_material_types.hpp>``
+
+   A soft coloured emission around the material's box (E9-C): the box grown by ``spread`` on every side and blurred by ``blur_radius`` (σ = blur_radius / 2, as a shadow's), centred on the box. The engine's material bake adds it, as light, to the outer shadows beneath it, and draws the fills over it; paint_surface_material composites it as an outer shadow at no offset, which differs only where it lies over a shadow. Its reach, spread + 2 × blur_radius (where its blur is below one 8-bit step), is at most SurfaceMaterial::maximum_glow_reach, so that it stays within the part's granted overflow.
+
+   .. cpp:member:: Color color
+
+      Default: ``{Color::rgba(255, 255, 255, 96)}``.
+
+   .. cpp:member:: double blur_radius
+
+      Default: ``{2.0}``.
+
+   .. cpp:member:: double spread
 
 .. cpp:namespace:: gui_forms
 
@@ -2660,9 +2714,19 @@ Types
 
       Default: ``8U``.
 
+   .. cpp:member:: constexpr std::size_t maximum_glows
+
+      Default: ``2U``.
+
+   .. cpp:member:: constexpr double maximum_glow_reach
+
+      The farthest a glow reaches outside the box, in logical units: the engine material's granted overflow on every side. Default: ``8.0``.
+
    .. cpp:member:: std::vector<MaterialFillLayer> fills
 
    .. cpp:member:: std::vector<MaterialShadow> shadows
+
+   .. cpp:member:: std::vector<MaterialGlow> glows
 
    .. cpp:member:: std::optional<MaterialBorder> border
 
@@ -4174,6 +4238,22 @@ Functions, constants and aliases
 .. cpp:function:: Insets box_shadow_visual_outsets(std::span<const MaterialShadow> shadows) noexcept
 
    How far the outer (not inset) shadows among ``shadows`` reach outside the rect that casts them: three blur radii plus any positive spread, shifted by each offset.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/surface_material/presets/material_presets.hpp>``
+
+.. cpp:function:: SurfaceMaterial gloss_material(const GlossColours& colours, double corner_radius)
+
+   The gloss material (design language §4.3): one vertical four-stop gradient with a hard break near mid-face, a 1-unit shine keyline just under the top edge (inside the border, clipped to the corners), and a 1-unit border, with ``corner_radius`` in logical units. Throws std::invalid_argument for a corner radius that is not finite or lies outside [0, 4096].
+
+.. cpp:var:: constexpr double gloss_break_start
+
+   Where the gloss gradient breaks, as fractions of the face's height from its top: the colour steps from above_break to below_break between them. Value: ``0.48``.
+
+.. cpp:var:: constexpr double gloss_break_end
+
+   Value: ``0.52``.
 
 .. cpp:namespace:: gui_forms
 
