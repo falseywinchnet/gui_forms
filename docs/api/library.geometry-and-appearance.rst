@@ -90,8 +90,12 @@ Types
      - GradientStop pairs a normalized monotonic offset with a copied color for retained display-list safety.
    * - :cpp:class:`ImageId <gui_forms::ImageId>`
      - ImageId is the nonzero renderer-neutral identity returned by a Window image registry.
+   * - :cpp:class:`ImageVariantRequest <gui_forms::ImageVariantRequest>`
+     - One sized variant of an image resource: the image resampled to ``extent`` device pixels, for display ``scale``.
    * - :cpp:class:`Insets <gui_forms::Insets>`
      - Insets stores independent logical left, top, right, and bottom extents for margin, padding, damage, and visual outsets.
+   * - :cpp:class:`LentImageVariants <gui_forms::LentImageVariants>`
+     - The variants lent for one bake, by fill layer; null where none is lent.
    * - :cpp:class:`MaterialBorder <gui_forms::MaterialBorder>`
      - MaterialBorder pairs an authored color and logical stroke width.
    * - :cpp:class:`MaterialBorderEdges <gui_forms::MaterialBorderEdges>`
@@ -167,7 +171,7 @@ Types
    * - :cpp:class:`PrimitiveSlicePlan <gui_forms::PrimitiveSlicePlan>`
      - How a part's raster may be assembled (EnginePrimitive::slice_plan).
    * - :cpp:class:`PrimitiveTarget <gui_forms::PrimitiveTarget>`
-     - The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, its published states, and the engine inputs' values for it, by EngineInput (NaN for an input that is not published, such as the pointer of a part that is not hot).
+     -  
    * - :cpp:class:`PropertyTransition <gui_forms::PropertyTransition>`
      - A transition on one resolved property: ``opacity``, or a number parameter of the rule's primitive that the primitive declares animated (such as the bulge's amplitude), so that its frames never remake the part's preparation.
    * - :cpp:class:`RasterCacheStatistics <gui_forms::RasterCacheStatistics>`
@@ -992,6 +996,10 @@ Types
 
       How the primitive is composited over a part of ``part`` size when it stands behind the overlay seam (PointerOverlay); none for a primitive drawn over the part's own box, unless the primitive says otherwise. ``parameters`` match the declarations.
 
+   .. cpp:function:: virtual std::size_t image_variants(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target, std::span<ImageVariantRequest> requests) const noexcept
+
+      Fills the front of ``requests`` with the image variants a bake of this target needs, at most one per fill layer, and returns how many; the engine lends them in PrimitiveTarget::variants. None unless the primitive says otherwise. Called as accepts() is, with a target the primitive accepts; ``requests`` holds maximum_image_variants entries.
+
    .. cpp:function:: virtual bool accepts(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target) const noexcept
 
       Whether the primitive will draw this target with ``parameters``, such as a material whose bake would exceed its bound. A primitive that refuses is drawn by the built-in recipe instead, and the engine counts the refusal. True unless the primitive says otherwise. Called only with a target in range and parameters that match the declarations.
@@ -1198,6 +1206,30 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ImageVariantRequest final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   One sized variant of an image resource: the image resampled to ``extent`` device pixels, for display ``scale``. A nine-patch's fixed segments are resampled apart from its middle: ``source_slice`` are their source pixels (left, top, right, bottom) and ``fixed`` their device lengths in the variant, both zero for a stretched or tiled image, which is resampled whole. ``layer`` is the fill layer the variant serves, by index among the material's fills; it is not part of what the variant is.
+
+   .. cpp:member:: std::size_t layer
+
+   .. cpp:member:: ImageId image
+
+   .. cpp:member:: std::uint32_t source_width
+
+   .. cpp:member:: std::uint32_t source_height
+
+   .. cpp:member:: DeviceExtent extent
+
+   .. cpp:member:: Insets source_slice
+
+   .. cpp:member:: std::array<std::uint32_t, 4> fixed
+
+   .. cpp:member:: DeviceScale scale
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: Insets
 
    ``#include <gui_forms/types/geometry/geometry.hpp>``
@@ -1211,6 +1243,16 @@ Types
    .. cpp:member:: double right
 
    .. cpp:member:: double bottom
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: LentImageVariants final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   The variants lent for one bake, by fill layer; null where none is lent.
+
+   .. cpp:member:: std::array<std::shared_ptr<const PartRaster>, maximum_image_variants> layers
 
 .. cpp:namespace:: gui_forms
 
@@ -2242,8 +2284,6 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, its published states, and the engine inputs' values for it, by EngineInput (NaN for an input that is not published, such as the pointer of a part that is not hot). The destination's extent is the caller's choice, normally the logical size grown by the descriptor's outsets, times the scale, rounded up. A primitive with outsets draws its box starting at the left and top outsets times the scale, in device pixels, and clips what it draws to the destination. A primitive that draws a theme material (theme_material) also gets the part's material for its state, its own corner radius when the part sets one (PartPaint::corner_radius, which replaces the material's), and the window's image resources for the material's image fills. ``material`` and ``images`` are borrowed for the call that receives the target; a caller that keeps a target clears them.
-
    .. cpp:member:: Size logical_size
 
    .. cpp:member:: DeviceScale scale
@@ -2257,6 +2297,10 @@ Types
    .. cpp:member:: std::optional<double> corner_radius
 
    .. cpp:member:: const ImageRegistry* images
+
+   .. cpp:member:: const LentImageVariants* variants
+
+      Borrowed, as ``material`` is.
 
 .. cpp:namespace:: gui_forms
 
@@ -2326,11 +2370,19 @@ Types
 
    .. cpp:member:: std::uint64_t shared_evictions
 
-      The shared bakes: evicted to keep within their budget, held now, and their bytes.
+      The shared bakes: evicted to keep within their budget, held now, and their bytes. The bytes, and the evictions, include image variants'.
 
    .. cpp:member:: std::size_t shared_rasters
 
    .. cpp:member:: std::size_t shared_bytes
+
+   .. cpp:member:: std::uint64_t image_variant_bakes
+
+      Image faces' sized variants (owner, 2026-10-22): made from their images, lent from those held, and held now. Each is made once while it is held; a theme change or a change to the window's images drops them all.
+
+   .. cpp:member:: std::uint64_t image_variant_hits
+
+   .. cpp:member:: std::size_t image_variants
 
 .. cpp:namespace:: gui_forms
 
@@ -3926,6 +3978,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_prepared_values
 
    Value: ``4``.
+
+.. cpp:var:: constexpr std::size_t maximum_image_variants
+
+   The most image variants one bake uses: one per fill layer (SurfaceMaterial::maximum_fill_layers). Value: ``8U``.
 
 .. cpp:var:: constexpr std::size_t maximum_registered_primitives
 

@@ -259,6 +259,11 @@ std::optional<PointerOverlay> EnginePrimitive::pointer_overlay(const PrimitivePa
     return std::nullopt;
 }
 
+std::size_t EnginePrimitive::image_variants(const PrimitiveParameterBlock&, const PrimitiveTarget&,
+                                            std::span<ImageVariantRequest>) const noexcept {
+    return 0U;
+}
+
 bool EnginePrimitive::accepts(const PrimitiveParameterBlock&, const PrimitiveTarget&) const noexcept {
     return true;
 }

@@ -26,6 +26,7 @@
 #include "gui_forms/theme.hpp"
 #include "gui_forms/window.hpp"
 
+#include "../src/core/engine/primitives/material/image_variant.hpp"
 #include "../src/core/engine/primitives/material/material_bake_policy.hpp"
 #include "../src/core/engine/primitives/material/material_primitive.hpp"
 
@@ -132,12 +133,31 @@ PrimitiveTarget target_for(Size logical, double scale, const SurfaceMaterial* ma
     return target;
 }
 
+// Makes the image variants `target`'s fills need into `lent` and lends
+// them, as the engine does before a bake.
+void lend_variants(PrimitiveTarget& target, LentImageVariants& lent) {
+    if (target.images == nullptr || target.material == nullptr) return;
+    const EnginePrimitive& primitive = material_primitive();
+    const PrimitiveParameterBlock parameters = recipe("button");
+    std::array<ImageVariantRequest, maximum_image_variants> requests{};
+    const std::size_t count = primitive.image_variants(parameters, target, requests);
+    for (std::size_t index = 0U; index < count; ++index) {
+        const ImageVariantRequest& request = requests[index];
+        lent.layers[request.layer] = engine_primitives::make_image_variant(*target.images, request);
+        require(lent.layers[request.layer] != nullptr, "the image variant is made");
+    }
+    target.variants = &lent;
+}
+
 RasterOutcome try_draw(const PrimitiveTarget& target, TestRaster& raster) {
     const EnginePrimitive& primitive = material_primitive();
     const PrimitiveParameterBlock parameters = recipe("button");
     PrimitivePreparation preparation{};
     require(primitive.prepare(parameters, target, preparation) == PreparationOutcome::prepared, "the part prepares");
-    const RasterOutcome outcome = primitive.rasterize(parameters, target, preparation, raster.view());
+    LentImageVariants lent{};
+    PrimitiveTarget lending = target;
+    lend_variants(lending, lent);
+    const RasterOutcome outcome = primitive.rasterize(parameters, lending, preparation, raster.view());
     return outcome;
 }
 
@@ -480,11 +500,11 @@ struct ImageCase final {
 
 // The image fills' reference hashes, in the order image_fills draws them.
 constexpr ImageCase image_cases[] = {
-    {"stretch_bgra", 0x11a8d0f979d4679dULL},
-    {"stretch_png", 0x11a8d0f979d4679dULL},
-    {"tile", 0xf564c3441afb625ULL},
-    {"nine_patch", 0x257d6b5a7cb7d17dULL},
-    {"shrink", 0x27634c1d25e2a705ULL},
+    {"stretch_bgra", 0x62d23c31627fdeb5ULL},
+    {"stretch_png", 0x62d23c31627fdeb5ULL},
+    {"tile", 0x7f68c692b6b84925ULL},
+    {"nine_patch", 0x937e6be15e8d40fdULL},
+    {"shrink", 0x55ad2e0e76d50405ULL},
 };
 
 void image_fills() {
@@ -551,6 +571,96 @@ void image_fills() {
                   << '\n';
         require(false, "an image fill matches its reference image");
     }
+}
+
+// An image variant is made once, from its image, and lent to every bake
+// that needs it (owner, 2026-10-22); a change to the window's images or a
+// theme change drops it.
+void image_variant_made_once() {
+    ImageRegistry registry{};
+    const std::vector<std::byte> bgra = quadrant_pixels();
+    const ImageLoadResult loaded = registry.load_bgra32_premultiplied(4U, 4U, 16U, bgra);
+    require(static_cast<bool>(loaded), "the BGRA image loads");
+    SurfaceMaterial stretch = solid_material(clear);
+    stretch.fills.push_back(MaterialFillLayer::stretched_image(loaded.image, Size{4.0, 4.0}));
+    const Size logical{20.0, 20.0};
+    const TestRaster expected = draw(stretch, logical, 1.0, &registry);
+
+    PartRasterRequest request{};
+    request.primitive = &material_primitive();
+    request.parameters = recipe("button");
+    request.target = target_for(logical, 1.0, &stretch, &registry);
+    request.extent = expected.extent;
+    EnginePartTable table{};
+    const PartRasterResult first = table.raster_without_record(request, 1U);
+    const PartRasterResult second = table.raster_without_record(request, 2U);
+    require(first.raster != nullptr && second.raster != nullptr, "the table bakes the image face");
+    const RasterCacheStatistics made = table.cache_statistics();
+    require(made.bakes == 2U, "the part is baked twice");
+    require(made.image_variant_bakes == 1U && made.image_variant_hits == 1U && made.image_variants == 1U,
+            "its variant is made once and reused");
+    require(made.shared_bytes == 20U * 20U * 4U, "the variant's bytes count with the shared bakes");
+    // The table's bake is the variant composited, as the primitive's is.
+    const PartRaster& baked = *second.raster;
+    for (std::uint32_t row = 0U; row < expected.extent.height; ++row) {
+        const std::size_t from = static_cast<std::size_t>(row) * baked.row_bytes();
+        const std::size_t to = static_cast<std::size_t>(row) * expected.row_bytes;
+        const bool same = std::memcmp(baked.pixels().data() + from, expected.bytes.data() + to,
+                                      static_cast<std::size_t>(expected.extent.width) * 4U) == 0;
+        require(same, "the table's bake matches the primitive's");
+    }
+
+    // Another image loaded: the registry's revision moves on, and the
+    // variant is made again.
+    const ImageLoadResult other = registry.load_bgra32_premultiplied(4U, 4U, 16U, bgra);
+    require(static_cast<bool>(other), "a second image loads");
+    static_cast<void>(table.raster_without_record(request, 3U));
+    const RasterCacheStatistics remade = table.cache_statistics();
+    require(remade.image_variant_bakes == 2U && remade.image_variants == 1U,
+            "a change to the images makes the variant again");
+    table.invalidate_rasters();
+    const RasterCacheStatistics cleared = table.cache_statistics();
+    require(cleared.image_variants == 0U && cleared.shared_bytes == 0U, "a theme change drops the variants");
+}
+
+// Making a variant is preparation, not bake (owner, 2026-10-22): the bake
+// bound counts the composite alone, so a large image, which takes far
+// longer to resample than the bound allows, is accepted and baked.
+void image_variant_outside_the_bound() {
+    ImageRegistry registry{};
+    // 1024 × 1024 premultiplied grey at half alpha.
+    const std::vector<std::byte> large(1024U * 1024U * 4U, std::byte{0x80});
+    const ImageLoadResult loaded = registry.load_bgra32_premultiplied(1024U, 1024U, 4096U, large);
+    const std::vector<std::byte> small(4U * 4U * 4U, std::byte{0x80});
+    const ImageLoadResult tiny = registry.load_bgra32_premultiplied(4U, 4U, 16U, small);
+    require(static_cast<bool>(loaded) && static_cast<bool>(tiny), "the images load");
+    SurfaceMaterial shrunk = solid_material(clear);
+    shrunk.fills.push_back(MaterialFillLayer::stretched_image(loaded.image, Size{1024.0, 1024.0}));
+    SurfaceMaterial magnified = solid_material(clear);
+    magnified.fills.push_back(MaterialFillLayer::stretched_image(tiny.image, Size{4.0, 4.0}));
+    const Size logical{240.0, 240.0};
+    const double shrunk_estimate =
+        engine_primitives::material_bake_estimate(shrunk, target_for(logical, 1.0, &shrunk, &registry));
+    const double magnified_estimate =
+        engine_primitives::material_bake_estimate(magnified, target_for(logical, 1.0, &magnified, &registry));
+    require(shrunk_estimate == magnified_estimate, "the image's size does not enter the bake estimate");
+    require(shrunk_estimate <= engine_primitives::maximum_material_bake_nanoseconds, "the composite is within the bound");
+
+    PartRasterRequest request{};
+    request.primitive = &material_primitive();
+    request.parameters = recipe("button");
+    request.target = target_for(logical, 1.0, &shrunk, &registry);
+    request.extent = make_raster(logical, 1.0).extent;
+    require(material_primitive().accepts(request.parameters, request.target), "the large image face is accepted");
+    EnginePartTable table{};
+    const PartRasterResult baked = table.raster_without_record(request, 1U);
+    require(baked.raster != nullptr && baked.status == PartRasterStatus::uncached, "the large image face bakes");
+    require(table.cache_statistics().image_variant_bakes == 1U, "its variant is made on first need");
+    // The interior shows the image's grey at half alpha.
+    const PartRaster& raster = *baked.raster;
+    const std::size_t centre = 128U * raster.row_bytes() + 128U * 4U;
+    require(raster.pixels()[centre + 3U] == 0x80U && raster.pixels()[centre] == 0x80U,
+            "the shrunk image keeps its colour");
 }
 
 // -- reference images: the professional theme's button ---------------------------
@@ -752,8 +862,11 @@ void engine_counts_refusals() {
 double median_bake_nanoseconds(const SurfaceMaterial& material, const ImageRegistry* images) {
     const Size logical{240.0, 240.0};
     TestRaster raster = make_raster(logical, 1.0);
-    const PrimitiveTarget target = target_for(logical, 1.0, &material, images);
+    PrimitiveTarget target = target_for(logical, 1.0, &material, images);
     require(valid_surface_material(material), "the measured material is valid");
+    // The variants are prepared once, apart from the bakes measured.
+    LentImageVariants lent{};
+    lend_variants(target, lent);
     const PartRasterView view = raster.view();
     std::array<double, 9> samples{};
     for (double& sample : samples) {
@@ -774,34 +887,6 @@ std::vector<std::byte> noise_pixels(std::size_t size) {
         pixels[index] = static_cast<std::byte>(value);
     }
     return pixels;
-}
-
-// The same image as an RGBA8 PNG (opaque, so BGRA swapped to RGBA).
-std::vector<std::byte> noise_png(std::size_t size) {
-    const std::vector<std::byte> bgra = noise_pixels(size);
-    std::vector<std::uint8_t> raw{};
-    for (std::size_t row = 0U; row < size; ++row) {
-        raw.push_back(0U);
-        for (std::size_t column = 0U; column < size; ++column) {
-            const std::size_t offset = (row * size + column) * 4U;
-            raw.push_back(static_cast<std::uint8_t>(bgra[offset + 2U]));
-            raw.push_back(static_cast<std::uint8_t>(bgra[offset + 1U]));
-            raw.push_back(static_cast<std::uint8_t>(bgra[offset]));
-            raw.push_back(static_cast<std::uint8_t>(bgra[offset + 3U]));
-        }
-    }
-    const std::vector<std::byte> png =
-        encode_png(static_cast<std::uint32_t>(size), static_cast<std::uint32_t>(size), raw);
-    return png;
-}
-
-// The taps the estimate counts for an image of `source` pixels square
-// stretched over the 240-unit box into the 256-pixel destination.
-double estimated_taps(double source) {
-    const double factor = std::max(1.0, source / 240.0);
-    const double taps = 4.0 * factor + 2.0;
-    const double total = source * 256.0 * taps + 256.0 * 256.0 * taps;
-    return total;
 }
 
 void measure() {
@@ -843,21 +928,14 @@ void measure() {
     SurfaceMaterial keyline = base;
     keyline.keylines.push_back(MaterialKeyline{MaterialEdge::top, blue, 1.0, 0.0});
 
+    // An image's bake composites its prepared variant: the source's size
+    // does not enter it.
     ImageRegistry registry{};
     const std::vector<std::byte> small = noise_pixels(64U);
     const ImageLoadResult small_image = registry.load_bgra32_premultiplied(64U, 64U, 256U, small);
-    const std::vector<std::byte> large = noise_pixels(1024U);
-    const ImageLoadResult large_image = registry.load_bgra32_premultiplied(1024U, 1024U, 4096U, large);
-    const std::vector<std::byte> encoded = noise_png(64U);
-    const ImageLoadResult png_image = registry.load_png(encoded);
-    require(static_cast<bool>(small_image) && static_cast<bool>(large_image) && static_cast<bool>(png_image),
-            "the measured images load");
-    SurfaceMaterial magnified = base;
-    magnified.fills.push_back(MaterialFillLayer::stretched_image(small_image.image, Size{64.0, 64.0}));
-    SurfaceMaterial shrunk = base;
-    shrunk.fills.push_back(MaterialFillLayer::stretched_image(large_image.image, Size{1024.0, 1024.0}));
-    SurfaceMaterial decoded = base;
-    decoded.fills.push_back(MaterialFillLayer::stretched_image(png_image.image, Size{64.0, 64.0}));
+    require(static_cast<bool>(small_image), "the measured image loads");
+    SurfaceMaterial imaged = base;
+    imaged.fills.push_back(MaterialFillLayer::stretched_image(small_image.image, Size{64.0, 64.0}));
 
     const double per_pixel_solid = (median_bake_nanoseconds(solid, nullptr) - base_time) / pixels;
     const double per_pixel_linear = (median_bake_nanoseconds(linear, nullptr) - base_time) / pixels;
@@ -871,16 +949,7 @@ void measure() {
     const double per_pixel_border = (median_bake_nanoseconds(border, nullptr) - rounded_time) / pixels;
     const double per_pixel_edge = (median_bake_nanoseconds(edge, nullptr) - base_time) / pixels;
     const double per_pixel_keyline = (median_bake_nanoseconds(keyline, nullptr) - base_time) / pixels;
-    const double magnify_time = median_bake_nanoseconds(magnified, &registry) - base_time;
-    const double shrink_time = median_bake_nanoseconds(shrunk, &registry) - base_time;
-    const double decode_time = median_bake_nanoseconds(decoded, &registry) - base_time;
-    // Two image workloads with different tap counts separate the cost per
-    // tap from the cost per composited pixel.
-    const double magnify_taps = estimated_taps(64.0);
-    const double shrink_taps = estimated_taps(1024.0);
-    const double per_tap = (shrink_time - magnify_time) / (shrink_taps - magnify_taps);
-    const double per_pixel_image = (magnify_time - magnify_taps * per_tap) / pixels;
-    const double per_source_pixel = (decode_time - magnify_time) / (64.0 * 64.0);
+    const double per_pixel_image = (median_bake_nanoseconds(imaged, &registry) - base_time) / pixels;
 
     std::cout << std::fixed << std::setprecision(3);
     std::cout << "base " << base_time / pixels << '\n';
@@ -896,8 +965,6 @@ void measure() {
     std::cout << "border_edge " << per_pixel_edge << '\n';
     std::cout << "keyline " << per_pixel_keyline << '\n';
     std::cout << "image " << per_pixel_image << '\n';
-    std::cout << "image_tap " << per_tap << '\n';
-    std::cout << "image_decode " << per_source_pixel << '\n';
 }
 
 } // namespace
@@ -915,6 +982,8 @@ int main(int argc, char** argv) {
     gradients();
     keylines_and_inset_shadow();
     image_fills();
+    image_variant_made_once();
+    image_variant_outside_the_bound();
     reference_images();
     engine_draws_the_material();
     engine_counts_refusals();

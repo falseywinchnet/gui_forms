@@ -72,6 +72,10 @@ public:
         const PrimitiveParameterBlock& parameters) const noexcept override;
     [[nodiscard]] bool accepts(const PrimitiveParameterBlock& parameters,
                                const PrimitiveTarget& target) const noexcept override;
+    // One variant per image fill, of the material's box (material_image.hpp).
+    [[nodiscard]] std::size_t image_variants(const PrimitiveParameterBlock& parameters,
+                                             const PrimitiveTarget& target,
+                                             std::span<ImageVariantRequest> requests) const noexcept override;
     [[nodiscard]] PrimitiveSlicePlan slice_plan(const PrimitiveParameterBlock& parameters,
                                                 const PrimitiveTarget& target,
                                                 DeviceExtent extent) const noexcept override;

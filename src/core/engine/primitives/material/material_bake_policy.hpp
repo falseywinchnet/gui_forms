@@ -44,26 +44,23 @@ struct MaterialBakeCosts final {
     double border{};
     double border_edge{};
     double keyline{};
-    // Per device pixel, for each image fill: compositing its resampled
-    // colour.
+    // Per device pixel, for each image fill: compositing its prepared
+    // variant's colour. The variant's decode and resampling are not the
+    // bake's (image_variant.hpp).
     double image{};
-    // Per resampling tap: one source sample weighted into one output.
-    double image_tap{};
-    // Per source pixel of a PNG image fill: its decode.
-    double image_decode{};
 };
 
 // Measured by gui_forms_engine_material_tests --measure: for each layer
 // kind, the median of nine bakes of a 240-unit square part (a 256 × 256
 // destination with the outsets) at scale 1, less the median bake of the base
-// material, divided by the pixels; images are a 64 × 64 source magnified and
-// a 1024 × 1024 source shrunk over the same box, and a 64 × 64 PNG decoded.
+// material, divided by the pixels; an image is a prepared variant of the
+// box composited (until 2026-10-22 it was resampled in the bake).
 // Release build (clang 22, -O2) on Windows 11, AMD EPYC 9354 virtual
 // machine with 8 logical CPUs, 2026-10-22, while other builds held the CPUs
 // at 88-97% load. Each figure is the median of seven runs, rounded up; the
-// load makes them pessimistic. image and image_decode are below the noise
-// at this workload (single runs measured below zero), so they carry
-// conservative upper figures rather than measurements. The runs are
+// load makes them pessimistic. image is below the noise at this workload
+// (single runs measured below zero), so it carries
+// a conservative upper figure rather than a measurement. The runs are
 // recorded in planning/stages/T2-engine-core/README.md, "E8c bake costs".
 // outer_shadow and outer_corner are PROVISIONAL: they were measured again
 // for E9's separable outer shadow, on the same machine on 2026-10-22, with
@@ -84,8 +81,6 @@ inline constexpr MaterialBakeCosts measured_material_costs{
     .border_edge = 11.0,
     .keyline = 13.0,
     .image = 6.0,
-    .image_tap = 4.0,
-    .image_decode = 10.0,
 };
 
 } // namespace gui_forms::engine_primitives

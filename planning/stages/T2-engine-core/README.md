@@ -325,8 +325,8 @@ the plan left a number or a form open, E3 chose:
    colour. When an image is shrunk, its kernel is widened by the shrink
    factor and the weights are normalized.
    - **The filter is decided (owner, 2026-10-22): stx_conv (CONV) prepares
-     face sizes; nothing resamples inside a bake.** It is built as its own
-     PR after E9.2.
+     face sizes; nothing resamples inside a bake.** Built as its own PR
+     after E9.2; see "CONV, image face variants" below.
      - *Preparation.* An image face's sized variant is produced by CONV
        through the internal seam `src/core/interpolation/interpolation.hpp`
        (`resample_image`, binary64, clamped to the valid premultiplied
@@ -392,10 +392,12 @@ table gives the minimum, median and maximum per pixel (per tap for
 | image tap | 3.4 | 3.9 | 4.3 | 4 |
 | image decode | −96 | −3.9 | 81 | 10 |
 
-The "used" column rounds each median up. The two image figures are below
+The "used" column rounds each median up. The three image figures are below
 the noise at this workload: single runs measured below zero. They therefore
 carry conservative figures rather than measurements. The machine's load
-makes every figure pessimistic.
+makes every figure pessimistic. Since CONV (below) the bake only composites
+a prepared variant: `image_tap` and `image_decode` are retired, and
+`--measure` reports only the composite.
 
 What the bound admits:
 
@@ -578,6 +580,52 @@ radius plus its reach (3.5σ'), and one pixel, on each side.
 
 The overlay tooltip of 120 × 40 at scale 2 now bakes within the bound. It
 was refused at 1.5 and 2 under the old per-pixel cost of 69 ns.
+
+## CONV, image face variants
+
+The owner's decision of 2026-10-22 (E8c item 2): an image face's sized
+variant is prepared by CONV, and the bake only composites it.
+
+- **The seam.** `EnginePrimitive::image_variants` names the variants a
+  bake needs, one per image fill (`ImageVariantRequest`: the image, its
+  source size, the variant's device extent and scale, and a nine-patch's
+  source slices and fixed device lengths). The engine lends them in
+  `PrimitiveTarget::variants` (`LentImageVariants`). A fill whose variant
+  is not lent draws nothing.
+- **What a variant is.** A stretched or nine-patch image's variant is the
+  material box's size, rounded; a tile's is one tile. The material maps
+  each destination pixel's centre to the variant pixel it falls on,
+  proportionally within its nine-patch segment or its tile, so a variant
+  of the box's size composites one to one.
+- **Preparation.** `make_image_variant` (`src/core/engine/primitives/
+  material/image_variant.cpp`) resamples each axis through the
+  interpolation seam in binary64: `resample_line` with pixel-area sampling
+  when the axis shrinks, `interpolate_line_at` at the pixel centres,
+  (o + 0.5) × s / t − 0.5 clamped to the first and last pixel, when it
+  enlarges, and a copy when it keeps its length. This is the face study's
+  CONV centre composition; `resample_image` takes one sampling for both
+  axes, so it is not used. The vertical axis goes first when the height
+  shrinks. A nine-patch's nine regions are resampled apart. The colour is
+  then clamped to alpha and quantized once.
+- **The cache.** `EnginePartTable` holds the variants beside the shared
+  bakes, matched on everything but the fill layer. Their bytes count in
+  `shared_bytes` against `shared_bake_budget_bytes`, and eviction takes the
+  least recently used of both lists. A theme change (`invalidate_rasters`)
+  or a new revision of the window's images drops them. Counters:
+  `image_variant_bakes`, `image_variant_hits`, `image_variants`.
+- **When.** A variant is made on the first bake that needs it, a keyframe's
+  idle bake included, so an idle keyframe prepares its variant in the idle
+  frame. Otherwise it is made synchronously on first need.
+- **Removed.** Mitchell–Netravali, `MaterialResamplingFilter`, the tap
+  planner, and the `image_tap` and `image_decode` costs. The bake estimate
+  counts only the composite (`image`, 6 ns per pixel).
+- **Proof.** `gui_forms_engine_material_tests`: the image-fill reference
+  hashes, updated (stretch, PNG equal to BGRA, tile, nine-patch, shrink);
+  `image_variant_made_once`: two bakes make one variant and reuse it, the
+  table's bake matches the primitive's byte for byte, a new image revision
+  makes it again, and a theme change drops it; `image_variant_outside_the_bound`:
+  a 1024 × 1024 image on a 240-unit part has the same estimate as a 4 × 4
+  one, is accepted and bakes, its variant made on first need.
 
 ## Open decisions (ask, do not decide)
 
