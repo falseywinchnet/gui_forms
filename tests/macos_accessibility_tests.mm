@@ -745,6 +745,10 @@ private:
 
 int main(int argc, char** argv) {
     try {
+        if (!gui_forms::host::macos_capabilities().supports(gui_forms::HostCapability::accessibility)) {
+            std::cerr << "the macOS host does not advertise accessibility\n";
+            return 1;
+        }
         StockControlFixture fixture = gui_forms::test_support::make_stock_control_fixture();
         std::unique_ptr<gui_forms::Window> window = std::make_unique<gui_forms::Window>(
             fixture.root, gui_forms::test_support::stock_control_fixture_size);

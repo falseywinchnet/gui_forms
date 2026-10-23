@@ -4314,10 +4314,14 @@ void run_windows_tooltip_fixture(const std::filesystem::path& fonts) {
 }
 #endif
 
+// accessibility: MSAA and UI Automation publication of the semantic tree,
+// including the TextPattern, verified by the MSAA and UI Automation client
+// tests over the Gallery (stage A).
 HostCapabilities windows_capabilities() {
     return {HostCapabilities::current_protocol_version,
             "win32-dib",
             HostCapability::lifecycle |
+                HostCapability::accessibility |
                 HostCapability::frame_capture |
                 HostCapability::scale_notifications |
                 HostCapability::scheduled_wake |

@@ -13,7 +13,9 @@ fixture (A-L1) and of the whole Gallery (A-L2,
 `gui_forms_macos_accessibility_client_tests` (AXUIElement client; skipped as
 unsupported without the Accessibility permission) registered; gate run
 recorded in `results/2026-10-20-a-macos`. Editable text ranges (item 5) are
-next. Authority: `planning/FORWARD_PROGRAMME.md`
+in place on all three hosts (ATK Text, UIA TextPattern, AppKit text
+attributes, each with client tests), and every native host advertises
+`HostCapability::accessibility` (item 6, 2026-10-22). Authority: `planning/FORWARD_PROGRAMME.md`
 §3 A; this brief adds context and does not change the gate.
 
 Read [the shared brief](../README.md) first.
@@ -89,8 +91,9 @@ is never turned off (accessibility round A3).
   and a Python AT-SPI client (`tests/linux_accessibility_client.py`) exist
   but are not registered with `ctest`.
 - **Capability.** `HostCapability::accessibility` exists in
-  `include/gui_forms/host/types/host_capability/host_capability.hpp`; no host
-  advertises it.
+  `include/gui_forms/host/types/host_capability/host_capability.hpp`; the
+  macOS, Windows and Linux hosts advertise it (the headless host does not),
+  and each host's accessibility or host test checks that.
 - **Keyboard reach.** Tab order, focus scopes, mnemonics and accept/cancel
   targets are implemented and tested.
 - **Text.** Editable text ranges are not exposed on any host, so a client
