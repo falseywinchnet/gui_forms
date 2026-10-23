@@ -1,6 +1,6 @@
 #include "material_image.hpp"
 
-#include "../../../image/png_pixels.hpp"
+#include "../../../image/resource_pixels.hpp"
 
 #include <algorithm>
 #include <array>
@@ -155,15 +155,12 @@ bool read_material_image(const ImageRegistry& registry, const MaterialFillLayer&
     // from it.
     if (row_bytes / 4U != width || row_bytes > std::numeric_limits<std::size_t>::max() / height) return false;
     std::vector<std::uint8_t> bytes(row_bytes * height, 0U);
-    if (view.encoding == ImageResourceEncoding::png) {
-        image::PngPixelDecoder decoder{};
-        image::PngPixelRequest request{};
-        request.limits = image::png_limits_for_image(width, height, view.encoded.size());
-        request.target = image::PixelTarget{image::PixelOrder::rgba, image::PixelAlpha::premultiplied};
-        request.purpose = image::PngPixelPurpose::resource;
+    if (view.encoding != ImageResourceEncoding::bgra32_premultiplied) {
+        image::ResourcePixelDecoder decoder{};
+        const image::PixelTarget target{image::PixelOrder::rgba, image::PixelAlpha::premultiplied};
         const std::span<std::byte> destination = std::as_writable_bytes(std::span<std::uint8_t>(bytes));
-        const image::PngPixelResult decoded = decoder.decode(view.encoded, request, destination, row_bytes);
-        if (decoded.error != image::PngPixelError::none || decoded.width != width || decoded.height != height) {
+        const image::ResourcePixelResult decoded = decoder.decode(view, target, destination, row_bytes);
+        if (decoded.error != image::ResourcePixelError::none || decoded.width != width || decoded.height != height) {
             return false;
         }
     } else {

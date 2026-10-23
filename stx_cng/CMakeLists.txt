@@ -39,6 +39,13 @@ if(NOT EXISTS "${STX_CNG_ZSTD_ROOT}/lib/zstd.h")
     file(ARCHIVE_EXTRACT INPUT "${STX_CNG_ZSTD_ARCHIVE}" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/zstd"
         PATTERNS zstd-1.5.7/lib zstd-1.5.7/LICENSE)
 endif()
+# The checked-in licence copy (installed, and shipped by GUI.Forms) must be
+# the release's own.
+file(SHA256 "${STX_CNG_ZSTD_ROOT}/LICENSE" stx_cng_zstd_licence)
+file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE-zstd.txt" stx_cng_zstd_licence_copy)
+if(NOT stx_cng_zstd_licence STREQUAL stx_cng_zstd_licence_copy)
+    message(FATAL_ERROR "stx_cng/LICENSE-zstd.txt differs from Zstandard 1.5.7's LICENSE")
+endif()
 include(cmake/zstd.cmake)
 
 add_library(stx_cng STATIC src/codec.cpp src/sequences.cpp src/literals.cpp src/restore.cpp)
@@ -99,4 +106,4 @@ write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/stx_cngConfigVersio
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stx_cngConfig.cmake ${CMAKE_CURRENT_BINARY_DIR}/stx_cngConfigVersion.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/stx_cng)
 install(FILES LICENSE PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/stx_cng)
-install(FILES "${STX_CNG_ZSTD_ROOT}/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/stx_cng RENAME zstd-LICENSE.txt)
+install(FILES LICENSE-zstd.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/stx_cng RENAME zstd-LICENSE.txt)

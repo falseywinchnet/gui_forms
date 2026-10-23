@@ -26,6 +26,9 @@ jobs:
           echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
       - name: Require the supported compiler
         run: python3 gui_forms/tools/compiler_identity.py
+      # stx_cng's pinned Zstandard tarball; the proof copies it with the tree.
+      - name: Fetch the pinned Zstandard
+        run: sh gui_forms/stx_cng/tools/fetch_zstd.sh
       - name: Prove cold, relocated, source, header and option behavior
         run: python3 gui_forms/tools/prove_compiler_cache.py --source gui_forms --scratch cache-proof --jobs 4
       - uses: actions/upload-artifact@v4

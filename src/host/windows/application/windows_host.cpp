@@ -29,7 +29,7 @@
 
 #include "../paint_endpoint/windows_compatibility_paint_endpoint_metrics.hpp"
 #include "../../../core/host/frame_capture/frame_capture.hpp"
-#include "../../../core/image/png_pixels.hpp"
+#include "../../../core/image/resource_pixels.hpp"
 #include "../../../core/image/png_writer.hpp"
 
 #include <windows.h>
@@ -861,7 +861,7 @@ public:
         }
         if (&registry != image_registry_) images_.clear();
         // One decoder for the batch; its storage is released when it goes.
-        gui_forms::image::PngPixelDecoder decoder{};
+        gui_forms::image::ResourcePixelDecoder decoder{};
         bool synchronized = true;
         std::unordered_set<std::uint64_t> active;
         for (const ImageId id : registry.image_ids()) {
@@ -897,7 +897,7 @@ public:
                     static_cast<std::size_t>(decoded.width) * decoded.height);
                 std::memcpy(decoded.pixels.data(), (*resource).encoded.data(), expected);
             } else {
-                if (!decode_png(decoder, *resource, decoded)) {
+                if (!decode_resource(decoder, *resource, decoded)) {
                     images_.erase(id.value);
                     synchronized = false;
                     continue;
@@ -2400,23 +2400,20 @@ private:
         glyph_runs_.reset();
     }
 
-    // The shared owned decode (src/core/image/png_pixels), as on every host:
-    // premultiplied BGRA, the DIB's native order.
-    static bool decode_png(gui_forms::image::PngPixelDecoder& decoder,
-                           const ImageResourceView& resource,
-                           DecodedImage& output) {
+    // The shared owned CNG or PNG decode (src/core/image/resource_pixels), as
+    // on every host: premultiplied BGRA, the DIB's native order.
+    static bool decode_resource(gui_forms::image::ResourcePixelDecoder& decoder,
+                                const ImageResourceView& resource,
+                                DecodedImage& output) {
         if (resource.encoded.empty() || output.width == 0 || output.height == 0 ||
             output.width > std::numeric_limits<std::size_t>::max() / 4U / output.height) return false;
-        gui_forms::image::PngPixelRequest request{};
-        request.limits = gui_forms::image::png_limits_for_image(output.width, output.height,
-                                                     resource.encoded.size());
-        request.target = {gui_forms::image::PixelOrder::bgra, gui_forms::image::PixelAlpha::premultiplied};
-        request.purpose = gui_forms::image::PngPixelPurpose::resource;
+        const gui_forms::image::PixelTarget target{gui_forms::image::PixelOrder::bgra,
+                                                   gui_forms::image::PixelAlpha::premultiplied};
         output.pixels.resize(static_cast<std::size_t>(output.width) * output.height);
         const std::span<std::byte> pixels = std::as_writable_bytes(std::span<std::uint32_t>(output.pixels));
         const std::size_t row_bytes = static_cast<std::size_t>(output.width) * 4U;
-        const gui_forms::image::PngPixelResult decoded = decoder.decode(resource.encoded, request, pixels, row_bytes);
-        const bool accepted = decoded.error == gui_forms::image::PngPixelError::none &&
+        const gui_forms::image::ResourcePixelResult decoded = decoder.decode(resource, target, pixels, row_bytes);
+        const bool accepted = decoded.error == gui_forms::image::ResourcePixelError::none &&
                               decoded.width == output.width && decoded.height == output.height;
         return accepted;
     }
