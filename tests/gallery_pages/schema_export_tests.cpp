@@ -406,6 +406,8 @@ void append_engine(std::string& out) {
     names.push_back(opacity_property);
     names.push_back(scale_property);
     names.push_back(face_property);
+    names.push_back(translate_x_property);
+    names.push_back(translate_y_property);
     append_name_list(out, names);
     out += ", ";
     append_json_string(out, "maximum_states");

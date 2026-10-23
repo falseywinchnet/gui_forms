@@ -164,7 +164,7 @@ These are only presentational: hit region and layout are unchanged.
 | CSS | Engine carrier | Status | Smallest addition |
 |---|---|---|---|
 | `scale` | presentational `scale` (`scale_property`), 0.5 to 2, within the granted overflow | present | |
-| `translate` (a press nudge or a lift) | `ControlVisualRecipe::visual_offset` and `pressed_content_offset` (static, per state) | present (static) | An animated presentational `translate`, like scale: within the grant, with the raster composited at the offset, so nothing bakes. E9.6 |
+| `translate` (a press nudge or a lift) | `ControlVisualRecipe::visual_offset` and `pressed_content_offset` (static, per state); animated: `translate_x` and `translate_y` (±32), within the grant less the scale's share, the raster composited at the offset | present (E9.6 G4) | |
 | `rotate`, `skew`, 3D transforms | none | missing | Not proposed for controls (axis-aligned hit regions and pixel-exact parts). For activity glyphs, an ambient rotation of a baked raster would be its own primitive; ask the owner |
 | `transform-origin` | the centre (scale) | present (fixed) | |
 
@@ -175,12 +175,12 @@ These are only presentational: hit region and layout are unchanged.
 | `transition-property`, `transition-duration` | `PropertyTransition`, `MotionCurve::timed`, a 400 ms ceiling | present | |
 | `transition-timing-function`: `linear`, `ease-in-out` | `MotionEasing::linear`, `ease`, `smoothstep` | present | |
 | the overshoot ("back-out") | `MotionEasing` overshoot (8 %) | present | |
-| `cubic-bezier()` of any control points | none (the closed set above) | missing | T3 matches the nearest admitted easing and warns. If the owner wants arbitrary curves, add a bounded `cubic_bezier` easing (control points clamped to the 8 % overshoot), solved by a fixed number of Newton steps; E9.6 |
-| `steps()` | none | missing | A `steps(n)` easing: a floor at n levels. It pairs with E7r's keyframe levels; E9.6 |
-| `transition-delay` | none | missing | A delay on `MotionCurve` before the value moves, inside the 400 ms ceiling; E9.6 |
+| `cubic-bezier()` of any control points | `MotionCurve::cubic_bezier`: x clamped to [0, 1], y to the 8 % overshoot, solved by 40 bisections | present (E9.6 G4) | |
+| `steps()` | `MotionCurve::stepped`: n in [1, 32], `jump-end` or `jump-start` | present (E9.6 G4) | |
+| `transition-delay` | `MotionCurve::delayed`, delay and duration within the 400 ms ceiling | present (E9.6 G4) | |
 | `follow()`, `spring()`, `decay()` (engine functions) | `MotionCurve::follow`, `spring`, `decay` | present | |
 | state-driven `@keyframes` (enter from, then rest) | `PresentationState::enter_from` and `target` | present | |
-| multi-stop `@keyframes` | none (two points per state) | missing | Up to 4 stops per presentation state, each baked as an E7r keyframe; E9.6 |
+| multi-stop `@keyframes` | `PresentationState::stops`, up to 4, played on entering the state (`MotionValue::animate_through`); a parameter shows each at its nearest E7r keyframe | present (E9.6 G4) | |
 | looping `animation` (`animation-iteration-count: infinite`) | `AmbientEffect` (period, frame rate, pose) with `time_in_state` expressions | present | |
 | `prefers-reduced-motion` | engine-wide: every transition jumps and ambient effects rest | present | |
 
