@@ -64,8 +64,9 @@ takes the BSD option). The official release tarball
 `eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3`, the hash
 the release publishes beside it. `tools/fetch_zstd.sh` downloads and verifies
 it into `third_party/` (not checked in); configuration verifies it again
-before extracting `lib/` and `LICENSE`. The licence is installed as
-`share/licenses/stx_cng/zstd-LICENSE.txt`.
+before extracting `lib/` and `LICENSE`. `LICENSE-zstd.txt` is a copy of
+that licence, checked against the extracted one at configuration, and is
+installed as `share/licenses/stx_cng/zstd-LICENSE.txt`.
 
 `cmake/zstd.cmake` builds a static library from an explicit source list:
 

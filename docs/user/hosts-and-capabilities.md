@@ -37,7 +37,7 @@ whole record for logs.
 | `notification_area_menus` | a native menu shown from a tray icon | yes | yes | no |
 | `menus` | native menu-bar publication | no | no | no |
 | `font_discovery` | host font enumeration | no, by design | no, by design | no, by design |
-| `accessibility` | native accessibility publication of the semantic tree | not yet advertised | not yet advertised | not yet advertised |
+| `accessibility` | native accessibility publication of the semantic tree, verified by client tests | yes | yes | yes |
 | `typed_drag_source` | outbound drag initiation | no | no | no |
 | `runtime_windows` | owned windows opened and destroyed while the application runs | yes | yes | yes |
 | `window_frames` | window frames read and requested in desktop logical units, with a report for every move and resize | yes | yes | yes (the window manager decides) |
@@ -143,9 +143,11 @@ Headless
   target, not an installed SDK component. SDK consumers can link
   `GUIForms::Controls` to test retained models without a native host.
 
-The missing `accessibility` bit does not mean native publication is absent:
-the adapters have accessibility implementations. It means that the current
-capability record does not advertise that integration.
+Every native adapter advertises `accessibility`: it publishes the semantic
+tree, including editable text ranges, through the platform's own API
+(NSAccessibility, MSAA and UI Automation, ATK/AT-SPI), and a client test on
+each host reads it back through that API (stage A). The headless adapter
+publishes nothing and does not advertise it.
 
 ## What stays portable
 

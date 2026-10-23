@@ -20,6 +20,7 @@
 // layer alone over the base material, in nanoseconds per device pixel.
 
 #include "gui_forms/control.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "gui_forms/controls/panel/panel.hpp"
 #include "gui_forms/engine.hpp"
 #include "gui_forms/surface_material/presets/material_presets.hpp"
@@ -971,7 +972,7 @@ constexpr ReferenceCase reference_cases[] = {
 };
 
 void reference_images() {
-    const std::shared_ptr<const Theme> theme = Theme::create(windows_professional_theme_definition());
+    const std::shared_ptr<const Theme> theme = Theme::create(*test_support::professional_definition());
     const bool printing = print_mode();
     bool all_match = true;
     for (const ReferenceCase& reference : reference_cases) {
@@ -1062,7 +1063,8 @@ std::unique_ptr<Fixture> make_fixture(Size size, double scale) {
     made.window = std::make_unique<Window>(made.root, Size{size.width + 100.0, size.height + 100.0});
     Window& window = *made.window;
     window.set_scale(scale);
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "engine-material-test";
     definition.rules.rules.push_back(material_rule());
     window.set_theme(Theme::create(definition));

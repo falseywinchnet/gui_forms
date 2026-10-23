@@ -1,6 +1,6 @@
 #include "coregraphics_raster.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
-#include "../../../core/image/png_pixels.hpp"
+#include "../../../core/image/resource_pixels.hpp"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
@@ -321,8 +321,8 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
     }
 
     bool synchronized = true;
-    // One shared owned decoder for the batch (src/core/image/png_pixels).
-    gui_forms::image::PngPixelDecoder decoder{};
+    // One shared owned decoder for the batch (src/core/image/resource_pixels).
+    gui_forms::image::ResourcePixelDecoder decoder{};
     std::unordered_set<std::uint64_t> active;
     for (const ImageId id : registry.image_ids()) {
         active.insert(id.value);
@@ -338,7 +338,7 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
         }
 
         // Premultiplied RGBA source rows: swizzled from a BGRA resource, or
-        // decoded by the shared owned PNG path (as on every host).
+        // decoded by the shared owned CNG or PNG path (as on every host).
         CGImageRef source_image = nullptr;
         const std::size_t tight_row_bytes =
             static_cast<std::size_t>((*resource).metadata.width) * 4U;
@@ -359,16 +359,12 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
             }
         } else if ((*resource).metadata.decoded_byte_count <=
                    std::numeric_limits<std::size_t>::max()) {
-            gui_forms::image::PngPixelRequest request{};
-            request.limits = gui_forms::image::png_limits_for_image((*resource).metadata.width,
-                (*resource).metadata.height, (*resource).encoded.size());
-            request.target = {gui_forms::image::PixelOrder::rgba,
-                              gui_forms::image::PixelAlpha::premultiplied};
-            request.purpose = gui_forms::image::PngPixelPurpose::resource;
+            const gui_forms::image::PixelTarget target{gui_forms::image::PixelOrder::rgba,
+                                                       gui_forms::image::PixelAlpha::premultiplied};
             rgba.resize(static_cast<std::size_t>((*resource).metadata.decoded_byte_count));
-            const gui_forms::image::PngPixelResult decoded =
-                decoder.decode((*resource).encoded, request, rgba, tight_row_bytes);
-            have_rgba = decoded.error == gui_forms::image::PngPixelError::none &&
+            const gui_forms::image::ResourcePixelResult decoded =
+                decoder.decode(*resource, target, rgba, tight_row_bytes);
+            have_rgba = decoded.error == gui_forms::image::ResourcePixelError::none &&
                         decoded.width == (*resource).metadata.width &&
                         decoded.height == (*resource).metadata.height;
         }

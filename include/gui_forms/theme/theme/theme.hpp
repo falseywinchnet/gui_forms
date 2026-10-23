@@ -15,8 +15,13 @@ namespace gui_forms {
 
 class Theme final {
 public:
+    // Validates `definition` and makes a theme holding its own copy, with
+    // every family's high-contrast records derived from its ordinary ones.
+    // Throws std::invalid_argument and makes nothing when the definition is
+    // invalid. The definition is read, never copied onto the stack (see
+    // ThemeDefinition).
     [[nodiscard]] static std::shared_ptr<const Theme> create(
-        ThemeDefinition definition);
+        const ThemeDefinition& definition);
     [[nodiscard]] std::string_view id() const noexcept { return definition_.id; }
     [[nodiscard]] const BasicControlStyle& basic_style() const noexcept {
         return definition_.compatibility;
@@ -48,8 +53,9 @@ public:
 private:
     // The engine compiles the definition's rules: a theme is made whole or
     // not at all, so the theme it replaces stays in force until it exists.
-    explicit Theme(ThemeDefinition definition)
-        : definition_(std::move(definition)), engine_(definition_.rules) {}
+    // The copy is made straight into the theme's heap storage.
+    explicit Theme(const ThemeDefinition& definition)
+        : definition_(definition), engine_(definition_.rules) {}
     ThemeDefinition definition_;
     ThemeEngine engine_;
 };

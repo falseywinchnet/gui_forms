@@ -29,6 +29,10 @@ namespace {
 
 using namespace gui_forms;
 
+// Each test holds its window on the heap. main inlines every test, and
+// the sanitizer build gives each inlined local its own stack slot, so
+// windows held on the stack add up to a frame of 90 KB in main.
+
 void require(bool condition, const std::string& message) {
     if (!condition) {
         throw std::runtime_error(message);
@@ -245,7 +249,8 @@ void test_track_bar_geometry_matches_pointer_mapping() {
     std::shared_ptr<TrackBar> slider = make_control<TrackBar>(StableId("anatomy.slider"));
     (*slider).set_requested_bounds({10.0, 10.0, 200.0, 28.0});
     (*slider).set_value(25.0);
-    Window window(slider, {240.0, 60.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(slider, Size{240.0, 60.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     const Rect span = (*slider).value_span_bounds();
@@ -312,7 +317,8 @@ void test_scroll_bar_geometry_and_states() {
     (*vertical).set_requested_bounds({260.0, 10.0, 18.0, 180.0});
     (*root).add_child(horizontal);
     (*root).add_child(vertical);
-    Window window(root, {300.0, 210.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{300.0, 210.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     const std::array<std::shared_ptr<ScrollBar>, 2> bars{horizontal, vertical};
@@ -376,7 +382,8 @@ void test_progress_bar_geometry_and_states() {
     std::shared_ptr<ProgressBar> progress = make_control<ProgressBar>(StableId("anatomy.bar"));
     (*progress).set_requested_bounds({0.0, 0.0, 204.0, 20.0});
     (*progress).set_value(50.0);
-    Window window(progress, {204.0, 20.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(progress, Size{204.0, 20.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     const PartGeometry fill = (*progress).parts().fill;
@@ -408,7 +415,8 @@ void test_base_anatomy_for_undeclared_controls() {
     std::shared_ptr<UndeclaredControl> plain =
         make_control<UndeclaredControl>(StableId("anatomy.plain"));
     (*plain).set_requested_bounds({0.0, 0.0, 80.0, 40.0});
-    Window window(plain, {80.0, 40.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(plain, Size{80.0, 40.0});
+    Window& window = *held_window;
     window.perform_layout();
     require(&(*plain).anatomy() == &base_control_anatomy(),
             "a type that declares nothing inherits the base anatomy");
@@ -456,7 +464,8 @@ void test_button_label_matches_painted_text() {
     std::shared_ptr<Button> button = make_control<Button>(StableId("anatomy.button"), "Apply");
     (*button).set_requested_bounds({20.0, 30.0, 120.0, 30.0});
     (*root).add_child(button);
-    Window window(root, {300.0, 120.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{300.0, 120.0});
+    Window& window = *held_window;
     TextOriginPainter painter;
     window.set_text_metrics_provider(&painter);
     window.perform_layout();
@@ -513,7 +522,8 @@ void test_check_box_and_radio_button_parts() {
     (*radio).set_requested_bounds({10.0, 50.0, 160.0, 24.0});
     (*root).add_child(check);
     (*root).add_child(radio);
-    Window window(root, {300.0, 120.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{300.0, 120.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     require(validate_control_anatomy((*check).anatomy()).defect == AnatomyDefect::none &&
@@ -585,7 +595,8 @@ void test_check_box_and_radio_button_parts() {
 void test_link_label_custom_visited_state() {
     std::shared_ptr<LinkLabel> link = make_control<LinkLabel>(StableId("anatomy.link"), "Learn more");
     (*link).set_requested_bounds({0.0, 0.0, 160.0, 22.0});
-    Window window(link, {160.0, 22.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(link, Size{160.0, 22.0});
+    Window& window = *held_window;
     window.perform_layout();
     const ControlAnatomy& anatomy = (*link).anatomy();
     require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none,
@@ -610,7 +621,8 @@ void test_drop_down_button_disclosure() {
     std::shared_ptr<DropDownButton> button = make_control<DropDownButton>(
         StableId("anatomy.drop"), "Export", DropDownButtonMode::split);
     (*button).set_requested_bounds({0.0, 0.0, 140.0, 28.0});
-    Window window(button, {140.0, 28.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(button, Size{140.0, 28.0});
+    Window& window = *held_window;
     window.perform_layout();
     require(validate_control_anatomy((*button).anatomy()).defect == AnatomyDefect::none &&
                 (*button).anatomy().control_id == "drop_down_button",
@@ -640,7 +652,8 @@ void test_panel_and_scrollable_parts() {
     std::shared_ptr<Label> tall = make_control<Label>(StableId("anatomy.panel.tall"), "Tall");
     (*tall).set_requested_bounds({0.0, 0.0, 120.0, 400.0});
     (*panel).add_child(tall);
-    Window window(panel, {200.0, 120.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(panel, Size{200.0, 120.0});
+    Window& window = *held_window;
     window.perform_layout();
     require(validate_control_anatomy((*panel).anatomy()).defect == AnatomyDefect::none &&
                 (*panel).anatomy().control_id == "panel",
@@ -680,7 +693,8 @@ void test_group_box_and_label_parts() {
     (*label).set_requested_bounds({10.0, 130.0, 160.0, 24.0});
     (*root).add_child(group);
     (*root).add_child(label);
-    Window window(root, {320.0, 200.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{320.0, 200.0});
+    Window& window = *held_window;
     TextOriginPainter painter;
     window.set_text_metrics_provider(&painter);
     window.perform_layout();
@@ -720,7 +734,8 @@ void test_base_record_follows_dynamic_type() {
         make_control<MaterialPanel>(StableId("anatomy.material"));
     (*material).set_requested_bounds({0.0, 0.0, 120.0, 60.0});
     (*material).set_border_style(BorderStyle::line);
-    Window window(material, {120.0, 60.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(material, Size{120.0, 60.0});
+    Window& window = *held_window;
     window.perform_layout();
     const Panel& as_panel = *material;
     const Panel::Parts parts = as_panel.parts();
@@ -737,7 +752,8 @@ void test_base_record_follows_dynamic_type() {
 void test_text_box_caret_and_selection() {
     std::shared_ptr<TextBox> box = make_control<TextBox>(StableId("anatomy.text"), "hello world");
     (*box).set_requested_bounds({0.0, 0.0, 200.0, 28.0});
-    Window window(box, {200.0, 28.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(box, Size{200.0, 28.0});
+    Window& window = *held_window;
     TextOriginPainter painter;
     window.set_text_metrics_provider(&painter);
     window.perform_layout();
@@ -785,7 +801,8 @@ void test_spin_combo_and_picker_parts() {
     (*root).add_child(spin);
     (*root).add_child(combo);
     (*root).add_child(picker);
-    Window window(root, {320.0, 160.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{320.0, 160.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     const NumericUpDown::Parts spin_parts = (*spin).parts();
@@ -848,7 +865,8 @@ void test_list_rows_are_item_records() {
     (*checks).set_items({"Wrap", "Spell", "Grammar"});
     (*root).add_child(list);
     (*root).add_child(checks);
-    Window window(root, {400.0, 200.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{400.0, 200.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     require(validate_control_anatomy((*list).anatomy()).defect == AnatomyDefect::none &&
@@ -968,7 +986,8 @@ void test_interactions_follow_the_type() {
     std::shared_ptr<Button> button =
         make_control<Button>(StableId("anatomy.interactions.button"), "Go");
     (*root).add_child(button);
-    Window window(root, Size{200.0, 100.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{200.0, 100.0});
+    Window& window = *held_window;
     const std::vector<InteractionDeclaration> declared = (*button).interactions();
     require(validate_interactions(declared).defect == InteractionDefect::none,
             "a button's interactions validate");
@@ -1052,7 +1071,8 @@ void test_value_editors_and_diagnostic_views() {
     (*metrics).set_requested_bounds({10.0, 90.0, 300.0, 90.0});
     (*root).add_child(color);
     (*root).add_child(metrics);
-    Window window(root, {360.0, 200.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{360.0, 200.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     const ColorValueEditor::Parts color_parts = (*color).parts();
@@ -1115,7 +1135,8 @@ void test_tabs_menus_and_breadcrumbs_are_items() {
     (*root).add_child(menu);
     (*root).add_child(trail);
     (*root).add_child(split);
-    Window window(root, {640.0, 360.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{640.0, 360.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     const std::vector<TabControl::Item> tab_items = (*tabs).realized_items();
@@ -1184,7 +1205,8 @@ void test_tree_and_correspondence_items() {
     (*view).set_items({first, second});
     (*root).add_child(tree);
     (*root).add_child(view);
-    Window window(root, {700.0, 400.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{700.0, 400.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     const std::vector<TreeView::Item> nodes = (*tree).realized_items();
@@ -1235,7 +1257,8 @@ void test_object_view_columns_are_items() {
     sort.column = ObjectColumnId{"name"};
     (*view).set_details_model(std::move(columns), std::move(items), sort);
     (*root).add_child(view);
-    Window window(root, Size{400.0, 200.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{400.0, 200.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     const ControlAnatomy& anatomy = (*view).anatomy();

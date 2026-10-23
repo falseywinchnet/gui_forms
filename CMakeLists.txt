@@ -93,6 +93,9 @@ include(CMakePackageConfigHelpers)
 add_subdirectory(stx_zlib)
 add_subdirectory(stx_png)
 add_subdirectory(stx_conv)
+# CNG, the native resource image codec (PNG stays for interchange); its
+# pinned Zstandard 1.5.7 comes from stx_cng/tools/fetch_zstd.sh.
+add_subdirectory(stx_cng)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -211,6 +214,8 @@ add_library(gui_forms_core STATIC
     src/core/host/image/clipboard_dib.cpp
     src/core/host/image/clipboard_png.cpp
     src/core/image/png_pixels.cpp
+    src/core/image/cng_pixels.cpp
+    src/core/image/resource_pixels.cpp
     src/core/image/png_color.cpp
     src/core/image/color_conversion.cpp
     src/core/interpolation/interpolation.cpp
@@ -258,6 +263,9 @@ add_library(gui_forms_core STATIC
 target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib stx_png::stx_png)
 # The interpolation seam's private engine; no stx_conv type is public.
 target_link_libraries(gui_forms_core PRIVATE stx_conv::stx_conv)
+# The resource decode seam's CNG engine (src/core/image/cng_pixels); no
+# stx_cng or Zstandard type is public.
+target_link_libraries(gui_forms_core PRIVATE stx_cng::stx_cng)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
 set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 # Compatibility properties alone do not traverse LINK_ONLY dependencies of
@@ -2191,6 +2199,11 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_png_pixels_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_pixels_tests COMMAND gui_forms_png_pixels_tests)
 
+    # The codec-neutral resource seam: CNG and PNG admission and decoding.
+    add_executable(gui_forms_resource_pixels_tests tests/image/resource_pixels_tests.cpp)
+    target_link_libraries(gui_forms_resource_pixels_tests PRIVATE gui_forms_core stx_cng::stx_cng)
+    add_test(NAME gui_forms_resource_pixels_tests COMMAND gui_forms_resource_pixels_tests)
+
     # Deterministic malformed-input sweeps (owner revision of decision 6A).
     add_executable(gui_forms_malformed_sweep_tests tests/compression/malformed_sweep_tests.cpp)
     target_link_libraries(gui_forms_malformed_sweep_tests PRIVATE stx_zlib::stx_zlib)
@@ -2292,6 +2305,13 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_pop_tests tests/engine_pop_tests.cpp)
     target_link_libraries(gui_forms_engine_pop_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_pop_tests COMMAND gui_forms_engine_pop_tests)
+
+    # T2's gate evidence (E11): every registered primitive's reference images
+    # and the idle-frame counters, written as a manifest that CI compares
+    # across hosts (tools/engine_gate.py).
+    add_executable(gui_forms_engine_gate_tests tests/engine_gate_tests.cpp)
+    target_link_libraries(gui_forms_engine_gate_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_gate_tests COMMAND gui_forms_engine_gate_tests)
 
     add_executable(gui_forms_damage_clip_tests tests/damage_clip_tests.cpp)
     target_link_libraries(gui_forms_damage_clip_tests PRIVATE gui_forms_controls)
@@ -3611,7 +3631,7 @@ include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
-# stx_zlib, stx_png and stx_conv install their own licences and provenance under
+# stx_zlib, stx_png, stx_conv and stx_cng install their own licences and provenance under
 # share/licenses/<package>; the SDK also carries them beside GUI.Forms' others.
 install(FILES stx_zlib/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE.txt)
 install(FILES stx_zlib/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-puff.txt)
@@ -3621,6 +3641,9 @@ install(FILES stx_png/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIF
 install(FILES stx_png/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-PROVENANCE.md)
 install(FILES stx_conv/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_conv-LICENSE.txt)
 install(FILES stx_conv/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_conv-PROVENANCE.md)
+install(FILES stx_cng/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_cng-LICENSE.txt)
+install(FILES stx_cng/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_cng-PROVENANCE.md)
+install(FILES stx_cng/LICENSE-zstd.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Zstandard-LICENSE.txt)
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 # Every third-party component the SDK and the programs ship, with its licence
 # and the FreeType credit (THIRD_PARTY_NOTICES.md).
@@ -3865,5 +3888,5 @@ endif()
 # Every test carries one area label (cmake/TestAreas.cmake, tools/test_areas.json).
 if(GUI_FORMS_BUILD_TESTS)
     include(cmake/TestAreas.cmake)
-    gui_forms_label_test_areas(stx_zlib stx_png stx_conv)
+    gui_forms_label_test_areas(stx_zlib stx_png stx_conv stx_cng)
 endif()

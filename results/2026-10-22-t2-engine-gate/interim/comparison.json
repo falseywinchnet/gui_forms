@@ -1,0 +1,36 @@
+{
+  "platforms": [
+    "linux-arm64",
+    "linux-x64",
+    "macos-arm64",
+    "windows-x64"
+  ],
+  "missing": [],
+  "primitives": [
+    "bulge",
+    "dithered_bulge",
+    "etched_divider",
+    "glass",
+    "gold_plate",
+    "grip",
+    "inset_well",
+    "material",
+    "overlay_shadow",
+    "pill_plate",
+    "seam_line",
+    "sheen"
+  ],
+  "images": 144,
+  "registry": {
+    "linux-arm64": 12,
+    "linux-x64": 12,
+    "macos-arm64": 12,
+    "windows-x64": 12
+  },
+  "registry_agrees": true,
+  "differences": [],
+  "busy_idle_counters": [],
+  "identical": true,
+  "commit": "5a87ab47fd08a534111431f24c4f0c5a2bc09eca",
+  "run": "https://github.com/falseywinchnet/gui_forms/actions/runs/39910508309"
+}

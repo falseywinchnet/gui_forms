@@ -513,6 +513,8 @@ void client_size_request(Runtime &runtime) {
 }
 int main() {
   try {
+    require(host::linux_capabilities().supports(HostCapability::accessibility),
+            "the Linux host advertises accessibility");
     Runtime runtime;
     const std::shared_ptr<Root> root =
         make_control<Root>(StableId("linux.services"));

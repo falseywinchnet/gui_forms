@@ -8,6 +8,7 @@
 // the insets leave no room.
 
 #include "gui_forms/gui_forms.hpp"
+#include "support/theme_definition_heap.hpp"
 
 #include <array>
 #include <chrono>
@@ -181,7 +182,8 @@ std::unique_ptr<Fixture> make_fixture(std::string_view primitive, Insets overflo
     made.window = std::make_unique<Window>(made.root, Size{400.0, 300.0});
     Window& window = *made.window;
     window.motion_clock().set_time_source(&made.time);
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "engine-scale-test";
     definition.rules.rules.push_back(pad_rule("pad", primitive, hot_scale));
     window.set_theme(Theme::create(definition));

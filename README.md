@@ -100,7 +100,8 @@ See [Download](https://gui-forms.readthedocs.io/en/latest/user/download.html) fo
 - Stable IDs on every control, used by logs, semantics, tests and automation.
 - A C ABI seam (`include/gui_forms/c_api.h`) and an installed CMake SDK
   (`GUIForms::Application`).
-- PNG is the only image decoder in the core.
+- CNG (native resources) and PNG (interchange) are the only image codecs in
+  the core.
 - No GPU, no .NET, no browser engine.
 
 ## Controls

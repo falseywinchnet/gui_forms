@@ -14,6 +14,7 @@
 // checking them.
 
 #include "gui_forms/gui_forms.hpp"
+#include "support/theme_definition_heap.hpp"
 
 #include <array>
 #include <chrono>
@@ -825,7 +826,8 @@ std::unique_ptr<AmbientFixture> make_ambient() {
     (*made.large).face = Rect{0.0, 10.0, 100.0, 50.0};
     (*made.root).add_child(made.small);
     (*made.root).add_child(made.large);
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "ambient-test";
     definition.rules.rules.push_back(ambient_rule("small", 30.0));
     definition.rules.rules.push_back(ambient_rule("large", 30.0));
