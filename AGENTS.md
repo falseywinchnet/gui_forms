@@ -70,7 +70,7 @@ Before committing, run the spelling check over everything you touched; the
 finding:
 
 ```text
-python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis
+python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv stx_cng fuzz
 python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis
 ```
 
@@ -151,8 +151,12 @@ mandatory for work in that directory.
   platform differences are capability-reported adapter behavior, not hidden
   core policy. Private Skia extensions may use platform-specific CPU details but
   may not change or leak through the portable contract.
-- PNG is the only image decoder admitted to the renderer/resource core. Other
-  codecs are excluded.
+- Two image codecs are admitted to the renderer/resource core, both
+  first-party and reached only through `src/core/image/`: CNG (`stx_cng`, with
+  the pinned Zstandard 1.5.7 built inside it) is the native resource format,
+  and PNG (`stx_png`) is the interchange format for the clipboard, imports,
+  export and GUI.Drawing. The registry, renderers and hosts see codec-neutral
+  types only. Other codecs are excluded.
 - AppKit types remain inside `src/host/macos/`.
 - Win32, COM, WIC, MSAA, and UIA types remain inside `src/host/windows/`.
 - The core is retained; do not introduce an immediate-mode control API or a

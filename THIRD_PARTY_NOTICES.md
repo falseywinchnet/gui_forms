@@ -37,6 +37,8 @@ source files carry "Copyright (C) 1996-2025".)
 | stx_zlib (the owned zlib codec) | in this repository | MIT; the zlib License notices of the puff-derived inflate and the zlib-informed deflate are retained | all | `licenses/stx_zlib.txt`, `licenses/stx_zlib-puff.txt` and `licenses/stx_zlib-zlib.txt` | `stx_zlib-LICENSE.txt`, `stx_zlib-LICENSE-puff.txt` and `stx_zlib-LICENSE-zlib.txt` (and `share/licenses/stx_zlib/`) |
 | stx_png (the owned PNG codec) | in this repository | MIT | all | `licenses/stx_png.txt` | `stx_png-LICENSE.txt` (and `share/licenses/stx_png/`) |
 | stx_conv (the owner's CONV resampler) | in this repository | MIT | all | `licenses/stx_conv.txt` | `stx_conv-LICENSE.txt` (and `share/licenses/stx_conv/`) |
+| stx_cng (the owner's CNG image codec) | in this repository | MIT | all | `licenses/stx_cng.txt` | `stx_cng-LICENSE.txt` (and `share/licenses/stx_cng/`) |
+| Zstandard | 1.5.7, release tarball SHA-256 `eb33e51f` | BSD-3-Clause, elected from Zstandard's BSD/GPLv2 dual licence | all (inside `stx_cng`) | `licenses/Zstandard.txt` | `Zstandard-LICENSE.txt` (and `share/licenses/stx_cng/zstd-LICENSE.txt`) |
 | Unicode Character Database (grapheme tables) | Unicode 17.0.0 | Unicode License v3 | all | `licenses/Unicode.txt` | `Unicode-LICENSE.txt` |
 | Skia | `chrome/m152`, `2a9b593b` | BSD-3-Clause | macOS, Linux | `licenses/Skia.txt` | `Skia-LICENSE.txt` |
 | LLVM libc++ and libc++abi | 22.1.8 | Apache-2.0 WITH LLVM-exception | macOS (bundled dylibs), Windows (statically linked) | Windows `licenses/LLVM/libc++-LICENSE.TXT`; macOS `licenses/LLVM/libcxx-LICENSE.TXT` and `licenses/LLVM/libcxxabi-LICENSE.TXT` | `libc++-LICENSE.txt` (Windows) |

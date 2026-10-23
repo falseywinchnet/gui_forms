@@ -2,6 +2,7 @@
 
 #include "gui_forms/compression/inflate.hpp"
 #include "png_color.hpp"
+#include "pixel_target.hpp"
 #include "png_decoder.hpp"
 #include "stx_png/pixels.hpp"
 
@@ -21,14 +22,9 @@ namespace gui_forms::image {
 // and cHRM follow png_color.hpp (stage I6), which converts gAMA/cHRM images
 // to sRGB before the 8-bit kernel.
 
-// The 8-bit conversion kernel and its target vocabulary are stx_png's
-// (stx_png/pixels.hpp): its rounding rule is stated there.
-using stx_png::PixelAlpha;
-using stx_png::PixelOrder;
-using stx_png::PixelTarget;
+// The 8-bit conversion kernel is stx_png's (stx_png/pixels.hpp): its
+// rounding rule is stated there. The target vocabulary is pixel_target.hpp.
 using stx_png::convert_rgba16_samples;
-using stx_png::valid_pixel_destination;
-using stx_png::valid_pixel_target;
 
 // What an embedded ICC profile (iCCP) does to a pixel request. GUI.Forms has
 // no ICC transform: refuse fails the request; ignore treats the samples as
