@@ -12,13 +12,16 @@
 //   pattern is not ready draws its fill's ground; the pattern is made in an
 //   idle frame, and the part is repainted with it. A scale change generates
 //   the new scale's pattern.
-// - A pattern whose generation would exceed the bake bound, or whose bytes
+// - A pattern whose generation would exceed the bake budget, or whose bytes
 //   would crowd the shared cache, refuses the material: the built-in recipe
 //   draws, and the refusal is counted.
 //
-// `--measure` prints each generator's cost (procedural_pattern.hpp) instead
-// of testing: the median of nine generations of a 256 × 256 pattern at
-// scale 1, in nanoseconds per device pixel.
+// `--measure` prints, instead of testing, what each generator's effort
+// weight (procedural_pattern.hpp) is chosen from: the median of nine
+// generations of a 256 × 256 pattern at scale 1, in nanoseconds per device
+// pixel, whose ratio to a solid layer's (gui_forms_engine_material_tests
+// --measure) times the solid layer's weight suggests the weight. It never
+// decides acceptance.
 
 #include "gui_forms/control.hpp"
 #include "gui_forms/controls/panel/panel.hpp"
@@ -478,7 +481,7 @@ void scale_change_regenerates() {
     require(face_shows(made.painter, *expected, 2.0, 48U), "the face shows the scale-2 pattern");
 }
 
-// The cost-bound fallback: a pattern past the generation bound, or past
+// The cost-bound fallback: a pattern past the bake budget, or past
 // the pattern byte limit, refuses the material.
 void cost_bound_fallback() {
     const EnginePrimitive* const primitive = builtin_primitive_registry().find("material");
@@ -495,7 +498,7 @@ void cost_bound_fallback() {
     target.logical_size = Size{40.0, 24.0};
     target.scale = DeviceScale{1.0};
     target.material = &small;
-    require((*primitive).accepts(parameters, target), "a 32-unit felt tile is within the bound");
+    require((*primitive).accepts(parameters, target), "a 32-unit felt tile is within the budget");
 
     // A 256-unit felt tile at scale 4: 1024 x 1024 pixels, past both.
     ProceduralFill large = felt();
@@ -506,9 +509,9 @@ void cost_bound_fallback() {
     target.material = &heavy;
     target.scale = DeviceScale{4.0};
     const DeviceExtent extent = engine_primitives::procedural_extent(large, Rect{}, 4.0);
-    require(engine_primitives::procedural_generation_estimate(large, extent) >
-                engine_primitives::maximum_material_bake_nanoseconds,
-            "its generation is estimated past the bound");
+    require(engine_primitives::procedural_generation_effort(large, extent) >
+                engine_primitives::maximum_material_bake_effort,
+            "its generation's effort is past the budget");
     require(!(*primitive).accepts(parameters, target), "the material is refused");
 
     // A 256-unit pinstripe at scale 4: cheap to generate, but 4 MB.
@@ -519,9 +522,9 @@ void cost_bound_fallback() {
     striped.fills.push_back(MaterialFillLayer::procedural_pattern(wide));
     target.material = &striped;
     const DeviceExtent stripes = engine_primitives::procedural_extent(wide, Rect{}, 4.0);
-    require(engine_primitives::procedural_generation_estimate(wide, stripes) <=
-                engine_primitives::maximum_material_bake_nanoseconds,
-            "the wide pinstripe's generation is within the bound");
+    require(engine_primitives::procedural_generation_effort(wide, stripes) <=
+                engine_primitives::maximum_material_bake_effort,
+            "the wide pinstripe's generation is within the budget");
     require(!(*primitive).accepts(parameters, target), "but its bytes refuse the material");
 
     // Through the engine: a fresco over a 2000 x 400 box holds 3.2 MB.

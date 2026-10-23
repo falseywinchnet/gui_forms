@@ -64,7 +64,7 @@ const PrimitiveParameterDeclaration material_parameters[] = {
 static_assert(std::size(material_parameters) == material_parameter_count, "one declaration per material parameter");
 
 // The declared cost is the most the load check admits; a material's real
-// bake is bounded by its estimate instead (accepts, material_bake_policy.hpp).
+// bake is bounded by its effort instead (accepts, material_bake_policy.hpp).
 const PrimitiveDescriptor material_descriptor{
     "material",
     EngineVersion{0, 2},
@@ -1347,7 +1347,7 @@ void apply_mask(const MaterialLook& look, const MaterialImages& images, const Pa
     }
 }
 
-// -- the bake estimate -------------------------------------------------------------
+// -- the bake effort ---------------------------------------------------------------
 
 // Whether a fill blends other than source-over (MaterialBlendMode).
 bool blends_apart(const MaterialFillLayer& fill) noexcept {
@@ -1363,43 +1363,43 @@ DeviceExtent destination_extent(const PrimitiveTarget& target, double outset) no
     return extent;
 }
 
-double extra_stops(const MaterialFillLayer& layer) noexcept {
-    const double stops = static_cast<double>(layer.stops.size());
-    const double extra = std::max(0.0, stops - 2.0);
+std::uint64_t extra_stops(const MaterialFillLayer& layer) noexcept {
+    const std::uint64_t stops = layer.stops.size();
+    const std::uint64_t extra = stops > 2U ? stops - 2U : 0U;
     return extra;
 }
 
-// One fill layer's estimated cost per pixel, in nanoseconds.
-double fill_cost(const MaterialFillLayer& layer, const MaterialBakeCosts& costs) noexcept {
+// One fill layer's effort weight per pixel, in effort units.
+std::uint64_t fill_weight(const MaterialFillLayer& layer, const MaterialEffortWeights& weights) noexcept {
     switch (layer.kind) {
     case MaterialFillKind::solid: {
         // A solid fill of alpha 0 is not drawn (resolve_look).
-        const double solid = layer.color.alpha != 0U ? costs.solid : 0.0;
+        const std::uint64_t solid = layer.color.alpha != 0U ? weights.solid : 0U;
         return solid;
     }
     case MaterialFillKind::linear_gradient: {
-        const double linear = costs.linear + extra_stops(layer) * costs.gradient_stop;
+        const std::uint64_t linear = weights.linear + extra_stops(layer) * weights.gradient_stop;
         return linear;
     }
     case MaterialFillKind::radial_gradient: {
-        const double radial = costs.radial + extra_stops(layer) * costs.gradient_stop;
+        const std::uint64_t radial = weights.radial + extra_stops(layer) * weights.gradient_stop;
         return radial;
     }
     case MaterialFillKind::conic_gradient: {
-        const double conic = costs.conic + extra_stops(layer) * costs.gradient_stop;
+        const std::uint64_t conic = weights.conic + extra_stops(layer) * weights.gradient_stop;
         return conic;
     }
     case MaterialFillKind::image:
         // Compositing the prepared variant only: its resampling is not
         // the bake's (owner, 2026-10-22).
-        return costs.image;
+        return weights.image;
     case MaterialFillKind::procedural:
         // Compositing the generated pattern, as an image's variant is
         // composited; its generation is an idle frame's, bounded apart
-        // (procedural_generation_estimate).
-        return costs.image;
+        // (procedural_generation_effort).
+        return weights.image;
     }
-    return 0.0;
+    return 0U;
 }
 
 } // namespace
@@ -1445,57 +1445,62 @@ double corner_span(double start, double end, const ResolvedShadow& shadow, std::
 }
 
 // The pixels at which the rounded outer shadows evaluate their signed
-// distance (outer_coverage), summed over the shadows.
-double corner_pixels(const MaterialLook& look, DeviceExtent extent) noexcept {
-    double pixels = 0.0;
+// distance (outer_coverage), summed over the shadows: each shadow's
+// columns times its rows, rounded up to a whole pixel.
+std::uint64_t corner_pixels(const MaterialLook& look, DeviceExtent extent) noexcept {
+    std::uint64_t pixels = 0U;
     for (std::size_t index = 0U; index < look.outer_count; ++index) {
         const ResolvedShadow& shadow = look.outer[index];
         if (shadow.radius <= 0.0) continue;
         const Rect& shape = shadow.shape;
         const double columns = corner_span(shape.x, shape.right(), shadow, extent.width);
         const double rows = corner_span(shape.y, shape.bottom(), shadow, extent.height);
-        pixels = pixels + columns * rows;
+        const std::uint64_t covered = static_cast<std::uint64_t>(std::ceil(columns * rows));
+        pixels = pixels + covered;
     }
     return pixels;
 }
 
 } // namespace
 
-double material_bake_estimate(const SurfaceMaterial& authored, const PrimitiveTarget& target,
-                              double outset, PartShapeKind shape) noexcept {
+BakeEffort material_bake_effort(const SurfaceMaterial& authored, const PrimitiveTarget& target, double outset,
+                                PartShapeKind shape) noexcept {
     std::optional<SurfaceMaterial> finish_storage{};
     const SurfaceMaterial& material = baked_material(authored, finish_storage);
-    const MaterialBakeCosts& costs = measured_material_costs;
+    const MaterialEffortWeights& weights = material_effort_weights;
     const DeviceExtent extent = destination_extent(target, outset);
-    double per_pixel = costs.base;
-    for (const MaterialFillLayer& layer : material.fills) per_pixel = per_pixel + fill_cost(layer, costs);
+    // A material's layers are few (SurfaceMaterial's maxima), so the weight
+    // per pixel is some thousands of units, and with sides of at most
+    // 2^32 pixels the products stay far within 64 bits for any part a
+    // raster can hold (maximum_part_raster_side).
+    std::uint64_t per_pixel = weights.base;
+    for (const MaterialFillLayer& layer : material.fills) per_pixel = per_pixel + fill_weight(layer, weights);
     // A mask (E9.6) is a fill's evaluation and its pass.
-    if (material.mask) per_pixel = per_pixel + fill_cost(*material.mask, costs) + costs.mask;
+    if (material.mask) per_pixel = per_pixel + fill_weight(*material.mask, weights) + weights.mask;
     for (const MaterialShadow& shadow : material.shadows) {
-        per_pixel = per_pixel + (shadow.inset ? costs.inset_shadow : costs.outer_shadow);
+        per_pixel = per_pixel + (shadow.inset ? weights.inset_shadow : weights.outer_shadow);
     }
     // A glow is an outer shadow's kernel with an addition for its blend.
-    per_pixel = per_pixel + static_cast<double>(material.glows.size()) * costs.outer_shadow;
-    if (material.border) per_pixel = per_pixel + costs.border;
+    per_pixel = per_pixel + material.glows.size() * std::uint64_t{weights.outer_shadow};
+    if (material.border) per_pixel = per_pixel + weights.border;
     if (material.border && (*material.border).style != MaterialBorderStyle::solid) {
-        per_pixel = per_pixel + costs.border_pattern;
+        per_pixel = per_pixel + weights.border_pattern;
     }
     const MaterialBorderEdges& edges = material.border_edges;
-    const double edge_count = static_cast<double>(edges.top.has_value()) + static_cast<double>(edges.right.has_value()) +
-                              static_cast<double>(edges.bottom.has_value()) +
-                              static_cast<double>(edges.left.has_value());
-    per_pixel = per_pixel + edge_count * costs.border_edge;
-    per_pixel = per_pixel + static_cast<double>(material.keylines.size()) * costs.keyline;
-    if (material.colour_filter) per_pixel = per_pixel + costs.colour_filter;
-    if (material.drop_shadow) per_pixel = per_pixel + costs.drop_shadow;
-    if (material.filter_blur > 0.0) per_pixel = per_pixel + costs.filter_blur;
+    const std::uint64_t edge_count = std::uint64_t{edges.top.has_value()} + std::uint64_t{edges.right.has_value()} +
+                                     std::uint64_t{edges.bottom.has_value()} + std::uint64_t{edges.left.has_value()};
+    per_pixel = per_pixel + edge_count * weights.border_edge;
+    per_pixel = per_pixel + material.keylines.size() * std::uint64_t{weights.keyline};
+    if (material.colour_filter) per_pixel = per_pixel + weights.colour_filter;
+    if (material.drop_shadow) per_pixel = per_pixel + weights.drop_shadow;
+    if (material.filter_blur > 0.0) per_pixel = per_pixel + weights.filter_blur;
     if (std::any_of(material.fills.begin(), material.fills.end(), &blends_apart)) {
-        per_pixel = per_pixel + costs.fill_blend;
+        per_pixel = per_pixel + weights.fill_blend;
     }
-    const double pixels = static_cast<double>(extent.width) * static_cast<double>(extent.height);
-    const double corners = corner_pixels(resolve_look(material, target, outset, shape), extent);
-    const double estimate = pixels * per_pixel + corners * costs.outer_corner;
-    return estimate;
+    const std::uint64_t pixels = std::uint64_t{extent.width} * extent.height;
+    const std::uint64_t corners = corner_pixels(resolve_look(material, target, outset, shape), extent);
+    const BakeEffort effort{pixels * per_pixel + corners * weights.outer_corner};
+    return effort;
 }
 
 // -- slicing (E7r) -------------------------------------------------------------------
@@ -1753,8 +1758,8 @@ bool MaterialPrimitive::accepts(const PrimitiveParameterBlock& parameters,
         plan.across.outcome == SliceAxisOutcome::sliced || plan.down.outcome == SliceAxisOutcome::sliced;
     PrimitiveTarget baked = target;
     if (sliced) baked.logical_size = plan.reference_size;
-    const double estimate = material_bake_estimate(material, baked, material_outset, kind);
-    const bool within = estimate <= maximum_material_bake_nanoseconds;
+    const BakeEffort effort = material_bake_effort(material, baked, material_outset, kind);
+    const bool within = effort <= maximum_material_bake_effort;
     return within;
 }
 

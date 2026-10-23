@@ -37,6 +37,14 @@ admit and says what carries it in the engine today.
   - *T3*: parser only (no engine change);
   - *T5*: the host, which owns the backplane renderer upgrade.
 
+Every present row is bounded in effort, not time (owner, 2026-10-23): a
+layer's bake is charged its kind's integer effort weight per device pixel
+against one effort budget per bake, the same on every platform
+(`material_bake_policy.hpp`; T2 README, "Bake effort"), and a part over it
+is drawn by the built-in recipe. Only perceptual timings stay in time: the
+transition rows' durations, delays and 400 ms ceiling, keyframe times and
+the ambient rate.
+
 Where a CSS form is not admitted by decision, the row says so, with the
 decision.
 

@@ -3,6 +3,7 @@
 #include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/surface_material/procedural_fill/procedural_fill.hpp"
 #include "gui_forms/types.hpp"
+#include "../material/material_bake_policy.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -38,51 +39,49 @@ namespace gui_forms::engine_primitives {
 // one pixel), or for the fresco the box's lengths rounded, at least one.
 [[nodiscard]] DeviceExtent procedural_extent(const ProceduralFill& fill, Rect box, double scale) noexcept;
 
-// The generators' costs, in nanoseconds per generated device pixel on the
-// reference machine (material_bake_policy.hpp). Measured by
+// The generators' effort weights, in effort units per generated device
+// pixel (material_bake_policy.hpp): dimensionless, fixed in code, on the
+// material weights' scale. Their relative sizes come from
 // gui_forms_engine_procedural_tests --measure: the median of nine
 // generations of a 256 × 256 pattern at scale 1 (a 256-unit tile; the
-// fresco over a 256 × 256 box), divided by its pixels; each figure is the
-// median of seven runs, rounded up. Release build (clang 22, -O2) on
-// Windows 11, AMD EPYC 9354 virtual machine with 8 logical CPUs,
-// 2026-10-22, with the load not sampled (other workers' builds were
-// running; the seven runs agreed within 3 % but for one felt run at
-// 32.7): PROVISIONAL, as E9's shadow costs are, until the quiet-machine
-// re-measure. The runs: felt 28.30-32.71, wood grain 13.21-13.75, paper
-// fibre 66.57-68.74, pinstripe 0.69-0.70, brushed metal 23.29-23.81,
-// fresco 8.56-8.73.
-struct ProceduralCosts final {
-    double felt{};
-    double wood_grain{};
-    double paper_fibre{};
-    double pinstripe{};
-    double brushed_metal{};
-    double fresco{};
+// fresco over a 256 × 256 box), per pixel; each the median of seven runs,
+// rounded up and scaled by five, as the material layers' are
+// (2026-10-22, with other builds running; the seven runs agreed within
+// 3 % but for one felt run). The runs: felt 28.30-32.71, wood grain
+// 13.21-13.75, paper fibre 66.57-68.74, pinstripe 0.69-0.70, brushed
+// metal 23.29-23.81, fresco 8.56-8.73.
+struct ProceduralEffortWeights final {
+    std::uint32_t felt{};
+    std::uint32_t wood_grain{};
+    std::uint32_t paper_fibre{};
+    std::uint32_t pinstripe{};
+    std::uint32_t brushed_metal{};
+    std::uint32_t fresco{};
 };
 
-inline constexpr ProceduralCosts measured_procedural_costs{
-    .felt = 29.0,
-    .wood_grain = 14.0,
-    .paper_fibre = 67.0,
-    .pinstripe = 1.0,
-    .brushed_metal = 24.0,
-    .fresco = 9.0,
+inline constexpr ProceduralEffortWeights procedural_effort_weights{
+    .felt = 145U,
+    .wood_grain = 70U,
+    .paper_fibre = 335U,
+    .pinstripe = 5U,
+    .brushed_metal = 120U,
+    .fresco = 45U,
 };
 
-// The estimated generation of `fill`'s pattern at `extent`, in nanoseconds
-// on the reference machine. A generation is an idle frame's whole work, so
-// it is held to the bake bound (maximum_material_bake_nanoseconds): a
-// material with a fill whose generation would exceed it is refused, and
-// the part is drawn by the built-in recipe (the cost-bound fallback).
-[[nodiscard]] double procedural_generation_estimate(const ProceduralFill& fill, DeviceExtent extent) noexcept;
+// The effort of generating `fill`'s pattern at `extent`. A generation is
+// an idle frame's whole work, so it is held to the bake budget
+// (maximum_material_bake_effort): a material with a fill whose generation
+// would exceed it is refused, and the part is drawn by the built-in recipe
+// (the cost-bound fallback).
+[[nodiscard]] BakeEffort procedural_generation_effort(const ProceduralFill& fill, DeviceExtent extent) noexcept;
 
 // The most bytes one pattern may hold: half the engine's shared budget
 // (shared_bake_budget_bytes), so that one pattern never displaces the
-// rest. A material with a larger pattern is refused, as one past the bound
+// rest. A material with a larger pattern is refused, as one past the budget
 // is.
 inline constexpr std::size_t maximum_procedural_pattern_bytes = 2U * 1024U * 1024U;
 
-// Whether `fill`'s pattern at `extent` is within the generation bound and
+// Whether `fill`'s pattern at `extent` is within the bake budget and
 // maximum_procedural_pattern_bytes.
 [[nodiscard]] bool procedural_pattern_bounded(const ProceduralFill& fill, DeviceExtent extent) noexcept;
 
