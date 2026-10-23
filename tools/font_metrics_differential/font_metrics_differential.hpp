@@ -2,9 +2,10 @@
 
 // Stage F's metrics differential (planning/stages/F-font-substitution). It
 // measures a reference face and a candidate substitute with the bundled
-// HarfBuzz/FreeType engine, optionally asks GDI for the same measurements, and
-// compares the two under the tolerance of the mapping's class (owner decision 8
-// of 2026-10-23). Reference fonts are oracles: the tool reads them by path and
+// HarfBuzz/FreeType engine and compares the two under the tolerance of the
+// mapping's class (owner decisions 8 and 9 of 2026-10-23). GDI's measurements
+// of the same faces are optional information for stages R and S, never part
+// of the gate. Reference fonts are oracles: the tool reads them by path and
 // records their version and SHA-256, never their bytes.
 
 #include <array>
@@ -143,7 +144,7 @@ struct FaceMeasurement final {
 enum class Criterion : std::uint8_t {
     passed,
     failed,
-    // A gated criterion whose oracle did not run (GDI off Windows).
+    // Reserved for a gated criterion whose measurement did not run.
     not_measured,
     // Measured and reported, not gated for this mapping class.
     recorded,
@@ -196,8 +197,8 @@ struct Differential final {
 
 // Tolerances of owner decision 8. A nearest mapping's mean corpus line width
 // stays within this fraction of the reference at every size; a
-// metric-compatible mapping's engine line height stays within this many
-// pixels of GDI's reference height.
+// metric-compatible mapping's line height stays within this many pixels of
+// the reference's, both measured by the bundled engine.
 inline constexpr double nearest_mean_width_tolerance = 0.05;
 inline constexpr double compatible_line_height_tolerance_px = 1.0;
 
@@ -217,14 +218,14 @@ void validate_face_bytes(std::span<const std::byte> encoded);
 // Lowercase hexadecimal SHA-256 of bytes.
 [[nodiscard]] std::string sha256_hex(std::span<const std::byte> bytes);
 
-// Measures one face with the bundled engine; with_gdi also runs the GDI oracle
+// Measures one face with the bundled engine; with_gdi also runs the GDI measurement
 // (Windows only; elsewhere it records why it did not run). encoded is borrowed
 // until return.
 [[nodiscard]] FaceMeasurement measure_face(std::string_view file_name,
                                            std::span<const std::byte> encoded,
                                            const Corpus& corpus, bool with_gdi);
 
-// Implemented per platform: gdi_oracle_windows.cpp, gdi_oracle_unavailable.cpp.
+// Implemented per platform: gdi_measurement_windows.cpp, gdi_measurement_unavailable.cpp.
 [[nodiscard]] GdiMeasurement measure_with_gdi(std::span<const std::byte> encoded,
                                               const FaceFacts& facts, const Corpus& corpus);
 

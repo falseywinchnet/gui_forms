@@ -9,7 +9,8 @@
 // Stage F's metrics differential over bundled faces only, so CI never needs a
 // Microsoft font: a face compared with itself is metric-compatible, a wider
 // face is not a near substitute, and every malformed input is rejected before
-// measurement. On Windows the GDI oracle measures a privately added face.
+// measurement. On Windows the GDI measurement (information for stages R and S,
+// never gated) runs over a privately added face.
 // Arguments: the bundled font directory and the corpus file.
 
 namespace {
@@ -103,10 +104,8 @@ void check_self_comparison(const font_metrics::FaceMeasurement& carlito) {
     require(same.advances == font_metrics::Criterion::passed, "advances criterion passes");
     require(same.line_breaks == font_metrics::Criterion::passed, "line breaks criterion passes");
     require(same.line_width == font_metrics::Criterion::recorded, "line width is recorded for this class");
-    if (!carlito.gdi.available) {
-        require(same.line_height == font_metrics::Criterion::not_measured, "no GDI oracle, no height verdict");
-        require(!same.gate_passed, "an unmeasured gated criterion holds the gate closed");
-    }
+    require(same.line_height == font_metrics::Criterion::passed, "line height equals its own");
+    require(same.gate_passed, "a face is a metric-compatible substitute for itself");
     for (const font_metrics::SizeDifferential& size : same.sizes) {
         require(size.mean_width_deviation == 0.0 && size.max_abs_width_deviation == 0.0, "zero width deviation");
     }
@@ -134,7 +133,7 @@ void check_wider_face(const font_metrics::FaceMeasurement& carlito, const font_m
     require(rejects(CompareCall{&carlito, &short_corpus}), "measurements of different corpora are rejected");
 }
 
-void check_gdi_oracle(const font_metrics::FaceMeasurement& carlito) {
+void check_gdi_measurement(const font_metrics::FaceMeasurement& carlito) {
 #if defined(_WIN32)
     require(carlito.gdi.available, "GDI measured the privately added face");
     require(carlito.gdi.selected_face == "Carlito", "GDI selected the requested family");
@@ -144,9 +143,6 @@ void check_gdi_oracle(const font_metrics::FaceMeasurement& carlito) {
         require(size.height > 0 && size.height == size.ascent + size.descent, "GDI height is ascent plus descent");
         require(size.string_widths.size() == carlito.sizes[0].string_widths_px.size(), "GDI measured every string");
     }
-    const font_metrics::Differential same =
-        font_metrics::compare_faces(carlito, carlito, font_metrics::MappingClass::metric_compatible);
-    require(same.line_height != font_metrics::Criterion::not_measured, "the GDI oracle yields a height verdict");
 #else
     require(!carlito.gdi.available && !carlito.gdi.unavailable_reason.empty(), "no GDI off Windows, with a reason");
 #endif
@@ -175,7 +171,7 @@ int main(int count, char** values) {
             font_metrics::measure_face("Cousine-Regular.ttf", cousine_bytes, corpus, false);
         check_self_comparison(carlito);
         check_wider_face(carlito, cousine);
-        check_gdi_oracle(carlito);
+        check_gdi_measurement(carlito);
         std::cout << "font metrics differential tests passed\n";
         return 0;
     } catch (const std::exception& failure) {

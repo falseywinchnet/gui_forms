@@ -5,6 +5,12 @@ them under the tolerance of the mapping's class. It is the measurement behind
 stage F's gate (`planning/stages/F-font-substitution/README.md`, owner
 decisions 8 and 9 of 2026-10-23).
 
+The reference is always our own engine. Both faces go through the same
+FreeType and HarfBuzz code that GUI.Forms renders with, and no host renderer
+is ever the reference. The optional GDI measurement is information for stages
+R and S, which compare against Windows Forms. It is never part of F's
+gate.
+
 ```text
 gui_forms_font_metrics_differential --reference <face.ttf> --candidate <face.ttf>
     --class metric_compatible|nearest --corpus <corpus.txt> --out <report.json> [--gdi]
@@ -29,11 +35,12 @@ For each face:
   (ADR-004). It records the line metrics (ascent, descent, gap), the width of
   every corpus string, and the greedy line breaks of every corpus paragraph at
   20, 35 and 60 ems.
-- **GDI's measurements**, with `--gdi` on Windows: `tmAscent`, `tmDescent`,
-  `tmHeight`, the leadings and `GetTextExtentPoint32W` widths, at the same
-  sizes. The face's own bytes are added privately (`AddFontMemResourceEx`),
-  so a candidate need not be installed. `GetFontData` then proves that GDI
-  measured exactly the file (`bytes_match_file`).
+- **GDI's measurements**, with `--gdi` on Windows, as information for R and
+  S: `tmAscent`, `tmDescent`, `tmHeight`, the leadings and
+  `GetTextExtentPoint32W` widths, at the same sizes. The face's own bytes are
+  added privately (`AddFontMemResourceEx`), so a candidate need not be
+  installed. `GetFontData` then proves that GDI measured exactly the file
+  (`bytes_match_file`).
 
 ## The criteria (owner decision 8)
 
@@ -41,17 +48,32 @@ For each face:
 |---|---|---|
 | Advances | identical in ems (integer cross-multiplication) for every code point both faces map | recorded |
 | Line breaks | identical for every paragraph, width and size | recorded |
-| Line height | the candidate's engine line height within 1 px of GDI's reference `tmHeight` at every size; `not_measured` without GDI, or when GDI did not measure the reference file's own bytes | recorded |
+| Line height | the candidate's engine line height (ascent + descent + gap) within 1 px of the reference's engine line height at every size | recorded |
 | Line width | recorded | the mean corpus string-width deviation within 5% at every size |
 
 The gate passes when no gated criterion is `failed` or `not_measured`.
 
-The report also records evidence that is not gated:
+The report also records information that is not gated, from GDI:
 
 - GDI's width deviation between the two faces.
 - Each face's engine-versus-GDI width deviation, which shows how far unhinted
   advances sit from GDI's hinted ones.
 - GDI's heights for both faces.
+
+## The engine's line metrics
+
+The engine takes its vertical metrics from FreeType 2.14.2, pinned and
+unmodified apart from its options header. That rule is:
+
+- the OS/2 typo metrics when the face sets `USE_TYPO_METRICS` (bit 7 of
+  `fsSelection`);
+- otherwise `hhea`;
+- the typo metrics, then the win metrics, only when `hhea`'s ascender and
+  descender are both zero.
+
+At a size, FreeType rounds the ascender up, the descender down and the height
+to the nearest pixel (`GRID_FIT_METRICS`). The line gap is that height less
+the ascender and descender, never below zero.
 
 ## Rules
 

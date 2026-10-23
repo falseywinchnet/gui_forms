@@ -6,7 +6,10 @@
 
 // The comparison kernel. It validates that both measurements follow one plan
 // and one corpus shape before it compares anything, then derives each
-// criterion of owner decision 8 from the mapping class.
+// criterion of owner decision 8 from the mapping class. Every gated criterion
+// compares the bundled engine with itself (owner, 2026-10-23: GUI.Forms never
+// renders through a host, so a host renderer is never the reference); GDI's
+// measurements are carried as information for stages R and S.
 
 namespace gui_forms::tools::font_metrics {
 
@@ -168,20 +171,15 @@ Differential compare_faces(const FaceMeasurement& reference, const FaceMeasureme
     for (const SizeDifferential& size : result.sizes) {
         breaks_identical = breaks_identical && size.line_break_sets_identical == size.line_break_sets;
         widths_within = widths_within && std::fabs(size.mean_width_deviation) <= nearest_mean_width_tolerance;
-        if (size.gdi_reference_height) {
-            const double gdi_height = static_cast<double>(*size.gdi_reference_height);
-            const double difference = std::fabs(size.candidate_line_height_px - gdi_height);
-            heights_within = heights_within && difference <= compatible_line_height_tolerance_px;
-        }
+        const double difference = std::fabs(size.candidate_line_height_px - size.reference_line_height_px);
+        heights_within = heights_within && difference <= compatible_line_height_tolerance_px;
     }
     if (mapping == MappingClass::metric_compatible) {
         const bool advances_identical = result.advances_compared != 0U &&
             result.advances_identical == result.advances_compared;
         result.advances = judged(advances_identical);
         result.line_breaks = judged(breaks_identical);
-        // GDI's heights count only when GDI measured the reference file's own bytes.
-        const bool oracle_ran = reference.gdi.available && reference.gdi.bytes_match_file;
-        result.line_height = oracle_ran ? judged(heights_within) : Criterion::not_measured;
+        result.line_height = judged(heights_within);
         result.line_width = Criterion::recorded;
     } else {
         result.advances = Criterion::recorded;

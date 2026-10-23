@@ -7,8 +7,8 @@
 
 #include <cmath>
 
-// The GDI oracle: what a Windows Forms author saw for the same face, size and
-// strings. The face's own bytes are added privately to this process
+// The GDI measurement: what a Windows Forms program sees for the same face,
+// size and strings. Information for stages R and S; never part of F's gate. The face's own bytes are added privately to this process
 // (AddFontMemResourceEx), so the candidate need not be installed; GetFontData
 // then proves which bytes GDI measured. Win32 types stay in this file.
 

@@ -378,11 +378,11 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     )
     if(WIN32)
         target_sources(gui_forms_font_metrics_differential PRIVATE
-            tools/font_metrics_differential/gdi_oracle_windows.cpp)
+            tools/font_metrics_differential/gdi_measurement_windows.cpp)
         target_link_libraries(gui_forms_font_metrics_differential PRIVATE gdi32)
     else()
         target_sources(gui_forms_font_metrics_differential PRIVATE
-            tools/font_metrics_differential/gdi_oracle_unavailable.cpp)
+            tools/font_metrics_differential/gdi_measurement_unavailable.cpp)
     endif()
     target_include_directories(gui_forms_font_metrics_differential
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools/font_metrics_differential)

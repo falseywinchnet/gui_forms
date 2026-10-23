@@ -129,14 +129,16 @@ The owner accepted every recommendation of the F0 plan.
    bold or oblique.
 8. **Tolerance.** A `metric_compatible` mapping has identical advances in font
    units over the corpus coverage, identical line breaks, and a line height
-   within 1 px of the GDI oracle. A `nearest` mapping has a mean corpus
+   within 1 px of the reference's. A `nearest` mapping has a mean corpus
    line-width deviation within 5% at every size; its line breaks and line
-   height are recorded but not gated.
-9. **Oracle.** Widths come from the bundled engine on both faces; vertical
-   metrics come from GDI, whose view the authors of Windows Forms programs
-   saw. The GDI extents are recorded as evidence. Calibri's own `hhea` table
-   differs from what GDI reports for it, so FreeType's reading of the
-   reference file is not the vertical oracle.
+   height are recorded but not gated. Every measurement is our engine's
+   (decision 9).
+9. **Our engine against our engine for widths and line heights** (revised
+   2026-10-23). The reference font's file goes through the same pinned
+   FreeType and HarfBuzz code as the substitute's. GUI.Forms never renders
+   through GDI or any other host renderer, so no host is the reference. GDI's
+   measurements are kept in the results as information for stages R and S,
+   outside F's gate.
 10. **Unmapped families** (refines decision 2). Host bytes are accepted only
     when the face the host selected has the requested name. Otherwise the
     family resolves to the content face and the result reports `substituted`.

@@ -1,5 +1,5 @@
 {"schema":"gui_forms.font_metrics_differential.v1","corpus":"forms_latin_v1.txt","sizes_px":[11,12,13,16,22,24],"wrap_widths_em":[20,35,60],
-"differential":{"class":"metric_compatible","gate_passed":false,"criteria":{"advances":"passed","line_breaks":"passed","line_height":"failed","line_width":"recorded"},"tolerance":{"nearest_mean_width":0.05,"compatible_line_height_px":1},
+"differential":{"class":"metric_compatible","gate_passed":true,"criteria":{"advances":"passed","line_breaks":"passed","line_height":"passed","line_width":"recorded"},"tolerance":{"nearest_mean_width":0.05,"compatible_line_height_px":1},
  "advances":{"compared":318,"identical":318,"missing_in_candidate":1,"missing_in_reference":0,"max_abs_delta_em":0,"mismatches":[]},
  "sizes":[
   {"size_px":11,"mean_width_deviation":0,"max_abs_width_deviation":0,"line_break_sets":15,"line_break_sets_identical":15,"reference_line_height_px":13,"candidate_line_height_px":14,"gdi_reference_height":13,"gdi_candidate_height":13,"gdi_mean_width_deviation":-0.0318483213,"reference_engine_versus_gdi":-0.0415581864,"candidate_engine_versus_gdi":-0.00992071922},

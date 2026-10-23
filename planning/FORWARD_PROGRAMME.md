@@ -136,11 +136,17 @@ metrics, line breaks on a fixed corpus) against the reference face, within a
 recorded tolerance; licences recorded in `assets/fonts/ATTRIBUTION.md`.
 
 Today (2026-10-23): the owner accepted the stage plan (stage brief decisions 4
-to 14). The measurement tool, `tools/font_metrics_differential`, has had its
-first run against the Windows reference fonts
-(`results/2026-10-23-f1-metrics-harness`). Carlito and Cousine match their
-references' advances and line breaks exactly. The downloads of Arimo, Tinos
-and Selawik await the owner's approval, and the substitution table is next.
+to 14). The measurement tool, `tools/font_metrics_differential`, compares
+each reference font with its substitute through our own engine on both sides,
+with no host renderer as the reference. Its first runs are recorded in
+`results/2026-10-23-f1-metrics-harness`:
+- Cousine and Tinos match their references exactly.
+- Carlito and Arimo match apart from kerning and one glyph.
+- Selawik is a near substitute only.
+- No face comes within 5% of Tahoma Bold.
+
+The owner approved downloading Arimo, Tinos and Selawik; F3 adds them, and
+the substitution table is next.
 
 ## 4. The theming spine
 
