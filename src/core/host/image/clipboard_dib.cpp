@@ -104,14 +104,15 @@ HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes) 
     start += palette * 4U;
     const std::uint64_t stride = ((static_cast<std::uint64_t>(width) * bits + 31U) / 32U) * 4U;
     if (stride * height > bytes.size() - start) return result;
-    result.image.width = width;
-    result.image.height = height;
-    result.image.row_bytes = static_cast<std::uint64_t>(width) * 4U;
-    result.image.pixels.resize(static_cast<std::size_t>(pixel_count * 4U));
+    HostImage image{};
+    image.width = width;
+    image.height = height;
+    image.row_bytes = static_cast<std::uint64_t>(width) * 4U;
+    image.pixels.resize(static_cast<std::size_t>(pixel_count * 4U));
     for (std::uint32_t y = 0; y < height; ++y) {
         const std::uint32_t source_y = top_down ? y : height - 1U - y;
         const std::byte* source = bytes.data() + start + static_cast<std::size_t>(stride) * source_y;
-        std::byte* target = result.image.pixels.data() + static_cast<std::size_t>(result.image.row_bytes) * y;
+        std::byte* target = image.pixels.data() + static_cast<std::size_t>(image.row_bytes) * y;
         for (std::uint32_t x = 0; x < width; ++x) {
             const std::size_t dest = static_cast<std::size_t>(x) * 4U;
             if (bits == 24U) {
@@ -128,7 +129,7 @@ HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes) 
         }
     }
     result.status = {};
-    result.has_image = true;
+    result.image = std::move(image);
     return result;
 }
 } // namespace gui_forms::detail

@@ -58,7 +58,11 @@ class SanitizerOptionTests(unittest.TestCase):
         options: list[str]
         environment: dict[str, str]
         options, environment = ci_build.sanitizer_options('macos', Path('lsan.supp'))
-        self.assertEqual(options, ['-DCMAKE_BUILD_TYPE=RelWithDebInfo'])
+        flag: str
+        for flag in options:
+            # Only the build type and its own flags: CMAKE_<LANG>_FLAGS would replace the toolchain's.
+            self.assertTrue(flag.startswith('-DCMAKE_BUILD_TYPE=') or '_FLAGS_RELWITHDEBINFO=' in flag, flag)
+        self.assertIn('-DCMAKE_OBJCXX_FLAGS_RELWITHDEBINFO=-O2 -gline-tables-only -DNDEBUG', options)
         name: str
         for name in ('CFLAGS', 'CXXFLAGS', 'OBJCXXFLAGS'):
             self.assertEqual(environment[name], ci_build.SANITIZER_FLAGS, name)
@@ -112,9 +116,82 @@ class TestTargetTests(unittest.TestCase):
                                                    [{'name': name, 'value': ['setup']}])]}
             self.assertIsNone(ci_build.targets_for_tests(listing, self.KNOWN, TREE), name)
 
+    def test_a_test_without_a_command_builds_everything(self) -> None:
+        listing: dict = {'tests': [{'name': 'example', 'properties': []}]}
+        self.assertIsNone(ci_build.targets_for_tests(listing, self.KNOWN, TREE))
+
     def test_a_sibling_directory_with_the_same_prefix_is_outside_the_tree(self) -> None:
         listing: dict = {'tests': [test_record([str(TREE) + '-other' + os.sep + 'gui_forms_example_tests.exe'])]}
         self.assertEqual(ci_build.targets_for_tests(listing, self.KNOWN, TREE), [])
+
+
+class TestCommandTests(unittest.TestCase):
+    def test_arguments_are_unquoted(self) -> None:
+        self.assertEqual(ci_build.cmake_arguments('[=[a b]=] "x\\"y" plain [[c]]'), ['a b', 'x"y', 'plain', 'c'])
+
+    def test_commands_come_from_the_tree_and_its_subdirectories(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            tree: Path = Path(scratch)
+            (tree / 'sub').mkdir()
+            (tree / 'CTestTestfile.cmake').write_text(
+                '# CMake generated Testfile\n'
+                'add_test("first_tests" "/b/first_tests.exe")\n'
+                'set_tests_properties("first_tests" PROPERTIES  LABELS "area_core")\n'
+                'subdirs("sub")\n', encoding='utf-8')
+            (tree / 'sub' / 'CTestTestfile.cmake').write_text(
+                'add_test([=[second_tests]=] "/usr/bin/python3" "/s/check.py" "-DX=/b/sub/tool")\n', encoding='utf-8')
+            commands: dict[str, list[str]] = ci_build.test_commands(tree)
+        self.assertEqual(commands, {'first_tests': ['/b/first_tests.exe'],
+                                    'second_tests': ['/usr/bin/python3', '/s/check.py', '-DX=/b/sub/tool']})
+
+    def test_a_tree_without_tests_has_no_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            self.assertEqual(ci_build.test_commands(Path(scratch)), {})
+
+
+class UnbuiltListingCommands:
+    """Stands in for ci_build.captured: ctest's listing of a fresh tree, where no
+    test executable exists yet, so ctest leaves every command out."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def capture(self, *arguments: str | Path) -> str:
+        command: list[str] = []
+        argument: str | Path
+        for argument in arguments:
+            command.append(str(argument))
+        self.calls.append(command)
+        return ('{"tests": [{"name": "stx_png_core_tests", "properties": []},'
+                ' {"name": "gui_forms_paint_group_tests", "properties": []}]}')
+
+
+class TestsPatternListingTests(unittest.TestCase):
+    """--tests on a fresh tree (#217): the matching tests are listed with their
+    commands, so the narrowed build makes their executables and none is Not Run."""
+
+    def test_unbuilt_tests_matching_the_pattern_get_commands_and_targets(self) -> None:
+        fake: UnbuiltListingCommands = UnbuiltListingCommands()
+        original: object = ci_build.captured
+        ci_build.captured = fake.capture
+        try:
+            with tempfile.TemporaryDirectory() as scratch:
+                tree: Path = Path(scratch)
+                (tree / 'stx_png').mkdir()
+                (tree / 'CTestTestfile.cmake').write_text(
+                    'add_test([=[gui_forms_paint_group_tests]=] "' + (tree / 'gui_forms_paint_group_tests.exe').as_posix()
+                    + '")\nsubdirs("stx_png")\n', encoding='utf-8')
+                (tree / 'stx_png' / 'CTestTestfile.cmake').write_text(
+                    'add_test([=[stx_png_core_tests]=] "' + (tree / 'stx_png' / 'stx_png_core_tests.exe').as_posix()
+                    + '")\n', encoding='utf-8')
+                listing: dict = ci_build.test_listing(tree, 'stx_png_core|paint_group', '')
+                known: set[str] = {'gui_forms_paint_group_tests.exe', 'stx_png/stx_png_core_tests.exe'}
+                targets: list[str] | None = ci_build.targets_for_tests(listing, known, tree)
+        finally:
+            ci_build.captured = original
+        self.assertIn('-R', fake.calls[0])
+        self.assertIn('stx_png_core|paint_group', fake.calls[0])
+        self.assertEqual(targets, ['gui_forms_paint_group_tests.exe', 'stx_png/stx_png_core_tests.exe'])
 
 
 CHECKOUT: Path = Path(__file__).resolve().parents[1]
@@ -182,6 +259,49 @@ class SetupSkipTests(unittest.TestCase):
         self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=2'], {'CC': 'clang'}, b'cache'))
         self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'gcc'}, b'cache'))
         self.assertNotEqual(base, ci_build.configure_record(['cmake', '-DA=1'], {'CC': 'clang'}, b'edited'))
+
+
+class DebugInfoTests(unittest.TestCase):
+    def test_line_tables_are_the_default(self) -> None:
+        self.assertEqual(ci_build.debug_info_mode('', {}), 'lines')
+        options: list[str]
+        environment: dict[str, str]
+        options, environment = ci_build.sanitizer_options('linux', Path('lsan.supp'))
+        self.assertIn('-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -gline-tables-only -DNDEBUG', options)
+        self.assertIn('-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -gline-tables-only -DNDEBUG', options)
+
+    def test_full_restores_g_from_the_flag_or_the_environment(self) -> None:
+        self.assertEqual(ci_build.debug_info_mode('full', {}), 'full')
+        self.assertEqual(ci_build.debug_info_mode('', {ci_build.DEBUG_INFO_VARIABLE: ' Full '}), 'full')
+        self.assertEqual(ci_build.debug_info_mode('lines', {ci_build.DEBUG_INFO_VARIABLE: 'full'}), 'lines')
+        options: list[str]
+        environment: dict[str, str]
+        options, environment = ci_build.sanitizer_options('windows', Path('lsan.supp'), 'full')
+        self.assertIn('-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g -DNDEBUG', options)
+
+    def test_other_modes_are_refused(self) -> None:
+        with self.assertRaises(ValueError):
+            ci_build.debug_info_mode('', {ci_build.DEBUG_INFO_VARIABLE: 'some'})
+
+    def test_the_sanitizer_job_sets_the_variable_this_tool_reads(self) -> None:
+        workflow: str = (CHECKOUT / '.github/workflows/native.yml').read_text(encoding='utf-8')
+        self.assertIn(ci_build.DEBUG_INFO_VARIABLE + '=$mode', workflow)
+        self.assertIn('gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-', workflow)
+
+
+class SelectionTests(unittest.TestCase):
+    def test_patterns_and_labels_become_ctest_arguments(self) -> None:
+        self.assertEqual(ci_build.ctest_selection('', ''), [])
+        self.assertEqual(ci_build.ctest_selection('tool_strip', ''), ['-R', 'tool_strip', '--no-tests=error'])
+        self.assertEqual(ci_build.ctest_selection('', 'gallery_accessibility'), ['-LE', 'gallery_accessibility'])
+
+    def test_the_gallery_accessibility_tests_carry_the_label(self) -> None:
+        cmake: str = (CHECKOUT / 'CMakeLists.txt').read_text(encoding='utf-8')
+        name: str
+        for name in ('gui_forms_macos_accessibility_client_gallery_tests', 'gui_forms_linux_accessibility_gallery_tests',
+                     'gui_forms_windows_accessibility_msaa_gallery_tests',
+                     'gui_forms_windows_accessibility_uia_gallery_tests'):
+            self.assertIn('set_property(TEST ' + name + ' APPEND PROPERTY LABELS gallery_accessibility)', cmake)
 
 
 class LeakSuppressionTests(unittest.TestCase):

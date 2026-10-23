@@ -4,6 +4,7 @@
 // part is hot, the time in its states, the two scales and the values the
 // application publishes; and a change to an input damages only the parts
 // that read it, within their extents, on the control that recorded them.
+// A parameter the pointer drives steps through the engine's keyframes (E7r).
 // The window's metrics count it: a pointer moving over a part that reads no
 // pointer input damages nothing, a reading part is damaged only within its
 // extent, and a published value reaches only its readers.
@@ -14,6 +15,7 @@
 #include "gui_forms/theme.hpp"
 #include "gui_forms/window.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -227,6 +229,17 @@ DamageRegion repaint(Fixture& fixture) {
     return damage;
 }
 
+// The keyframe level nearest `value` of an amplitude over [0, 1] (E7r;
+// owner D, 2026-10-22): a parameter the pointer drives steps through the
+// engine's animated_keyframe_levels levels, the ends exact.
+double keyframe_level(double value) {
+    const double steps = static_cast<double>(animated_keyframe_levels - 1U);
+    const double level = std::round(std::clamp(value, 0.0, 1.0) * steps);
+    if (level >= steps) return 1.0;
+    const double shown = level / steps;
+    return shown;
+}
+
 // The amplitude a keyed face was last drawn with, from its cached raster.
 double drawn_amplitude(const Window& window, std::string_view control) {
     const std::optional<PartRecordHandle> handle = window.engine_parts().find(control, PartKey{"face", {}, {}});
@@ -272,18 +285,20 @@ void reader_is_damaged_within_its_extent() {
     Window& window = *(*fixture).window;
     // Before the pointer reaches it, the reader's pointer is not published:
     // its expression gives the fallback.
-    require(drawn_amplitude(window, "reader") == 0.0625, "a part that is not hot reads no pointer: the fallback");
+    require(drawn_amplitude(window, "reader") == keyframe_level(0.0625),
+            "a part that is not hot reads no pointer: the fallback, at its keyframe");
     move_to(window, {130.0, 40.0});
     static_cast<void>(repaint(*fixture));
     // Part-local logical units: the face's left edge is at window x 120.
-    require(drawn_amplitude(window, "reader") == 10.0 / 40.0, "the pointer is read from the part's corner");
+    require(drawn_amplitude(window, "reader") == keyframe_level(10.0 / 40.0),
+            "the pointer is read from the part's corner");
     window.reset_activity_metrics();
     const Rect face_in_window{120.0, 20.0, 40.0, 30.0};
     for (int step = 1; step <= 4; ++step) {
         move_to(window, {130.0 + 4.0 * static_cast<double>(step), 40.0});
         const DamageRegion damage = repaint(*fixture);
         require(covers_only(damage, face_in_window), "the reading part is damaged only within its extent");
-        const double expected = (10.0 + 4.0 * static_cast<double>(step)) / 40.0;
+        const double expected = keyframe_level((10.0 + 4.0 * static_cast<double>(step)) / 40.0);
         require(std::fabs(drawn_amplitude(window, "reader") - expected) < 1e-12, "and drawn at the new position");
     }
     const MetricsSnapshot metrics = window.metrics_snapshot();
@@ -292,7 +307,8 @@ void reader_is_damaged_within_its_extent() {
     // Leaving: the pad repaints itself and the pointer is no longer read.
     move_to(window, {50.0, 40.0});
     static_cast<void>(repaint(*fixture));
-    require(drawn_amplitude(window, "reader") == 0.0625, "away from the part the pointer is unpublished again");
+    require(drawn_amplitude(window, "reader") == keyframe_level(0.0625),
+            "away from the part the pointer is unpublished again");
 }
 
 void painted_on_behalf_is_damaged_where_drawn() {

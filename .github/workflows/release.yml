@@ -122,6 +122,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
+          # native.yml's dispatch input reaches this called workflow through github.event.
+          GUI_FORMS_PACKAGE_WINDOWS_TOOLCHAIN: ${{ github.event.inputs.package_windows_toolchain }}
         run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/windows_toolchain.py restore'
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
@@ -131,17 +133,28 @@ jobs:
         run: |
           brew install cmake ninja ccache llvm@22
           echo "$(brew --prefix llvm@22)/bin" >> "$GITHUB_PATH"
+      # The Ubuntu mirror is sometimes slow (7-11 minutes for 30 MB), so the
+      # downloaded Ubuntu packages are kept in an Actions cache, refreshed once
+      # per runner image; only main saves it (tools/install_linux_ci_packages.sh).
+      - name: Name the Linux package cache
+        id: linux-image
+        if: runner.os == 'Linux'
+        run: echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: linux-packages
+        if: runner.os == 'Linux'
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: linux-debs-v1-programs-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-${{ steps.linux-image.outputs.image }}
+          restore-keys: linux-debs-v1-programs-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
-        run: |
-          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o "$RUNNER_TEMP/llvm-key.asc"
-          sudo install -m 0644 "$RUNNER_TEMP/llvm-key.asc" /usr/share/keyrings/apt-llvm.asc
-          echo 'deb [signed-by=/usr/share/keyrings/apt-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main' | sudo tee /etc/apt/sources.list.d/llvm-22.list
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build ccache clang-22 generate-ninja pkg-config \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev \
-            xvfb xauth xdg-utils xdotool patchelf dpkg-dev dbus at-spi2-core python3-gi gir1.2-atspi-2.0
-          echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
+        run: sh gui_forms/tools/install_linux_ci_packages.sh programs "$RUNNER_TEMP/apt-archives"
+      - uses: actions/cache/save@v4
+        if: runner.os == 'Linux' && github.event_name != 'pull_request' && steps.linux-packages.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: ${{ steps.linux-packages.outputs.cache-primary-key }}
       - uses: msys2/setup-msys2@v2
         id: msys2
         if: runner.os == 'Windows' && steps.toolchain.outputs.restored != 'true'
@@ -207,8 +220,9 @@ jobs:
       # the toolkit and tests of this very tree and archived its .ccache (or,
       # on a promoted main run, the archive of the run that tested this tree).
       # Its entries are added to the restored cache: ccache entries are
-      # content-addressed files, so the union is a valid cache. Every test
-      # below still runs.
+      # content-addressed files, so the union is a valid cache. Its
+      # cache-manifest.json names the tests that native job passed on this
+      # tree (validated_tests); a pull request runs only the others below.
       - uses: actions/download-artifact@v4
         if: inputs.from_native
         with:
@@ -218,6 +232,7 @@ jobs:
         if: inputs.from_native
         run: |
           tar -xzf .ci/native-cache/gui-forms-cache-${{ matrix.platform }}.tar.gz .ccache
+          tar -xzf .ci/native-cache/gui-forms-cache-${{ matrix.platform }}.tar.gz -O cache-manifest.json > .ci/native-manifest.json
           rm -rf .ci/native-cache
       # --- build, as tools/ci_build.py configures it, plus the programs ------------
       - name: Fetch pinned text sources and build the CPU renderer
@@ -261,15 +276,30 @@ jobs:
         with:
           path: .ccache
           key: ${{ steps.objects.outputs.cache-primary-key }}
+      # A pull request called from native.yml runs only the tests its native
+      # job did not pass on this tree: those of the Gallery, the demoboard and
+      # any the native job skipped (tools/native_tests.py). Pushes to main,
+      # which publish the release record, and direct runs test everything.
       - name: Test
         env:
           GUI_FORMS_FONT_DIR: ${{ github.workspace }}/gui_forms/assets/fonts
+          NARROW: ${{ inputs.from_native && github.event_name == 'pull_request' }}
         run: |
           mkdir -p dist
+          selection=ALL
+          if [ "$NARROW" = true ]; then
+            selection=$(python gui_forms/tools/native_tests.py select --manifest .ci/native-manifest.json --build-dir "$BUILD_DIR")
+          fi
+          set -- --test-dir "$BUILD_DIR" --output-on-failure --timeout 120 --output-junit "$PWD/dist/ctest-${{ matrix.platform }}.xml"
+          case "$selection" in
+            ALL) echo "Running every test" ;;
+            NONE) echo "The native job passed every test of this build; nothing left to run"; exit 0 ;;
+            *) echo "Running the tests the native job did not pass: $selection"; set -- "$@" -R "$selection" --no-tests=error ;;
+          esac
           if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" ctest --test-dir "$BUILD_DIR" --output-on-failure --timeout 120 --output-junit "$PWD/dist/ctest-${{ matrix.platform }}.xml"
+            xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" ctest "$@"
           else
-            ctest --test-dir "$BUILD_DIR" --output-on-failure --timeout 120 --output-junit "$PWD/dist/ctest-${{ matrix.platform }}.xml"
+            ctest "$@"
           fi
       # --- package, then install and launch what was packaged -----------------------
       - name: Package the programs

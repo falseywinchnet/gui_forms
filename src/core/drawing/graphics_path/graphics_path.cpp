@@ -223,6 +223,42 @@ void GraphicsPath::add_path(const GraphicsPath& path, bool connect) {
     elements_.swap(replacement);
 }
 
+namespace {
+
+// One element's geometry through `matrix`; shapes keep their bounds' box.
+void transform_element(PathElement& element, const Matrix& matrix) {
+    switch (element.verb) {
+    case PathVerb::line:
+        element.first = matrix.transform(element.first);
+        element.second = matrix.transform(element.second);
+        return;
+    case PathVerb::quadratic:
+        element.first = matrix.transform(element.first);
+        element.second = matrix.transform(element.second);
+        element.third = matrix.transform(element.third);
+        return;
+    case PathVerb::bezier:
+        element.first = matrix.transform(element.first);
+        element.second = matrix.transform(element.second);
+        element.third = matrix.transform(element.third);
+        element.fourth = matrix.transform(element.fourth);
+        return;
+    case PathVerb::rectangle:
+    case PathVerb::ellipse:
+    case PathVerb::arc:
+        element.rect = matrix.transform_bounds(element.rect);
+        return;
+    case PathVerb::start_figure:
+    case PathVerb::close_figure:
+        // Figure marks carry no geometry.
+        return;
+    }
+    // A verb outside the enumeration has no geometry to move.
+    return;
+}
+
+} // namespace
+
 void GraphicsPath::transform(const Matrix& matrix) {
     require_alive();
     if (!matrix.finite()) {
@@ -230,31 +266,7 @@ void GraphicsPath::transform(const Matrix& matrix) {
     }
     std::vector<PathElement> transformed = elements_;
     for (PathElement& element : transformed) {
-        switch (element.verb) {
-        case PathVerb::line:
-            element.first = matrix.transform(element.first);
-            element.second = matrix.transform(element.second);
-            break;
-        case PathVerb::quadratic:
-            element.first = matrix.transform(element.first);
-            element.second = matrix.transform(element.second);
-            element.third = matrix.transform(element.third);
-            break;
-        case PathVerb::bezier:
-            element.first = matrix.transform(element.first);
-            element.second = matrix.transform(element.second);
-            element.third = matrix.transform(element.third);
-            element.fourth = matrix.transform(element.fourth);
-            break;
-        case PathVerb::rectangle:
-        case PathVerb::ellipse:
-        case PathVerb::arc:
-            element.rect = matrix.transform_bounds(element.rect);
-            break;
-        case PathVerb::start_figure:
-        case PathVerb::close_figure:
-            break;
-        }
+        transform_element(element, matrix);
     }
     elements_ = std::move(transformed);
 }
@@ -265,115 +277,127 @@ bool GraphicsPath::is_visible(PointF point) const {
     return path_snapshot_visible(snapshot(), point);
 }
 
+namespace {
+
+// One element's points in the compatibility PathPoints order, appended
+// to `result`.
+void append_element_points(const PathElement& element, std::vector<PointF>& result) {
+    switch (element.verb) {
+    case PathVerb::line:
+        if (result.empty() || result.back() != element.first) {
+            result.push_back(element.first);
+        }
+        result.push_back(element.second);
+        return;
+    case PathVerb::quadratic:
+        if (result.empty() || result.back() != element.first) {
+            result.push_back(element.first);
+        }
+        result.push_back(element.second);
+        result.push_back(element.third);
+        return;
+    case PathVerb::bezier:
+        if (result.empty() || result.back() != element.first) {
+            result.push_back(element.first);
+        }
+        result.push_back(element.second);
+        result.push_back(element.third);
+        result.push_back(element.fourth);
+        return;
+    case PathVerb::rectangle:
+        result.insert(result.end(), {{element.rect.left(), element.rect.top()},
+            {element.rect.right(), element.rect.top()},
+            {element.rect.right(), element.rect.bottom()},
+            {element.rect.left(), element.rect.bottom()}});
+        return;
+    case PathVerb::ellipse: {
+        // The compatibility API exposes four cubic ellipse segments through
+        // PathPoints:
+        // the right-middle start, three points per quadrant, and the
+        // repeated closing point. Keep that public geometry rather than a
+        // four-cardinal approximation.
+        constexpr double kappa = 0.55228474983079339840;
+        const double center_x = element.rect.x + element.rect.width / 2.0;
+        const double center_y = element.rect.y + element.rect.height / 2.0;
+        const double radius_x = element.rect.width / 2.0;
+        const double radius_y = element.rect.height / 2.0;
+        const double control_x = radius_x * kappa;
+        const double control_y = radius_y * kappa;
+        result.insert(result.end(), {
+            {center_x + radius_x, center_y},
+            {center_x + radius_x, center_y + control_y},
+            {center_x + control_x, center_y + radius_y},
+            {center_x, center_y + radius_y},
+            {center_x - control_x, center_y + radius_y},
+            {center_x - radius_x, center_y + control_y},
+            {center_x - radius_x, center_y},
+            {center_x - radius_x, center_y - control_y},
+            {center_x - control_x, center_y - radius_y},
+            {center_x, center_y - radius_y},
+            {center_x + control_x, center_y - radius_y},
+            {center_x + radius_x, center_y - control_y},
+            {center_x + radius_x, center_y},
+        });
+        return;
+    }
+    case PathVerb::arc: {
+        const double center_x = element.rect.x + element.rect.width / 2.0;
+        const double center_y = element.rect.y + element.rect.height / 2.0;
+        const double radius_x = element.rect.width / 2.0;
+        const double radius_y = element.rect.height / 2.0;
+        constexpr double two_pi = 6.283185307179586476925286766559;
+        constexpr double half_pi = 1.5707963267948966192313216916398;
+        const double sweep = std::clamp(element.sweep_angle, -360.0, 360.0);
+        double start = ellipse_parameter_angle(
+            radius_x, radius_y, element.start_angle);
+        double finish = ellipse_parameter_angle(
+            radius_x, radius_y, element.start_angle + sweep);
+        if (sweep > 0.0) {
+            while (finish <= start) finish += two_pi;
+            if (sweep == 360.0) finish = start + two_pi;
+        } else {
+            while (finish >= start) finish -= two_pi;
+            if (sweep == -360.0) finish = start - two_pi;
+        }
+        result.push_back(ellipse_point(center_x, center_y, radius_x,
+                                       radius_y, start));
+        while ((sweep > 0.0 && start < finish) ||
+               (sweep < 0.0 && start > finish)) {
+            const double delta = sweep > 0.0
+                ? std::min(half_pi, finish - start)
+                : std::max(-half_pi, finish - start);
+            const double end = start + delta;
+            const double alpha = 4.0 / 3.0 * std::tan(delta / 4.0);
+            const PointF first = ellipse_point(
+                center_x, center_y, radius_x, radius_y, start);
+            const PointF last = ellipse_point(
+                center_x, center_y, radius_x, radius_y, end);
+            result.push_back({first.x - alpha * radius_x * std::sin(start),
+                              first.y + alpha * radius_y * std::cos(start)});
+            result.push_back({last.x + alpha * radius_x * std::sin(end),
+                              last.y - alpha * radius_y * std::cos(end)});
+            result.push_back(last);
+            start = end;
+        }
+        return;
+    }
+    case PathVerb::start_figure:
+    case PathVerb::close_figure:
+        // Figure marks carry no points.
+        return;
+    }
+    // A verb outside the enumeration has no points.
+    return;
+}
+
+} // namespace
+
 std::vector<PointF> GraphicsPath::path_points() const {
     require_alive();
     std::vector<PointF> result;
     result.reserve(elements_.size() * 2U);
-    constexpr double degrees_to_radians = 0.017453292519943295769;
     for (const PathElement& element : elements_) {
-        switch (element.verb) {
-        case PathVerb::line:
-            if (result.empty() || result.back() != element.first) {
-                result.push_back(element.first);
-            }
-            result.push_back(element.second);
-            break;
-        case PathVerb::quadratic:
-            if (result.empty() || result.back() != element.first) {
-                result.push_back(element.first);
-            }
-            result.push_back(element.second);
-            result.push_back(element.third);
-            break;
-        case PathVerb::bezier:
-            if (result.empty() || result.back() != element.first) {
-                result.push_back(element.first);
-            }
-            result.push_back(element.second);
-            result.push_back(element.third);
-            result.push_back(element.fourth);
-            break;
-        case PathVerb::rectangle:
-            result.insert(result.end(), {{element.rect.left(), element.rect.top()},
-                {element.rect.right(), element.rect.top()},
-                {element.rect.right(), element.rect.bottom()},
-                {element.rect.left(), element.rect.bottom()}});
-            break;
-        case PathVerb::ellipse: {
-            // The compatibility API exposes four cubic ellipse segments through
-            // PathPoints:
-            // the right-middle start, three points per quadrant, and the
-            // repeated closing point. Keep that public geometry rather than a
-            // four-cardinal approximation.
-            constexpr double kappa = 0.55228474983079339840;
-            const double center_x = element.rect.x + element.rect.width / 2.0;
-            const double center_y = element.rect.y + element.rect.height / 2.0;
-            const double radius_x = element.rect.width / 2.0;
-            const double radius_y = element.rect.height / 2.0;
-            const double control_x = radius_x * kappa;
-            const double control_y = radius_y * kappa;
-            result.insert(result.end(), {
-                {center_x + radius_x, center_y},
-                {center_x + radius_x, center_y + control_y},
-                {center_x + control_x, center_y + radius_y},
-                {center_x, center_y + radius_y},
-                {center_x - control_x, center_y + radius_y},
-                {center_x - radius_x, center_y + control_y},
-                {center_x - radius_x, center_y},
-                {center_x - radius_x, center_y - control_y},
-                {center_x - control_x, center_y - radius_y},
-                {center_x, center_y - radius_y},
-                {center_x + control_x, center_y - radius_y},
-                {center_x + radius_x, center_y - control_y},
-                {center_x + radius_x, center_y},
-            });
-            break;
-        }
-        case PathVerb::arc: {
-            const double center_x = element.rect.x + element.rect.width / 2.0;
-            const double center_y = element.rect.y + element.rect.height / 2.0;
-            const double radius_x = element.rect.width / 2.0;
-            const double radius_y = element.rect.height / 2.0;
-            constexpr double two_pi = 6.283185307179586476925286766559;
-            constexpr double half_pi = 1.5707963267948966192313216916398;
-            const double sweep = std::clamp(element.sweep_angle, -360.0, 360.0);
-            double start = ellipse_parameter_angle(
-                radius_x, radius_y, element.start_angle);
-            double finish = ellipse_parameter_angle(
-                radius_x, radius_y, element.start_angle + sweep);
-            if (sweep > 0.0) {
-                while (finish <= start) finish += two_pi;
-                if (sweep == 360.0) finish = start + two_pi;
-            } else {
-                while (finish >= start) finish -= two_pi;
-                if (sweep == -360.0) finish = start - two_pi;
-            }
-            result.push_back(ellipse_point(center_x, center_y, radius_x,
-                                           radius_y, start));
-            while ((sweep > 0.0 && start < finish) ||
-                   (sweep < 0.0 && start > finish)) {
-                const double delta = sweep > 0.0
-                    ? std::min(half_pi, finish - start)
-                    : std::max(-half_pi, finish - start);
-                const double end = start + delta;
-                const double alpha = 4.0 / 3.0 * std::tan(delta / 4.0);
-                const PointF first = ellipse_point(
-                    center_x, center_y, radius_x, radius_y, start);
-                const PointF last = ellipse_point(
-                    center_x, center_y, radius_x, radius_y, end);
-                result.push_back({first.x - alpha * radius_x * std::sin(start),
-                                  first.y + alpha * radius_y * std::cos(start)});
-                result.push_back({last.x + alpha * radius_x * std::sin(end),
-                                  last.y - alpha * radius_y * std::cos(end)});
-                result.push_back(last);
-                start = end;
-            }
-            break;
-        }
-        case PathVerb::start_figure:
-        case PathVerb::close_figure:
-            break;
-        }
+        append_element_points(element, result);
     }
     return result;
 }
@@ -389,31 +413,7 @@ RectF GraphicsPath::bounds() const {
     require_alive();
     RectBoundsAccumulator accumulator;
     for (const PathElement& element : elements_) {
-        switch (element.verb) {
-        case PathVerb::line:
-            accumulator.include(element.first);
-            accumulator.include(element.second);
-            break;
-        case PathVerb::quadratic:
-            accumulator.include(element.first);
-            accumulator.include(element.second);
-            accumulator.include(element.third);
-            break;
-        case PathVerb::bezier:
-            accumulator.include(element.first);
-            accumulator.include(element.second);
-            accumulator.include(element.third);
-            accumulator.include(element.fourth);
-            break;
-        case PathVerb::rectangle:
-        case PathVerb::ellipse:
-        case PathVerb::arc:
-            accumulator.include(element.rect);
-            break;
-        case PathVerb::start_figure:
-        case PathVerb::close_figure:
-            break;
-        }
+        include_path_element(element, accumulator);
     }
     return accumulator.bounds();
 }

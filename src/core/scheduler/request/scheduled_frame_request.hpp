@@ -14,6 +14,10 @@ enum class FrameRequestKind : std::uint8_t {
     // The window's motion clock: no target and no callback; each frame
     // advances the clock.
     motion_clock,
+    // The window's idle engine work (E7r): no target and no callback; each
+    // frame in which no motion runs and nothing waits to be painted bakes
+    // one queued keyframe, and the request ends with the queue.
+    engine_idle,
 };
 
 class ScheduledFrameRequest final : public Revocable {

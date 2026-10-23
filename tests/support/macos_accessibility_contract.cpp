@@ -34,6 +34,14 @@ const char* expected_ax_role(SemanticRole role) {
     case SemanticRole::menu_item: return "AXMenuItem";
     case SemanticRole::split_button: return "AXButton";
     case SemanticRole::menu_button: return "AXMenuButton";
+    case SemanticRole::tree: return "AXOutline";
+    case SemanticRole::tree_item: return "AXRow";
+    case SemanticRole::table: return "AXTable";
+    case SemanticRole::row: return "AXRow";
+    case SemanticRole::cell: return "AXCell";
+    case SemanticRole::column_header: return "AXCell";
+    case SemanticRole::row_header: return "AXCell";
+    case SemanticRole::tree_grid: return "AXOutline";
     case SemanticRole::generic:
     case SemanticRole::group:
     case SemanticRole::calendar:
@@ -42,6 +50,9 @@ const char* expected_ax_role(SemanticRole role) {
     case SemanticRole::separator:
     case SemanticRole::pane:
     case SemanticRole::tab_panel:
+    case SemanticRole::dialog:
+    case SemanticRole::status_bar:
+    case SemanticRole::live_region:
     case SemanticRole::count:
         return "AXGroup";
     }
@@ -51,6 +62,10 @@ const char* expected_ax_role(SemanticRole role) {
 const char* expected_ax_subrole(SemanticRole role) {
     if (role == SemanticRole::tab_panel) return "AXTabPanel";
     if (role == SemanticRole::tab) return "AXTabButton";
+    if (role == SemanticRole::tree_item) return "AXOutlineRow";
+    if (role == SemanticRole::dialog) return "AXApplicationDialog";
+    if (role == SemanticRole::status_bar) return "AXApplicationStatus";
+    if (role == SemanticRole::live_region) return "AXApplicationLog";
     return "";
 }
 
@@ -70,7 +85,9 @@ std::string expected_ax_value(const SemanticNode& node) {
 
 AccessibilityProjection expected_ax_projection(const SemanticNode& node) {
     AccessibilityProjection expected;
-    expected.role = expected_ax_role(node.role);
+    // A text box whose text runs over several lines is a text area.
+    const bool text_area = node.role == SemanticRole::text_box && node.multiline;
+    expected.role = text_area ? "AXTextArea" : expected_ax_role(node.role);
     expected.subrole = expected_ax_subrole(node.role);
     expected.label = node.name;
     expected.identifier = node.stable_id;

@@ -189,11 +189,17 @@ void append_vocabulary(std::string& out) {
     append_name_list(out, names);
     out += ",\n";
     names.clear();
-    names.push_back("position_in_set");
-    names.push_back("set_size");
-    names.push_back("has_popup");
-    names.push_back("controlled_panel");
-    names.push_back("orientation");
+    for (const SemanticState state : semantic_states) {
+        names.push_back(semantic_state_name(state));
+    }
+    append_key(out, "    ", "semantic_states");
+    append_name_list(out, names);
+    out += ",\n";
+    names.clear();
+    const std::span<const char* const> fields = semantic_field_names();
+    for (std::size_t index = 0; index < fields.size(); ++index) {
+        names.push_back(fields[index]);
+    }
     append_key(out, "    ", "semantic_fields");
     append_name_list(out, names);
     out += "\n  },\n";
@@ -389,7 +395,7 @@ void append_engine(std::string& out) {
     out += ": ";
     append_unsigned(out, maximum_published_values);
     out += "},\n";
-    // Presentational state machines (E7): the engine property besides the
+    // Presentational state machines (E7): the engine properties besides the
     // primitives' animated parameters, and the bounds a machine is checked
     // against at load.
     append_key(out, "    ", "transitions");
@@ -398,6 +404,8 @@ void append_engine(std::string& out) {
     out += ": ";
     names.clear();
     names.push_back(opacity_property);
+    names.push_back(scale_property);
+    names.push_back(face_property);
     append_name_list(out, names);
     out += ", ";
     append_json_string(out, "maximum_states");

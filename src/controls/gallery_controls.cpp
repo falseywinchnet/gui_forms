@@ -103,9 +103,21 @@ void sunken_frame(Painter& painter, Rect rect, Color fill)
     case NodeKind::group:
     case NodeKind::list:
         return PaintPlane::backplane;
-    default:
+    case NodeKind::label:
+    case NodeKind::link_label:
+    case NodeKind::button:
+    case NodeKind::text_input:
+    case NodeKind::check_box:
+    case NodeKind::radio_button:
+    case NodeKind::slider:
+    case NodeKind::progress:
+    case NodeKind::row:
+    case NodeKind::instrument:
+    case NodeKind::diagnostics:
         return PaintPlane::control;
     }
+    // A kind outside the enumeration paints with the controls.
+    return PaintPlane::control;
 }
 
 [[nodiscard]] Rect content_rect(NodeKind kind, Size size) noexcept
@@ -733,19 +745,20 @@ void GalleryControl::on_paint(Painter& painter, Rect)
     switch ((*specification_).kind) {
     case NodeKind::form:
         painter.fill_rect(bounds, Color::rgba(213, 223, 232));
-        break;
+        return;
     case NodeKind::command_strip:
         painter.fill_rect(bounds, face_light);
         painter.fill_rect({0.0, 0.0, bounds.width, 3.0}, accent);
         painter.fill_rect({0.0, 3.0, bounds.width, 1.0}, Color::rgba(151, 201, 235));
         painter.draw_line({0.0, bounds.height - 1.0}, {bounds.width, bounds.height - 1.0},
                           command_rule, 1.0);
-        break;
+        return;
     case NodeKind::panel:
         painter.fill_rect(bounds, paper);
-        break;
+        return;
     case NodeKind::user_control:
-        break;
+        // A user control is drawn by the controls it holds.
+        return;
     case NodeKind::backplane: {
         painter.fill_rect(bounds, Color::rgba(222, 235, 247));
         const double third = bounds.width / 3.0;
@@ -756,7 +769,7 @@ void GalleryControl::on_paint(Painter& painter, Rect)
         painter.fill_rect({0.0, bounds.height * 0.62, bounds.width, bounds.height * 0.38},
                           Color::rgba(245, 248, 251, 224));
         painter.fill_rect({0.0, 0.0, 5.0, bounds.height}, accent);
-        break;
+        return;
     }
     case NodeKind::group:
     case NodeKind::diagnostics:
@@ -771,7 +784,7 @@ void GalleryControl::on_paint(Painter& painter, Rect)
                               ? Color::rgba(230, 238, 247, 232)
                               : face);
         painter.draw_text_utf8({13.0, 15.0}, text, {FontRole::control, 12.0, 600, false}, ink);
-        break;
+        return;
     // These families are always instantiated as reusable public controls by
     // build_gallery_tree(). Keeping duplicate Gallery renderers here would
     // disguise an extraction regression.
@@ -782,7 +795,8 @@ void GalleryControl::on_paint(Painter& painter, Rect)
     case NodeKind::radio_button:
     case NodeKind::slider:
     case NodeKind::progress:
-        break;
+        // Drawn by the public control (above).
+        return;
     case NodeKind::text_input:
         sunken_frame(painter, bounds, paper);
         if (focused_) {
@@ -795,7 +809,7 @@ void GalleryControl::on_paint(Painter& painter, Rect)
             const double caret_x = std::min(bounds.width - 5.0, 7.0 + text.size() * 7.0);
             painter.draw_line({caret_x, 5.0}, {caret_x, bounds.height - 5.0}, ink, 1.0);
         }
-        break;
+        return;
     case NodeKind::list:
         sunken_frame(painter, bounds, paper);
         if (drag_hovered_) {
@@ -805,7 +819,7 @@ void GalleryControl::on_paint(Painter& painter, Rect)
             painter.stroke_rect({1.5, 1.5, std::max(0.0, bounds.width - 3.0),
                                  std::max(0.0, bounds.height - 3.0)}, accent, 2.0);
         }
-        break;
+        return;
     case NodeKind::row:
         painter.fill_rect(bounds, selected() ? selection : paper);
         if (selected()) {
@@ -820,7 +834,7 @@ void GalleryControl::on_paint(Painter& painter, Rect)
             painter.stroke_rect({1.5, 1.5, bounds.width - 3.0, bounds.height - 3.0},
                                 selected() ? highlight : accent, 1.0);
         }
-        break;
+        return;
     case NodeKind::instrument: {
         ++paint_sequence_;
         painter.fill_rect(bounds, instrument_face);
@@ -841,9 +855,11 @@ void GalleryControl::on_paint(Painter& painter, Rect)
         char percent[32]{};
         std::snprintf(percent, sizeof(percent), "LEVEL %3.0f%%", level * 100.0);
         painter.draw_text_utf8({12.0, 17.0}, percent, {FontRole::monospace, 12.0, 600, false}, cyan);
-        break;
+        return;
     }
     }
+    // A kind outside the enumeration paints nothing.
+    return;
 }
 
 bool GalleryControl::hit_test_local(Point local_point) const

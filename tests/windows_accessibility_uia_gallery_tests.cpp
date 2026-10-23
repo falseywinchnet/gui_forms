@@ -238,6 +238,21 @@ CONTROLTYPEID expected_control_type(SemanticRole role) noexcept {
     case SemanticRole::menu_button: return UIA_ButtonControlTypeId;
     case SemanticRole::pane: return UIA_PaneControlTypeId;
     case SemanticRole::tab_panel: return UIA_PaneControlTypeId;
+    // The stage A vocabulary (12.13). A tree grid is a data grid whose rows
+    // are tree items; a cell is a data item, as a grid's cells are; a dialog
+    // inside the window is a pane with IsDialog; a live region is a group
+    // with a polite LiveSetting.
+    case SemanticRole::tree: return UIA_TreeControlTypeId;
+    case SemanticRole::tree_item: return UIA_TreeItemControlTypeId;
+    case SemanticRole::table: return UIA_TableControlTypeId;
+    case SemanticRole::row: return UIA_DataItemControlTypeId;
+    case SemanticRole::cell: return UIA_DataItemControlTypeId;
+    case SemanticRole::column_header: return UIA_HeaderItemControlTypeId;
+    case SemanticRole::row_header: return UIA_HeaderItemControlTypeId;
+    case SemanticRole::tree_grid: return UIA_DataGridControlTypeId;
+    case SemanticRole::dialog: return UIA_PaneControlTypeId;
+    case SemanticRole::status_bar: return UIA_StatusBarControlTypeId;
+    case SemanticRole::live_region: return UIA_GroupControlTypeId;
     case SemanticRole::count: return UIA_GroupControlTypeId;
     }
     return UIA_GroupControlTypeId;

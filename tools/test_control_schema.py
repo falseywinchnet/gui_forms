@@ -86,6 +86,17 @@ public:
         self.assertEqual(len(findings), 1)
         self.assertIn("vocabulary", findings[0])
 
+    def test_the_vocabulary_lists_the_stage_a_atoms(self) -> None:
+        vocabulary = cs.load_schema()["vocabulary"]
+        for role in ("tree", "tree_item", "table", "row", "cell", "column_header", "row_header", "tree_grid",
+                     "dialog", "status_bar", "live_region"):
+            self.assertIn(role, vocabulary["semantic_roles"])
+        for state in ("checkable", "multiselectable"):
+            self.assertIn(state, vocabulary["semantic_states"])
+        for field in ("level", "modal", "row_index", "column_index", "row_count", "column_count", "access_key",
+                      "small_step", "large_step", "text_selection", "multiline"):
+            self.assertIn(field, vocabulary["semantic_fields"])
+
     def test_the_vocabulary_lists_the_docking_atoms(self) -> None:
         schema = cs.load_schema()
         vocabulary = schema["vocabulary"]
@@ -116,7 +127,7 @@ public:
         self.assertEqual(engine["budgets"]["operations_per_device_pixel"], 512)
         names = [primitive["name"] for primitive in engine["primitives"]]
         self.assertEqual(names, ["bulge", "dithered_bulge", "pill_plate", "gold_plate", "inset_well", "etched_divider",
-                                 "seam_line", "grip"])
+                                 "seam_line", "grip", "material", "overlay_shadow"])
         bulge = engine["primitives"][0]
         self.assertEqual(bulge["roles"], ["face"])
         amplitude = next(item for item in bulge["parameters"] if item["name"] == "amplitude")
@@ -161,7 +172,7 @@ public:
     def test_the_engine_lists_its_motion_caps(self) -> None:
         schema = cs.load_schema()
         engine = schema["engine"]
-        self.assertEqual(engine["transitions"]["engine_properties"], ["opacity"])
+        self.assertEqual(engine["transitions"]["engine_properties"], ["opacity", "scale", "face"])
         self.assertEqual(engine["ambient"]["maximum_frames_per_second"], 30)
         broken = json.loads(json.dumps(engine))
         broken["ambient"]["maximum_frames_per_second"] = 60

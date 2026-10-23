@@ -338,27 +338,27 @@ private:
         std::string stable_id{};
         HostWindowId owner{};
         HostWindowKind kind{HostWindowKind::standard};
-        HostWindowFrame frame{};
-        bool frame_known{};
+        // The frame last reported, until the first report.
+        std::optional<HostWindowFrame> frame{};
         // Visibility: what the program wants, and what the policy last put
         // on screen.
         bool requested_visible{};
         bool shown{};
         bool minimized{};
         // A following window's offset from the primary window's client
-        // origin, and the client origins the policy last placed it at (most
-        // recent first). A report at one of those origins is the policy's own
-        // placement, possibly answered late (X11), and never changes the
-        // offset; the targets are forgotten when the user moves the window.
-        Point offset{};
-        bool offset_known{};
+        // origin (until first learned), and the client origins the policy
+        // last placed it at (most recent first). A report at one of those
+        // origins is the policy's own placement, possibly answered late
+        // (X11), and never changes the offset; the targets are forgotten when
+        // the user moves the window.
+        std::optional<Point> offset{};
         std::array<Point, 4> recent_targets{};
         std::size_t recent_target_count{};
         // The primary window's client origin when its followers were last
-        // placed; a follower move seen while the primary has moved since
-        // then is the platform carrying it, not the user.
-        Point followed_origin{};
-        bool followed_known{};
+        // placed (none before the first placement); a follower move seen
+        // while the primary has moved since then is the platform carrying
+        // it, not the user.
+        std::optional<Point> followed_origin{};
     };
 
     void apply_visibility(WindowRecord& entry);

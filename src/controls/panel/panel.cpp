@@ -105,12 +105,13 @@ void Panel::paint_panel(Painter& painter, Rect bounds) const {
     }
     switch (border_style_) {
     case BorderStyle::none:
-        break;
+        // No border; the face is the whole panel.
+        return;
     case BorderStyle::line:
         painter.stroke_rect({0.5, 0.5, std::max(0.0, bounds.width - 1.0),
                              std::max(0.0, bounds.height - 1.0)},
                             colors.border, 1.0);
-        break;
+        return;
     case BorderStyle::sunken:
         painter.draw_line({0.0, 0.0}, {bounds.width, 0.0}, colors.dark_border, 1.0);
         painter.draw_line({0.0, 0.0}, {0.0, bounds.height}, colors.dark_border, 1.0);
@@ -118,7 +119,7 @@ void Panel::paint_panel(Painter& painter, Rect bounds) const {
                           {bounds.width, bounds.height - 1.0}, colors.highlight, 1.0);
         painter.draw_line({bounds.width - 1.0, 0.0},
                           {bounds.width - 1.0, bounds.height}, colors.highlight, 1.0);
-        break;
+        return;
     case BorderStyle::raised:
         painter.draw_line({0.0, 0.0}, {bounds.width, 0.0}, colors.highlight, 1.0);
         painter.draw_line({0.0, 0.0}, {0.0, bounds.height}, colors.highlight, 1.0);
@@ -126,8 +127,10 @@ void Panel::paint_panel(Painter& painter, Rect bounds) const {
                           {bounds.width, bounds.height - 1.0}, colors.dark_border, 1.0);
         painter.draw_line({bounds.width - 1.0, 0.0},
                           {bounds.width - 1.0, bounds.height}, colors.dark_border, 1.0);
-        break;
+        return;
     }
+    // A style outside the enumeration draws no border.
+    return;
 }
 
 Insets Panel::visual_outsets() const noexcept {

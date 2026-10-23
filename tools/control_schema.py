@@ -271,13 +271,13 @@ def _engine_findings(engine: object, vocabulary: object) -> list[str]:
 
 
 def _motion_findings(transitions: object, ambient: object) -> list[str]:
-    """Presentational state machines and ambient effects (T2 E7): opacity is the
-    engine property, the machine bounds are positive, and the ambient caps are
+    """Presentational state machines and ambient effects (T2 E7, E8): opacity and
+    scale are the engine properties, the machine bounds are positive, and the ambient caps are
     the accepted starting tokens (at most 30 frames per second over at most 10 %
     of the window)."""
     findings: list[str] = []
-    if not isinstance(transitions, dict) or "opacity" not in transitions.get("engine_properties", []):
-        findings.append("engine: transitions do not list opacity as the engine property")
+    if not isinstance(transitions, dict) or not {"opacity", "scale"} <= set(transitions.get("engine_properties", [])):
+        findings.append("engine: transitions do not list opacity and scale as the engine properties")
     elif not all(isinstance(transitions.get(key), int) and int(transitions[key]) > 0
                  for key in ("maximum_states", "maximum_per_part")):
         findings.append("engine: transitions: the machine bounds are not positive")
@@ -329,11 +329,11 @@ def validate(schema: Mapping[str, object], registry: control_registry.Registry,
                         "or the order differs)")
     vocabulary: object = schema.get("vocabulary")
     if not isinstance(vocabulary, dict):
-        findings.append("the schema has no vocabulary (part roles, states, custom states, marks, values, "
-                        "families, semantic roles, actions and fields)")
+        findings.append("the schema has no vocabulary (part roles, states, custom states, marks, engine inputs, values, "
+                        "families, semantic roles, actions, states and fields)")
     else:
         for key in ("part_roles", "states", "custom_states", "marks", "engine_inputs", "values", "families",
-                    "semantic_roles", "semantic_actions", "semantic_fields"):
+                    "semantic_roles", "semantic_actions", "semantic_states", "semantic_fields"):
             names: object = vocabulary.get(key)
             if not isinstance(names, list) or not names:
                 findings.append(f"vocabulary: {key} is missing or empty")
@@ -444,6 +444,7 @@ def render_page(schema: Mapping[str, object]) -> str:
                                          ("families", "Recipe families"),
                                          ("semantic_roles", "Semantic roles"),
                                          ("semantic_actions", "Semantic actions"),
+                                         ("semantic_states", "Semantic states"),
                                          ("semantic_fields", "Semantic node fields")]
         for key, title in titles:
             names: Sequence[object] = vocabulary.get(key, [])  # type: ignore[assignment]

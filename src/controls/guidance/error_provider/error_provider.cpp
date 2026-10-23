@@ -172,7 +172,7 @@ void ErrorProvider::set_error(const std::shared_ptr<Control>& target,
     }
     refresh_visual(entry, true);
     const ErrorProviderChange change{
-        std::string((*target).stable_id().value()), entry.error, !entry.error.empty()};
+        std::string((*target).stable_id().value()), entry.error};
     error_changed_.emit(change);
     erase_if_empty((*target).runtime_id().value);
 }
@@ -502,22 +502,31 @@ void ErrorProvider::set_tag(std::any tag_value) {
     tag_ = std::move(tag_value);
 }
 
+namespace {
+
+// The alignment on the other side of the target, at the same height.
+ErrorIconAlignment mirrored_alignment(ErrorIconAlignment alignment) noexcept {
+    switch (alignment) {
+    case ErrorIconAlignment::top_left: return ErrorIconAlignment::top_right;
+    case ErrorIconAlignment::top_right: return ErrorIconAlignment::top_left;
+    case ErrorIconAlignment::middle_left: return ErrorIconAlignment::middle_right;
+    case ErrorIconAlignment::middle_right: return ErrorIconAlignment::middle_left;
+    case ErrorIconAlignment::bottom_left: return ErrorIconAlignment::bottom_right;
+    case ErrorIconAlignment::bottom_right: return ErrorIconAlignment::bottom_left;
+    }
+    // An alignment outside the enumeration is left as it is.
+    return alignment;
+}
+
+} // namespace
+
 Rect ErrorProvider::icon_bounds(const Entry& entry) const noexcept {
     const std::shared_ptr<gui_forms::Control> target = entry.target.lock();
     Window* owner = bound_window();
     if (!target || !owner) return {};
     const Rect anchor = (*target).absolute_bounds();
     ErrorIconAlignment alignment = entry.alignment;
-    if (right_to_left_) {
-        switch (alignment) {
-        case ErrorIconAlignment::top_left: alignment = ErrorIconAlignment::top_right; break;
-        case ErrorIconAlignment::top_right: alignment = ErrorIconAlignment::top_left; break;
-        case ErrorIconAlignment::middle_left: alignment = ErrorIconAlignment::middle_right; break;
-        case ErrorIconAlignment::middle_right: alignment = ErrorIconAlignment::middle_left; break;
-        case ErrorIconAlignment::bottom_left: alignment = ErrorIconAlignment::bottom_right; break;
-        case ErrorIconAlignment::bottom_right: alignment = ErrorIconAlignment::bottom_left; break;
-        }
-    }
+    if (right_to_left_) alignment = mirrored_alignment(alignment);
     const bool left = alignment == ErrorIconAlignment::top_left ||
                       alignment == ErrorIconAlignment::middle_left ||
                       alignment == ErrorIconAlignment::bottom_left;

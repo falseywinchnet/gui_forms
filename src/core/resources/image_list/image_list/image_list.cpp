@@ -391,6 +391,8 @@ ImageListResolution ImageList::resolve(std::size_t index,
     std::array<ImageVisualState, 3> states{state, ImageVisualState::normal,
                                           ImageVisualState::normal};
     std::size_t state_count = 2U;
+    // Pressed and selected fall back through hot to normal, normal stands
+    // alone, and every other state falls back to normal (above).
     if (state == ImageVisualState::pressed) {
         states = {ImageVisualState::pressed, ImageVisualState::hot,
                   ImageVisualState::normal};
