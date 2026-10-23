@@ -65,10 +65,12 @@ between hosts, any primitive missing on one host, or any non-zero idle
 counter, and uploads the filled record as the `t2-engine-gate-record`
 artifact.
 
-A native job that reused an earlier validation of the same tree runs no
-test and has no manifest. The record then lists that host as missing. For
-the sealed record, use a run in which all four native jobs built: a pull
-request that changes source does.
+A native job that promoted (a push to main) or reused an earlier
+validation of the same tree runs no test. It carries the validation run's
+manifest instead (`engine_gate.py carry`), marked with a comment naming that
+run. A host with no manifest at all, or no manifest found anywhere, fails
+the comparison: a gate that compares fewer hosts than it covers proves
+nothing about the missing ones.
 
 ## Parts 3 and 4: the primitives' own tests
 

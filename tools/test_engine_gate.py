@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Tests for engine_gate.py: reading manifests, comparing hosts and filling the record."""
 from __future__ import annotations
+import io
 import json
 from pathlib import Path
 import tempfile
 import unittest
+import zipfile
 
 import engine_gate
 
@@ -49,14 +51,13 @@ class ParseTests(unittest.TestCase):
 
 
 class CompareTests(unittest.TestCase):
-    def run_compare(self, manifests: dict[str, str], require_all: bool = False) -> tuple[int, dict, str]:
+    def run_compare(self, manifests: dict[str, str]) -> tuple[int, dict, str]:
         with tempfile.TemporaryDirectory() as scratch:
             root: Path = Path(scratch)
             write_evidence(root / 'evidence', manifests)
+            (root / 'evidence').mkdir(exist_ok=True)
             arguments: list[str] = ['compare', '--evidence', str(root / 'evidence'), '--out', str(root / 'out'),
                                     '--commit', 'abc123', '--run', 'https://example.invalid/run/1']
-            if require_all:
-                arguments.append('--require-all')
             status: int = engine_gate.main(arguments)
             result: dict = json.loads((root / 'out' / 'comparison.json').read_text(encoding='utf-8'))
             record: str = (root / 'out' / 'record.md').read_text(encoding='utf-8')
@@ -71,7 +72,7 @@ class CompareTests(unittest.TestCase):
         status: int
         result: dict
         record: str
-        status, result, record = self.run_compare(manifests, require_all=True)
+        status, result, record = self.run_compare(manifests)
         self.assertEqual(status, 0)
         self.assertTrue(result['identical'])
         self.assertEqual(result['primitives'], ['bulge', 'glass'])
@@ -111,17 +112,29 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertEqual(result['busy_idle_counters'][0]['counter'], 'primitive.glass.idle_frames_run')
 
-    def test_missing_hosts_fail_only_when_all_are_required(self) -> None:
-        manifests: dict[str, str] = {'windows-x64': manifest_text([BULGE, GLASS])}
+    def test_a_missing_host_fails(self) -> None:
+        manifests: dict[str, str] = {}
+        platform: str
+        for platform in engine_gate.PLATFORMS[:3]:
+            manifests[platform] = manifest_text([BULGE, GLASS])
         status: int
         result: dict
         record: str
         status, result, record = self.run_compare(manifests)
-        self.assertEqual(status, 0)
-        self.assertEqual(result['missing'], ['macos-arm64', 'linux-x64', 'linux-arm64'])
-        self.assertIn('no manifest', record)
-        status, result, record = self.run_compare(manifests, require_all=True)
         self.assertEqual(status, 1)
+        self.assertEqual(result['missing'], ['linux-arm64'])
+        self.assertIn('no manifest', record)
+
+    def test_no_manifest_at_all_fails(self) -> None:
+        # A push to main whose native jobs all promoted ran no gate test (run
+        # 40019820396): comparing nothing must not pass.
+        status: int
+        result: dict
+        record: str
+        status, result, record = self.run_compare({})
+        self.assertEqual(status, 1)
+        self.assertEqual(result['missing'], list(engine_gate.PLATFORMS))
+        self.assertEqual(result['images'], 0)
 
     def test_two_manifests_for_one_platform_are_refused(self) -> None:
         with tempfile.TemporaryDirectory() as scratch:
@@ -138,6 +151,74 @@ class CompareTests(unittest.TestCase):
                      'counter_table'):
             self.assertIn('{{' + name + '}}', template)
 
+
+
+class FakeArtifacts:
+    """Stands in for GitHubArtifacts: one run's evidence artifacts, held as zips."""
+
+    def __init__(self, run: str, zips: dict[str, bytes]) -> None:
+        self.run: str = run
+        self.ids: dict[str, int] = {}
+        self.zips: dict[int, bytes] = {}
+        name: str
+        data: bytes
+        for name, data in zips.items():
+            self.ids[name] = len(self.ids) + 1
+            self.zips[self.ids[name]] = data
+        self.downloads: int = 0
+
+    def find(self, run: str, name: str) -> int | None:
+        if run != self.run:
+            return None
+        return self.ids.get(name)
+
+    def download(self, artifact: int) -> bytes:
+        self.downloads += 1
+        return self.zips[artifact]
+
+
+def evidence_zip(members: dict[str, str]) -> bytes:
+    buffer: io.BytesIO = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w') as archive:
+        name: str
+        text: str
+        for name, text in members.items():
+            archive.writestr(name, text)
+    return buffer.getvalue()
+
+
+class CarryTests(unittest.TestCase):
+    """A native job that promoted or reused a validation carries that run's manifest."""
+
+    def test_a_job_that_ran_the_test_carries_nothing(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            state: Path = Path(scratch)
+            fake: FakeArtifacts = FakeArtifacts('7', {})
+            self.assertEqual(engine_gate.carry('linux-x64', state, fake), 0)
+            self.assertEqual(fake.downloads, 0)
+            self.assertFalse((state / 'engine-gate-linux-x64.tsv').exists())
+
+    def test_a_reused_validation_carries_its_manifest_with_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            state: Path = Path(scratch)
+            (state / 'reused.json').write_text(json.dumps({'validation_run': '7', 'tree': 'abc'}), encoding='utf-8')
+            text: str = manifest_text([BULGE, GLASS])
+            fake: FakeArtifacts = FakeArtifacts('7', {'gui-forms-evidence-linux-x64': evidence_zip({
+                '.ci/inputs.json': '{}', '.ci/engine-gate-linux-x64.tsv': text})})
+            self.assertEqual(engine_gate.carry('linux-x64', state, fake), 0)
+            carried: str = (state / 'engine-gate-linux-x64.tsv').read_text(encoding='utf-8')
+            self.assertIn('# carried from validation run 7 of tree abc', carried)
+            manifest: engine_gate.Manifest = engine_gate.parse_manifest(carried)
+            self.assertEqual(manifest.images, engine_gate.parse_manifest(text).images)
+
+    def test_a_validation_without_a_manifest_leaves_the_host_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            state: Path = Path(scratch)
+            (state / 'reused.json').write_text(json.dumps({'validation_run': '7', 'tree': 'abc'}), encoding='utf-8')
+            fake: FakeArtifacts = FakeArtifacts('7', {'gui-forms-evidence-linux-x64': evidence_zip({
+                '.ci/inputs.json': '{}'})})
+            self.assertEqual(engine_gate.carry('linux-x64', state, fake), 0)
+            self.assertFalse((state / 'engine-gate-linux-x64.tsv').exists())
 
 if __name__ == '__main__':
     unittest.main()
