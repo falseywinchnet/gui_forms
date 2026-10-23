@@ -6,6 +6,11 @@
 #include <cstdint>
 #include <span>
 
+namespace gui_forms {
+// Declared in gui_forms/types/painter/painter.hpp.
+enum class PaintGroupComposite : std::uint8_t;
+} // namespace gui_forms
+
 namespace gui_forms::detail {
 
 // ADR-004 shared text blending. Every host composites text coverage through
@@ -70,9 +75,13 @@ enum class TextCompositeMode : std::uint8_t { source_over, source };
 [[nodiscard]] std::uint32_t text_clip_coverage(TextCompositeClip clip, std::int64_t x, std::int64_t y) noexcept;
 
 // How composite_part_raster joins a weighted source pixel to the target
-// pixel: premultiplied source-over, or plus (each channel added, clamped at
-// 255; PaintGroupComposite::plus).
-enum class PartCompositeBlend : std::uint8_t { source_over, plus };
+// pixel: premultiplied source-over; plus (each channel added, clamped at
+// 255; PaintGroupComposite::plus); or multiply or screen
+// (PaintGroupComposite, E9.6), in bytes, each product rounded once:
+//   multiply: (s × (255 − αd) + d × (255 − αs) + s × d + 127) / 255,
+//   screen:   s + d − (s × d + 127) / 255,
+//   alpha:    αs + αd − (αs × αd + 127) / 255 (255 on an opaque target).
+enum class PartCompositeBlend : std::uint8_t { source_over, plus, multiply, screen };
 
 // The same blend for the theme engine's part rasters (T2 plan, "One blend";
 // GIVEN A2-2 and C1-1). A part raster is premultiplied RGBA8, memory order
@@ -121,5 +130,9 @@ struct PartRasterSource final {
 // overlap.
 [[nodiscard]] TextCompositeStatus composite_part_raster(PartRasterSource source, TextCompositeTarget target,
                                                         TextCompositeClip clip, std::uint8_t opacity) noexcept;
+
+// The blend a paint group's composite composites through, for the hosts'
+// painters. A value outside the enumeration is source-over.
+[[nodiscard]] PartCompositeBlend part_composite_blend(PaintGroupComposite composite) noexcept;
 
 } // namespace gui_forms::detail

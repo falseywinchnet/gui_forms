@@ -1223,6 +1223,17 @@ void measure() {
     edge.border_edges.top = MaterialBorder{blue, 1.0};
     SurfaceMaterial keyline = base;
     keyline.keylines.push_back(MaterialKeyline{MaterialEdge::top, blue, 1.0, 0.0});
+    // The part filters (E9.6), each over the plain base. A box blur's cost
+    // does not depend on its radius; the largest the reach admits is used.
+    SurfaceMaterial colour_filtered = base;
+    colour_filtered.colour_filter = MaterialColourMatrix::sepia(1.0);
+    SurfaceMaterial drop_shadowed = base;
+    drop_shadowed.drop_shadow = MaterialDropShadow{Point{0.0, 2.0}, 4.0, black};
+    SurfaceMaterial blurred = base;
+    blurred.filter_blur = 5.0;
+    // A multiply fill (E9.6) against a normal one: the face gathered apart.
+    SurfaceMaterial multiplied = solid;
+    multiplied.fills[1].blend = MaterialBlendMode::multiply;
 
     // An image's bake composites its prepared variant: the source's size
     // does not enter it.
@@ -1249,6 +1260,11 @@ void measure() {
     const double per_pixel_edge = (median_bake_nanoseconds(edge, nullptr) - base_time) / pixels;
     const double per_pixel_keyline = (median_bake_nanoseconds(keyline, nullptr) - base_time) / pixels;
     const double per_pixel_image = (median_bake_nanoseconds(imaged, &registry) - base_time) / pixels;
+    const double per_pixel_colour_filter = (median_bake_nanoseconds(colour_filtered, nullptr) - base_time) / pixels;
+    const double per_pixel_drop_shadow = (median_bake_nanoseconds(drop_shadowed, nullptr) - base_time) / pixels;
+    const double per_pixel_filter_blur = (median_bake_nanoseconds(blurred, nullptr) - base_time) / pixels;
+    const double solid_time = median_bake_nanoseconds(solid, nullptr);
+    const double per_pixel_blend = (median_bake_nanoseconds(multiplied, nullptr) - solid_time) / pixels;
 
     std::cout << std::fixed << std::setprecision(3);
     std::cout << "base " << base_time / pixels << '\n';
@@ -1266,6 +1282,10 @@ void measure() {
     std::cout << "border_edge " << per_pixel_edge << '\n';
     std::cout << "keyline " << per_pixel_keyline << '\n';
     std::cout << "image " << per_pixel_image << '\n';
+    std::cout << "colour_filter " << per_pixel_colour_filter << '\n';
+    std::cout << "drop_shadow " << per_pixel_drop_shadow << '\n';
+    std::cout << "filter_blur " << per_pixel_filter_blur << '\n';
+    std::cout << "fill_blend " << per_pixel_blend << '\n';
 }
 
 } // namespace

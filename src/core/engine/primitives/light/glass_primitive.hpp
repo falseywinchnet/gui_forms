@@ -31,12 +31,19 @@ namespace gui_forms::engine_primitives {
 // cap is §4.6's 8 logical px, and a rule past it is rejected and falls
 // back); `tint`, composited over the blurred backplane (default white at
 // alpha 64); `corner`, the shape's corner radius in logical units (0 to
-// 64, default 0), replaced by the part's own when the part sets one. It
-// reads no states, no inputs and no time.
+// 64, default 0), replaced by the part's own when the part sets one;
+// `recipe` (E9.6), `none` (the default) or a recipe role, whose material's
+// colour filter (SurfaceMaterial::colour_filter) glass applies to the
+// blurred backplane before the tint: CSS `backdrop-filter` colour
+// functions, composed into one matrix in source order (coordinator,
+// 2026-10-22). Its other layers are not drawn. It reads no states, no
+// inputs and no time.
 class GlassPrimitive final : public EnginePrimitive {
 public:
     [[nodiscard]] const PrimitiveDescriptor& descriptor() const noexcept override;
     [[nodiscard]] PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept override;
+    [[nodiscard]] std::optional<ControlVisualRole> theme_material(
+        const PrimitiveParameterBlock& parameters) const noexcept override;
     [[nodiscard]] std::optional<std::uint32_t> backplane_margin(const PrimitiveParameterBlock& parameters,
                                                                 DeviceScale scale) const noexcept override;
 

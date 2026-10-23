@@ -187,6 +187,7 @@ std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept {
     case RuleDiagnosticKind::transition_invalid: return "transition_invalid";
     case RuleDiagnosticKind::ambient_over_frame_cap: return "ambient_over_frame_cap";
     case RuleDiagnosticKind::ambient_invalid: return "ambient_invalid";
+    case RuleDiagnosticKind::blend_invalid: return "blend_invalid";
     case RuleDiagnosticKind::published_value_invalid: return "published_value_invalid";
     }
     return {};
@@ -326,6 +327,10 @@ void CompiledThemeRules::add_rules(CompiledThemeRules& result, const ThemeRuleSh
         }
         for (const RuleDeclaration& declaration : rule.declarations) {
             if (declaration.property == primitive_property) continue;
+            if (declaration.property == blend_property) {
+                add_blend(result.diagnostics_, index, rule, declaration, compiled);
+                continue;
+            }
             if (compiled.primitive == nullptr) {
                 result.diagnostics_.push_back(
                     diagnostic(RuleDiagnosticKind::parameter_without_primitive, index, rule, declaration.property));
@@ -388,13 +393,39 @@ void CompiledThemeRules::add_rules(CompiledThemeRules& result, const ThemeRuleSh
         add_transitions(result.diagnostics_, index, rule, compiled);
         add_ambient(result.diagnostics_, index, rule, compiled);
         const bool declares = compiled.selects || !compiled.parameters.empty() || !compiled.transitions.empty() ||
-                              compiled.ambient.has_value();
+                              compiled.ambient.has_value() || compiled.blend.has_value();
         if (!declares) {
             result.diagnostics_.push_back(diagnostic(RuleDiagnosticKind::rule_empty, index, rule, {}));
             continue;
         }
         result.rules_.push_back(std::move(compiled));
     }
+}
+
+// -- the blend property (E9.6) ----------------------------------------------------
+
+namespace {
+
+constexpr std::array<std::string_view, 3> part_blend_names{"normal", "multiply", "screen"};
+
+} // namespace
+
+void CompiledThemeRules::add_blend(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
+                                   const RuleDeclaration& declaration, CompiledRule& compiled) {
+    if (compiled.blend) {
+        diagnostics.push_back(diagnostic(RuleDiagnosticKind::duplicate_declaration, index, rule, declaration.property));
+        return;
+    }
+    if (declaration.kind != RuleValueKind::name) {
+        diagnostics.push_back(diagnostic(RuleDiagnosticKind::blend_invalid, index, rule, declaration.property));
+        return;
+    }
+    for (std::size_t position = 0U; position < part_blend_names.size(); ++position) {
+        if (part_blend_names[position] != declaration.name) continue;
+        compiled.blend = static_cast<PartBlend>(static_cast<std::uint8_t>(position));
+        return;
+    }
+    diagnostics.push_back(diagnostic(RuleDiagnosticKind::blend_invalid, index, rule, declaration.property));
 }
 
 // -- transitions and ambient effects (E7) ------------------------------------------
@@ -629,8 +660,9 @@ void CompiledThemeRules::resolve_transitions(const PartFacts& facts, Resolution&
     std::array<const CompiledTransition*, maximum_primitive_parameters> parameters{};
     const bool primitive = result.outcome == Outcome::primitive;
     for (const CompiledRule& rule : rules_) {
-        if ((rule.transitions.empty() && !rule.ambient) || !matches(rule, facts)) continue;
+        if ((rule.transitions.empty() && !rule.ambient && !rule.blend) || !matches(rule, facts)) continue;
         if (rule.ambient) result.ambient = &*rule.ambient;
+        if (rule.blend) result.blend = *rule.blend;
         const bool same_primitive = primitive && rule.primitive == result.primitive;
         for (const CompiledTransition& transition : rule.transitions) {
             if (transition.property == PresentationProperty::opacity) {

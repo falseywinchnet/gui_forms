@@ -172,6 +172,20 @@ inline constexpr double maximum_presentational_scale = 2.0;
 // uses it.
 inline constexpr std::string_view face_property = "face";
 
+// How a part joins what lies beneath it (E9.6, CSS `mix-blend-mode`).
+enum class PartBlend : std::uint8_t { normal, multiply, screen };
+
+// The engine's blend property (E9.6): a declaration of this name, whose
+// value is the name `normal`, `multiply` or `screen`, draws the part
+// through a paint group of that composite (PaintGroupComposite), whatever
+// draws it, so that it multiplies or screens what was painted beneath it.
+// Like opacity it is no atom and no primitive parameter, and a rule that
+// declares it needs no primitive; the last matching rule that declares it
+// wins. The group's bounds are the part's extent (its bounds grown by its
+// primitive's outsets and its granted overflow): nothing the part draws
+// beyond them is shown. The forced high-contrast pass draws no blend.
+inline constexpr std::string_view blend_property = "blend";
+
 // What a transition moves: a primitive parameter, or one of the engine's
 // presentational properties.
 enum class PresentationProperty : std::uint8_t {
@@ -360,6 +374,9 @@ enum class RuleDiagnosticKind : std::uint8_t {
     // pose inside it.
     ambient_over_frame_cap,
     ambient_invalid,
+    // A blend declaration (blend_property) whose value is not one of its
+    // names is dropped.
+    blend_invalid,
     // A published value's name is invalid, repeats an earlier one or is
     // past maximum_published_values. The diagnostic, of the sheet rather
     // than a rule, names it in `property`; its position stays, and reads as
@@ -484,6 +501,8 @@ public:
         std::size_t transition_count{};
         // The part's ambient effect, or null; it belongs to the rules.
         const AmbientEffect* ambient{};
+        // The part's blend (blend_property): the last matching rule's.
+        PartBlend blend{PartBlend::normal};
     };
 
     // The cascade for one part: the winning primitive declaration, then
@@ -521,6 +540,7 @@ private:
         std::vector<CompiledDeclaration> parameters{};
         std::vector<CompiledTransition> transitions{};
         std::optional<AmbientEffect> ambient{};
+        std::optional<PartBlend> blend{};
     };
 
     // Compiles `sheet`'s rules into `result` at their authored levels, or,
@@ -529,7 +549,8 @@ private:
                           bool engine_table);
     // The winning rule's primitive and parameters into `result`.
     void resolve_primitive(const PartFacts& facts, const CompiledRule& chosen, Resolution& result) const noexcept;
-    // The resolved transitions of the matching rules into `result`.
+    // The resolved transitions, ambient effect and blend of the matching
+    // rules into `result`.
     void resolve_transitions(const PartFacts& facts, Resolution& result) const noexcept;
     // A rule's transitions and ambient effect, checked; a defect drops the
     // one transition or the effect with a diagnostic.
@@ -537,6 +558,10 @@ private:
                                 CompiledRule& compiled);
     static void add_ambient(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
                             CompiledRule& compiled);
+    // A rule's blend declaration, checked; a defect drops it with a
+    // diagnostic.
+    static void add_blend(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
+                          const RuleDeclaration& declaration, CompiledRule& compiled);
 
     [[nodiscard]] static bool matches(const CompiledRule& rule, const PartFacts& facts) noexcept;
 
