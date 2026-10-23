@@ -30,8 +30,11 @@ int main() {
     const std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + std::chrono::seconds(25);
     while (std::chrono::steady_clock::now() < deadline) {
         accessibility_dispatch(); accessibility.update();
-        if (fixture.presses == 1 && (*number).value() == 37 && (*text).text() == "مرحبا ABC") {
-            std::cout << "AT-SPI action, numeric value and UTF-8 text edit passed\n";
+        // The client's last request puts the caret after the combining
+        // sequence of "e", U+0301 and "x" (byte 3), after the Text checks.
+        if (fixture.presses == 1 && (*number).value() == 37 && (*text).text() == "e\xCC\x81x" &&
+            (*text).selection().caret == Utf8Offset(3U)) {
+            std::cout << "AT-SPI action, numeric value, UTF-8 text edit and Text interface passed\n";
             accessibility.detach(); XDestroyWindow(display, native); XCloseDisplay(display); return 0;
         }
         accessibility_wait(ConnectionNumber(display), -1, 100);

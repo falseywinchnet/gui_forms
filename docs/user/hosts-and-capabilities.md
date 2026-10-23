@@ -116,7 +116,8 @@ Windows (Win32)
   MSAA publication is implemented through `IAccessible`, and UI Automation
   through providers for `UiaRootObjectId` (AutomationId is the stable ID;
   Invoke, Toggle, Value, RangeValue, ExpandCollapse, SelectionItem and
-  Selection patterns; no TextPattern yet). The adapter advertises `text_composition`, but
+  Selection patterns, and TextPattern and TextPattern2 for a text box's
+  text, units, selection, caret and bounds). The adapter advertises `text_composition`, but
   its current input path forwards committed `WM_CHAR` text rather than a TSF
   preedit session. OLE drag/drop and native menu publication are not implemented.
 

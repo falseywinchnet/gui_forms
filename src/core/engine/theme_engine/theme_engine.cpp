@@ -693,6 +693,12 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     if (record || primitive_draws) place = (*window).engine_paint_place(control, painter);
     const bool reduced_motion = window != nullptr && (*window).presentation_settings().reduced_motion;
     Rect extent{};
+    // Glass (E9-B) samples the window's backplane, the backplane plane
+    // alone; a part recorded in the backplane plane would sample itself, so
+    // it samples nothing.
+    const bool samples_backplane =
+        primitive_draws && (*resolution.primitive).backplane_margin(resolution.parameters, decided.scale) &&
+        (*place.painted_by).paint_plane() != PaintPlane::backplane;
     if (record) {
         Insets outsets{};
         std::uint64_t inputs_read = 0U;
@@ -713,6 +719,7 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         }
         extent = part_extent(part.bounds, place.origin, outsets);
         (*window).note_engine_paint(*record, inputs_read, *place.painted_by, extent);
+        (*window).note_engine_backplane_reader(*record, samples_backplane);
     }
     // The part's record, for its transitions and its ambient effect (E7).
     EnginePartRecord* const kept = record ? (*window).engine_part_record(*record) : nullptr;
@@ -847,6 +854,23 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         request.target.material = &overlay;
         request.target.images = &(*window).image_resources();
     }
+    // Glass borrows the backplane image under its raster, grown by the
+    // margin its blur reads, for this paint only. Its raster depends on
+    // where it lies, so it is never shared as a keyframe.
+    Window::EngineBackplane backplane{};
+    const std::optional<std::uint32_t> margin =
+        samples_backplane ? (*request.primitive).backplane_margin(request.parameters, decided.scale) : std::nullopt;
+    if (margin) {
+        const Point raster_origin{place.window_origin.x + shown.bounds.x - descriptor.outsets.left,
+                                  place.window_origin.y + shown.bounds.y - descriptor.outsets.top};
+        backplane = (*window).engine_backplane(raster_origin, request.extent, decided.scale, *margin);
+        request.target.backplane = backplane.image.get();
+        request.target.backplane_margin = *margin;
+        request.target.backplane_generation = backplane.generation;
+        request.target.backplane_origin = backplane.origin;
+        request.target.corner_radius = part.corner_radius;
+        request.shared = false;
+    }
     // A primitive that refuses the part leaves it to the built-in recipe;
     // a keyed part's refusal is counted when it begins (E8c).
     const bool accepted = (*request.primitive).accepts(request.parameters, request.target);
@@ -854,7 +878,7 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     // keyframes queued for idle frames when it first paints and whenever
     // its states change; one it reaches first is baked on demand.
     const bool requeue = kept != nullptr && (!(*kept).keyframe_states || *(*kept).keyframe_states != part.states);
-    if (accepted && movable != 0U && requeue) {
+    if (accepted && movable != 0U && requeue && !margin) {
         (*kept).keyframe_states = part.states;
         queue_keyframes(*window, request, movable);
     }

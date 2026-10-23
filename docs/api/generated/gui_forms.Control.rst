@@ -1438,6 +1438,14 @@ gui_forms::Control
 
    .. cpp:function:: virtual bool on_semantic_child_action(std::string_view stable_id, SemanticAction action, std::string_view value)
 
+   .. cpp:function:: virtual SemanticTextResult on_semantic_text_layout(SemanticTextLayout& layout)
+
+      Editable text for hosts (owner decision A-T1, 12.13), reached only through Window::semantic_text_layout and Window::set_semantic_text_selection, which have already refused stale identities and calls during paint. A control whose own node publishes editable text fills ``layout`` (empty on entry) with offsets into the value its descriptor publishes and returns done. It may build the stale layout its next paint would build (such as a multiline box's rows and scroll bars) but changes no text, selection or scroll position. The base returns no_text.
+
+   .. cpp:function:: virtual SemanticTextResult on_set_semantic_text_selection(SemanticTextSelection selection)
+
+      Moves the selection of the published text to ``selection`` without moving focus, as the user's own selection would (selection_changed is raised; the text is unchanged). Refuses an offset off a grapheme boundary with off_boundary and changes nothing then. The base returns no_text.
+
    .. cpp:function:: virtual void on_drag_preview(DragEvent& event)
 
    .. cpp:function:: virtual void on_drag(DragEvent& event)

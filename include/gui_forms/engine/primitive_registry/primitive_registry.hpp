@@ -9,6 +9,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -20,6 +21,7 @@ namespace gui_forms {
 enum class ControlVisualRole : std::uint8_t;
 struct SurfaceMaterial;
 class ImageRegistry;
+class PartRaster;
 
 // The engine's primitive registry: the extension seam of stage T2 (brief
 // item 10). A primitive is one kind of effect, written in C++ under the house
@@ -184,6 +186,53 @@ enum class ParameterAssignment : std::uint8_t {
 // window's image resources for the material's image fills. `material` and
 // `images` are borrowed for the call that receives the target; a caller that
 // keeps a target clears them.
+//
+// Image faces (owner, 2026-10-22: stx_conv prepares face sizes; nothing
+// resamples inside a bake). A primitive with image fills names the sized
+// variants it needs (EnginePrimitive::image_variants); the engine prepares
+// each once, through the internal interpolation seam, keeps it in its
+// shared cache, and lends it in `variants` for the bake, which only
+// composites it. A fill whose variant is not lent draws nothing.
+
+// The most image variants one bake uses: one per fill layer
+// (SurfaceMaterial::maximum_fill_layers).
+inline constexpr std::size_t maximum_image_variants = 8U;
+
+// One sized variant of an image resource: the image resampled to `extent`
+// device pixels, for display `scale`. A nine-patch's fixed segments are
+// resampled apart from its middle: `source_slice` are their source pixels
+// (left, top, right, bottom) and `fixed` their device lengths in the
+// variant, both zero for a stretched or tiled image, which is resampled
+// whole. `layer` is the fill layer the variant serves, by index among the
+// material's fills; it is not part of what the variant is.
+struct ImageVariantRequest final {
+    std::size_t layer{};
+    ImageId image{};
+    std::uint32_t source_width{};
+    std::uint32_t source_height{};
+    DeviceExtent extent{};
+    Insets source_slice{};
+    std::array<std::uint32_t, 4> fixed{};
+    DeviceScale scale{};
+};
+
+// The variants lent for one bake, by fill layer; null where none is lent.
+struct LentImageVariants final {
+    std::array<std::shared_ptr<const PartRaster>, maximum_image_variants> layers{};
+};
+
+// The backplane (E9-B, owner 2026-10-22). A primitive that samples the
+// window's style backplane (glass) says how far past the part it reads
+// (EnginePrimitive::backplane_margin). The engine lends the backplane
+// plane alone, never the control plane, in `backplane`: an image at the
+// target's scale covering the destination grown by `backplane_margin`
+// device pixels on every side, so destination pixel (x, y) lies over its
+// pixel (x + margin, y + margin). `backplane_generation` is the backplane's
+// damage generation the image was made at; a raster drawn from it is
+// current only while the generation is. `backplane` is borrowed, as
+// `material` is, and null when the window lends none: the primitive then
+// draws without it.
+
 struct PrimitiveTarget final {
     Size logical_size{};
     DeviceScale scale{};
@@ -192,6 +241,13 @@ struct PrimitiveTarget final {
     const SurfaceMaterial* material{};
     std::optional<double> corner_radius{};
     const ImageRegistry* images{};
+    // Borrowed, as `material` is.
+    const LentImageVariants* variants{};
+    const PartRaster* backplane{};
+    std::uint32_t backplane_margin{};
+    std::uint64_t backplane_generation{};
+    // The backplane image's top-left pixel in the window's device pixels.
+    Point backplane_origin{};
 };
 
 // Slicing (E7r, owner 2026-10-22). A primitive whose raster repeats along
@@ -365,6 +421,22 @@ public:
     // `parameters` match the declarations.
     [[nodiscard]] virtual std::optional<PointerOverlay> pointer_overlay(const PrimitiveParameterBlock& parameters,
                                                                         Size part) const noexcept;
+
+    // How many device pixels past the destination, on every side, the
+    // primitive reads the backplane at display `scale` (PrimitiveTarget::
+    // backplane); none for a primitive that does not sample it, unless the
+    // primitive says otherwise. `parameters` match the declarations.
+    [[nodiscard]] virtual std::optional<std::uint32_t> backplane_margin(const PrimitiveParameterBlock& parameters,
+                                                                        DeviceScale scale) const noexcept;
+
+    // Fills the front of `requests` with the image variants a bake of this
+    // target needs, at most one per fill layer, and returns how many; the
+    // engine lends them in PrimitiveTarget::variants. None unless the
+    // primitive says otherwise. Called as accepts() is, with a target the
+    // primitive accepts; `requests` holds maximum_image_variants entries.
+    [[nodiscard]] virtual std::size_t image_variants(const PrimitiveParameterBlock& parameters,
+                                                     const PrimitiveTarget& target,
+                                                     std::span<ImageVariantRequest> requests) const noexcept;
 
     // Whether the primitive will draw this target with `parameters`, such as
     // a material whose bake would exceed its bound. A primitive that refuses

@@ -2461,6 +2461,27 @@ bool Window::perform_semantic_action(RuntimeId control_id,
     return claimed;
 }
 
+SemanticTextResult Window::semantic_text_layout(RuntimeId control_id, SemanticTextLayout& layout) {
+    require_ui_thread("semantic text layout");
+    layout.clear();
+    if (in_paint_) return SemanticTextResult::during_paint;
+    const Control::Ptr control = find_runtime_control(control_id);
+    if (!control) return SemanticTextResult::stale_identity;
+    const SemanticTextResult result = (*control).on_semantic_text_layout(layout);
+    if (result != SemanticTextResult::done) layout.clear();
+    return result;
+}
+
+SemanticTextResult Window::set_semantic_text_selection(RuntimeId control_id, SemanticTextSelection selection) {
+    require_ui_thread("semantic text selection");
+    if (in_paint_) return SemanticTextResult::during_paint;
+    const Control::Ptr control = find_runtime_control(control_id);
+    if (!control) return SemanticTextResult::stale_identity;
+    if (!semantic_scope_reaches(control)) return SemanticTextResult::outside_focus_scope;
+    const SemanticTextResult result = (*control).on_set_semantic_text_selection(selection);
+    return result;
+}
+
 Control::Ptr Window::find_runtime_control(RuntimeId control) const {
     ControlList pending{root_};
     pending.reserve(1U + popups_.size());
@@ -2585,6 +2606,8 @@ void Window::add_damage(Rect damage, PaintPlane plane) {
     metrics_.record_damage_region(
         region.rectangle_count(), region.compaction_count() - compactions,
         region.collapse_count() - collapses);
+    // Glass over the damaged backplane shows it changed (E9-B).
+    if (plane == PaintPlane::backplane) damage_backplane_readers(&damage);
 }
 
 void Window::add_damage_all_planes(Rect damage) {
@@ -2625,31 +2648,25 @@ void Window::acknowledge_paint_wake_if_damage_drained() noexcept {
 void Window::touch_paint() noexcept {
     ++content_revision_;
     if (content_revision_ == 0U) ++content_revision_;
-    if (in_paint_) {
-        dirty_after_render_ = true;
-        paint_lease_state_ = PaintLeaseState::rendering_dirty;
-    } else {
-        paint_lease_state_ = occluded_ ? PaintLeaseState::occluded_dirty
-                                       : PaintLeaseState::dirty_queued;
-    }
+    if (in_paint_) dirty_after_render_ = true;
     request_paint_wake();
 }
 
-void Window::update_paint_lease_state() noexcept {
+PaintLeaseState Window::paint_lease_state() const noexcept {
     if (in_paint_) {
-        paint_lease_state_ = dirty_after_render_
+        const PaintLeaseState rendering = dirty_after_render_
             ? PaintLeaseState::rendering_dirty
             : PaintLeaseState::rendering;
-    } else if (occluded_ && paint_pending()) {
-        paint_lease_state_ = PaintLeaseState::occluded_dirty;
-    } else if (paint_pending() || rendered_revision_ < content_revision_) {
-        paint_lease_state_ = PaintLeaseState::dirty_queued;
-    } else if (presented_revision_ < rendered_revision_) {
-        paint_lease_state_ = PaintLeaseState::ready;
-    } else {
-        paint_lease_state_ = PaintLeaseState::clean;
-        dirty_after_render_ = false;
+        return rendering;
     }
+    const bool owed = paint_pending();
+    if (owed && occluded_) return PaintLeaseState::occluded_dirty;
+    if (owed) return PaintLeaseState::dirty_queued;
+    // Nothing owed. A content revision past the rendered one changed nothing
+    // a paint can reach (a control outside the client area), so it is not
+    // queued; what remains is whether the last render has been presented.
+    if (presented_revision_ < rendered_revision_) return PaintLeaseState::ready;
+    return PaintLeaseState::clean;
 }
 
 void Window::add_subtree_damage(const Control::Ptr& control) {

@@ -11,6 +11,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/controls/panel/panel.hpp"
 #include "gui_forms/engine.hpp"
+#include "gui_forms/surface_material/presets/material_presets.hpp"
 #include "gui_forms/theme.hpp"
 #include "gui_forms/window.hpp"
 
@@ -120,6 +121,12 @@ SurfaceMaterial layered_material(bool single_edges) {
     inset.offset = Point{-1.0, 1.0};
     inset.blur_radius = 2.0;
     material.shadows.push_back(inset);
+    // A glow over the outer shadow (E9-C) slices as an outer shadow does.
+    MaterialGlow glow{};
+    glow.color = Color{255, 220, 120, 110};
+    glow.blur_radius = 2.0;
+    glow.spread = 1.0;
+    material.glows.push_back(glow);
     if (single_edges) {
         // Single edges are square-cornered.
         material.corner_radius = 0.0;
@@ -198,6 +205,13 @@ void assembly_equals_whole_bake() {
         }
     }
     require(layered.across > 0U && layered.down > 0U, "the layered material slices on both axes");
+    // The gloss preset's vertical gradient slices across only.
+    SliceCount gloss{};
+    const SurfaceMaterial glossy = gloss_material(GlossColours{}, 4.0);
+    for (const double scale : scales) {
+        for (const double width : widths) compare_assembly(glossy, Size{width, 24.0}, scale, gloss);
+    }
+    require(gloss.across > 0U && gloss.down == 0U, "the gloss slices across only");
 }
 
 // -- the fallbacks -----------------------------------------------------------------

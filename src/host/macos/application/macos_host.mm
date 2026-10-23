@@ -91,6 +91,10 @@ using gui_forms::SemanticNode;
 using gui_forms::SemanticOrientation;
 using gui_forms::SemanticRole;
 using gui_forms::SemanticState;
+using gui_forms::SemanticTextGrapheme;
+using gui_forms::SemanticTextLayout;
+using gui_forms::SemanticTextLine;
+using gui_forms::SemanticTextSelection;
 using GFRect = gui_forms::Rect;
 using GFSize = gui_forms::Size;
 using gui_forms::TextInputEvent;
@@ -854,6 +858,10 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     // then republishes the tree at once, so that a changed announcement is
     // posted when it changes rather than when a client next reads.
     BOOL _publishesLiveRegion;
+    // Whether the last published tree held a text node with text ranges: a
+    // semantic change then republishes the tree at once, so that its
+    // element posts a changed value or selection when it changes.
+    BOOL _publishesTextRanges;
     std::uint64_t _nativeCallbackFaults;
     BOOL _initialHostOccluded;
     std::uint64_t _scheduledWakeCount;
@@ -944,6 +952,14 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
                      stableId:(const std::string&)stableId
                         value:(NSString*)value;
 - (id)semanticAccessibilityElementForStableId:(NSString*)stableId;
+// The text queries of owner decision A-T1 for the control `control`
+// (Window::semantic_text_layout and Window::set_semantic_text_selection).
+// Each returns NO when the window has gone or the control refuses.
+- (BOOL)readSemanticTextLayout:(std::uint64_t)control layout:(SemanticTextLayout&)layout;
+- (BOOL)selectSemanticText:(std::uint64_t)control selection:(SemanticTextSelection)selection;
+// A point in screen coordinates (AppKit's, origin at the bottom left) in
+// the view's semantic coordinates.
+- (NSPoint)semanticPointForScreenPoint:(NSPoint)point;
 @end
 
 @implementation GUIFormsDisplayTarget
@@ -978,6 +994,9 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     // The virtual child's stable identity; empty for a control's own node.
     std::string _virtualChild;
     NSArray* _semanticChildren;
+    // A text node's layout, read again by every text attribute
+    // (readSemanticText) into this one storage.
+    SemanticTextLayout _textLayout;
 }
 - (instancetype)initWithNode:(const SemanticNode&)node
                        owner:(GUIFormsView*)owner
@@ -1006,6 +1025,207 @@ static void announce_live_region(GUIFormsView* owner, const std::string& text) {
 }
 
 // Whether `node` or a node below it is a live region.
+// -- editable text (stage A, A-T1) -------------------------------------------
+//
+// A control's own text box that publishes a text selection (TextBox,
+// MaskedTextBox, TokenBox's editor; a password box publishes none, A-T2)
+// publishes AppKit's text attributes and parameterized attributes. AppKit
+// counts text in UTF-16 code units (NSRange) and the core in UTF-8 bytes:
+// every range crosses here, and a range that falls inside a UTF-16
+// surrogate pair widens to the whole scalar. Lines are visual lines, each
+// running to the next line's start (so it holds its break); a composed
+// character is a grapheme; the text has one style run.
+
+// Whether `node` publishes text ranges.
+static bool publishes_text_ranges(const SemanticNode& node) noexcept {
+    const bool text = node.role == SemanticRole::text_box && node.text_selection.has_value() &&
+                      node.runtime_id != 0U && !gui_forms::is_virtual_semantic_runtime_id(node.runtime_id) &&
+                      !gui_forms::has_semantic_state(node.states, SemanticState::protected_content);
+    return text;
+}
+
+// Whether `node` or a node below it publishes text ranges.
+static bool contains_text_ranges(const SemanticNode& node) {
+    if (publishes_text_ranges(node)) return true;
+    for (const SemanticNode& child : node.children) {
+        if (contains_text_ranges(child)) return true;
+    }
+    return false;
+}
+
+// The bytes of the UTF-8 sequence `lead` starts; 1 for a byte that starts
+// none.
+static std::size_t utf8_sequence_bytes(unsigned char lead) noexcept {
+    if (lead >= 0xF0U) return 4U;
+    if (lead >= 0xE0U) return 3U;
+    if (lead >= 0xC0U) return 2U;
+    return 1U;
+}
+
+// The UTF-16 code units of value[0, bytes).
+static std::size_t utf16_units_before(std::string_view value, std::size_t bytes) noexcept {
+    const std::size_t end = std::min(bytes, value.size());
+    std::size_t units = 0U;
+    std::size_t index = 0U;
+    while (index < end) {
+        const std::size_t length = utf8_sequence_bytes(static_cast<unsigned char>(value[index]));
+        units += length == 4U ? 2U : 1U;
+        index += length;
+    }
+    return units;
+}
+
+// How a UTF-16 position inside a surrogate pair maps to a byte offset.
+enum class SurrogateRounding : std::uint8_t {
+    down,
+    up,
+};
+
+// The byte offset in `value` of UTF-16 unit `units`: the end of the value
+// past its last unit, and inside a surrogate pair the start (down) or the
+// end (up) of its scalar.
+static std::size_t utf8_offset_at_units(std::string_view value, std::size_t units,
+                                        SurrogateRounding rounding) noexcept {
+    std::size_t counted = 0U;
+    std::size_t index = 0U;
+    while (index < value.size() && counted < units) {
+        const std::size_t length = utf8_sequence_bytes(static_cast<unsigned char>(value[index]));
+        const std::size_t width = length == 4U ? 2U : 1U;
+        if (counted + width > units && rounding == SurrogateRounding::down) break;
+        counted += width;
+        index += length;
+    }
+    const std::size_t offset = std::min(index, value.size());
+    return offset;
+}
+
+// [start, end) of `value`, in bytes, as an NSRange in UTF-16 code units.
+static NSRange utf16_range(std::string_view value, std::size_t start, std::size_t end) noexcept {
+    const std::size_t first = utf16_units_before(value, start);
+    const std::size_t last = utf16_units_before(value, std::max(start, end));
+    const NSRange range = NSMakeRange(static_cast<NSUInteger>(first), static_cast<NSUInteger>(last - first));
+    return range;
+}
+
+// `range`, in UTF-16 code units, as bytes [start, end) of `value`. Returns
+// false, leaving both unchanged, when the range starts past the text's end
+// or its end overflows; a range that runs past the end stops there.
+static bool utf8_range(std::string_view value, NSRange range, std::size_t& start, std::size_t& end) noexcept {
+    const std::size_t units = utf16_units_before(value, value.size());
+    if (range.location > units || range.length > std::numeric_limits<NSUInteger>::max() - range.location) {
+        return false;
+    }
+    const std::size_t last = std::min(static_cast<std::size_t>(range.location + range.length), units);
+    start = utf8_offset_at_units(value, range.location, SurrogateRounding::down);
+    end = utf8_offset_at_units(value, last, SurrogateRounding::up);
+    return true;
+}
+
+// The visual line that holds byte `offset`: the last line starting at or
+// before it, so a line break belongs to the line it ends.
+static std::size_t line_of_offset(const SemanticTextLayout& layout, std::size_t offset) noexcept {
+    std::size_t found = 0U;
+    for (std::size_t index = 0U; index < layout.lines.size(); ++index) {
+        if (layout.lines[index].range.start.value() > offset) break;
+        found = index;
+    }
+    return found;
+}
+
+// The box of the caret at byte `offset`, one point wide: at the left edge
+// of the grapheme starting there, else at the right edge of the grapheme
+// ending there, else at the start of the line that holds it. None for a
+// layout without lines.
+static std::optional<GFRect> caret_box(const SemanticTextLayout& layout, std::size_t offset) noexcept {
+    if (layout.lines.empty()) return std::nullopt;
+    std::size_t line = line_of_offset(layout, offset);
+    double x = layout.lines[line].bounds.x;
+    bool placed = false;
+    for (const SemanticTextGrapheme& grapheme : layout.graphemes) {
+        if (grapheme.range.start.value() == offset) {
+            line = grapheme.line.value();
+            x = grapheme.bounds.x;
+            placed = true;
+            break;
+        }
+    }
+    if (!placed) {
+        for (const SemanticTextGrapheme& grapheme : layout.graphemes) {
+            if (grapheme.range.end.value() != offset) continue;
+            line = grapheme.line.value();
+            x = grapheme.bounds.x + grapheme.bounds.width;
+        }
+    }
+    if (line >= layout.lines.size()) return std::nullopt;
+    const GFRect line_bounds = layout.lines[line].bounds;
+    const GFRect box{x, line_bounds.y, 1.0, line_bounds.height};
+    return box;
+}
+
+// The union of the boxes of the graphemes within bytes [start, end), or the
+// caret's box for an empty range; none when no grapheme lies within.
+static std::optional<GFRect> range_box(const SemanticTextLayout& layout, std::size_t start,
+                                       std::size_t end) noexcept {
+    if (start == end) return caret_box(layout, start);
+    std::optional<GFRect> united;
+    for (const SemanticTextGrapheme& grapheme : layout.graphemes) {
+        if (grapheme.range.start.value() < start || grapheme.range.end.value() > end) continue;
+        united = united ? GFRect::united(*united, grapheme.bounds) : grapheme.bounds;
+    }
+    return united;
+}
+
+// The grapheme at the point (x, y), in the view's semantic coordinates: on
+// the line whose band holds y, or the nearest line, the grapheme whose
+// horizontal extent holds x, or the nearest one. Null when the text has
+// none. Borrows `layout`.
+static const SemanticTextGrapheme* grapheme_at_point(const SemanticTextLayout& layout, double x,
+                                                     double y) noexcept {
+    std::size_t line = 0U;
+    double nearest_line = std::numeric_limits<double>::infinity();
+    for (std::size_t index = 0U; index < layout.lines.size(); ++index) {
+        const GFRect band = layout.lines[index].bounds;
+        const double distance = std::max(0.0, std::max(band.y - y, y - (band.y + band.height)));
+        if (distance < nearest_line) {
+            nearest_line = distance;
+            line = index;
+        }
+    }
+    const SemanticTextGrapheme* found = nullptr;
+    double nearest = std::numeric_limits<double>::infinity();
+    for (const SemanticTextGrapheme& grapheme : layout.graphemes) {
+        if (grapheme.line.value() != line) continue;
+        const double left = grapheme.bounds.x;
+        const double right = grapheme.bounds.x + grapheme.bounds.width;
+        const double distance = std::max(0.0, std::max(left - x, x - right));
+        if (distance < nearest) {
+            nearest = distance;
+            found = &grapheme;
+        }
+    }
+    return found;
+}
+static const SemanticTextGrapheme* grapheme_at_point(SemanticTextLayout&&, double, double) = delete;
+
+// Whether `selector` is one of the text attributes above.
+static bool text_range_selector(SEL selector) noexcept {
+    const bool text = selector == @selector(accessibilityNumberOfCharacters) ||
+                      selector == @selector(accessibilitySelectedTextRange) ||
+                      selector == @selector(setAccessibilitySelectedTextRange:) ||
+                      selector == @selector(accessibilitySelectedText) ||
+                      selector == @selector(accessibilityVisibleCharacterRange) ||
+                      selector == @selector(accessibilityInsertionPointLineNumber) ||
+                      selector == @selector(accessibilityStringForRange:) ||
+                      selector == @selector(accessibilityAttributedStringForRange:) ||
+                      selector == @selector(accessibilityLineForIndex:) ||
+                      selector == @selector(accessibilityRangeForLine:) ||
+                      selector == @selector(accessibilityFrameForRange:) ||
+                      selector == @selector(accessibilityRangeForPosition:) ||
+                      selector == @selector(accessibilityRangeForIndex:) ||
+                      selector == @selector(accessibilityStyleRangeForIndex:);
+    return text;
+}
+
 static bool contains_live_region(const SemanticNode& node) {
     if (node.role == SemanticRole::live_region) return true;
     for (const SemanticNode& child : node.children) {
@@ -1036,15 +1256,22 @@ static bool contains_live_region(const SemanticNode& node) {
 
 // A live region whose name changed to a new, non-empty announcement posts
 // it (a new element announces nothing, as on the other hosts).
+// A text node whose value or selection changed posts it, as AppKit's text
+// views do.
 - (void)updateWithNode:(const SemanticNode&)node
                  owner:(GUIFormsView*)owner
                 parent:(id)parent {
     const bool announce = node.role == SemanticRole::live_region && !node.name.empty() &&
                           node.name != _node.name;
+    const bool text = publishes_text_ranges(node) && publishes_text_ranges(_node);
+    const bool value_changed = text && node.value != _node.value;
+    const bool selection_changed = text && node.text_selection != _node.text_selection;
     _owner = owner;
     _node = node;
     self.accessibilityParent = parent;
     if (announce) announce_live_region(owner, node.name);
+    if (value_changed) NSAccessibilityPostNotification(self, NSAccessibilityValueChangedNotification);
+    if (selection_changed) NSAccessibilityPostNotification(self, NSAccessibilitySelectedTextChangedNotification);
 }
 
 - (void)setSemanticChildren:(NSArray*)children {
@@ -1240,7 +1467,154 @@ static bool contains_live_region(const SemanticNode& node) {
     static_cast<void>([self performNodeAction:SemanticAction::set_value value:text]);
 }
 
+// Brings this element's node up to date and reads its layout into
+// _textLayout. Returns NO when the node publishes no text ranges, its
+// control has left the window or the window has gone.
+- (BOOL)readSemanticText {
+    if (_owner == nil || !publishes_text_ranges(_node)) return NO;
+    try {
+        // The view republishes its tree when the semantic generation has
+        // moved, which updates this element's node in place.
+        static_cast<void>([_owner accessibilityChildren]);
+        if (!publishes_text_ranges(_node)) return NO;
+        return [_owner readSemanticTextLayout:_control layout:_textLayout];
+    } catch (...) {
+        return NO;
+    }
+}
+// The selection's ends in bytes, low first, within the value.
+- (void)selectionBytesLow:(std::size_t&)low high:(std::size_t&)high {
+    const SemanticTextSelection selection = *_node.text_selection;
+    const std::size_t size = _node.value.size();
+    low = std::min(std::min(selection.anchor.value(), selection.caret.value()), size);
+    high = std::min(std::max(selection.anchor.value(), selection.caret.value()), size);
+}
+- (NSInteger)accessibilityNumberOfCharacters {
+    if (![self readSemanticText]) return 0;
+    const std::size_t units = utf16_units_before(_node.value, _node.value.size());
+    return static_cast<NSInteger>(units);
+}
+- (NSRange)accessibilitySelectedTextRange {
+    if (![self readSemanticText]) return NSMakeRange(0, 0);
+    std::size_t low = 0U;
+    std::size_t high = 0U;
+    [self selectionBytesLow:low high:high];
+    return utf16_range(_node.value, low, high);
+}
+// The selection becomes the range, anchored at its start with the caret at
+// its end.
+- (void)setAccessibilitySelectedTextRange:(NSRange)range {
+    if (![self readSemanticText]) return;
+    std::size_t start = 0U;
+    std::size_t end = 0U;
+    if (!utf8_range(_node.value, range, start, end)) return;
+    const SemanticTextSelection selection{.anchor = gui_forms::Utf8Offset(start),
+                                          .caret = gui_forms::Utf8Offset(end)};
+    static_cast<void>([_owner selectSemanticText:_control selection:selection]);
+}
+- (NSString*)accessibilitySelectedText {
+    if (![self readSemanticText]) return nil;
+    std::size_t low = 0U;
+    std::size_t high = 0U;
+    [self selectionBytesLow:low high:high];
+    const std::string_view selected = std::string_view(_node.value).substr(low, high - low);
+    return native_string(selected);
+}
+// From the first grapheme whose box meets the node's bounds to the last.
+- (NSRange)accessibilityVisibleCharacterRange {
+    if (![self readSemanticText]) return NSMakeRange(0, 0);
+    std::optional<std::size_t> first;
+    std::size_t last = 0U;
+    for (const SemanticTextGrapheme& grapheme : _textLayout.graphemes) {
+        const GFRect shown = GFRect::intersection(grapheme.bounds, _node.bounds);
+        if (shown.empty()) continue;
+        if (!first) first = grapheme.range.start.value();
+        last = grapheme.range.end.value();
+    }
+    if (!first) return NSMakeRange(0, 0);
+    return utf16_range(_node.value, *first, last);
+}
+- (NSInteger)accessibilityInsertionPointLineNumber {
+    if (![self readSemanticText]) return 0;
+    const std::size_t caret = (*_node.text_selection).caret.value();
+    return static_cast<NSInteger>(line_of_offset(_textLayout, caret));
+}
+- (NSString*)accessibilityStringForRange:(NSRange)range {
+    if (![self readSemanticText]) return nil;
+    std::size_t start = 0U;
+    std::size_t end = 0U;
+    if (!utf8_range(_node.value, range, start, end)) return nil;
+    const std::string_view text = std::string_view(_node.value).substr(start, end - start);
+    return native_string(text);
+}
+// The text has one style run, so the attributed string carries no
+// attributes.
+- (NSAttributedString*)accessibilityAttributedStringForRange:(NSRange)range {
+    NSString* const text = [self accessibilityStringForRange:range];
+    if (text == nil) return nil;
+    return [[NSAttributedString alloc] initWithString:text];
+}
+- (NSInteger)accessibilityLineForIndex:(NSInteger)index {
+    if (![self readSemanticText] || index < 0) return 0;
+    const std::size_t offset =
+        utf8_offset_at_units(_node.value, static_cast<std::size_t>(index), SurrogateRounding::down);
+    return static_cast<NSInteger>(line_of_offset(_textLayout, offset));
+}
+// A line runs to the next line's start, so it holds its break.
+- (NSRange)accessibilityRangeForLine:(NSInteger)line {
+    if (![self readSemanticText] || line < 0) return NSMakeRange(NSNotFound, 0);
+    const std::size_t index = static_cast<std::size_t>(line);
+    const std::vector<SemanticTextLine>& lines = _textLayout.lines;
+    if (index >= lines.size()) return NSMakeRange(NSNotFound, 0);
+    const std::size_t start = lines[index].range.start.value();
+    const std::size_t end = index + 1U < lines.size() ? lines[index + 1U].range.start.value() : _node.value.size();
+    return utf16_range(_node.value, start, end);
+}
+// The union of the range's grapheme boxes (the caret's box for an empty
+// range), cut to the node's bounds, in screen coordinates.
+- (NSRect)accessibilityFrameForRange:(NSRange)range {
+    if (![self readSemanticText]) return NSZeroRect;
+    std::size_t start = 0U;
+    std::size_t end = 0U;
+    if (!utf8_range(_node.value, range, start, end)) return NSZeroRect;
+    const std::optional<GFRect> box = range_box(_textLayout, start, end);
+    if (!box) return NSZeroRect;
+    const GFRect shown = GFRect::intersection(*box, _node.bounds);
+    if (shown.empty()) return NSZeroRect;
+    return [_owner accessibilityFrameForSemanticBounds:shown];
+}
+// The composed character at a screen point.
+- (NSRange)accessibilityRangeForPosition:(NSPoint)point {
+    if (![self readSemanticText]) return NSMakeRange(NSNotFound, 0);
+    const NSPoint local = [_owner semanticPointForScreenPoint:point];
+    const SemanticTextGrapheme* const hit = grapheme_at_point(_textLayout, local.x, local.y);
+    if (hit == nullptr) return NSMakeRange(NSNotFound, 0);
+    return utf16_range(_node.value, (*hit).range.start.value(), (*hit).range.end.value());
+}
+// The composed character holding a UTF-16 index: its grapheme, or the line
+// break there, which is one character.
+- (NSRange)accessibilityRangeForIndex:(NSInteger)index {
+    if (![self readSemanticText] || index < 0) return NSMakeRange(NSNotFound, 0);
+    const std::size_t offset =
+        utf8_offset_at_units(_node.value, static_cast<std::size_t>(index), SurrogateRounding::down);
+    if (offset >= _node.value.size()) return NSMakeRange(NSNotFound, 0);
+    for (const SemanticTextGrapheme& grapheme : _textLayout.graphemes) {
+        if (grapheme.range.start.value() <= offset && offset < grapheme.range.end.value()) {
+            return utf16_range(_node.value, grapheme.range.start.value(), grapheme.range.end.value());
+        }
+    }
+    const std::size_t next = offset + utf8_sequence_bytes(static_cast<unsigned char>(_node.value[offset]));
+    return utf16_range(_node.value, offset, next);
+}
+- (NSRange)accessibilityStyleRangeForIndex:(NSInteger)index {
+    if (![self readSemanticText] || index < 0) return NSMakeRange(NSNotFound, 0);
+    return utf16_range(_node.value, 0U, _node.value.size());
+}
+
 - (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {
+    if (text_range_selector(selector)) {
+        return publishes_text_ranges(_node) ? YES : NO;
+    }
     if (selector == @selector(setAccessibilityFocused:)) {
         return semantic_has_action(_node, SemanticAction::focus);
     }
@@ -1284,6 +1658,9 @@ static bool contains_live_region(const SemanticNode& node) {
     }
     if ([attribute isEqualToString:NSAccessibilitySelectedAttribute]) {
         return semantic_has_action(_node, SemanticAction::select);
+    }
+    if ([attribute isEqualToString:NSAccessibilitySelectedTextRangeAttribute]) {
+        return publishes_text_ranges(_node) ? YES : NO;
     }
     return [super accessibilityIsAttributeSettable:attribute];
 }
@@ -1476,6 +1853,7 @@ void post_perform_close(NSWindow* window) {
         _windowDragRegionIds = std::move(windowDragRegionIds);
         _semanticAccessibilityChildren = nil;
         _publishesLiveRegion = NO;
+        _publishesTextRanges = NO;
         _semanticAccessibilityElements = [[NSMutableDictionary alloc] init];
         _semanticAccessibilityElementsByStableId = [[NSMutableDictionary alloc] init];
         _markedText = [[NSMutableAttributedString alloc] init];
@@ -1715,6 +2093,7 @@ void post_perform_close(NSWindow* window) {
     NSMutableArray* result = [[NSMutableArray alloc]
         initWithCapacity:snapshot.roots.size()];
     bool live_region = false;
+    bool text_ranges = false;
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* next =
         [[NSMutableDictionary alloc] initWithCapacity:snapshot.node_count];
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* byStableId =
@@ -1724,8 +2103,10 @@ void post_perform_close(NSWindow* window) {
             node, self, self, 0U, _semanticAccessibilityElements, next, byStableId);
         [result addObject:element];
         if (contains_live_region(node)) live_region = true;
+        if (contains_text_ranges(node)) text_ranges = true;
     }
     _publishesLiveRegion = live_region ? YES : NO;
+    _publishesTextRanges = text_ranges ? YES : NO;
     _semanticAccessibilityElements = next;
     _semanticAccessibilityElementsByStableId = byStableId;
     _semanticAccessibilityChildren = [result copy];
@@ -1746,6 +2127,29 @@ void post_perform_close(NSWindow* window) {
     const NSRect local = NSMakeRect(bounds.x, bounds.y, bounds.width, bounds.height);
     const NSRect inWindow = [self convertRect:local toView:nil];
     return [self.window convertRectToScreen:inWindow];
+}
+
+- (BOOL)readSemanticTextLayout:(std::uint64_t)control layout:(SemanticTextLayout&)layout {
+    if (!_model) return NO;
+    const gui_forms::RuntimeId identity{control};
+    const gui_forms::SemanticTextResult result = (*_model).semantic_text_layout(identity, layout);
+    return result == gui_forms::SemanticTextResult::done ? YES : NO;
+}
+
+- (BOOL)selectSemanticText:(std::uint64_t)control selection:(SemanticTextSelection)selection {
+    if (!_model) return NO;
+    const gui_forms::RuntimeId identity{control};
+    const gui_forms::SemanticTextResult result = (*_model).set_semantic_text_selection(identity, selection);
+    if (result != gui_forms::SemanticTextResult::done) return NO;
+    [self collectDamage];
+    return YES;
+}
+
+- (NSPoint)semanticPointForScreenPoint:(NSPoint)point {
+    if (self.window == nil) return NSZeroPoint;
+    const NSRect on_screen = NSMakeRect(point.x, point.y, 0.0, 0.0);
+    const NSRect in_window = [self.window convertRectFromScreen:on_screen];
+    return [self convertPoint:in_window.origin fromView:nil];
 }
 
 // The element of the current semantic tree with this stable identity, or
@@ -1968,8 +2372,11 @@ void post_perform_close(NSWindow* window) {
             _lastSemanticGeneration = semanticGeneration;
             _semanticAccessibilityChildren = nil;
             _accessibilityCacheGeneration = 0;
-            // Republishing posts a changed live region's announcement now.
-            if (_publishesLiveRegion == YES) static_cast<void>([self accessibilityChildren]);
+            // Republishing posts a changed live region's announcement, and
+            // a text node's changed value or selection, now.
+            if (_publishesLiveRegion == YES || _publishesTextRanges == YES) {
+                static_cast<void>([self accessibilityChildren]);
+            }
             NSAccessibilityPostNotification(
                 self, NSAccessibilityLayoutChangedNotification);
         }

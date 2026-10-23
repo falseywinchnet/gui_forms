@@ -72,6 +72,10 @@ public:
         const PrimitiveParameterBlock& parameters) const noexcept override;
     [[nodiscard]] bool accepts(const PrimitiveParameterBlock& parameters,
                                const PrimitiveTarget& target) const noexcept override;
+    // One variant per image fill, of the material's box (material_image.hpp).
+    [[nodiscard]] std::size_t image_variants(const PrimitiveParameterBlock& parameters,
+                                             const PrimitiveTarget& target,
+                                             std::span<ImageVariantRequest> requests) const noexcept override;
     [[nodiscard]] PrimitiveSlicePlan slice_plan(const PrimitiveParameterBlock& parameters,
                                                 const PrimitiveTarget& target,
                                                 DeviceExtent extent) const noexcept override;
@@ -111,6 +115,15 @@ private:
 // materials past the bound.
 void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& target,
                    const PartRasterView& destination, double outset = material_outset) noexcept;
+
+// The kernel over one region of a box: `material` for a box of
+// target.logical_size at the target's scale whose top-left corner is the
+// device origin, drawn into `destination`, whose top-left pixel lies at
+// `device_origin` (device pixels, possibly fractional). The window's
+// backplane image (E9-B) bakes the window's material this way, a part's
+// region of it at a time. The same preconditions as bake_material.
+void bake_material_region(const SurfaceMaterial& material, const PrimitiveTarget& target, Point device_origin,
+                          const PartRasterView& destination) noexcept;
 
 // Φ, the standard normal integral, by a polynomial: deterministic, absolute
 // error at most 4e-4, exactly 0 and 1 from ±3.5 on.

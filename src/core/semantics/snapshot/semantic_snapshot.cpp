@@ -1,9 +1,16 @@
 #include "gui_forms/semantics.hpp"
 
+#include <algorithm>
 #include <sstream>
 
 namespace gui_forms {
 namespace {
+
+// Whether an offset lies past `end` (fill_semantic_text_boundaries).
+struct OffsetPast final {
+    Utf8Offset end;
+    bool operator()(Utf8Offset offset) const noexcept { return end < offset; }
+};
 
 void append_json_string(std::ostringstream& stream, std::string_view value) {
     stream << '"';
@@ -181,6 +188,67 @@ const char* semantic_orientation_name(SemanticOrientation orientation) noexcept 
     case SemanticOrientation::vertical: return "vertical";
     }
     return "horizontal";
+}
+
+const char* semantic_text_result_name(SemanticTextResult result) noexcept {
+    switch (result) {
+    case SemanticTextResult::done: return "done";
+    case SemanticTextResult::stale_identity: return "stale_identity";
+    case SemanticTextResult::during_paint: return "during_paint";
+    case SemanticTextResult::outside_focus_scope: return "outside_focus_scope";
+    case SemanticTextResult::no_text: return "no_text";
+    case SemanticTextResult::off_boundary: return "off_boundary";
+    }
+    return "unknown";
+}
+
+const char* semantic_text_unit_name(SemanticTextUnit unit) noexcept {
+    switch (unit) {
+    case SemanticTextUnit::character: return "character";
+    case SemanticTextUnit::word: return "word";
+    case SemanticTextUnit::line: return "line";
+    case SemanticTextUnit::paragraph: return "paragraph";
+    case SemanticTextUnit::document: return "document";
+    }
+    return "unknown";
+}
+
+void fill_semantic_text_boundaries(const SemanticTextLayout& layout, std::string_view value,
+                                   SemanticTextUnit unit, std::vector<Utf8Offset>& boundaries) {
+    boundaries.clear();
+    const Utf8Offset start{0U};
+    const Utf8Offset end{value.size()};
+    boundaries.push_back(start);
+    switch (unit) {
+    case SemanticTextUnit::character:
+        for (const SemanticTextGrapheme& grapheme : layout.graphemes) {
+            boundaries.push_back(grapheme.range.start);
+            boundaries.push_back(grapheme.range.end);
+        }
+        break;
+    case SemanticTextUnit::word:
+        boundaries.insert(boundaries.end(), layout.word_starts.begin(), layout.word_starts.end());
+        break;
+    case SemanticTextUnit::line:
+        for (const SemanticTextLine& line : layout.lines) boundaries.push_back(line.range.start);
+        break;
+    case SemanticTextUnit::paragraph:
+        for (std::size_t index = 0U; index < value.size(); ++index) {
+            if (value[index] == '\n') boundaries.push_back(Utf8Offset{index + 1U});
+        }
+        break;
+    case SemanticTextUnit::document:
+        break;
+    }
+    boundaries.push_back(end);
+    // A layout read for other text could hold offsets past this value's
+    // end; they are no boundaries of it.
+    const std::vector<Utf8Offset>::iterator past =
+        std::remove_if(boundaries.begin(), boundaries.end(), OffsetPast{end});
+    boundaries.erase(past, boundaries.end());
+    std::sort(boundaries.begin(), boundaries.end());
+    const std::vector<Utf8Offset>::iterator repeated = std::unique(boundaries.begin(), boundaries.end());
+    boundaries.erase(repeated, boundaries.end());
 }
 
 const char* semantic_state_name(SemanticState state) noexcept {
