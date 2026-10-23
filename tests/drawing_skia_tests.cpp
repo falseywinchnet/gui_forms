@@ -1,5 +1,8 @@
 #include "drawing_skia.hpp"
 #include "image/png_test_files.hpp"
+#if defined(__APPLE__)
+#include "core_text_font_bytes.hpp"
+#endif
 
 #include <array>
 #include <atomic>
@@ -9,6 +12,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <span>
 #include <string>
 #include <thread>
@@ -416,14 +420,50 @@ void text_uses_the_shared_engine() {
     if (std::getenv("GUI_DRAWING_TEXT_PRINT") == nullptr) CHECK(scene == UINT64_C(0xc63b693ed7325115));
 }
 
+// Stage F: a registered italic face draws unsheared, and an alias draws
+// one family's requests with another's faces.
+void italic_faces_and_aliases_draw_registered_faces() {
+    const std::vector<std::byte> regular = read_file(GUI_DRAWING_TEST_FONT);
+    const std::vector<std::byte> italic_face = read_file(GUI_DRAWING_TEST_ITALIC_FONT);
+    const Font font("Portsmouth Rapids", 16.0, FontStyle::regular, GraphicsUnit::pixel);
+    const Font italic("Portsmouth Rapids", 16.0, FontStyle::italic, GraphicsUnit::pixel);
+    const Font aliased("Arial", 16.0, FontStyle::regular, GraphicsUnit::pixel);
+    const Matrix shifted(1.0, 0.0, 0.0, 1.0, 20.0, 40.0);
+
+    SkiaExecutor sheared;
+    CHECK(sheared.register_typeface("Portsmouth Rapids", regular));
+    SkiaExecutor faced;
+    CHECK(faced.register_typeface("Portsmouth Rapids", regular));
+    CHECK(faced.register_typeface("Portsmouth Rapids", italic_face, 2U));
+    CHECK(draw_ink(faced, font, shifted) == draw_ink(sheared, font, shifted));
+    CHECK(draw_ink(faced, italic, shifted) != draw_ink(sheared, italic, shifted));
+
+    CHECK(!faced.alias_family("Arial", "GUI Forms Absent Family"));
+    CHECK(faced.alias_family("Arial", "Portsmouth Rapids"));
+    CHECK(draw_ink(faced, aliased, shifted) == draw_ink(faced, font, shifted));
+    const StringFormat format;
+    CHECK(faced.measure_string("Hamburgefonstiv", aliased.snapshot(), format.snapshot()).width ==
+          faced.measure_string("Hamburgefonstiv", font.snapshot(), format.snapshot()).width);
+}
+
 #if defined(__APPLE__)
-// ADR-004 phase 7: a family nobody registered is found through CoreText
-// directly, since Skia has no font backend. Helvetica ships with every macOS
-// and has a real bold face, whose advances are wider; synthesized bold keeps
-// advances.
+// ADR-004 phase 7 and stage F: the raster module asks CoreText for a family
+// the substitution table does not map, with the family name mandatory, since
+// Skia has no font backend. An absent family has no bytes rather than a
+// CoreText substitute. Helvetica ships with every macOS and has a real bold
+// face, whose advances are wider; synthesized bold keeps advances.
 void installed_families_are_located_through_core_text() {
+    constexpr std::size_t maximum_bytes = 64U * 1024U * 1024U;
+    CHECK(!gui_drawing::render::core_text_font_bytes("GUI Forms Absent Family", false, maximum_bytes));
+    const std::optional<std::vector<std::byte>> located_regular =
+        gui_drawing::render::core_text_font_bytes("Helvetica", false, maximum_bytes);
+    const std::optional<std::vector<std::byte>> located_bold =
+        gui_drawing::render::core_text_font_bytes("Helvetica", true, maximum_bytes);
+    CHECK(located_regular && located_bold);
     SkiaExecutor executor;
     CHECK(executor.register_typeface("Portsmouth Rapids", read_file(GUI_DRAWING_TEST_FONT)));
+    CHECK(executor.register_typeface("Helvetica", *located_regular, 0U));
+    CHECK(executor.register_typeface("Helvetica", *located_bold, 1U));
     const StringFormat format;
     const Font fallback("Portsmouth Rapids", 16.0, FontStyle::regular, GraphicsUnit::pixel);
     const Font missing("GUI Forms Absent Family", 16.0, FontStyle::regular, GraphicsUnit::pixel);
@@ -451,6 +491,7 @@ int main() {
     connected_line_figures_fill_as_one_contour();
     quadratic_bezier_polygon_and_pie_paths_rasterize();
     text_uses_the_shared_engine();
+    italic_faces_and_aliases_draw_registered_faces();
 #if defined(__APPLE__)
     installed_families_are_located_through_core_text();
 #endif

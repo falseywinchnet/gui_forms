@@ -26,6 +26,8 @@ int main(void) {
     gd_handle brush = {0};
     gd_handle pen = {0};
     gd_handle font = {0};
+    gd_handle substituted_font = {0};
+    gd_font_resolution font_resolution;
     gd_handle format = {0};
     gd_handle recorder = {0};
     gd_handle extended_recorder = {0};
@@ -96,6 +98,7 @@ int main(void) {
     CHECK(api.bitmap_edit_commit != NULL);
     CHECK(api.bitmap_edit_cancel != NULL);
     CHECK(api.bitmap_changes_since != NULL);
+    CHECK(api.font_resolve != NULL);
 
     CHECK(api.solid_brush_create((gd_color){UINT32_C(0xffff0000), 0},
                                  &brush) == GD_OK);
@@ -105,6 +108,27 @@ int main(void) {
           GD_ERROR_INVALID_ARGUMENT);
     CHECK(api.pen_set_dash_style(pen, GD_DASH_DASH) == GD_OK);
     CHECK(api.font_create(view_of("Lucida Grande"), 12.0, 1, 3, 1, &font) == GD_OK);
+    /* Stage F without a raster module: the table's answer, nothing loaded. */
+    memset(&font_resolution, 0, sizeof(font_resolution));
+    font_resolution.struct_size = (uint32_t)(sizeof(uint32_t) * 2U);
+    CHECK(api.font_resolve(font, &font_resolution) == GD_ERROR_INVALID_ARGUMENT);
+    font_resolution.struct_size = (uint32_t)sizeof(font_resolution);
+    CHECK(api.font_resolve(font, &font_resolution) == GD_OK);
+    CHECK(font_resolution.struct_size == sizeof(font_resolution));
+    CHECK(font_resolution.source == GD_FONT_SOURCE_UNMAPPED);
+    CHECK(font_resolution.requested_style == 1U);
+    CHECK(font_resolution.family.size == 0U && font_resolution.face_loaded == 0U);
+    CHECK(api.font_create(view_of("CALIBRI"), 12.0, 3, 3, 1, &substituted_font) == GD_OK);
+    CHECK(api.font_resolve(substituted_font, &font_resolution) == GD_OK);
+    CHECK(font_resolution.source == GD_FONT_SOURCE_SUBSTITUTION);
+    CHECK(font_resolution.mapping == GD_FONT_MAPPING_METRIC_COMPATIBLE);
+    CHECK(font_resolution.requested_style == 3U && font_resolution.face_style == 3U);
+    CHECK(font_resolution.family.size == 7U &&
+          memcmp(font_resolution.family.data, "Carlito", 7U) == 0);
+    CHECK(font_resolution.face_file.size == 22U &&
+          memcmp(font_resolution.face_file.data, "Carlito-BoldItalic.ttf", 22U) == 0);
+    CHECK(api.release(substituted_font) == GD_OK);
+    CHECK(api.font_resolve(substituted_font, &font_resolution) == GD_ERROR_STALE_HANDLE);
     CHECK(api.string_format_create(4, &format) == GD_OK);
     CHECK(api.string_format_set(format, GD_STRING_CENTER, GD_STRING_NEAR,
                                 GD_TRIM_ELLIPSIS_CHARACTER, 4) == GD_OK);

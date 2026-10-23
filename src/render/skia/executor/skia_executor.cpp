@@ -17,9 +17,6 @@
 #include "include/effects/SkColorMatrixFilter.h"
 #include "include/effects/SkDashPathEffect.h"
 #include "include/effects/SkGradient.h"
-#if defined(__APPLE__)
-#include "core_text_font_bytes.hpp"
-#endif
 
 #include "../../../core/image/png_pixels.hpp"
 #include "../../../core/image/png_writer.hpp"
@@ -40,7 +37,6 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -519,16 +515,28 @@ struct FaceRecord final {
     FaceMetrics metrics{};
 };
 
-// A family's faces, regular and bold, with a private HarfBuzz engine that
-// shapes them and a rasterizer over the same bytes (ADR-004). Declared in
-// that order so the rasterizer is destroyed before the engine it borrows.
+// A family's faces, indexed by the bold (1) and italic (2) bits of a font
+// style, with a private HarfBuzz engine that shapes them and a rasterizer
+// over the same bytes (ADR-004). Declared in that order so the rasterizer is
+// destroyed before the engine it borrows.
 struct TextFamily final {
-    std::array<std::optional<FaceRecord>, 2> faces;
-    // True when the faces came from the host catalog, not register_typeface.
-    bool located{};
+    std::array<std::optional<FaceRecord>, 4> faces;
     std::unique_ptr<text::HarfBuzzFontEngine> engine;
     std::unique_ptr<text::GlyphRunRasterizer> rasterizer;
 };
+
+constexpr std::size_t bold_slot_bit = 1U;
+constexpr std::size_t italic_slot_bit = 2U;
+
+// The faces tried for each requested slot, nearest first: the same slant
+// with the other weight before the other slant. A face of another weight or
+// slant is emboldened or sheared toward the request.
+constexpr std::array<std::array<std::size_t, 4>, 4> nearest_slots{{
+    {0U, 1U, 2U, 3U},
+    {1U, 0U, 3U, 2U},
+    {2U, 0U, 3U, 1U},
+    {3U, 1U, 2U, 0U},
+}};
 
 constexpr std::uint16_t regular_weight = 400U;
 constexpr std::uint16_t bold_weight = 700U;
@@ -615,10 +623,9 @@ public:
     FreeTypeLibrary library;
     // Keyed by ASCII-lowercased family name.
     std::unordered_map<std::string, std::unique_ptr<TextFamily>> families;
-#if defined(__APPLE__)
-    // Family and bold bit already asked of the host catalog.
-    std::unordered_set<std::string> located_requests;
-#endif
+    // Requested family to the registered family drawn for it, both
+    // ASCII-lowercased (stage F substitution).
+    std::unordered_map<std::string, std::string> aliases;
 
     // Chooses the collection face best matching family and weight, scanning
     // at most 64 faces. Nullopt when the bytes hold no usable face.
@@ -648,21 +655,21 @@ public:
         return best;
     }
 
-    // Stores a face in a family's regular or bold slot and rebuilds the
+    // Stores a face in one of a family's four slots and rebuilds the
     // family's engine from its records, so a replaced face takes effect.
-    void install(const std::string& key, const std::size_t slot, FaceRecord record, const bool located) {
+    void install(const std::string& key, const std::size_t slot, FaceRecord record) {
         std::unique_ptr<TextFamily>& entry = families[key];
         if (!entry) entry = std::make_unique<TextFamily>();
         TextFamily& family = *entry;
         family.faces[slot] = std::move(record);
-        family.located = located;
         family.rasterizer.reset();
         family.engine = std::make_unique<text::HarfBuzzFontEngine>();
         for (std::size_t index = 0; index < family.faces.size(); ++index) {
             const std::optional<FaceRecord>& face = family.faces[index];
             if (!face) continue;
-            const std::uint16_t weight = index == 1U ? bold_weight : regular_weight;
-            if (!(*family.engine).register_shared_typeface(gui_forms::FontRole::control, weight, false,
+            const std::uint16_t weight = (index & bold_slot_bit) != 0U ? bold_weight : regular_weight;
+            const bool italic = (index & italic_slot_bit) != 0U;
+            if (!(*family.engine).register_shared_typeface(gui_forms::FontRole::control, weight, italic,
                                                           (*face).bytes, (*face).index)) {
                 throw std::runtime_error("font registration failed");
             }
@@ -670,60 +677,45 @@ public:
         family.rasterizer = std::make_unique<text::GlyphRunRasterizer>(*family.engine);
     }
 
+    // The family registered under a name, following its alias if it has one.
     [[nodiscard]] TextFamily* registered(std::string_view family) {
         using FamilyMap =
             std::unordered_map<std::string, std::unique_ptr<TextFamily>>;
-        const FamilyMap::iterator found = families.find(ascii_lower(family));
+        using AliasMap = std::unordered_map<std::string, std::string>;
+        std::string key = ascii_lower(family);
+        const AliasMap::const_iterator alias = aliases.find(key);
+        if (alias != aliases.end()) key = (*alias).second;
+        const FamilyMap::iterator found = families.find(key);
         TextFamily* const result = found == families.end() ? nullptr : (*found).second.get();
         return result;
     }
 
-    // Asks the host catalog for a family nobody registered. Only macOS has
-    // one here; Windows registers GDI's bytes before drawing.
-    [[nodiscard]] TextFamily* locate(std::string_view family, const bool bold) {
-#if defined(__APPLE__)
-        const std::string key = ascii_lower(family);
-        if (family.empty() || !located_requests.insert(key + (bold ? "\x1f" "1" : "\x1f" "0")).second) {
-            return registered(family);
-        }
-        std::optional<std::vector<std::byte>> located = core_text_font_bytes(family, bold, maximum_font_bytes);
-        if (!located) return registered(family);
-        const std::shared_ptr<const std::vector<std::byte>> owner =
-            std::make_shared<const std::vector<std::byte>>(std::move(*located));
-        const FreeTypeFace face(library.get(), *owner, 0);
-        if (face.get() == nullptr || !FT_IS_SCALABLE(face.get())) return registered(family);
-        // The face CoreText chose may not be the requested weight; its own
-        // weight decides the slot.
-        const std::size_t slot = face_weight(face.get()) >= 600 ? 1U : 0U;
-        install(key, slot, FaceRecord{owner, 0U, face_metrics(face.get())}, true);
-        return registered(family);
-#else
-        static_cast<void>(bold);
-        return registered(family);
-#endif
-    }
-
-    // Registered family, then the host catalog, then Portsmouth Rapids.
-    // Bold without a bold face emboldens; italic always shears (only the
-    // bold bit selects registered faces).
+    // The registered family, else Portsmouth Rapids. The requested slot's
+    // face draws as it is; otherwise the nearest registered face is
+    // emboldened or sheared toward the request.
     [[nodiscard]] std::optional<ResolvedFont> resolve(const FontSnapshot& spec) {
-        const bool bold = (spec.style & 1U) != 0U;
+        const std::size_t requested = static_cast<std::size_t>(spec.style & 3U);
         TextFamily* family = registered(spec.family);
-        if (family == nullptr || ((*family).located && !(*family).faces[bold ? 1U : 0U])) {
-            family = locate(spec.family, bold);
-        }
         if (family == nullptr) family = registered("Portsmouth Rapids");
         std::optional<ResolvedFont> result;
         if (family == nullptr) return result;
-        std::size_t slot = bold && (*family).faces[1] ? 1U : 0U;
-        if (!(*family).faces[slot]) slot = 1U - slot;
+        std::size_t slot = requested;
+        for (const std::size_t candidate : nearest_slots[requested]) {
+            if (!(*family).faces[candidate]) continue;
+            slot = candidate;
+            break;
+        }
+        if (!(*family).faces[slot]) return result;
         const double size = pixel_font_size(spec);
         if (!std::isfinite(size) || size <= 0.0) throw std::invalid_argument("font size is invalid");
+        const bool face_bold = (slot & bold_slot_bit) != 0U;
+        const bool face_italic = (slot & italic_slot_bit) != 0U;
         ResolvedFont resolved{};
         resolved.family = family;
-        resolved.spec = gui_forms::FontSpec{gui_forms::FontRole::control, size, slot == 1U ? bold_weight : regular_weight, false};
-        resolved.synthesis.embolden = bold && slot == 0U;
-        resolved.synthesis.oblique = (spec.style & 2U) != 0U;
+        resolved.spec = gui_forms::FontSpec{gui_forms::FontRole::control, size,
+                                            face_bold ? bold_weight : regular_weight, face_italic};
+        resolved.synthesis.embolden = (requested & bold_slot_bit) != 0U && !face_bold;
+        resolved.synthesis.oblique = (requested & italic_slot_bit) != 0U && !face_italic;
         resolved.metrics = (*(*family).faces[slot]).metrics;
         result = resolved;
         return result;
@@ -809,12 +801,35 @@ bool SkiaExecutor::register_typeface(std::string_view family,
     try {
         const std::shared_ptr<const std::vector<std::byte>> bytes =
             std::make_shared<const std::vector<std::byte>>(encoded.begin(), encoded.end());
-        const bool bold = (style & 1U) != 0U;
+        const std::size_t slot = static_cast<std::size_t>(style & 3U);
+        const bool bold = (slot & bold_slot_bit) != 0U;
         // Collections (TTC/OTC) hold several faces; choose the requested
         // family and weight instead of silently using face zero.
         std::optional<FaceRecord> record = (*impl_).select_face(family, bytes, bold ? bold_weight : regular_weight);
         if (!record) return false;
-        (*impl_).install(ascii_lower(family), bold ? 1U : 0U, std::move(*record), false);
+        const std::string key = ascii_lower(family);
+        // A face registered under its own name replaces an alias of it.
+        (*impl_).aliases.erase(key);
+        (*impl_).install(key, slot, std::move(*record));
+    } catch (const std::exception&) {
+        return false;
+    }
+    return true;
+}
+
+bool SkiaExecutor::alias_family(std::string_view requested, std::string_view family) {
+    if (!owner_thread() || requested.empty() || requested.size() > 4096U || family.empty() ||
+        family.size() > 4096U) {
+        return false;
+    }
+    try {
+        const std::string target = ascii_lower(family);
+        if ((*impl_).families.find(target) == (*impl_).families.end()) return false;
+        const std::string key = ascii_lower(requested);
+        if (key == target) return true;
+        // The alias replaces faces registered under the requested name.
+        (*impl_).families.erase(key);
+        (*impl_).aliases.insert_or_assign(key, target);
     } catch (const std::exception&) {
         return false;
     }

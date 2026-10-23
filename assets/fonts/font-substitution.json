@@ -1,0 +1,167 @@
+{
+  "schema": "gui_forms.font_substitution.v1",
+  "description": "Stage F's font substitution table. A requested family resolves to a bundled family: its own name first, then a substitution, an alias or a generic name. A family named nowhere here is unmapped: host bytes are accepted only when the host's face has the requested name, otherwise the content family substitutes. Every face file lives beside this file. The build generates a fixed record array from it (cmake/FontSubstitution.cmake); C# and Web.Forms read the same file.",
+  "content_family": "Carlito",
+  "families": [
+    {
+      "family": "Portsmouth Rapids",
+      "licence": "LICENSE-PortsmouthRapids.txt",
+      "faces": [
+        {"style": "regular", "file": "PortsmouthRapids.ttf"},
+        {"style": "bold", "file": "PortsmouthRapids-Bold.ttf"},
+        {"style": "italic", "file": "PortsmouthRapids-Italic.ttf"},
+        {"style": "bold_italic", "file": "PortsmouthRapids-BoldItalic.ttf"}
+      ]
+    },
+    {
+      "family": "Portsmouth Mono",
+      "licence": "LICENSE-PortsmouthRapids.txt",
+      "faces": [
+        {"style": "regular", "file": "PortsmouthMono.ttf"}
+      ]
+    },
+    {
+      "family": "Carlito",
+      "licence": "OFL-Carlito.txt",
+      "faces": [
+        {"style": "regular", "file": "Carlito-Regular.ttf"},
+        {"style": "bold", "file": "Carlito-Bold.ttf"},
+        {"style": "italic", "file": "Carlito-Italic.ttf"},
+        {"style": "bold_italic", "file": "Carlito-BoldItalic.ttf"}
+      ]
+    },
+    {
+      "family": "Cousine",
+      "licence": "OFL-Cousine.txt",
+      "faces": [
+        {"style": "regular", "file": "Cousine-Regular.ttf"},
+        {"style": "bold", "file": "Cousine-Bold.ttf"},
+        {"style": "italic", "file": "Cousine-Italic.ttf"},
+        {"style": "bold_italic", "file": "Cousine-BoldItalic.ttf"}
+      ]
+    },
+    {
+      "family": "Arimo",
+      "licence": "OFL-Arimo.txt",
+      "faces": [
+        {"style": "regular", "file": "Arimo-Regular.ttf"},
+        {"style": "bold", "file": "Arimo-Bold.ttf"},
+        {"style": "italic", "file": "Arimo-Italic.ttf"},
+        {"style": "bold_italic", "file": "Arimo-BoldItalic.ttf"}
+      ]
+    },
+    {
+      "family": "Tinos",
+      "licence": "OFL-Tinos.txt",
+      "faces": [
+        {"style": "regular", "file": "Tinos-Regular.ttf"},
+        {"style": "bold", "file": "Tinos-Bold.ttf"},
+        {"style": "italic", "file": "Tinos-Italic.ttf"},
+        {"style": "bold_italic", "file": "Tinos-BoldItalic.ttf"}
+      ]
+    },
+    {
+      "family": "Selawik",
+      "licence": "OFL-Selawik.txt",
+      "faces": [
+        {"style": "regular", "file": "Selawik-Regular.ttf"},
+        {"style": "bold", "file": "Selawik-Bold.ttf"}
+      ]
+    },
+    {
+      "family": "Selawik Semibold",
+      "licence": "OFL-Selawik.txt",
+      "faces": [
+        {"style": "regular", "file": "Selawik-Semibold.ttf"},
+        {"style": "bold", "file": "Selawik-Bold.ttf"}
+      ]
+    }
+  ],
+  "substitutions": [
+    {
+      "requested": "Calibri",
+      "family": "Carlito",
+      "class": "metric_compatible",
+      "evidence": "results/2026-10-23-f1-metrics-harness/calibri-carlito-*.json",
+      "exceptions": [
+        {"style": "bold_italic", "note": "2 of 90 paragraph line-break sets differ (kerning); decision 17"}
+      ]
+    },
+    {
+      "requested": "Arial",
+      "family": "Arimo",
+      "class": "metric_compatible",
+      "evidence": "results/2026-10-23-f1-metrics-harness/arial-arimo-*.json",
+      "exceptions": [
+        {"style": "bold", "note": "U+00B5 advances 1229 against 1180 units; decision 17"},
+        {"style": "bold_italic", "note": "4 of 90 paragraph line-break sets differ; decision 17"}
+      ]
+    },
+    {
+      "requested": "Times New Roman",
+      "family": "Tinos",
+      "class": "metric_compatible",
+      "evidence": "results/2026-10-23-f1-metrics-harness/timesnewroman-tinos-*.json",
+      "exceptions": []
+    },
+    {
+      "requested": "Courier New",
+      "family": "Cousine",
+      "class": "metric_compatible",
+      "evidence": "results/2026-10-23-f1-metrics-harness/couriernew-cousine-*.json",
+      "exceptions": []
+    },
+    {
+      "requested": "Microsoft Sans Serif",
+      "family": "Arimo",
+      "class": "nearest",
+      "evidence": "results/2026-10-23-f1-metrics-harness/microsoftsansserif-arimo-regular.json",
+      "exceptions": []
+    },
+    {
+      "requested": "Tahoma",
+      "family": "Selawik",
+      "class": "nearest",
+      "evidence": "results/2026-10-23-f1-metrics-harness/tahoma-selawik-*.json",
+      "exceptions": [
+        {"style": "bold", "note": "mean line width -7.0% against Tahoma Bold, outside the 5% bound; decision 16"}
+      ]
+    },
+    {
+      "requested": "Segoe UI",
+      "family": "Selawik",
+      "class": "nearest",
+      "evidence": "results/2026-10-23-f1-metrics-harness/segoeui-selawik-regular.json, segoeui-selawik-bold.json",
+      "exceptions": []
+    },
+    {
+      "requested": "Segoe UI Semibold",
+      "family": "Selawik Semibold",
+      "class": "nearest",
+      "evidence": "results/2026-10-23-f1-metrics-harness/segoeui-selawik-semibold.json",
+      "exceptions": []
+    },
+    {
+      "requested": "Consolas",
+      "family": "Portsmouth Mono",
+      "class": "nearest",
+      "evidence": "results/2026-10-23-f1-metrics-harness/consolas-portsmouthmono-regular.json",
+      "exceptions": []
+    }
+  ],
+  "aliases": [
+    {"requested": "Helvetica", "same_as": "Arial"},
+    {"requested": "Times", "same_as": "Times New Roman"},
+    {"requested": "Courier", "same_as": "Courier New"},
+    {"requested": "MS Sans Serif", "same_as": "Microsoft Sans Serif"},
+    {"requested": "MS Shell Dlg", "same_as": "Microsoft Sans Serif"},
+    {"requested": "MS Shell Dlg 2", "same_as": "Tahoma"},
+    {"requested": "Segoe UI Light", "same_as": "Segoe UI"},
+    {"requested": "Segoe UI Semilight", "same_as": "Segoe UI"}
+  ],
+  "generics": [
+    {"requested": "sans-serif", "family": "Carlito"},
+    {"requested": "serif", "family": "Tinos"},
+    {"requested": "monospace", "family": "Cousine"}
+  ]
+}

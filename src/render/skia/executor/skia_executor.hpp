@@ -66,9 +66,15 @@ public:
     SkiaExecutor(const SkiaExecutor&) = delete;
     SkiaExecutor& operator=(const SkiaExecutor&) = delete;
 
+    // Registers a face in the slot named by the bold (1) and italic (2)
+    // bits of style. A request for a missing slot draws the nearest
+    // registered face, emboldened or sheared toward the request.
     [[nodiscard]] bool register_typeface(std::string_view family,
                                          std::span<const std::byte> encoded,
                                          std::uint32_t style = 0U);
+    // Draws requests for one family with another registered family's faces
+    // (stage F substitution). False when family is not registered.
+    [[nodiscard]] bool alias_family(std::string_view requested, std::string_view family);
     [[nodiscard]] RasterResult execute(const GraphicsRecorder& recorder,
                                        Bitmap& target,
                                        std::size_t first_command = 0U);

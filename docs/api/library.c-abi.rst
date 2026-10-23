@@ -34,6 +34,8 @@ Types
      - gd_color_remap maps one exact source ARGB value to a replacement for image-attribute processing.
    * - :cpp:class:`gd_error_view <gd_error_view>`
      - gd_error_view returns thread-local drawing result code and borrowed bounded diagnostic.
+   * - :cpp:class:`gd_font_resolution <gd_font_resolution>`
+     -  
    * - :cpp:class:`gd_handle <gd_handle>`
      - gd_handle encodes one-based drawing registry slot plus generation for deterministic stale-object rejection.
    * - :cpp:class:`gd_matrix <gd_matrix>`
@@ -403,6 +405,8 @@ Types
 
    .. cpp:member:: gd_result (*native_surface_publish_retained)(uintptr_t surface, uint32_t kind, gd_handle bitmap)
 
+   .. cpp:member:: gd_result (*font_resolve)(gd_handle font, gd_font_resolution* resolution)
+
 .. cpp:namespace:: 0
 
 .. cpp:struct:: gd_bitmap_damage_summary
@@ -497,6 +501,28 @@ Types
 
 .. cpp:namespace:: 0
 
+.. cpp:struct:: gd_font_resolution
+
+   ``#include <gui_forms/drawing_c_api.h>``
+
+   .. cpp:member:: uint32_t struct_size
+
+   .. cpp:member:: uint32_t source
+
+   .. cpp:member:: uint32_t mapping
+
+   .. cpp:member:: uint32_t requested_style
+
+   .. cpp:member:: uint32_t face_style
+
+   .. cpp:member:: uint32_t face_loaded
+
+   .. cpp:member:: gd_string_view family
+
+   .. cpp:member:: gd_string_view face_file
+
+.. cpp:namespace:: 0
+
 .. cpp:struct:: gd_handle
 
    ``#include <gui_forms/drawing_c_api.h>``
@@ -558,6 +584,8 @@ Types
    .. cpp:member:: gd_result (*decode_png)(const void* data, uint64_t size, void** bitmap)
 
    .. cpp:member:: gd_result (*measure_string)(const void* font, const void* format, gd_string_view text, double layout_width, gd_size* measured)
+
+   .. cpp:member:: gd_result (*resolve_font)(const void* font, gd_font_resolution* resolution)
 
 .. cpp:namespace:: 0
 

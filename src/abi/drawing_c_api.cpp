@@ -1,7 +1,9 @@
 #include "gui_forms/drawing_c_api.h"
 
 #include "gui_forms/drawing.hpp"
+#include "gui_forms/drawing/font_substitution/font_substitution.hpp"
 #include "drawing_platform.hpp"
+#include "font_resolution_record.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1088,6 +1090,26 @@ gd_result measure_string_with_format(
         fail(result, "GUI.Drawing raster text measurement failed");
 }
 
+gd_result resolve_font_with_service(gui_drawing::Font& font,
+                                    const gd_raster_service_v0& service,
+                                    gd_font_resolution* resolution) {
+    const gd_result result = service.resolve_font(&font, resolution);
+    return result == GD_OK ? GD_OK :
+        fail(result, "GUI.Drawing raster font resolution failed");
+}
+
+// Without a raster module nothing can ask the host or load a face, so an
+// unmapped family stays unmapped.
+gd_result resolve_font_from_table(gui_drawing::Font& font,
+                                  gd_font_resolution* resolution) {
+    const gui_drawing::FontSnapshot snapshot = font.snapshot();
+    const gui_drawing::FontFamilyResolution answer =
+        gui_drawing::resolve_font_family(
+            snapshot.family, gui_drawing::font_face_style(snapshot.style));
+    gui_drawing::abi::fill_font_resolution(answer, false, *resolution);
+    return GD_OK;
+}
+
 gd_result export_bitmap_hbitmap(gui_drawing::Bitmap& bitmap,
                                 gd_color background,
                                 std::uintptr_t* output) {
@@ -1881,7 +1903,7 @@ gd_result api_raster_service_install(const gd_raster_service_v0* service) {
     if (service == nullptr || (*service).struct_size < sizeof(gd_raster_service_v0) ||
         (*service).abi_version != GD_ABI_VERSION_0_1 || (*service).execute == nullptr ||
         (*service).encode_png == nullptr || (*service).decode_png == nullptr ||
-        (*service).measure_string == nullptr) {
+        (*service).measure_string == nullptr || (*service).resolve_font == nullptr) {
         return fail(GD_ERROR_INVALID_ARGUMENT,
                     "raster service requires a complete ABI 0.1 callback table");
     }
@@ -1890,7 +1912,8 @@ gd_result api_raster_service_install(const gd_raster_service_v0* service) {
         (raster_service.execute != (*service).execute ||
          raster_service.encode_png != (*service).encode_png ||
          raster_service.decode_png != (*service).decode_png ||
-         raster_service.measure_string != (*service).measure_string)) {
+         raster_service.measure_string != (*service).measure_string ||
+         raster_service.resolve_font != (*service).resolve_font)) {
         return fail(GD_ERROR_INVALID_ARGUMENT,
                     "a different GUI.Drawing raster service is already installed");
     }
@@ -1995,6 +2018,22 @@ gd_result api_measure_string(gd_string_view text, gd_handle font,
     return registry().with_two<gui_drawing::Font, gui_drawing::StringFormat>(
         font, GD_OBJECT_FONT, format, GD_OBJECT_STRING_FORMAT,
         &measure_string_with_format, service, view, layout_width, measured);
+}
+
+gd_result api_font_resolve(gd_handle font, gd_font_resolution* resolution) {
+    if (resolution == nullptr ||
+        (*resolution).struct_size < sizeof(gd_font_resolution)) {
+        return fail(GD_ERROR_INVALID_ARGUMENT,
+                    "font resolution requires a size-prefixed output record");
+    }
+    (*resolution).struct_size = sizeof(gd_font_resolution);
+    gd_raster_service_v0 service{};
+    if (!load_raster_service(service)) {
+        return registry().with<gui_drawing::Font>(
+            font, GD_OBJECT_FONT, &resolve_font_from_table, resolution);
+    }
+    return registry().with<gui_drawing::Font>(
+        font, GD_OBJECT_FONT, &resolve_font_with_service, service, resolution);
 }
 
 gd_result api_bitmap_export_hbitmap(gd_handle handle, gd_color background,
@@ -2153,6 +2192,7 @@ const gd_api_v0 api_table{
     &api_bitmap_edit_cancel, &api_bitmap_changes_since,
     &api_native_surface_refresh,
     &api_native_surface_publish_retained,
+    &api_font_resolve,
 };
 
 } // namespace

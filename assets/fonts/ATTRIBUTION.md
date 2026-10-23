@@ -136,8 +136,9 @@ substitute for Times New Roman and CSS `serif`.
 | `Tinos-Italic.ttf` | 565016 | `5aed4f3757537bf334ca89dd6893063a3ef9ecc9` | `5942266ed398b155d7dc23e36833e7ec6be988f2439bdbeb8ef1bede808eaa91` |
 | `Tinos-BoldItalic.ttf` | 578976 | `a9abd086816f68d6eb3672f1d0babd1db1807d4a` | `a5de79f0fe863ea0954757acb3d47b3ccd0a930ce3dd5b97230cd3866790a06e` |
 
-**Selawik 1.01** is Microsoft's open fallback for Segoe UI, and a near
-substitute for Segoe UI and Tahoma Regular.
+**Selawik 1.01** is Microsoft's open fallback for Segoe UI, and the near
+substitute for Segoe UI and Tahoma (Tahoma Bold is a named exception in the
+gate).
 - Source: the `microsoft/Selawik` release 1.01 archive `Selawik_Release.zip`
   (530652 bytes, SHA-256
   `3f62c51e05e3b5a1e6241cf92a371f0be2ea1183aa87b30718bbd40832a8d423`). The
@@ -158,6 +159,7 @@ substitute for Segoe UI and Tahoma Regular.
 | `Selawik-Semibold.ttf` | `selawksb.ttf` | 44192 | `0a9e9d0549a10f24bef9b3a29e06fe6e0b5c21e7a784c503b048a307841a7783` |
 | `Selawik-Bold.ttf` | `selawkb.ttf` | 44068 | `f0db5e174a90e0956ad7d2844bdca1d5e6da92ec65b2c04e57ba9b180668c904` |
 
-None of these faces is registered or packaged yet. Stage F's substitution
-table (phase F2) registers them, and adds them to the install set and to
-`THIRD_PARTY_NOTICES.md`.
+Stage F's substitution table, `font-substitution.json` beside these files,
+names every face it maps to. GUI.Drawing's raster module ships them in its
+`fonts` directory and loads each face the first time a request resolves to
+it. The SDK installs the whole font directory.
