@@ -12,17 +12,29 @@ primitives with the same hashes, and that every idle counter is zero. It
 then writes the comparison as JSON and as the record filled from
 results/2026-10-22-t2-engine-gate/record.template.md.
 
-The exit status is 1 on any difference between hosts or any non-zero idle
-counter. It is also 1 when --require-all is given and a platform of
-PLATFORMS has no manifest, as when a native job reused an earlier
-validation and ran no test. Otherwise it is 0.
+The exit status is 1 on any difference between hosts, any non-zero idle
+counter, or any platform of PLATFORMS without a manifest (none found at
+all included): a gate that compares fewer hosts than it covers proves
+nothing about the missing ones. Otherwise it is 0.
+
+`carry` keeps a host in the comparison when its native job ran no test:
+a job that promoted (a push to main) or reused an exact-tree validation
+finds the validation run in .ci/reused.json and copies that run's manifest
+for its platform from the run's gui-forms-evidence-<platform> artifact
+into .ci/, with a comment naming the run. The tree is the same one (the
+reuse trust gate checked it), so the manifest is that tree's evidence. A
+job that ran the test has no reused.json and carries nothing.
 """
 from __future__ import annotations
 import argparse
+import io
 import json
+import os
 from pathlib import Path
 import re
+import subprocess
 import sys
+import zipfile
 
 PLATFORMS: tuple[str, ...] = ('windows-x64', 'macos-arm64', 'linux-x64', 'linux-arm64')
 MANIFEST_NAME: re.Pattern[str] = re.compile(r'engine-gate-([a-z0-9-]+)\.tsv')
@@ -235,15 +247,93 @@ def fill_record(template: str, result: dict, manifests: dict[str, Manifest], com
     return record
 
 
+class GitHubArtifacts:
+    """A run's artifacts, read through the gh command line (GH_TOKEN in the environment)."""
+
+    def __init__(self, repository: str) -> None:
+        self.repository: str = repository
+
+    def find(self, run: str, name: str) -> int | None:
+        """The id of the run's unexpired artifact with this name, or None."""
+        endpoint: str = f'repos/{self.repository}/actions/runs/{run}/artifacts?name={name}'
+        listing: dict = json.loads(subprocess.check_output(['gh', 'api', endpoint], text=True))
+        artifact: dict
+        for artifact in listing.get('artifacts', []):
+            if artifact.get('name') == name and not artifact.get('expired'):
+                return int(artifact['id'])
+        return None
+
+    def download(self, artifact: int) -> bytes:
+        endpoint: str = f'repos/{self.repository}/actions/artifacts/{artifact}/zip'
+        return subprocess.check_output(['gh', 'api', endpoint])
+
+
+def manifest_in_zip(data: bytes, platform: str) -> str | None:
+    """The text of engine-gate-<platform>.tsv at any depth in an artifact zip, or None."""
+    wanted: str = 'engine-gate-' + platform + '.tsv'
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        name: str
+        for name in archive.namelist():
+            if name.rsplit('/', 1)[-1] == wanted:
+                return archive.read(name).decode('utf-8')
+    return None
+
+
+def with_provenance(text: str, run: str, tree: str) -> str:
+    """The manifest with a comment, after its header, naming the validation run it was carried from."""
+    lines: list[str] = text.splitlines()
+    lines.insert(1, f'# carried from validation run {run} of tree {tree}')
+    return '\n'.join(lines) + '\n'
+
+
+def carry(platform: str, state: Path, artifacts: GitHubArtifacts) -> int:
+    """Copy the validation run's manifest into state when this job reused that validation.
+
+    Returns 0, also when there is nothing to carry or it cannot be found
+    (a warning says so): compare then reports the host as missing and fails.
+    """
+    reused: Path = state / 'reused.json'
+    if not reused.is_file():
+        print('engine gate: this job ran the gate test; nothing to carry')
+        return 0
+    receipt: dict = json.loads(reused.read_text(encoding='utf-8'))
+    run: str = str(receipt.get('validation_run', ''))
+    tree: str = str(receipt.get('tree', ''))
+    if not run:
+        print('::warning::engine gate: the reused receipt names no validation run; no manifest carried')
+        return 0
+    name: str = 'gui-forms-evidence-' + platform
+    artifact: int | None = artifacts.find(run, name)
+    if artifact is None:
+        print(f'::warning::engine gate: validation run {run} has no {name} artifact; no manifest carried')
+        return 0
+    text: str | None = manifest_in_zip(artifacts.download(artifact), platform)
+    if text is None:
+        print(f'::warning::engine gate: validation run {run} recorded no manifest for {platform}; none carried')
+        return 0
+    parse_manifest(text)
+    destination: Path = state / ('engine-gate-' + platform + '.tsv')
+    destination.write_text(with_provenance(text, run, tree), encoding='utf-8')
+    print(f'engine gate: carried the {platform} manifest of validation run {run}')
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('command', choices=['compare'])
-    parser.add_argument('--evidence', type=Path, required=True, help='directory holding engine-gate-*.tsv files')
-    parser.add_argument('--out', type=Path, required=True, help='directory for comparison.json and record.md')
-    parser.add_argument('--commit', default='', help='the commit the manifests were made from')
-    parser.add_argument('--run', default='', help='the CI run that made them')
-    parser.add_argument('--require-all', action='store_true', help='fail when a platform has no manifest')
+    parser.add_argument('command', choices=['compare', 'carry'])
+    parser.add_argument('--evidence', type=Path, help='compare: directory holding engine-gate-*.tsv files')
+    parser.add_argument('--out', type=Path, help='compare: directory for comparison.json and record.md')
+    parser.add_argument('--commit', default='', help='compare: the commit the manifests were made from')
+    parser.add_argument('--run', default='', help='compare: the CI run that made them')
+    parser.add_argument('--platform', default='', help='carry: the platform of this native job')
+    parser.add_argument('--state', type=Path, default=Path('.ci'), help='carry: the .ci directory of this job')
     args: argparse.Namespace = parser.parse_args(argv)
+    if args.command == 'carry':
+        if not args.platform:
+            parser.error('carry needs --platform')
+        return carry(args.platform, args.state, GitHubArtifacts(os.environ.get('GITHUB_REPOSITORY', '')))
+    if args.evidence is None or args.out is None:
+        parser.error('compare needs --evidence and --out')
     paths: dict[str, Path] = find_manifests(args.evidence)
     manifests: dict[str, Manifest] = {}
     platform: str
@@ -260,11 +350,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"engine gate: {len(manifests)} hosts, {result['images']} images, "
           f"{len(result['differences'])} differences, {len(result['busy_idle_counters'])} busy idle counters, "
           f"missing {result['missing']}")
-    failed: bool = not result['identical'] or bool(result['busy_idle_counters'])
-    if args.require_all and result['missing']:
-        failed = True
+    failed: bool = not result['identical'] or bool(result['busy_idle_counters']) or bool(result['missing'])
     if not manifests:
         print('engine gate: no manifest found; nothing compared')
+        failed = True
     return 1 if failed else 0
 
 

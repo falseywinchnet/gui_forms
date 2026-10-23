@@ -619,6 +619,16 @@ jobs:
           include-hidden-files: true
           overwrite: true
           retention-days: 30
+      # A job that promoted (a push to main) or reused an exact-tree
+      # validation ran no test, so it has no engine gate manifest of its own:
+      # it carries the validation run's manifest for the same tree, so the
+      # engine-gate job compares every host (tools/engine_gate.py carry).
+      - name: Carry the validation run's engine gate manifest
+        if: always() && (steps.promotion.outputs.reused == 'true' || steps.reuse.outputs.reused == 'true')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python gui_forms/tools/engine_gate.py carry --platform "${{ matrix.platform }}" --state .ci
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -640,9 +650,9 @@ jobs:
   # release, built after the native jobs from their objects. One failed native
   # platform skips the programs of all four, as a release needs all four.
   # T2's gate evidence (E11): every native job's engine gate manifest, compared
-  # across hosts. Fails on any reference-image hash that differs between hosts
-  # or any idle counter above zero; a host whose native job reused an earlier
-  # validation ran no test and is listed as missing. The filled record is the
+  # across hosts. Fails on any reference-image hash that differs between hosts,
+  # any idle counter above zero, or any host without a manifest (a job that
+  # reused a validation carries that run's manifest). The filled record is the
   # t2-engine-gate-record artifact (results/2026-10-22-t2-engine-gate/).
   engine-gate:
     needs: native
