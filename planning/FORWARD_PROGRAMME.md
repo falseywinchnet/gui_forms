@@ -79,39 +79,48 @@ H  HTML import + WYSIWYG layout designer ─ needs L, T3                │
 V  WYSIWYG theme designer ─────────────── needs T4, D core ───────────┘
 ```
 
-A, F, T1 and DP can start now; A and F run beside everything else. T1 to T4
-are the spine. FD and DP were added on 2026-10-12 to match the public
-roadmap's 0.4 release; the owner accepted their gates on 2026-10-13.
+State on 2026-10-23: A, T1 and T2 are complete (T2 sealed with its gate
+identical on four hosts, `results/2026-10-23-t2-engine-gate`), and so is Z
+below; F starts now. T1 to T4 are the spine; T3, T5, L and C are unblocked.
+FD and DP were added on 2026-10-12 to match the public roadmap's 0.4 release;
+the owner accepted their gates on 2026-10-13.
+
+Owner decisions, 2026-10-23:
+
+- 0.2 Verified stays A, F and T1, and is declared when F's gate is recorded.
+  The codec work (Z, and the CNG and CONV work after it) appears in 0.2 as
+  done: owned compression and image codecs on every host (one zlib, owned
+  PNG, CNG native resources, CONV interpolation), GPL-free.
+- In 0.3 Themeable, the engine (T2) is marked done.
+- Reflection and full-fidelity glass move to T5.
+- Release distribution near 1.0 (rolling releases, pinnable caches, likely
+  hosted off GitHub) is a future note, not a stage.
 
 Each stage has a working brief in `planning/stages/<stage>/README.md` with
 the owner's reasons, the current code, the agreed approach, house-style
 points and open decisions. Read `planning/stages/README.md` first.
 
-Added by owner request, 2026-10-19: **Z, the owned zlib replacement**,
-starts with a document-only study and threat model. Its
-[brief](stages/Z-zlib/README.md) records the source audit, proposed phases and
-accepted decisions; phase 1 evidence is in `results/2026-10-19-zlib`. The owner
-has decided to remove WIC PNG decoding and use one owned zlib on every host.
-The owner accepted all six recommended decisions, including naming/location,
-initially pinned libpng and disabled FreeType compression. A subsequent owner
-direction authorizes source reuse and house-style rewrites of both deflate and
-PNG, revising the PNG choice to an owned codec. Phase 2 inflate is implemented
-for review; its verification gate remains open. The owner explicitly started
-the [owned PNG phase](stages/Z-zlib/PNG_CODEC.md) alongside it on 2026-10-19;
-its private sample decoder does not yet replace a production path. The requested
-[precursor alternatives audit](stages/Z-zlib/ALTERNATIVES_LIGHT_AUDIT.md) is recorded;
-the source choice is recorded in the phase-2 provenance. Each phase gets its
-own PR and gate; no production decoder has switched. This addition does not change other stage gates.
+Added by owner request, 2026-10-19, and complete: **Z, the owned zlib
+replacement**. Its [brief](stages/Z-zlib/README.md) records the source audit,
+phases and decisions. `stx_zlib` and `stx_png` are in production on every
+host: WIC PNG decoding is removed, Skia's libpng and zlib are gone, and
+FreeType is built without zlib (general-availability record
+[GA_RECORD.md](stages/Z-zlib/GA_RECORD.md), #240). After it came `stx_conv`
+(CONV interpolation, the face-variant generator) and `stx_cng` (CNG, the
+native resource format, with PNG kept for interchange; #270, #276). The owner
+placed this work in 0.2 as done (2026-10-23). It does not change other stage
+gates.
 
 ## 3. Foundations
 
 ### A. Accessibility verified on every host
 
-Today (2026-10-22): macOS (NSAccessibility), Windows (MSAA and UI
+Complete (2026-10-23): macOS (NSAccessibility), Windows (MSAA and UI
 Automation) and Linux (ATK/AT-SPI) publish the semantic tree and editable
-text ranges; a client test on each host reads the Gallery through its own
-API (results under `results/2026-10-*-a-*`); every native host advertises
-`HostCapability::accessibility`.
+text ranges (#263, #271, #273); a client test on each host reads the Gallery
+through its own API (results under `results/2026-10-*-a-*`); every native
+host advertises `HostCapability::accessibility` (#277); the macOS AX client
+waits for a settled window before it reads (#249, #266, #275).
 
 Work: register tests that query each host's own accessibility API (AX on
 macOS, MSAA and UI Automation on Windows, AT-SPI on Linux) for every stock
@@ -125,6 +134,8 @@ actions the semantic tree reports, and performs each control's default action
 through that API.
 
 ### F. Font substitution
+
+Status (2026-10-23): not started; starting now. Its gate declares 0.2.
 
 Applications, Windows Forms programs and web pages request families GUI.Forms
 does not bundle (Segoe UI, Tahoma, Microsoft Sans Serif, Arial, Helvetica,

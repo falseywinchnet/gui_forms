@@ -35,12 +35,13 @@ STAGES = [
         "Installed SDK, cached builds",
     ]),
     ("0.2", "Verified", "stage", [
-        "Accessibility verified on every host",
+        "Accessibility verified on every host (done)",
         "Font substitution",
-        "Articulated controls: named parts, one schema",
+        "Articulated controls: named parts, one schema (done)",
+        "Owned compression and image codecs (done)",
     ]),
     ("0.3", "Themeable", "stage", [
-        "Theme engine",
+        "Theme engine (done)",
         "CSS-syntax themes",
         "Default theme, light and dark",
         "Windows-familiar themes",
