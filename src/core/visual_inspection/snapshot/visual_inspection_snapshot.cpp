@@ -110,6 +110,19 @@ const char* fill_kind_name(MaterialFillKind kind) noexcept {
     case MaterialFillKind::radial_gradient: return "radial_gradient";
     case MaterialFillKind::image: return "image";
     case MaterialFillKind::conic_gradient: return "conic_gradient";
+    case MaterialFillKind::procedural: return "procedural";
+    }
+    return "unknown";
+}
+
+const char* procedural_pattern_name(ProceduralPattern pattern) noexcept {
+    switch (pattern) {
+    case ProceduralPattern::felt: return "felt";
+    case ProceduralPattern::wood_grain: return "wood_grain";
+    case ProceduralPattern::paper_fibre: return "paper_fibre";
+    case ProceduralPattern::pinstripe: return "pinstripe";
+    case ProceduralPattern::brushed_metal: return "brushed_metal";
+    case ProceduralPattern::fresco: return "fresco";
     }
     return "unknown";
 }
@@ -241,6 +254,23 @@ void append_material(std::ostringstream& output,
         output << ",\"image_scale\":" << fill.image_scale
                << ",\"opacity\":" << fill.opacity << ",\"image_mode\":";
         append_json_string(output, image_mode_name(fill.image_mode));
+        // A procedural fill's parameters (E10), only for one, so that other
+        // fills' snapshots are unchanged.
+        if (fill.kind == MaterialFillKind::procedural) {
+            const ProceduralFill& pattern = fill.procedural;
+            output << ",\"procedural\":{\"pattern\":";
+            append_json_string(output, procedural_pattern_name(pattern.pattern));
+            output << ",\"seed\":" << pattern.seed << ",\"tile\":" << pattern.tile
+                   << ",\"strength\":" << pattern.strength << ",\"ground\":";
+            append_color(output, pattern.ground);
+            output << ",\"figure\":";
+            append_color(output, pattern.figure);
+            output << ",\"accent\":";
+            append_color(output, pattern.accent);
+            output << ",\"bloom\":";
+            append_color(output, pattern.bloom);
+            output << '}';
+        }
         output << '}';
     }
     output << "],\"shadows\":[";
