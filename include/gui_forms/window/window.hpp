@@ -961,7 +961,10 @@ private:
     void request_paint_wake() noexcept;
     void acknowledge_paint_wake_if_damage_drained() noexcept;
     void touch_paint() noexcept;
-    void update_paint_lease_state() noexcept;
+    // The paint lease's state, derived from the facts each time (in paint,
+    // a change during render, occlusion, what is owed, the revisions), so
+    // it can never report a queued paint with nothing to paint.
+    [[nodiscard]] PaintLeaseState paint_lease_state() const noexcept;
     // A semantic action that arrived during paint. `owner` is zero for one
     // named by stable identity alone; otherwise it is the publishing
     // control's runtime identity and `stable_id` the virtual child (empty for
@@ -1163,12 +1166,14 @@ private:
         bool explicit_request);
     [[nodiscard]] Rect plane_paint_bounds(std::size_t index, Rect rectangle,
                                           bool explicit_request) const;
-    [[nodiscard]] bool has_popup_paint_dirty() const noexcept;
     [[nodiscard]] bool has_plane_damage() const noexcept;
-    // Whether a paint is owed: a change during the last render, a control
-    // or popup whose paint is dirty, or damage on any plane. Derived each
-    // time, so taking damage (any overload) or painting cannot leave a stale
-    // flag behind that keeps the window asking for frames.
+    // Whether a paint is owed: a change during the last render, or damage on
+    // any plane. Damage is clipped to the client area and recorded for every
+    // visible change, so it is what a paint can discharge. A control's own
+    // paint-dirty mark is not owed: it only rebuilds the control's chunk when
+    // a paint next reaches it, and a control outside the client area or a
+    // viewport is never reached. Derived each time, so no overload of
+    // take_damage, paint or a dirty mark can leave it stale.
     [[nodiscard]] bool paint_pending() const noexcept;
     void collect_visible_overlay_rectangles(
         const Control::Ptr& control, std::vector<Rect>& rectangles) const;
@@ -1211,7 +1216,6 @@ private:
     bool hit_test_dirty_{true};
     bool in_layout_{};
     bool in_paint_{};
-    PaintLeaseState paint_lease_state_{PaintLeaseState::dirty_queued};
     std::uint64_t content_revision_{1U};
     std::uint64_t rendered_revision_{};
     std::uint64_t presented_revision_{};
