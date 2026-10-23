@@ -106,6 +106,8 @@ Types
      - MaterialBorder pairs an authored color and logical stroke width.
    * - :cpp:class:`MaterialBorderEdges <gui_forms::MaterialBorderEdges>`
      -  
+   * - :cpp:class:`MaterialCornerRadii <gui_forms::MaterialCornerRadii>`
+     - A material's four corner radii (E9.6, CSS ``border-*-radius``), in logical units: top-left, top-right, bottom-right and bottom-left.
    * - :cpp:class:`MaterialFillLayer <gui_forms::MaterialFillLayer>`
      - MaterialFillLayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity.
    * - :cpp:class:`MaterialGlow <gui_forms::MaterialGlow>`
@@ -132,6 +134,8 @@ Types
      - A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that group layer may be needed for"): commands drawn as one image, then composited once.
    * - :cpp:class:`ParameterValidation <gui_forms::ParameterValidation>`
      - The first defect found and the index of the parameter it concerns.
+   * - :cpp:class:`PartCornerRadii <gui_forms::PartCornerRadii>`
+     - The four corners' radii of a shape drawn in a box, in the box's units: top-left, top-right, bottom-right and bottom-left.
    * - :cpp:class:`PartHitRegion <gui_forms::PartHitRegion>`
      - A part's hit region (T1's hand-off): its shape in its bounds, never less than the minimum target.
    * - :cpp:class:`PartKey <gui_forms::PartKey>`
@@ -1401,6 +1405,10 @@ Types
 
       Default: ``{1.0}``.
 
+   .. cpp:member:: MaterialBorderStyle style
+
+      Default: ``{MaterialBorderStyle::solid}``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: MaterialBorderEdges final
@@ -1424,6 +1432,22 @@ Types
    .. cpp:member:: std::optional<MaterialBorder> bottom
 
    .. cpp:member:: std::optional<MaterialBorder> left
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaterialCornerRadii final
+
+   ``#include <gui_forms/surface_material/types/surface_material_types.hpp>``
+
+   A material's four corner radii (E9.6, CSS ``border-*-radius``), in logical units: top-left, top-right, bottom-right and bottom-left. Each is drawn at most half the box's shorter side.
+
+   .. cpp:member:: double top_left
+
+   .. cpp:member:: double top_right
+
+   .. cpp:member:: double bottom_right
+
+   .. cpp:member:: double bottom_left
 
 .. cpp:namespace:: gui_forms
 
@@ -1467,6 +1491,12 @@ Types
    .. cpp:function:: static MaterialFillLayer radial(Point center, Size radii, const GradientStop* stops, std::size_t stop_count, MaterialCoordinateSpace space = MaterialCoordinateSpace::normalized)
 
       Creates a radial gradient with owned stops and explicit center/radii space.
+
+   .. cpp:function:: static MaterialFillLayer repeating_radial(Point center, Size radii, std::vector<GradientStop> stops, MaterialCoordinateSpace space = MaterialCoordinateSpace::normalized)
+
+   .. cpp:function:: static MaterialFillLayer conic(Point center, double from_degrees, std::vector<GradientStop> stops, MaterialCoordinateSpace space = MaterialCoordinateSpace::normalized)
+
+   .. cpp:function:: static MaterialFillLayer repeating_conic(Point center, double from_degrees, double period_degrees, std::vector<GradientStop> stops, MaterialCoordinateSpace space = MaterialCoordinateSpace::normalized)
 
    .. cpp:function:: static MaterialFillLayer stretched_image(ImageId image, Size pixel_size, double opacity = 1.0)
 
@@ -1539,6 +1569,10 @@ Types
    .. cpp:member:: MaterialImageMode image_mode
 
       Default: ``{MaterialImageMode::stretch}``.
+
+   .. cpp:member:: double period_degrees
+
+      Default: ``{360.0}``.
 
    .. cpp:member:: ProceduralFill procedural
 
@@ -1961,6 +1995,22 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PartCornerRadii final
+
+   ``#include <gui_forms/engine/part_shape/part_shape.hpp>``
+
+   The four corners' radii of a shape drawn in a box, in the box's units: top-left, top-right, bottom-right and bottom-left.
+
+   .. cpp:member:: double top_left
+
+   .. cpp:member:: double top_right
+
+   .. cpp:member:: double bottom_right
+
+   .. cpp:member:: double bottom_left
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PartHitRegion final
 
    ``#include <gui_forms/engine/part_shape/part_shape.hpp>``
@@ -2200,6 +2250,12 @@ Types
    .. cpp:member:: double corner_radius
 
       The corner radius of a rounded rectangle, in logical units.
+
+   .. cpp:member:: bool per_corner
+
+      A rounded rectangle whose corners differ (E9.6): when ``per_corner`` is set, ``corners`` replaces ``corner_radius``, each clamped to half the shorter side. Other kinds ignore both.
+
+   .. cpp:member:: PartCornerRadii corners
 
 .. cpp:namespace:: gui_forms
 
@@ -2850,6 +2906,10 @@ Types
    .. cpp:member:: std::vector<MaterialKeyline> keylines
 
    .. cpp:member:: double corner_radius
+
+   .. cpp:member:: std::optional<MaterialCornerRadii> corner_radii
+
+      Corners that differ (E9.6): when present they replace corner_radius in the engine's material primitive. The built-in path, paint_surface_material, rounds every corner by corner_radius, so a theme sets that to the radius the fallback should draw.
 
 .. cpp:namespace:: gui_forms
 
@@ -3505,6 +3565,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: MaterialBorderStyle
+
+   ``#include <gui_forms/surface_material/types/surface_material_types.hpp>``
+
+   .. cpp:enumerator:: solid
+
+   .. cpp:enumerator:: dashed
+
+   .. cpp:enumerator:: dotted
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: MaterialCoordinateSpace
 
    ``#include <gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp>``
@@ -3540,6 +3612,8 @@ Enumerations
    .. cpp:enumerator:: radial_gradient
 
    .. cpp:enumerator:: image
+
+   .. cpp:enumerator:: conic_gradient
 
    .. cpp:enumerator:: procedural
 
@@ -4120,6 +4194,10 @@ Functions, constants and aliases
 
 .. cpp:function:: EngineSineCosine engine_sine_cosine(double x) noexcept
 
+.. cpp:function:: double engine_arctangent2(double y, double x) noexcept
+
+   The angle of the point (x, y) from the positive x axis, in radians in [−π, π], as std::atan2(y, x) (E9.6's conic gradient). Exact cases: (0, 0) gives 0, and a point on an axis gives 0, ±π/2 or π. NaN in either argument gives NaN. The ratio of the smaller to the larger magnitude is reduced twice (by π/4 and by the half-angle formula) to at most 0.2, where a 13-term series converges past 2^-60.
+
 .. cpp:namespace:: gui_forms
 
 ``#include <gui_forms/engine/motion_clock/motion_clock.hpp>``
@@ -4171,6 +4249,10 @@ Functions, constants and aliases
 .. cpp:namespace:: gui_forms
 
 ``#include <gui_forms/engine/part_shape/part_shape.hpp>``
+
+.. cpp:function:: PartCornerRadii part_corner_radii(PartShape shape, Rect box) noexcept
+
+   The radii of ``shape``'s corners drawn in ``box``, clamped to half its shorter side. A circle reports half the shorter side at every corner, though it is the inscribed circle, not a rounded box.
 
 .. cpp:function:: double shape_signed_distance(PartShape shape, Rect box, Point point) noexcept
 

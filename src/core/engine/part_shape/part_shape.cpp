@@ -13,40 +13,40 @@
 #endif
 
 namespace gui_forms {
-namespace {
 
-// The four corners' radii: top-left, top-right, bottom-right, bottom-left.
-struct CornerRadii final {
-    double top_left{};
-    double top_right{};
-    double bottom_right{};
-    double bottom_left{};
-};
-
-CornerRadii corner_radii(PartShape shape, Rect box) noexcept {
+PartCornerRadii part_corner_radii(PartShape shape, Rect box) noexcept {
     const double half = std::min(box.width, box.height) * 0.5;
     const bool across = box.width >= box.height;
     // Square corners: the count sentinel's and the fallback's radii.
-    const CornerRadii square{};
+    const PartCornerRadii square{};
     switch (shape.kind) {
     case PartShapeKind::rounded_rectangle: {
+        if (shape.per_corner) {
+            const PartCornerRadii each{std::clamp(shape.corners.top_left, 0.0, half),
+                                       std::clamp(shape.corners.top_right, 0.0, half),
+                                       std::clamp(shape.corners.bottom_right, 0.0, half),
+                                       std::clamp(shape.corners.bottom_left, 0.0, half)};
+            return each;
+        }
         const double radius = std::clamp(shape.corner_radius, 0.0, half);
-        const CornerRadii rounded{radius, radius, radius, radius};
+        const PartCornerRadii rounded{radius, radius, radius, radius};
         return rounded;
     }
     case PartShapeKind::pill:
     case PartShapeKind::circle: {
-        const CornerRadii round_ends{half, half, half, half};
+        const PartCornerRadii round_ends{half, half, half, half};
         return round_ends;
     }
     case PartShapeKind::cap_start: {
         // The start is the left of a box lying across, the top of one
         // standing upright.
-        const CornerRadii start = across ? CornerRadii{half, 0.0, 0.0, half} : CornerRadii{half, half, 0.0, 0.0};
+        const PartCornerRadii start =
+            across ? PartCornerRadii{half, 0.0, 0.0, half} : PartCornerRadii{half, half, 0.0, 0.0};
         return start;
     }
     case PartShapeKind::cap_end: {
-        const CornerRadii end = across ? CornerRadii{0.0, half, half, 0.0} : CornerRadii{0.0, 0.0, half, half};
+        const PartCornerRadii end =
+            across ? PartCornerRadii{0.0, half, half, 0.0} : PartCornerRadii{0.0, 0.0, half, half};
         return end;
     }
     case PartShapeKind::count:
@@ -56,8 +56,6 @@ CornerRadii corner_radii(PartShape shape, Rect box) noexcept {
     // A kind outside the enumeration has square corners.
     return square;
 }
-
-} // namespace
 
 double shape_signed_distance(PartShape shape, Rect box, Point point) noexcept {
     const double centre_x = box.x + box.width * 0.5;
@@ -70,7 +68,7 @@ double shape_signed_distance(PartShape shape, Rect box, Point point) noexcept {
         return distance;
     }
     // The radius of the corner whose quadrant holds the point.
-    const CornerRadii radii = corner_radii(shape, box);
+    const PartCornerRadii radii = part_corner_radii(shape, box);
     double radius = 0.0;
     if (dx < 0.0) {
         radius = dy < 0.0 ? radii.top_left : radii.bottom_left;

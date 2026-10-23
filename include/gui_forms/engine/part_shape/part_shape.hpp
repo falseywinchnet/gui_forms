@@ -35,15 +35,40 @@ inline constexpr std::size_t part_shape_kind_count = static_cast<std::size_t>(Pa
 inline constexpr std::array<std::string_view, part_shape_kind_count> part_shape_names{
     "rounded_rectangle", "pill", "circle", "cap_start", "cap_end"};
 
+// The four corners' radii of a shape drawn in a box, in the box's units:
+// top-left, top-right, bottom-right and bottom-left.
+struct PartCornerRadii final {
+    double top_left{};
+    double top_right{};
+    double bottom_right{};
+    double bottom_left{};
+
+    friend constexpr bool operator==(PartCornerRadii left, PartCornerRadii right) noexcept {
+        return left.top_left == right.top_left && left.top_right == right.top_right &&
+               left.bottom_right == right.bottom_right && left.bottom_left == right.bottom_left;
+    }
+};
+
 struct PartShape final {
     PartShapeKind kind{PartShapeKind::rounded_rectangle};
     // The corner radius of a rounded rectangle, in logical units.
     double corner_radius{};
+    // A rounded rectangle whose corners differ (E9.6): when `per_corner` is
+    // set, `corners` replaces `corner_radius`, each clamped to half the
+    // shorter side. Other kinds ignore both.
+    bool per_corner{};
+    PartCornerRadii corners{};
 
     friend constexpr bool operator==(PartShape left, PartShape right) noexcept {
-        return left.kind == right.kind && left.corner_radius == right.corner_radius;
+        return left.kind == right.kind && left.corner_radius == right.corner_radius &&
+               left.per_corner == right.per_corner && left.corners == right.corners;
     }
 };
+
+// The radii of `shape`'s corners drawn in `box`, clamped to half its
+// shorter side. A circle reports half the shorter side at every corner,
+// though it is the inscribed circle, not a rounded box.
+[[nodiscard]] PartCornerRadii part_corner_radii(PartShape shape, Rect box) noexcept;
 
 // The signed distance from `point` to the edge of `shape` drawn in `box`,
 // in the box's units: negative inside, positive outside.

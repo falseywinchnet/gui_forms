@@ -822,6 +822,108 @@ variant is prepared by CONV, and the bake only composites it.
   a 1024 × 1024 image on a 240-unit part has the same estimate as a 4 × 4
   one, is accepted and bakes, its variant made on first need.
 
+## E9.6, the effects follow-up (in progress)
+
+The owner admitted rows 1 to 9 and 11 to 14 of `CSS_COVERAGE.md`'s "Missing
+rows" (2026-10-22). They are built as separable PRs on main: fills and
+shape; filters and blend; finish, mask and position; motion.
+
+### E9.6 G1, fills and shape (rows 1 to 4)
+
+- **Repeating radial gradients.** A radial fill takes the `repeat` and
+  `reflect` spreads as a linear one does
+  (`MaterialFillLayer::repeating_radial`).
+- **Conic gradients.** `MaterialFillKind::conic_gradient`, with the
+  factories `conic(center, from_degrees, stops)` and
+  `repeating_conic(center, from_degrees, period_degrees, stops)`:
+  - the stops sweep clockwise from up, past the from-angle
+    (`angle_degrees`, as CSS `from`), over `period_degrees` (360, or less
+    when repeating);
+  - the angle is `engine_arctangent2`, a new deterministic `atan2` in
+    `engine_math` (+, −, ×, ÷ and a 13-term series; within 4 × 10⁻¹⁵ of
+    the C library, and the same bits on every host);
+  - a period outside (0, 360] is invalid.
+- **Per-corner radii.** `SurfaceMaterial::corner_radii`, four
+  `MaterialCornerRadii` corners in logical units, each drawn at most half
+  the shorter side. Every layer follows them: the box, the outer and inset
+  shadows and the glows (each corner grown by the spread), and the
+  border's inner edge. A part's own radius still overrides them. Single
+  edges stay square-cornered: `corner_radii` with `border_edges` is
+  invalid, as a non-zero `corner_radius` is.
+- **The `shape` parameter.** The material primitive's second parameter,
+  one of `part_shape_names` (default `rounded_rectangle`, which takes the
+  material's radii). A pill, a circle or a capped end replaces the
+  material's radii, and the part's hit region follows the shape
+  (`EnginePrimitive::shape`). `PartShape` gains `per_corner` and `corners`,
+  and `part_corner_radii` is public.
+- **Dashed and dotted borders.** `MaterialBorder::style`, a
+  `MaterialBorderStyle`:
+  - a dash is three widths with a gap of two; a dot is one width across,
+    one every two widths;
+  - each runs along the border's centre line, clockwise from the end of
+    the top-left corner, with its period stretched so that a whole number
+    go round;
+  - each is anti-aliased: a dash by the pixel's span along the line, a dot
+    by its distance from the dot's centre, both within the solid ring.
+  A dashed or dotted border varies all the way round, so it is never
+  sliced (E7r).
+- **The built-in path.** `paint_surface_material` has no conic gradient,
+  no radial spread, no per-corner radii and no dashes. It draws a conic
+  gradient as its first stop, a repeating radial gradient padded, the
+  material's `corner_radius`, and every border solid. A theme that needs
+  them selects the `material` primitive for the part.
+- **Slicing reach clamps the radius.** A corner is drawn at most half the
+  box's shorter side, so the slice reach takes the largest corner radius
+  clamped to that half. Before, a uniform radius past it (say 32 on a part
+  32 high) reached its full length and made the reference needlessly
+  long. No pixel changes, and the slice tests prove the assembled bytes.
+  A radius-32 part 120 × 32 at scale 2 of the layered test material now
+  slices and is accepted (it was estimated at 4.35 ms and refused). The
+  shadows' corner test still uses the unclamped radius, so such a part
+  evaluates more corner pixels than a pill, and its estimate counts them.
+  A layered part 120 × 64 at scale 1.5 (a pill or a radius of 32), at
+  4.09 ms against the 4 ms bound, is the case to re-check after the
+  quiet-machine re-measure.
+- **A uniform material is unchanged.** A material without per-corner radii,
+  drawn as a rounded rectangle, keeps its exact arithmetic: every reference
+  image of `gui_forms_engine_material_tests` is unchanged.
+- **Cost.** A conic fill and a dashed or dotted border each have a cost
+  (`conic`, `border_pattern`); see "E9.6 G1 costs".
+- **Inspection.** The snapshot reports `corner_radii`, a fill's
+  `period_degrees`, `conic_gradient`, and a border's `style`.
+- **Proof.** `gui_forms_engine_fill_shape_tests`:
+  - the shape parameter's choices and hit regions;
+  - repeating and reflected radial spreads past the radii;
+  - a conic sweep's start, end, quarter turn, from-angle and repeat;
+  - per-corner radii at each corner, four equal corners as one radius, and
+    a part's own radius over them;
+  - a pill as half-height corners, a circle and the caps;
+  - dashes, gaps and dots along an edge, all within the solid ring;
+  - validation of each, and reference hashes at scale 1 and 2.
+
+  `gui_forms_engine_math_tests`: the arctangent against the C library and
+  its table hash. `gui_forms_engine_slice_tests`: per-corner radii and a
+  pill assemble from slices to the whole bake's bytes.
+
+### E9.6 G1 costs
+
+Measured with `gui_forms_engine_material_tests --measure` on the E8c
+machine, 2026-10-22, with the CPU load sampled at 100 % (other builds).
+The unchanged inset shadow measured 40.6–63.6 ns (median 56.9), as in the
+E8c runs, so the medians are used unscaled, rounded up. Both are
+**provisional** until the quiet-machine re-measure. Seven runs, in
+nanoseconds per pixel:
+
+| Cost | Min | Median | Max | Used |
+|---|---|---|---|---|
+| conic fill (2 stops) | 49.22 | 51.14 | 58.69 | 52 |
+| dashed pattern, per ring pixel on an arc | 51.11 | 53.04 | 58.95 | 54 |
+
+The pattern's workload is a border 64 wide on a box rounded to a circle,
+so every ring pixel finds its place on an arc with the arctangent: the
+dearest case. On a straight edge it costs about a tenth of that. The
+estimate charges it per destination pixel, an upper bound.
+
 ## Open decisions (ask, do not decide)
 
 The proposed numbers (light angle 135°, overshoot 8 %, blur cap 8 px,

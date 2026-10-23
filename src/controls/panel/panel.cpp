@@ -52,6 +52,7 @@ Color Panel::background() const noexcept {
         return fill.color;
     case MaterialFillKind::linear_gradient:
     case MaterialFillKind::radial_gradient:
+    case MaterialFillKind::conic_gradient:
         if (fill.stops.empty()) return fill.color;
         return fill.stops.front().color;
     case MaterialFillKind::image:
