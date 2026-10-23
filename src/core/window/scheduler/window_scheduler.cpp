@@ -206,7 +206,7 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
             (*request).deadline = now + (*request).interval;
             // Idle: no motion runs and nothing waits to be painted. One
             // keyframe per idle frame, so that none stalls a frame.
-            if (motion_clock_.armed() || paint_dirty_) continue;
+            if (motion_clock_.armed() || paint_pending()) continue;
             const bool waiting = engine_parts_.bake_idle_keyframe(&image_resources(), paint_leases_completed_);
             if (!waiting) (*request).disconnect();
             continue;
