@@ -822,6 +822,67 @@ variant is prepared by CONV, and the bake only composites it.
   a 1024 × 1024 image on a 240-unit part has the same estimate as a 4 × 4
   one, is accepted and bakes, its variant made on first need.
 
+## E9.6, the effects follow-up (in progress)
+
+The owner admitted rows 1 to 9 and 11 to 14 of `CSS_COVERAGE.md`'s "Missing
+rows" (2026-10-22). They are built as separable PRs on main: fills and
+shape; filters and blend; finish, mask and position; motion.
+
+### E9.6 G4, motion (rows 13 and 14)
+
+- **Cubic Bézier easing.** `MotionCurve::cubic_bezier(duration, x1, y1,
+  x2, y2)`, CSS's `cubic-bezier()`:
+  - each x is clamped to [0, 1], so x rises with the curve's parameter;
+    each y to [−8 %, 108 %], the overshoot bound; a coordinate that is not
+    finite takes the straight curve's;
+  - the parameter is found by 40 bisections (within 2⁻⁴⁰ on every host;
+    CSS_COVERAGE proposed Newton steps, which can leave the interval
+    where the slope is flat), and the velocity is y′/x′ there, 0 where x
+    stands still;
+  - `motion_curve_easing(curve, progress)` evaluates a curve's own
+    easing; `motion_easing` keeps the closed set's.
+- **Steps.** `MotionCurve::stepped(duration, steps, position)`, CSS's
+  `steps(n, jump-end | jump-start)`: n clamped to [1, 32], the value
+  floored to n levels, its velocity 0.
+- **Delay.** `MotionCurve::delayed(delay)`, CSS's `transition-delay`: the
+  value stands at its origin, still, then moves. Delay and duration
+  together stay within the 400 ms ceiling (the delay is clamped to the
+  room left). The delay is taken off in clock ticks, so a delayed move
+  ends exactly at its delay plus its duration.
+- **Multi-stop keyframes.** `MotionValue::animate_through(stops, target)`,
+  up to `maximum_motion_stops` (4) `MotionStop`s (an offset strictly
+  within (0, 1), increasing, and a value): a timed move passes each
+  stop's value at its offset, each piece eased by the curve. In theme
+  rules, `PresentationState::stops` play when the move into the state
+  begins: on entering it from another state, or on appearing in it from
+  `enter_from`. They need a timed curve and values within the property's
+  range; otherwise the transition is `transition_invalid`. An animated
+  parameter shows each stop at its nearest keyframe level, as any moving
+  value does (E7r), so the stops bake nothing new.
+- **Translation.** `translate_x` and `translate_y`, engine properties like
+  scale (CSS `translate`): within ±32 logical units at load, at rest 0.
+  The part is drawn moved, its raster composited at the offset, so a move
+  bakes nothing; its hit region, layout and text slot stay put. The move
+  is clamped on each side to the overflow its control grants, less what
+  its scale as shown takes there, so a part granted none never moves; a
+  part that translates records its extent grown by the grant, as one that
+  scales does. Glass samples the backplane where the part is drawn; the
+  sheen stays under the pointer.
+- **Six transitions a part.** `maximum_part_transitions` is now 6:
+  opacity, scale, face, the two translations, and a parameter, resolved
+  in that order.
+- **Unchanged bits.** A curve with no delay and a move with no stops
+  evaluate as before: the motion clock's reference hash passes.
+- **Proof.** `gui_forms_engine_motion_curve_tests`: CSS `ease` at half
+  time, the straight Bézier, ease-in-out's monotony and symmetry, the
+  clamps; steps at both positions and in motion; the delay held, then
+  ending at 144 ms on 16 ms frames; a move through a stop, retained by
+  `animate_to` the same target, and the refusals; a reference hash over
+  the new curves; the rule checks and the six-transition order; a pad
+  translated 8 across and 4 up with its hit region and layout unchanged;
+  the grant's clamps, alone and after a scale; and stops played on
+  entering hot, not on leaving.
+
 ## Open decisions (ask, do not decide)
 
 The proposed numbers (light angle 135°, overshoot 8 %, blur cap 8 px,

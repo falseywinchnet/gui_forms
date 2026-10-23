@@ -120,6 +120,8 @@ Types
      - Which record of a clock a value holds while it moves: a slot and the slot's generation when the record was made.
    * - :cpp:class:`MotionStep <gui_forms::MotionStep>`
      - One step of a value, as its listener sees it.
+   * - :cpp:class:`MotionStop <gui_forms::MotionStop>`
+     - One intermediate stop of a timed move (E9.6, multi-stop @keyframes): the value passes ``value`` at ``offset`` of the move's duration, 0 < offset < 1.
    * - :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>`
      - Where a clock reads the time a motion starts.
    * - :cpp:class:`MotionValue <gui_forms::MotionValue>`
@@ -430,6 +432,8 @@ Types
    .. cpp:member:: double target
 
    .. cpp:member:: std::optional<double> enter_from
+
+   .. cpp:member:: std::vector<MotionStop> stops
 
 .. cpp:namespace:: gui_forms
 
@@ -1611,11 +1615,19 @@ Types
 
    .. cpp:function:: static MotionCurve timed(FrameInterval duration, MotionEasing easing) noexcept
 
+   .. cpp:function:: static MotionCurve cubic_bezier(FrameInterval duration, double x1, double y1, double x2, double y2) noexcept
+
+   .. cpp:function:: static MotionCurve stepped(FrameInterval duration, std::uint32_t steps, MotionStepPosition position = MotionStepPosition::end) noexcept
+
    .. cpp:function:: static MotionCurve follow(FrameInterval time_constant = follow_time_constant) noexcept
 
    .. cpp:function:: static MotionCurve spring(FrameInterval response, double overshoot = 0.0) noexcept
 
    .. cpp:function:: static MotionCurve decay(FrameInterval time_constant) noexcept
+
+   .. cpp:function:: MotionCurve delayed(FrameInterval delay) const noexcept
+
+      This curve with ``delay`` before each move, clamped as ``delay`` is.
 
    .. cpp:member:: MotionKind kind
 
@@ -1632,6 +1644,22 @@ Types
    .. cpp:member:: double overshoot
 
       spring only: the overshoot of a move from rest, as a fraction of the distance, from 0 (critically damped) to maximum_motion_overshoot.
+
+   .. cpp:member:: std::array<double, 4> bezier
+
+      timed with cubic_bezier: x1, y1, x2, y2. Each x is clamped to [0, 1] and each y to [−maximum_motion_overshoot, 1 + maximum_motion_overshoot], so the curve overshoots by at most 8 %; a non-finite point is the linear curve's. Default: ``{0.0, 0.0, 1.0, 1.0}``.
+
+   .. cpp:member:: std::uint32_t steps
+
+      timed with steps: the levels, clamped to [1, maximum_motion_steps], and where they jump. Default: ``{1U}``.
+
+   .. cpp:member:: MotionStepPosition step_position
+
+      Default: ``{MotionStepPosition::end}``.
+
+   .. cpp:member:: FrameInterval delay
+
+      Every curve (E9.6, CSS transition-delay): how long a move holds the value still before it starts, at no velocity. Clamped to [0, the ceiling less the duration], so that a delayed move still ends within motion_duration_ceiling.
 
 .. cpp:namespace:: gui_forms
 
@@ -1666,6 +1694,18 @@ Types
    .. cpp:member:: MotionStepCause cause
 
       Default: ``{MotionStepCause::advanced}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MotionStop final
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   One intermediate stop of a timed move (E9.6, multi-stop @keyframes): the value passes ``value`` at ``offset`` of the move's duration, 0 < offset < 1. Between stops the move is eased by its curve's easing.
+
+   .. cpp:member:: double offset
+
+   .. cpp:member:: double value
 
 .. cpp:namespace:: gui_forms
 
@@ -1734,6 +1774,10 @@ Types
    .. cpp:function:: MotionStart animate_to(double target)
 
       Moves toward :cpp:func:`target <gui_forms::MotionValue::target>` from where the value stands now. A decay comes to rest at the target. If the clock's record or its frame request cannot be made, the exception propagates and the value is unchanged.
+
+   .. cpp:function:: MotionStart animate_through(std::span<const MotionStop> stops, double target)
+
+      A timed move from where the value stands now through ``stops`` to :cpp:func:`target <gui_forms::MotionValue::target>` (E9.6): each stop's offset is a fraction of the duration, strictly increasing within (0, 1). It always starts a move. Refused, the value unchanged, for a curve that is not timed, more than maximum_motion_stops stops, an offset out of order or out of range, or a value or target that is not finite. While it runs, animate_to the same target leaves it running.
 
    .. cpp:function:: MotionStart fling(double velocity)
 
@@ -2188,13 +2232,15 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One state of a part's presentational state machine (E7; design language §9.6). The machine is in the first of its states whose ``when`` states the part's published states all include (an empty ``when`` always matches), and moves its property to ``target``. A part whose states match none rests at the property's own value: its cascade value, or 1 for opacity. When the machine enters this state from another, or the part first appears in it, ``enter_from``, if set, stands the property at that value first; this is how a part fades in when it appears (the docking tiles, T2 GIVEN C2-1). Otherwise every move starts from the value shown, so a transition retargets and never restarts. The machine is presentational only: it reads the published states and writes nothing back, so it can neither create an observable state nor delay behaviour.
+   One state of a part's presentational state machine (E7; design language §9.6). The machine is in the first of its states whose ``when`` states the part's published states all include (an empty ``when`` always matches), and moves its property to ``target``. A part whose states match none rests at the property's own value: its cascade value, or 1 for opacity. When the machine enters this state from another, or the part first appears in it, ``enter_from``, if set, stands the property at that value first; this is how a part fades in when it appears (the docking tiles, T2 GIVEN C2-1). Otherwise every move starts from the value shown, so a transition retargets and never restarts. ``stops`` (E9.6, multi-stop @keyframes), at most maximum_motion_stops, make the move into this state pass each stop's value at its offset of the duration, offsets strictly increasing within (0, 1), values within the property's range; they need a timed curve. They play when the move into the state begins: on entering it from another state, or on appearing in it from ``enter_from``. A part that appears in the state without an entry value stands at its target, as before. An animated parameter shows each stop at its nearest keyframe level, as any moving value (E7r). The machine is presentational only: it reads the published states and writes nothing back, so it can neither create an observable state nor delay behaviour.
 
    .. cpp:member:: std::vector<AnatomyState> when
 
    .. cpp:member:: double target
 
    .. cpp:member:: std::optional<double> enter_from
+
+   .. cpp:member:: std::vector<MotionStop> stops
 
 .. cpp:namespace:: gui_forms
 
@@ -3478,6 +3524,10 @@ Enumerations
 
    .. cpp:enumerator:: overshoot
 
+   .. cpp:enumerator:: cubic_bezier
+
+   .. cpp:enumerator:: steps
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: MotionKind
@@ -3519,6 +3569,16 @@ Enumerations
    .. cpp:enumerator:: reduced_motion
 
    .. cpp:enumerator:: occluded
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MotionStepPosition
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   .. cpp:enumerator:: end
+
+   .. cpp:enumerator:: start
 
 .. cpp:namespace:: gui_forms
 
@@ -3683,6 +3743,10 @@ Enumerations
    .. cpp:enumerator:: scale
 
    .. cpp:enumerator:: face
+
+   .. cpp:enumerator:: translate_x
+
+   .. cpp:enumerator:: translate_y
 
 .. cpp:namespace:: gui_forms
 
@@ -3991,7 +4055,11 @@ Functions, constants and aliases
 
 .. cpp:function:: double motion_easing(MotionEasing easing, double progress) noexcept
 
-   The eased progress for ``progress`` in [0, 1] (clamped), for tests and for later engine transitions.
+   The eased progress for ``progress`` in [0, 1] (clamped), for tests and for later engine transitions. cubic_bezier and steps take their defaults here: the linear curve and one step; motion_curve_easing reads a curve's own.
+
+.. cpp:function:: double motion_curve_easing(const MotionCurve& curve, double progress) noexcept
+
+   The eased progress of a timed ``curve`` (its easing with its control points or steps) for ``progress`` in [0, 1] (clamped).
 
 .. cpp:var:: constexpr FrameInterval motion_duration_ceiling
 
@@ -4020,6 +4088,14 @@ Functions, constants and aliases
 .. cpp:var:: constexpr double maximum_motion_extent
 
    Value: ``1e6``.
+
+.. cpp:var:: constexpr std::uint32_t maximum_motion_steps
+
+   The most levels steps() takes. Value: ``32U``.
+
+.. cpp:var:: constexpr std::size_t maximum_motion_stops
+
+   The most stops one move passes. Value: ``4U``.
 
 .. cpp:type:: MotionListener = Delegate<const MotionStep&>
 
@@ -4171,13 +4247,25 @@ Functions, constants and aliases
 
    The engine's face cross-fade (E7r form a): when a primitive-drawn part's face changes between discrete states (its raster is replaced), the old face fades into the new over the transition's curve, each baked once and blended through a paint group (old at 1 - t, new at t, added). The transition names no states: it runs on every change of face. A change while a fade runs fades from the face shown last to the new one; a face of another size or scale does not fade. Like scale, no built-in rule uses it. Value: ``"face"``.
 
+.. cpp:var:: constexpr std::string_view translate_x_property
+
+   The engine's presentational translation (E9.6, CSS ``translate``): the part drawn moved by this many logical units across or down, within the overflow its control grants, its hit region, layout and text slot unchanged. The part's raster is composited at the offset, so a move bakes nothing. Like scale it is no atom and no parameter; only a transition sets it, a part without one rests at 0, and a part granted no overflow (beyond what its scale uses) never moves. A machine's values lie within ±maximum_presentational_translate; the grant clamps further. Value: ``"translate_x"``.
+
+.. cpp:var:: constexpr std::string_view translate_y_property
+
+   Value: ``"translate_y"``.
+
+.. cpp:var:: constexpr double maximum_presentational_translate
+
+   Value: ``32.0``.
+
 .. cpp:var:: constexpr std::size_t maximum_presentation_states
 
-   The most states one presentational state machine has, and the most transitions one part runs. Value: ``8``.
+   The most states one presentational state machine has, and the most transitions one part runs: opacity, scale, face and both translations, with room for a parameter. Value: ``8``.
 
 .. cpp:var:: constexpr std::size_t maximum_part_transitions
 
-   Value: ``4``.
+   Value: ``6``.
 
 .. cpp:var:: constexpr double maximum_ambient_frames_per_second
 
