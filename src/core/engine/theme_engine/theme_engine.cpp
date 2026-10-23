@@ -679,12 +679,41 @@ Rect ThemeEngine::text_slot(const Control& control, const PartPaint& part) const
 }
 
 void ThemeEngine::paint(Painter& painter, const Control& control, const PartPaint& part) const {
+    const PartPlan decided = plan(control, part);
+    const PartBlend blend = decided.resolution.blend;
+    // Forced high contrast draws no blend, whatever draws the part.
+    const bool high_contrast = blend != PartBlend::normal && part_visual_context(control, part.states).high_contrast;
+    const bool blends = blend != PartBlend::normal && !high_contrast;
+    if (!blends) {
+        paint_planned(painter, control, part, decided);
+        return;
+    }
+    // The part's extent, as its record notes it: its bounds grown by its
+    // primitive's outsets and its granted overflow.
+    Insets grown = part.granted_overflow;
+    if (decided.drawing == PartDrawing::primitive) {
+        const Insets outsets = (*decided.resolution.primitive).descriptor().outsets;
+        grown.left = grown.left + outsets.left;
+        grown.top = grown.top + outsets.top;
+        grown.right = grown.right + outsets.right;
+        grown.bottom = grown.bottom + outsets.bottom;
+    }
+    PaintGroup group{};
+    group.bounds = Rect{part.bounds.x - grown.left, part.bounds.y - grown.top,
+                        part.bounds.width + grown.left + grown.right, part.bounds.height + grown.top + grown.bottom};
+    group.composite = blend == PartBlend::multiply ? PaintGroupComposite::multiply : PaintGroupComposite::screen;
+    painter.begin_group(group);
+    paint_planned(painter, control, part, decided);
+    painter.end_group();
+}
+
+void ThemeEngine::paint_planned(Painter& painter, const Control& control, const PartPaint& part,
+                                const PartPlan& decided) const {
     Window* const window = control.attached_window();
     std::optional<PartRecordHandle> record{};
     if (part.key && part_bounds_paintable(part.bounds) && window != nullptr) {
         record = (*window).note_engine_part(control, *part.key, part.states);
     }
-    const PartPlan decided = plan(control, part);
     const CompiledThemeRules::Resolution& resolution = decided.resolution;
     const bool primitive_draws = decided.drawing == PartDrawing::primitive && window != nullptr;
     // Where the part lands, and what it reads: the inputs are delivered and

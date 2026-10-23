@@ -50,6 +50,7 @@ struct PaintCall final {
     double opacity{};
     PaintGroupComposite composite{PaintGroupComposite::source_over};
     bool isolated{};
+    Rect bounds{};
 };
 
 class CallWatch final : public Painter {
@@ -75,6 +76,7 @@ public:
         call.opacity = group.opacity;
         call.composite = group.composite;
         call.isolated = group.isolated;
+        call.bounds = group.bounds;
         calls.push_back(call);
     }
     void end_group() override {
@@ -171,7 +173,8 @@ struct Fixture final {
     CallWatch painter{};
 };
 
-std::unique_ptr<Fixture> make_fixture(bool moving = false) {
+// With `blend` (a blend_property name), the pad's rule declares it too.
+std::unique_ptr<Fixture> make_fixture(bool moving = false, std::string_view blend = {}) {
     std::unique_ptr<Fixture> fixture = std::make_unique<Fixture>();
     Fixture& made = *fixture;
     made.root = make_control<Panel>(StableId("root"));
@@ -189,6 +192,9 @@ std::unique_ptr<Fixture> make_fixture(bool moving = false) {
         definition.rules.rules.push_back(moving_rule("pad"));
     } else {
         definition.rules.rules.push_back(fading_rule("pad"));
+    }
+    if (!blend.empty()) {
+        definition.rules.rules.back().declarations.push_back(RuleDeclaration::choice_value(blend_property, blend));
     }
     window.set_theme(Theme::create(definition));
     require(window.theme().engine().rules().diagnostics().empty(), "the fading theme compiles cleanly");
@@ -376,8 +382,48 @@ void face_transition_is_checked_at_load() {
 
 } // namespace
 
+// A part with a blend (E9.6) is drawn inside a group of that composite,
+// bounded by its extent: its bounds grown by its primitive's outsets and
+// its granted overflow.
+void blend_draws_through_a_group() {
+    std::unique_ptr<Fixture> fixture = make_fixture(false, "multiply");
+    const std::vector<PaintCall>& calls = (*fixture).painter.calls;
+    require(calls.size() == 3U, "a blended face is a group around its raster");
+    require(calls[0].kind == CallKind::begin_group && calls[0].composite == PaintGroupComposite::multiply &&
+                calls[0].opacity == 1.0,
+            "the group multiplies");
+    require(calls[1].kind == CallKind::raster && calls[2].kind == CallKind::end_group, "the face is drawn inside it");
+    const Insets outsets = (*builtin_primitive_registry().find("pill_plate")).descriptor().outsets;
+    const Rect expected{20.0 - 5.0 - outsets.left, 20.0 - 3.0 - outsets.top,
+                        40.0 + 10.0 + outsets.left + outsets.right, 24.0 + 6.0 + outsets.top + outsets.bottom};
+    require(calls[0].bounds == expected, "the group covers the part's extent");
+
+    std::unique_ptr<Fixture> screened = make_fixture(false, "screen");
+    require((*screened).painter.calls.size() == 3U &&
+                (*screened).painter.calls[0].composite == PaintGroupComposite::screen,
+            "the group screens");
+    std::unique_ptr<Fixture> plain = make_fixture(false, "normal");
+    require((*plain).painter.calls.size() == 1U && (*plain).painter.calls[0].kind == CallKind::raster,
+            "a normal blend draws no group");
+
+    // Forced high contrast draws no blend.
+    std::unique_ptr<Fixture> contrasted = make_fixture(false, "multiply");
+    Window& window = *(*contrasted).window;
+    PresentationSettings settings = window.presentation_settings();
+    settings.high_contrast = true;
+    window.set_presentation_settings(settings);
+    (*contrasted).painter.calls.clear();
+    window.perform_layout();
+    window.paint((*contrasted).painter);
+    for (const PaintCall& call : (*contrasted).painter.calls) {
+        require(call.kind != CallKind::begin_group || call.composite == PaintGroupComposite::source_over,
+                "high contrast draws no blend group");
+    }
+}
+
 int main() {
     face_transition_is_checked_at_load();
+    blend_draws_through_a_group();
     face_cross_fades_between_baked_endpoints();
     no_bakes_while_transitions_run();
     std::cout << "engine retained form tests passed\n";

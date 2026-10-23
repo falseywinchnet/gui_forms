@@ -306,6 +306,50 @@ void test_plus_blend() {
     }
 }
 
+// Multiply and screen (E9.6): CSS's separable blend modes in bytes, each
+// product rounded once.
+void test_separable_blends() {
+    const std::vector<std::uint8_t> half{100U, 50U, 0U, 128U};
+    const std::uint32_t beneath = pack(TextPixelOrder::rgba, 200U, 10U, 5U, 200U);
+    PartRasterSource multiplied = source_of(half, 1U, 1U, 0, 0);
+    multiplied.blend = detail::PartCompositeBlend::multiply;
+    TestTarget product = make_target(1U, 1U, beneath, TextPixelOrder::rgba, false);
+    require(detail::composite_part_raster(multiplied, product.target, whole(1U, 1U), 255U) ==
+                detail::TextCompositeStatus::success,
+            "a multiply source composites");
+    // (s(255 − αd) + d(255 − αs) + sd + 127) / 255; alpha αs + αd − αsαd.
+    require(product.pixels[0] == pack(TextPixelOrder::rgba, 200U, 18U, 2U, 228U), "multiply in bytes");
+    PartRasterSource screened = source_of(half, 1U, 1U, 0, 0);
+    screened.blend = detail::PartCompositeBlend::screen;
+    TestTarget lifted = make_target(1U, 1U, beneath, TextPixelOrder::rgba, false);
+    static_cast<void>(detail::composite_part_raster(screened, lifted.target, whole(1U, 1U), 255U));
+    // s + d − (sd + 127) / 255.
+    require(lifted.pixels[0] == pack(TextPixelOrder::rgba, 222U, 58U, 5U, 228U), "screen in bytes");
+
+    // Multiply over opaque white, and screen over opaque black, are the
+    // source; an opaque target stays opaque.
+    const std::vector<std::uint8_t> face{90U, 140U, 200U, 255U};
+    PartRasterSource over_white = source_of(face, 1U, 1U, 0, 0);
+    over_white.blend = detail::PartCompositeBlend::multiply;
+    TestTarget white = make_target(1U, 1U, pack(TextPixelOrder::bgra, 255U, 255U, 255U, 255U), TextPixelOrder::bgra,
+                                   true);
+    static_cast<void>(detail::composite_part_raster(over_white, white.target, whole(1U, 1U), 255U));
+    require(white.pixels[0] == pack(TextPixelOrder::bgra, 90U, 140U, 200U, 255U), "multiply over white is the source");
+    PartRasterSource over_black = source_of(face, 1U, 1U, 0, 0);
+    over_black.blend = detail::PartCompositeBlend::screen;
+    TestTarget black = make_target(1U, 1U, pack(TextPixelOrder::bgra, 0U, 0U, 0U, 255U), TextPixelOrder::bgra, true);
+    static_cast<void>(detail::composite_part_raster(over_black, black.target, whole(1U, 1U), 255U));
+    require(black.pixels[0] == pack(TextPixelOrder::bgra, 90U, 140U, 200U, 255U), "screen over black is the source");
+
+    require(detail::part_composite_blend(PaintGroupComposite::source_over) == detail::PartCompositeBlend::source_over &&
+                detail::part_composite_blend(PaintGroupComposite::plus) == detail::PartCompositeBlend::plus &&
+                detail::part_composite_blend(PaintGroupComposite::multiply) == detail::PartCompositeBlend::multiply &&
+                detail::part_composite_blend(PaintGroupComposite::screen) == detail::PartCompositeBlend::screen &&
+                detail::part_composite_blend(static_cast<PaintGroupComposite>(9U)) ==
+                    detail::PartCompositeBlend::source_over,
+            "each group composite has its blend; another value is source-over");
+}
+
 void test_part_raster() {
     const std::shared_ptr<PartRaster> raster = PartRaster::create(DeviceExtent{3U, 2U}, DeviceScale{1.5});
     require(raster != nullptr, "a raster is made");
@@ -447,6 +491,7 @@ int main() {
     test_premultiplied_sources_never_overflow();
     test_scaled_sampling();
     test_plus_blend();
+    test_separable_blends();
     test_part_raster();
     test_command_is_recorded_replayed_and_inspected();
     std::cout << "part composite tests passed\n";

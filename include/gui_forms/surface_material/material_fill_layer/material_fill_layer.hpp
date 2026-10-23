@@ -19,6 +19,19 @@ namespace gui_forms {
 // paint_surface_material, draws a repeating radial gradient padded and a
 // conic gradient as a solid of its first stop: a theme that needs them
 // selects the material primitive for the part.
+// How a fill layer joins the layers beneath it (E9.6, CSS
+// `background-blend-mode`): source-over, multiply or screen, on
+// premultiplied colour. A material whose fills all use `normal` draws them
+// as before; one with another mode first gathers its fills into one face,
+// apart from the shadows beneath, as CSS blends background layers only with
+// one another. The built-in path, paint_surface_material, draws every
+// layer source-over.
+enum class MaterialBlendMode : std::uint8_t {
+    normal,
+    multiply,
+    screen,
+};
+
 enum class MaterialFillKind : std::uint8_t {
     solid, linear_gradient, radial_gradient, image, conic_gradient,
     // A built-in pattern generated per display scale (E10): `procedural`.
@@ -55,6 +68,7 @@ struct MaterialFillLayer final {
     double opacity{1.0};
     MaterialImageMode image_mode{MaterialImageMode::stretch};
     double period_degrees{360.0};
+    MaterialBlendMode blend{MaterialBlendMode::normal};
     // Read only by a procedural fill, with `opacity`.
     ProceduralFill procedural{};
 
@@ -126,6 +140,7 @@ struct MaterialFillLayer final {
         left.image_scale == right.image_scale &&
         left.opacity == right.opacity && left.image_mode == right.image_mode &&
         left.period_degrees == right.period_degrees &&
+        left.blend == right.blend &&
         left.procedural == right.procedural)) {
         return left.kind == right.kind &&
                left.coordinate_space == right.coordinate_space &&
@@ -141,6 +156,7 @@ struct MaterialFillLayer final {
                left.opacity == right.opacity &&
                left.image_mode == right.image_mode &&
                left.period_degrees == right.period_degrees &&
+               left.blend == right.blend &&
                left.procedural == right.procedural;
     }
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui_forms/surface_material/colour_matrix/colour_matrix.hpp"
 #include "gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp"
 
 #include <cstddef>
@@ -31,6 +32,22 @@ struct MaterialBorder final {
                                      const MaterialBorder& right) noexcept {
         return left.color == right.color && left.width == right.width &&
                left.style == right.style;
+    }
+};
+
+// A drop shadow of the part's own drawn alpha (E9.6, CSS `filter:
+// drop-shadow()`): the baked raster's alpha, blurred by `blur_radius`
+// (σ = blur / 2, as a shadow's), moved by `offset`, in `color`, drawn
+// beneath the raster. Unlike a MaterialShadow it follows whatever the
+// material draws, such as a glyph or a round shape.
+struct MaterialDropShadow final {
+    Point offset{0.0, 1.0};
+    double blur_radius{2.0};
+    Color color{Color::rgba(0, 0, 0, 96)};
+    friend constexpr bool operator==(const MaterialDropShadow& left,
+                                     const MaterialDropShadow& right) noexcept {
+        return left.offset == right.offset &&
+               left.blur_radius == right.blur_radius && left.color == right.color;
     }
 };
 
@@ -144,6 +161,10 @@ struct SurfaceMaterial final {
     // The farthest a glow reaches outside the box, in logical units: the
     // engine material's granted overflow on every side.
     static constexpr double maximum_glow_reach = 8.0;
+    // The farthest the part filters reach outside the box, in logical
+    // units: the drop shadow's larger offset component plus 1.5 × its blur,
+    // plus 1.5 × the filter blur. The engine material's outsets hold it.
+    static constexpr double maximum_filter_reach = 8.0;
     std::vector<MaterialFillLayer> fills{
         MaterialFillLayer::solid(Color::rgba(255, 255, 255))};
     std::vector<MaterialShadow> shadows;
@@ -157,6 +178,17 @@ struct SurfaceMaterial final {
     // paint_surface_material, rounds every corner by corner_radius, so a
     // theme sets that to the radius the fallback should draw.
     std::optional<MaterialCornerRadii> corner_radii;
+    // The part filters (E9.6, CSS `filter`), applied to the baked raster in
+    // this order: the colour filter to each pixel, then the drop shadow
+    // beneath, then the blur over the whole. A theme's filter list lowers
+    // to that order. The engine's material primitive draws them; the
+    // built-in path, paint_surface_material, draws none of them, and the
+    // window's backplane image draws only the colour filter.
+    MaterialColourFilter colour_filter;
+    std::optional<MaterialDropShadow> drop_shadow;
+    // CSS `filter: blur(σ)` as filter_blur = 2σ logical units, the blur
+    // radius convention of shadows; 0 for none.
+    double filter_blur{};
     [[nodiscard]] static SurfaceMaterial from_parts(
         const MaterialFillLayer* fills, std::size_t fill_count,
         const MaterialShadow* shadows, std::size_t shadow_count,
@@ -179,14 +211,20 @@ struct SurfaceMaterial final {
         left.border == right.border && left.border_edges == right.border_edges &&
         left.keylines == right.keylines &&
         left.corner_radius == right.corner_radius &&
-        left.corner_radii == right.corner_radii)) {
+        left.corner_radii == right.corner_radii &&
+        left.colour_filter == right.colour_filter &&
+        left.drop_shadow == right.drop_shadow &&
+        left.filter_blur == right.filter_blur)) {
         return left.fills == right.fills && left.shadows == right.shadows &&
                left.glows == right.glows &&
                left.border == right.border &&
                left.border_edges == right.border_edges &&
                left.keylines == right.keylines &&
                left.corner_radius == right.corner_radius &&
-               left.corner_radii == right.corner_radii;
+               left.corner_radii == right.corner_radii &&
+               left.colour_filter == right.colour_filter &&
+               left.drop_shadow == right.drop_shadow &&
+               left.filter_blur == right.filter_blur;
     }
 };
 
