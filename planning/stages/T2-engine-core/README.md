@@ -473,7 +473,7 @@ assembles any size of a sliceable material from one reference bake.
   `gui_forms_engine_motion_tests` bake nothing after the idle frames, and at
   most one keyframe per frame before them.
 
-## E9, light (in progress)
+## E9, light
 
 ### Decisions for E9 (owner, 2026-10-22)
 
@@ -665,6 +665,46 @@ assembles any size of a sliceable material from one reference bake.
 
   `gui_forms_engine_slice_tests`: a glow in the layered material, and the
   gloss, assemble from slices to the whole bake's bytes.
+
+### E9.5, pop as rule data, and the proof (E9-C)
+
+- **No engine change.** A pop (§9.3 item 1) is a theme's data alone:
+  - the material primitive draws the face from the theme's recipe for the
+    part's family, so the hot and selected recipes carry the risen look: a
+    brighter fill, a deeper shadow and a glow (E9.4);
+  - a `scale` transition grows the part while it is hot, selected or
+    focus-visible, within the overflow its control grants (E8b);
+  - a `face` cross-fade blends the resting and risen faces (E7r form a).
+  No built-in rule pops anything.
+- **Proof.** `gui_forms_engine_pop_tests` pops the middle of three gloss
+  tiles to 1.08 within a grant of 4:
+  - the theme compiles cleanly and the registry still holds 12
+    primitives;
+  - the risen face's shadow is deeper below it, and it glows above its top;
+  - the change bakes at most the risen face and the face to stretch;
+  - while the pop moves, nothing is baked; only the popped part is painted,
+    within its grant and its material's outsets; the face is stretched
+    towards the popped scale;
+  - at rest it is baked sharp once at its popped size, and the window then
+    runs no frames;
+  - the neighbours keep their bounds;
+  - selection pops it as hover does;
+  - reduced motion jumps to the popped size without stretching;
+  - a part granted no overflow never grows.
+- **E9 as a whole.** Every light effect follows E7r's retained forms:
+  - shadow, gloss, glow and glass are baked once per state, size and scale;
+  - sheen composites one band baked once;
+  - pop stretches cached rasters.
+  Each effect's suite shows that nothing is baked while it moves or
+  follows the pointer, and that damage stays within the part. The
+  per-primitive reference hashes are:
+  - overlay shadow 0x12c9cfd27f7ea098;
+  - sheen band 0xd4c2e5fcf3e31bf5;
+  - glass kernel 0x748e797fedc763e5;
+  - glow 0x047bc7d0bde0012d and 0xda184a1654d76385;
+  - gloss 0x4507eda3b5101fcb and 0xce445232e6045c6d.
+  CI checks them on every platform. The quiet-machine re-measure of the
+  bake costs is still open.
 
 ### E9 shadow costs
 
