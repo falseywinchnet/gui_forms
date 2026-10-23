@@ -169,6 +169,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/motion_value/motion_value.cpp
     src/core/engine/motion_clock/motion_clock.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
+    src/core/surface_material/presets/material_presets.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
     src/core/text/prepared/prepared_storage.cpp

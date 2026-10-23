@@ -78,7 +78,17 @@ struct ResolvedShadow final {
     Color colour{};
     // An inset shadow whose hole is empty covers the whole box.
     bool solid{};
+    // A glow (MaterialGlow): an outer shadow at no offset whose colour is
+    // added to what lies beneath it rather than composited over it.
+    bool additive{};
 };
+
+// The outer shadows, then the glows over them.
+constexpr std::size_t maximum_outer = SurfaceMaterial::maximum_shadows + SurfaceMaterial::maximum_glows;
+
+// The glow's reach is within the material's outsets, so that the
+// destination holds all of it (valid_surface_material).
+static_assert(SurfaceMaterial::maximum_glow_reach <= material_outset, "a glow stays within the material's outsets");
 
 struct ResolvedFill final {
     MaterialFillKind kind{MaterialFillKind::solid};
@@ -114,7 +124,7 @@ struct MaterialLook final {
     // corners: there its coverage is exactly 1 without its signed distance.
     Rect wide_interior{};
     Rect tall_interior{};
-    std::array<ResolvedShadow, SurfaceMaterial::maximum_shadows> outer{};
+    std::array<ResolvedShadow, maximum_outer> outer{};
     std::size_t outer_count{};
     std::array<ResolvedShadow, SurfaceMaterial::maximum_shadows> inset{};
     std::size_t inset_count{};
@@ -325,6 +335,18 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
         look.inset[look.inset_count] = resolved;
         look.inset_count = look.inset_count + 1U;
     }
+    for (const MaterialGlow& glow : material.glows) {
+        const double spread = glow.spread * scale;
+        ResolvedShadow resolved{};
+        resolved.inverse_sigma = inverse_sigma_of(glow.blur_radius, scale);
+        resolved.colour = glow.color;
+        resolved.additive = true;
+        resolved.shape = Rect{box.x - spread, box.y - spread, box.width + spread * 2.0, box.height + spread * 2.0};
+        resolved.radius = radius + spread;
+        if (resolved.shape.width <= 0.0 || resolved.shape.height <= 0.0) continue;
+        look.outer[look.outer_count] = resolved;
+        look.outer_count = look.outer_count + 1U;
+    }
     for (std::size_t index = 0U; index < material.fills.size(); ++index) {
         const MaterialFillLayer& layer = material.fills[index];
         if (layer.kind == MaterialFillKind::solid && layer.color.alpha == 0U) continue;
@@ -501,8 +523,8 @@ struct OuterIntegrals final {
     std::vector<double> across;
     std::vector<std::uint8_t> corner_columns;
     std::size_t width{};
-    std::array<double, SurfaceMaterial::maximum_shadows> down{};
-    std::array<bool, SurfaceMaterial::maximum_shadows> corner_rows{};
+    std::array<double, maximum_outer> down{};
+    std::array<bool, maximum_outer> corner_rows{};
 };
 
 void fill_columns(const MaterialLook& look, std::size_t width, OuterIntegrals& integrals) noexcept {
@@ -606,6 +628,15 @@ Unit fill_colour(const ResolvedFill& fill, const MaterialImages& images, std::si
     return Unit{};
 }
 
+// Adds `light` to `target`, each premultiplied channel at most 1: a glow
+// brightens the shadow beneath it instead of covering it.
+void add_light(Unit& target, Unit light) noexcept {
+    target.red = std::min(target.red + light.red, 1.0);
+    target.green = std::min(target.green + light.green, 1.0);
+    target.blue = std::min(target.blue + light.blue, 1.0);
+    target.alpha = std::min(target.alpha + light.alpha, 1.0);
+}
+
 bool centre_within(Rect band, double x, double y) noexcept {
     const bool within = x >= band.x && x <= band.right() && y >= band.y && y <= band.bottom();
     return within;
@@ -642,7 +673,11 @@ Unit material_pixel(const MaterialLook& look, const MaterialImages& images, cons
             coverage = outer_coverage(shadow, across_integral(shadow, centre_x), down_integral(shadow, centre_y),
                                       corner_column, corner_row, centre_x, centre_y);
         }
-        blend_over(result, premultiply(shadow.colour, coverage));
+        if (shadow.additive) {
+            add_light(result, premultiply(shadow.colour, coverage));
+        } else {
+            blend_over(result, premultiply(shadow.colour, coverage));
+        }
     }
     if (!look.reads_inside) return result;
     const double inside = box_coverage(look, x, y, centre_x, centre_y);
@@ -775,6 +810,8 @@ double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTa
     for (const MaterialShadow& shadow : material.shadows) {
         per_pixel = per_pixel + (shadow.inset ? costs.inset_shadow : costs.outer_shadow);
     }
+    // A glow is an outer shadow's kernel with an addition for its blend.
+    per_pixel = per_pixel + static_cast<double>(material.glows.size()) * costs.outer_shadow;
     if (material.border) per_pixel = per_pixel + costs.border;
     const MaterialBorderEdges& edges = material.border_edges;
     const double edge_count = static_cast<double>(edges.top.has_value()) + static_cast<double>(edges.right.has_value()) +
@@ -867,6 +904,12 @@ AxisReach axis_reach(const SurfaceMaterial& material, const PrimitiveTarget& tar
         const double blurred = shadow_reach(shadow.blur_radius, scale, corner);
         reach_at_least(reach, offset + spread + blurred + 1.0, -offset + spread + blurred + 1.0,
                        spread * 2.0 + 1.0);
+    }
+    // A glow changes as an outer shadow at no offset does.
+    for (const MaterialGlow& glow : material.glows) {
+        const double spread = glow.spread * scale;
+        const double blurred = shadow_reach(glow.blur_radius, scale, radius + spread);
+        reach_at_least(reach, blurred - spread + 1.0, blurred - spread + 1.0, 1.0 - spread * 2.0);
     }
     if (material.border) {
         const double width = (*material.border).width * scale;

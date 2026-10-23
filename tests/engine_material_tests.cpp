@@ -22,6 +22,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/controls/panel/panel.hpp"
 #include "gui_forms/engine.hpp"
+#include "gui_forms/surface_material/presets/material_presets.hpp"
 #include "gui_forms/resources/image_registry/image_registry.hpp"
 #include "gui_forms/theme.hpp"
 #include "gui_forms/window.hpp"
@@ -43,6 +44,7 @@
 #include <iostream>
 #include <memory>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -361,6 +363,170 @@ void keylines_and_inset_shadow() {
                 edge.pixel(18U, 18U) == (std::array<std::uint8_t, 4>{0U, 0U, 255U, 255U}) &&
                 edge.pixel(18U, 17U) == (std::array<std::uint8_t, 4>{255U, 0U, 0U, 255U}),
             "a bottom edge is its width of rows");
+}
+
+// -- glow and gloss (E9-C) -----------------------------------------------------------
+
+// The reference hashes of the glow and gloss bakes, at scale 1 and 2.
+constexpr std::uint64_t expected_glow_hashes[] = {0x047bc7d0bde0012dULL, 0xda184a1654d76385ULL};
+constexpr std::uint64_t expected_gloss_hashes[] = {0x4507eda3b5101fcbULL, 0xce445232e6045c6dULL};
+
+// Checks `raster`'s hash against `expected`, or prints it in print mode.
+bool reference_matches(const TestRaster& raster, const char* name, std::uint64_t expected) {
+    const std::uint64_t hash = raster_hash(raster);
+    if (print_mode()) {
+        std::cout << "    " << name << " 0x" << std::hex << hash << std::dec << "ULL\n";
+        return true;
+    }
+    if (hash == expected) return true;
+    std::cerr << name << " hash 0x" << std::hex << hash << std::dec << '\n';
+    return false;
+}
+
+MaterialGlow glow_of(Color colour, double blur, double spread) {
+    MaterialGlow glow{};
+    glow.color = colour;
+    glow.blur_radius = blur;
+    glow.spread = spread;
+    return glow;
+}
+
+constexpr Color white_half{255, 255, 255, 128};
+constexpr Color black_half{0, 0, 0, 128};
+
+void glows() {
+    // A glow lies around the box, under the face's fills.
+    SurfaceMaterial lit = solid_material(red);
+    lit.glows.push_back(glow_of(white_half, 2.0, 0.0));
+    const TestRaster raster = draw(lit, Size{20.0, 10.0}, 1.0);
+    require(raster.pixel(18U, 13U) == (std::array<std::uint8_t, 4>{255U, 0U, 0U, 255U}), "the face covers its glow");
+    const std::array<std::uint8_t, 4> halo = raster.pixel(18U, 7U);
+    require(halo[3] > 0U && halo[0] == halo[1] && halo[1] == halo[2], "the glow lies just outside the box");
+    require(raster.pixel(18U, 0U)[3] == 0U, "and fades within its reach");
+
+    // It adds light to the shadow beneath it instead of covering it.
+    SurfaceMaterial shaded = solid_material(red);
+    shaded.shadows.push_back(MaterialShadow{Point{0.0, 0.0}, 2.0, 0.0, black_half, false});
+    SurfaceMaterial glowing = solid_material(red);
+    glowing.glows.push_back(glow_of(white_half, 2.0, 0.0));
+    SurfaceMaterial both = shaded;
+    both.glows.push_back(glow_of(white_half, 2.0, 0.0));
+    const TestRaster shadow_only = draw(shaded, Size{20.0, 10.0}, 1.0);
+    const TestRaster glow_only = draw(glowing, Size{20.0, 10.0}, 1.0);
+    const TestRaster added = draw(both, Size{20.0, 10.0}, 1.0);
+    const int sum = std::min(255, channel(shadow_only, 18U, 7U, 3U) + channel(glow_only, 18U, 7U, 3U));
+    require(std::abs(channel(added, 18U, 7U, 3U) - sum) <= 1, "a glow's alpha adds to the shadow's");
+    require(channel(added, 18U, 7U, 0U) >= channel(glow_only, 18U, 7U, 0U) - 1,
+            "and the shadow does not darken the glow's light");
+
+    // Its reach, spread + 2 × blur, is within the granted overflow.
+    SurfaceMaterial widest = solid_material(red);
+    widest.glows.push_back(glow_of(white_half, 2.0, 4.0));
+    require(valid_surface_material(widest), "a glow reaching 8 units is valid");
+    const Insets outsets = surface_material_visual_outsets(widest);
+    require(outsets.left == 8.0 && outsets.top == 8.0 && outsets.right == 8.0 && outsets.bottom == 8.0,
+            "its visual outsets are its reach");
+    const TestRaster edge = draw(widest, Size{20.0, 10.0}, 2.0);
+    require(edge.pixel(36U, 0U)[3] <= 1U, "it fades by the destination's edge");
+    const EnginePrimitive& primitive = material_primitive();
+    const PrimitiveParameterBlock parameters = recipe("button");
+    SurfaceMaterial beyond = solid_material(red);
+    beyond.glows.push_back(glow_of(white_half, 2.0, 4.5));
+    require(!valid_surface_material(beyond), "a glow reaching past 8 units is invalid");
+    require(!primitive.accepts(parameters, target_for(Size{20.0, 10.0}, 1.0, &beyond)), "and refused");
+    SurfaceMaterial negative = solid_material(red);
+    negative.glows.push_back(glow_of(white_half, -1.0, 0.0));
+    require(!valid_surface_material(negative), "a negative blur is invalid");
+    SurfaceMaterial crowded = solid_material(red);
+    for (std::size_t index = 0U; index <= SurfaceMaterial::maximum_glows; ++index) {
+        crowded.glows.push_back(glow_of(white_half, 1.0, 0.0));
+    }
+    require(!valid_surface_material(crowded), "a material holds at most maximum_glows glows");
+
+    // Its bytes, over a rounded face.
+    SurfaceMaterial reference = solid_material(Color{90, 120, 200, 255});
+    reference.corner_radius = 4.0;
+    reference.glows.push_back(glow_of(Color{255, 200, 80, 140}, 3.0, 1.0));
+    const bool first = reference_matches(draw(reference, Size{40.0, 20.0}, 1.0), "glow_1", expected_glow_hashes[0]);
+    const bool second = reference_matches(draw(reference, Size{40.0, 20.0}, 2.0), "glow_2", expected_glow_hashes[1]);
+    require(first && second, "the glow matches its reference images");
+}
+
+// A painter that logs the order of what paint_surface_material draws.
+class LayerLog final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect, Color) override { events.push_back('f'); }
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point, Point, Color, double) override {}
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId, Rect, double) override {}
+    void draw_box_shadow(Rect, double, Point offset, double blur_radius, double spread, Color color) override {
+        events.push_back('s');
+        last_offset = offset;
+        last_blur = blur_radius;
+        last_spread = spread;
+        last_colour = color;
+    }
+    std::string events{};
+    Point last_offset{};
+    double last_blur{};
+    double last_spread{};
+    Color last_colour{};
+};
+
+void glow_painter_path() {
+    SurfaceMaterial material = solid_material(red);
+    material.shadows.push_back(MaterialShadow{Point{0.0, 2.0}, 2.0, 0.0, black_half, false});
+    material.glows.push_back(glow_of(white_half, 1.5, 1.0));
+    LayerLog log{};
+    paint_surface_material(log, Rect{0.0, 0.0, 20.0, 10.0}, material);
+    require(log.events == "ssf", "the built-in path draws the shadow, then the glow, then the fill");
+    require(log.last_offset == Point{} && log.last_blur == 1.5 && log.last_spread == 1.0 &&
+                log.last_colour == white_half,
+            "the glow is a shadow at no offset");
+}
+
+void gloss_preset() {
+    const GlossColours colours{};
+    const SurfaceMaterial gloss = gloss_material(colours, 3.0);
+    require(valid_surface_material(gloss), "the gloss is a valid material");
+    require(gloss.fills.size() == 1U && gloss.fills[0].kind == MaterialFillKind::linear_gradient,
+            "one gradient fill");
+    const std::vector<GradientStop>& stops = gloss.fills[0].stops;
+    require(stops.size() == 4U && stops[0] == GradientStop{0.0, colours.top} &&
+                stops[1] == GradientStop{0.48, colours.above_break} &&
+                stops[2] == GradientStop{0.52, colours.below_break} && stops[3] == GradientStop{1.0, colours.bottom},
+            "four stops with a hard break at mid-face");
+    require(gloss.keylines.size() == 1U && gloss.keylines[0].edge == MaterialEdge::top &&
+                gloss.keylines[0].width == 1.0 && gloss.keylines[0].inset == 1.0 &&
+                gloss.keylines[0].color == colours.shine,
+            "a 1-unit shine under the top, inside the border");
+    require(gloss.border && (*gloss.border).width == 1.0 && gloss.corner_radius == 3.0, "a 1-unit border");
+    bool refused = false;
+    try {
+        static_cast<void>(gloss_material(colours, -1.0));
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused, "a negative corner radius is refused");
+
+    // The face of a 75 × 23 part at scale 1 spans rows 8 to 30.
+    const TestRaster raster = draw(gloss, Size{75.0, 23.0}, 1.0);
+    const int above = channel(raster, 45U, 18U, 0U);
+    const int below = channel(raster, 45U, 20U, 0U);
+    require(above - below > 30, "the colour steps across the break");
+    require(std::abs(channel(raster, 45U, 12U, 0U) - channel(raster, 45U, 14U, 0U)) < 10,
+            "and changes gently above it");
+    require(channel(raster, 45U, 9U, 0U) > channel(raster, 45U, 10U, 0U), "the shine lies under the border");
+    const std::array<std::uint8_t, 4> top_edge{colours.border.red, colours.border.green, colours.border.blue, 255U};
+    require(raster.pixel(45U, 8U) == top_edge, "under the top border");
+    const bool first = reference_matches(raster, "gloss_1", expected_gloss_hashes[0]);
+    const bool second = reference_matches(draw(gloss, Size{75.0, 23.0}, 2.0), "gloss_2", expected_gloss_hashes[1]);
+    require(first && second, "the gloss matches its reference images");
 }
 
 // -- image fills -------------------------------------------------------------------
@@ -981,6 +1147,9 @@ int main(int argc, char** argv) {
     straight_edge_blur_is_half();
     gradients();
     keylines_and_inset_shadow();
+    glows();
+    glow_painter_path();
+    gloss_preset();
     image_fills();
     image_variant_made_once();
     image_variant_outside_the_bound();

@@ -615,6 +615,57 @@ assembles any size of a sliceable material from one reference bake.
     image again, and the glass shows the change;
   - a blur of 9 is rejected at compile and draws as the default blur.
 
+### E9.4, the gloss preset and the glow layer (E9-C)
+
+- **No new primitive.** Both are material data, baked by the `material`
+  primitive and painted by `paint_surface_material` on the built-in path.
+  No built-in theme carries either (§9.3 item 5).
+- **Gloss.** `gloss_material(GlossColours, corner_radius)`, in
+  `surface_material/presets/`, builds the §4.3 gloss from the ordinary
+  layers:
+  - one vertical gradient with stops at 0, 0.48, 0.52 and 1 (the hard
+    break: `above_break` to `below_break` within 4 % of the face's height);
+  - a 1-unit shine keyline under the top edge, inside the border, clipped
+    to the corners;
+  - and a 1-unit border.
+  A corner radius outside [0, 4096] is refused (`std::invalid_argument`).
+  Its vertical gradient slices across (E7r) like any other.
+- **Glow.** `MaterialGlow{color, blur_radius, spread}`, at most
+  `SurfaceMaterial::maximum_glows` (2) per material:
+  - *The shape.* The box grown by `spread` and blurred by `blur_radius`
+    (σ = blur / 2, as a shadow's), at no offset. Its corner radius is the
+    box's plus the spread.
+  - *Additive.* The engine bakes it with the outer shadow's separable
+    kernel. It then adds its premultiplied colour to the outer shadows
+    beneath it, each channel at most 1. The fills, inset shadows, border
+    and keylines are drawn over it, so it is a halo that the face covers.
+    `paint_surface_material` draws it as a shadow at no offset after the
+    outer shadows. That differs from the bake only where a glow lies over
+    a shadow, since adding light over nothing is compositing it.
+  - *Bounded by the grant.* Its reach, spread + 2 × blur (four σ, where
+    its blur is below one 8-bit step), is at most
+    `SurfaceMaterial::maximum_glow_reach`, 8 logical units: the material's
+    outsets, which a static assertion ties to it. A material whose glow
+    reaches further is invalid, so the primitive refuses it and the theme
+    rejects it. The built-in path's visual outsets include the reach.
+  - *Cost.* Each glow is costed as an outer shadow (`outer_shadow`, and
+    `outer_corner` at its rounded corners), since it runs the same kernel.
+  - *Inspection.* The visual-inspection snapshot lists the glows.
+- **Proof.** `gui_forms_engine_material_tests`:
+  - the glow lies outside the box and under the face, and fades within
+    its reach;
+  - its alpha adds to a shadow's beneath it, and the shadow does not
+    darken it;
+  - a reach of 8 is valid and fills the outsets; a reach past 8, a
+    negative blur and a third glow are invalid;
+  - the built-in path draws the shadow, then the glow, then the fill;
+  - the gloss's stops, shine and border, the step across the break and
+    the shine under the top border;
+  - reference hashes for both at scale 1 and 2.
+
+  `gui_forms_engine_slice_tests`: a glow in the layered material, and the
+  gloss, assemble from slices to the whole bake's bytes.
+
 ### E9 shadow costs
 
 The outer shadow was measured again after the separable kernel, with
