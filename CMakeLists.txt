@@ -154,6 +154,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/primitives/material/material_image.cpp
     src/core/engine/primitives/material/material_primitive.cpp
     src/core/engine/primitives/material/overlay_shadow_primitive.cpp
+    src/core/engine/primitives/light/sheen_primitive.cpp
     src/core/engine/primitives/kernel/pixel_kernel.cpp
     src/core/engine/part_shape/part_shape.cpp
     src/core/engine/part_table/engine_part_table.cpp

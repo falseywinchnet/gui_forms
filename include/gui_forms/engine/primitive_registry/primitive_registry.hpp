@@ -299,6 +299,21 @@ enum class RasterOutcome : std::uint8_t {
     stale_preparation,
 };
 
+// How a primitive behind the overlay seam is composited (E9-A, owner
+// 2026-10-22: the seam serves the sheen only). Its raster is `size`, in
+// logical units, baked once per (size, state, scale) and never per
+// pointer position; the engine composites it with its centre across at the
+// part-local pointer, its top at the part's top, clipped to the part's
+// shape, and damages only the part's extent when the pointer moves within
+// it. While the pointer is not over the part, and always under reduced
+// motion, its centre rests at `rest` times the part's width. It follows the
+// part's presentational scale as a face does: baked at the scaled size at
+// rest, and stretched with the face while the scale moves.
+struct PointerOverlay final {
+    Size size{};
+    double rest{};
+};
+
 // One kind of effect. A primitive is immutable and holds no per-part state:
 // one instance serves every part, on the UI thread. Per-part derived values
 // live in the caller's PrimitivePreparation.
@@ -343,6 +358,13 @@ public:
     // shadows, at the part's corner radius, and draws nothing when the theme
     // casts none. False unless the primitive says otherwise.
     [[nodiscard]] virtual bool lends_overlay_shadow() const noexcept;
+
+    // How the primitive is composited over a part of `part` size when it
+    // stands behind the overlay seam (PointerOverlay); none for a primitive
+    // drawn over the part's own box, unless the primitive says otherwise.
+    // `parameters` match the declarations.
+    [[nodiscard]] virtual std::optional<PointerOverlay> pointer_overlay(const PrimitiveParameterBlock& parameters,
+                                                                        Size part) const noexcept;
 
     // Whether the primitive will draw this target with `parameters`, such as
     // a material whose bake would exceed its bound. A primitive that refuses
