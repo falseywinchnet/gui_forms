@@ -5,9 +5,12 @@
 
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace gui_forms {
@@ -162,6 +165,50 @@ struct ControlRoleRecipes final {
 // records are replaced.
 [[nodiscard]] ControlRoleRecipes derive_high_contrast_recipes(ControlRoleRecipes recipes);
 
+// The recipes of every control visual role, indexed by ControlVisualRole,
+// held out of line. They are most of a theme's description (one family of
+// four state tables per role, some 100 KB), so holding them on the heap
+// keeps a ThemeDefinition small enough to be an ordinary value.
+//
+// The table always holds exactly one family per role: it is made with
+// default recipes, and a copy copies every recipe. Moving copies too (no
+// move operations are declared), so a moved-from table still holds its
+// recipes rather than none.
+class ControlRoleTable final {
+public:
+    using Families = std::array<ControlRoleRecipes, control_visual_role_count>;
+
+    // Allocates the families, value-initialized in place on the heap.
+    ControlRoleTable() : families_(std::make_unique<Families>()) {}
+    ControlRoleTable(const ControlRoleTable& other)
+        : families_(std::make_unique<Families>(*other.families_)) {}
+    // Copies every recipe into this table's existing storage.
+    ControlRoleTable& operator=(const ControlRoleTable& other) {
+        if (this != &other) *families_ = *other.families_;
+        return *this;
+    }
+
+    // `role` is a ControlVisualRole's index, below control_visual_role_count.
+    [[nodiscard]] ControlRoleRecipes& operator[](std::size_t role) noexcept { return (*families_)[role]; }
+    [[nodiscard]] const ControlRoleRecipes& operator[](std::size_t role) const noexcept {
+        return (*families_)[role];
+    }
+    [[nodiscard]] static constexpr std::size_t size() noexcept { return control_visual_role_count; }
+    [[nodiscard]] Families::iterator begin() noexcept { return (*families_).begin(); }
+    [[nodiscard]] Families::iterator end() noexcept { return (*families_).end(); }
+    [[nodiscard]] Families::const_iterator begin() const noexcept { return (*families_).begin(); }
+    [[nodiscard]] Families::const_iterator end() const noexcept { return (*families_).end(); }
+
+    friend bool operator==(const ControlRoleTable& left, const ControlRoleTable& right) noexcept(
+        noexcept(std::declval<const Families&>() == std::declval<const Families&>())) {
+        return *left.families_ == *right.families_;
+    }
+
+private:
+    // Never null.
+    std::unique_ptr<Families> families_;
+};
+
 struct ThemeSpacingTokens final {
     double micro{2.0};
     double xsmall{4.0};
@@ -275,10 +322,14 @@ struct ThemeStructureTokens final {
     return layers;
 }
 
+// A theme's whole authored description. Its role recipes are held out of
+// line (ControlRoleTable), so the definition itself is a small value, but
+// copying one still copies every recipe: pass it by reference, and let
+// Theme::create make the theme's own copy.
 struct ThemeDefinition final {
     std::string id{"windows-professional"};
     BasicControlStyle compatibility;
-    std::array<ControlRoleRecipes, control_visual_role_count> roles;
+    ControlRoleTable roles;
     ThemeStructureTokens structure;
     // At least one colour; Theme::create refuses an empty ramp.
     std::vector<Color> accent_ramp{provisional_accent_ramp()};

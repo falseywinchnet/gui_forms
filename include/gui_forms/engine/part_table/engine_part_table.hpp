@@ -102,6 +102,10 @@ struct CachedPartRaster final {
     DeviceExtent extent{};
     std::optional<SurfaceMaterial> material{};
     std::uint64_t image_revision{};
+    // Set when `raster` drew a procedural fill's ground because its pattern
+    // was not ready (E10): the table's pattern generation then. Such a
+    // raster is current only until the table makes another pattern.
+    std::optional<std::uint64_t> awaited_patterns{};
     // Whether `raster` is one of the table's shared bakes (a keyframe): it
     // then counts against shared_bake_budget_bytes, not the part cache's,
     // and is never drawn over.
@@ -326,6 +330,15 @@ struct RasterCacheStatistics final {
     std::uint64_t image_variant_bakes{};
     std::uint64_t image_variant_hits{};
     std::size_t image_variants{};
+    // Procedural fills' patterns (E10): generated in idle frames, lent from
+    // those held, and asked for by a bake before they were ready (the fill
+    // then drew its ground); held now, and queued for idle frames now.
+    // Their bytes count with the shared bakes'. A theme change keeps them.
+    std::uint64_t procedural_generations{};
+    std::uint64_t procedural_hits{};
+    std::uint64_t procedural_placeholders{};
+    std::size_t procedural_patterns{};
+    std::size_t procedural_queued{};
     // The window's backplane images (E9-B, owner 2026-10-22): made, lent
     // from those held, and held now; and the backplane commands their
     // making skipped. The core bakes a backplane image from the window's
@@ -366,6 +379,17 @@ inline constexpr std::size_t shared_bake_budget_bytes = 4U * 1024U * 1024U;
 // each of about six parts. A keyframe that does not fit is baked on demand
 // when a paint first reaches it.
 inline constexpr std::size_t maximum_idle_keyframes = 64U;
+
+// The most procedural patterns queued for idle frames at once (E10). A
+// pattern that does not fit is queued again when a paint next asks for it.
+inline constexpr std::size_t maximum_queued_patterns = 32U;
+
+// What EnginePartTable::generate_pattern did (E10): nothing was queued
+// (none); a pattern was made, and the parts whose rasters drew a ground
+// are to be repainted (made); or a pattern was made and a raster without a
+// record had drawn a ground, so that every part is to be repainted
+// (made_unrecorded).
+enum class PatternGeneration : std::uint8_t { none, made, made_unrecorded };
 
 // What acquire() did.
 struct PartRecordAcquisition final {
@@ -450,6 +474,22 @@ public:
     void queue_idle_keyframe(const PartRasterRequest& request);
     bool bake_idle_keyframe(const ImageRegistry* images, std::uint64_t paint_sequence);
     [[nodiscard]] bool idle_keyframes_waiting() const noexcept;
+
+    // Procedural patterns (E10). A bake that asks for a pattern not held
+    // queues it (at most maximum_queued_patterns) and draws the fill's
+    // ground; nothing is generated inside a paint. generate_pattern
+    // generates the oldest queued pattern not held and holds it. Making
+    // one ends the currency of every raster that drew a ground
+    // (CachedPartRaster::awaited_patterns): the shared bakes among them and
+    // the backplane images are dropped, and the window repaints the parts
+    // (awaits_pattern), or every part when a raster without a record drew
+    // one, since it records no place. A pattern that cannot be made is
+    // dropped from the queue. Allocation failure propagates as
+    // std::bad_alloc.
+    PatternGeneration generate_pattern(std::uint64_t paint_sequence);
+    [[nodiscard]] bool patterns_waiting() const noexcept;
+    // Whether `cached` drew a ground for a pattern made since.
+    [[nodiscard]] bool awaits_pattern(const CachedPartRaster& cached) const noexcept;
 
     // A raster for a part painted without a key, which has no record: drawn
     // for this paint and never kept (status uncached), assembled from a
@@ -567,14 +607,19 @@ private:
     // reference when the primitive slices it (baking the reference when
     // none is held, or again when `refresh`), else baked whole with
     // `preparation`, prepared again when stale. Anything but painted or
-    // empty leaves `destination` unchanged.
+    // empty leaves `destination` unchanged. `awaited` is set to the
+    // pattern generation when the drawing drew a procedural fill's ground
+    // (E10), and reset otherwise.
     [[nodiscard]] RasterOutcome draw(const PartRasterRequest& request, PrimitivePreparation& preparation,
-                                     const PartRasterView& destination, std::uint64_t paint_sequence, bool refresh);
+                                     const PartRasterView& destination, std::uint64_t paint_sequence, bool refresh,
+                                     std::optional<std::uint64_t>& awaited);
     // The held shared bake answering `request`, or one baked and held now
     // (again in place of the held one when `refresh`); null when the
-    // primitive refuses it. `use` chooses the counters.
+    // primitive refuses it. `use` chooses the counters. `awaited` is set
+    // as draw sets it, from the held bake's record when one answers.
     [[nodiscard]] std::shared_ptr<PartRaster> shared_bake(const PartRasterRequest& request,
-                                                          std::uint64_t paint_sequence, bool refresh, SharedUse use);
+                                                          std::uint64_t paint_sequence, bool refresh, SharedUse use,
+                                                          std::optional<std::uint64_t>& awaited);
     // Evicts the least recently used shared bakes and image variants until
     // `incoming` more bytes fit shared_bake_budget_bytes.
     void make_shared_room(std::size_t incoming) noexcept;
@@ -596,9 +641,20 @@ private:
     // those held, and those not held made now and held (the first need;
     // owner, 2026-10-22). A variant that cannot be made is not lent, and
     // its fill draws nothing. Held variants made from an earlier revision
-    // of the window's images are dropped first.
-    void lend_image_variants(const PartRasterRequest& request, std::uint64_t paint_sequence,
-                             LentImageVariants& lent);
+    // of the window's images are dropped first. A procedural pattern not
+    // held is queued instead and not lent (E10). Returns the pattern
+    // generation when a pattern was not lent, else none.
+    std::optional<std::uint64_t> lend_image_variants(const PartRasterRequest& request,
+                                                     std::uint64_t paint_sequence, LentImageVariants& lent);
+    // Queues `asked`, a procedural pattern, unless it is queued already or
+    // the queue is full.
+    void queue_pattern(const ImageVariantRequest& asked);
+    // Holds `made` for `asked` within the shared budget, as an image
+    // variant is held; counts it.
+    void hold_variant(const ImageVariantRequest& asked, const std::shared_ptr<PartRaster>& made,
+                      std::uint64_t paint_sequence);
+    // Subtracts `held`'s bytes and its count from the statistics.
+    void forget_variant(const HeldImageVariant& held) noexcept;
 
     std::vector<RecordSlot> slots_;
     std::vector<std::uint32_t> free_slots_;
@@ -624,6 +680,15 @@ private:
     // image_variant_revision_ (none before the first).
     std::vector<HeldImageVariant> image_variants_;
     std::optional<std::uint64_t> image_variant_revision_{};
+    // Procedural patterns (E10) are held among image_variants_ (their
+    // requests' `procedural` set) and are kept when the images or the
+    // theme change. Patterns waiting for idle frames, oldest first; the
+    // number of patterns made so far; and whether a raster without a
+    // record (raster_without_record, or a backplane image) drew a ground
+    // since the last pattern was made.
+    std::deque<ImageVariantRequest> pattern_queue_;
+    std::uint64_t pattern_generation_{};
+    bool unrecorded_awaited_{};
     // A backplane image held: its region, and the paint that last used it.
     struct HeldBackplane final {
         BackplaneRegion region{};

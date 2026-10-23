@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <span>
 #include <stdexcept>
 #include <string_view>
@@ -61,6 +62,27 @@ bool valid_material_glow(const MaterialGlow& glow) noexcept {
                        glow.blur_radius >= 0.0 && glow.spread >= 0.0 &&
                        glow_reach(glow) <= SurfaceMaterial::maximum_glow_reach;
     return valid;
+}
+
+// A procedural fill's parameters (E10): a built-in pattern, a finite tile
+// within [minimum_procedural_tile, maximum_procedural_tile], and a finite
+// strength in [0, 1].
+bool valid_procedural_fill(const ProceduralFill& fill) noexcept {
+    switch (fill.pattern) {
+    case ProceduralPattern::felt:
+    case ProceduralPattern::wood_grain:
+    case ProceduralPattern::paper_fibre:
+    case ProceduralPattern::pinstripe:
+    case ProceduralPattern::brushed_metal:
+    case ProceduralPattern::fresco: {
+        const bool valid = std::isfinite(fill.tile) && fill.tile >= minimum_procedural_tile &&
+                           fill.tile <= maximum_procedural_tile && std::isfinite(fill.strength) &&
+                           fill.strength >= 0.0 && fill.strength <= 1.0;
+        return valid;
+    }
+    }
+    // A pattern outside the enumeration is not built in.
+    return false;
 }
 
 // An overlay shadow: at most SurfaceMaterial::maximum_shadows valid layers,
@@ -330,9 +352,16 @@ ControlVisualRecipe recipe(Color top, Color bottom, Color border, Color text,
     return result;
 }
 
-ControlRoleRecipes professional_role(Color top, Color bottom, Color border,
-                                     Color text, double radius = 3.0) {
-    ControlRoleRecipes result;
+// Fills `result` with one professional role's recipes. It fills the
+// caller's storage rather than returning a value: a ControlRoleRecipes is
+// some 9 KB, and windows_professional_theme_definition makes twelve, so
+// returned temporaries cost its frame 100 KB where stack slots are not
+// reused (sanitizer builds), close to a Windows thread's 1 MB stack.
+void fill_professional_role(ControlRoleRecipes& result, Color top, Color bottom,
+                            Color border, Color text, double radius = 3.0) {
+    // Every record starts from its default; the high-contrast records stay
+    // so (they are derived when the theme is made).
+    result = ControlRoleRecipes{};
     std::array<ControlVisualRecipe, control_surface_state_count>& values = result.ordinary;
     values[static_cast<std::size_t>(ControlSurfaceState::normal)] =
         recipe(top, bottom, border, text, radius);
@@ -379,7 +408,6 @@ ControlRoleRecipes professional_role(Color top, Color bottom, Color border,
     // The high-contrast records are derived from the ordinary ones when the
     // theme is made (derive_high_contrast_recipes, the forced high-contrast
     // pass of T2 E4), not authored here.
-    return result;
 }
 
 // GUI.Forms' own high-contrast mode (T2 plan, E4; design language 5.8): a
@@ -505,6 +533,19 @@ void paint_fill_layer(Painter& painter, Rect bounds, const MaterialFillLayer& fi
     case MaterialFillKind::image:
         paint_image_fill(painter, bounds, fill);
         return;
+    case MaterialFillKind::procedural: {
+        // The painter path never generates a pattern (E10): it draws the
+        // fill's ground, as the engine does until the pattern is ready.
+        Color ground = fill.procedural.ground;
+        const double alpha = static_cast<double>(ground.alpha) * std::clamp(fill.opacity, 0.0, 1.0);
+        ground.alpha = static_cast<std::uint8_t>(std::floor(alpha + 0.5));
+        if (clipped) {
+            painter.fill_rounded_rect(bounds, corner_radius, ground);
+        } else {
+            painter.fill_rect(bounds, ground);
+        }
+        return;
+    }
     }
     // A kind outside the enumeration paints nothing.
     return;
@@ -655,6 +696,15 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
                 return false;
             }
             break;
+        case MaterialFillKind::procedural:
+            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+                fill.spread != GradientSpreadMode::pad ||
+                !valid_procedural_fill(fill.procedural) ||
+                !std::isfinite(fill.opacity) || fill.opacity < 0.0 ||
+                fill.opacity > 1.0) {
+                return false;
+            }
+            break;
         default:
             return false;
         }
@@ -796,7 +846,7 @@ ControlRoleRecipes derive_high_contrast_recipes(ControlRoleRecipes recipes) {
     return recipes;
 }
 
-std::shared_ptr<const Theme> Theme::create(ThemeDefinition definition) {
+std::shared_ptr<const Theme> Theme::create(const ThemeDefinition& definition) {
     if (definition.id.empty() || definition.id.size() > 128U) {
         throw std::invalid_argument("theme id must contain 1 to 128 bytes");
     }
@@ -807,11 +857,6 @@ std::shared_ptr<const Theme> Theme::create(ThemeDefinition definition) {
                          &valid_recipe)) {
             throw std::invalid_argument("theme contains an invalid visual recipe");
         }
-    }
-    // The forced high-contrast pass: every family's high-contrast records
-    // are derived from its ordinary ones, replacing whatever was authored.
-    for (ControlRoleRecipes& role : definition.roles) {
-        role = derive_high_contrast_recipes(std::move(role));
     }
     if (definition.accent_ramp.empty() || definition.accent_ramp.size() > 256U) {
         throw std::invalid_argument("theme accent ramp must hold 1 to 256 colours");
@@ -825,7 +870,15 @@ std::shared_ptr<const Theme> Theme::create(ThemeDefinition definition) {
         throw std::invalid_argument(
             "theme structural tokens must be finite, ordered, and bounded");
     }
-    return std::shared_ptr<const Theme>(new Theme(std::move(definition)));
+    std::unique_ptr<Theme> theme(new Theme(definition));
+    // The forced high-contrast pass: every family's high-contrast records
+    // are derived from its ordinary ones, replacing whatever was authored.
+    // It reads only the roles, so the engine compiled from the rules stands.
+    for (ControlRoleRecipes& role : (*theme).definition_.roles) {
+        role = derive_high_contrast_recipes(std::move(role));
+    }
+    std::shared_ptr<const Theme> result(std::move(theme));
+    return result;
 }
 
 std::string_view control_visual_role_name(ControlVisualRole role) noexcept {
@@ -866,36 +919,36 @@ ThemeDefinition windows_professional_theme_definition() {
     ThemeDefinition result;
     const Color ink = Color::rgba(27, 39, 51);
     for (ControlRoleRecipes& role : result.roles) {
-        role = professional_role(Color::rgba(250, 252, 254),
+        fill_professional_role(role, Color::rgba(250, 252, 254),
                                  Color::rgba(225, 231, 237),
                                  Color::rgba(132, 148, 163), ink);
     }
-    result.roles[static_cast<std::size_t>(ControlVisualRole::window)] =
-        professional_role(Color::rgba(246, 248, 250),
+    fill_professional_role(result.roles[static_cast<std::size_t>(ControlVisualRole::window)],
+        Color::rgba(246, 248, 250),
                           Color::rgba(246, 248, 250),
                           Color::rgba(155, 166, 177), ink, 0.0);
-    result.roles[static_cast<std::size_t>(ControlVisualRole::panel)] =
-        professional_role(Color::rgba(240, 244, 248),
+    fill_professional_role(result.roles[static_cast<std::size_t>(ControlVisualRole::panel)],
+        Color::rgba(240, 244, 248),
                           Color::rgba(232, 237, 242),
                           Color::rgba(148, 162, 175), ink, 0.0);
-    result.roles[static_cast<std::size_t>(ControlVisualRole::card)] =
-        professional_role(Color::rgba(255, 255, 255),
+    fill_professional_role(result.roles[static_cast<std::size_t>(ControlVisualRole::card)],
+        Color::rgba(255, 255, 255),
                           Color::rgba(244, 247, 250),
                           Color::rgba(151, 166, 179), ink, 6.0);
-    result.roles[static_cast<std::size_t>(ControlVisualRole::accent_button)] =
-        professional_role(Color::rgba(72, 145, 213),
+    fill_professional_role(result.roles[static_cast<std::size_t>(ControlVisualRole::accent_button)],
+        Color::rgba(72, 145, 213),
                           Color::rgba(31, 100, 177),
                           Color::rgba(20, 75, 145), Color::rgba(255, 255, 255));
-    result.roles[static_cast<std::size_t>(ControlVisualRole::command_button)] =
-        professional_role(Color::rgba(252, 253, 255),
+    fill_professional_role(result.roles[static_cast<std::size_t>(ControlVisualRole::command_button)],
+        Color::rgba(252, 253, 255),
                           Color::rgba(229, 236, 244),
                           Color::rgba(126, 147, 166), ink, 2.0);
-    result.roles[static_cast<std::size_t>(ControlVisualRole::editor)] =
-        professional_role(Color::rgba(255, 255, 255),
+    fill_professional_role(result.roles[static_cast<std::size_t>(ControlVisualRole::editor)],
+        Color::rgba(255, 255, 255),
                           Color::rgba(255, 255, 255),
                           Color::rgba(118, 139, 158), ink, 2.0);
-    result.roles[static_cast<std::size_t>(ControlVisualRole::menu_item)] =
-        professional_role(Color::rgba(255, 255, 255, 0),
+    fill_professional_role(result.roles[static_cast<std::size_t>(ControlVisualRole::menu_item)],
+        Color::rgba(255, 255, 255, 0),
                           Color::rgba(255, 255, 255, 0),
                           Color::rgba(148, 162, 175, 0), ink, 2.0);
     // Menu and command-strip items are flat at rest (design language: strip
@@ -909,12 +962,12 @@ ThemeDefinition windows_professional_theme_definition() {
         menu_items.ordinary[static_cast<std::size_t>(ControlSurfaceState::normal)].material;
     menu_items.ordinary[static_cast<std::size_t>(ControlSurfaceState::disabled)].material = resting;
     menu_items.ordinary[static_cast<std::size_t>(ControlSurfaceState::deactivated)].material = resting;
-    result.roles[static_cast<std::size_t>(ControlVisualRole::selection)] =
-        professional_role(Color::rgba(255, 255, 255, 0),
+    fill_professional_role(result.roles[static_cast<std::size_t>(ControlVisualRole::selection)],
+        Color::rgba(255, 255, 255, 0),
                           Color::rgba(255, 255, 255, 0),
                           Color::rgba(148, 162, 175, 0), ink, 0.0);
-    result.roles[static_cast<std::size_t>(ControlVisualRole::progress)] =
-        professional_role(Color::rgba(238, 242, 246),
+    fill_professional_role(result.roles[static_cast<std::size_t>(ControlVisualRole::progress)],
+        Color::rgba(238, 242, 246),
                           Color::rgba(220, 227, 234),
                           Color::rgba(118, 139, 158), ink, 2.0);
     ControlRoleRecipes& progress =
@@ -928,8 +981,8 @@ ThemeDefinition windows_professional_theme_definition() {
     // it had a family, a pale yellow square plate with a grey line and
     // near-black text. A tooltip takes no input, so its hot and pressed
     // recipes are never reached.
-    result.roles[static_cast<std::size_t>(ControlVisualRole::tool_tip)] =
-        professional_role(Color::rgba(255, 255, 225),
+    fill_professional_role(result.roles[static_cast<std::size_t>(ControlVisualRole::tool_tip)],
+        Color::rgba(255, 255, 225),
                           Color::rgba(255, 255, 225),
                           Color::rgba(104, 111, 118),
                           Color::rgba(24, 31, 38), 0.0);
@@ -939,8 +992,7 @@ ThemeDefinition windows_professional_theme_definition() {
 }
 
 std::shared_ptr<const Theme> default_theme() {
-    static const std::shared_ptr<const Theme> value =
-        Theme::create(windows_professional_theme_definition());
+    static const std::shared_ptr<const Theme> value = Theme::create(windows_professional_theme_definition());
     return value;
 }
 

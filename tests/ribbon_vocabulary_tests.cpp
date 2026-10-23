@@ -5,6 +5,7 @@
 // snapshots.
 
 #include "gui_forms/gui_forms.hpp"
+#include "support/theme_definition_heap.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -146,7 +147,9 @@ void accents() {
     second.accent = AccentIndex{1U};
     require(!(first == second), "published geometry compares its accent");
 
-    ThemeDefinition empty = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_empty = test_support::professional_definition();
+
+    ThemeDefinition& empty = *held_empty;
     empty.accent_ramp.clear();
     bool threw = false;
     try {

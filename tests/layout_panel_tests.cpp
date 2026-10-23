@@ -6,12 +6,17 @@
 #include <cstdlib>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <thread>
 
 namespace {
 
 using namespace gui_forms;
+
+// Each test holds its window on the heap. main inlines every test, and
+// the sanitizer build gives each inlined local its own stack slot, so
+// windows held on the stack add up to a frame of 73 KB in main.
 
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
@@ -99,7 +104,9 @@ void test_margin_padding_validation_and_retained_slots() {
     const Rect second_preferred = (*second).requested_bounds();
     const Rect third_preferred = (*third).requested_bounds();
 
-    Window window(flow, {120.0, 100.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(flow, Size{120.0, 100.0});
+
+    Window& window = *held_window;
     window.perform_layout();
     require((*first).arranged_bounds() == Rect{7.0, 6.0, 40.0, 20.0} &&
                 (*second).arranged_bounds() == Rect{54.0, 6.0, 50.0, 20.0} &&
@@ -142,7 +149,8 @@ void test_flow_direction_break_visibility_and_resize() {
     (*flow).add_child(second);
     (*flow).add_child(third);
     (*flow).set_flow_break(*first, true);
-    Window window(flow, {100.0, 100.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(flow, Size{100.0, 100.0});
+    Window& window = *held_window;
     window.perform_layout();
     require((*first).arranged_bounds().y == 0.0 &&
                 (*second).arranged_bounds().y == 20.0 &&
@@ -190,7 +198,8 @@ void test_flow_item_spacing_is_explicit_bounded_layout_state() {
     (*flow).add_child(second);
     (*flow).add_child(third);
     (*flow).set_item_spacing({7.0, 9.0});
-    Window window(flow, {75.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(flow, Size{75.0, 80.0});
+    Window& window = *held_window;
     window.perform_layout();
     require((*first).arranged_bounds() == Rect{0.0, 0.0, 30.0, 20.0} &&
                 (*second).arranged_bounds() == Rect{37.0, 0.0, 30.0, 20.0} &&
@@ -236,7 +245,8 @@ void test_flow_alignment_projects_relational_flex_geometry() {
     (*centered).set_wrap_contents(false);
     (*centered).set_main_alignment(FlowMainAlignment::center);
     (*centered).set_cross_alignment(FlowCrossAlignment::center);
-    Window centered_window(centered, {200.0, 100.0});
+    const std::unique_ptr<Window> held_centered_window = std::make_unique<Window>(centered, Size{200.0, 100.0});
+    Window& centered_window = *held_centered_window;
     centered_window.perform_layout();
     require((*centered_child).arranged_bounds() == Rect{80.0, 40.0, 40.0, 20.0},
             "single-line flow must center a child on both live container axes");
@@ -255,7 +265,8 @@ void test_flow_alignment_projects_relational_flex_geometry() {
     (*distributed).set_wrap_contents(false);
     (*distributed).set_main_alignment(FlowMainAlignment::space_between);
     (*distributed).set_cross_alignment(FlowCrossAlignment::stretch);
-    Window distributed_window(distributed, {100.0, 30.0});
+    const std::unique_ptr<Window> held_distributed_window = std::make_unique<Window>(distributed, Size{100.0, 30.0});
+    Window& distributed_window = *held_distributed_window;
     distributed_window.perform_layout();
     require((*first).arranged_bounds() == Rect{0.0, 0.0, 20.0, 30.0} &&
                 (*second).arranged_bounds() == Rect{40.0, 0.0, 20.0, 30.0} &&
@@ -293,7 +304,8 @@ void test_flow_alignment_projects_relational_flex_geometry() {
     (*growing).set_wrap_contents(false);
     (*growing).set_flex_grow(*first_grow, 1.0);
     (*growing).set_flex_grow(*second_grow, 2.0);
-    Window growing_window(growing, {100.0, 20.0});
+    const std::unique_ptr<Window> held_growing_window = std::make_unique<Window>(growing, Size{100.0, 20.0});
+    Window& growing_window = *held_growing_window;
     growing_window.perform_layout();
     require((*fixed).arranged_bounds().width == 20.0 &&
                 near((*first_grow).arranged_bounds().width, 30.0) &&
@@ -324,7 +336,8 @@ void test_layout_panels_revalidate_snapshot_after_measure_callback() {
         (*removed).set_requested_bounds({0.0, 0.0, 40.0, 20.0});
         (*flow).add_child(mutator);
         (*flow).add_child(removed);
-        Window window(flow, {160.0, 80.0});
+        const std::unique_ptr<Window> held_window = std::make_unique<Window>(flow, Size{160.0, 80.0});
+        Window& window = *held_window;
         window.perform_layout();
         (*mutator).measure_count = 0U;
         (*removed).measure_count = 0U;
@@ -354,7 +367,8 @@ void test_layout_panels_revalidate_snapshot_after_measure_callback() {
         (*removed).set_requested_bounds({0.0, 0.0, 40.0, 20.0});
         (*table).add_child(mutator);
         (*table).add_child(removed);
-        Window window(table, {160.0, 80.0});
+        const std::unique_ptr<Window> held_window = std::make_unique<Window>(table, Size{160.0, 80.0});
+        Window& window = *held_window;
         window.perform_layout();
         (*mutator).measure_count = 0U;
         (*removed).measure_count = 0U;
@@ -398,7 +412,8 @@ void test_table_mixed_tracks_spans_and_lookup() {
     (*table).set_column_span(*spanning, 3U);
 
     const Rect spanning_preferred = (*spanning).requested_bounds();
-    Window window(table, {400.0, 160.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(table, Size{400.0, 160.0});
+    Window& window = *held_window;
     window.perform_layout();
     const std::span<const double> widths = (*table).column_widths();
     const std::span<const double> heights = (*table).row_heights();
@@ -441,7 +456,8 @@ void test_table_growth_hidden_children_and_fixed_overflow() {
     (*table).add_child(first);
     (*table).add_child(second);
     (*table).add_child(third);
-    Window window(table, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(table, Size{120.0, 80.0});
+    Window& window = *held_window;
     window.perform_layout();
     require((*table).row_heights().size() == 2U &&
                 (*table).cell_position(*third) ==
@@ -488,7 +504,8 @@ void test_table_cell_dock_fill_consumes_growth() {
     (*child).set_margin({});
     (*child).set_dock(DockStyle::fill);
     (*table).add_child(child);
-    Window window(table, {240.0, 120.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(table, Size{240.0, 120.0});
+    Window& window = *held_window;
     window.perform_layout();
     require((*child).arranged_bounds() == Rect{0.0, 0.0, 240.0, 120.0},
             "a table-cell Dock=Fill child must consume its complete initial cell");
@@ -516,7 +533,8 @@ void test_table_track_spacing_is_relational_and_bounded() {
     (*second).set_dock(DockStyle::fill);
     (*table).add_child(first);
     (*table).add_child(second);
-    Window window(table, {218.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(table, Size{218.0, 80.0});
+    Window& window = *held_window;
     window.perform_layout();
     require((*table).column_widths().size() == 2U &&
                 near((*table).column_widths()[0], 100.0) &&
@@ -554,7 +572,8 @@ void test_table_border_paint_is_public_geometry() {
     (*table).set_column_count(2U);
     (*table).set_row_count(2U);
     (*table).set_cell_border_style(TableCellBorderStyle::inset);
-    Window window(table, {100.0, 60.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(table, Size{100.0, 60.0});
+    Window& window = *held_window;
     window.perform_layout();
     GridPainter painter;
     (*table).on_paint(painter, {0.0, 0.0, 100.0, 60.0});
@@ -575,7 +594,9 @@ void test_scaled_panel_and_group_are_public_layout_controls() {
     (*group).add_at(grouped, {5.0, 10.0, 20.0, 15.0});
     (*root).add_at(group, {50.0, 0.0, 50.0, 100.0});
 
-    Window window(root, {200.0, 100.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{200.0, 100.0});
+
+    Window& window = *held_window;
     window.perform_layout();
     require((*child).arranged_bounds() == Rect{20.0, 20.0, 60.0, 40.0} &&
                 (*group).arranged_bounds() == Rect{100.0, 0.0, 100.0, 100.0} &&
@@ -634,7 +655,9 @@ void test_default_dock_layout_all_directions_and_z_order() {
     (*root).add_child(bottom);
     (*root).add_child(fill);
 
-    Window window(root, {300.0, 200.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{300.0, 200.0});
+
+    Window& window = *held_window;
     window.perform_layout();
     require((*left).arranged_bounds() == Rect{10.0, 10.0, 30.0, 180.0} &&
                 (*top).arranged_bounds() == Rect{40.0, 10.0, 250.0, 20.0} &&
@@ -660,7 +683,8 @@ void test_default_dock_layout_all_directions_and_z_order() {
     (*second).set_dock(DockStyle::top);
     (*order_root).add_child(first);
     (*order_root).add_child(second);
-    Window order_window(order_root, {100.0, 100.0});
+    const std::unique_ptr<Window> held_order_window = std::make_unique<Window>(order_root, Size{100.0, 100.0});
+    Window& order_window = *held_order_window;
     order_window.perform_layout();
     require((*first).arranged_bounds().y == 0.0 &&
                 (*second).arranged_bounds().y == 20.0,
@@ -692,7 +716,8 @@ void test_compound_anchor_resize_runtime_rebase_and_validation() {
     (*root).add_child(stretch);
     (*root).add_child(bottom_right);
     (*root).add_child(centered);
-    Window window(root, {200.0, 100.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{200.0, 100.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     window.resize({300.0, 150.0});
@@ -749,7 +774,8 @@ void test_flow_auto_scroll_owns_viewport_and_input() {
         (*flow).add_child(item);
         items.push_back(item);
     }
-    Window window(flow, {300.0, 100.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(flow, Size{300.0, 100.0});
+    Window& window = *held_window;
     window.perform_layout();
     require((*flow).hscroll() && !(*flow).vscroll() &&
                 (*flow).scroll_snapshot().viewport_rectangle.width == 300.0,

@@ -18,6 +18,7 @@
 // grows.
 
 #include "gui_forms/gui_forms.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "gui_forms/surface_material/presets/material_presets.hpp"
 
 #include <chrono>
@@ -186,8 +187,9 @@ SurfaceMaterial raised_face() {
     return material;
 }
 
-ThemeDefinition pop_theme() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+std::unique_ptr<ThemeDefinition> pop_theme() {
+    std::unique_ptr<ThemeDefinition> held = test_support::professional_definition();
+    ThemeDefinition& definition = *held;
     definition.id = "engine-pop";
     ControlRoleRecipes& button = definition.roles[static_cast<std::size_t>(ControlVisualRole::button)];
     const std::size_t normal = static_cast<std::size_t>(ControlSurfaceState::normal);
@@ -197,7 +199,7 @@ ThemeDefinition pop_theme() {
     button.selected[normal].material = raised_face();
     button.selected[hot].material = raised_face();
     definition.rules.rules.push_back(pop_rule());
-    return definition;
+    return held;
 }
 
 struct Fixture final {
@@ -225,7 +227,7 @@ std::unique_ptr<Fixture> make_fixture(bool reduced_motion, Insets middle_overflo
     made.window = std::make_unique<Window>(made.root, Size{300.0, 80.0});
     Window& window = *made.window;
     window.motion_clock().set_time_source(&made.time);
-    window.set_theme(Theme::create(pop_theme()));
+    window.set_theme(Theme::create(*pop_theme()));
     require(window.theme().engine().rules().diagnostics().empty(), "the pop theme compiles cleanly");
     if (reduced_motion) {
         PresentationSettings settings = window.presentation_settings();

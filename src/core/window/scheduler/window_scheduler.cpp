@@ -205,8 +205,15 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
         if ((*request).kind == detail::FrameRequestKind::engine_idle) {
             (*request).deadline = now + (*request).interval;
             // Idle: no motion runs and nothing waits to be painted. One
-            // keyframe per idle frame, so that none stalls a frame.
+            // procedural pattern (E10), else one keyframe, per idle frame,
+            // so that none stalls a frame; patterns first, since parts
+            // show their fills' ground until theirs are made.
             if (motion_clock_.armed() || paint_pending()) continue;
+            if (engine_parts_.patterns_waiting()) {
+                const PatternGeneration generation = engine_parts_.generate_pattern(paint_leases_completed_);
+                damage_pattern_waiters(generation);
+                continue;
+            }
             const bool waiting = engine_parts_.bake_idle_keyframe(&image_resources(), paint_leases_completed_);
             if (!waiting) (*request).disconnect();
             continue;

@@ -36,6 +36,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_ci_sanitizer_seed.py
           python3 -B -m unittest discover -s tools -p test_publish_cache.py
           python3 -B -m unittest discover -s tools -p test_windows_toolchain.py
+          python3 -B -m unittest discover -s tools -p test_stack_frames.py
           python3 -B -m unittest discover -s tools -p test_control_registry.py
           python3 tools/control_registry.py check
           python3 tools/control_registry.py emit-cpp --check
@@ -48,6 +49,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_lifetime_rules.py
           python3 -B -m unittest discover -s tools -p test_state_machines.py
           python3 -B -m unittest discover -s tools -p test_ci_build.py
+          python3 -B -m unittest discover -s tools -p test_engine_gate.py
           python3 -B -m unittest discover -s tools -p test_change_selection.py
           python3 -B -m unittest discover -s tools -p test_native_tests.py
           python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv stx_cng fuzz
@@ -190,6 +192,15 @@ jobs:
             selection="--changed-from $CHANGED_FROM"
           fi
           xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/ci_build.py --jobs 4 --sanitize $selection
+      # No first-party function may need a stack frame over 256 KB under the
+      # sanitizers: AddressSanitizer's redzones grew test mains to hundreds of KB
+      # on Windows, and a chain of them overflowed theme_tests' 1 MB main
+      # thread (#283). Reads the prologues of the objects this run built, so
+      # a narrowed pull-request build checks the areas it changed. Runs after
+      # a failed test too: an overflow fails as a crash, which this names.
+      - name: Check stack frames
+        if: ${{ !cancelled() }}
+        run: python gui_forms/tools/stack_frames.py check --tree .build/native-linux-x64/gui-forms-sanitize --jobs 4 --top 15
       - name: Report cache statistics
         if: always()
         run: ccache --show-stats --verbose
@@ -481,8 +492,11 @@ jobs:
       - name: Restore content-checked objects without reusing test results
         if: steps.seed.outputs.seeded == 'true'
         run: python gui_forms/tools/ci_promote.py restore-seed
+      # The engine gate test writes its manifest for the engine-gate job (T2 E11).
       - name: Build and test native toolkit
         if: steps.promotion.outputs.reused != 'true' && (steps.reuse.outputs.reused != 'true')
+        env:
+          GUI_FORMS_ENGINE_GATE_MANIFEST: ${{ github.workspace }}/.ci/engine-gate-${{ matrix.platform }}.tsv
         run: |
           ccache --zero-stats
           if [ "$RUNNER_OS" = Linux ]; then
@@ -612,6 +626,7 @@ jobs:
           path: |
             .build/native-${{ matrix.platform }}/**/Testing/Temporary/*LastTest.log
             .ci/*.json
+            .ci/engine-gate-*.tsv
       - name: Publish this passing platform immediately
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         shell: bash
@@ -622,6 +637,39 @@ jobs:
   # The demonstration programs, their tests, packages and (on main) the tested
   # release, built after the native jobs from their objects. One failed native
   # platform skips the programs of all four, as a release needs all four.
+  # T2's gate evidence (E11): every native job's engine gate manifest, compared
+  # across hosts. Fails on any reference-image hash that differs between hosts
+  # or any idle counter above zero; a host whose native job reused an earlier
+  # validation ran no test and is listed as missing. The filled record is the
+  # t2-engine-gate-record artifact (results/2026-10-22-t2-engine-gate/).
+  engine-gate:
+    needs: native
+    if: always() && needs.native.result != 'skipped' && needs.native.result != 'cancelled'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gui-forms-evidence-*
+          path: .ci/evidence
+      - name: Compare the engine gate manifests across hosts
+        run: >-
+          python3 -B tools/engine_gate.py compare --evidence .ci/evidence --out .ci/engine-gate
+          --commit "${{ github.sha }}"
+          --run "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      - name: Show the record
+        if: always()
+        run: |
+          if [ -f .ci/engine-gate/record.md ]; then cat .ci/engine-gate/record.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: t2-engine-gate-record
+          include-hidden-files: true
+          path: .ci/engine-gate/
+          if-no-files-found: warn
+
   programs:
     needs: native
     uses: ./.github/workflows/release.yml
