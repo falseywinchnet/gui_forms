@@ -10,6 +10,7 @@
 // extent, and a published value reaches only its readers.
 
 #include "gui_forms/control.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "gui_forms/controls/panel/panel.hpp"
 #include "gui_forms/engine.hpp"
 #include "gui_forms/theme.hpp"
@@ -145,8 +146,9 @@ constexpr ExpressionInputIndex pointer_x = engine_input_position(EngineInput::po
 // and `other`, `clock` the time in its states, `scaled` the text scale and
 // `layer` paints the face of `host`, which reads pointer_x, from 5 units
 // right and 5 down.
-ThemeDefinition input_theme() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+std::unique_ptr<ThemeDefinition> input_theme() {
+    std::unique_ptr<ThemeDefinition> held = test_support::professional_definition();
+    ThemeDefinition& definition = *held;
     definition.id = "engine-input-test";
     ThemeRuleSheet& sheet = definition.rules;
     sheet.published_values = {"level", "other"};
@@ -160,7 +162,7 @@ ThemeDefinition input_theme() {
     sheet.rules.push_back(
         bulge_rule("scaled", amplitude_from(engine_input_position(EngineInput::text_scale), 0.25, 0.0625)));
     sheet.rules.push_back(bulge_rule("host", amplitude_from(pointer_x, 1.0 / 40.0, 0.0625)));
-    return definition;
+    return held;
 }
 
 struct Fixture final {
@@ -209,7 +211,7 @@ std::unique_ptr<Fixture> make_fixture() {
     made.window = std::make_unique<Window>(made.root, Size{1000.0, 400.0});
     Window& window = *made.window;
     window.motion_clock().set_time_source(&made.time);
-    window.set_theme(Theme::create(input_theme()));
+    window.set_theme(Theme::create(*input_theme()));
     require(window.theme().engine().rules().diagnostics().empty(), "the input theme compiles cleanly");
     window.perform_layout();
     window.paint(made.painter);

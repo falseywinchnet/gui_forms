@@ -4,6 +4,7 @@
 // shadow (owner decision RB-37).
 
 #include "gui_forms/control.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "gui_forms/theme.hpp"
 
 #include <algorithm>
@@ -315,7 +316,8 @@ void overlay_shadow(const Control& control) {
 // A theme that casts no overlay shadow paints nothing for a shadow part and
 // reports no reach; Theme::create refuses inset or too many layers.
 void theme_without_overlay_shadow() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "no-overlay-shadow";
     definition.overlay_shadow.clear();
     const std::shared_ptr<Control> control = make_control<Control>(StableId("part.flat"));
@@ -329,7 +331,9 @@ void theme_without_overlay_shadow() {
     require(painter.operations.empty() && reach == Insets{},
             "a theme without an overlay shadow casts none");
 
-    ThemeDefinition inset = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_inset = test_support::professional_definition();
+
+    ThemeDefinition& inset = *held_inset;
     inset.overlay_shadow[0].inset = true;
     bool refused_inset = false;
     try {
@@ -337,7 +341,8 @@ void theme_without_overlay_shadow() {
     } catch (const std::invalid_argument&) {
         refused_inset = true;
     }
-    ThemeDefinition crowded = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_crowded = test_support::professional_definition();
+    ThemeDefinition& crowded = *held_crowded;
     crowded.high_contrast_overlay_shadow.assign(SurfaceMaterial::maximum_shadows + 1U, MaterialShadow{});
     bool refused_crowded = false;
     try {

@@ -2137,7 +2137,7 @@
         "request_paint_wake": "Coalesces one thread-safe host paint wake unless occluded or already pending.",
         "acknowledge_paint_wake_if_damage_drained": "Clears the pending wake only after all retained damage drains.",
         "touch_paint": "Advances nonzero content revision and transitions the lease state for a new mutation.",
-        "update_paint_lease_state": "Derives the legal lease state from occlusion, active render, dirty revision, and ready/presented progress.",
+        "paint_lease_state": "Derives the lease state each time from active render, a change during render, occlusion, owed damage, and rendered/presented progress.",
         "defer_input": "Queues bounded critical input during paint while compacting only replaceable moves/drag-overs.",
         "schedule_deferred_input_drain": "Posts one coalesced dispatcher drain after the paint lease releases.",
         "drain_deferred_input": "Delivers one ordered deferred batch outside paint with per-event fault accounting.",

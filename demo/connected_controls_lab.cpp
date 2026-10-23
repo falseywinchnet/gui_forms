@@ -140,7 +140,11 @@ ControlVisualRecipe pearl_recipe(const ControlSurfaceState state,
 }
 
 std::shared_ptr<const Theme> pearl_theme() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    // A ThemeDefinition is some 105 KB and is never kept on the stack
+    // (theme_types.hpp). `new` from the returned value builds it on the
+    // heap directly; std::make_unique would first materialize it here.
+    const std::unique_ptr<ThemeDefinition> held(new ThemeDefinition(windows_professional_theme_definition()));
+    ThemeDefinition& definition = *held;
     definition.id = "connected-controls-office-pearl";
     for (const ControlVisualRole role : {
              ControlVisualRole::button,
@@ -156,7 +160,8 @@ std::shared_ptr<const Theme> pearl_theme() {
             recipes.selected[index] = pearl_recipe(state, true);
         }
     }
-    return Theme::create(std::move(definition));
+    std::shared_ptr<const Theme> theme = Theme::create(definition);
+    return theme;
 }
 
 template <typename ButtonType>

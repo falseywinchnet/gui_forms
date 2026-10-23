@@ -1,5 +1,6 @@
 #include "gui_forms/resources.hpp"
 
+#include "../../image/cng_pixels.hpp"
 #include "stx_zlib/checksum.hpp"
 
 #include <algorithm>
@@ -132,12 +133,20 @@ std::string_view image_resource_error_name(ImageResourceError error) noexcept {
         return "registry_decoded_limit_exceeded";
     case ImageResourceError::stale_image_id: return "stale_image_id";
     case ImageResourceError::allocation_failed: return "allocation_failed";
+    case ImageResourceError::invalid_image_header: return "invalid_image_header";
+    case ImageResourceError::invalid_image_data: return "invalid_image_data";
     }
     return "unknown";
 }
 
-PngValidationResult validate_png(std::span<const std::byte> encoded,
-                                 const ImageRegistryLimits& limits) noexcept {
+namespace {
+
+// validate_png's checks. `transparency` reports a tRNS chunk, which gives an
+// image without an alpha channel transparent pixels.
+PngValidationResult validate_png_chunks(std::span<const std::byte> encoded,
+                                        const ImageRegistryLimits& limits,
+                                        bool& transparency) noexcept {
+    transparency = false;
     if (encoded.empty()) {
         return PngValidationResult::failure(ImageResourceError::empty_input);
     }
@@ -278,6 +287,7 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
             if (offset != encoded.size()) {
                 return PngValidationResult::failure(ImageResourceError::trailing_data);
             }
+            transparency = saw_trns;
             return PngValidationResult::success(metadata);
         } else if (type == iccp) {
             // Compressed ICC profiles are an independent decompression boundary.
@@ -338,11 +348,37 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
                  : ImageResourceError::missing_idat);
 }
 
+ImageMetadata png_image_metadata(const PngMetadata& png, bool transparency) noexcept {
+    bool alpha_channel = png.color_type == PngColorType::grayscale_alpha ||
+                         png.color_type == PngColorType::truecolor_alpha;
+    ImageAlpha alpha = alpha_channel || transparency ? ImageAlpha::straight : ImageAlpha::opaque;
+    ImageMetadata metadata{png.width, png.height, alpha, png.decoded_byte_count};
+    return metadata;
+}
+
+} // namespace
+
+PngValidationResult validate_png(std::span<const std::byte> encoded,
+                                 const ImageRegistryLimits& limits) noexcept {
+    bool transparency = false;
+    PngValidationResult result = validate_png_chunks(encoded, limits, transparency);
+    return result;
+}
+
+// An encoded file the registry has validated: its encoding, what it reports,
+// and its unfiltered sample row length.
+struct ImageRegistry::EncodedImage final {
+    ImageResourceError error{ImageResourceError::none};
+    ImageResourceEncoding encoding{ImageResourceEncoding::png};
+    ImageMetadata metadata{};
+    std::uint64_t row_bytes{};
+};
+
 struct ImageRegistry::Slot final {
     std::uint64_t generation{1};
     bool occupied{};
     ImageResourceEncoding encoding{ImageResourceEncoding::png};
-    PngMetadata metadata{};
+    ImageMetadata metadata{};
     std::vector<std::byte> encoded;
     std::uint64_t row_bytes{};
     std::uint64_t content_hash{};
@@ -397,9 +433,53 @@ ImageResourceError ImageRegistry::registry_quota_error(
     return ImageResourceError::none;
 }
 
+ImageRegistry::EncodedImage ImageRegistry::validate_encoded(
+    std::span<const std::byte> encoded, bool png_only) const noexcept {
+    EncodedImage result;
+    bool transparency = false;
+    const PngValidationResult png = validate_png_chunks(encoded, limits_, transparency);
+    if (png || png.error != ImageResourceError::invalid_signature || png_only) {
+        result.error = png.error;
+        result.encoding = ImageResourceEncoding::png;
+        result.metadata = png_image_metadata(png.metadata, transparency);
+        result.row_bytes = png.metadata.source_row_bytes;
+        return result;
+    }
+    // Not a PNG file (validate_png checked emptiness and the encoded size
+    // first): a CNG file, or neither (invalid_signature).
+    const image::CngFraming cng = image::validate_cng_framing(encoded);
+    if (cng.error != ImageResourceError::none) {
+        result.error = cng.error;
+        return result;
+    }
+    const std::uint64_t pixel_count = static_cast<std::uint64_t>(cng.width) * cng.height;
+    const std::uint64_t decoded_bytes = pixel_count * 4U;
+    if (cng.width > limits_.maximum_width || cng.height > limits_.maximum_height ||
+        pixel_count > limits_.maximum_pixels ||
+        decoded_bytes > limits_.maximum_decoded_bytes_per_image) {
+        result.error = ImageResourceError::dimension_limit_exceeded;
+        return result;
+    }
+    const std::uint64_t channels = cng.alpha ? 4U : 3U;
+    result.error = ImageResourceError::none;
+    result.encoding = ImageResourceEncoding::cng;
+    result.metadata = ImageMetadata{cng.width, cng.height,
+                                   cng.alpha ? ImageAlpha::straight : ImageAlpha::opaque, decoded_bytes};
+    result.row_bytes = static_cast<std::uint64_t>(cng.width) * channels;
+    return result;
+}
+
+ImageLoadResult ImageRegistry::load_image(std::span<const std::byte> encoded) {
+    return load_encoded(encoded, false);
+}
+
 ImageLoadResult ImageRegistry::load_png(std::span<const std::byte> encoded) {
-    const PngValidationResult validated = validate_png(encoded, limits_);
-    if (!validated) {
+    return load_encoded(encoded, true);
+}
+
+ImageLoadResult ImageRegistry::load_encoded(std::span<const std::byte> encoded, bool png_only) {
+    const EncodedImage validated = validate_encoded(encoded, png_only);
+    if (validated.error != ImageResourceError::none) {
         return ImageLoadResult::failure(validated.error);
     }
     if (resource_count_ >= limits_.maximum_resources) {
@@ -411,9 +491,9 @@ ImageLoadResult ImageRegistry::load_png(std::span<const std::byte> encoded) {
         return ImageLoadResult::failure(quota);
     }
     try {
-        return store_new(ImageResourceEncoding::png,
+        return store_new(validated.encoding,
                          std::vector<std::byte>(encoded.begin(), encoded.end()),
-                         validated.metadata, validated.metadata.source_row_bytes,
+                         validated.metadata, validated.row_bytes,
                          hash_bytes(encoded));
     } catch (const std::bad_alloc&) {
         return ImageLoadResult::failure(ImageResourceError::allocation_failed);
@@ -422,7 +502,7 @@ ImageLoadResult ImageRegistry::load_png(std::span<const std::byte> encoded) {
 
 ImageLoadResult ImageRegistry::store_new(ImageResourceEncoding encoding,
                                          std::vector<std::byte> encoded,
-                                         PngMetadata metadata,
+                                         ImageMetadata metadata,
                                          std::uint64_t row_bytes,
                                          std::uint64_t content_hash) {
     std::size_t slot_index = 0;
@@ -484,8 +564,7 @@ ImageLoadResult ImageRegistry::load_bgra32_premultiplied(
                         static_cast<std::size_t>(tight_row_bytes),
                         tight.data() + static_cast<std::size_t>(tight_row_bytes) * row);
         }
-        PngMetadata metadata{width, height, 8, PngColorType::truecolor_alpha,
-                             false, tight_row_bytes, decoded_bytes};
+        ImageMetadata metadata{width, height, ImageAlpha::premultiplied, decoded_bytes};
         std::uint64_t hash = hash_bytes(tight);
         hash ^= (static_cast<std::uint64_t>(width) << 32U) | height;
         return store_new(ImageResourceEncoding::bgra32_premultiplied,
@@ -495,8 +574,19 @@ ImageLoadResult ImageRegistry::load_bgra32_premultiplied(
     }
 }
 
+ImageLoadResult ImageRegistry::replace_image(ImageId image,
+                                             std::span<const std::byte> encoded) {
+    return replace_encoded(image, encoded, false);
+}
+
 ImageLoadResult ImageRegistry::replace_png(ImageId image,
                                            std::span<const std::byte> encoded) {
+    return replace_encoded(image, encoded, true);
+}
+
+ImageLoadResult ImageRegistry::replace_encoded(ImageId image,
+                                               std::span<const std::byte> encoded,
+                                               bool png_only) {
     std::size_t slot_index = 0;
     std::uint64_t generation = 0;
     if (!split_image_id(image, slot_index, generation) || slot_index >= slots_.size()) {
@@ -506,8 +596,8 @@ ImageLoadResult ImageRegistry::replace_png(ImageId image,
     if (!slot.occupied || slot.generation != generation) {
         return ImageLoadResult::failure(ImageResourceError::stale_image_id);
     }
-    const PngValidationResult validated = validate_png(encoded, limits_);
-    if (!validated) {
+    const EncodedImage validated = validate_encoded(encoded, png_only);
+    if (validated.error != ImageResourceError::none) {
         return ImageLoadResult::failure(validated.error);
     }
     if (const ImageResourceError quota = registry_quota_error(
@@ -526,10 +616,10 @@ ImageLoadResult ImageRegistry::replace_png(ImageId image,
     encoded_bytes_ -= slot.encoded.size();
     decoded_bytes_ -= slot.metadata.decoded_byte_count;
     slot.generation = next_generation(slot.generation);
-    slot.encoding = ImageResourceEncoding::png;
+    slot.encoding = validated.encoding;
     slot.metadata = validated.metadata;
     slot.encoded = std::move(replacement);
-    slot.row_bytes = validated.metadata.source_row_bytes;
+    slot.row_bytes = validated.row_bytes;
     slot.content_hash = hash_bytes(encoded);
     encoded_bytes_ += slot.encoded.size();
     decoded_bytes_ += slot.metadata.decoded_byte_count;
@@ -580,8 +670,7 @@ ImageLoadResult ImageRegistry::replace_bgra32_premultiplied(
         decoded_bytes_ -= slot.metadata.decoded_byte_count;
         slot.generation = next_generation(slot.generation);
         slot.encoding = ImageResourceEncoding::bgra32_premultiplied;
-        slot.metadata = {width, height, 8, PngColorType::truecolor_alpha,
-                         false, tight_row_bytes, decoded_bytes};
+        slot.metadata = ImageMetadata{width, height, ImageAlpha::premultiplied, decoded_bytes};
         slot.encoded = std::move(tight);
         slot.row_bytes = tight_row_bytes;
         slot.content_hash = hash_bytes(slot.encoded) ^

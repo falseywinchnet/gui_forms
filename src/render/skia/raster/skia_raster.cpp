@@ -10,7 +10,7 @@
 #include "../../text/harfbuzz/harfbuzz_font_engine.hpp"
 #include "../../text/glyph_run/glyph_run_raster.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
-#include "../../../core/image/png_pixels.hpp"
+#include "../../../core/image/resource_pixels.hpp"
 #include "../../../core/image/png_writer.hpp"
 
 #include "include/core/SkCanvas.h"
@@ -555,8 +555,8 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
     }
 
     bool synchronized = true;
-    // One shared owned decoder for the batch (src/core/image/png_pixels).
-    gui_forms::image::PngPixelDecoder decoder{};
+    // One shared owned decoder for the batch (src/core/image/resource_pixels).
+    gui_forms::image::ResourcePixelDecoder decoder{};
     std::unordered_set<std::uint64_t> active;
     for (const ImageId id : registry.image_ids()) {
         active.insert(id.value);
@@ -609,15 +609,12 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
             pixel_data = SkData::MakeWithCopy(
                 (*resource).encoded.data(), (*resource).encoded.size());
         } else {
-            gui_forms::image::PngPixelRequest request{};
-            request.limits = gui_forms::image::png_limits_for_image((*resource).metadata.width,
-                (*resource).metadata.height, (*resource).encoded.size());
-            request.target = {gui_forms::image::PixelOrder::rgba, gui_forms::image::PixelAlpha::premultiplied};
-            request.purpose = gui_forms::image::PngPixelPurpose::resource;
+            const gui_forms::image::PixelTarget target{gui_forms::image::PixelOrder::rgba,
+                                                       gui_forms::image::PixelAlpha::premultiplied};
             pixels.resize((*resource).metadata.decoded_byte_count);
-            const gui_forms::image::PngPixelResult decoded =
-                decoder.decode((*resource).encoded, request, pixels, row_bytes);
-            if (decoded.error != gui_forms::image::PngPixelError::none ||
+            const gui_forms::image::ResourcePixelResult decoded =
+                decoder.decode(*resource, target, pixels, row_bytes);
+            if (decoded.error != gui_forms::image::ResourcePixelError::none ||
                 decoded.width != (*resource).metadata.width ||
                 decoded.height != (*resource).metadata.height) {
                 (*impl_).images.erase(id.value);

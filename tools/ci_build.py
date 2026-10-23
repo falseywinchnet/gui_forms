@@ -480,6 +480,9 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         options.extend(sanitizer_cmake)
         os.environ.update(sanitizer_environment)
         timeout = '900'
+    # stx_cng's pinned Zstandard 1.5.7 tarball: fetched once, then only its
+    # SHA-256 is checked (the script returns at once when the pin matches).
+    run('sh', ROOT / 'gui_forms/stx_cng/tools/fetch_zstd.sh')
     configure: list[str] = [
         'cmake', '-S', str(ROOT / 'gui_forms'), '-B', str(toolkit), '-G', 'Ninja',
         '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_LIBDIR=lib',

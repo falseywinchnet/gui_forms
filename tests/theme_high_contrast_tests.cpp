@@ -6,6 +6,7 @@
 // and shadows; and Theme::create replaces authored high-contrast records.
 
 #include "gui_forms/theme.hpp"
+#include "support/theme_definition_heap.hpp"
 
 #include <array>
 #include <cstddef>
@@ -88,7 +89,7 @@ StateRecipes reference_high_contrast_selected(double radius) {
 // -- tests ---------------------------------------------------------------------
 
 void derived_records_match_the_authored_ones() {
-    const std::shared_ptr<const Theme> theme = Theme::create(windows_professional_theme_definition());
+    const std::shared_ptr<const Theme> theme = Theme::create(*test_support::professional_definition());
     const ThemeDefinition& definition = (*theme).definition();
     std::size_t compared = 0U;
     for (std::size_t family = 0; family < control_visual_role_count; ++family) {
@@ -115,7 +116,8 @@ void derived_records_match_the_authored_ones() {
 }
 
 void the_pass_keeps_geometry_and_drops_effects() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "effects";
     ControlRoleRecipes& card = definition.roles[static_cast<std::size_t>(ControlVisualRole::card)];
     ControlVisualRecipe& ordinary = card.ordinary[at(ControlSurfaceState::hot)];

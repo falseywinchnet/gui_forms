@@ -23,12 +23,31 @@
 // built as the Gallery variant (GUI_FORMS_AX_GALLERY), the GUI.Forms
 // Gallery. While it runs it writes a dump the client compares against:
 //
-//   {"pid":N,"generation":G,"effects":E,"types":{stable id: manifest id},
-//    "snapshot":<SemanticSnapshot::to_json()>}
+//   {"pid":N,"generation":G,"effects":E,"request":R,"settled":S,
+//    "frame_pending":F,"occluded":O,"motion_armed":M,"freeze_pending":Z,
+//    "paint_passes":P,"lease":L,"content_revision":C,"rendered_revision":D,
+//    "presented_revision":V,
+//    "types":{stable id: manifest id},"snapshot":<SemanticSnapshot::to_json()>}
 //
 // to the path after --semantic-dump, whenever its content changes (checked
 // every 50 ms), by writing a temporary file and renaming it over the
-// dump. The fixture variant adds two controls: "ax.disposable" and the
+// dump.
+//
+// "settled" is true when the window has painted at least once, no
+// invalidation waits for a paint (Window::needs_frame), the motion clock is
+// not armed and (Gallery) no page freeze is pending: nothing the app knows
+// of will change the tree or a value (such as a paint counter a diagnostics
+// control publishes) before the next input. Its inputs, the window's
+// occlusion and its paint lease (state and revisions) are written beside
+// it, so that a client that waits in vain can say what held it.
+// "request" is the number the client last wrote to the file at the dump's
+// path plus ".request", as read by the writer's latest tick. A client that
+// writes a new number after its last action and then waits for a dump with
+// that number and "settled" true reads a tree that reflects the action and
+// is quiet; it never infers quiet from timing. The writer's ticks run on the
+// main thread, after any AX action the client already completed there.
+//
+// The fixture variant adds two controls: "ax.disposable" and the
 // button "ax.dispose", whose click removes and destroys "ax.disposable", so
 // the client can hold an element of a disposed control (interview GF017).
 //
@@ -81,7 +100,7 @@ void freeze_page_on_main(void* context);
 class SemanticDumpWriter final {
 public:
     SemanticDumpWriter(gui_forms::Window& window, const StockEffectCounter* effects, std::string path)
-        : window_(window), effects_(effects), path_(std::move(path)) {}
+        : window_(window), effects_(effects), path_(std::move(path)), request_path_(path_ + ".request") {}
 
     // The timer whose ticks call tick(); observed, owned by AppState, which
     // keeps it no longer than this writer. Started again after a freeze.
@@ -122,17 +141,85 @@ public:
 private:
     void write_if_changed() {
         const std::uint64_t effects = effects_ == nullptr ? 0U : (*effects_).total();
-        const std::string text = dump_text(effects);
+        const std::uint64_t request = read_request();
+        const SettleState settle = settle_state();
+        const std::string text = dump_text(effects, request, settle);
         if (text == written_text_) return;
         write(text);
         written_text_ = text;
     }
 
-    std::string dump_text(std::uint64_t effects) const {
+    // What decides "settled" (see the file comment), read on the main
+    // thread, which also paints, so the inputs cannot change while it runs.
+    struct SettleState final {
+        std::uint64_t paint_passes{};
+        bool frame_pending{};
+        bool occluded{};
+        bool motion_armed{};
+        bool freeze_pending{};
+        gui_forms::PaintLeaseSnapshot lease{};
+        bool settled{};
+    };
+
+    SettleState settle_state() const {
+        SettleState state{};
+        state.paint_passes = window_.metrics_snapshot().paint_passes;
+        state.frame_pending = window_.needs_frame();
+        state.occluded = window_.occluded();
+        state.motion_armed = window_.motion_clock().armed();
+        state.freeze_pending = freeze_pending_;
+        state.lease = window_.paint_lease_snapshot();
+        state.settled = state.paint_passes != 0U && !state.frame_pending && !state.motion_armed &&
+                        !state.freeze_pending;
+        return state;
+    }
+
+    static const char* lease_state_name(gui_forms::PaintLeaseState state) noexcept {
+        switch (state) {
+        case gui_forms::PaintLeaseState::clean: return "clean";
+        case gui_forms::PaintLeaseState::dirty_queued: return "dirty_queued";
+        case gui_forms::PaintLeaseState::rendering: return "rendering";
+        case gui_forms::PaintLeaseState::ready: return "ready";
+        case gui_forms::PaintLeaseState::occluded_dirty: return "occluded_dirty";
+        case gui_forms::PaintLeaseState::retired: return "retired";
+        case gui_forms::PaintLeaseState::rendering_dirty: return "rendering_dirty";
+        }
+        return "unknown";
+    }
+
+    // The client's latest request number, or 0 when it wrote none or the
+    // file does not hold a number. The client replaces the file by rename,
+    // so a read sees a whole number or the previous one.
+    std::uint64_t read_request() const {
+        std::FILE* file = std::fopen(request_path_.c_str(), "r");
+        if (file == nullptr) return 0U;
+        unsigned long long value = 0U;
+        const int fields = std::fscanf(file, "%llu", &value);
+        static_cast<void>(std::fclose(file));
+        if (fields != 1) return 0U;
+        const std::uint64_t request = static_cast<std::uint64_t>(value);
+        return request;
+    }
+
+    static const char* json_bool(bool value) noexcept { return value ? "true" : "false"; }
+
+    std::string dump_text(std::uint64_t effects, std::uint64_t request, const SettleState& settle) const {
         const SemanticSnapshot snapshot = window_.semantic_snapshot();
         std::string text = "{\"pid\":" + std::to_string(static_cast<long long>(getpid())) +
                            ",\"generation\":" + std::to_string(snapshot.generation) +
-                           ",\"effects\":" + std::to_string(effects) + ",\"types\":{";
+                           ",\"effects\":" + std::to_string(effects) +
+                           ",\"request\":" + std::to_string(request) +
+                           ",\"settled\":" + json_bool(settle.settled) +
+                           ",\"frame_pending\":" + json_bool(settle.frame_pending) +
+                           ",\"occluded\":" + json_bool(settle.occluded) +
+                           ",\"motion_armed\":" + json_bool(settle.motion_armed) +
+                           ",\"freeze_pending\":" + json_bool(settle.freeze_pending) +
+                           ",\"paint_passes\":" + std::to_string(settle.paint_passes) +
+                           ",\"lease\":\"" + lease_state_name(settle.lease.state) + "\"" +
+                           ",\"content_revision\":" + std::to_string(settle.lease.content_revision) +
+                           ",\"rendered_revision\":" + std::to_string(settle.lease.rendered_revision) +
+                           ",\"presented_revision\":" + std::to_string(settle.lease.presented_revision) +
+                           ",\"types\":{";
         bool first = true;
         for (const SemanticNode& root : snapshot.roots) append_types(window_, root, text, first);
         text += "},\"snapshot\":";
@@ -153,6 +240,8 @@ private:
     gui_forms::Window& window_;
     const StockEffectCounter* effects_;
     std::string path_;
+    // The file the client writes its request number to: path_ + ".request".
+    std::string request_path_;
     std::string written_text_;
     gui_forms::Timer* timer_{};
     // The page whose frame requests were last cancelled; empty before the

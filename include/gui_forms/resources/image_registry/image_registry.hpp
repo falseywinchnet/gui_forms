@@ -8,8 +8,9 @@
 
 namespace gui_forms {
 
-// Renderer-neutral ownership for validated PNG and premultiplied BGRA bytes.
-// ImageId values are generational; views expire at the next registry mutation.
+// Renderer-neutral ownership for validated CNG and PNG files and
+// premultiplied BGRA bytes. ImageId values are generational; views expire at
+// the next registry mutation.
 class ImageRegistry final {
 public:
     explicit ImageRegistry(ImageRegistryLimits limits = {});
@@ -22,10 +23,21 @@ public:
     ImageRegistry(const ImageRegistry&) = delete;
     ImageRegistry& operator=(const ImageRegistry&) = delete;
 
+    // Admits an encoded image file, CNG or PNG, chosen by its signature:
+    // its framing is validated (validate_png, or the CNG framing check) and
+    // its dimensions held to the limits. A file of neither format is
+    // invalid_signature.
+    [[nodiscard]] ImageLoadResult load_image(std::span<const std::byte> encoded);
+    // As load_image, for PNG files only.
     [[nodiscard]] ImageLoadResult load_png(std::span<const std::byte> encoded);
     [[nodiscard]] ImageLoadResult load_bgra32_premultiplied(
         std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes,
         std::span<const std::byte> pixels);
+    // Replaces an image's contents with an encoded file, as load_image
+    // admits it; a refusal leaves the image unchanged.
+    [[nodiscard]] ImageLoadResult replace_image(
+        ImageId image, std::span<const std::byte> encoded);
+    // As replace_image, for PNG files only.
     [[nodiscard]] ImageLoadResult replace_png(
         ImageId image, std::span<const std::byte> encoded);
     [[nodiscard]] ImageLoadResult replace_bgra32_premultiplied(
@@ -49,9 +61,16 @@ public:
 
 private:
     struct Slot;
+    struct EncodedImage;
+    [[nodiscard]] EncodedImage validate_encoded(
+        std::span<const std::byte> encoded, bool png_only) const noexcept;
+    [[nodiscard]] ImageLoadResult load_encoded(
+        std::span<const std::byte> encoded, bool png_only);
+    [[nodiscard]] ImageLoadResult replace_encoded(
+        ImageId image, std::span<const std::byte> encoded, bool png_only);
     [[nodiscard]] ImageLoadResult store_new(
         ImageResourceEncoding encoding, std::vector<std::byte> encoded,
-        PngMetadata metadata, std::uint64_t row_bytes,
+        ImageMetadata metadata, std::uint64_t row_bytes,
         std::uint64_t content_hash);
     [[nodiscard]] ImageResourceError registry_quota_error(
         std::uint64_t encoded_bytes, std::uint64_t decoded_bytes,

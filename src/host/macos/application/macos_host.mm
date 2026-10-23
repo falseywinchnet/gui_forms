@@ -3599,10 +3599,14 @@ static KeyMap macos_key_map() {
     return map;
 }
 
+// accessibility: NSAccessibility publication of the semantic tree,
+// including editable text attributes, verified by
+// gui_forms_macos_accessibility_tests and the AXUIElement client (stage A).
 HostCapabilities macos_capabilities() {
     return {HostCapabilities::current_protocol_version,
             "appkit-macos",
             HostCapability::lifecycle |
+                HostCapability::accessibility |
                 HostCapability::frame_capture |
                 HostCapability::scale_notifications |
                 HostCapability::occlusion |

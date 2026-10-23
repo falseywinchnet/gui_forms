@@ -109,7 +109,7 @@ Types
    * - :cpp:class:`MaterialFillLayer <gui_forms::MaterialFillLayer>`
      - MaterialFillLayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity.
    * - :cpp:class:`MaterialGlow <gui_forms::MaterialGlow>`
-     - A soft coloured emission around the material's box (E9-C): the box grown by ``spread`` on every side and blurred by ``blur_radius`` (σ = blur_radius / 2, as a shadow's), centred on the box.
+     - A soft coloured emission of the material's box (E9-C): the box grown by ``spread`` on every side and blurred by ``blur_radius`` (σ = blur_radius / 2, as a shadow's), centred on the box.
    * - :cpp:class:`MaterialKeyline <gui_forms::MaterialKeyline>`
      - One ordered physical keyline.
    * - :cpp:class:`MaterialShadow <gui_forms::MaterialShadow>`
@@ -1523,7 +1523,7 @@ Types
 
    ``#include <gui_forms/surface_material/types/surface_material_types.hpp>``
 
-   A soft coloured emission around the material's box (E9-C): the box grown by ``spread`` on every side and blurred by ``blur_radius`` (σ = blur_radius / 2, as a shadow's), centred on the box. The engine's material bake adds it, as light, to the outer shadows beneath it, and draws the fills over it; paint_surface_material composites it as an outer shadow at no offset, which differs only where it lies over a shadow. Its reach, spread + 2 × blur_radius (where its blur is below one 8-bit step), is at most SurfaceMaterial::maximum_glow_reach, so that it stays within the part's granted overflow.
+   A soft coloured emission of the material's box (E9-C): the box grown by ``spread`` on every side and blurred by ``blur_radius`` (σ = blur_radius / 2, as a shadow's), centred on the box. The engine's material bake adds it as light, each premultiplied channel at most 1: - ``under``, to the outer shadows beneath it, with the fills drawn over it. paint_surface_material composites it as an outer shadow at no offset after the outer shadows, which differs only where it lies over a shadow. - ``over``, to the finished face (after its keylines), within the box's coverage. paint_surface_material composites it as an outer shadow at no offset, clipped to the face, after the keylines; that is source-over, not added, so the built-in path's over glow is the dimmer of the two. Its reach, spread + 2 × blur_radius (where its blur is below one 8-bit step), is at most SurfaceMaterial::maximum_glow_reach in both placements, so that an under glow stays within the part's granted overflow; an over glow lies within the box and needs no overflow.
 
    .. cpp:member:: Color color
 
@@ -1534,6 +1534,10 @@ Types
       Default: ``{2.0}``.
 
    .. cpp:member:: double spread
+
+   .. cpp:member:: MaterialGlowPlacement placement
+
+      Default: ``{MaterialGlowPlacement::under}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2830,7 +2834,7 @@ Types
 
    .. rubric:: Methods
 
-   .. cpp:function:: static std::shared_ptr<const Theme> create(ThemeDefinition definition)
+   .. cpp:function:: static std::shared_ptr<const Theme> create(const ThemeDefinition& definition)
 
       Validates bounded identity, every ordinary/selected/high-contrast recipe, and ordered finite structural tokens before publishing shared immutable ownership.
 
@@ -3499,6 +3503,16 @@ Enumerations
    .. cpp:enumerator:: image
 
    .. cpp:enumerator:: conic_gradient
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MaterialGlowPlacement
+
+   ``#include <gui_forms/surface_material/types/surface_material_types.hpp>``
+
+   .. cpp:enumerator:: under
+
+   .. cpp:enumerator:: over
 
 .. cpp:namespace:: gui_forms
 

@@ -66,9 +66,12 @@ What history teaches:
 - **Transitions and state machines**: CSS transition and keyframe syntax
   mapped onto the engine's state machines and settling primitives
   (`follow()`, `spring()`, `decay()` as engine functions).
-- **Resources**: PNG for theme assets (a tiling background, a backplane
-  fresco), never control faces (§12.3). No font bytes; a theme selects among
-  bundled typography roles. No executable code, filesystem or network access.
+- **Resources**: image assets named by resource: tiling backgrounds,
+  backplane frescoes and control faces. Image faces are supported: CONV
+  prepares each face size ahead of the bake (T2, "CONV, image face
+  variants"). CNG is the native resource format, and PNG is for interop. No
+  font bytes; a theme selects among bundled typography roles. No executable
+  code, filesystem or network access.
 - **Engine version**: a theme declares the engine version it needs.
 
 The scenario, in the syntax direction agreed with the owner (illustrative,

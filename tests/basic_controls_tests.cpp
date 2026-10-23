@@ -1,4 +1,5 @@
 #include "gui_forms/basic_controls.hpp"
+#include "support/theme_definition_heap.hpp"
 #include "gui_forms/diagnostic_controls.hpp"
 #include "gui_forms/window.hpp"
 #include "gui_forms/text.hpp"
@@ -23,6 +24,10 @@
 namespace {
 
 using namespace gui_forms;
+
+// Each test holds its window on the heap. main inlines every test, and
+// the sanitizer build gives each inlined local its own stack slot, so
+// windows held on the stack add up to a frame of 105 KB in main.
 namespace callbacks = gui_forms::test_support;
 
 constexpr std::array<std::uint8_t, 70> one_pixel_png{
@@ -265,7 +270,8 @@ void test_public_controls_render_with_role_policy() {
     (*group).add_child(check);
     (*group).add_child(radio);
     (*panel).add_child(group);
-    Window window(panel, {360.0, 180.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(panel, Size{360.0, 180.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     RecordingPainter painter{};
@@ -289,7 +295,8 @@ void test_public_controls_render_with_role_policy() {
 void test_button_pointer_and_keyboard_activation() {
     std::shared_ptr<gui_forms::Button> button = make_control<Button>(StableId("button"), "Run");
     (*button).set_requested_bounds({10.0, 10.0, 90.0, 28.0});
-    Window window(button, {120.0, 60.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(button, Size{120.0, 60.0});
+    Window& window = *held_window;
     std::uint64_t clicks = 0;
     SubscriptionToken clicked = (*button).clicked().subscribe(
         callbacks::IncrementCounter<std::uint64_t, ButtonBase&>(clicks));
@@ -336,7 +343,8 @@ void test_button_focus_cue_tracks_input_modality() {
     (*second).set_requested_bounds({100.0, 10.0, 80.0, 30.0});
     (*root).add_child(first);
     (*root).add_child(second);
-    Window window(root, {200.0, 50.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{200.0, 50.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     click(window, first);
@@ -419,7 +427,8 @@ void test_button_authored_state_recipes_are_owned_and_retained() {
         StableId("button.authored-state-recipes"), "Authored");
     (*button).set_requested_bounds({0.0, 0.0, 120.0, 32.0});
     (*button).set_visual_recipes(recipes);
-    Window window(button, {120.0, 32.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(button, Size{120.0, 32.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     RecordingPainter normal_painter{};
@@ -511,7 +520,8 @@ void test_nested_authored_surfaces_are_control_background_layers() {
     (*root).set_authored_surface_material(solid_material(root_color));
     (*child).set_requested_bounds({10.0, 10.0, 60.0, 24.0});
     (*root).add_child(child);
-    Window window(root, {100.0, 60.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{100.0, 60.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     RecordingPainter reveal_painter{};
@@ -583,7 +593,8 @@ void test_mnemonics_and_dialog_buttons_are_retained_commands() {
     (*root).add_child(run_duplicate);
     (*root).add_child(accept);
     (*root).add_child(cancel);
-    Window window(root, {240.0, 104.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{240.0, 104.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     std::uint64_t run_clicks{};
@@ -744,7 +755,8 @@ void test_mnemonics_and_dialog_buttons_are_retained_commands() {
 void test_checkbox_state_and_click_order() {
     std::shared_ptr<gui_forms::CheckBox> check = make_control<CheckBox>(StableId("check"), "Precise");
     (*check).set_requested_bounds({0.0, 0.0, 140.0, 24.0});
-    Window window(check, {140.0, 24.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(check, Size{140.0, 24.0});
+    Window& window = *held_window;
     std::string order{};
     SubscriptionToken state =
         (*check).check_state_changed().subscribe(TraceCheckState(order));
@@ -788,7 +800,8 @@ void test_radio_group_scope_and_order() {
     (*group).add_child(independent);
     (*first).set_checked(true);
     (*independent).set_checked(true);
-    Window window(group, {360.0, 70.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(group, Size{360.0, 70.0});
+    Window& window = *held_window;
 
     std::string order{};
     SubscriptionToken first_changed = (*first).checked_changed().subscribe(
@@ -806,7 +819,8 @@ void test_radio_group_scope_and_order() {
 void test_link_and_callback_disposal() {
     std::shared_ptr<gui_forms::LinkLabel> link = make_control<LinkLabel>(StableId("link"), "Show details");
     (*link).set_requested_bounds({0.0, 0.0, 120.0, 24.0});
-    Window link_window(link, {120.0, 24.0});
+    const std::unique_ptr<Window> held_link_window = std::make_unique<Window>(link, Size{120.0, 24.0});
+    Window& link_window = *held_link_window;
     std::uint64_t clicks = 0;
     SubscriptionToken link_click = (*link).clicked().subscribe(
         callbacks::IncrementCounter<std::uint64_t, ButtonBase&>(clicks));
@@ -818,7 +832,8 @@ void test_link_and_callback_disposal() {
     std::shared_ptr<gui_forms::CheckBox> check = make_control<CheckBox>(StableId("dispose.check"), "Dispose safely");
     (*check).set_requested_bounds({0.0, 0.0, 140.0, 24.0});
     (*root).add_child(check);
-    Window window(root, {140.0, 24.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{140.0, 24.0});
+    Window& window = *held_window;
     std::uint64_t later_callbacks = 0;
     SubscriptionToken dispose_on_state = (*check).check_state_changed().subscribe(
         callbacks::DisposeCapturedControl<CheckBox, CheckState>(check));
@@ -834,7 +849,8 @@ void test_link_and_callback_disposal() {
 
 void test_wrong_thread_property_mutation_is_rejected() {
     std::shared_ptr<gui_forms::Label> label = make_control<Label>(StableId("thread.label"), "Before");
-    Window window(label, {100.0, 24.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(label, Size{100.0, 24.0});
+    Window& window = *held_window;
     bool rejected = false;
     std::thread worker(attempt_label_mutation, std::cref(label),
                        std::ref(rejected));
@@ -846,7 +862,8 @@ void test_wrong_thread_property_mutation_is_rejected() {
 void test_fixed_label_text_is_paint_only() {
     std::shared_ptr<gui_forms::Label> label = make_control<Label>(StableId("label.telemetry"), "0 kB/s");
     (*label).set_requested_bounds({0.0, 0.0, 120.0, 24.0});
-    Window window(label, {120.0, 24.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(label, Size{120.0, 24.0});
+    Window& window = *held_window;
     window.perform_layout();
     RecordingPainter painter{};
     window.paint(painter, {0.0, 0.0, 120.0, 24.0});
@@ -894,7 +911,8 @@ void test_fixed_label_measurement_does_not_resolve_unused_text() {
     (*label).set_requested_bounds({0.0, 0.0, 190.0, 108.0});
     (*label).set_text_wrapping(TextWrapping::word);
     (*label).set_maximum_lines(7U);
-    Window window(label, {190.0, 108.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(label, Size{190.0, 108.0});
+    Window& window = *held_window;
     window.set_text_metrics_provider(&provider);
     provider.calls = 0U;
     const Size complete = (*label).measure({300.0, 200.0});
@@ -934,7 +952,8 @@ void test_label_multiline_wrapping_and_alignment() {
     (*label).set_text_wrapping(TextWrapping::word);
     (*label).set_vertical_alignment(VerticalAlignment::near);
     (*label).set_alignment(HorizontalAlignment::far);
-    Window window(label, {120.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(label, Size{120.0, 80.0});
+    Window& window = *held_window;
     RecordingPainter painter{};
     window.paint(painter, {0.0, 0.0, 120.0, 80.0});
     require(painter.texts.size() == 4U && painter.texts.front() == "Retained labels" &&
@@ -1105,7 +1124,8 @@ void test_label_line_limit_bounds_hidden_wrapping_work() {
     (*label).set_font({FontRole::content, 13.0, 400, false});
     (*label).set_text_wrapping(TextWrapping::word);
     (*label).set_maximum_lines(7U);
-    Window window(label, {190.0, 108.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(label, Size{190.0, 108.0});
+    Window& window = *held_window;
     window.perform_layout();
     RecordingPainter painter{};
     (*label).on_paint(painter, {0.0, 0.0, 190.0, 108.0});
@@ -1163,7 +1183,8 @@ void test_owner_decoration_is_retained_and_owner_relative() {
     after_recipe.right = 10.0;
     const OwnerDecorationRecipe recipes[]{before_recipe, after_recipe};
     (*button).set_owned_decorations(recipes, 2U);
-    Window window(button, {80.0, 40.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(button, Size{80.0, 40.0});
+    Window& window = *held_window;
     RecordingPainter first{};
     window.paint(first, {0.0, 0.0, 80.0, 40.0});
     const std::vector<char> expected_order{'L', 'L', 'T', 'L', 'L'};
@@ -1201,7 +1222,8 @@ void test_basic_control_layout_customization_is_bounded_and_atomic() {
     require((*label).maximum_lines() == 2U && limited.height < unrestricted.height,
             "Label MaximumLines must bound content-sized desired height");
     (*label).set_requested_bounds({0.0, 0.0, 72.0, 80.0});
-    Window label_window(label, {72.0, 80.0});
+    const std::unique_ptr<Window> held_label_window = std::make_unique<Window>(label, Size{72.0, 80.0});
+    Window& label_window = *held_label_window;
     RecordingPainter label_painter{};
     label_window.paint(label_painter, {0.0, 0.0, 72.0, 80.0});
     require(label_painter.texts.size() == 2U,
@@ -1253,7 +1275,8 @@ void test_basic_control_layout_customization_is_bounded_and_atomic() {
 }
 
 void test_label_inherits_theme_typography_until_explicitly_overridden() {
-    ThemeDefinition definition = windows_professional_theme_definition();
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
     definition.id = "label-type-roles";
     definition.structure.typography.heading =
         {FontRole::control, 17.0, 650, false, 0.31};
@@ -1264,7 +1287,7 @@ void test_label_inherits_theme_typography_until_explicitly_overridden() {
         .ordinary[static_cast<std::size_t>(ControlSurfaceState::normal)].text =
         themed_text;
     std::shared_ptr<gui_forms::Label> label = make_control<Label>(StableId("label.theme"), "Heading");
-    (*label).set_theme_override(Theme::create(std::move(definition)));
+    (*label).set_theme_override(Theme::create(definition));
     (*label).set_text_style_role(TextStyleRole::heading);
     require(!(*label).has_font_override() &&
                 (*label).font() == FontSpec{FontRole::control, 17.0, 650, false,
@@ -1298,7 +1321,8 @@ void test_picture_box_modes_registry_and_semantics() {
     (*picture).set_requested_bounds({0.0, 0.0, 100.0, 100.0});
     (*picture).set_border_style(BorderStyle::line);
     (*picture).set_accessible_name("Professional test card");
-    Window window(picture, {100.0, 100.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(picture, Size{100.0, 100.0});
+    Window& window = *held_window;
     const std::vector<std::byte> pixels(4U * 2U * 4U, std::byte{0xff});
     const ImageLoadResult loaded = window.load_bgra32_premultiplied(
         4U, 2U, 16U, pixels);
@@ -1399,7 +1423,8 @@ void test_public_drawing_metrics_and_control_tag() {
     (*metrics).set_requested_bounds({0.0, 60.0, 240.0, 90.0});
     (*root).add_child(drawing);
     (*root).add_child(metrics);
-    Window window(root, {240.0, 150.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{240.0, 150.0});
+    Window& window = *held_window;
     window.perform_layout();
     RecordingPainter painter{};
     window.paint(painter, {0.0, 0.0, 240.0, 150.0});
@@ -1480,7 +1505,8 @@ void test_drop_down_button_routes_pointer_keyboard_and_semantics() {
     (*split).set_requested_bounds({120.0, 10.0, 120.0, 32.0});
     (*root).add_child(menu);
     (*root).add_child(split);
-    Window window(root, {250.0, 52.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(root, Size{250.0, 52.0});
+    Window& window = *held_window;
     window.perform_layout();
 
     std::size_t menu_requests{};
@@ -1594,7 +1620,8 @@ void test_bottom_disclosure_and_multiline_button_content() {
     (*button).set_font({FontRole::control,12,400,false});
     (*button).set_text("Paste");
     (*button).set_requested_bounds({0, 0, 64, 80});
-    Window window(button, {64, 80});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(button, Size{64, 80});
+    Window& window = *held_window;
     window.perform_layout();
     std::size_t clicks = 0, menus = 0;
     SubscriptionToken click_token = (*button).clicked().subscribe(callbacks::IncrementCounter<std::size_t, ButtonBase&>(clicks));
@@ -1618,7 +1645,8 @@ void test_bottom_disclosure_and_multiline_button_content() {
 void test_image_list_state_density_ownership_and_button_layout() {
     std::shared_ptr<gui_forms::Button> button = make_control<Button>(StableId("button.images"), "Launch");
     (*button).set_requested_bounds({0.0, 0.0, 150.0, 36.0});
-    Window window(button, {150.0, 36.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(button, Size{150.0, 36.0});
+    Window& window = *held_window;
     std::shared_ptr<gui_forms::ImageList> images = std::make_shared<ImageList>(window, Size{16.0, 16.0});
     const std::span<const std::byte, 70U> png =
         std::as_bytes(std::span{one_pixel_png});
@@ -1693,7 +1721,8 @@ void test_image_list_state_density_ownership_and_button_layout() {
             "ImageList key rename must be atomic, case-insensitive, and tokenized");
 
     std::shared_ptr<gui_forms::Panel> other_root = make_control<Panel>(StableId("button.images.other"));
-    Window other_window(other_root, {10.0, 10.0});
+    const std::unique_ptr<Window> held_other_window = std::make_unique<Window>(other_root, Size{10.0, 10.0});
+    Window& other_window = *held_other_window;
     std::shared_ptr<gui_forms::ImageList> foreign = std::make_shared<ImageList>(other_window);
     bool rejected_foreign{};
     try {

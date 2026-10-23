@@ -15,6 +15,10 @@ namespace {
 
 using namespace gui_forms;
 
+// Each test holds its fixture on the heap. main inlines every test, and
+// the sanitizer build gives each inlined local its own stack slot, so
+// fixtures held on the stack add up to a frame of 103 KB in main.
+
 void require(bool condition, const char* message) {
     if (!condition) {
         throw std::runtime_error(message);
@@ -403,7 +407,8 @@ private:
 };
 
 std::string canonical_host_trace() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     std::uint64_t time = 1'000;
     require(fixture.host.dispatch(HostAttachEvent{{320.0, 180.0}, 2.0}, time++).accepted(),
             "headless attach must be accepted");
@@ -433,7 +438,8 @@ std::string canonical_host_trace() {
 }
 
 std::string canonical_service_trace() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     HostServices& services = fixture.host.services();
     const HostMonitorResult monitors = services.query_monitors();
     std::string trace = "service=monitors error=";
@@ -481,7 +487,8 @@ std::string canonical_service_trace() {
 }
 
 std::string canonical_modal_trace() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     host::HeadlessHostServices& services = static_cast<host::HeadlessHostServices&>(
         fixture.host.services());
     std::string trace;
@@ -496,7 +503,8 @@ std::string canonical_modal_trace() {
 }
 
 void test_capabilities_and_normalized_dispatch() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     const HostCapabilities capabilities = host::headless_capabilities();
     require(capabilities.supports(HostCapability::lifecycle |
                                       HostCapability::scale_notifications |
@@ -543,7 +551,8 @@ void test_capabilities_and_normalized_dispatch() {
 }
 
 void test_application_callback_fault_is_contained_at_host_boundary() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     require(fixture.host.dispatch(
                 HostAttachEvent{{320.0, 180.0}, 1.0}, 1).accepted(),
             "callback-fault fixture must attach before input");
@@ -575,7 +584,8 @@ void test_application_callback_fault_is_contained_at_host_boundary() {
 }
 
 void test_semantic_sound_cues_are_bounded_and_deterministic() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     host::HeadlessHostServices& services = static_cast<host::HeadlessHostServices&>(
         fixture.host.services());
     require(fixture.window.host_services() == &services,
@@ -626,7 +636,8 @@ void test_semantic_sound_cues_are_bounded_and_deterministic() {
 }
 
 void test_typed_dialog_requests_and_results() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     host::HeadlessHostServices& services = static_cast<host::HeadlessHostServices&>(
         fixture.host.services());
 
@@ -729,7 +740,8 @@ DragEvent drag_event(DragAction action, std::uint64_t session_id, Point position
 }
 
 void test_typed_drag_destination_routing_and_bounds() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     require(fixture.host.dispatch(HostAttachEvent{{100.0, 80.0}, 1.0}, 0).accepted(),
             "drag fixture must attach before host input");
     require(fixture.host.dispatch(drag_event(DragAction::enter, 90, {10.0, 10.0}), 1)
@@ -783,7 +795,8 @@ void test_typed_drag_destination_routing_and_bounds() {
     (*right).set_requested_bounds({50.0, 0.0, 50.0, 40.0});
     (*root).add_child(left);
     (*root).add_child(right);
-    Window transition_window(root, {100.0, 40.0});
+    const std::unique_ptr<Window> held_transition_window = std::make_unique<Window>(root, Size{100.0, 40.0});
+    Window& transition_window = *held_transition_window;
     host::HeadlessHost transition_host(transition_window);
     require(transition_host.dispatch(HostAttachEvent{{100.0, 40.0}, 1.0}, 0)
                 .accepted(),
@@ -806,7 +819,8 @@ void test_typed_drag_destination_routing_and_bounds() {
 }
 
 void test_nested_modal_order_owner_suppression_and_limit() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     require(fixture.host.dispatch(HostAttachEvent{{100.0, 80.0}, 1.0}, 0).accepted(),
             "modal fixture must attach before host input");
     host::HeadlessHostServices& services = static_cast<host::HeadlessHostServices&>(
@@ -843,7 +857,9 @@ void test_nested_modal_order_owner_suppression_and_limit() {
             "modal exit must restore owner eligibility without losing focus");
     observation.disconnect();
 
-    Fixture limit_fixture;
+    const std::unique_ptr<Fixture> held_limit_fixture = std::make_unique<Fixture>();
+
+    Fixture& limit_fixture = *held_limit_fixture;
     host::HeadlessHostServices& limit_services =
         static_cast<host::HeadlessHostServices&>(limit_fixture.host.services());
     HostServiceError terminal_error = HostServiceError::none;
@@ -855,7 +871,9 @@ void test_nested_modal_order_owner_suppression_and_limit() {
                 limit_services.snapshot().modal_depth == 0,
             "nested modal depth must fail closed at the portable bound and unwind");
 
-    Fixture shutdown_fixture;
+    const std::unique_ptr<Fixture> held_shutdown_fixture = std::make_unique<Fixture>();
+
+    Fixture& shutdown_fixture = *held_shutdown_fixture;
     host::HeadlessHostServices& shutdown_services =
         static_cast<host::HeadlessHostServices&>(shutdown_fixture.host.services());
     shutdown_services.set_dialog_handler(shutdown_during_dialog);
@@ -869,7 +887,8 @@ void test_nested_modal_order_owner_suppression_and_limit() {
 
 void test_modal_observer_failure_and_shutdown_unwind() {
     for (unsigned scenario = 0; scenario < 3; ++scenario) {
-        Fixture fixture;
+        const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+        Fixture& fixture = *held_fixture;
         host::HeadlessHostServices& services =
             static_cast<host::HeadlessHostServices&>(fixture.host.services());
         unsigned calls{};
@@ -893,7 +912,8 @@ void test_modal_observer_failure_and_shutdown_unwind() {
 }
 
 void test_display_capture_and_occlusion_synchronization() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     require(fixture.host.dispatch(HostAttachEvent{{640.0, 360.0}, 1.0}, 1).accepted(),
             "host synchronization fixture must attach");
     require(fixture.host.dispatch(
@@ -957,7 +977,8 @@ void test_display_capture_and_occlusion_synchronization() {
 }
 
 void test_environment_services_are_bounded_and_deterministic() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     HostServices& services = fixture.host.services();
     const HostMonitorResult monitors = services.query_monitors();
     require(monitors.status.accepted() && monitors.monitors.size() == 1 &&
@@ -1014,7 +1035,8 @@ void test_environment_services_are_bounded_and_deterministic() {
 }
 
 void test_sequence_geometry_and_shutdown_guards() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     HostDispatchResult wrong_thread;
     std::thread worker(DispatchSessionOffThread(fixture, wrong_thread));
     worker.join();
@@ -1056,7 +1078,8 @@ void test_sequence_geometry_and_shutdown_guards() {
 }
 
 void test_lifecycle_transition_guards() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
 
     require(fixture.host.dispatch(HostActivationEvent{true}, 1).error ==
                 HostDispatchError::invalid_lifecycle,
@@ -1114,7 +1137,8 @@ void test_lifecycle_transition_guards() {
 }
 
 void test_close_cancellation_and_closed_cleanup() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     static_cast<void>(fixture.host.dispatch(HostAttachEvent{{320.0, 180.0}, 1.0}, 1));
     SubscriptionToken cancellation =
         fixture.host.session().closing().subscribe(cancel_close);
@@ -1150,7 +1174,8 @@ void test_headless_trace_is_byte_deterministic() {
 }
 
 void test_headless_host_observes_model_originated_paint_wakes() {
-    Fixture fixture;
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
     require(fixture.host.consume_paint_wake(),
             "headless host must observe initial retained Window dirtiness");
     static_cast<void>(fixture.window.take_damage());
@@ -1164,7 +1189,8 @@ void test_normalized_host_input_reports_paint_lease_deferral() {
     std::shared_ptr<HostLeaseInputProbe> probe =
         make_control<HostLeaseInputProbe>(StableId("host.paint.input"));
     (*probe).set_requested_bounds({0.0, 0.0, 100.0, 80.0});
-    Window window(probe, {100.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(probe, Size{100.0, 80.0});
+    Window& window = *held_window;
     host::HeadlessHost host(window);
     require(host.dispatch(
                 HostAttachEvent{{100.0, 80.0}, 1.0}, 1U).accepted(),
@@ -1194,7 +1220,8 @@ void test_drag_over_reuses_effect_and_compacts_while_painting() {
     std::shared_ptr<HostLeaseInputProbe> probe =
         make_control<HostLeaseInputProbe>(StableId("host.paint.drag"));
     (*probe).set_requested_bounds({0.0, 0.0, 100.0, 80.0});
-    Window window(probe, {100.0, 80.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(probe, Size{100.0, 80.0});
+    Window& window = *held_window;
     host::HeadlessHost host(window);
     require(host.dispatch(
                 HostAttachEvent{{100.0, 80.0}, 1.0}, 1U).accepted(),
