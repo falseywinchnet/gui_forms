@@ -795,6 +795,8 @@ int main(int argc, char** argv) {
     try {
         // The multithreaded apartment outlives both clients, so the element
         // the first keeps stays valid for the second to check and release.
+        require(host::windows_capabilities().supports(HostCapability::accessibility),
+                "the Windows host advertises accessibility");
         CO_MTA_USAGE_COOKIE mta{};
         require(SUCCEEDED(CoIncrementMTAUsage(&mta)), "the multithreaded apartment is kept");
         Decoy decoy;

@@ -1457,9 +1457,13 @@ HostServiceStatus NativeWindow::request_frame(Rect content) {
 }
 } // namespace gui_forms::host::linux_detail
 namespace gui_forms::host {
+// accessibility: ATK/AT-SPI publication of the semantic tree, including
+// AtkText, verified by the AT-SPI client tests over a fixture and the
+// Gallery (stage A). ATK is a required dependency of this host.
 HostCapabilities linux_capabilities() {
   return {HostCapabilities::current_protocol_version, "linux-x11",
-          HostCapability::lifecycle | HostCapability::frame_capture |
+          HostCapability::lifecycle | HostCapability::accessibility |
+              HostCapability::frame_capture |
               HostCapability::monitor_geometry |
               HostCapability::occlusion | HostCapability::scheduled_wake |
               HostCapability::pointer_input | HostCapability::keyboard_input |
