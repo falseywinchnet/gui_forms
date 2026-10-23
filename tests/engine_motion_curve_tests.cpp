@@ -11,6 +11,7 @@
 // hash instead of checking it.
 
 #include "gui_forms/gui_forms.hpp"
+#include "support/theme_definition_heap.hpp"
 
 #include <array>
 #include <chrono>
@@ -446,8 +447,7 @@ std::unique_ptr<PadFixture> make_pad(Insets overflow, std::vector<PropertyTransi
     made.window = std::make_unique<Window>(made.root, Size{400.0, 300.0});
     Window& window = *made.window;
     window.motion_clock().set_time_source(&made.time);
-    // Held on the heap: a theme definition is too large for a test frame.
-    std::unique_ptr<ThemeDefinition> definition{new ThemeDefinition{windows_professional_theme_definition()}};
+    const std::unique_ptr<ThemeDefinition> definition = test_support::professional_definition();
     (*definition).id = "engine-motion-curve-test";
     ThemeRule rule = pad_rule("pad", "pill_plate");
     rule.transitions = std::move(transitions);
