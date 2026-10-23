@@ -152,6 +152,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/engine_math/engine_math.cpp
     src/core/engine/engine_expression/engine_expression.cpp
     src/core/engine/primitive_registry/primitive_registry.cpp
+    src/core/engine/feature_samples/engine_feature_samples.cpp
     src/core/engine/primitives/bulge/bulge_primitives.cpp
     src/core/engine/primitives/relief/relief_primitives.cpp
     src/core/engine/primitives/material/material_image.cpp
@@ -2315,10 +2316,16 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_engine_pop_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_pop_tests COMMAND gui_forms_engine_pop_tests)
 
-    # T2's gate evidence (E11): every registered primitive's reference images
-    # and the idle-frame counters, written as a manifest that CI compares
-    # across hosts (tools/engine_gate.py).
+    # T2's gate evidence (E11): every registered primitive's and every feature
+    # sample's reference images, the census of features, and the idle-frame
+    # counters, written as a manifest that CI compares across hosts
+    # (tools/engine_gate.py).
     add_executable(gui_forms_engine_gate_tests tests/engine_gate_tests.cpp)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        # The census names every value of the engine's vocabulary in a switch:
+        # a value added without a name (and a feature sample) fails the build.
+        set_source_files_properties(tests/engine_gate_tests.cpp PROPERTIES COMPILE_OPTIONS "-Werror=switch")
+    endif()
     target_link_libraries(gui_forms_engine_gate_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_gate_tests COMMAND gui_forms_engine_gate_tests)
 

@@ -21,6 +21,8 @@ def manifest_text(rows: list[str], counters: list[str] | None = None, registry: 
 
 BULGE: str = 'primitive\tbulge\trest\t1.00\t1\t51\t0\t58212a64ba6d4616'
 GLASS: str = 'primitive\tglass\trest\t1.00\t1\t51\t0\t8002a0c7d2724c39'
+SAMPLES: list[str] = ['samples\t1', 'sample\tfill_conic\tmaterial\trest\t1.00\t1\t51\t0\t35e5bfc0b8f3e2a1',
+                      'feature\tfill.conic_gradient\tfill_conic']
 
 
 def write_evidence(root: Path, manifests: dict[str, str]) -> None:
@@ -40,6 +42,17 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(manifest.registry, 2)
         self.assertEqual(manifest.images[('bulge', 'rest', '1.00')], ('1', '51', '0', '58212a64ba6d4616'))
         self.assertEqual(manifest.counters, {'ribbon.idle_frames_run': 0})
+
+    def test_samples_and_features_are_read(self) -> None:
+        manifest: engine_gate.Manifest = engine_gate.parse_manifest(manifest_text([BULGE] + SAMPLES))
+        self.assertEqual(manifest.sample_count, 1)
+        self.assertEqual(manifest.samples[('fill_conic', 'rest', '1.00')],
+                         ('material', '1', '51', '0', '35e5bfc0b8f3e2a1'))
+        self.assertEqual(manifest.features, {'fill.conic_gradient': 'fill_conic'})
+        with self.assertRaises(ValueError):
+            engine_gate.parse_manifest(manifest_text([BULGE] + SAMPLES + [SAMPLES[1]]))
+        with self.assertRaises(ValueError):
+            engine_gate.parse_manifest(manifest_text([BULGE] + SAMPLES + [SAMPLES[2]]))
 
     def test_a_foreign_file_or_a_malformed_row_is_refused(self) -> None:
         with self.assertRaises(ValueError):
@@ -64,7 +77,7 @@ class CompareTests(unittest.TestCase):
         return status, result, record
 
     def test_identical_hosts_pass_and_fill_the_record(self) -> None:
-        text: str = manifest_text([BULGE, GLASS])
+        text: str = manifest_text([BULGE, GLASS] + SAMPLES)
         manifests: dict[str, str] = {}
         platform: str
         for platform in engine_gate.PLATFORMS:
@@ -76,9 +89,12 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertTrue(result['identical'])
         self.assertEqual(result['primitives'], ['bulge', 'glass'])
+        self.assertEqual(result['samples'], ['fill_conic'])
+        self.assertEqual(result['sample_images'], 1)
         self.assertEqual(result['missing'], [])
         self.assertIn('`abc123`', record)
-        self.assertIn('| linux-arm64 | 2 | 2 | yes |', record)
+        self.assertIn('| linux-arm64 | 2 | 2 | 1 | 1 | yes |', record)
+        self.assertIn('| `fill.conic_gradient` | `fill_conic` |', record)
         self.assertNotIn('{{', record)
 
     def test_one_differing_hash_fails_and_names_the_host(self) -> None:
@@ -92,8 +108,26 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertEqual(len(result['differences']), 1)
         self.assertEqual(result['differences'][0]['primitive'], 'glass')
-        self.assertIn('| macos-arm64 | 2 | 2 | no (see differences) |', record)
-        self.assertIn('| windows-x64 | 2 | 2 | yes |', record)
+        self.assertIn('| macos-arm64 | 2 | 2 | 0 | 0 | no (see differences) |', record)
+        self.assertIn('| windows-x64 | 2 | 2 | 0 | 0 | yes |', record)
+
+    def test_a_differing_sample_or_feature_fails(self) -> None:
+        changed: list[str] = [SAMPLES[0], SAMPLES[1].replace('35e5bfc0b8f3e2a1', '0000000000000002'), SAMPLES[2]]
+        moved: list[str] = [SAMPLES[0], SAMPLES[1], 'feature\tfill.conic_gradient\tother_sample']
+        status: int
+        result: dict
+        record: str
+        status, result, record = self.run_compare({
+            'windows-x64': manifest_text([BULGE] + SAMPLES), 'linux-x64': manifest_text([BULGE] + changed),
+            'macos-arm64': manifest_text([BULGE] + moved)})
+        self.assertEqual(status, 1)
+        kinds: list[str] = []
+        difference: dict
+        for difference in result['differences']:
+            kinds.append(difference['kind'])
+        self.assertEqual(kinds, ['sample', 'feature'])
+        self.assertIn('- sample `fill_conic` rest at 1.00:', record)
+        self.assertIn('- feature `fill.conic_gradient`:', record)
 
     def test_a_primitive_missing_on_one_host_is_a_difference(self) -> None:
         status: int
@@ -147,8 +181,8 @@ class CompareTests(unittest.TestCase):
     def test_the_template_names_every_placeholder_the_tool_fills(self) -> None:
         template: str = engine_gate.TEMPLATE.read_text(encoding='utf-8')
         name: str
-        for name in ('commit', 'run', 'verdict', 'primitives', 'image_count', 'host_table', 'differences',
-                     'counter_table'):
+        for name in ('commit', 'run', 'verdict', 'primitives', 'image_count', 'samples', 'sample_image_count',
+                     'host_table', 'differences', 'feature_table', 'counter_table'):
             self.assertIn('{{' + name + '}}', template)
 
 

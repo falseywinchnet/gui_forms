@@ -181,6 +181,15 @@ settling primitive has settled; a part whose cost cannot be bounded falls back
 to the built-in recipe; reduced motion disables motion primitives. Record
 under `results/` with the hash comparison per host.
 
+The reference images also cover every engine feature that is a layer or
+parameter of a primitive rather than a primitive (coordinator, 2026-10-23).
+Each sample in `engine_samples::builtin_feature_samples()`
+(`src/core/engine/feature_samples/`) is drawn at the four scales, and a
+motion sample also at fixed frames after its part turns hot. A census
+requires every value of the vocabulary's enumerations, and every feature
+that is no enumeration, in at least one sample. See
+`results/2026-10-22-t2-engine-gate/README.md`.
+
 ## Owner decisions, interview round 001 (2026-10-19)
 
 Recorded in `planning/interview/T2_INTERVIEW_ROUND_001.md`, answered on
