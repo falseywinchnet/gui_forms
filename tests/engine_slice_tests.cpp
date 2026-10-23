@@ -264,12 +264,23 @@ void assembly_equals_whole_bake() {
     }
     require(cornered.across > 0U && cornered.down > 0U, "four corners slice on both axes");
     require(pill.across > 0U, "a pill slices along its length");
-    // With its over glow the layered material is dearer: a pill of it 40
-    // high at scale 2 is past the bake bound and refused.
+    // With its over glow the layered material is dearer: a pill of it 80
+    // high at scale 2 is past the bake bound and refused (at the costs
+    // measured on a quiet machine, 2026-10-23; at 64 high it is too).
     const SurfaceMaterial glowing = layered_material(false);
-    const PartRasterRequest heavy = request_for(glowing, Size{76.0, 40.0}, 2.0, "pill");
+    const PartRasterRequest heavy = request_for(glowing, Size{76.0, 80.0}, 2.0, "pill");
     require(!material_primitive().accepts(heavy.parameters, heavy.target),
             "the heavier material's pill past the bound is refused");
+    // The re-check after the quiet-machine re-measure (E9.6 G1): a 120 x 64
+    // part at scale 1.5, a pill or a radius of 32, estimated at 4.09 ms
+    // before, is within the bound (3.1 ms; 3.5 with the over glow).
+    const PartRasterRequest long_pill = request_for(plain, Size{120.0, 64.0}, 1.5, "pill");
+    const PartRasterRequest long_round = request_for(generous, Size{120.0, 64.0}, 1.5);
+    const PartRasterRequest glowing_pill = request_for(glowing, Size{120.0, 64.0}, 1.5, "pill");
+    require(material_primitive().accepts(long_pill.parameters, long_pill.target) &&
+                material_primitive().accepts(long_round.parameters, long_round.target) &&
+                material_primitive().accepts(glowing_pill.parameters, glowing_pill.target),
+            "a 120 x 64 part at scale 1.5 is within the bake bound");
     require(round_ended.across > 0U, "a radius past half the height slices along the length");
     // The case that was refused before the clamp: radius 32, 32 high, at 2.
     SliceCount large{};

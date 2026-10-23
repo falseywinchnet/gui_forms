@@ -1469,8 +1469,8 @@ double material_bake_estimate(const SurfaceMaterial& authored, const PrimitiveTa
     const DeviceExtent extent = destination_extent(target, outset);
     double per_pixel = costs.base;
     for (const MaterialFillLayer& layer : material.fills) per_pixel = per_pixel + fill_cost(layer, costs);
-    // A mask (E9.6) is a fill's evaluation and one multiplication.
-    if (material.mask) per_pixel = per_pixel + fill_cost(*material.mask, costs) + costs.solid;
+    // A mask (E9.6) is a fill's evaluation and its pass.
+    if (material.mask) per_pixel = per_pixel + fill_cost(*material.mask, costs) + costs.mask;
     for (const MaterialShadow& shadow : material.shadows) {
         per_pixel = per_pixel + (shadow.inset ? costs.inset_shadow : costs.outer_shadow);
     }
