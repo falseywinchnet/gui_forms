@@ -169,6 +169,11 @@ description (control, part role, bounds, states, content).
 
 ## Gate
 
+The closing gate check (owner, 2026-10-22) also needs the CSS coverage
+inventory, `CSS_COVERAGE.md`, to be reviewed. It lists every CSS visual
+property T3 admits, with its engine carrier and its status, and proposes the
+smallest engine addition for each missing row.
+
 A reference-image test per primitive on all three hosts with identical
 pixels; the window counters report zero frames once inputs stop and every
 settling primitive has settled; a part whose cost cannot be bounded falls back
