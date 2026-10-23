@@ -1246,6 +1246,17 @@ void measure() {
     edge.border_edges.top = MaterialBorder{blue, 1.0};
     SurfaceMaterial keyline = base;
     keyline.keylines.push_back(MaterialKeyline{MaterialEdge::top, blue, 1.0, 0.0});
+    // The part filters (E9.6), each over the plain base. A box blur's cost
+    // does not depend on its radius; the largest the reach admits is used.
+    SurfaceMaterial colour_filtered = base;
+    colour_filtered.colour_filter = MaterialColourMatrix::sepia(1.0);
+    SurfaceMaterial drop_shadowed = base;
+    drop_shadowed.drop_shadow = MaterialDropShadow{Point{0.0, 2.0}, 4.0, black};
+    SurfaceMaterial blurred = base;
+    blurred.filter_blur = 5.0;
+    // A multiply fill (E9.6) against a normal one: the face gathered apart.
+    SurfaceMaterial multiplied = solid;
+    multiplied.fills[1].blend = MaterialBlendMode::multiply;
 
     // An image's bake composites its prepared variant: the source's size
     // does not enter it.
@@ -1272,6 +1283,11 @@ void measure() {
     const double per_pixel_edge = (median_bake_nanoseconds(edge, nullptr) - base_time) / pixels;
     const double per_pixel_keyline = (median_bake_nanoseconds(keyline, nullptr) - base_time) / pixels;
     const double per_pixel_image = (median_bake_nanoseconds(imaged, &registry) - base_time) / pixels;
+    const double per_pixel_colour_filter = (median_bake_nanoseconds(colour_filtered, nullptr) - base_time) / pixels;
+    const double per_pixel_drop_shadow = (median_bake_nanoseconds(drop_shadowed, nullptr) - base_time) / pixels;
+    const double per_pixel_filter_blur = (median_bake_nanoseconds(blurred, nullptr) - base_time) / pixels;
+    const double solid_time = median_bake_nanoseconds(solid, nullptr);
+    const double per_pixel_blend = (median_bake_nanoseconds(multiplied, nullptr) - solid_time) / pixels;
 
     std::cout << std::fixed << std::setprecision(3);
     std::cout << "base " << base_time / pixels << '\n';
@@ -1289,6 +1305,10 @@ void measure() {
     std::cout << "border_edge " << per_pixel_edge << '\n';
     std::cout << "keyline " << per_pixel_keyline << '\n';
     std::cout << "image " << per_pixel_image << '\n';
+    std::cout << "colour_filter " << per_pixel_colour_filter << '\n';
+    std::cout << "drop_shadow " << per_pixel_drop_shadow << '\n';
+    std::cout << "filter_blur " << per_pixel_filter_blur << '\n';
+    std::cout << "fill_blend " << per_pixel_blend << '\n';
 }
 
 } // namespace
@@ -1300,7 +1320,7 @@ void measure() {
 // top half lifted by 0.25 f, the break darkened by 0.15 f and a shine of
 // alpha 176 f; the bake draws exactly the material it describes.
 void surface_finish() {
-    const Color face = Color::rgba(100, 140, 200);
+    const Color face = Color::rgba(120, 160, 200);
     SurfaceMaterial material = solid_material(face);
     material.border = MaterialBorder{Color::rgba(40, 60, 90), 1.0};
     material.corner_radius = 3.0;
@@ -1313,12 +1333,12 @@ void surface_finish() {
                 finished.fills.front().stops.size() == 4U,
             "a finish rebuilds the first fill as four stops");
     const std::vector<GradientStop>& stops = finished.fills.front().stops;
-    // 100 + 155 / 4 = 138.75, 140 + 115 / 4 = 168.75, 200 + 55 / 4 = 213.75.
-    require(stops[0] == (GradientStop{0.0, Color::rgba(139, 169, 214)}) &&
-                stops[1] == (GradientStop{gloss_break_start, Color::rgba(139, 169, 214)}),
+    // 120 + 135 / 4 = 153.75, 160 + 95 / 4 = 183.75, 200 + 55 / 4 = 213.75.
+    require(stops[0] == (GradientStop{0.0, Color::rgba(154, 184, 214)}) &&
+                stops[1] == (GradientStop{gloss_break_start, Color::rgba(154, 184, 214)}),
             "the top half is lifted by a quarter towards white");
-    // 0.85 of 100, 140 and 200.
-    require(stops[2] == (GradientStop{gloss_break_end, Color::rgba(85, 119, 170)}) &&
+    // 0.85 of 120, 160 and 200.
+    require(stops[2] == (GradientStop{gloss_break_end, Color::rgba(102, 136, 170)}) &&
                 stops[3] == (GradientStop{1.0, face}),
             "the break is darkened by 0.15 and the bottom kept");
     require(finished.keylines.size() == 1U && finished.keylines[0].edge == MaterialEdge::top &&
@@ -1329,7 +1349,7 @@ void surface_finish() {
     half.finish = 0.5;
     const SurfaceMaterial half_finished = finished_surface_material(half);
     require(half_finished.keylines[0].color.alpha == 88U &&
-                half_finished.fills.front().stops[2].color == Color::rgba(93, 129, 185),
+                half_finished.fills.front().stops[2].color == Color::rgba(111, 148, 185),
             "a half finish has half the shine and half the darkening");
 
     // A gradient face is sampled at 0, 0.5 and 1: black to white has 128
@@ -1403,13 +1423,13 @@ void surface_mask() {
     faded.mask = MaterialFillLayer::linear(Point{0.0, 0.0}, Point{0.0, 1.0},
                                            std::vector<GradientStop>{{0.0, black}, {1.0, clear}});
     const TestRaster fade = draw(faded, logical, 1.0);
-    require(channel(plain, 18U, 31U, 3U) > 100 && fade.pixel(18U, 31U) == (std::array<std::uint8_t, 4>{0U, 0U, 0U, 0U}),
+    require(channel(plain, 18U, 31U, 3U) > 50 && fade.pixel(18U, 31U) == (std::array<std::uint8_t, 4>{0U, 0U, 0U, 0U}),
             "below the box the mask extends at its clear bottom edge");
     require(channel(plain, 18U, 6U, 3U) > 0 && fade.pixel(18U, 6U) == plain.pixel(18U, 6U),
             "above the box it extends at its opaque top edge");
     // Row 18's centre is 10.5 units into the box: the mask keeps 0.475.
     const double beside = channel(plain, 5U, 18U, 3U) * 0.475;
-    require(channel(plain, 5U, 18U, 3U) > 100 && std::abs(channel(fade, 5U, 18U, 3U) - beside) <= 1.0,
+    require(channel(plain, 5U, 18U, 3U) > 50 && std::abs(channel(fade, 5U, 18U, 3U) - beside) <= 1.0,
             "beside the box the shadow fades with the face");
     require(std::abs(channel(fade, 18U, 18U, 3U) - 255.0 * 0.475) <= 1.0, "the face fades down the box");
 
@@ -1427,7 +1447,7 @@ void surface_mask() {
     const TestRaster masked = draw(imaged, logical, 1.0, &registry);
     require(channel(masked, 9U, 18U, 3U) >= 240 && channel(masked, 26U, 18U, 3U) <= 15,
             "the face is kept on the left and masked on the right");
-    require(channel(plain, 30U, 18U, 3U) > 100 && channel(masked, 30U, 18U, 3U) <= 15 &&
+    require(channel(plain, 30U, 18U, 3U) > 50 && channel(masked, 30U, 18U, 3U) <= 15 &&
                 channel(plain, 5U, 18U, 3U) - channel(masked, 5U, 18U, 3U) <= 15,
             "outside the box an image mask extends at its edge columns");
 

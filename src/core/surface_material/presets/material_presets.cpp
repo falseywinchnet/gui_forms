@@ -6,6 +6,7 @@
 #include <iterator>
 #include <span>
 #include <stdexcept>
+#include <utility>
 
 namespace gui_forms {
 namespace {
@@ -105,7 +106,9 @@ SurfaceMaterial finished_surface_material(const SurfaceMaterial& material) {
         {gloss_break_end, darkened(middle, finish_break_darkening * finish)},
         {1.0, bottom},
     };
-    result.fills.front() = MaterialFillLayer::linear(Point{0.0, 0.0}, Point{0.0, 1.0}, stops, std::size(stops));
+    MaterialFillLayer rebuilt = MaterialFillLayer::linear(Point{0.0, 0.0}, Point{0.0, 1.0}, stops, std::size(stops));
+    rebuilt.blend = first.blend;
+    result.fills.front() = std::move(rebuilt);
     MaterialKeyline shine{};
     shine.edge = MaterialEdge::top;
     shine.color = Color::rgba(255, 255, 255, channel_of(finish_shine_alpha * finish));

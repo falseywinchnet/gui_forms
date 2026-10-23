@@ -924,6 +924,109 @@ so every ring pixel finds its place on an arc with the arctangent: the
 dearest case. On a straight edge it costs about a tenth of that. The
 estimate charges it per destination pixel, an upper bound.
 
+### E9.6 G2, filters and blend (rows 6 to 8)
+
+- **The colour matrix.** `MaterialColourMatrix`, a 4 × 5 matrix on
+  straight colour in [0, 1], each result clamped:
+  - its factories are CSS's colour functions with CSS's matrices
+    (`brightness`, `contrast`, `saturate`, `grayscale`, `sepia`,
+    `invert`, `opacity`, `hue_rotate`), each amount clamped as CSS clamps
+    it, and a non-finite amount throws;
+  - `hue_rotate` uses `engine_sine_cosine`, so its matrix has the same
+    bits on every host;
+  - a list of functions composes into one matrix with `then`, in source
+    order. CSS clamps between the functions of a list and one matrix does
+    not: they differ only where an intermediate colour leaves [0, 1];
+  - an entry past 256 in magnitude, or not finite, is invalid.
+- **The part filters (CSS `filter`).** Three `SurfaceMaterial` fields,
+  applied to the baked raster in this order:
+  - `colour_filter`, the matrix, applied to each finished pixel;
+  - `drop_shadow` (`MaterialDropShadow`: an offset, a blur radius and a
+    colour), the raster's alpha blurred, moved and drawn beneath it in
+    the shadow's colour;
+  - `filter_blur`, every channel blurred (CSS `blur(σ)` as 2σ, the
+    shadows' blur-radius convention).
+
+  Both blurs are three integer box blurs, the kernel glass already used,
+  now shared (`kernel/box_blur`): glass's bytes are unchanged. The
+  filters' reach outside the box (1.5 × each blur, plus the shadow's
+  offset) is at most `maximum_filter_reach`, 8, the material's outsets;
+  past it the material is invalid. The material primitive draws them; the
+  built-in path draws none. They carry every change further in, so the
+  slice reach grows by their reach in device pixels.
+- **Held out of line.** `colour_filter` is a `MaterialColourFilter`, which
+  owns one matrix on the heap with value semantics (a deep copy, an
+  empty move source, equal by matrix). Every recipe of every theme holds
+  a `SurfaceMaterial`; an inline optional matrix grew a theme definition
+  from 132 to 205 KB and overflowed the 1 MB main stack in the material,
+  slice and theme tests, which hold several on the stack. Out of line it
+  is 151 KB.
+- **Fill blend modes.** `MaterialFillLayer::blend`, a `MaterialBlendMode`:
+  `normal`, `multiply` or `screen`, CSS's separable modes. When any fill
+  blends, the fills are gathered into one face before the shadows meet
+  it (CSS's isolated background layers); otherwise a material draws the
+  bytes it drew before.
+- **Glass's recipe filter (CSS `backdrop-filter`).** Glass gains a
+  `recipe` choice, `none` (the default) or a recipe role. The recipe's
+  material's `colour_filter` applies to the blurred backplane before the
+  tint (coordinator, 2026-10-22). T3 lowers `backdrop-filter`'s colour
+  functions by composing them into one matrix in source order; its blur
+  is glass's `blur`.
+- **Group composites and the rule `blend` property (CSS
+  `mix-blend-mode`).** `PaintGroupComposite` and the shared blend gain
+  `multiply` and `screen`, in bytes, each product rounded once. A rule
+  declaring `blend` (`normal`, `multiply` or `screen`) draws the part
+  through a paint group of that composite, whatever draws it. The group
+  is bounded by the part's extent. The last matching rule wins, a rule
+  declaring only a blend needs no primitive, and an unknown value is
+  `blend_invalid`. Forced high contrast draws no blend. The replay reads
+  an unknown composite as source-over.
+- **Cost.** The colour filter, the drop shadow, the blur and a material
+  whose fills blend each have a per-pixel cost (`colour_filter`,
+  `drop_shadow`, `filter_blur`, `fill_blend`); see "E9.6 G2 costs".
+- **Inspection.** The snapshot reports `colour_filter` (its 20 entries or
+  null), `drop_shadow`, `filter_blur` and each fill's `blend`.
+- **Proof.** `gui_forms_engine_filter_blend_tests`:
+  - the factories at their neutral amounts, their clamps, composition and
+    its order, non-finite amounts and the matrix bound;
+  - the filter holder's copy, move and equality;
+  - an inverted and a grayscale fill, a composed filter, a drop shadow
+    and a blur, by chosen pixels and reference hashes;
+  - multiply and screen fills, and a blended face under a shadow;
+  - glass inverting a uniform backdrop by its recipe's filter;
+  - the rule property's cascade and diagnostics;
+  - validation of each.
+
+  `gui_forms_part_composite_tests`: multiply and screen in bytes, over
+  translucent and opaque targets. `gui_forms_engine_retained_tests`: a
+  blended part's group, its composite and its bounds.
+  `gui_forms_engine_slice_tests`: a filtered part assembles from slices to
+  the whole bake's bytes.
+
+### E9.6 G2 costs
+
+Measured with `gui_forms_engine_material_tests --measure` on the E8c
+machine, 2026-10-23, with the CPU load sampled at 96-97 % (other builds).
+The unchanged inset shadow measured 55.3-69.4 ns (median 58.7), as in the
+E8c runs, so the medians are used unscaled, rounded up. All four are
+**provisional** until the quiet-machine re-measure. Seven runs, in
+nanoseconds per pixel:
+
+| Cost | Min | Median | Max | Used |
+|---|---|---|---|---|
+| colour filter (sepia) | 6.15 | 12.99 | 15.48 | 13 |
+| drop shadow (blur 4) | 28.50 | 35.74 | 42.51 | 36 |
+| blur (5) | 48.74 | 54.53 | 68.57 | 55 |
+| fill blend (a multiply fill against a normal one) | 19.06 | 21.73 | 23.52 | 22 |
+
+Before these runs the shared box blur divided each average and read its
+passes down column by column, and the drop shadow blurred four lanes for
+its one alpha: the shadow measured 72-76 ns. The kernel now divides by a
+multiply and shift that is exact for every sum it meets, reads the passes
+down row by row with a row of window sums, and the shadow blurs its alpha
+alone. Every byte is unchanged: the glass reference and the G2 references
+pass before and after.
+
 ## Open decisions (ask, do not decide)
 
 The proposed numbers (light angle 135°, overshoot 8 %, blur cap 8 px,

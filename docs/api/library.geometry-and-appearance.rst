@@ -46,6 +46,8 @@ Types
      - The recipes of every control visual role, indexed by ControlVisualRole, held out of line.
    * - :cpp:class:`ControlStateRecipes <gui_forms::ControlStateRecipes>`
      -  
+   * - :cpp:class:`ControlTextShadow <gui_forms::ControlTextShadow>`
+     -  
    * - :cpp:class:`ControlVisualContext <gui_forms::ControlVisualContext>`
      - ControlVisualContext selects a role recipe from surface state plus selected, focused, defaulted, and high-contrast axes.
    * - :cpp:class:`ControlVisualRecipe <gui_forms::ControlVisualRecipe>`
@@ -106,8 +108,14 @@ Types
      - MaterialBorder pairs an authored color and logical stroke width.
    * - :cpp:class:`MaterialBorderEdges <gui_forms::MaterialBorderEdges>`
      -  
+   * - :cpp:class:`MaterialColourFilter <gui_forms::MaterialColourFilter>`
+     - A material's colour filter: none, or one matrix held out of line.
+   * - :cpp:class:`MaterialColourMatrix <gui_forms::MaterialColourMatrix>`
+     - A colour filter (E9.6; CSS ``filter`` and ``backdrop-filter`` colour functions): a 4 × 5 matrix on straight (not premultiplied) colour with each channel in [0, 1].
    * - :cpp:class:`MaterialCornerRadii <gui_forms::MaterialCornerRadii>`
      - A material's four corner radii (E9.6, CSS ``border-*-radius``), in logical units: top-left, top-right, bottom-right and bottom-left.
+   * - :cpp:class:`MaterialDropShadow <gui_forms::MaterialDropShadow>`
+     - A drop shadow of the part's own drawn alpha (E9.6, CSS ``filter: drop-shadow()``): the baked raster's alpha, blurred by ``blur_radius`` (σ = blur / 2, as a shadow's), moved by ``offset``, in ``color``, drawn beneath the raster.
    * - :cpp:class:`MaterialFillLayer <gui_forms::MaterialFillLayer>`
      - MaterialFillLayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity.
    * - :cpp:class:`MaterialGlow <gui_forms::MaterialGlow>`
@@ -521,6 +529,10 @@ Types
 
       The part's ambient effect, or null; it belongs to the rules.
 
+   .. cpp:member:: PartBlend blend
+
+      The part's blend (blend_property): the last matching rule's. Default: ``{PartBlend::normal}``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: ConnectedControlSeam final
@@ -635,6 +647,20 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ControlTextShadow final
+
+   ``#include <gui_forms/theme/types/theme_types.hpp>``
+
+   .. cpp:member:: Point offset
+
+   .. cpp:member:: double blur_radius
+
+   .. cpp:member:: Color color
+
+      Default: ``{Color::rgba(0, 0, 0, 0)}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ControlVisualContext final
 
    ``#include <gui_forms/theme/types/theme_types.hpp>``
@@ -700,6 +726,10 @@ Types
    .. cpp:member:: Point pressed_content_offset
 
       Default: ``{1.0, 1.0}``.
+
+   .. cpp:member:: std::optional<ControlTextShadow> text_shadow
+
+      The shadow under the recipe's text, if any (E9.6, data only).
 
 .. cpp:namespace:: gui_forms
 
@@ -1343,7 +1373,7 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   One sized variant of an image resource: the image resampled to ``extent`` device pixels, for display ``scale``. A nine-patch's fixed segments are resampled apart from its middle: ``source_slice`` are their source pixels (left, top, right, bottom) and ``fixed`` their device lengths in the variant, both zero for a stretched or tiled image, which is resampled whole. ``layer`` is the fill layer the variant serves, by index among the material's fills; it is not part of what the variant is. A procedural fill's pattern (E10) is asked for the same way, with ``procedural`` set and no image: the pattern generated at ``scale`` and ``extent``, never resampled. The engine never generates one inside a paint: a bake whose pattern is not ready is lent none, and the fill draws its ground; the pattern is generated in an idle frame and the parts that drew the ground are repainted.
+   One sized variant of an image resource: the image resampled to ``extent`` device pixels, for display ``scale``. A nine-patch's fixed segments are resampled apart from its middle: ``source_slice`` are their source pixels (left, top, right, bottom) and ``fixed`` their device lengths in the variant, both zero for a stretched or tiled image, which is resampled whole. ``layer`` is the fill layer the variant serves, by index among the material's fills (an image mask's is maximum_image_variants - 1); it is not part of what the variant is. A procedural fill's pattern (E10) is asked for the same way, with ``procedural`` set and no image: the pattern generated at ``scale`` and ``extent``, never resampled. The engine never generates one inside a paint: a bake whose pattern is not ready is lent none, and the fill draws its ground; the pattern is generated in an idle frame and the parts that drew the ground are repainted.
 
    .. cpp:member:: std::size_t layer
 
@@ -1435,6 +1465,86 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: MaterialColourFilter final
+
+   ``#include <gui_forms/surface_material/colour_matrix/colour_matrix.hpp>``
+
+   A material's colour filter: none, or one matrix held out of line. Every recipe of every theme holds a SurfaceMaterial, so a matrix held inline (160 bytes) would grow a theme definition by tens of kilobytes; this holder is one pointer. It owns its matrix; a copy copies the matrix, a move leaves the source empty, and two filters are equal when both are empty or their matrices are equal.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: MaterialColourFilter() noexcept
+
+   .. cpp:function:: MaterialColourFilter(const MaterialColourMatrix& matrix)
+
+      Implicit, as std::optional's is: ``material.colour_filter = matrix;``. Throws std::bad_alloc when the matrix cannot be held.
+
+   .. cpp:function:: MaterialColourFilter(const MaterialColourFilter& other)
+
+   .. cpp:function:: MaterialColourFilter(MaterialColourFilter&& other) noexcept
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool has_value() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void reset() noexcept
+
+      Leaves the filter empty.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaterialColourMatrix final
+
+   ``#include <gui_forms/surface_material/colour_matrix/colour_matrix.hpp>``
+
+   A colour filter (E9.6; CSS ``filter`` and ``backdrop-filter`` colour functions): a 4 × 5 matrix on straight (not premultiplied) colour with each channel in [0, 1]. Its rows give red, green, blue and alpha; its columns read red, green, blue and alpha, and the fifth is a constant. Each result is clamped to [0, 1]. The factories are the CSS functions, with CSS's matrices (Filter Effects Level 1). A list of functions composes into one matrix with :cpp:func:`then <gui_forms::MaterialColourMatrix::then>`, in source order. CSS clamps between the functions of a list; one matrix does not, which differs only where an intermediate colour leaves [0, 1].
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static MaterialColourMatrix brightness(double amount)
+
+      Each amount is clamped as CSS clamps it: brightness, contrast and saturate to at least 0; grayscale, sepia, invert and opacity to [0, 1]. A non-finite amount throws std::invalid_argument.
+
+   .. cpp:function:: static MaterialColourMatrix contrast(double amount)
+
+   .. cpp:function:: static MaterialColourMatrix saturate(double amount)
+
+   .. cpp:function:: static MaterialColourMatrix grayscale(double amount)
+
+   .. cpp:function:: static MaterialColourMatrix sepia(double amount)
+
+   .. cpp:function:: static MaterialColourMatrix invert(double amount)
+
+   .. cpp:function:: static MaterialColourMatrix opacity(double amount)
+
+   .. cpp:function:: static MaterialColourMatrix hue_rotate(double degrees)
+
+      Turns hues by ``degrees`` (any finite angle), with the engine's sine and cosine so that the matrix has the same bits on every host.
+
+   .. cpp:function:: MaterialColourMatrix then(const MaterialColourMatrix& after) const noexcept
+
+      This filter, then ``after``: one matrix applying both.
+
+   .. cpp:member:: constexpr std::size_t rows
+
+      Default: ``4U``.
+
+   .. cpp:member:: constexpr std::size_t columns
+
+      Default: ``5U``.
+
+   .. cpp:member:: std::array<double, rows * columns> values
+
+      Row-major: values[row × 5 + column]. The identity by default. Default: ``{detail::identity_colour_entries}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: MaterialCornerRadii final
 
    ``#include <gui_forms/surface_material/types/surface_material_types.hpp>``
@@ -1448,6 +1558,26 @@ Types
    .. cpp:member:: double bottom_right
 
    .. cpp:member:: double bottom_left
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaterialDropShadow final
+
+   ``#include <gui_forms/surface_material/types/surface_material_types.hpp>``
+
+   A drop shadow of the part's own drawn alpha (E9.6, CSS ``filter: drop-shadow()``): the baked raster's alpha, blurred by ``blur_radius`` (σ = blur / 2, as a shadow's), moved by ``offset``, in ``color``, drawn beneath the raster. Unlike a MaterialShadow it follows whatever the material draws, such as a glyph or a round shape.
+
+   .. cpp:member:: Point offset
+
+      Default: ``{0.0, 1.0}``.
+
+   .. cpp:member:: double blur_radius
+
+      Default: ``{2.0}``.
+
+   .. cpp:member:: Color color
+
+      Default: ``{Color::rgba(0, 0, 0, 96)}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1570,9 +1700,19 @@ Types
 
       Default: ``{MaterialImageMode::stretch}``.
 
+   .. cpp:member:: Point image_anchor
+
+      A tiled image's position (E9.6, CSS ``background-position``): one tile's top-left corner lies at ``image_anchor`` of the room the box leaves around one tile (fractions in [0, 1] across and down, as CSS percentages: 0 the box's left or top, 1 a tile flush with its right or bottom) plus ``image_offset`` in logical units, and the tiling runs on from there both ways. Read in tile mode only: a stretched image and a nine-patch cover the box.
+
+   .. cpp:member:: Point image_offset
+
    .. cpp:member:: double period_degrees
 
       Default: ``{360.0}``.
+
+   .. cpp:member:: MaterialBlendMode blend
+
+      Default: ``{MaterialBlendMode::normal}``.
 
    .. cpp:member:: ProceduralFill procedural
 
@@ -2893,6 +3033,10 @@ Types
 
       The farthest a glow reaches outside the box, in logical units: the engine material's granted overflow on every side. Default: ``8.0``.
 
+   .. cpp:member:: constexpr double maximum_filter_reach
+
+      The farthest the part filters reach outside the box, in logical units: the drop shadow's larger offset component plus 1.5 × its blur, plus 1.5 × the filter blur. The engine material's outsets hold it. Default: ``8.0``.
+
    .. cpp:member:: std::vector<MaterialFillLayer> fills
 
    .. cpp:member:: std::vector<MaterialShadow> shadows
@@ -2910,6 +3054,24 @@ Types
    .. cpp:member:: std::optional<MaterialCornerRadii> corner_radii
 
       Corners that differ (E9.6): when present they replace corner_radius in the engine's material primitive. The built-in path, paint_surface_material, rounds every corner by corner_radius, so a theme sets that to the radius the fallback should draw.
+
+   .. cpp:member:: MaterialColourFilter colour_filter
+
+      The part filters (E9.6, CSS ``filter``), applied to the baked raster in this order: the colour filter to each pixel, then the drop shadow beneath, then the blur over the whole. A theme's filter list lowers to that order. The engine's material primitive draws them; the built-in path, paint_surface_material, draws none of them, and the window's backplane image draws only the colour filter.
+
+   .. cpp:member:: std::optional<MaterialDropShadow> drop_shadow
+
+   .. cpp:member:: double filter_blur
+
+      CSS ``filter: blur(σ)`` as filter_blur = 2σ logical units, the blur radius convention of shadows; 0 for none.
+
+   .. cpp:member:: double finish
+
+      The surface finish (E9.6, CSS coverage row 9), from 0, the material as authored, to 1, a full gloss derived from its first fill (finished_surface_material, which both paths draw). A finish above 0 needs a solid or linear first fill and room for one more keyline.
+
+   .. cpp:member:: std::optional<MaterialFillLayer> mask
+
+      An alpha mask (E9.6, CSS ``mask-image``): a solid, gradient or image fill whose alpha, times its opacity for an image, multiplies the whole finished part, its shadows and glows included; outside the box it extends at its edge value, so that a shadow fades with the face beside it. The engine's material primitive draws it; the built-in path, paint_surface_material, draws the material unmasked.
 
 .. cpp:namespace:: gui_forms
 
@@ -3032,7 +3194,7 @@ Types
 
    .. cpp:function:: void paint(Painter& painter, const Control& control, const PartPaint& part) const
 
-      Paints one part of ``control`` (see paint_part). A part with a key (PartPaint::key) and paintable bounds, painted by a control attached to a window, has its record in that window's part table made or updated first; a primitive then draws into the record's cached raster. A part without a key leaves no record; a primitive draws it into a raster of its own for this paint. If the primitive refuses the part, the built-in recipe draws it.
+      Paints one part of ``control`` (see paint_part). A part with a key (PartPaint::key) and paintable bounds, painted by a control attached to a window, has its record in that window's part table made or updated first; a primitive then draws into the record's cached raster. A part without a key leaves no record; a primitive draws it into a raster of its own for this paint. If the primitive refuses the part, the built-in recipe draws it. A part with a blend (blend_property) is drawn inside a paint group of that composite.
 
    .. cpp:function:: PartHitRegion hit_region(const Control& control, const PartPaint& part) const noexcept
 
@@ -3565,6 +3727,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: MaterialBlendMode
+
+   ``#include <gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp>``
+
+   .. cpp:enumerator:: normal
+
+   .. cpp:enumerator:: multiply
+
+   .. cpp:enumerator:: screen
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: MaterialBorderStyle
 
    ``#include <gui_forms/surface_material/types/surface_material_types.hpp>``
@@ -3717,6 +3891,10 @@ Enumerations
 
    .. cpp:enumerator:: plus
 
+   .. cpp:enumerator:: multiply
+
+   .. cpp:enumerator:: screen
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: ParameterAssignment
@@ -3748,6 +3926,18 @@ Enumerations
    .. cpp:enumerator:: not_finite
 
    .. cpp:enumerator:: out_of_range
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PartBlend
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: normal
+
+   .. cpp:enumerator:: multiply
+
+   .. cpp:enumerator:: screen
 
 .. cpp:namespace:: gui_forms
 
@@ -4036,6 +4226,8 @@ Enumerations
    .. cpp:enumerator:: ambient_over_frame_cap
 
    .. cpp:enumerator:: ambient_invalid
+
+   .. cpp:enumerator:: blend_invalid
 
    .. cpp:enumerator:: published_value_invalid
 
@@ -4348,7 +4540,7 @@ Functions, constants and aliases
 
 .. cpp:var:: constexpr std::size_t maximum_image_variants
 
-   The most image variants one bake uses: one per fill layer (SurfaceMaterial::maximum_fill_layers). Value: ``8U``.
+   The most image variants one bake uses: one per fill layer (SurfaceMaterial::maximum_fill_layers), then one for an image mask (E9.6), whose ``layer`` is maximum_image_variants - 1. Value: ``9U``.
 
 .. cpp:var:: constexpr std::size_t maximum_registered_primitives
 
@@ -4399,6 +4591,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::string_view face_property
 
    The engine's face cross-fade (E7r form a): when a primitive-drawn part's face changes between discrete states (its raster is replaced), the old face fades into the new over the transition's curve, each baked once and blended through a paint group (old at 1 - t, new at t, added). The transition names no states: it runs on every change of face. A change while a fade runs fades from the face shown last to the new one; a face of another size or scale does not fade. Like scale, no built-in rule uses it. Value: ``"face"``.
+
+.. cpp:var:: constexpr std::string_view blend_property
+
+   The engine's blend property (E9.6): a declaration of this name, whose value is the name ``normal``, ``multiply`` or ``screen``, draws the part through a paint group of that composite (PaintGroupComposite), whatever draws it, so that it multiplies or screens what was painted beneath it. Like opacity it is no atom and no primitive parameter, and a rule that declares it needs no primitive; the last matching rule that declares it wins. The group's bounds are the part's extent (its bounds grown by its primitive's outsets and its granted overflow): nothing the part draws beyond them is shown. The forced high-contrast pass draws no blend. Value: ``"blend"``.
 
 .. cpp:var:: constexpr std::size_t maximum_presentation_states
 
@@ -4470,6 +4666,14 @@ Functions, constants and aliases
 
 .. cpp:namespace:: gui_forms
 
+``#include <gui_forms/surface_material/colour_matrix/colour_matrix.hpp>``
+
+.. cpp:function:: bool valid_colour_matrix(const MaterialColourMatrix& matrix) noexcept
+
+   Every entry finite and at most 256 in magnitude.
+
+.. cpp:namespace:: gui_forms
+
 ``#include <gui_forms/surface_material/painting/surface_material_painting.hpp>``
 
 .. cpp:function:: bool valid_surface_material(const SurfaceMaterial& material) noexcept
@@ -4490,6 +4694,10 @@ Functions, constants and aliases
 
    The gloss material (design language §4.3): one vertical four-stop gradient with a hard break near mid-face, a 1-unit shine keyline just under the top edge (inside the border, clipped to the corners), and a 1-unit border, with ``corner_radius`` in logical units. Throws std::invalid_argument for a corner radius that is not finite or lies outside [0, 4096].
 
+.. cpp:function:: SurfaceMaterial finished_surface_material(const SurfaceMaterial& material)
+
+   The material ``material.finish`` describes, with a finish of 0 (E9.6): the first fill's colours at 0, 0.5 and 1 along it (a solid fill's colour throughout) are rebuilt as the gloss's four vertical stops, keeping the fill's blend mode, its top half lifted and its break darkened, and a white shine keyline is added under the top edge, inside the border. A material whose finish is 0 is returned as it is. ``material`` must be valid (valid_surface_material); gloss_material is unchanged and is not finish 1 over its colours.
+
 .. cpp:var:: constexpr double gloss_break_start
 
    Where the gloss gradient breaks, as fractions of the face's height from its top: the colour steps from above_break to below_break between them. Value: ``0.48``.
@@ -4497,6 +4705,18 @@ Functions, constants and aliases
 .. cpp:var:: constexpr double gloss_break_end
 
    Value: ``0.52``.
+
+.. cpp:var:: constexpr double finish_lift
+
+   The surface finish's constants (E9.6, owner 2026-10-23), provisional until the owner's eye at the gate: at finish f, the face's top half is lifted towards white by finish_lift * f, the colour just below the break is darkened by finish_break_darkening * f, and the shine keyline's alpha is finish_shine_alpha * f. Value: ``0.25``.
+
+.. cpp:var:: constexpr double finish_break_darkening
+
+   Value: ``0.15``.
+
+.. cpp:var:: constexpr double finish_shine_alpha
+
+   Value: ``176.0``.
 
 .. cpp:namespace:: gui_forms
 
@@ -4569,6 +4789,14 @@ Functions, constants and aliases
 .. cpp:function:: inline std::vector<MaterialShadow> provisional_overlay_shadow()
 
    The overlay shadow (owner decision RB-37, design language 12.9; the E4 level of 3.4 scaled to small overlays): a soft shadow cast down and right, away from the one upper-left light, by surfaces that really overlap content (tooltips, popups, menus). The ``shadow`` part role paints it around the casting surface. Two layers, in the units of MaterialShadow (blur is a CSS blur radius): a wide soft layer and a close contact layer, each offset right by at most half its drop (3.3). Provisional starting tokens until the default theme (stage T4) owns them.
+
+.. cpp:var:: constexpr double maximum_text_shadow_blur
+
+   A text shadow (E9.6, CSS ``text-shadow``): the text's glyphs, moved by ``offset`` logical units, blurred by ``blur_radius`` (the shadows' blur-radius convention, 0 to maximum_text_shadow_blur) and drawn in ``color`` under the glyphs. Data only in T2: the theme carries it, and the text stage (M4/M9) draws it, with a first-party blur so that it is the same on every host. Value: ``8.0``.
+
+.. cpp:var:: constexpr double maximum_text_shadow_offset
+
+   Value: ``16.0``.
 
 .. cpp:var:: constexpr std::size_t control_visual_role_count
 

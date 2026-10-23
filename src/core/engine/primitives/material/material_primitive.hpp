@@ -132,7 +132,9 @@ void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& targe
 // device origin, drawn into `destination`, whose top-left pixel lies at
 // `device_origin` (device pixels, possibly fractional). The window's
 // backplane image (E9-B) bakes the window's material this way, a part's
-// region of it at a time. The same preconditions as bake_material.
+// region of it at a time. The same preconditions as bake_material. Of the
+// part filters (E9.6) it draws the colour filter, which is per pixel; the
+// drop shadow and the blur read the whole raster, so it draws neither.
 void bake_material_region(const SurfaceMaterial& material, const PrimitiveTarget& target, Point device_origin,
                           const PartRasterView& destination) noexcept;
 

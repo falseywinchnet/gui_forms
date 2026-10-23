@@ -48,8 +48,8 @@ inline constexpr double finish_shine_alpha = 176.0;
 
 // The material `material.finish` describes, with a finish of 0 (E9.6):
 // the first fill's colours at 0, 0.5 and 1 along it (a solid fill's colour
-// throughout) are rebuilt as the gloss's four vertical stops, its top
-// half lifted and its break darkened, and a white shine keyline is added
+// throughout) are rebuilt as the gloss's four vertical stops, keeping the
+// fill's blend mode, its top half lifted and its break darkened, and a white shine keyline is added
 // under the top edge, inside the border. A material whose finish is 0 is
 // returned as it is. `material` must be valid (valid_surface_material);
 // gloss_material is unchanged and is not finish 1 over its colours.

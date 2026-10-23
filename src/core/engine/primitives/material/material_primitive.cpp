@@ -2,6 +2,7 @@
 
 #include "material_bake_policy.hpp"
 #include "material_image.hpp"
+#include "../kernel/box_blur.hpp"
 #include "../kernel/pixel_kernel.hpp"
 #include "../procedural/procedural_pattern.hpp"
 
@@ -16,6 +17,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <new>
 #include <optional>
@@ -117,6 +119,7 @@ struct ResolvedFill final {
     double from_turn{};
     double periods_per_turn{1.0};
     GradientSpreadMode spread{GradientSpreadMode::pad};
+    MaterialBlendMode blend{MaterialBlendMode::normal};
     // Borrowed from the material for the bake.
     std::span<const GradientStop> stops{};
     // An image fill's opacity and its resampled layer (MaterialImages).
@@ -172,6 +175,12 @@ struct MaterialLook final {
     // Whether any layer reads the box's coverage; when none does, the pixel
     // loop does not compute it.
     bool reads_inside{};
+    // Whether a fill blends other than source-over: the fills are then
+    // gathered into one face before it meets the shadows (MaterialBlendMode).
+    bool face_blends{};
+    // The colour filter, applied to each finished pixel (E9.6).
+    bool filtered{};
+    MaterialColourMatrix filter{};
     bool border{};
     Color border_colour{};
     Rect border_inner{};
@@ -350,6 +359,7 @@ ResolvedFill resolve_fill(const MaterialFillLayer& layer, Rect box, double scale
     fill.kind = layer.kind;
     fill.colour = layer.color;
     fill.spread = layer.spread;
+    fill.blend = layer.blend;
     fill.stops = std::span<const GradientStop>(layer.stops.data(), layer.stops.size());
     fill.opacity = layer.opacity;
     // A procedural fill draws its ground until its pattern is lent (E10).
@@ -540,6 +550,7 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
         look.fills[look.fill_count] = resolve_fill(layer, box, scale);
         look.fills[look.fill_count].image = index;
         look.fill_count = look.fill_count + 1U;
+        if (layer.blend != MaterialBlendMode::normal) look.face_blends = true;
     }
     if (material.mask) {
         look.mask = resolve_fill(*material.mask, box, scale);
@@ -574,6 +585,10 @@ MaterialLook resolve_look_at(const SurfaceMaterial& material, const PrimitiveTar
     }
     const bool clip_keylines = radius > 0.0;
     for (const MaterialKeyline& keyline : material.keylines) add_keyline(look, keyline, scale, clip_keylines);
+    if (material.colour_filter) {
+        look.filtered = true;
+        look.filter = *material.colour_filter;
+    }
     bool over_glows = false;
     for (std::size_t index = 0U; index < look.outer_count; ++index) {
         if (look.outer[index].over) over_glows = true;
@@ -1026,6 +1041,30 @@ double patterned_ring(const MaterialLook& look, double ring, double x, double y)
     return covered;
 }
 
+// One fill layer joined to the face beneath it by its blend mode.
+void join_layer(Unit& face, Unit layer, MaterialBlendMode blend) noexcept {
+    switch (blend) {
+    case MaterialBlendMode::normal:
+        blend_over(face, layer);
+        return;
+    case MaterialBlendMode::multiply:
+        blend_multiply(face, layer);
+        return;
+    case MaterialBlendMode::screen:
+        blend_screen(face, layer);
+        return;
+    }
+    // A mode outside the enumeration is drawn source-over.
+    blend_over(face, layer);
+}
+
+// A finished pixel through the material's colour filter, if it has one.
+Unit finished(const MaterialLook& look, Unit pixel) noexcept {
+    if (!look.filtered) return pixel;
+    const Unit filtered = colour_filtered(look.filter, pixel);
+    return filtered;
+}
+
 // How much of pixel (x, y) the box covers.
 double box_coverage(const MaterialLook& look, std::int64_t x, std::int64_t y, double centre_x,
                     double centre_y) noexcept {
@@ -1036,7 +1075,7 @@ double box_coverage(const MaterialLook& look, std::int64_t x, std::int64_t y, do
     return coverage;
 }
 
-Unit unmasked_pixel(const MaterialLook& look, const MaterialImages& images, const OuterIntegrals& integrals,
+Unit material_pixel(const MaterialLook& look, const MaterialImages& images, const OuterIntegrals& integrals,
                     std::int64_t x, std::int64_t y) noexcept {
     Unit result{};
     const double centre_x = static_cast<double>(x) + 0.5;
@@ -1067,12 +1106,24 @@ Unit unmasked_pixel(const MaterialLook& look, const MaterialImages& images, cons
             blend_over(result, premultiply(shadow.colour, coverage));
         }
     }
-    if (!look.reads_inside) return result;
+    if (!look.reads_inside) return finished(look, result);
     const double inside = box_coverage(look, x, y, centre_x, centre_y);
     if (inside > 0.0) {
-        for (std::size_t index = 0U; index < look.fill_count; ++index) {
-            blend_over(result, fill_colour(look.fills[index], images, static_cast<std::size_t>(x),
-                                           static_cast<std::size_t>(y), centre_x, centre_y, inside));
+        if (look.face_blends) {
+            // The fills gathered into one face, then over the shadows.
+            Unit face{};
+            for (std::size_t index = 0U; index < look.fill_count; ++index) {
+                const ResolvedFill& fill = look.fills[index];
+                const Unit layer = fill_colour(fill, images, static_cast<std::size_t>(x),
+                                               static_cast<std::size_t>(y), centre_x, centre_y, inside);
+                join_layer(face, layer, fill.blend);
+            }
+            blend_over(result, face);
+        } else {
+            for (std::size_t index = 0U; index < look.fill_count; ++index) {
+                blend_over(result, fill_colour(look.fills[index], images, static_cast<std::size_t>(x),
+                                               static_cast<std::size_t>(y), centre_x, centre_y, inside));
+            }
         }
         for (std::size_t index = 0U; index < look.inset_count; ++index) {
             const ResolvedShadow& shadow = look.inset[index];
@@ -1104,13 +1155,164 @@ Unit unmasked_pixel(const MaterialLook& look, const MaterialImages& images, cons
             add_light(result, premultiply(shadow.colour, over_coverage[index] * inside));
         }
     }
-    return result;
+    return finished(look, result);
+}
+
+// -- the part filters (E9.6) ----------------------------------------------------------
+
+// The drop shadow's and the blur's box halves (box_blur_half) and the
+// shadow's offset, in device pixels. The offset is rounded to whole pixels.
+struct PartFilters final {
+    bool shadow{};
+    std::uint32_t shadow_half{};
+    std::int64_t shadow_x{};
+    std::int64_t shadow_y{};
+    Color shadow_colour{};
+    std::uint32_t blur_half{};
+};
+
+PartFilters part_filters(const SurfaceMaterial& material, double scale) noexcept {
+    PartFilters filters{};
+    if (material.drop_shadow) {
+        const MaterialDropShadow& shadow = *material.drop_shadow;
+        filters.shadow = true;
+        filters.shadow_half = box_blur_half(shadow.blur_radius, scale);
+        filters.shadow_x = static_cast<std::int64_t>(std::floor(shadow.offset.x * scale + 0.5));
+        filters.shadow_y = static_cast<std::int64_t>(std::floor(shadow.offset.y * scale + 0.5));
+        filters.shadow_colour = shadow.color;
+    }
+    filters.blur_half = box_blur_half(material.filter_blur, scale);
+    return filters;
+}
+
+// How far, in device pixels, the filters carry a change of the layers
+// beneath them: three box halves per blur, and the shadow's offset.
+double filter_reach_pixels(const PartFilters& filters) noexcept {
+    double reach = static_cast<double>(filters.blur_half) * 3.0;
+    if (filters.shadow) {
+        const double moved = static_cast<double>(std::max(std::abs(filters.shadow_x), std::abs(filters.shadow_y)));
+        reach = reach + moved + static_cast<double>(filters.shadow_half) * 3.0;
+    }
+    return reach;
+}
+
+// The destination's pixels copied into `grown`, an image grown by `margin`
+// transparent pixels on every side: every channel, four lanes a pixel, or
+// with `lanes` 1 the alpha alone.
+void load_grown(const PartRasterView& destination, std::size_t margin, std::size_t lanes,
+                std::span<std::uint32_t> grown) noexcept {
+    const std::size_t width = destination.extent.width;
+    const std::size_t height = destination.extent.height;
+    const std::size_t stride = (width + margin * 2U) * lanes;
+    const std::size_t skipped = part_raster_bytes_per_pixel - lanes;
+    for (std::size_t row = 0U; row < height; ++row) {
+        const std::size_t read = row * destination.row_bytes;
+        const std::size_t write = (row + margin) * stride + margin * lanes;
+        for (std::size_t column = 0U; column < width; ++column) {
+            const std::size_t from = read + column * part_raster_bytes_per_pixel + skipped;
+            const std::size_t to = write + column * lanes;
+            for (std::size_t lane = 0U; lane < lanes; ++lane) grown[to + lane] = destination.pixels[from + lane];
+        }
+    }
+}
+
+// Prepares `work` for a blur of `half` over the destination, `lanes` lanes
+// a pixel; false when its storage cannot be held.
+bool make_room(const PartRasterView& destination, std::uint32_t half, std::size_t lanes, BoxBlurWork& work) noexcept {
+    const std::size_t margin = static_cast<std::size_t>(half) * 3U;
+    const std::size_t columns = static_cast<std::size_t>(destination.extent.width) + margin * 2U;
+    const std::size_t rows = static_cast<std::size_t>(destination.extent.height) + margin * 2U;
+    try {
+        prepare_box_blur(work, columns, rows, lanes);
+    } catch (const std::exception&) {
+        // std::bad_alloc or std::length_error: the step is left undone.
+        return false;
+    }
+    return true;
+}
+
+// Draws the drop shadow beneath the destination's pixels: their alpha,
+// blurred, moved by the offset, in the shadow's colour.
+void add_drop_shadow(const PartFilters& filters, const PartRasterView& destination, BoxBlurWork& work) noexcept {
+    if (!make_room(destination, filters.shadow_half, 1U, work)) return;
+    const std::size_t width = destination.extent.width;
+    const std::size_t height = destination.extent.height;
+    const std::size_t margin = static_cast<std::size_t>(filters.shadow_half) * 3U;
+    const std::size_t columns = width + margin * 2U;
+    const std::size_t rows = height + margin * 2U;
+    load_grown(destination, margin, 1U, work.first);
+    blur_three_boxes(work, columns, rows, 1U, filters.shadow_half);
+    // The blurred alpha is width × height pixels at the start of `first`,
+    // one lane a pixel.
+    const std::span<const std::uint32_t> first = work.first;
+    const std::size_t stride = columns;
+    const std::int64_t wide = static_cast<std::int64_t>(width);
+    const std::int64_t high = static_cast<std::int64_t>(height);
+    for (std::int64_t row = 0; row < high; ++row) {
+        const std::size_t start = static_cast<std::size_t>(row) * destination.row_bytes;
+        const std::int64_t source_row = row - filters.shadow_y;
+        for (std::int64_t column = 0; column < wide; ++column) {
+            const std::int64_t source_column = column - filters.shadow_x;
+            const bool within = source_row >= 0 && source_row < high && source_column >= 0 && source_column < wide;
+            double coverage = 0.0;
+            if (within) {
+                const std::size_t at = static_cast<std::size_t>(source_row) * stride +
+                                       static_cast<std::size_t>(source_column);
+                coverage = static_cast<double>(first[at]) / 255.0;
+            }
+            if (coverage <= 0.0) continue;
+            const std::size_t offset = start + static_cast<std::size_t>(column) * part_raster_bytes_per_pixel;
+            const Unit drawn{static_cast<double>(destination.pixels[offset]) / 255.0,
+                             static_cast<double>(destination.pixels[offset + 1U]) / 255.0,
+                             static_cast<double>(destination.pixels[offset + 2U]) / 255.0,
+                             static_cast<double>(destination.pixels[offset + 3U]) / 255.0};
+            // The raster over its shadow.
+            Unit shadowed = premultiply(filters.shadow_colour, coverage);
+            blend_over(shadowed, drawn);
+            store(destination, offset, shadowed);
+        }
+    }
+}
+
+// Blurs the destination's pixels, every channel.
+void blur_destination(const PartFilters& filters, const PartRasterView& destination, BoxBlurWork& work) noexcept {
+    if (!make_room(destination, filters.blur_half, box_blur_lanes, work)) return;
+    const std::size_t width = destination.extent.width;
+    const std::size_t height = destination.extent.height;
+    const std::size_t margin = static_cast<std::size_t>(filters.blur_half) * 3U;
+    const std::size_t columns = width + margin * 2U;
+    const std::size_t rows = height + margin * 2U;
+    load_grown(destination, margin, box_blur_lanes, work.first);
+    blur_three_boxes(work, columns, rows, box_blur_lanes, filters.blur_half);
+    const std::span<const std::uint32_t> first = work.first;
+    const std::size_t stride = columns * box_blur_lanes;
+    for (std::size_t row = 0U; row < height; ++row) {
+        const std::size_t start = row * destination.row_bytes;
+        for (std::size_t column = 0U; column < width; ++column) {
+            const std::size_t from = row * stride + column * box_blur_lanes;
+            const std::size_t to = start + column * part_raster_bytes_per_pixel;
+            for (std::size_t lane = 0U; lane < box_blur_lanes; ++lane) {
+                destination.pixels[to + lane] = static_cast<std::uint8_t>(first[from + lane]);
+            }
+        }
+    }
+}
+
+// The drop shadow, then the blur, over a finished bake. Work images that
+// cannot be allocated leave that step undone: the bake is noexcept and its
+// pixels stay as drawn.
+void apply_part_filters(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                        const PartRasterView& destination) noexcept {
+    const PartFilters filters = part_filters(material, target.scale.value);
+    if (!filters.shadow && filters.blur_half == 0U) return;
+    BoxBlurWork work{};
+    if (filters.shadow) add_drop_shadow(filters, destination, work);
+    if (filters.blur_half > 0U) blur_destination(filters, destination, work);
 }
 
 // The mask's alpha at pixel (x, y) (E9.6): its centre moved into the box,
 // so that outside the box the mask extends at its edge value (an image
-// mask's maps are extended so, extend_at_box). A mask without its variant
-// keeps nothing, as an image fill without one draws nothing.
+// mask's maps are extended so, extend_at_box).
 double mask_alpha(const MaterialLook& look, const MaterialImages& images, std::int64_t x, std::int64_t y) noexcept {
     const Rect& box = look.box;
     const double centre_x = std::max(box.x, std::min(static_cast<double>(x) + 0.5, box.right()));
@@ -1120,17 +1322,38 @@ double mask_alpha(const MaterialLook& look, const MaterialImages& images, std::i
     return sampled.alpha;
 }
 
-// Pixel (x, y) of the finished part, multiplied by the mask's alpha.
-Unit material_pixel(const MaterialLook& look, const MaterialImages& images, const OuterIntegrals& integrals,
-                    std::int64_t x, std::int64_t y) noexcept {
-    const Unit unmasked = unmasked_pixel(look, images, integrals, x, y);
-    if (!look.masked) return unmasked;
-    const double kept = mask_alpha(look, images, x, y);
-    const Unit masked{unmasked.red * kept, unmasked.green * kept, unmasked.blue * kept, unmasked.alpha * kept};
-    return masked;
+// Multiplies every pixel of the finished raster by the mask's alpha (E9.6,
+// owner 2026-10-23): after the part filters, so that the shadows, the drop
+// shadow and the blur fade with the face beside them.
+// An image mask whose variant was not lent leaves the raster unmasked, as
+// the built-in path draws it.
+void apply_mask(const MaterialLook& look, const MaterialImages& images, const PartRasterView& destination) noexcept {
+    if (!look.masked) return;
+    const bool image = look.mask.kind == MaterialFillKind::image;
+    if (image && images.layers[mask_layer].variant == nullptr) return;
+    for (std::uint32_t row = 0U; row < destination.extent.height; ++row) {
+        const std::size_t start = static_cast<std::size_t>(row) * destination.row_bytes;
+        for (std::uint32_t column = 0U; column < destination.extent.width; ++column) {
+            const std::size_t offset = start + static_cast<std::size_t>(column) * part_raster_bytes_per_pixel;
+            // The mask's alpha over 255: a byte times it is the masked unit.
+            const double weight = mask_alpha(look, images, static_cast<std::int64_t>(column),
+                                           static_cast<std::int64_t>(row)) / 255.0;
+            const Unit masked{static_cast<double>(destination.pixels[offset]) * weight,
+                              static_cast<double>(destination.pixels[offset + 1U]) * weight,
+                              static_cast<double>(destination.pixels[offset + 2U]) * weight,
+                              static_cast<double>(destination.pixels[offset + 3U]) * weight};
+            store(destination, offset, masked);
+        }
+    }
 }
 
 // -- the bake estimate -------------------------------------------------------------
+
+// Whether a fill blends other than source-over (MaterialBlendMode).
+bool blends_apart(const MaterialFillLayer& fill) noexcept {
+    const bool apart = fill.blend != MaterialBlendMode::normal;
+    return apart;
+}
 
 DeviceExtent destination_extent(const PrimitiveTarget& target, double outset) noexcept {
     const double scale = target.scale.value;
@@ -1240,8 +1463,8 @@ double corner_pixels(const MaterialLook& look, DeviceExtent extent) noexcept {
 
 double material_bake_estimate(const SurfaceMaterial& authored, const PrimitiveTarget& target,
                               double outset, PartShapeKind shape) noexcept {
-    std::optional<SurfaceMaterial> finished{};
-    const SurfaceMaterial& material = baked_material(authored, finished);
+    std::optional<SurfaceMaterial> finish_storage{};
+    const SurfaceMaterial& material = baked_material(authored, finish_storage);
     const MaterialBakeCosts& costs = measured_material_costs;
     const DeviceExtent extent = destination_extent(target, outset);
     double per_pixel = costs.base;
@@ -1263,6 +1486,12 @@ double material_bake_estimate(const SurfaceMaterial& authored, const PrimitiveTa
                               static_cast<double>(edges.left.has_value());
     per_pixel = per_pixel + edge_count * costs.border_edge;
     per_pixel = per_pixel + static_cast<double>(material.keylines.size()) * costs.keyline;
+    if (material.colour_filter) per_pixel = per_pixel + costs.colour_filter;
+    if (material.drop_shadow) per_pixel = per_pixel + costs.drop_shadow;
+    if (material.filter_blur > 0.0) per_pixel = per_pixel + costs.filter_blur;
+    if (std::any_of(material.fills.begin(), material.fills.end(), &blends_apart)) {
+        per_pixel = per_pixel + costs.fill_blend;
+    }
     const double pixels = static_cast<double>(extent.width) * static_cast<double>(extent.height);
     const double corners = corner_pixels(resolve_look(material, target, outset, shape), extent);
     const double estimate = pixels * per_pixel + corners * costs.outer_corner;
@@ -1381,6 +1610,11 @@ AxisReach axis_reach(const SurfaceMaterial& material, const PrimitiveTarget& tar
     for (const MaterialKeyline& keyline : material.keylines) {
         band_reach(reach, keyline.edge, keyline.inset * scale, keyline.width * scale, across);
     }
+    // The drop shadow and the blur carry every change further in.
+    const double carried = filter_reach_pixels(part_filters(material, scale));
+    reach.start = reach.start + carried;
+    reach.end = reach.end + carried;
+    reach.minimum_length = reach.minimum_length + carried * 2.0;
     return reach;
 }
 
@@ -1443,8 +1677,8 @@ AxisPlan plan_axis(const AxisReach& reach, double logical, double scale, std::ui
 
 PrimitiveSlicePlan material_slice_plan(const SurfaceMaterial& authored, const PrimitiveTarget& target,
                                        DeviceExtent extent, double outset, PartShapeKind shape) noexcept {
-    std::optional<SurfaceMaterial> finished{};
-    const SurfaceMaterial& material = baked_material(authored, finished);
+    std::optional<SurfaceMaterial> finish_storage{};
+    const SurfaceMaterial& material = baked_material(authored, finish_storage);
     const double scale = target.scale.value;
     const AxisReach across_reach = axis_reach(material, target, true, outset, shape);
     const AxisReach down_reach = axis_reach(material, target, false, outset, shape);
@@ -1573,10 +1807,9 @@ void MaterialPrimitive::fill(const PrimitiveParameterBlock& parameters, const Pr
 
 namespace {
 
-void bake_look(const SurfaceMaterial& material, const PrimitiveTarget& target, const MaterialLook& look,
-               const PartRasterView& destination) noexcept {
-    MaterialImages images{};
-    prepare_images(material, target, look, destination.extent, images);
+// The look's pixels into every pixel of `destination`, with `images`
+// prepared for it (prepare_images).
+void bake_look(const MaterialLook& look, const MaterialImages& images, const PartRasterView& destination) noexcept {
     const std::size_t width = destination.extent.width;
     OuterIntegrals integrals{};
     fill_columns(look, width, integrals);
@@ -1595,19 +1828,26 @@ void bake_look(const SurfaceMaterial& material, const PrimitiveTarget& target, c
 
 void bake_material(const SurfaceMaterial& authored, const PrimitiveTarget& target,
                    const PartRasterView& destination, double outset, PartShapeKind shape) noexcept {
-    std::optional<SurfaceMaterial> finished{};
-    const SurfaceMaterial& material = baked_material(authored, finished);
+    std::optional<SurfaceMaterial> finish_storage{};
+    const SurfaceMaterial& material = baked_material(authored, finish_storage);
     const MaterialLook look = resolve_look(material, target, outset, shape);
-    bake_look(material, target, look, destination);
+    MaterialImages images{};
+    prepare_images(material, target, look, destination.extent, images);
+    bake_look(look, images, destination);
+    apply_part_filters(material, target, destination);
+    apply_mask(look, images, destination);
 }
 
 void bake_material_region(const SurfaceMaterial& authored, const PrimitiveTarget& target, Point device_origin,
                           const PartRasterView& destination) noexcept {
-    std::optional<SurfaceMaterial> finished{};
-    const SurfaceMaterial& material = baked_material(authored, finished);
+    std::optional<SurfaceMaterial> finish_storage{};
+    const SurfaceMaterial& material = baked_material(authored, finish_storage);
     const MaterialLook look =
         resolve_look_at(material, target, Point{-device_origin.x, -device_origin.y}, PartShapeKind::rounded_rectangle);
-    bake_look(material, target, look, destination);
+    MaterialImages images{};
+    prepare_images(material, target, look, destination.extent, images);
+    bake_look(look, images, destination);
+    apply_mask(look, images, destination);
 }
 
 } // namespace gui_forms::engine_primitives
