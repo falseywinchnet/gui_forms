@@ -324,12 +324,17 @@ std::optional<PartRecordHandle> Window::note_engine_part(const Control& control,
 
 PartRasterResult Window::engine_part_raster(PartRecordHandle handle, const PartRasterRequest& request) {
     const PartRasterResult result = engine_parts_.raster_for(handle, request, paint_leases_completed_);
+    // A procedural pattern it asked for is generated in an idle frame (E10).
+    if (engine_parts_.patterns_waiting()) arm_engine_idle();
     return result;
 }
 
 void Window::engine_queue_keyframe(const PartRasterRequest& request) {
     engine_parts_.queue_idle_keyframe(request);
-    if (!engine_parts_.idle_keyframes_waiting()) return;
+    if (engine_parts_.idle_keyframes_waiting()) arm_engine_idle();
+}
+
+void Window::arm_engine_idle() {
     for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& scheduled : frame_requests_) {
         if ((*scheduled).connected() && (*scheduled).kind == detail::FrameRequestKind::engine_idle) return;
     }
@@ -345,6 +350,7 @@ void Window::engine_queue_keyframe(const PartRasterRequest& request) {
 
 PartRasterResult Window::engine_unkeyed_raster(const PartRasterRequest& request) {
     const PartRasterResult result = engine_parts_.raster_without_record(request, paint_leases_completed_);
+    if (engine_parts_.patterns_waiting()) arm_engine_idle();
     return result;
 }
 

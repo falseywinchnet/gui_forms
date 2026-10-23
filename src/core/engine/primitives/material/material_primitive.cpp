@@ -3,6 +3,7 @@
 #include "material_bake_policy.hpp"
 #include "material_image.hpp"
 #include "../kernel/pixel_kernel.hpp"
+#include "../procedural/procedural_pattern.hpp"
 
 #include "gui_forms/engine/engine_math/engine_math.hpp"
 #include "gui_forms/engine/part_raster/part_raster.hpp"
@@ -224,6 +225,8 @@ ResolvedFill resolve_fill(const MaterialFillLayer& layer, Rect box, double scale
     fill.spread = layer.spread;
     fill.stops = std::span<const GradientStop>(layer.stops.data(), layer.stops.size());
     fill.opacity = layer.opacity;
+    // A procedural fill draws its ground until its pattern is lent (E10).
+    if (layer.kind == MaterialFillKind::procedural) fill.colour = layer.procedural.ground;
     if (layer.kind == MaterialFillKind::linear_gradient) {
         Point start{};
         Point end{};
@@ -411,19 +414,67 @@ struct MaterialImages final {
     std::array<MaterialImageLayer, SurfaceMaterial::maximum_fill_layers> layers{};
 };
 
-// Maps each image fill's lent variant onto the destination. Storage that
-// cannot be allocated leaves that layer without a variant: fill() is
-// noexcept and still writes every pixel.
+// Maps a procedural fill's lent pattern onto the destination (E10): a
+// tile repeats from the box's first device pixel, one tile pixel to one
+// destination pixel; the fresco is stretched over the box as an image is.
+// A pattern made for another extent is not composited.
+void map_pattern(const ProceduralFill& pattern, Rect box, double scale, const PartRaster& variant,
+                 DeviceExtent extent, MaterialImageLayer& mapped) noexcept {
+    const DeviceExtent wanted = procedural_extent(pattern, box, scale);
+    if (!(variant.extent() == wanted)) return;
+    const bool stretched = pattern.pattern == ProceduralPattern::fresco;
+    try {
+        std::vector<std::uint32_t> map{};
+        if (stretched) {
+            ImageAxisPlacement across{};
+            across.start = box.x;
+            across.length = box.width;
+            across.source_length = wanted.width;
+            map_image_variant(across, wanted.width, 0U, 0U, extent.width, map);
+        } else {
+            map_procedural_tile(box.x, wanted.width, extent.width, map);
+        }
+        mapped.columns.resize(map.size());
+        for (std::size_t column = 0U; column < map.size(); ++column) {
+            mapped.columns[column] = static_cast<std::size_t>(map[column]) * part_raster_bytes_per_pixel;
+        }
+        if (stretched) {
+            ImageAxisPlacement down{};
+            down.start = box.y;
+            down.length = box.height;
+            down.source_length = wanted.height;
+            map_image_variant(down, wanted.height, 0U, 0U, extent.height, map);
+        } else {
+            map_procedural_tile(box.y, wanted.height, extent.height, map);
+        }
+        mapped.rows.resize(map.size());
+        for (std::size_t row = 0U; row < map.size(); ++row) {
+            mapped.rows[row] = static_cast<std::size_t>(map[row]) * variant.row_bytes();
+        }
+        mapped.variant = &variant;
+    } catch (const std::bad_alloc&) {
+        mapped = MaterialImageLayer{};
+    }
+}
+
+// Maps each image fill's lent variant, and each procedural fill's lent
+// pattern, onto the destination. Storage that cannot be allocated leaves
+// that layer without a variant: fill() is noexcept and still writes every
+// pixel.
 void prepare_images(const SurfaceMaterial& material, const PrimitiveTarget& target, const MaterialLook& look,
                     DeviceExtent extent, MaterialImages& images) noexcept {
     if (target.variants == nullptr) return;
     const double scale = target.scale.value;
     for (std::size_t index = 0U; index < material.fills.size(); ++index) {
         const MaterialFillLayer& layer = material.fills[index];
-        if (layer.kind != MaterialFillKind::image) continue;
+        if (layer.kind != MaterialFillKind::image && layer.kind != MaterialFillKind::procedural) continue;
         const std::shared_ptr<const PartRaster>& lent = (*target.variants).layers[index];
         if (!lent) continue;
         const PartRaster& variant = *lent;
+        if (layer.kind == MaterialFillKind::procedural) {
+            map_pattern(layer.procedural, look.box, scale, variant, extent, images.layers[index]);
+            continue;
+        }
         const ImageVariantRequest wanted = image_variant_request(layer, index, look.box, scale);
         // A variant made for another size is not composited.
         if (!(variant.extent() == wanted.extent)) continue;
@@ -624,6 +675,21 @@ Unit fill_colour(const ResolvedFill& fill, const MaterialImages& images, std::si
                          static_cast<double>(pixels[at + 2U]) * weight, static_cast<double>(pixels[at + 3U]) * weight};
         return image;
     }
+    case MaterialFillKind::procedural: {
+        const MaterialImageLayer& layer = images.layers[fill.image];
+        // Not ready: the ground, as a solid (E10).
+        if (layer.variant == nullptr) {
+            const Unit ground = premultiply(fill.colour, coverage * fill.opacity);
+            return ground;
+        }
+        const std::span<const std::uint8_t> pixels = (*layer.variant).pixels();
+        const std::size_t at = layer.rows[y] + layer.columns[x];
+        const double weight = coverage * fill.opacity / 255.0;
+        const Unit pattern{static_cast<double>(pixels[at]) * weight, static_cast<double>(pixels[at + 1U]) * weight,
+                           static_cast<double>(pixels[at + 2U]) * weight,
+                           static_cast<double>(pixels[at + 3U]) * weight};
+        return pattern;
+    }
     }
     return Unit{};
 }
@@ -803,6 +869,12 @@ double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTa
         case MaterialFillKind::image:
             // Compositing the prepared variant only: its resampling is not
             // the bake's (owner, 2026-10-22).
+            per_pixel = per_pixel + costs.image;
+            break;
+        case MaterialFillKind::procedural:
+            // Compositing the generated pattern, as an image's variant is
+            // composited; its generation is an idle frame's, bounded apart
+            // (procedural_generation_estimate).
             per_pixel = per_pixel + costs.image;
             break;
         }
@@ -1017,7 +1089,16 @@ bool MaterialPrimitive::accepts(const PrimitiveParameterBlock&, const PrimitiveT
     if (target.material == nullptr) return false;
     const SurfaceMaterial& material = *target.material;
     if (!valid_surface_material(material)) return false;
+    const Rect box = material_box(target, material_outset);
     for (const MaterialFillLayer& layer : material.fills) {
+        if (layer.kind == MaterialFillKind::procedural) {
+            // A pattern whose generation would stall an idle frame, or which
+            // would crowd the shared cache, is refused (E10): the cost-bound
+            // fallback.
+            const DeviceExtent pattern = procedural_extent(layer.procedural, box, target.scale.value);
+            if (!procedural_pattern_bounded(layer.procedural, pattern)) return false;
+            continue;
+        }
         if (layer.kind != MaterialFillKind::image) continue;
         if (target.images == nullptr || !material_image_available(*target.images, layer)) return false;
     }
@@ -1048,6 +1129,16 @@ std::size_t MaterialPrimitive::image_variants(const PrimitiveParameterBlock&, co
     std::size_t count = 0U;
     for (std::size_t index = 0U; index < material.fills.size() && count < requests.size(); ++index) {
         const MaterialFillLayer& layer = material.fills[index];
+        if (layer.kind == MaterialFillKind::procedural) {
+            ImageVariantRequest pattern{};
+            pattern.layer = index;
+            pattern.scale = target.scale;
+            pattern.extent = procedural_extent(layer.procedural, box, target.scale.value);
+            pattern.procedural = layer.procedural;
+            requests[count] = pattern;
+            count = count + 1U;
+            continue;
+        }
         if (layer.kind != MaterialFillKind::image) continue;
         requests[count] = image_variant_request(layer, index, box, target.scale.value);
         count = count + 1U;

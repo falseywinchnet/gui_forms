@@ -178,6 +178,8 @@ Types
      - How a part's raster may be assembled (EnginePrimitive::slice_plan).
    * - :cpp:class:`PrimitiveTarget <gui_forms::PrimitiveTarget>`
      -  
+   * - :cpp:class:`ProceduralFill <gui_forms::ProceduralFill>`
+     - One procedural fill's parameters.
    * - :cpp:class:`PropertyTransition <gui_forms::PropertyTransition>`
      - A transition on one resolved property: ``opacity``, or a number parameter of the rule's primitive that the primitive declares animated (such as the bulge's amplitude), so that its frames never remake the part's preparation.
    * - :cpp:class:`RasterCacheStatistics <gui_forms::RasterCacheStatistics>`
@@ -330,6 +332,10 @@ Types
    .. cpp:member:: std::optional<SurfaceMaterial> material
 
    .. cpp:member:: std::uint64_t image_revision
+
+   .. cpp:member:: std::optional<std::uint64_t> awaited_patterns
+
+      Set when ``raster`` drew a procedural fill's ground because its pattern was not ready (E10): the table's pattern generation then. Such a raster is current only until the table makes another pattern.
 
    .. cpp:member:: bool shared
 
@@ -915,6 +921,8 @@ Types
 
    .. cpp:function:: bool idle_keyframes_waiting() const noexcept
 
+   .. cpp:function:: bool patterns_waiting() const noexcept
+
    .. cpp:function:: RasterCacheStatistics cache_statistics() const noexcept
 
 
@@ -947,6 +955,14 @@ Types
       Idle keyframes (E7r; owner A, 2026-10-22). queue_idle_keyframe keeps a copy of ``request`` (its lent material copied, its borrows cleared) to bake in an idle frame, unless the table holds or queues it already or the queue is full. bake_idle_keyframe bakes the oldest queued keyframe the table does not hold, lending it ``images`` (a queued material whose images changed is dropped), and returns whether any remain queued. A theme change (invalidate_rasters) empties the queue. Allocation failure propagates as std::bad_alloc, the queue then holding what it held less the keyframe taken.
 
    .. cpp:function:: bool bake_idle_keyframe(const ImageRegistry* images, std::uint64_t paint_sequence)
+
+   .. cpp:function:: PatternGeneration generate_pattern(std::uint64_t paint_sequence)
+
+      Procedural patterns (E10). A bake that asks for a pattern not held queues it (at most maximum_queued_patterns) and draws the fill's ground; nothing is generated inside a paint. generate_pattern generates the oldest queued pattern not held and holds it. Making one ends the currency of every raster that drew a ground (CachedPartRaster::awaited_patterns): the shared bakes among them and the backplane images are dropped, and the window repaints the parts (awaits_pattern), or every part when a raster without a record drew one, since it records no place. A pattern that cannot be made is dropped from the queue. Allocation failure propagates as std::bad_alloc.
+
+   .. cpp:function:: bool awaits_pattern(const CachedPartRaster& cached) const noexcept
+
+      Whether ``cached`` drew a ground for a pattern made since.
 
    .. cpp:function:: PartRasterResult raster_without_record(const PartRasterRequest& request, std::uint64_t paint_sequence)
 
@@ -1286,7 +1302,7 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   One sized variant of an image resource: the image resampled to ``extent`` device pixels, for display ``scale``. A nine-patch's fixed segments are resampled apart from its middle: ``source_slice`` are their source pixels (left, top, right, bottom) and ``fixed`` their device lengths in the variant, both zero for a stretched or tiled image, which is resampled whole. ``layer`` is the fill layer the variant serves, by index among the material's fills; it is not part of what the variant is.
+   One sized variant of an image resource: the image resampled to ``extent`` device pixels, for display ``scale``. A nine-patch's fixed segments are resampled apart from its middle: ``source_slice`` are their source pixels (left, top, right, bottom) and ``fixed`` their device lengths in the variant, both zero for a stretched or tiled image, which is resampled whole. ``layer`` is the fill layer the variant serves, by index among the material's fills; it is not part of what the variant is. A procedural fill's pattern (E10) is asked for the same way, with ``procedural`` set and no image: the pattern generated at ``scale`` and ``extent``, never resampled. The engine never generates one inside a paint: a bake whose pattern is not ready is lent none, and the fill draws its ground; the pattern is generated in an idle frame and the parts that drew the ground are repainted.
 
    .. cpp:member:: std::size_t layer
 
@@ -1303,6 +1319,8 @@ Types
    .. cpp:member:: std::array<std::uint32_t, 4> fixed
 
    .. cpp:member:: DeviceScale scale
+
+   .. cpp:member:: std::optional<ProceduralFill> procedural
 
 .. cpp:namespace:: gui_forms
 
@@ -1425,6 +1443,8 @@ Types
 
       Creates a nine-slice image layer with source insets and scale.
 
+   .. cpp:function:: static MaterialFillLayer procedural_pattern(const ProceduralFill& pattern, double opacity = 1.0)
+
    .. cpp:member:: MaterialFillKind kind
 
       Default: ``{MaterialFillKind::solid}``.
@@ -1482,6 +1502,10 @@ Types
    .. cpp:member:: MaterialImageMode image_mode
 
       Default: ``{MaterialImageMode::stretch}``.
+
+   .. cpp:member:: ProceduralFill procedural
+
+      Read only by a procedural fill, with ``opacity``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2408,6 +2432,44 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ProceduralFill final
+
+   ``#include <gui_forms/surface_material/procedural_fill/procedural_fill.hpp>``
+
+   One procedural fill's parameters. The pattern is generated per display scale from these alone, in integer arithmetic, so that its bytes are the same on every host; each scale is generated, never resampled from another. - ``seed`` chooses the noise; equal parameters give equal bytes. - ``tile`` is the pattern's repeat in logical units: the side of its square tile, round(tile × scale) device pixels, within [2, 256]; a pinstripe's period. The fresco covers the box and does not read it. - ``strength`` in [0, 1] scales how far the figure departs from the ground; for the fresco, its blooms' opacity. - The ground is the pattern's base colour, and what the fill draws, as a solid, until its pattern is ready; the figure is its contrasting colour (fibres, grain, stripes, streaks); the fresco also reads ``accent``, its gradient's last stop, and ``bloom``, whose alpha is its blooms' peak opacity.
+
+   .. cpp:member:: ProceduralPattern pattern
+
+      Default: ``{ProceduralPattern::felt}``.
+
+   .. cpp:member:: std::uint32_t seed
+
+   .. cpp:member:: double tile
+
+      Default: ``{64.0}``.
+
+   .. cpp:member:: double strength
+
+      Default: ``{1.0}``.
+
+   .. cpp:member:: Color ground
+
+      Default: ``{Color::rgba(128, 128, 128)}``.
+
+   .. cpp:member:: Color figure
+
+      Default: ``{Color::rgba(96, 96, 96)}``.
+
+   .. cpp:member:: Color accent
+
+      Default: ``{Color::rgba(128, 128, 128)}``.
+
+   .. cpp:member:: Color bloom
+
+      Default: ``{Color::rgba(255, 255, 255, 0)}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PropertyTransition final
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
@@ -2487,6 +2549,18 @@ Types
    .. cpp:member:: std::uint64_t image_variant_hits
 
    .. cpp:member:: std::size_t image_variants
+
+   .. cpp:member:: std::uint64_t procedural_generations
+
+      Procedural fills' patterns (E10): generated in idle frames, lent from those held, and asked for by a bake before they were ready (the fill then drew its ground); held now, and queued for idle frames now. Their bytes count with the shared bakes'. A theme change keeps them.
+
+   .. cpp:member:: std::uint64_t procedural_hits
+
+   .. cpp:member:: std::uint64_t procedural_placeholders
+
+   .. cpp:member:: std::size_t procedural_patterns
+
+   .. cpp:member:: std::size_t procedural_queued
 
    .. cpp:member:: std::uint64_t backplane_bakes
 
@@ -3426,6 +3500,8 @@ Enumerations
 
    .. cpp:enumerator:: image
 
+   .. cpp:enumerator:: procedural
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: MaterialImageMode
@@ -3646,6 +3722,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PatternGeneration
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: made
+
+   .. cpp:enumerator:: made_unrecorded
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PreparationOutcome
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -3681,6 +3769,24 @@ Enumerations
    .. cpp:enumerator:: colour
 
    .. cpp:enumerator:: choice
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ProceduralPattern
+
+   ``#include <gui_forms/surface_material/procedural_fill/procedural_fill.hpp>``
+
+   .. cpp:enumerator:: felt
+
+   .. cpp:enumerator:: wood_grain
+
+   .. cpp:enumerator:: paper_fibre
+
+   .. cpp:enumerator:: pinstripe
+
+   .. cpp:enumerator:: brushed_metal
+
+   .. cpp:enumerator:: fresco
 
 .. cpp:namespace:: gui_forms
 
@@ -4061,6 +4167,10 @@ Functions, constants and aliases
 
    The most keyframes queued for idle frames at once (E7r): ten levels for each of about six parts. A keyframe that does not fit is baked on demand when a paint first reaches it. Value: ``64U``.
 
+.. cpp:var:: constexpr std::size_t maximum_queued_patterns
+
+   The most procedural patterns queued for idle frames at once (E10). A pattern that does not fit is queued again when a paint next asks for it. Value: ``32U``.
+
 .. cpp:namespace:: gui_forms
 
 ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -4254,6 +4364,18 @@ Functions, constants and aliases
 .. cpp:var:: constexpr double gloss_break_end
 
    Value: ``0.52``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/surface_material/procedural_fill/procedural_fill.hpp>``
+
+.. cpp:var:: constexpr double minimum_procedural_tile
+
+   The smallest and largest tile, in logical units. Value: ``2.0``.
+
+.. cpp:var:: constexpr double maximum_procedural_tile
+
+   Value: ``256.0``.
 
 .. cpp:namespace:: gui_forms
 

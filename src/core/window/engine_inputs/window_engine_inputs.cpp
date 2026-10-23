@@ -9,6 +9,7 @@
 #include "gui_forms/engine/theme_rules/theme_rules.hpp"
 #include "gui_forms/theme/theme/theme.hpp"
 #include "../../display/recording_painter/recording_painter.hpp"
+#include "../popup/popup_attachment.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -143,6 +144,36 @@ void Window::damage_backplane_readers(const Rect* damage) {
         static_cast<void>(damage_engine_part(*record, damaged));
     }
     if (damaged.parts > 0U) metrics_.record_engine_input_damage(damaged.parts, damaged.area);
+}
+
+void Window::damage_pattern_waiters(PatternGeneration generation) {
+    switch (generation) {
+    case PatternGeneration::none:
+        // Nothing was made, so every raster that drew a ground is current.
+        return;
+    case PatternGeneration::made: {
+        EngineDamage damaged{};
+        for (std::size_t slot = 0; slot < engine_parts_.slot_count(); ++slot) {
+            const EnginePartRecord* const record = engine_parts_.record_in_slot(slot);
+            if (record == nullptr || !(*record).cached) continue;
+            if (!engine_parts_.awaits_pattern(*(*record).cached)) continue;
+            static_cast<void>(damage_engine_part(*record, damaged));
+        }
+        if (damaged.parts > 0U) metrics_.record_engine_input_damage(damaged.parts, damaged.area);
+        return;
+    }
+    case PatternGeneration::made_unrecorded:
+        // A part without a record drew a ground and recorded no place:
+        // every control repaints, and glass sees the backplane again.
+        mark_subtree_dirty(*root_, invalidation::paint_only);
+        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+            if (const Control::Ptr overlay = (*popup).popup()) mark_subtree_dirty(*overlay, invalidation::paint_only);
+        }
+        damage_backplane_readers(nullptr);
+        return;
+    }
+    // A generation outside the enumeration repaints nothing.
+    return;
 }
 
 void Window::note_engine_backplane_reader(PartRecordHandle handle, bool reads) noexcept {

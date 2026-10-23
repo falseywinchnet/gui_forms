@@ -797,6 +797,9 @@ private:
     // `request` to bake in an idle frame (EnginePartTable::
     // queue_idle_keyframe), and keeps an idle frame request while any wait.
     void engine_queue_keyframe(const PartRasterRequest& request);
+    // Keeps one engine_idle frame request while the engine has idle work:
+    // keyframes or procedural patterns queued (E7r, E10).
+    void arm_engine_idle();
     // Where a part ThemeEngine::paint draws with `painter` lands (E6): the
     // control whose display chunk records it (the control being recorded,
     // which may paint on behalf of `control`, or else `control` itself), the
@@ -848,6 +851,10 @@ private:
     // of every keyed part that sampled the backplane within `damage`
     // (window logical units), or every such part when `damage` is null.
     void damage_backplane_readers(const Rect* damage);
+    // After the engine made a procedural pattern (E10): invalidates the
+    // extent of every keyed part whose raster drew a fill's ground in its
+    // place, or, for made_unrecorded, every control and the backplane.
+    void damage_pattern_waiters(PatternGeneration generation);
     // Composites the backplane-plane display chunks of `control` and its
     // subtree, clipped to `clip` (window logical units), into `image`
     // covering `region`; adds the commands skipped to `skipped`.
