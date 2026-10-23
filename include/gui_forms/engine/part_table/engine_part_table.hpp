@@ -312,10 +312,17 @@ struct RasterCacheStatistics final {
     std::uint64_t keyframe_hits{};
     std::size_t idle_keyframes_queued{};
     // The shared bakes: evicted to keep within their budget, held now, and
-    // their bytes.
+    // their bytes. The bytes, and the evictions, include image variants'.
     std::uint64_t shared_evictions{};
     std::size_t shared_rasters{};
     std::size_t shared_bytes{};
+    // Image faces' sized variants (owner, 2026-10-22): made from their
+    // images, lent from those held, and held now. Each is made once while
+    // it is held; a theme change or a change to the window's images drops
+    // them all.
+    std::uint64_t image_variant_bakes{};
+    std::uint64_t image_variant_hits{};
+    std::size_t image_variants{};
 };
 
 // The most bytes of cached rasters one window keeps (GIVEN F2-1: 8 MB).
@@ -513,11 +520,28 @@ private:
     // primitive refuses it. `use` chooses the counters.
     [[nodiscard]] std::shared_ptr<PartRaster> shared_bake(const PartRasterRequest& request,
                                                           std::uint64_t paint_sequence, bool refresh, SharedUse use);
-    // Evicts the least recently used shared bakes until `incoming` more
-    // bytes fit shared_bake_budget_bytes.
+    // Evicts the least recently used shared bakes and image variants until
+    // `incoming` more bytes fit shared_bake_budget_bytes.
     void make_shared_room(std::size_t incoming) noexcept;
-    // Drops every shared bake.
+    // Drops every shared bake and image variant.
     void clear_shared_bakes() noexcept;
+    // Drops every image variant.
+    void clear_image_variants() noexcept;
+
+    // An image variant held: what it is (its layer unused), and the paint
+    // that last used it.
+    struct HeldImageVariant final {
+        ImageVariantRequest request{};
+        std::shared_ptr<const PartRaster> raster{};
+        std::uint64_t last_used{};
+    };
+    // Fills `lent` with the image variants `request`'s primitive asks for:
+    // those held, and those not held made now and held (the first need;
+    // owner, 2026-10-22). A variant that cannot be made is not lent, and
+    // its fill draws nothing. Held variants made from an earlier revision
+    // of the window's images are dropped first.
+    void lend_image_variants(const PartRasterRequest& request, std::uint64_t paint_sequence,
+                             LentImageVariants& lent);
 
     std::vector<RecordSlot> slots_;
     std::vector<std::uint32_t> free_slots_;
@@ -538,6 +562,11 @@ private:
     // The shared bakes, in no order; a few hundred at most, and looked up
     // only when a part's own raster is not current, so lookups scan them.
     std::vector<SharedBake> shared_bakes_;
+    // The image variants, in no order; one for each image fill size in use,
+    // so lookups scan them. Made from the window's images at
+    // image_variant_revision_ (none before the first).
+    std::vector<HeldImageVariant> image_variants_;
+    std::optional<std::uint64_t> image_variant_revision_{};
     // Keyframes waiting for idle frames, oldest first; each a request kept
     // as a cached raster's description, its raster null.
     std::deque<CachedPartRaster> idle_keyframes_;

@@ -152,6 +152,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/primitives/bulge/bulge_primitives.cpp
     src/core/engine/primitives/relief/relief_primitives.cpp
     src/core/engine/primitives/material/material_image.cpp
+    src/core/engine/primitives/material/image_variant.cpp
     src/core/engine/primitives/material/material_primitive.cpp
     src/core/engine/primitives/material/overlay_shadow_primitive.cpp
     src/core/engine/primitives/light/sheen_primitive.cpp
