@@ -276,6 +276,46 @@ CngInspectResult inspect_cng(std::span<const std::byte> encoded) noexcept {
     return result;
 }
 
+CngInspectResult validate_cng_framing(std::span<const std::byte> encoded) noexcept {
+    CngInspectResult result = inspect_cng(encoded);
+    if (result.error != CngError::none) {
+        return result;
+    }
+    // As for the probe, the image is reported only when the whole file passes.
+    CngImage image = result.image;
+    result.image = CngImage{};
+    std::span<const std::uint8_t> file = bytes_of(encoded);
+    BandShape shape = detail::band_shape(image.width, image.height, channel_count(image.channels));
+    std::size_t offset = detail::signature.size() + detail::chunk_framing_bytes + detail::header_payload_bytes;
+    for (std::size_t row = 0; row < image.height; row += shape.rows) {
+        Chunk chunk = read_chunk(file, offset, detail::band_type);
+        if (chunk.error != CngError::none) {
+            result.error = chunk.error;
+            return result;
+        }
+        if (chunk.length < detail::band_fields_bytes + detail::band_coding_bytes) {
+            result.error = CngError::invalid_band;
+            return result;
+        }
+        offset = chunk.next;
+    }
+    Chunk end = read_chunk(file, offset, detail::end_type);
+    if (end.error != CngError::none) {
+        result.error = end.error;
+        return result;
+    }
+    if (end.length != 0) {
+        result.error = CngError::invalid_chunk;
+        return result;
+    }
+    if (end.next != file.size()) {
+        result.error = CngError::trailing_data;
+        return result;
+    }
+    result.image = image;
+    return result;
+}
+
 // ---------------------------------------------------------------- decoding
 
 class CngDecoderStorage final {

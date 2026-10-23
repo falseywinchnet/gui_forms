@@ -67,6 +67,12 @@ struct CngInspectResult final {
 // its checksum and every field. Band contents are not examined.
 [[nodiscard]] CngInspectResult inspect_cng(std::span<const std::byte> encoded) noexcept;
 
+// Framing check, for admitting a file before it is decoded: the header probe,
+// then exactly the band chunks the header implies, each chunk's length, type
+// and checksum, the empty end chunk, and the end of input. Band payloads are
+// not decoded, so a file that passes can still be refused by decode.
+[[nodiscard]] CngInspectResult validate_cng_framing(std::span<const std::byte> encoded) noexcept;
+
 struct CngDecodeResult final {
     CngError error = CngError::invalid_argument;
     CngImage image{};

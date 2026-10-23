@@ -35,6 +35,7 @@ bands, so there is no hidden parser state machine. Each call's response:
 | Operation | Bad signature or header | Extent or channels | Wrong storage | Overlap | Bad band | After `CEND` |
 |---|---|---|---|---|---|---|
 | `inspect_cng` | `invalid_signature`, `truncated`, `invalid_chunk`, `crc_mismatch`, `invalid_header` | `unsupported_dimensions` | — | — | not examined | not examined |
+| `validate_cng_framing` | as `inspect_cng` | as `inspect_cng` | — | — | framing only: `truncated`, `invalid_chunk`, `crc_mismatch`, `invalid_band` (shorter than its fields) | `trailing_data` |
 | `decode` | as `inspect_cng`; samples untouched | as `inspect_cng` | `insufficient_storage` (size other than `cng_sample_bytes`); untouched | `overlap`; untouched | `invalid_band`, `entropy_failure`, `invalid_sequences`, `invalid_literals`, `truncated`, `invalid_chunk`, `crc_mismatch`; earlier bands written | `trailing_data` |
 | `encode` | — | `unsupported_dimensions` | stride below a row or overflowing, short samples: `invalid_argument`; destination below the bound: `insufficient_storage` | `overlap` | — | — |
 
@@ -52,6 +53,7 @@ refusal leaves the owner grown and reusable (`tests/malformed.cpp`,
 | `read_chunk` | — | — | 12 framing bytes present; length within the remaining input (subtraction, no addition overflow); type; CRC | — | pass |
 | `declared_frame` | — | — | non-skippable; one frame spanning the payload exactly; content size declared and within the limit | — | **fixed** (F6) |
 | `inspect_cng` | — | — | signature, header length 16, version, channels, flags, reserved, budget, extent | — | **fixed** (F3: header probe) |
+| `validate_cng_framing` | bands from the header | none | as `inspect_cng`, then each band chunk's framing and minimum length, the empty `CEND`, end of input | the image is reported only when the whole file passes | added for registry admission |
 | `decode_band` | records `N`, literals `L` | none | `1 <= N <= P/4 + 1`, `L <= P`, `S` within the payload, sequence frame exactly `12N`; coding 0 payload exactly `L*C`; coding 1 needs `L > 0` and payload below `L*C` | all checks precede the band's first write | **fixed** (F6) |
 | `valid_sequences` | `N` | none | literals within the band and within `L`; runs >= 4 and within the band; distance <= produced and <= 262,144; exact totals | the single grammar validator | **fixed** (F7: was three copies) |
 | `restore_runs` | descriptors until the packed count | none | five groups at most, no redundant zero group, runs >= 4, cursors meet | — | pass |
@@ -87,8 +89,8 @@ RGBA with five bands, 700 x 520 RGB with four) and three patterns (ramp,
 noise, sparse noise: stored and compressed literals), at every byte offset,
 or at 256 evenly spaced offsets for files above 4 KB:
 
-- every proper prefix is refused;
-- every byte flipped by 0x01, 0x80 and 0xFF is refused; with the chunk CRC
+- every proper prefix is refused, by decode and by `validate_cng_framing`;
+- every byte flipped by 0x01, 0x80 and 0xFF is refused, by both; with the chunk CRC
   then repaired, the decoder runs to a defined result without a checksum
   error (under the sanitizer, with no memory or UB finding);
 - one trailing byte is refused as `trailing_data`;

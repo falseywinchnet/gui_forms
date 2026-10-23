@@ -2,7 +2,8 @@
 //
 // The first input byte chooses the mode:
 //   - even: the rest is a file. inspect_cng and decode must agree on the
-//     header; an accepted file's samples must re-encode and decode exactly.
+//     header, a decoded file must pass validate_cng_framing, and an accepted
+//     file's samples must re-encode and decode exactly.
 //   - odd: the rest describes an image (width, height, channels, stride
 //     padding) and seeds its samples; encode then decode must be exact, and
 //     a truncated copy of the file must be refused.
@@ -72,6 +73,7 @@ void decode_file(const std::uint8_t* data, std::size_t size) {
         return;
     }
     ++accepted;
+    require(stx_cng::validate_cng_framing(file).error == stx_cng::CngError::none, "decoded file passes the framing check");
     require(decoded.image.width == inspected.image.width && decoded.image.height == inspected.image.height
         && decoded.image.channels == inspected.image.channels, "probe and decode agree");
     std::uint64_t row_bytes = static_cast<std::uint64_t>(decoded.image.width) * static_cast<std::size_t>(decoded.image.channels);

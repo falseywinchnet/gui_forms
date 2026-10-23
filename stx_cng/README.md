@@ -17,6 +17,9 @@ measurements, with their workload and machine, are in
   failure as a `CngError` in its result. No borrow outlives a call.
 - `inspect_cng` checks the signature and the header chunk (checksum and every
   field) and returns the image's width, height and channels.
+  `validate_cng_framing` also walks every chunk (the band count the header
+  implies, lengths, types, checksums, the end chunk and end of input) without
+  decoding, for admitting a file before it is drawn.
 - `cng_sample_bytes(image)` is `width * height * channels`;
   `cng_encoded_bound(image)` is the largest file the encoder can write. Both
   are zero for an image outside the admitted extent: sides 1 to 16,384, at

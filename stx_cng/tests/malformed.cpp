@@ -138,15 +138,18 @@ Bytes encode_file(stx_cng::CngEncoder& encoder, CngImage image, stx_cng_test::Pa
 }
 
 // Every proper prefix fails; every flipped byte fails (the CRC or the framing
-// catches it); with the chunk CRC repaired the edit reaches the band logic,
-// which returns some result (the sanitizer build checks it does so safely).
+// catches it), in decode and in the framing check; with the chunk CRC
+// repaired the edit reaches the band logic, which returns some result (the
+// sanitizer build checks it does so safely).
 void sweep(stx_cng::CngDecoder& decoder, const Bytes& file, std::size_t sample_bytes) {
     check(decode(decoder, file, sample_bytes) == CngError::none, "sweep source decodes");
+    check(stx_cng::validate_cng_framing(as_bytes(file)).error == CngError::none, "sweep source framing valid");
     // Small files are swept exhaustively, large ones at 256 evenly spaced bytes.
     std::size_t step = file.size() > 4096 ? file.size() / 256 : 1;
     for (std::size_t keep = 0; keep < file.size(); keep += step) {
         Bytes prefix(file.begin(), file.begin() + static_cast<std::ptrdiff_t>(keep));
         check(decode(decoder, prefix, sample_bytes) != CngError::none, "every proper prefix refused");
+        check(stx_cng::validate_cng_framing(as_bytes(prefix)).error != CngError::none, "framing refuses every prefix");
     }
     std::vector<std::size_t> chunks;
     for (std::size_t offset = stx_cng::detail::signature.size(); offset + 12 <= file.size(); offset += 12 + read_u32(file, offset)) {
@@ -158,6 +161,7 @@ void sweep(stx_cng::CngDecoder& decoder, const Bytes& file, std::size_t sample_b
             Bytes damaged(file);
             damaged[position] = static_cast<std::uint8_t>(damaged[position] ^ flip);
             check(decode(decoder, damaged, sample_bytes) != CngError::none, "every flipped byte refused");
+            check(stx_cng::validate_cng_framing(as_bytes(damaged)).error != CngError::none, "framing refuses every flip");
             for (std::size_t chunk : chunks) {
                 std::size_t length = read_u32(file, chunk);
                 if (position >= chunk + 8 && position < chunk + 8 + length) {
@@ -170,6 +174,7 @@ void sweep(stx_cng::CngDecoder& decoder, const Bytes& file, std::size_t sample_b
     Bytes extended(file);
     extended.push_back(0);
     check(decode(decoder, extended, sample_bytes) == CngError::trailing_data, "trailing byte refused");
+    check(stx_cng::validate_cng_framing(as_bytes(extended)).error == CngError::trailing_data, "framing refuses trailing byte");
 }
 
 struct HeaderCase final {
@@ -372,6 +377,14 @@ void framing_cases(stx_cng::CngDecoder& decoder, stx_cng::CngEncoder& encoder) {
     append_chunk(extra_band, stx_cng::detail::band_type, Bytes(13, 0));
     append_chunk(extra_band, stx_cng::detail::end_type, Bytes{});
     check(decode(decoder, extra_band, samples) == CngError::invalid_chunk, "extra band refused");
+    check(stx_cng::validate_cng_framing(as_bytes(long_end)).error == CngError::invalid_chunk, "framing: nonempty end");
+    check(stx_cng::validate_cng_framing(as_bytes(without_end)).error == CngError::truncated, "framing: missing end");
+    check(stx_cng::validate_cng_framing(as_bytes(extra_band)).error == CngError::invalid_chunk, "framing: extra band");
+    Bytes short_band(file.begin(), file.begin() + 8 + 12 + 16);
+    append_chunk(short_band, stx_cng::detail::band_type, Bytes(12, 0));
+    append_chunk(short_band, stx_cng::detail::end_type, Bytes{});
+    check(stx_cng::validate_cng_framing(as_bytes(short_band)).error == CngError::invalid_band, "framing: short band");
+    check(stx_cng::validate_cng_framing(as_bytes(file)).image.width == 40, "framing reports the image");
     check(decode(decoder, file, samples - 1) == CngError::insufficient_storage, "wrong sample storage refused");
     check(decode(decoder, file, samples) == CngError::none, "decoder reusable after refusals");
 }
