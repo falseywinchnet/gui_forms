@@ -44,6 +44,8 @@ class FixtureAPI:
         self.payload_run: int = 10
         self.calls: list[str] = []
         self.pending: bool = False
+        # Commits other than the run's head, by revision: (tree, parent revisions).
+        self.commits: dict[str, tuple[str, list[str]]] = {}
 
     def request(self, endpoint: str) -> Any:
         self.calls.append(endpoint)
@@ -54,7 +56,17 @@ class FixtureAPI:
                 'expired': self.expired, 'size_in_bytes': len(self.data),
                 'digest': 'sha256:' + hashlib.sha256(self.data).hexdigest()}]}
         if '/git/commits/' in endpoint:
-            return {'tree': {'sha': self.tree}}
+            revision: str = endpoint.rpartition('/')[2]
+            if revision in self.commits:
+                tree: str
+                parents: list[str]
+                tree, parents = self.commits[revision]
+                parent_records: list[dict[str, str]] = []
+                parent: str
+                for parent in parents:
+                    parent_records.append({'sha': parent})
+                return {'tree': {'sha': tree}, 'parents': parent_records}
+            return {'tree': {'sha': self.tree}, 'parents': []}
         if '/jobs?' in endpoint:
             return {'jobs': [self.job]}
         if endpoint.endswith('/runs/10'):
@@ -108,6 +120,27 @@ class ReuseTests(unittest.TestCase):
         fixture: FixtureAPI = FixtureAPI()
         fixture.tree = 'different'
         self.assertFalse(self.lookup(fixture))
+
+    def test_a_merge_commit_of_the_producer_head_vouches_for_its_tree(self) -> None:
+        # A branch behind its base: the producer checked out the test merge
+        # commit, whose tree is not the head's.
+        fixture: FixtureAPI = FixtureAPI()
+        fixture.tree = 'head-tree'
+        fixture.receipt['revision'] = 'merge'
+        fixture.data = zipped_receipt(fixture.receipt)
+        fixture.commits['merge'] = ('tree', ['base', 'commit'])
+        self.assertTrue(self.lookup(fixture))
+
+    def test_a_merge_commit_without_the_head_or_with_another_tree_is_rejected(self) -> None:
+        case: tuple[str, list[str]]
+        for case in (('tree', ['base', 'other-head']), ('other-tree', ['base', 'commit'])):
+            with self.subTest(case=case):
+                fixture: FixtureAPI = FixtureAPI()
+                fixture.tree = 'head-tree'
+                fixture.receipt['revision'] = 'merge'
+                fixture.data = zipped_receipt(fixture.receipt)
+                fixture.commits['merge'] = case
+                self.assertFalse(self.lookup(fixture))
 
     def test_foreign_workflow_and_fork_are_rejected(self) -> None:
         fixture: FixtureAPI = FixtureAPI()
