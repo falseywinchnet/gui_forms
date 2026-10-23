@@ -35,9 +35,33 @@ bool surface_role(PartRole role) noexcept {
     case PartRole::activity:
     case PartRole::selection:
         return true;
-    default:
+    case PartRole::region:
+    case PartRole::shadow:
+    case PartRole::edge:
+    case PartRole::keyline:
+    case PartRole::perimeter:
+    case PartRole::sheen:
+    case PartRole::seam:
+    case PartRole::divider:
+    case PartRole::caption:
+    case PartRole::indicator:
+    case PartRole::glyph:
+    case PartRole::icon:
+    case PartRole::label:
+    case PartRole::content:
+    case PartRole::caret:
+    case PartRole::disclosure:
+    case PartRole::grip:
+    case PartRole::focus:
+    case PartRole::preselect:
+    case PartRole::validation:
+    case PartRole::drop:
+    case PartRole::image:
+    case PartRole::count:
         return false;
     }
+    // A role outside the enumeration is not a surface.
+    return false;
 }
 
 // The corner radius a surface part is drawn with: its own, when set (never
@@ -281,11 +305,42 @@ void paint_pin(Painter& painter, Rect box, bool pinned, Color ink) {
     painter.draw_line(needle_start, needle_end, ink, 1.0);
 }
 
+// The part of a dock shape's interior a drop region fills: a half of the
+// interior for a side, or the middle half of it each way for tab_into.
+Rect dock_shape_fill(Rect interior, DockShapeRegion region) noexcept {
+    const double half_width = std::floor(interior.width * 0.5);
+    const double half_height = std::floor(interior.height * 0.5);
+    Rect filled = interior;
+    switch (region) {
+    case DockShapeRegion::top:
+        filled.height = half_height;
+        return filled;
+    case DockShapeRegion::bottom:
+        filled.y = interior.y + interior.height - half_height;
+        filled.height = half_height;
+        return filled;
+    case DockShapeRegion::left:
+        filled.width = half_width;
+        return filled;
+    case DockShapeRegion::right:
+        filled.x = interior.x + interior.width - half_width;
+        filled.width = half_width;
+        return filled;
+    case DockShapeRegion::tab_into:
+        filled.x = interior.x + std::floor(interior.width * 0.25);
+        filled.y = interior.y + std::floor(interior.height * 0.25);
+        filled.width = half_width;
+        filled.height = half_height;
+        return filled;
+    }
+    // A region outside the enumeration fills the whole interior.
+    return interior;
+}
+
 // A docking target's shape (owner decision DK-35, J2): a small window, its
 // caption a two-unit bar along the top and its other three edges one-unit
 // strokes, with the region a drop there gives the panel filled inside it,
-// one unit clear of the edges: a half of the interior for a side, or the
-// middle half of it each way for tab_into.
+// one unit clear of the edges (dock_shape_fill).
 void paint_dock_shape(Painter& painter, Rect box, DockShapeRegion region, Color ink) {
     const Rect square = square_in(box);
     const double side = square.width;
@@ -298,31 +353,7 @@ void paint_dock_shape(Painter& painter, Rect box, DockShapeRegion region, Color 
     painter.draw_line({right, square.y + 2.0}, {right, bottom}, ink, 1.0);
     painter.draw_line({left, bottom}, {right, bottom}, ink, 1.0);
     const Rect interior{square.x + 2.0, square.y + 3.0, side - 4.0, side - 5.0};
-    const double half_width = std::floor(interior.width * 0.5);
-    const double half_height = std::floor(interior.height * 0.5);
-    Rect filled = interior;
-    switch (region) {
-    case DockShapeRegion::top:
-        filled.height = half_height;
-        break;
-    case DockShapeRegion::bottom:
-        filled.y = interior.y + interior.height - half_height;
-        filled.height = half_height;
-        break;
-    case DockShapeRegion::left:
-        filled.width = half_width;
-        break;
-    case DockShapeRegion::right:
-        filled.x = interior.x + interior.width - half_width;
-        filled.width = half_width;
-        break;
-    case DockShapeRegion::tab_into:
-        filled.x = interior.x + std::floor(interior.width * 0.25);
-        filled.y = interior.y + std::floor(interior.height * 0.25);
-        filled.width = half_width;
-        filled.height = half_height;
-        break;
-    }
+    const Rect filled = dock_shape_fill(interior, region);
     painter.fill_rect(filled, ink);
 }
 
@@ -332,6 +363,7 @@ void paint_mark(Painter& painter, const PartPaint& part, const ControlVisualReci
     switch (part.mark) {
     case PartMark::none:
     case PartMark::count:
+        // Nothing to draw: no mark, or the count sentinel.
         return;
     case PartMark::check: {
         // Two strokes through fixed fractions of the mark's box: the house
@@ -408,6 +440,8 @@ void paint_mark(Painter& painter, const PartPaint& part, const ControlVisualReci
         paint_dock_shape(painter, box, part.dock_region, ink);
         return;
     }
+    // A mark outside the enumeration draws nothing.
+    return;
 }
 
 // One line of text in the part's bounds, its line box centred across the
@@ -427,6 +461,7 @@ void paint_text(Painter& painter, const PartPaint& part, Color color) {
     // Distances along the reading direction from the end reading starts at,
     // and across it from the edge the glyph tops face.
     double along = 0.0;
+    // A run aligned at the start stays at the reading start (0).
     if (part.alignment == PartTextAlignment::center) {
         along = (run_extent - measured.width) * 0.5;
     } else if (part.alignment == PartTextAlignment::end) {
@@ -434,6 +469,7 @@ void paint_text(Painter& painter, const PartPaint& part, Color color) {
     }
     const double line_top = (cross_extent - line_height) * 0.5;
     Point origin{part.bounds.x + along, part.bounds.y + line_top + ascent};
+    // Horizontal text keeps this origin; a turned run's is turned with it.
     if (part.orientation == TextOrientation::bottom_to_top) {
         origin = {part.bounds.x + line_top + ascent, part.bounds.y + part.bounds.height - along};
     } else if (part.orientation == TextOrientation::top_to_bottom) {
@@ -553,6 +589,8 @@ void paint_part_from_recipe(Painter& painter, const PartPaint& part,
     case PartRole::perimeter:
     case PartRole::sheen:
     case PartRole::count:
+        // The built-in recipe has no paint of its own for these (a shadow is
+        // painted by paint_part_with_built_in_recipe; count is no role).
         return;
     case PartRole::fill:
         if (part.content_color) {
@@ -619,6 +657,8 @@ void paint_part_from_recipe(Painter& painter, const PartPaint& part,
         if (context.defaulted) paint_preselect(painter, part.bounds, recipe);
         return;
     }
+    // A role outside the enumeration paints nothing.
+    return;
 }
 
 } // namespace gui_forms

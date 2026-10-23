@@ -150,6 +150,7 @@ void continue_exposure(const std::shared_ptr<State>& state, const ExposureStage 
         (*state).close();
         break;
     case ExposureStage::initial:
+        // Exercised before the native window is looked up (above).
         break;
     }
 }

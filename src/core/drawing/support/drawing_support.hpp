@@ -447,36 +447,76 @@ void require_enum(Enum value, unsigned maximum, std::string_view field) {
     return result;
 }
 
+// One path element's points or box, included in `accumulator`.
+void include_path_element(const PathElement& element, RectBoundsAccumulator& accumulator) {
+    switch (element.verb) {
+    case PathVerb::line:
+        accumulator.include(element.first);
+        accumulator.include(element.second);
+        return;
+    case PathVerb::quadratic:
+        accumulator.include(element.first);
+        accumulator.include(element.second);
+        accumulator.include(element.third);
+        return;
+    case PathVerb::bezier:
+        accumulator.include(element.first);
+        accumulator.include(element.second);
+        accumulator.include(element.third);
+        accumulator.include(element.fourth);
+        return;
+    case PathVerb::rectangle:
+    case PathVerb::ellipse:
+    case PathVerb::arc:
+        accumulator.include(element.rect);
+        return;
+    case PathVerb::start_figure:
+    case PathVerb::close_figure:
+        // Figure marks carry no extent.
+        return;
+    }
+    // A verb outside the enumeration has no extent.
+    return;
+}
+
+// One path element's coordinates in a trace, appended to `result`.
+void append_element_text(const PathElement& element, std::string& result) {
+    switch (element.verb) {
+    case PathVerb::line:
+        result += "," + point_text(element.first) + "," + point_text(element.second);
+        return;
+    case PathVerb::quadratic:
+        result += "," + point_text(element.first) + "," +
+                  point_text(element.second) + "," + point_text(element.third);
+        return;
+    case PathVerb::bezier:
+        result += "," + point_text(element.first) + "," +
+                  point_text(element.second) + "," + point_text(element.third) +
+                  "," + point_text(element.fourth);
+        return;
+    case PathVerb::rectangle:
+    case PathVerb::ellipse:
+        result += "," + rect_text(element.rect);
+        return;
+    case PathVerb::arc:
+        result += "," + rect_text(element.rect) + "," +
+                  number(element.start_angle) + "," +
+                  number(element.sweep_angle);
+        return;
+    case PathVerb::start_figure:
+    case PathVerb::close_figure:
+        // Figure marks are traced by their verb alone.
+        return;
+    }
+    // A verb outside the enumeration is traced by its number alone.
+    return;
+}
+
 [[nodiscard]] std::string path_text(const PathSnapshot& path) {
     std::string result = std::to_string(static_cast<unsigned>(path.fill_mode));
     for (const PathElement& element : path.elements) {
         result += ";" + std::to_string(static_cast<unsigned>(element.verb));
-        switch (element.verb) {
-        case PathVerb::line:
-            result += "," + point_text(element.first) + "," + point_text(element.second);
-            break;
-        case PathVerb::quadratic:
-            result += "," + point_text(element.first) + "," +
-                      point_text(element.second) + "," + point_text(element.third);
-            break;
-        case PathVerb::bezier:
-            result += "," + point_text(element.first) + "," +
-                      point_text(element.second) + "," + point_text(element.third) +
-                      "," + point_text(element.fourth);
-            break;
-        case PathVerb::rectangle:
-        case PathVerb::ellipse:
-            result += "," + rect_text(element.rect);
-            break;
-        case PathVerb::arc:
-            result += "," + rect_text(element.rect) + "," +
-                      number(element.start_angle) + "," +
-                      number(element.sweep_angle);
-            break;
-        case PathVerb::start_figure:
-        case PathVerb::close_figure:
-            break;
-        }
+        append_element_text(element, result);
     }
     return result;
 }
@@ -484,11 +524,12 @@ void require_enum(Enum value, unsigned maximum, std::string_view field) {
 [[nodiscard]] std::string image_attributes_text(
     const ImageAttributesSnapshot& attributes) {
     std::string result;
-    if (attributes.has_color_matrix) {
+    if (attributes.color_matrix.has_value()) {
+        const std::array<double, 25>& matrix = *attributes.color_matrix;
         result = "matrix:";
-        for (std::size_t index = 0; index < attributes.color_matrix.size(); ++index) {
+        for (std::size_t index = 0; index < matrix.size(); ++index) {
             if (index != 0U) result += ",";
-            result += number(attributes.color_matrix[index]);
+            result += number(matrix[index]);
         }
     }
     if (!attributes.remap_table.empty()) {
@@ -524,95 +565,104 @@ void include_polygon_visibility(std::vector<PointF>& figure, PointF point,
     figure.clear();
 }
 
+// One element's part in whether `point` is inside: outlines collect into
+// `figure`, which a figure mark or a closed shape resolves into `inside`.
+void include_element_visibility(const PathElement& element, PointF point, FillMode fill_mode,
+                                std::vector<PointF>& figure, bool& inside) {
+    bool primitive_hit = false;
+    switch (element.verb) {
+    case PathVerb::start_figure:
+        include_polygon_visibility(
+            figure, point, fill_mode, inside);
+        return;
+    case PathVerb::line:
+        if (figure.empty()) figure.push_back(element.first);
+        figure.push_back(element.second);
+        return;
+    case PathVerb::quadratic: {
+        if (figure.empty() || figure.back() != element.first) {
+            figure.push_back(element.first);
+        }
+        constexpr int segments = 24;
+        for (int index = 1; index <= segments; ++index) {
+            const double t = static_cast<double>(index) / segments;
+            const double u = 1.0 - t;
+            figure.push_back({u * u * element.first.x +
+                                  2.0 * u * t * element.second.x +
+                                  t * t * element.third.x,
+                              u * u * element.first.y +
+                                  2.0 * u * t * element.second.y +
+                                  t * t * element.third.y});
+        }
+        return;
+    }
+    case PathVerb::bezier: {
+        if (figure.empty() || figure.back() != element.first) {
+            figure.push_back(element.first);
+        }
+        constexpr int segments = 32;
+        for (int index = 1; index <= segments; ++index) {
+            const double t = static_cast<double>(index) / segments;
+            const double u = 1.0 - t;
+            figure.push_back({u * u * u * element.first.x +
+                                  3.0 * u * u * t * element.second.x +
+                                  3.0 * u * t * t * element.third.x +
+                                  t * t * t * element.fourth.x,
+                              u * u * u * element.first.y +
+                                  3.0 * u * u * t * element.second.y +
+                                  3.0 * u * t * t * element.third.y +
+                                  t * t * t * element.fourth.y});
+        }
+        return;
+    }
+    case PathVerb::rectangle:
+        include_polygon_visibility(
+            figure, point, fill_mode, inside);
+        primitive_hit = element.rect.contains(point);
+        inside = fill_mode == FillMode::alternate ?
+            inside != primitive_hit : inside || primitive_hit;
+        return;
+    case PathVerb::ellipse: {
+        include_polygon_visibility(
+            figure, point, fill_mode, inside);
+        const double rx = element.rect.width / 2.0;
+        const double ry = element.rect.height / 2.0;
+        if (rx > 0.0 && ry > 0.0) {
+            const double dx = (point.x - (element.rect.x + rx)) / rx;
+            const double dy = (point.y - (element.rect.y + ry)) / ry;
+            primitive_hit = dx * dx + dy * dy <= 1.0;
+        }
+        inside = fill_mode == FillMode::alternate ?
+            inside != primitive_hit : inside || primitive_hit;
+        return;
+    }
+    case PathVerb::arc: {
+        const PointF start =
+            point_on_ellipse(element.rect, element.start_angle);
+        if (figure.empty() || figure.back() != start) figure.push_back(start);
+        const int segments = std::max(
+            1, static_cast<int>(std::ceil(std::abs(element.sweep_angle) / 12.0)));
+        for (int index = 1; index <= segments; ++index) {
+            const double ratio = static_cast<double>(index) / segments;
+            figure.push_back(point_on_ellipse(element.rect,
+                element.start_angle + element.sweep_angle * ratio));
+        }
+        return;
+    }
+    case PathVerb::close_figure:
+        include_polygon_visibility(
+            figure, point, fill_mode, inside);
+        return;
+    }
+    // A verb outside the enumeration adds nothing to the figure.
+    return;
+}
+
 [[nodiscard]] bool path_snapshot_visible(const PathSnapshot& path, PointF point) {
     bool inside = false;
     std::vector<PointF> figure;
     for (const PathElement& element : path.elements) {
-        bool primitive_hit = false;
-        switch (element.verb) {
-        case PathVerb::start_figure:
-            include_polygon_visibility(
-                figure, point, path.fill_mode, inside);
-            break;
-        case PathVerb::line:
-            if (figure.empty()) figure.push_back(element.first);
-            figure.push_back(element.second);
-            break;
-        case PathVerb::quadratic: {
-            if (figure.empty() || figure.back() != element.first) {
-                figure.push_back(element.first);
-            }
-            constexpr int segments = 24;
-            for (int index = 1; index <= segments; ++index) {
-                const double t = static_cast<double>(index) / segments;
-                const double u = 1.0 - t;
-                figure.push_back({u * u * element.first.x +
-                                      2.0 * u * t * element.second.x +
-                                      t * t * element.third.x,
-                                  u * u * element.first.y +
-                                      2.0 * u * t * element.second.y +
-                                      t * t * element.third.y});
-            }
-            break;
-        }
-        case PathVerb::bezier: {
-            if (figure.empty() || figure.back() != element.first) {
-                figure.push_back(element.first);
-            }
-            constexpr int segments = 32;
-            for (int index = 1; index <= segments; ++index) {
-                const double t = static_cast<double>(index) / segments;
-                const double u = 1.0 - t;
-                figure.push_back({u * u * u * element.first.x +
-                                      3.0 * u * u * t * element.second.x +
-                                      3.0 * u * t * t * element.third.x +
-                                      t * t * t * element.fourth.x,
-                                  u * u * u * element.first.y +
-                                      3.0 * u * u * t * element.second.y +
-                                      3.0 * u * t * t * element.third.y +
-                                      t * t * t * element.fourth.y});
-            }
-            break;
-        }
-        case PathVerb::rectangle:
-            include_polygon_visibility(
-                figure, point, path.fill_mode, inside);
-            primitive_hit = element.rect.contains(point);
-            inside = path.fill_mode == FillMode::alternate ?
-                inside != primitive_hit : inside || primitive_hit;
-            break;
-        case PathVerb::ellipse: {
-            include_polygon_visibility(
-                figure, point, path.fill_mode, inside);
-            const double rx = element.rect.width / 2.0;
-            const double ry = element.rect.height / 2.0;
-            if (rx > 0.0 && ry > 0.0) {
-                const double dx = (point.x - (element.rect.x + rx)) / rx;
-                const double dy = (point.y - (element.rect.y + ry)) / ry;
-                primitive_hit = dx * dx + dy * dy <= 1.0;
-            }
-            inside = path.fill_mode == FillMode::alternate ?
-                inside != primitive_hit : inside || primitive_hit;
-            break;
-        }
-        case PathVerb::arc: {
-            const PointF start =
-                point_on_ellipse(element.rect, element.start_angle);
-            if (figure.empty() || figure.back() != start) figure.push_back(start);
-            const int segments = std::max(
-                1, static_cast<int>(std::ceil(std::abs(element.sweep_angle) / 12.0)));
-            for (int index = 1; index <= segments; ++index) {
-                const double ratio = static_cast<double>(index) / segments;
-                figure.push_back(point_on_ellipse(element.rect,
-                    element.start_angle + element.sweep_angle * ratio));
-            }
-            break;
-        }
-        case PathVerb::close_figure:
-            include_polygon_visibility(
-                figure, point, path.fill_mode, inside);
-            break;
-        }
+        include_element_visibility(element, point, path.fill_mode, figure, inside);
     }
     include_polygon_visibility(figure, point, path.fill_mode, inside);
     return inside;

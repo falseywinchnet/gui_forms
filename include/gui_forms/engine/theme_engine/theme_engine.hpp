@@ -102,6 +102,15 @@ public:
     // region (design language §7.4 rule 1). Test a point with part_hit.
     [[nodiscard]] PartHitRegion hit_region(const Control& control, const PartPaint& part) const noexcept;
 
+    // Where one part of `control` lays out its text (E8, T1's hand-off):
+    // the part's bounds less its primitive's content insets at the
+    // window's scale and text scale, as plan() decides it. Where the insets
+    // leave no room across or down, the slot shrinks to the bounds' centre
+    // line on that axis, so it never leaves the part. A part the built-in
+    // recipe draws has its bounds. Like the hit region, it ignores the
+    // presentational scale.
+    [[nodiscard]] Rect text_slot(const Control& control, const PartPaint& part) const noexcept;
+
 private:
     // E7: an ambient part's time_in_state for this paint, starting its
     // effect on the window's clock, or stopping it and returning the pose
@@ -112,6 +121,10 @@ private:
                                                 const AmbientEffect& ambient, bool area_ok);
     // Stops the ambient effect of a part whose paint has none.
     static void stop_ambient(Window& window, EnginePartRecord& record, PartRecordHandle handle) noexcept;
+    // E7r: queues for the window's idle frames every keyframe level of
+    // each animated parameter in `movable` (bits by parameter position),
+    // with the part's other parameters as `request` has them.
+    static void queue_keyframes(Window& window, const PartRasterRequest& request, std::uint32_t movable);
 
     // Borrowed: the built-in registry has static storage.
     const PrimitiveRegistry* registry_;

@@ -78,14 +78,26 @@ void DateTimePicker::set_format_provider(DateTimeFormatProvider provider) {
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
 }
 
-std::string DateTimePicker::formatted_value() const {
-    std::string_view pattern;
-    switch (format_) {
-    case DateTimePickerFormat::long_date: pattern = format_provider_.long_date_pattern; break;
-    case DateTimePickerFormat::short_date: pattern = format_provider_.short_date_pattern; break;
-    case DateTimePickerFormat::time: pattern = format_provider_.time_pattern; break;
-    case DateTimePickerFormat::custom: pattern = custom_format_; break;
+namespace {
+
+// The pattern a picker of `format` shows its value in: one of `provider`'s,
+// or `custom`.
+std::string_view format_pattern(DateTimePickerFormat format, const DateTimeFormatProvider& provider,
+                                std::string_view custom) noexcept {
+    switch (format) {
+    case DateTimePickerFormat::long_date: return provider.long_date_pattern;
+    case DateTimePickerFormat::short_date: return provider.short_date_pattern;
+    case DateTimePickerFormat::time: return provider.time_pattern;
+    case DateTimePickerFormat::custom: return custom;
     }
+    // A format outside the enumeration shows nothing.
+    return {};
+}
+
+} // namespace
+
+std::string DateTimePicker::formatted_value() const {
+    const std::string_view pattern = format_pattern(format_, format_provider_, custom_format_);
     return format_date_time(value_, pattern, format_provider_);
 }
 

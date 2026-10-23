@@ -271,13 +271,13 @@ def _engine_findings(engine: object, vocabulary: object) -> list[str]:
 
 
 def _motion_findings(transitions: object, ambient: object) -> list[str]:
-    """Presentational state machines and ambient effects (T2 E7): opacity is the
-    engine property, the machine bounds are positive, and the ambient caps are
+    """Presentational state machines and ambient effects (T2 E7, E8): opacity and
+    scale are the engine properties, the machine bounds are positive, and the ambient caps are
     the accepted starting tokens (at most 30 frames per second over at most 10 %
     of the window)."""
     findings: list[str] = []
-    if not isinstance(transitions, dict) or "opacity" not in transitions.get("engine_properties", []):
-        findings.append("engine: transitions do not list opacity as the engine property")
+    if not isinstance(transitions, dict) or not {"opacity", "scale"} <= set(transitions.get("engine_properties", [])):
+        findings.append("engine: transitions do not list opacity and scale as the engine properties")
     elif not all(isinstance(transitions.get(key), int) and int(transitions[key]) > 0
                  for key in ("maximum_states", "maximum_per_part")):
         findings.append("engine: transitions: the machine bounds are not positive")

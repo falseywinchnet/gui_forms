@@ -150,7 +150,7 @@ inline void paint_group_scene(Painter& painter, const GroupCase kind, const doub
         painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
         painter.draw_part_raster(smooth, Point{20.0, 10.0}, 1.0);
         painter.end_group();
-        break;
+        return;
     case GroupCase::nested:
         painter.begin_group(group_of({2.0, 2.0, 110.0, 40.0}, 0.75));
         painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
@@ -158,11 +158,11 @@ inline void paint_group_scene(Painter& painter, const GroupCase kind, const doub
         painter.draw_part_raster(smooth, Point{40.0, 8.0}, 1.0);
         painter.end_group();
         painter.end_group();
-        break;
+        return;
     case GroupCase::empty:
         painter.begin_group(group_of(whole_scene, 0.5));
         painter.end_group();
-        break;
+        return;
     case GroupCase::clipped:
         painter.save();
         painter.clip_rect({9.3, 3.4, 70.5, 33.75});
@@ -171,18 +171,18 @@ inline void paint_group_scene(Painter& painter, const GroupCase kind, const doub
         painter.draw_part_raster(smooth, Point{58.0, 12.0}, 1.0);
         painter.end_group();
         painter.restore();
-        break;
+        return;
     case GroupCase::opacity_zero:
         painter.begin_group(group_of(whole_scene, 0.0));
         painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
         painter.end_group();
-        break;
+        return;
     case GroupCase::opacity_one:
         painter.begin_group(group_of(whole_scene, 1.0));
         painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
         painter.draw_part_raster(smooth, Point{58.0, 12.0}, 1.0);
         painter.end_group();
-        break;
+        return;
     case GroupCase::refused:
         // Five deep: the fifth is refused and draws without isolation.
         for (std::size_t level = 0U; level < maximum_paint_group_depth + 1U; ++level) {
@@ -190,7 +190,7 @@ inline void paint_group_scene(Painter& painter, const GroupCase kind, const doub
         }
         painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
         for (std::size_t level = 0U; level < maximum_paint_group_depth + 1U; ++level) painter.end_group();
-        break;
+        return;
     case GroupCase::translated:
         painter.save();
         painter.translate({2.0, 4.0});
@@ -199,14 +199,16 @@ inline void paint_group_scene(Painter& painter, const GroupCase kind, const doub
         painter.draw_part_raster(smooth, Point{30.0, 4.0}, 1.0);
         painter.end_group();
         painter.restore();
-        break;
+        return;
     case GroupCase::overlap:
         painter.begin_group(group_of(whole_scene, 0.5));
         painter.fill_rect(overlap_red, Color::rgba(200, 30, 40, 255));
         painter.fill_rect(overlap_blue, Color::rgba(20, 60, 210, 255));
         painter.end_group();
-        break;
+        return;
     }
+    // A case outside the enumeration draws only the background.
+    return;
 }
 
 // The pixel at logical (x, y) of a scene raster at `scale`, as RGBA.

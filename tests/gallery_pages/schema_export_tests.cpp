@@ -395,7 +395,7 @@ void append_engine(std::string& out) {
     out += ": ";
     append_unsigned(out, maximum_published_values);
     out += "},\n";
-    // Presentational state machines (E7): the engine property besides the
+    // Presentational state machines (E7): the engine properties besides the
     // primitives' animated parameters, and the bounds a machine is checked
     // against at load.
     append_key(out, "    ", "transitions");
@@ -404,6 +404,8 @@ void append_engine(std::string& out) {
     out += ": ";
     names.clear();
     names.push_back(opacity_property);
+    names.push_back(scale_property);
+    names.push_back(face_property);
     append_name_list(out, names);
     out += ", ";
     append_json_string(out, "maximum_states");

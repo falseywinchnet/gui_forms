@@ -106,7 +106,8 @@
           {"name": "disabled_face_bottom", "kind": "colour", "default": "#b5c7deff", "animated": false},
           {"name": "disabled_border", "kind": "colour", "default": "#8fa6c464", "animated": false},
           {"name": "disabled_upper_line", "kind": "colour", "default": "#ffffff64", "animated": false},
-          {"name": "perimeter", "kind": "colour", "default": "#214b81ff", "animated": false}
+          {"name": "perimeter", "kind": "colour", "default": "#214b81ff", "animated": false},
+          {"name": "text_padding", "kind": "number", "minimum": 0, "maximum": 32, "default": 4, "animated": false}
         ]
       },
       {
@@ -127,7 +128,8 @@
           {"name": "pressed_face_bottom", "kind": "colour", "default": "#ffe297ff", "animated": false},
           {"name": "upper_line", "kind": "colour", "default": "#fffff0ff", "animated": false},
           {"name": "left_line", "kind": "colour", "default": "#fffff0b4", "animated": false},
-          {"name": "lower_line", "kind": "colour", "default": "#a06d1c23", "animated": false}
+          {"name": "lower_line", "kind": "colour", "default": "#a06d1c23", "animated": false},
+          {"name": "text_padding", "kind": "number", "minimum": 0, "maximum": 32, "default": 4, "animated": false}
         ]
       },
       {
@@ -145,7 +147,8 @@
           {"name": "face_bottom", "kind": "colour", "default": "#ffffffff", "animated": false},
           {"name": "border", "kind": "colour", "default": "#94acc8ff", "animated": false},
           {"name": "inner_shade", "kind": "colour", "default": "#6f8eb14b", "animated": false},
-          {"name": "outer_highlight", "kind": "colour", "default": "#ffffffe1", "animated": false}
+          {"name": "outer_highlight", "kind": "colour", "default": "#ffffffe1", "animated": false},
+          {"name": "text_padding", "kind": "number", "minimum": 0, "maximum": 32, "default": 2, "animated": false}
         ]
       },
       {
@@ -184,11 +187,33 @@
         "parameters": [
           {"name": "dot", "kind": "colour", "default": "#627997ff", "animated": false}
         ]
+      },
+      {
+        "name": "material",
+        "introduced": "0.2",
+        "roles": ["region", "face", "actuator", "well", "track", "thumb", "chip"],
+        "states_read": ["hot", "pressed", "captured", "selected", "checked", "current", "open", "active_tool", "focus_visible", "preselect", "disabled", "unavailable"],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 512, "fixed": 64, "preparation_per_device_pixel": 0},
+        "outsets": [8, 8, 8, 8],
+        "parameters": [
+          {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"], "default": "button", "animated": false}
+        ]
+      },
+      {
+        "name": "overlay_shadow",
+        "introduced": "0.2",
+        "roles": ["shadow"],
+        "states_read": [],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 512, "fixed": 64, "preparation_per_device_pixel": 0},
+        "outsets": [32, 32, 32, 32],
+        "parameters": []
       }
     ],
     "expressions": {"maximum_operations": 64, "maximum_stack": 16, "operations": ["constant", "input", "state", "parameter", "negate", "add", "subtract", "multiply", "divide", "minimum", "maximum", "less", "less_equal", "greater", "greater_equal", "equal", "not_equal", "clamp", "mix", "smoothstep", "choose"]},
     "published_values": {"maximum": 32},
-    "transitions": {"engine_properties": ["opacity"], "maximum_states": 8, "maximum_per_part": 4},
+    "transitions": {"engine_properties": ["opacity", "scale", "face"], "maximum_states": 8, "maximum_per_part": 4},
     "ambient": {"maximum_frames_per_second": 30, "maximum_window_fraction": 0.1}
   },
   "types": [

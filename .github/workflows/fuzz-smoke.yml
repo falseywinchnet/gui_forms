@@ -9,6 +9,7 @@ on:
     paths:
       - 'stx_zlib/**'
       - 'stx_png/**'
+      - 'stx_conv/**'
       - 'src/core/image/**'
       - 'include/gui_forms/compression/**'
       - 'fuzz/**'
@@ -31,7 +32,7 @@ jobs:
       fail-fast: false
       matrix:
         architecture: [x64, arm64]
-        target: [inflate, inflate_oracle_ordinary, inflate_oracle_strict, inflate_protocol, deflate, png_decode]
+        target: [inflate, inflate_oracle_ordinary, inflate_oracle_strict, inflate_protocol, deflate, png_decode, conv]
         include:
           - architecture: x64
             runner: ubuntu-24.04
@@ -81,6 +82,7 @@ jobs:
               clang++ $flags -Ioracle -DGUI_FORMS_INFLATE_ORACLE=1 fuzz/inflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp $objects -o smoke ;;
             inflate_protocol) clang++ $flags fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp -o smoke ;;
             deflate) clang++ $flags fuzz/deflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp stx_zlib/src/deflate.cpp -o smoke ;;
+            conv) clang++ $flags -Istx_conv/include stx_conv/fuzz/conv_fuzz.cpp stx_conv/src/plan.cpp stx_conv/src/profile.cpp stx_conv/src/image.cpp -o smoke ;;
             png_decode) clang++ $flags -Istx_png/include fuzz/png_decode_fuzz.cpp stx_png/src/decoder.cpp stx_png/src/encoder.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp stx_zlib/src/deflate.cpp -o smoke ;;
           esac
       - name: Run the smoke

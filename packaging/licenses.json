@@ -16,6 +16,7 @@
     {"name": "stx_zlib-puff.txt", "source": "stx_zlib/LICENSE-puff.txt", "component": "stx_zlib (the owned zlib codec)"},
     {"name": "stx_zlib-zlib.txt", "source": "stx_zlib/LICENSE-zlib.txt", "component": "stx_zlib (the owned zlib codec)"},
     {"name": "stx_png.txt", "source": "stx_png/LICENSE", "component": "stx_png (the owned PNG codec)"},
+    {"name": "stx_conv.txt", "source": "stx_conv/LICENSE", "component": "stx_conv (the owner's CONV resampler)"},
     {"name": "HarfBuzz.txt", "source": "third_party/harfbuzz/COPYING", "component": "HarfBuzz", "optional": true},
     {"name": "FreeType-FTL.txt", "source": "third_party/freetype/docs/FTL.TXT", "component": "FreeType", "optional": true},
     {"name": "Skia.txt", "source": "third_party/skia/LICENSE", "component": "Skia", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},

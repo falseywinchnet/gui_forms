@@ -1396,7 +1396,7 @@
       "status": "OBSERVED: bundle 005 provider event split; M4 build, focused tests, and Screen Sharing pass",
       "capture": "captures/tool_tip_error_provider.png",
       "capture_note": "M4 Complete Showcase crop showing the target whose error transition is represented by stable identity, text, and presence.",
-      "summary": "ErrorProviderChange is the post-commit payload for a target error transition, carrying stable identity, current message, and whether an effective error remains."
+      "summary": "ErrorProviderChange is the post-commit payload for a target error transition, carrying stable identity and the current message, which is empty once the error is cleared."
     },
     "ErrorIconSnapshot": {
       "status": "OBSERVED: bundle 005 diagnostic value split; M4 build, focused tests, and Screen Sharing pass",

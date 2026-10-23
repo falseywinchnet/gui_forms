@@ -136,6 +136,11 @@ struct MetricsSnapshot {
     // window on an everyday surface (counted when the refusal begins).
     std::uint64_t engine_ambient_frames{};
     std::uint64_t engine_ambient_refusals{};
+    // Parts a primitive refused to draw (E8c, EnginePrimitive::accepts),
+    // such as a material whose bake would exceed its bound: drawn by the
+    // built-in recipe instead. Counted when a keyed part's refusal begins,
+    // and at every paint of a part without a key.
+    std::uint64_t engine_primitive_refusals{};
     // Paint groups begun deeper than maximum_paint_group_depth, drawn
     // without isolation (Painter::begin_group).
     std::uint64_t paint_group_refusals{};

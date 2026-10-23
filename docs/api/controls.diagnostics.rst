@@ -291,6 +291,10 @@ Related types
 
    .. cpp:function:: void record_engine_ambient_refusal() noexcept
 
+   .. cpp:function:: void record_engine_primitive_refusal() noexcept
+
+      A primitive refused to draw a part (EnginePrimitive::accepts), which the built-in recipe drew instead.
+
    .. cpp:function:: void record_paint_group_refusals(std::uint64_t refusals) noexcept
 
    .. cpp:function:: void record_frame_callback_fault() noexcept
@@ -555,6 +559,10 @@ Related types
       The theme engine's ambient effects (E7): frames that repainted an ambient part, and effects refused for covering more than 10 % of the window on an everyday surface (counted when the refusal begins).
 
    .. cpp:member:: std::uint64_t engine_ambient_refusals
+
+   .. cpp:member:: std::uint64_t engine_primitive_refusals
+
+      Parts a primitive refused to draw (E8c, EnginePrimitive::accepts), such as a material whose bake would exceed its bound: drawn by the built-in recipe instead. Counted when a keyed part's refusal begins, and at every paint of a part without a key.
 
    .. cpp:member:: std::uint64_t paint_group_refusals
 

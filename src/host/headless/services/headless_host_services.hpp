@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <optional>
 #include <string>
 
 namespace gui_forms::host {
@@ -66,8 +67,8 @@ private:
         HostTrayIconRequest request;
     };
     std::vector<HostMonitor> monitors_;
-    HostImage clipboard_image_;
-    bool clipboard_has_image_{};
+    // The clipboard's image; absent while it holds none.
+    std::optional<HostImage> clipboard_image_;
     std::string clipboard_text_;
     std::uint64_t clipboard_generation_{};
     bool clipboard_has_text_{};

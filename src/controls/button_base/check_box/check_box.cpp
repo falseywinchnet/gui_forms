@@ -214,11 +214,11 @@ void CheckBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
     record.region = PartGeometry::from_bounds(bounds);
     record.well = PartGeometry::from_bounds(box);
     record.indicator = PartGeometry::from_bounds(mark);
-    if (layout.has_image) {
-        record.icon = PartGeometry::from_bounds(layout.image);
+    if (layout.image.has_value()) {
+        record.icon = PartGeometry::from_bounds(*layout.image);
     }
-    if (layout.has_text) {
-        record.label = PartGeometry::from_bounds(layout.text);
+    if (layout.text.has_value()) {
+        record.label = PartGeometry::from_bounds(*layout.text);
     }
     record.focus = PartGeometry::from_bounds(bounds);
     write_parts(anatomy(), check_box_part_fields, record, geometry);

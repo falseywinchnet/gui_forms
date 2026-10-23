@@ -3,9 +3,13 @@
 // bubbles and ContextMenu's panels cast the theme's overlay shadow from
 // their own rect, report its reach as visual outsets so that damage and
 // replay cover it, and cast none in high contrast. Both bubbles paint their
-// face from the `tool_tip` family.
+// face from the `tool_tip` family. The shadow is drawn by the engine's
+// overlay shadow primitive (T2 plan, phase E9): one part raster covering the
+// rect grown by its outsets, not the host's box shadow.
 
 #include "gui_forms/gui_forms.hpp"
+
+#include "../src/core/engine/primitives/material/overlay_shadow_primitive.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -94,19 +98,32 @@ bool painted_colour(const VisualControlInspection& control, Color color) {
     return false;
 }
 
+// Whether `operation` is the overlay shadow's raster for a rect of `size`:
+// placed the primitive's outsets above and left of the rect, and covering
+// the rect grown by them (rounded up to whole device pixels at scale 1).
+bool shadow_raster(const VisualPaintOperationSnapshot& operation, Size size) {
+    const double outset = engine_primitives::overlay_shadow_outset;
+    const Rect& rect = operation.rect;
+    const bool placed = operation.operation == VisualPaintOperation::draw_part_raster &&
+                        operation.first == Point{-outset, -outset} && rect.x == -outset && rect.y == -outset;
+    const bool covers = rect.width >= size.width + outset * 2.0 && rect.width < size.width + outset * 2.0 + 1.0 &&
+                        rect.height >= size.height + outset * 2.0 && rect.height < size.height + outset * 2.0 + 1.0;
+    return placed && covers;
+}
+
 // `overlay` cast the window theme's overlay shadow from its own rect, before
-// anything else it painted, and reports its reach unclipped by its layer.
+// anything else it painted, as the engine's raster with no host box shadow,
+// and reports its reach unclipped by its layer.
 void require_cast_shadow(const VisualControlInspection& overlay, const Theme& theme, const char* message) {
     const std::vector<MaterialShadow>& layers = theme.overlay_shadow(false);
-    const std::vector<const VisualPaintOperationSnapshot*> shadows =
-        operations_of(overlay, VisualPaintOperation::draw_box_shadow);
-    const Rect local{0.0, 0.0, overlay.layout.absolute_bounds.width, overlay.layout.absolute_bounds.height};
-    bool cast = shadows.size() == layers.size();
-    for (std::size_t index = 0; cast && index < shadows.size(); ++index) {
-        const VisualPaintOperationSnapshot& shadow = *shadows[index];
-        cast = shadow.rect == local && shadow.color == layers[index].color &&
-               shadow.first == layers[index].offset && shadow.command_index == index;
+    const Size size{overlay.layout.absolute_bounds.width, overlay.layout.absolute_bounds.height};
+    std::size_t rasters = 0U;
+    for (const VisualPaintOperationSnapshot& operation : overlay.display_operations) {
+        if (shadow_raster(operation, size)) rasters = rasters + 1U;
     }
+    const bool cast = operations_of(overlay, VisualPaintOperation::draw_box_shadow).empty() && rasters == 1U &&
+                      !overlay.display_operations.empty() && overlay.display_operations[0].command_index == 0U &&
+                      shadow_raster(overlay.display_operations[0], size);
     const Insets reach = box_shadow_visual_outsets(layers);
     const bool reported = overlay.layout.visual_outsets == reach && !overlay.layout.clipped_by_ancestor &&
                           overlay.layout.effective_clip == overlay.layout.visual_bounds;
@@ -114,7 +131,12 @@ void require_cast_shadow(const VisualControlInspection& overlay, const Theme& th
 }
 
 void require_no_shadow(const VisualControlInspection& overlay, const char* message) {
-    const bool none = operations_of(overlay, VisualPaintOperation::draw_box_shadow).empty() &&
+    const Size size{overlay.layout.absolute_bounds.width, overlay.layout.absolute_bounds.height};
+    bool raster = false;
+    for (const VisualPaintOperationSnapshot& operation : overlay.display_operations) {
+        if (shadow_raster(operation, size)) raster = true;
+    }
+    const bool none = operations_of(overlay, VisualPaintOperation::draw_box_shadow).empty() && !raster &&
                       overlay.layout.visual_outsets == Insets{};
     require(none, message);
 }

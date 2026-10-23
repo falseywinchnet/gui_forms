@@ -16,7 +16,9 @@ enum class TextMaskStatus {
 enum class TextMaskLimit {
     none, input_bytes, line_count, key_bytes, metadata_bytes, mask_dimension,
     mask_bytes, live_mask_bytes, live_mask_objects, workspace, shape_work,
-    source_key_objects, request_slots, font_bytes, font_banks, shaping_payload
+    source_key_objects, request_slots, font_bytes, font_banks, shaping_payload,
+    // The mask cache's entry count.
+    cache_entries
 };
 enum class TextMaskSlot { empty, dispatched, queued, running, completed, retiring };
 enum class TextMaskRetirement { released, pending_retirement };

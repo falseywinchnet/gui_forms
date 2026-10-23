@@ -62,6 +62,20 @@ Promotion applies when the `main` commit has exactly the tested tree, as when
 an up-to-date branch is merged. Any other merge builds fresh, usually from a
 seed.
 
+## Tests the programs job does not repeat
+
+The native job's `ci_build.py` run writes CTest's JUnit report
+(`ctest-native.xml` in the toolkit build directory). `cache_manifest.py`
+records the passed tests from it as `validated_tests` in
+`cache-manifest.json`. A reused validation carries the producer's list over.
+On a pull request, the programs job reads that list from its platform's
+archive and runs only the tests of its own build that are not on it
+(`tools/native_tests.py select`). Those are the Gallery and demoboard tests,
+which the native configuration leaves out, and any test the native job
+skipped. A manifest without the list runs every test. Pushes to `main`, which
+publish the release record, and direct runs of the programs workflow still
+run every test.
+
 ## The sanitizer job's cache
 
 The sanitizer job always builds and runs the whole suite; it never reuses a
@@ -135,9 +149,16 @@ paths enter the hash and lie outside `CCACHE_BASEDIR`. Prepend
 `msys64/clang64/bin` and `msys64/usr/bin` to `PATH`; `clang.exe` must match
 `compiler_sha256`. Create `msys64/tmp` if the archive lacks it (the first,
 layout 1 archive did). CI restores this archive instead of contacting the
-MSYS2 mirrors; it installs from them only when no published archive matches
-`tools/windows_toolchain.json` and the archive layout, then packages the new
-tree before building.
+MSYS2 mirrors: first from the release `tools/windows_toolchain_release.json`
+names, read by its tag, then from the recent releases. When neither holds an
+archive for `tools/windows_toolchain.json` and the archive layout, the job
+fails with `ToolchainUnavailable` rather than install the current MSYS2
+packages, because the mirrors carry only the current LLVM. A deliberate
+specification change is packaged by running `native.yml` by hand with
+`package_windows_toolchain`. Packing then refuses a clang whose version is not
+the specification's `llvm`. Once the new toolchain is published from main,
+point `tools/windows_toolchain_release.json` at that release and add its
+revision to `packaging/pinned_cache_revisions.json`.
 
 ## CI job times
 

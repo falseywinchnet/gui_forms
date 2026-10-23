@@ -1880,52 +1880,56 @@ bool DockSite::position_command_enabled(const DockPanelId& panel, DockPositionCo
     const DockNode* const stack = layout.find_node(location.stack);
     const bool in_documents = stack != nullptr && (*stack).kind == DockNodeKind::document_stack;
     const bool tool = (*descriptor).kind == DockPanelKind::tool;
-    bool enabled = false;
     switch (command) {
-    case DockPositionCommand::float_panel:
+    case DockPositionCommand::float_panel: {
         // While the workspace has windows and the panel may float (phase D4).
-        enabled = !floating_panel && (*workspace_).can_float(DockSubject::of_panel(panel));
-        break;
+        const bool floats = !floating_panel && (*workspace_).can_float(DockSubject::of_panel(panel));
+        return floats;
+    }
     case DockPositionCommand::auto_hide: {
         // A root-level tool stack (DK decision 28) that the layout lets go to
         // auto-hide.
         const std::optional<DockNodeId> owner = layout.pin_owner(panel);
-        if (auto_hidden || !tool || !owner || !(*owner == location.stack)) break;
+        if (auto_hidden || !tool || !owner || !(*owner == location.stack)) return false;
         DockTransaction transaction{};
         transaction.origin = DockEditOrigin::user;
         transaction.edits.push_back(DockEdit::auto_hide(DockSubject::of_stack(location.stack), DockSide::left));
-        enabled = static_cast<bool>(layout.check(transaction));
-        break;
+        const bool admitted = static_cast<bool>(layout.check(transaction));
+        return admitted;
     }
-    case DockPositionCommand::dock:
+    case DockPositionCommand::dock: {
         if (auto_hidden) {
             DockTransaction transaction{};
             transaction.origin = DockEditOrigin::user;
             transaction.edits.push_back(DockEdit::unpin(location.stack));
-            enabled = static_cast<bool>(layout.check(transaction));
-            break;
+            const bool admitted = static_cast<bool>(layout.check(transaction));
+            return admitted;
         }
         if (floating_panel) {
-            enabled = (*workspace_).dock_back_edit(DockSubject::of_panel(panel)).has_value();
-            break;
+            const bool returns = (*workspace_).dock_back_edit(DockSubject::of_panel(panel)).has_value();
+            return returns;
         }
-        enabled = tool && in_documents && (*descriptor).allowed.docked;
-        break;
-    case DockPositionCommand::dock_as_document:
-        enabled = tool && !in_documents && !auto_hidden && (*descriptor).dock_as_document &&
-                  (*descriptor).allowed.document_area;
-        break;
-    case DockPositionCommand::hide:
-        enabled = tool && (*descriptor).allowed.hidden;
-        break;
-    case DockPositionCommand::close:
-        enabled = (*descriptor).allowed.closed;
-        break;
-    case DockPositionCommand::move:
-        enabled = drag_.phase == DockDragPhase::idle;
-        break;
+        const bool docks = tool && in_documents && (*descriptor).allowed.docked;
+        return docks;
     }
-    return enabled;
+    case DockPositionCommand::dock_as_document: {
+        const bool documents = tool && !in_documents && !auto_hidden && (*descriptor).dock_as_document &&
+                               (*descriptor).allowed.document_area;
+        return documents;
+    }
+    case DockPositionCommand::hide: {
+        const bool hides = tool && (*descriptor).allowed.hidden;
+        return hides;
+    }
+    case DockPositionCommand::close:
+        return (*descriptor).allowed.closed;
+    case DockPositionCommand::move: {
+        const bool idle = drag_.phase == DockDragPhase::idle;
+        return idle;
+    }
+    }
+    // A command outside the enumeration is never available.
+    return false;
 }
 
 bool DockSite::run_position_command(const DockPanelId& panel, DockPositionCommand command) {

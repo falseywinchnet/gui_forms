@@ -3,14 +3,14 @@
 void ImageAttributes::set_color_matrix(std::span<const double, 25> matrix) {
     require_alive();
     for (const double entry : matrix) require_finite(entry, "color matrix entry");
-    std::copy(matrix.begin(), matrix.end(), value_.color_matrix.begin());
-    value_.has_color_matrix = true;
+    std::array<double, 25> stored{};
+    std::copy(matrix.begin(), matrix.end(), stored.begin());
+    value_.color_matrix = stored;
 }
 
 void ImageAttributes::reset_color_matrix() {
     require_alive();
-    value_.has_color_matrix = false;
-    value_.color_matrix = {};
+    value_.color_matrix.reset();
 }
 
 void ImageAttributes::set_remap_table(

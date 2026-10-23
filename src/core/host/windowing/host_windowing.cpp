@@ -417,7 +417,6 @@ void HostWindowing::report_frame(HostWindowId window, const HostWindowFrame& fra
     WindowRecord* entry = record(window);
     if (entry == nullptr || !valid_frame(frame)) return;
     (*entry).frame = frame;
-    (*entry).frame_known = true;
     ++snapshot_.frame_reports;
     const HostWindowFrameEvent event{window, frame};
     frame_changed_.emit(event);
@@ -541,16 +540,18 @@ void HostWindowing::follow_primary(WindowRecord& primary) {
     const HostWindowFrameResult current = frame_impl(primary_id);
     WindowRecord* main = record(primary_id);
     if (main == nullptr) return;
-    const HostWindowFrame main_frame = current.status.accepted() ? current.frame : (*main).frame;
+    // Without a report from either, the primary window is taken to be at
+    // the origin with no size.
+    HostWindowFrame main_frame = (*main).frame.value_or(HostWindowFrame{});
+    if (current.status.accepted()) main_frame = current.frame;
     const Point main_origin{main_frame.content.x, main_frame.content.y};
     (*main).followed_origin = main_origin;
-    (*main).followed_known = true;
 
     std::array<HostWindowId, maximum_floating_windows> followers{};
     std::size_t count = 0U;
     for (std::size_t index = 0U; index < windows_.size() && count < followers.size(); ++index) {
         const WindowRecord& candidate = windows_[index];
-        if (candidate.owner != primary_id || !candidate.frame_known || !candidate.offset_known) continue;
+        if (candidate.owner != primary_id || !candidate.frame.has_value() || !candidate.offset.has_value()) continue;
         if (!host_window_kind_traits(candidate.kind).follows_main_window) continue;
         followers[count] = candidate.id;
         ++count;
@@ -568,9 +569,13 @@ void HostWindowing::follow_primary(WindowRecord& primary) {
         const HostWindowFrameResult fresh = frame_impl(follower_id);
         WindowRecord* follower = record(follower_id);
         if (follower == nullptr) continue;
-        const HostWindowFrame frame = fresh.status.accepted() ? fresh.frame : (*follower).frame;
+        // Both were known when the follower was chosen and are never
+        // forgotten; the empty values only answer a record that was replaced.
+        HostWindowFrame frame = (*follower).frame.value_or(HostWindowFrame{});
+        if (fresh.status.accepted()) frame = fresh.frame;
+        const Point offset = (*follower).offset.value_or(Point{});
         const FollowPlacement placement =
-            follow_placement(frame, main_origin, (*follower).offset, monitors.monitors, main_frame.outer);
+            follow_placement(frame, main_origin, offset, monitors.monitors, main_frame.outer);
         const Point placed_origin{placement.content.x, placement.content.y};
         if (same_point(placed_origin, {frame.content.x, frame.content.y})) continue;
         // Remember the placement before asking for it: Win32 reports the
@@ -595,29 +600,32 @@ void HostWindowing::remember_policy_target(WindowRecord& follower, Point origin)
 void HostWindowing::learn_offset(WindowRecord& follower) {
     const HostWindowId follower_id = follower.id;
     const WindowRecord* main = record(follower.owner);
-    if (main == nullptr || !(*main).frame_known || (*main).minimized) return;
+    if (main == nullptr || !(*main).frame.has_value() || (*main).minimized) return;
     const HostWindowId primary_id = (*main).id;
     const HostWindowFrameResult main_now = frame_impl(primary_id);
     main = record(primary_id);
     if (main == nullptr) return;
-    const Rect main_content = main_now.status.accepted() ? main_now.frame.content : (*main).frame.content;
+    Rect main_content = (*main).frame.value_or(HostWindowFrame{}).content;
+    if (main_now.status.accepted()) main_content = main_now.frame.content;
     const Point main_origin{main_content.x, main_content.y};
     // The primary window has moved since its followers were placed: this
     // move is the platform carrying the follower (macOS child windows), and
     // the primary window's own report places it.
-    if ((*main).followed_known && !same_point(main_origin, (*main).followed_origin)) return;
+    if ((*main).followed_origin.has_value() && !same_point(main_origin, *(*main).followed_origin)) return;
     const HostWindowFrameResult follower_now = frame_impl(follower_id);
     WindowRecord* entry = record(follower_id);
     if (entry == nullptr) return;
-    const Rect content = follower_now.status.accepted() ? follower_now.frame.content : (*entry).frame.content;
+    // Without a report from either, the follower is taken to be at the
+    // origin.
+    Rect content = (*entry).frame.value_or(HostWindowFrame{}).content;
+    if (follower_now.status.accepted()) content = follower_now.frame.content;
     const Point origin{content.x, content.y};
     for (std::size_t slot = 0U; slot < (*entry).recent_target_count; ++slot) {
         if (same_point(origin, (*entry).recent_targets[slot])) return;
     }
     const Point offset{origin.x - main_origin.x, origin.y - main_origin.y};
-    if ((*entry).offset_known && same_point(offset, (*entry).offset)) return;
+    if ((*entry).offset.has_value() && same_point(offset, *(*entry).offset)) return;
     (*entry).offset = offset;
-    (*entry).offset_known = true;
     (*entry).recent_target_count = 0U;
 }
 

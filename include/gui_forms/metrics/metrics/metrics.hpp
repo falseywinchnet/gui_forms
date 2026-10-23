@@ -81,6 +81,9 @@ public:
     // An ambient part repainted for its effect, or an effect refused.
     void record_engine_ambient_frame() noexcept;
     void record_engine_ambient_refusal() noexcept;
+    // A primitive refused to draw a part (EnginePrimitive::accepts), which
+    // the built-in recipe drew instead.
+    void record_engine_primitive_refusal() noexcept;
     void record_paint_group_refusals(std::uint64_t refusals) noexcept;
     void record_frame_callback_fault() noexcept;
     void record_reentrant_frame_poll() noexcept;
