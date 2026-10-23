@@ -343,6 +343,8 @@ struct MsaaReading final {
     std::string value;
     std::string description;
     std::string default_action;
+    // The access key as MSAA's keyboard shortcut ("Alt+" and the mnemonic).
+    std::string keyboard_shortcut;
     LONG x{};
     LONG y{};
     LONG width{};
@@ -381,6 +383,9 @@ MsaaReading read_object(IAccessible& object) {
     BstrOwner action;
     note_failure(reading, object.get_accDefaultAction(self, action.receive()));
     reading.default_action = action.utf8();
+    BstrOwner shortcut;
+    note_failure(reading, object.get_accKeyboardShortcut(self, shortcut.receive()));
+    reading.keyboard_shortcut = shortcut.utf8();
     note_failure(reading, object.accLocation(&reading.x, &reading.y, &reading.width,
                                              &reading.height, self));
     note_failure(reading, object.get_accChildCount(&reading.child_count));
@@ -676,6 +681,10 @@ void compare_tree(PageWalk& walk, IAccessible& object, const SemanticNode& node,
     if (reading.description != node.description) {
         add_mismatch(walk, node, type, "description", node.description, reading.description,
                      matched);
+    }
+    const std::string shortcut = node.access_key.empty() ? std::string{} : "Alt+" + node.access_key;
+    if (reading.keyboard_shortcut != shortcut) {
+        add_mismatch(walk, node, type, "keyboard shortcut", shortcut, reading.keyboard_shortcut, matched);
     }
     const LONG state = expected_state(node);
     if (reading.state != state) {

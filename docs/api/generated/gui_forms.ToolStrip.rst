@@ -153,7 +153,8 @@ gui_forms::ToolStrip
    click (or open a drop-down button's menu), Down opens a menu and Escape
    closes it. On a vertical strip Up and Down move between buttons and Right
    opens a menu, which opens beside the item. The strip publishes the accessibility role ``toolbar``, with a
-   child per item: ``button``, ``static_text`` or ``separator``.
+   child per item: ``button``, ``static_text`` or ``separator``. A button that checks
+   on click, or is checked, also reports the checkable state.
 
    Hosted items hold real child controls (:cpp:class:`ComboBox <gui_forms::ComboBox>`, :cpp:class:`TextBox <gui_forms::TextBox>`,
    :cpp:class:`ProgressBar <gui_forms::ProgressBar>`) named ``<stable_id>.<item id>``, placed at the item's bounds

@@ -118,7 +118,9 @@ gui_forms::DockSite
 
       **drag_announcement** : ``std::string``, read-only
          What the drag announces ("Output: dock left of Properties"), also the
-         site's semantic description while the drag runs.
+         name of the site's last semantic child, a ``live_region`` with the ID
+         ``<site>.announcements`` that UI Automation announces when its name
+         changes.
 
       **drag_threshold** : ``double``, default ``4``
          How far, in logical units along either axis, a caption press moves
@@ -597,7 +599,9 @@ gui_forms::DockSite
    .. cpp:function:: const std::string& drag_announcement() const noexcept
 
       What the drag announces ("Output: dock left of Properties"), also the
-      site's semantic description while the drag runs.
+      name of the site's last semantic child, a ``live_region`` with the ID
+      ``<site>.announcements`` that UI Automation announces when its name
+      changes.
 
    .. cpp:function:: double drag_threshold() const noexcept
 

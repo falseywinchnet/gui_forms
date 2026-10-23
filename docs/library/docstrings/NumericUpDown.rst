@@ -96,8 +96,9 @@ value is shown as a 64-bit two's complement number, which cannot be typed
 back.
 
 The control publishes the accessibility role `numeric_field`, with the
-formatted value as text, the value as a number, and the minimum and maximum;
-the editor and the buttons are not published separately. The
+formatted value as text, the value as a number, the minimum and maximum, and
+the increment as its small step (there is no large step); the editor and
+the buttons are not published separately. The
 `SemanticAction::increment` and `SemanticAction::decrement` actions step,
 `SemanticAction::focus` moves focus to the editor, and
 `SemanticAction::set_value` takes a decimal number as text and refuses text

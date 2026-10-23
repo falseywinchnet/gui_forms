@@ -162,9 +162,9 @@ void embedded_semantics_and_anatomy() {
                     Point{parts.preview_text.bounds.x, parts.preview_text.bounds.y}),
             "the face, title and preview parts are published, the text inside its well");
     const SemanticDescriptor descriptor = dialog.semantic_descriptor();
-    require(descriptor.role == SemanticRole::group && descriptor.name == "Font" &&
-                descriptor.value == "Carlito Bold 9",
-            "the dialog is a named group valued with its selection");
+    require(descriptor.role == SemanticRole::dialog && descriptor.name == "Font" &&
+                descriptor.value == "Carlito Bold 9" && descriptor.modal == dialog.is_open(),
+            "the dialog is a named dialog valued with its selection, modal only while open");
     bool threw = false;
     try {
         dialog.set_preview_text(std::string("\xFF"));

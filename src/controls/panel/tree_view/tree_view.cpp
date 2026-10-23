@@ -446,7 +446,7 @@ void TreeView::on_focus_changed(bool focused) {
 
 SemanticDescriptor TreeView::semantic_descriptor() const {
     SemanticDescriptor descriptor;
-    descriptor.role = SemanticRole::list;
+    descriptor.role = SemanticRole::tree;
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
     descriptor.value = selected_id_;
@@ -466,9 +466,11 @@ std::vector<SemanticNode> TreeView::semantic_virtual_children() const {
         SemanticNode node;
         node.stable_id = item.stable_id;
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
-        node.role = SemanticRole::list_item;
+        node.role = SemanticRole::tree_item;
         node.name = item.text;
-        node.description = "level " + std::to_string(item.depth + 1U);
+        // The items are published flat, in display order; the level says
+        // how deep each one is (counting from one at the top level).
+        node.level = item.depth + 1U;
         node.bounds = {tree_bounds.x + 2.0,
                        tree_bounds.y + 2.0 +
                            static_cast<double>(row - top_row_) * row_height,

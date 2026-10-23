@@ -867,6 +867,10 @@ void semantic_snapshot() {
         if (child.role == SemanticRole::split_pane) ++seams;
     }
     require(seams == 3U, "each seam is a split pane");
+    const SemanticNode* announcements = find_node(snapshot.roots, "site.announcements");
+    require(announcements != nullptr && (*announcements).role == SemanticRole::live_region &&
+                (*announcements).name.empty() && (*announcements).actions.empty(),
+            "the site's live region is published before any announcement");
 }
 
 // -- lifetime and refusals -----------------------------------------------------

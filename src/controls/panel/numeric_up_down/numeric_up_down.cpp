@@ -217,6 +217,9 @@ SemanticDescriptor NumericUpDown::semantic_descriptor() const {
     descriptor.numeric_value = value_;
     descriptor.minimum_value = minimum_;
     descriptor.maximum_value = maximum_;
+    // The arrow keys and the spin buttons move by the increment; there is no
+    // larger step, so none is published (owner decision, stage A gap 7).
+    descriptor.small_step = increment_;
     descriptor.description = accessible_description();
     descriptor.actions = {SemanticAction::focus, SemanticAction::increment,
                           SemanticAction::decrement, SemanticAction::set_value};

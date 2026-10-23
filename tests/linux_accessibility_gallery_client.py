@@ -537,6 +537,11 @@ class Comparer:
                 if minimum != node['minimum_value'] or maximum != node['maximum_value']:
                     self.mismatch(where, 'range ' + repr(minimum) + '..' + repr(maximum) + ', expected ' +
                                   repr(node['minimum_value']) + '..' + repr(node['maximum_value']))
+            # The small step is the value's increment (12.13); zero without one.
+            step: float = atspi.Value.get_minimum_increment(obj)
+            wanted_step: float = 0.0 if node['small_step'] is None else node['small_step']
+            if step != wanted_step:
+                self.mismatch(where, 'increment ' + repr(step) + ', expected ' + repr(wanted_step))
         if self.value_text:
             text: str = atspi.Value.get_text(obj) or ''
             if text != node['value']:

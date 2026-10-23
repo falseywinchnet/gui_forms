@@ -32,9 +32,8 @@ The status strip publishes ``region``, ``face``, ``sizing_grip`` and
 window yet, because a control has no native window request; an application
 can call `ApplicationWindowHandle::request_client_size`.
 
-There is no status-bar role in the semantic vocabulary yet, so the strip is
-published to accessibility as a named `group` (named "Status" unless it has
-an accessible name), with a child per item.
+The strip is published to accessibility with the role `status_bar` (named
+"Status" unless it has an accessible name), with a child per item.
 
 Examples
 --------

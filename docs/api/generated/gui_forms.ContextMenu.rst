@@ -130,8 +130,9 @@ gui_forms::ContextMenu
    the name "Menu", and each item as a ``menu_item`` or ``separator`` named by its
    text without the ``&``. An item's description combines the command's
    description, its shortcut and, when it is disabled, its availability reason.
-   Items report the checked state, and a submenu reports whether it is
-   expanded. Enabled items offer the focus and press actions; submenus offer
+   Check and radio items, and checked command items, report the checkable
+   state and the checked state; the character after an item's ``&`` is its access
+   key; and a submenu reports whether it is expanded. Enabled items offer the focus and press actions; submenus offer
    focus, expand and collapse; disabled items offer none.
 
    Destroying or disposing the menu closes it. A disposed menu throws

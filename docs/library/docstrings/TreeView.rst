@@ -103,11 +103,11 @@ on_text_input
     Selects by typed prefix, as described under Notes. The window calls
     it.
 semantic_descriptor
-    Publishes the role `list`, the accessible name and description, and as
+    Publishes the role `tree`, the accessible name and description, and as
     value the selected item's ID.
 semantic_virtual_children
-    Publishes the rows in view as `list_item` children named by their text,
-    with the description ``level <n>`` and the `selected`, `focused` and
+    Publishes the rows in view as `tree_item` children named by their text,
+    with their level (1 for a root) and the `selected`, `focused` and
     `expanded` states.
 on_semantic_child_action
     Handles actions on a visible row: `expand` and `collapse` change its
@@ -139,8 +139,8 @@ starts with the typed characters. Characters typed within 850 milliseconds
 of each other form one prefix; letters compare without regard to ASCII
 case.
 
-The control publishes the accessibility role `list`, not a tree role: each
-visible row is a virtual `list_item` whose description gives its level.
+The control publishes the accessibility role `tree`: each visible row is a
+virtual `tree_item` that publishes its level, counting from 1 at the roots.
 
 Examples
 --------

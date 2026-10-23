@@ -491,6 +491,12 @@ SemanticDescriptor MaskedTextBox::semantic_descriptor() const {
     descriptor.name = accessible_name();
     // The value is what the field shows: prompts and literals in place.
     descriptor.value = provider_.length() == 0U ? text() : provider_.display_text();
+    // The editor shows the value, so its selection and caret index it; they
+    // are forwarded only while the two agree.
+    if (editor_ && (*editor_).text() == descriptor.value) {
+        const SemanticDescriptor editing = (*editor_).semantic_descriptor();
+        descriptor.text_selection = editing.text_selection;
+    }
     descriptor.description = accessible_description();
     descriptor.actions = {SemanticAction::focus};
     if (read_only_) {

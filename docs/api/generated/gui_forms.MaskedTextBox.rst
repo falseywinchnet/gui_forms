@@ -182,7 +182,8 @@ gui_forms::MaskedTextBox
    and there is no password character yet.
 
    The control publishes the accessibility role ``text_box`` with the field as
-   shown (prompts and literals in place) as its value, and the read-only state.
+   shown (prompts and literals in place) as its value, the read-only state, and
+   the editor's selection while the editor shows that value.
    :cpp:enumerator:`SemanticAction::set_value <gui_forms::SemanticAction::set_value>` goes through the mask as :cpp:func:`set_text <gui_forms::MaskedTextBox::set_text>` does and
    fails for text the mask refuses.
 
