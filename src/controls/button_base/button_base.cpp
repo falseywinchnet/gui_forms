@@ -1020,6 +1020,7 @@ SemanticDescriptor ButtonBase::semantic_descriptor() const {
     descriptor.role = SemanticRole::button;
     descriptor.name = accessible_name().empty() ? display_text() : accessible_name();
     descriptor.description = accessible_description();
+    if (use_mnemonic_) descriptor.access_key = mnemonic_access_key(text_);
     descriptor.actions = {SemanticAction::focus, SemanticAction::press};
     if (visual_status() == ControlVisualStatus::pending) {
         descriptor.states |= SemanticState::busy;

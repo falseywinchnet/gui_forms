@@ -8,10 +8,9 @@ namespace gui_forms {
 StatusStrip::StatusStrip(StableId stable_id) : ToolStrip(std::move(stable_id), StatusLayout{}) {}
 
 SemanticDescriptor StatusStrip::semantic_descriptor() const {
-    // No status-bar role exists in the semantic vocabulary yet; a status
-    // strip is published as a named group.
+    // A status bar (12.13).
     SemanticDescriptor descriptor = ToolStrip::semantic_descriptor();
-    descriptor.role = SemanticRole::group;
+    descriptor.role = SemanticRole::status_bar;
     descriptor.name = accessible_name().empty() ? "Status" : accessible_name();
     return descriptor;
 }

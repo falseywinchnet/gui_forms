@@ -415,6 +415,7 @@ std::vector<SemanticNode> BackstageView::semantic_virtual_children() const {
         node.stable_id = node_id(view_id, spec.stable_id);
         node.role = spec.kind == BackstageItemKind::topic ? SemanticRole::tab : SemanticRole::button;
         node.name = item_text(spec);
+        node.access_key = mnemonic_access_key(authored_text(spec));
         if (spec.command) node.description = (*spec.command).state().description;
         node.position_in_set = item + 1U;
         node.set_size = items_.size();

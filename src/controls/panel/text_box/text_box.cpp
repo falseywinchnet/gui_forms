@@ -1351,6 +1351,12 @@ SemanticDescriptor TextBox::semantic_descriptor() const {
         ? placeholder_ : accessible_description();
     if (read_only_) descriptor.states |= SemanticState::read_only;
     if (password_protected()) descriptor.states |= SemanticState::protected_content;
+    // The selection and caret index the value (A-T1, 12.13); a password box
+    // publishes neither its text nor where in it the caret is.
+    if (!password_protected()) {
+        descriptor.text_selection = SemanticTextSelection{.anchor = selection_.anchor, .caret = selection_.caret};
+    }
+    descriptor.multiline = multiline_;
     descriptor.actions = {SemanticAction::focus};
     if (!read_only_) descriptor.actions.push_back(SemanticAction::set_value);
     // A suggesting box opens a list; it is expanded while the list is open.

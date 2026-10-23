@@ -133,8 +133,9 @@ gui_forms::NumericUpDown
    back.
 
    The control publishes the accessibility role ``numeric_field``, with the
-   formatted value as text, the value as a number, and the minimum and maximum;
-   the editor and the buttons are not published separately. The
+   formatted value as text, the value as a number, the minimum and maximum, and
+   the increment as its small step (there is no large step); the editor and
+   the buttons are not published separately. The
    :cpp:enumerator:`SemanticAction::increment <gui_forms::SemanticAction::increment>` and :cpp:enumerator:`SemanticAction::decrement <gui_forms::SemanticAction::decrement>` actions step,
    :cpp:enumerator:`SemanticAction::focus <gui_forms::SemanticAction::focus>` moves focus to the editor, and
    :cpp:enumerator:`SemanticAction::set_value <gui_forms::SemanticAction::set_value>` takes a decimal number as text and refuses text

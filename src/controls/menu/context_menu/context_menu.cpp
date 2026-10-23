@@ -298,6 +298,7 @@ struct ContextMenu::Impl final {
             descriptor.role = item_.kind == MenuItemKind::separator
                 ? SemanticRole::separator : SemanticRole::menu_item;
             descriptor.name = menu_display_text(item_.text);
+            descriptor.access_key = mnemonic_access_key(item_.text);
             descriptor.description = item_.command_state.description;
             if (!item_.command_state.shortcut.empty()) {
                 if (!descriptor.description.empty()) descriptor.description += " · ";
@@ -311,6 +312,11 @@ struct ContextMenu::Impl final {
                 if (!descriptor.description.empty()) descriptor.description += " · ";
                 descriptor.description += "No commands are currently available";
             }
+            // A check or radio item can be checked whether or not it is now;
+            // a command item while its command is checked.
+            const bool can_check = item_.kind == MenuItemKind::check || item_.kind == MenuItemKind::radio ||
+                                   item_.command_state.checked;
+            if (can_check) descriptor.states |= SemanticState::checkable;
             if (item_.command_state.checked) descriptor.states |= SemanticState::checked;
             if (item_.kind == MenuItemKind::submenu &&
                 impl_.submenu_open(depth_, index_)) {

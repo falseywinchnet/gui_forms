@@ -323,6 +323,15 @@ AtkAttributeSet* attributes(AtkObject* object) {
     }
     return set;
 }
+// Asks a screen reader to speak a live region's latest announcement
+// (DK-51), its new name. ATK 2.46 and later carry the "announcement" signal
+// (AT-SPI object:announcement); it is looked up at run time, so that an
+// older ATK, which has none, publishes the name change alone.
+void announce_live_region(AtkObject* object, const std::string& text) {
+    const guint signal = g_signal_lookup("announcement", ATK_TYPE_OBJECT);
+    if (signal == 0U) return;
+    g_signal_emit(object, signal, 0U, text.c_str());
+}
 void class_init(gpointer raw, gpointer) {
     AtkObjectClass& object = *static_cast<AtkObjectClass*>(raw);
     object.get_name = name; object.get_description = description; object.get_parent = parent;
@@ -518,6 +527,9 @@ struct LinuxAccessibility::Impl {
         value.parent = parent; value.index = index;
         data(parent).children.push_back(object);
         if (!created && old_name != node.name) { g_object_notify(G_OBJECT(object), "accessible-name"); }
+        if (!created && node.role == SemanticRole::live_region && old_name != node.name && !node.name.empty()) {
+            announce_live_region(object, node.name);
+        }
         if (!created && old_value != node.value) { g_object_notify(G_OBJECT(object), "accessible-value"); }
         const StateBits new_states = state_bits(value.node);
         if (!created && old_states != new_states) {

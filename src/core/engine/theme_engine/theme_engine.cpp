@@ -13,6 +13,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 
 // The values a part is drawn with (expressions, transitions, inputs) must
@@ -520,6 +521,57 @@ PartPaint scaled_part(const PartPaint& part, double scale) noexcept {
     return shown;
 }
 
+// Whether the part's primitive stands behind the overlay seam (E9-A) and
+// follows the pointer: not under reduced motion, where its overlay rests.
+bool follows_pointer(const CompiledThemeRules::Resolution& resolution, const PartPaint& part,
+                     bool reduced_motion) noexcept {
+    if (reduced_motion) return false;
+    const Size size{part.bounds.width, part.bounds.height};
+    const bool follows = (*resolution.primitive).pointer_overlay(resolution.parameters, size).has_value();
+    return follows;
+}
+
+// Where an overlay is composited: over the part as shown (`face`, its
+// bounds at the presentational scale `granted`, 1 when unscaled), its
+// raster stretched by `granted` while the scale moves, centred at the
+// part-local `pointer_x` (NaN while the pointer is not over the part).
+struct OverlayPlacement final {
+    Rect face{};
+    double granted{1.0};
+    bool stretched{};
+    double pointer_x{};
+    bool reduced_motion{};
+};
+
+// Composites a primitive's overlay raster (E9-A) over the part as shown:
+// its centre across at the pointer, or at its rest across the shown face
+// with no pointer or under reduced motion; its top at the face's top;
+// clipped to the face's rounded shape (the part's own corner radius, else
+// its family recipe's, scaled with the face while it stretches), so that
+// it never draws outside the part's extent.
+void paint_pointer_overlay(Painter& painter, const Control& control, const PartPaint& part,
+                           const PointerOverlay& overlay, const OverlayPlacement& placement,
+                           const std::shared_ptr<const PartRaster>& raster, double opacity) {
+    const Rect& face = placement.face;
+    double centre = face.x + overlay.rest * face.width;
+    if (!placement.reduced_motion && std::isfinite(placement.pointer_x)) centre = part.bounds.x + placement.pointer_x;
+    const double width = overlay.size.width * placement.granted;
+    const ControlVisualContext context = part_visual_context(control, part.states);
+    const ControlVisualRecipe& recipe = control.effective_theme().resolve(part.family, context);
+    double radius = recipe.material.corner_radius;
+    if (part.corner_radius) radius = std::max(0.0, *part.corner_radius);
+    if (placement.stretched) radius = radius * placement.granted;
+    painter.save();
+    painter.clip_rounded_rect(face, radius);
+    if (placement.stretched) {
+        const Rect destination{centre - width * 0.5, face.y, width, face.height};
+        painter.draw_part_raster_scaled(raster, destination, opacity);
+    } else {
+        painter.draw_part_raster(raster, Point{centre - width * 0.5, face.y}, opacity);
+    }
+    painter.restore();
+}
+
 // How far past its bounds the built-in recipe may draw a part that is not
 // a shadow: its one-pixel contact shadow, default ring and focus outsets.
 constexpr double built_in_group_margin = 4.0;
@@ -639,6 +691,7 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     // damaged only for a part with a record (E6).
     Window::EnginePaintPlace place{};
     if (record || primitive_draws) place = (*window).engine_paint_place(control, painter);
+    const bool reduced_motion = window != nullptr && (*window).presentation_settings().reduced_motion;
     Rect extent{};
     if (record) {
         Insets outsets{};
@@ -646,6 +699,10 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         if (primitive_draws) {
             outsets = (*resolution.primitive).descriptor().outsets;
             inputs_read = resolution.inputs_read;
+            // An overlay that follows the pointer (E9-A) is repainted when
+            // the pointer moves within the part, though its raster never
+            // reads it.
+            if (follows_pointer(resolution, part, reduced_motion)) inputs_read = inputs_read | pointer_inputs();
         }
         // A part that scales may draw anywhere in its granted overflow.
         if (scales(resolution)) {
@@ -729,7 +786,22 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     // bounds (E7r form b), so that the move bakes nothing.
     PartPaint shown = scaled_part(part, presented.scale);
     const bool stretched = shown.bounds != part.bounds && presented.scale_moving;
-    if (shown.bounds != part.bounds && !stretched) {
+    // A primitive behind the overlay seam (E9-A, the sheen) bakes its own
+    // size, a band of the part's height, and is placed when composited. It
+    // follows the part's presentational scale as a face does: at rest it
+    // bakes at the scaled size, and while the scale moves its raster at the
+    // part's own size is stretched by the same factor (E7r form b).
+    const double granted = std::min(presented.scale, granted_scale(part.bounds, part.granted_overflow));
+    const std::optional<PointerOverlay> placed =
+        (*request.primitive).pointer_overlay(request.parameters, Size{part.bounds.width, part.bounds.height});
+    if (placed) {
+        const double baked_scale = stretched || shown.bounds == part.bounds ? 1.0 : granted;
+        const Size baked{(*placed).size.width * baked_scale, (*placed).size.height * baked_scale};
+        request.target.logical_size = baked;
+        request.extent = raster_extent(baked, Insets{}, decided.scale.value);
+        if (request.extent.width == 0U || request.extent.height == 0U) return;
+    }
+    if (!placed && shown.bounds != part.bounds && !stretched) {
         const double scale = decided.scale.value;
         const Size shown_size{shown.bounds.width, shown.bounds.height};
         const DeviceExtent scaled = raster_extent(shown_size, descriptor.outsets, scale);
@@ -806,6 +878,17 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     }
     if (!raster) {
         paint_built_in(painter, control, shown, opacity);
+        return;
+    }
+    if (placed) {
+        const double pointer_x = inputs[input_slot(EngineInput::pointer_x)];
+        OverlayPlacement placement{};
+        placement.face = shown.bounds;
+        placement.granted = shown.bounds == part.bounds ? 1.0 : granted;
+        placement.stretched = stretched;
+        placement.pointer_x = pointer_x;
+        placement.reduced_motion = reduced_motion;
+        paint_pointer_overlay(painter, control, part, *placed, placement, raster, opacity);
         return;
     }
     // A face that changed from one discrete state to another cross-fades

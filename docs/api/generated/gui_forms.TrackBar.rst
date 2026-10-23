@@ -112,7 +112,8 @@ gui_forms::TrackBar
    vertical one 28 by 160.
 
    The control publishes the accessibility role ``slider``, with its value as
-   text and as a number, and its minimum and maximum. The
+   text and as a number, its minimum and maximum, and ``small_change`` and
+   ``large_change`` as its steps. The
    :cpp:enumerator:`SemanticAction::increment <gui_forms::SemanticAction::increment>` and :cpp:enumerator:`SemanticAction::decrement <gui_forms::SemanticAction::decrement>` actions step by
    ``small_change``. The :cpp:enumerator:`SemanticAction::set_value <gui_forms::SemanticAction::set_value>` action takes a number as
    text, clamps it into the range and reports ``scroll`` with

@@ -289,8 +289,9 @@ with its groups, named by caption, and their commands: `button`,
 `split_button` or `menu_button`, with positions in their group and
 has-popup, and each launcher as a button. A collapsed group is a
 `menu_button` with a popup (expanded while open), and the scroll buttons are
-buttons. Hosted controls describe themselves as children of the ribbon, or
-of the popup while it is open.
+buttons. The File tab, the tabs and the commands publish their mnemonics
+as access keys. Hosted controls describe themselves as children of the
+ribbon, or of the popup while it is open.
 
 Contextual tab sets (owner decisions 14, 22 and 25). A tab whose
 `tab_set` names a set shows while the application makes the set available

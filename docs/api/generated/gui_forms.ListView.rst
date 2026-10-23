@@ -228,12 +228,16 @@ gui_forms::ListView
    activates. Typing the first letters of an item's text selects the next
    matching item; virtual views do not search yet.
 
-   The view publishes the accessibility role ``list``. Its children are the
-   visible column headers (as ``button``: there is no column-header role) and
-   the visible items, as ``list_item``, or ``check_list_item`` with check boxes,
-   whose description names each sub-item with its column. There is no table
-   role. The select action selects an item; press activates it, or toggles a
-   check-list item.
+   In the details view the control publishes the accessibility role ``table``,
+   with the item count and the column count; in the other views it publishes
+   ``list``. It is ``multiselectable`` while :cpp:func:`multi_select <gui_forms::ListView::multi_select>` is on. In the details
+   view its children are the visible column headers, as ``column_header`` with
+   their column index (counting from 1), and the visible items as ``row``, with
+   their row index and a ``cell`` child per visible column that holds the
+   sub-item text. In the other views the items are ``list_item``, or
+   ``check_list_item`` with check boxes. Items with check boxes are ``checkable``.
+   The select action selects an item; press activates it, or toggles a
+   check-box item.
 
    Not supported yet: groups, the tile view, label editing, the insertion mark,
    owner drawing, item tooltips, hot-tracking activation, column reordering,

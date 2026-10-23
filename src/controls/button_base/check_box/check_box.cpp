@@ -366,6 +366,7 @@ void CheckBox::on_activate() {
 SemanticDescriptor CheckBox::semantic_descriptor() const {
     SemanticDescriptor descriptor = ButtonBase::semantic_descriptor();
     descriptor.role = SemanticRole::check_box;
+    descriptor.states |= SemanticState::checkable;
     descriptor.value = check_state_ == CheckState::checked ? "checked"
         : check_state_ == CheckState::indeterminate ? "mixed" : "unchecked";
     if (check_state_ == CheckState::checked) descriptor.states |= SemanticState::checked;

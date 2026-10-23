@@ -283,8 +283,8 @@ struct DockFlyoutChange final {
 // along left, centre, right; Up and Down along top, centre, bottom), Tab and
 // Shift+Tab to the next and previous pane and then the window edges, over
 // exactly the targets the pointer reaches; each step updates the preview and
-// the announcement (drag_announcement, also the site's semantic
-// description while a drag runs). Enter commits through the same
+// the announcement (drag_announcement, also the name of the site's live
+// region, "<site id>.announcements"). Enter commits through the same
 // transaction as a drop; Escape cancels.
 class DockSite : public Control {
 public:

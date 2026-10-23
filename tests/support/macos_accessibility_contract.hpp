@@ -4,6 +4,8 @@
 
 #include "gui_forms/gui_forms.hpp"
 
+#include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -38,7 +40,21 @@ struct AccessibilityProjection final {
     bool selected_settable{};
     // A custom action named "Close".
     bool close_action{};
+    // The stage A fields (12.13): AXDisclosureLevel (a tree item's depth from
+    // zero; 0 without one), AXRowIndexRange and AXColumnIndexRange as
+    // "location+length" counting from zero ("" without one), AXRowCount and
+    // AXColumnCount (0 without one), and AXModal.
+    long long disclosure_level{};
+    std::string row_range;
+    std::string column_range;
+    long long row_count{};
+    long long column_count{};
+    bool modal{};
 };
+
+// A one-row or one-column range from an index counting from one, as
+// AXRowIndexRange publishes it: "location+length", or "" without one.
+[[nodiscard]] std::string expected_ax_range(const std::optional<std::size_t>& index);
 
 [[nodiscard]] const char* expected_ax_role(SemanticRole role);
 // The subrole, or "" for none.

@@ -81,6 +81,7 @@ SemanticDescriptor GroupBox::semantic_descriptor() const {
         ? (use_mnemonic_ ? parse_mnemonic_text(text_).display_text : text_)
         : accessible_name();
     descriptor.description = accessible_description();
+    if (use_mnemonic_) descriptor.access_key = mnemonic_access_key(text_);
     descriptor.exposed = true;
     return descriptor;
 }

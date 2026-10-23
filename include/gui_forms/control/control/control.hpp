@@ -236,6 +236,9 @@ struct MnemonicText final {
 };
 
 [[nodiscard]] MnemonicText parse_mnemonic_text(std::string_view text);
+// The character the first '&' marks, as UTF-8 (a semantic node's
+// access_key, 12.13), or empty when `text` marks none.
+[[nodiscard]] std::string mnemonic_access_key(std::string_view text);
 [[nodiscard]] bool is_mnemonic(char32_t character,
                                std::string_view text) noexcept;
 

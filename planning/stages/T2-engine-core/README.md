@@ -324,15 +324,26 @@ the plan left a number or a form open, E3 chose:
    theme uses them. Resampling is separable and done in premultiplied
    colour. When an image is shrunk, its kernel is widened by the shrink
    factor and the weights are normalized.
-   - **The filter is an open owner decision.** The candidates are
-     Mitchell–Netravali (B = C = 1/3) and the owner's convolution method
-     from Plan Paint. The owner may write an optimized `stx_conv` for the
-     latter.
-   - The filter is one named choice, `MaterialResamplingFilter`, selected in
-     one place (`material_resampling_filter` in `material_image.hpp`), so
-     that a convolution kernel can replace it without changing the
-     material's code.
-   - Mitchell–Netravali is the provisional implementation.
+   - **The filter is decided (owner, 2026-10-22): stx_conv (CONV) prepares
+     face sizes; nothing resamples inside a bake.** It is built as its own
+     PR after E9.2.
+     - *Preparation.* An image face's sized variant is produced by CONV
+       through the internal seam `src/core/interpolation/interpolation.hpp`
+       (`resample_image`, binary64, clamped to the valid premultiplied
+       range). It samples at pixel centres when enlarging and averages
+       pixel areas when shrinking, as the face study chose.
+     - *Cache.* Variants are cached by (resource, target device size,
+       scale) in the engine's shared cache. The engine owns them, and a
+       theme or resource change invalidates them. They are produced in idle
+       frames or once on first need, like the keyframes, and counted by
+       their own counter.
+     - *Bake.* The material bake only composites the prepared variant. The
+       4 ms bound applies to the composite, not to resampling, so image
+       faces are never refused for resampling cost.
+     - *Filter.* Mitchell–Netravali and `MaterialResamplingFilter` are
+       removed, since nothing would use them.
+     - *Hashes.* The image-fill reference hashes are updated. A test shows
+       that a variant is generated once and reused across bakes.
    - Nothing may be imported or copied from Plan Paint, because GUI.Forms
      depends on no sources outside its tree.
 3. **CSS inline images are named by resource.** An image is registered
@@ -503,6 +514,43 @@ assembles any size of a sliceable material from one reference bake.
   every CI platform. High contrast casts nothing. A shadow too wide falls
   back, counted. `gui_forms_overlay_shadow_tests` sees the raster first in
   each tooltip's and context menu's operations.
+
+### E9.2, the sheen behind the overlay seam
+
+- **The seam (E9-A).** `EnginePrimitive::pointer_overlay` returns a
+  `PointerOverlay`: the raster's logical size and its rest, a fraction of
+  the part's width. The engine bakes that raster through the part's
+  record, keyed like any other: once per (size, state, scale), never per
+  pointer position. It composites the raster with its centre across at the
+  part-local pointer and its top at the part's top. The raster is clipped
+  to the part's rounded shape: the part's own radius, else its family
+  recipe's. The part reads the pointer inputs for damage only, so a move
+  while the part is hot damages the part's extent and bakes nothing.
+- **Rest.** Without the pointer (the part is not hot), the band rests at
+  `rest`. Under reduced motion it always rests, and the part does not read
+  the pointer, so a move damages nothing (§9.5).
+- **Scale.** An overlay follows the part's presentational scale, so that a
+  popped or scaled part keeps its sheen aligned with its face. At rest it
+  is baked at the scaled size and clipped to the scaled face with the
+  part's own radius, as the face is baked. While the scale moves, the band
+  at the part's own size is stretched by the same factor, top to bottom of
+  the face, and the clip's radius scales with it. The move bakes nothing
+  (E7r form b).
+- **The sheen.** The `sheen` primitive is the seam's only user. Its band
+  is `width` logical units wide (2 to 96, default 24) and the part's height
+  tall. Its colour's alpha is weighted by (1 − t²)² across the band, with
+  no transcendental function, and is uniform down the part. Its colour
+  defaults to white at alpha 96. `rest` defaults to 0.25, towards the light.
+  No built-in rule selects it (§9.3 item 5: no theme must carry it).
+- **Proof.** `gui_forms_engine_light_tests`:
+  - the band's bytes, hash 0xd4c2e5fcf3e31bf5 at scale 1;
+  - the rest place, the rounded clip, and the band following the pointer;
+  - a move within the part damages exactly the part and composites the same raster;
+  - leaving the control returns the band to rest;
+  - reduced motion, and scale 2;
+  - a pop to 1.2: the band stretches with the face while the scale moves
+    and bakes nothing, then rests baked at 29 × 36 device pixels, clipped
+    to the popped face.
 
 ### E9 shadow costs
 

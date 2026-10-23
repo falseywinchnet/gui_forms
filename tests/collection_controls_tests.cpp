@@ -1545,6 +1545,40 @@ void test_details_semantic_item_returns_keyboard_to_body() {
     }
 }
 
+// A sortable column's header publishes press, which sorts as a click does
+// (stage A gap 2); a header that does not sort publishes no action and
+// refuses one.
+void test_details_header_semantic_press() {
+    const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.header-press"));
+    ObjectView& view = *owner;
+    view.set_requested_bounds({0.0, 0.0, 400.0, 190.0});
+    view.set_view_mode(ObjectViewMode::details);
+    view.set_details_model(details_test_columns(), details_test_items(3U));
+    Window window(owner, {400.0, 190.0});
+    window.flush();
+    std::vector<ObjectDetailsSort> requests{};
+    SubscriptionToken subscription = view.sort_requested().subscribe(DetailsSortRecorder{requests});
+    const std::vector<SemanticNode> nodes = view.semantic_virtual_children();
+    const SemanticNode* sortable = nullptr;
+    const SemanticNode* fixed = nullptr;
+    for (const SemanticNode& node : nodes) {
+        if (node.stable_id == "details.header-press.column.fact") sortable = &node;
+        if (node.stable_id == "details.header-press.column.state") fixed = &node;
+    }
+    require(sortable != nullptr && fixed != nullptr && (*sortable).role == SemanticRole::column_header &&
+                (*sortable).actions == std::vector<SemanticAction>{SemanticAction::press} &&
+                (*fixed).actions.empty(),
+            "a sortable header offers press and a fixed one offers nothing");
+    const bool pressed = window.perform_semantic_action("details.header-press.column.fact", SemanticAction::press);
+    require(pressed && requests.size() == 1U && requests[0U].column.value == "fact" &&
+                requests[0U].direction == ObjectSortDirection::ascending && window.focused_control() == owner,
+            "pressing a sortable header focuses the view and requests its sort");
+    const bool refused = window.perform_semantic_action("details.header-press.column.state", SemanticAction::press);
+    const bool selected = window.perform_semantic_action("details.header-press.column.fact", SemanticAction::select);
+    require(!refused && !selected && requests.size() == 1U,
+            "a fixed header, or an action other than press, is refused");
+}
+
 void test_details_header_input_resize_and_cache() {
     const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.input"));
     ObjectView& view = *owner;
@@ -1747,6 +1781,7 @@ int main() {
         test_details_sort_retires_capture();
         test_details_keyboard_sort_with_pending_layout();
         test_details_semantic_item_returns_keyboard_to_body();
+        test_details_header_semantic_press();
         test_details_scroll_fills_available_page();
         test_details_header_input_resize_and_cache();
         test_details_bounded_work();

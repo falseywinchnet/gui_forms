@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <charconv>
+#include <climits>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -61,12 +62,13 @@ constexpr std::size_t maximum_value_length = 1024U * 1024U;
 bool toggle_pattern(const SemanticNode& node) noexcept {
     if (checkable_role(node.role)) return true;
     if (node.role == SemanticRole::radio_button) return false;
-    // A toggle button or a checked menu item publishes checked (or mixed)
-    // while it is on; the tree has no flag for one that is off (stage A gap
-    // list), so the pattern is offered while the state is published.
-    const bool on = has_semantic_state(node.states, SemanticState::checked) ||
-                    has_semantic_state(node.states, SemanticState::mixed);
-    const bool toggles = on && semantic_has_action(node, SemanticAction::press);
+    // A toggle button or a checkable menu item publishes checkable (12.13)
+    // whether or not it is on; a node that publishes only checked (or
+    // mixed) while it is on is offered the pattern while it is on.
+    const bool can_check = has_semantic_state(node.states, SemanticState::checkable) ||
+                           has_semantic_state(node.states, SemanticState::checked) ||
+                           has_semantic_state(node.states, SemanticState::mixed);
+    const bool toggles = can_check && semantic_has_action(node, SemanticAction::press);
     return toggles;
 }
 
@@ -101,6 +103,19 @@ bool value_pattern(const SemanticNode& node) noexcept {
     return value;
 }
 
+// A table or tree grid publishes its size (12.13); a cell publishes its row
+// and its column. A row or a header publishes one index only and is not a
+// grid item.
+bool grid_pattern(const SemanticNode& node) noexcept {
+    const bool grid = node.row_count.has_value() && node.column_count.has_value();
+    return grid;
+}
+
+bool grid_item_pattern(const SemanticNode& node) noexcept {
+    const bool item = node.row_index.has_value() && node.column_index.has_value();
+    return item;
+}
+
 bool expand_collapse_pattern(const SemanticNode& node) noexcept {
     const bool expands = semantic_has_action(node, SemanticAction::expand) ||
                          semantic_has_action(node, SemanticAction::collapse) ||
@@ -117,6 +132,8 @@ bool supports_pattern(const SemanticNode& node, PATTERNID pattern) noexcept {
     case UIA_RangeValuePatternId: return range_value_pattern(node);
     case UIA_ValuePatternId: return value_pattern(node);
     case UIA_ExpandCollapsePatternId: return expand_collapse_pattern(node);
+    case UIA_GridPatternId: return grid_pattern(node);
+    case UIA_GridItemPatternId: return grid_item_pattern(node);
     default: return false;
     }
 }
@@ -277,7 +294,9 @@ class UiaElement final : public IRawElementProviderSimple,
                          public IRangeValueProvider,
                          public IExpandCollapseProvider,
                          public ISelectionItemProvider,
-                         public ISelectionProvider {
+                         public ISelectionProvider,
+                         public IGridProvider,
+                         public IGridItemProvider {
 public:
     UiaElement(std::shared_ptr<SemanticSource> source, SemanticElementId id) noexcept
         : source_(std::move(source)), id_(id) {}
@@ -345,6 +364,19 @@ public:
     HRESULT STDMETHODCALLTYPE GetSelection(SAFEARRAY** out) override;
     HRESULT STDMETHODCALLTYPE get_CanSelectMultiple(BOOL* out) override;
     HRESULT STDMETHODCALLTYPE get_IsSelectionRequired(BOOL* out) override;
+
+    // IGridProvider: rows and columns count from zero, as UI Automation
+    // counts them; the tree's indices count from one.
+    HRESULT STDMETHODCALLTYPE GetItem(int row, int column, IRawElementProviderSimple** out) override;
+    HRESULT STDMETHODCALLTYPE get_RowCount(int* out) override;
+    HRESULT STDMETHODCALLTYPE get_ColumnCount(int* out) override;
+
+    // IGridItemProvider.
+    HRESULT STDMETHODCALLTYPE get_Row(int* out) override;
+    HRESULT STDMETHODCALLTYPE get_Column(int* out) override;
+    HRESULT STDMETHODCALLTYPE get_RowSpan(int* out) override;
+    HRESULT STDMETHODCALLTYPE get_ColumnSpan(int* out) override;
+    HRESULT STDMETHODCALLTYPE get_ContainingGrid(IRawElementProviderSimple** out) override;
 
 private:
     ~UiaElement() = default;
@@ -451,6 +483,10 @@ HRESULT STDMETHODCALLTYPE UiaElement::QueryInterface(REFIID iid, void** out) {
         *out = static_cast<ISelectionItemProvider*>(this);
     } else if (iid == IID_ISelectionProvider) {
         *out = static_cast<ISelectionProvider*>(this);
+    } else if (iid == IID_IGridProvider) {
+        *out = static_cast<IGridProvider*>(this);
+    } else if (iid == IID_IGridItemProvider) {
+        *out = static_cast<IGridItemProvider*>(this);
     } else {
         return E_NOINTERFACE;
     }
@@ -1060,6 +1096,129 @@ HRESULT STDMETHODCALLTYPE UiaElement::get_IsSelectionRequired(BOOL* out) {
     return resolve_pattern(UIA_SelectionPatternId, client, self);
 }
 
+// The first node at or below `at`, in tree order, that is the grid item at
+// `row_index` and `column_index` (counting from one). Returns false, leaving
+// `found` unchanged, when there is none: the cell is outside the grid or not
+// realized (only the visible rows and columns publish cells).
+bool find_grid_item(const SemanticLocation& at, std::size_t row_index, std::size_t column_index,
+                    SemanticLocation& found) noexcept {
+    const SemanticNode& node = *at.node;
+    if (grid_item_pattern(node) && *node.row_index == row_index && *node.column_index == column_index) {
+        found = at;
+        return true;
+    }
+    const std::size_t count = node.children.size();
+    for (std::size_t index = 0; index < count; ++index) {
+        if (find_grid_item(child_location(at, index), row_index, column_index, found)) return true;
+    }
+    return false;
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::GetItem(int row, int column, IRawElementProviderSimple** out) {
+    if (out == nullptr) return E_INVALIDARG;
+    *out = nullptr;
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_pattern(UIA_GridPatternId, client, self);
+    if (FAILED(status)) return status;
+    if (row < 0 || column < 0) return E_INVALIDARG;
+    const std::size_t row_index = static_cast<std::size_t>(row) + 1U;
+    const std::size_t column_index = static_cast<std::size_t>(column) + 1U;
+    if (row_index > *(*self.node).row_count || column_index > *(*self.node).column_count) return E_INVALIDARG;
+    SemanticLocation item;
+    // A cell in range that is not realized has no element: none is returned.
+    if (!find_grid_item(self, row_index, column_index, item)) return S_OK;
+    *out = make_automation_element(source_, item.id);
+    if (*out == nullptr) return E_OUTOFMEMORY;
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::get_RowCount(int* out) {
+    if (out == nullptr) return E_INVALIDARG;
+    *out = 0;
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_pattern(UIA_GridPatternId, client, self);
+    if (FAILED(status)) return status;
+    const std::size_t count = std::min<std::size_t>(*(*self.node).row_count, INT_MAX);
+    *out = static_cast<int>(count);
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::get_ColumnCount(int* out) {
+    if (out == nullptr) return E_INVALIDARG;
+    *out = 0;
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_pattern(UIA_GridPatternId, client, self);
+    if (FAILED(status)) return status;
+    const std::size_t count = std::min<std::size_t>(*(*self.node).column_count, INT_MAX);
+    *out = static_cast<int>(count);
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::get_Row(int* out) {
+    if (out == nullptr) return E_INVALIDARG;
+    *out = 0;
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_pattern(UIA_GridItemPatternId, client, self);
+    if (FAILED(status)) return status;
+    const std::size_t row = std::min<std::size_t>(*(*self.node).row_index - 1U, INT_MAX);
+    *out = static_cast<int>(row);
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::get_Column(int* out) {
+    if (out == nullptr) return E_INVALIDARG;
+    *out = 0;
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_pattern(UIA_GridItemPatternId, client, self);
+    if (FAILED(status)) return status;
+    const std::size_t column = std::min<std::size_t>(*(*self.node).column_index - 1U, INT_MAX);
+    *out = static_cast<int>(column);
+    return S_OK;
+}
+
+// The tree has no spanning cells: every cell spans one row and one column.
+HRESULT STDMETHODCALLTYPE UiaElement::get_RowSpan(int* out) {
+    if (out == nullptr) return E_INVALIDARG;
+    *out = 1;
+    SemanticNode client;
+    SemanticLocation self;
+    return resolve_pattern(UIA_GridItemPatternId, client, self);
+}
+
+HRESULT STDMETHODCALLTYPE UiaElement::get_ColumnSpan(int* out) {
+    if (out == nullptr) return E_INVALIDARG;
+    *out = 1;
+    SemanticNode client;
+    SemanticLocation self;
+    return resolve_pattern(UIA_GridItemPatternId, client, self);
+}
+
+// The nearest ancestor that is a grid, or none.
+HRESULT STDMETHODCALLTYPE UiaElement::get_ContainingGrid(IRawElementProviderSimple** out) {
+    if (out == nullptr) return E_INVALIDARG;
+    *out = nullptr;
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_pattern(UIA_GridItemPatternId, client, self);
+    if (FAILED(status)) return status;
+    SemanticLocation at = self;
+    SemanticLocation parent;
+    while (parent_semantic_location(client, at, parent)) {
+        if (grid_pattern(*parent.node)) {
+            *out = make_automation_element(source_, parent.id);
+            if (*out == nullptr) return E_OUTOFMEMORY;
+            return S_OK;
+        }
+        at = parent;
+    }
+    return S_OK;
+}
+
 // -- events ----------------------------------------------------------------
 
 // One node of a published tree, by identity, for comparing two trees.
@@ -1150,6 +1309,15 @@ void raise_node_changes(const std::shared_ptr<SemanticSource>& source, SemanticE
         } else {
             VariantClear(&old_value);
             VariantClear(&new_value);
+        }
+        // A live region's name is its latest announcement (DK-51): a
+        // reader speaks it on the live-region event.
+        if (after.role == SemanticRole::live_region && !after.name.empty()) {
+            IRawElementProviderSimple* element = make_automation_element(source, id);
+            if (element != nullptr) {
+                UiaRaiseAutomationEvent(element, UIA_LiveRegionChangedEventId);
+                (*element).Release();
+            }
         }
     }
     const bool enabled_before = has_semantic_state(before.states, SemanticState::enabled);

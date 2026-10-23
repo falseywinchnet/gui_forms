@@ -89,7 +89,8 @@ change also updates layout.
 
 The control publishes the accessibility role `static_text`. Its name is the
 accessible name, or else the text without the mnemonic marker and without
-`text_case_transform`. A label with an empty name is not exposed.
+`text_case_transform`. The character after the mnemonic marker is its access
+key. A label with an empty name is not exposed.
 
 Examples
 --------

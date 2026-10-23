@@ -303,9 +303,10 @@ void check_boxes() {
     require(window.request_focus(view) && key(window, PhysicalKey::space) && (*view).item_checked(1U) == false,
             "Space toggles the focused item's check box");
     const std::vector<SemanticNode> children = (*view).semantic_virtual_children();
-    require(children.size() == 3U + 4U && children[3].role == SemanticRole::check_list_item &&
-                children[3].value == "unchecked",
-            "rows with check boxes are check-list items");
+    require(children.size() == 3U + 4U && children[3].role == SemanticRole::row &&
+                has_semantic_state(children[3].states, SemanticState::checkable) &&
+                !has_semantic_state(children[3].states, SemanticState::checked) && children[3].value == "unchecked",
+            "details rows with check boxes are checkable rows");
     require((*view).on_semantic_child_action("item-2", SemanticAction::press, {}) && (*view).item_checked(2U),
             "the semantic press toggles a check-list item");
     (*view).set_item_checked(3U, true);
@@ -470,12 +471,30 @@ void semantics() {
     Window window(view, {400.0, 240.0});
     window.perform_layout();
     const SemanticDescriptor descriptor = (*view).semantic_descriptor();
-    require(descriptor.role == SemanticRole::list && descriptor.name == "Files", "the view is a named list");
+    require(descriptor.role == SemanticRole::table && descriptor.name == "Files" && descriptor.row_count == 3U &&
+                descriptor.column_count == 3U && has_semantic_state(descriptor.states, SemanticState::multiselectable),
+            "the details view is a named multiple-selection table sized by its items and columns");
     const std::vector<SemanticNode> children = (*view).semantic_virtual_children();
-    require(children.size() == 3U + 3U && children[0].role == SemanticRole::button && children[0].name == "Name" &&
-                children[3].role == SemanticRole::list_item && children[3].name == "Delta 0" &&
-                children[3].description == "Size: 1 KB; Kind: Image",
-            "column headers are buttons and rows are list items describing their sub-items");
+    require(children.size() == 3U + 3U && children[0].role == SemanticRole::column_header &&
+                children[0].name == "Name" && children[0].column_index == 1U && children[2].column_index == 3U &&
+                children[3].role == SemanticRole::row && children[3].name == "Delta 0" &&
+                children[3].row_index == 1U && children[3].description.empty(),
+            "column headers carry their column and rows carry their row");
+    const SemanticNode& row = children[3];
+    require(row.children.size() == 3U && row.children[0].role == SemanticRole::cell &&
+                row.children[0].value == "Delta 0" && row.children[1].name == "Size" &&
+                row.children[1].value == "1 KB" && row.children[2].value == "Image" &&
+                row.children[2].row_index == 1U && row.children[2].column_index == 3U,
+            "a row holds one cell per column, the first holding the item's text");
+    (*view).set_multi_select(false);
+    (*view).set_view(ListViewView::list);
+    window.perform_layout();
+    const SemanticDescriptor list = (*view).semantic_descriptor();
+    require(list.role == SemanticRole::list && !list.row_count &&
+                !has_semantic_state(list.states, SemanticState::multiselectable),
+            "the other views are lists, multiple-selection only while multi_select is set");
+    (*view).set_view(ListViewView::details);
+    window.perform_layout();
     std::vector<std::size_t> clicks;
     SubscriptionToken clicked = (*view).column_click().subscribe(RecordColumnClick{&clicks});
     require((*view).on_semantic_child_action("list.column.kind", SemanticAction::press, {}) && clicks.size() == 1U &&
