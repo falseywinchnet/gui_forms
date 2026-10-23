@@ -331,10 +331,11 @@ the plan left a number or a form open, E3 chose:
 
 1. **A refused material falls back.** The `material` primitive refuses a part
    whose material is missing or invalid, whose image fill is unavailable, or
-   whose estimated bake exceeds the bound. The part is then drawn by the
+   whose bake effort exceeds the budget. The part is then drawn by the
    built-in recipe, and each refusal is counted once per part
-   (`engine_primitive_refusals` in the metrics snapshot). The bound and the
-   costs are set in one place, `material_bake_policy.hpp`.
+   (`engine_primitive_refusals` in the metrics snapshot). The budget and
+   the effort weights are set in one place, `material_bake_policy.hpp`
+   ("Bake effort").
 2. **Image fills are supported, never refused for being images.** No stock
    theme uses them. Resampling is separable and done in premultiplied
    colour. When an image is shrunk, its kernel is widened by the shrink
@@ -353,8 +354,8 @@ the plan left a number or a form open, E3 chose:
        frames or once on first need, like the keyframes, and counted by
        their own counter.
      - *Bake.* The material bake only composites the prepared variant. The
-       4 ms bound applies to the composite, not to resampling, so image
-       faces are never refused for resampling cost.
+       bake budget counts the composite, not resampling, so image faces are
+       never refused for resampling work.
      - *Filter.* Mitchell–Netravali and `MaterialResamplingFilter` are
        removed, since nothing would use them.
      - *Hashes.* The image-fill reference hashes are updated. A test shows
@@ -366,11 +367,12 @@ the plan left a number or a form open, E3 chose:
    is not built yet.
 4. **Bake cost and live cost are separate.** A material is baked once per
    invalidation (state, size, scale or theme) and cached. Compositing it
-   afterwards is a blit, plus a group blend where one applies. The bake is
-   bounded at 4 ms on the reference machine, a quarter of a 60 Hz frame.
-   The owner has accepted that bound. The per-layer costs were measured
-   again on a quiet machine, with the load recorded, on 2026-10-23 ("Bake
-   costs on a quiet machine").
+   afterwards is a blit, plus a group blend where one applies. The bake was
+   bounded at 4 ms on the reference machine, a quarter of a 60 Hz frame,
+   and is now bounded in effort, the same on every platform (owner,
+   2026-10-23; "Bake effort"). The per-layer costs measured on a quiet
+   machine on 2026-10-23 ("Bake costs on a quiet machine") set the effort
+   weights' relative sizes.
 5. **Nothing rasterizes per frame.** The material reads no inputs. The
    retained forms of E7's animated parameters, and slicing, are phase E7r
    (after E8c, before E9).
@@ -537,7 +539,8 @@ assembles any size of a sliceable material from one reference bake.
   units. The damage outsets controls report are unchanged.
 - **Refusals.** It refuses an inset shadow, a shadow that reaches past 32
   units (spread, offset and 3.5σ', plus two device pixels), and a bake over
-  the bound. A refused shadow is drawn by `draw_box_shadow` and counted.
+  the bake budget. A refused shadow is drawn by `draw_box_shadow` and
+  counted.
 - **The kernel.** An outer shadow's rectangle integral is separable. The
   kernel evaluates it once per column and once per row. The rounded edge's
   integral is taken only within the shape's corner squares and outward
@@ -786,7 +789,7 @@ The estimate counts every pixel at `outer_shadow`. It adds `outer_corner`
 for each pixel within a rounded shadow's corner span on both axes: its
 radius plus its reach (3.5σ'), and one pixel, on each side.
 
-The overlay tooltip of 120 × 40 at scale 2 now bakes within the bound. It
+The overlay tooltip of 120 × 40 at scale 2 now bakes within the budget. It
 was refused at 1.5 and 2 under the old per-pixel cost of 69 ns.
 
 ## CONV, image face variants
@@ -836,6 +839,9 @@ variant is prepared by CONV, and the bake only composites it.
   one, is accepted and bakes, its variant made on first need.
 
 ## Bake costs on a quiet machine
+
+Since "Bake effort" (owner, 2026-10-23) these figures only set the effort
+weights' relative sizes; no time figure decides acceptance.
 
 The per-layer costs were measured again on 2026-10-23 with nothing else
 running (no compiler, build or test processes, checked each run). Every
@@ -897,6 +903,61 @@ with the over glow, so all four are accepted and assemble from slices.
 `gui_forms_engine_slice_tests` asserts it. The heavier material's pill 40
 high at scale 2 is now accepted too, and the refusal assertion moved to 80
 high at scale 2 (64 high at scale 2 is refused as well).
+
+## Bake effort (owner, 2026-10-23)
+
+The owner, reviewing the specimen sheet: "the idea that we attempt to
+administratively cure timing, when platform variation will influence this.
+this is wrong thinking. we should cure effort, not time." The bake bound is
+therefore effort, not time, and measurements no longer decide anything.
+
+- **Weights.** Each layer kind has a dimensionless integer effort weight per
+  device pixel (`material_effort_weights`, `MaterialEffortWeights` in
+  `material_bake_policy.hpp`; the generators' are
+  `procedural_effort_weights` in `procedural_pattern.hpp`), fixed in code.
+  A bake's effort is the destination's pixels times the sum of its layers'
+  weights, plus the rounded outer shadows' corner pixels (rounded up to
+  whole pixels) times theirs, held in a `BakeEffort` (64-bit units).
+- **Measurements choose relative weights only.** The weights are the
+  quiet-machine medians above ("Used"), scaled by five so that the least,
+  a gradient stop past two, is one unit; a solid layer is 25. `--measure`
+  now prints each kind's time and the weight it suggests, its ratio to a
+  solid layer's times 25. A measurement may change a weight in a reviewed
+  change; it never decides acceptance at run time.
+- **Budget.** `maximum_material_bake_effort` is 20 000 000 units per bake,
+  the same on every platform by construction. It is the old 4 ms bound at
+  the same scale, so every case accepted or refused before keeps its
+  outcome; the gate manifest (every primitive and sample, with its refusal
+  count) is byte-identical, and so are every engine test's images. The one
+  change of arithmetic is the corner pixels' rounding up, at most one
+  pixel's weight per shadow, which moved no case.
+- **The cases the slice tests keep** (`gui_forms_engine_slice_tests`):
+
+  | Part (layered test material) | Effort | Outcome |
+  |---|---|---|
+  | 120 × 64 at 1.5, pill (sliced) | 15 477 520 | accepted |
+  | 120 × 64 at 1.5, radius 32 (sliced) | 17 587 280 | accepted |
+  | 120 × 64 at 1.5, pill with the over glow (sliced) | 17 587 280 | accepted |
+  | 76 × 40 at 2, pill (sliced) | 13 996 500 | accepted |
+  | 76 × 64 at 2, pill | 26 043 860 | refused |
+  | 76 × 64 at 2, pill with the over glow | 29 698 360 | refused |
+  | 76 × 80 at 2, pill with the over glow | 37 011 740 | refused |
+
+  The 76 × 40 pill is one of the pills the assembly comparison bakes at
+  every scale. The nearest accepted case is 12 % under the budget and the
+  nearest refused one 30 % over it.
+- **Audit: nothing else reads time to choose work.** The engine's other
+  limits were already effort or counts: the declared cost of 512
+  operations per device pixel and `maximum_animated_operations_per_frame`
+  (GIVEN F1-1), one procedural pattern or one keyframe per idle frame, and
+  the byte budgets of the caches. The material, overlay shadow and
+  procedural refusals were the only places a time figure decided
+  behaviour, and all three now compare `BakeEffort`. The engine reads its
+  clock only for motion.
+- **Perceptual timings stay in time,** because they describe what the user
+  sees: transition durations and delays, the 400 ms ceiling, keyframe
+  times, the follow time constant, the motion frame interval and the
+  ambient rate (30 frames per second over at most 10 % of the window).
 
 ## E9.6, the effects follow-up
 

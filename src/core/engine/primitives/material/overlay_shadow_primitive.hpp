@@ -26,8 +26,8 @@ namespace gui_forms::engine_primitives {
 // (draw_box_shadow) and counts the refusal when the target lends no valid
 // material, a shadow is inset, a shadow reaches past the outset (its
 // spread, offset and 3.5 σ' of blur, rounded up by a device pixel), or the
-// estimated bake of its reference (it slices like any material) exceeds
-// the bound of material_bake_policy.hpp.
+// bake effort of its reference (it slices like any material) exceeds the
+// budget of material_bake_policy.hpp.
 inline constexpr double overlay_shadow_outset = 32.0;
 
 class OverlayShadowPrimitive final : public EnginePrimitive {

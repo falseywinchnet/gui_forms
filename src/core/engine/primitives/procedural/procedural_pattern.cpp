@@ -548,19 +548,19 @@ void generate_fresco(const ProceduralFill& fill, const PatternInputs& inputs, co
     }
 }
 
-double generation_cost(ProceduralPattern pattern) noexcept {
-    const ProceduralCosts& costs = measured_procedural_costs;
+std::uint64_t generation_weight(ProceduralPattern pattern) noexcept {
+    const ProceduralEffortWeights& weights = procedural_effort_weights;
     switch (pattern) {
-    case ProceduralPattern::felt: return costs.felt;
-    case ProceduralPattern::wood_grain: return costs.wood_grain;
-    case ProceduralPattern::paper_fibre: return costs.paper_fibre;
-    case ProceduralPattern::pinstripe: return costs.pinstripe;
-    case ProceduralPattern::brushed_metal: return costs.brushed_metal;
-    case ProceduralPattern::fresco: return costs.fresco;
+    case ProceduralPattern::felt: return weights.felt;
+    case ProceduralPattern::wood_grain: return weights.wood_grain;
+    case ProceduralPattern::paper_fibre: return weights.paper_fibre;
+    case ProceduralPattern::pinstripe: return weights.pinstripe;
+    case ProceduralPattern::brushed_metal: return weights.brushed_metal;
+    case ProceduralPattern::fresco: return weights.fresco;
     }
     // A pattern outside the enumeration is never accepted
-    // (valid_surface_material): it costs past any bound.
-    const double unbounded = maximum_part_raster_side * 1.0e9;
+    // (valid_surface_material): one pixel of it is past the budget.
+    const std::uint64_t unbounded = maximum_material_bake_effort.units + 1U;
     return unbounded;
 }
 
@@ -583,16 +583,18 @@ DeviceExtent procedural_extent(const ProceduralFill& fill, Rect box, double scal
     return tile;
 }
 
-double procedural_generation_estimate(const ProceduralFill& fill, DeviceExtent extent) noexcept {
-    const double pixels = static_cast<double>(extent.width) * static_cast<double>(extent.height);
-    const double estimate = pixels * generation_cost(fill.pattern);
-    return estimate;
+BakeEffort procedural_generation_effort(const ProceduralFill& fill, DeviceExtent extent) noexcept {
+    // At most maximum_part_raster_side squared pixels (procedural_extent)
+    // times a weight of at most the budget: within 64 bits.
+    const std::uint64_t pixels = std::uint64_t{extent.width} * extent.height;
+    const BakeEffort effort{pixels * generation_weight(fill.pattern)};
+    return effort;
 }
 
 bool procedural_pattern_bounded(const ProceduralFill& fill, DeviceExtent extent) noexcept {
     const std::uint64_t bytes = std::uint64_t{extent.width} * extent.height * part_raster_bytes_per_pixel;
     if (bytes > maximum_procedural_pattern_bytes) return false;
-    const bool within = procedural_generation_estimate(fill, extent) <= maximum_material_bake_nanoseconds;
+    const bool within = procedural_generation_effort(fill, extent) <= maximum_material_bake_effort;
     return within;
 }
 
