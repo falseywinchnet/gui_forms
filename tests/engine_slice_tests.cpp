@@ -256,6 +256,22 @@ void assembly_equals_whole_bake() {
     SliceCount large{};
     compare_assembly(generous, Size{120.0, 32.0}, 2.0, large);
     require(large.across == 1U, "a radius-32 part 32 high at scale 2 slices and is within the bake bound");
+    // The part filters (E9.6) carry every change further in by their
+    // reach, so the corners grow by it: sliced, the part still has the
+    // whole bake's bytes.
+    SliceCount filtered{};
+    SurfaceMaterial filters = layered_material(false);
+    filters.colour_filter = MaterialColourMatrix::sepia(0.6);
+    filters.drop_shadow = MaterialDropShadow{Point{1.0, 2.0}, 2.0, Color{0, 0, 0, 90}};
+    filters.filter_blur = 1.0;
+    for (const double scale : scales) {
+        for (const double width : widths) {
+            for (const double height : heights) {
+                if (height <= 40.0) compare_assembly(filters, Size{width, height}, scale, filtered);
+            }
+        }
+    }
+    require(filtered.across > 0U && filtered.down > 0U, "a filtered part slices on both axes");
 }
 
 // -- the fallbacks -----------------------------------------------------------------

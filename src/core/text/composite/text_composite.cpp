@@ -1,5 +1,7 @@
 #include "text_composite.hpp"
 
+#include "gui_forms/types/painter/painter.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -266,6 +268,41 @@ unsigned weighted_channel(const std::uint64_t channel, const std::uint64_t weigh
     return weighted;
 }
 
+// One channel by multiply or screen (PartCompositeBlend), in bytes:
+// `source` and `destination` premultiplied, with their pixels' alphas.
+unsigned separable_channel(const unsigned source, const unsigned source_alpha, const unsigned destination,
+                           const unsigned destination_alpha, const PartCompositeBlend blend) noexcept {
+    const unsigned product = source * destination;
+    if (blend == PartCompositeBlend::screen) {
+        const unsigned screened = source + destination - (product + 127U) / 255U;
+        return std::min(255U, screened);
+    }
+    const unsigned kept = source * (255U - destination_alpha) + destination * (255U - source_alpha) + product;
+    const unsigned multiplied = (kept + 127U) / 255U;
+    return std::min(255U, multiplied);
+}
+
+// A target pixel joined by multiply or screen to the weighted premultiplied
+// `source` (red, green, blue, alpha).
+std::uint32_t separable_pixel(const std::uint32_t previous, const std::array<unsigned, 4>& source,
+                              const ChannelShifts shifts, const bool opaque, const PartCompositeBlend blend) noexcept {
+    const unsigned destination_alpha = (previous >> shifts.alpha) & 255U;
+    const unsigned out_red =
+        separable_channel(source[0], source[3], (previous >> shifts.red) & 255U, destination_alpha, blend);
+    const unsigned out_green =
+        separable_channel(source[1], source[3], (previous >> shifts.green) & 255U, destination_alpha, blend);
+    const unsigned out_blue =
+        separable_channel(source[2], source[3], (previous >> shifts.blue) & 255U, destination_alpha, blend);
+    unsigned out_alpha = 255U;
+    if (!opaque) {
+        const unsigned joined = source[3] + destination_alpha - (source[3] * destination_alpha + 127U) / 255U;
+        out_alpha = std::min(255U, joined);
+    }
+    const std::uint32_t joined_pixel = (out_red << shifts.red) | (out_green << shifts.green) |
+                                       (out_blue << shifts.blue) | (out_alpha << shifts.alpha);
+    return joined_pixel;
+}
+
 // One premultiplied source pixel blended over a target pixel at `weight`
 // (opacity 0..255 times clip coverage 0..256): see composite_part_raster.
 void blend_part_pixel(std::uint32_t& pixel, const std::array<std::uint64_t, 4>& rgba, const std::uint64_t weight,
@@ -276,6 +313,11 @@ void blend_part_pixel(std::uint32_t& pixel, const std::array<std::uint64_t, 4>& 
     const unsigned green = weighted_channel(rgba[1], weight);
     const unsigned blue = weighted_channel(rgba[2], weight);
     const std::uint32_t previous = pixel;
+    if (blend == PartCompositeBlend::multiply || blend == PartCompositeBlend::screen) {
+        const std::array<unsigned, 4> source{red, green, blue, alpha};
+        pixel = separable_pixel(previous, source, shifts, opaque, blend);
+        return;
+    }
     if (blend == PartCompositeBlend::plus) {
         const unsigned sum_red = std::min(255U, red + ((previous >> shifts.red) & 255U));
         const unsigned sum_green = std::min(255U, green + ((previous >> shifts.green) & 255U));
@@ -421,6 +463,16 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
         }
     }
     return TextCompositeStatus::success;
+}
+
+PartCompositeBlend part_composite_blend(const PaintGroupComposite composite) noexcept {
+    switch (composite) {
+    case PaintGroupComposite::source_over: return PartCompositeBlend::source_over;
+    case PaintGroupComposite::plus: return PartCompositeBlend::plus;
+    case PaintGroupComposite::multiply: return PartCompositeBlend::multiply;
+    case PaintGroupComposite::screen: return PartCompositeBlend::screen;
+    }
+    return PartCompositeBlend::source_over;
 }
 
 } // namespace gui_forms::detail

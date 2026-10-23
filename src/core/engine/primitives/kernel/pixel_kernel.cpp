@@ -1,6 +1,7 @@
 #include "pixel_kernel.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 // Identical bytes on every host: no fused multiply-add (see engine_math.cpp).
@@ -23,6 +24,41 @@ void blend_over(Unit& target, Unit source) noexcept {
     target.green = source.green + target.green * keep;
     target.blue = source.blue + target.blue * keep;
     target.alpha = source.alpha + target.alpha * keep;
+}
+
+void blend_multiply(Unit& target, Unit source) noexcept {
+    const double keep_target = 1.0 - source.alpha;
+    const double keep_source = 1.0 - target.alpha;
+    target.red = source.red * keep_source + target.red * keep_target + source.red * target.red;
+    target.green = source.green * keep_source + target.green * keep_target + source.green * target.green;
+    target.blue = source.blue * keep_source + target.blue * keep_target + source.blue * target.blue;
+    target.alpha = source.alpha + target.alpha - source.alpha * target.alpha;
+}
+
+void blend_screen(Unit& target, Unit source) noexcept {
+    target.red = source.red + target.red - source.red * target.red;
+    target.green = source.green + target.green - source.green * target.green;
+    target.blue = source.blue + target.blue - source.blue * target.blue;
+    target.alpha = source.alpha + target.alpha - source.alpha * target.alpha;
+}
+
+Unit colour_filtered(const MaterialColourMatrix& matrix, Unit pixel) noexcept {
+    const double alpha = pixel.alpha;
+    const bool visible = alpha > 0.0;
+    const std::array<double, 4> straight{visible ? pixel.red / alpha : 0.0, visible ? pixel.green / alpha : 0.0,
+                                         visible ? pixel.blue / alpha : 0.0, alpha};
+    std::array<double, 4> filtered{};
+    for (std::size_t row = 0U; row < MaterialColourMatrix::rows; ++row) {
+        const std::size_t first = row * MaterialColourMatrix::columns;
+        double sum = matrix.values[first + 4U];
+        for (std::size_t column = 0U; column < 4U; ++column) {
+            sum = sum + matrix.values[first + column] * straight[column];
+        }
+        filtered[row] = std::clamp(sum, 0.0, 1.0);
+    }
+    const double shown = filtered[3];
+    const Unit result{filtered[0] * shown, filtered[1] * shown, filtered[2] * shown, shown};
+    return result;
 }
 
 std::uint8_t to_byte(double value) noexcept {

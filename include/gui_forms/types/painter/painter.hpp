@@ -41,7 +41,13 @@ struct RetainedDrawCache final {
 //   one beneath and clamped at 255. The engine's cross-fade draws a part's
 //   old face at 1 - t and its new face in a plus group at t, inside one
 //   isolated group, so that the two sum to one face.
-enum class PaintGroupComposite : std::uint8_t { source_over, plus };
+// - multiply and screen (E9.6, CSS `mix-blend-mode`): CSS's separable
+//   blend modes, composited as CSS composites them. With s and d the
+//   premultiplied source and destination channels and αs and αd their
+//   alphas, multiply gives s × (1 − αd) + d × (1 − αs) + s × d, screen
+//   gives s + d − s × d, and both give alpha αs + αd − αs × αd. A theme
+//   rule's `blend` property (blend_property) draws a part through one.
+enum class PaintGroupComposite : std::uint8_t { source_over, plus, multiply, screen };
 
 // A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that
 // group layer may be needed for"): commands drawn as one image, then

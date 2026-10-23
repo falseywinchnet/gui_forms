@@ -1,18 +1,22 @@
 #include "glass_primitive.hpp"
 
+#include "../kernel/box_blur.hpp"
 #include "../kernel/pixel_kernel.hpp"
 
 #include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/engine/part_shape/part_shape.hpp"
+#include "gui_forms/surface_material/types/surface_material_types.hpp"
+#include "gui_forms/theme/types/theme_types.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <new>
+#include <exception>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 // Identical bytes on every host: no fused multiply-add (see engine_math.cpp).
@@ -28,71 +32,39 @@ const PartRole glass_roles[] = {PartRole::region, PartRole::face, PartRole::well
 constexpr std::size_t glass_blur = 0U;
 constexpr std::size_t glass_tint = 1U;
 constexpr std::size_t glass_corner = 2U;
+constexpr std::size_t glass_recipe = 3U;
+
+// `none`, then the theme's recipe roles in enum order (E9.6): the recipe
+// whose material's colour filter glass applies to its backdrop.
+constexpr std::array<std::string_view, 13> glass_recipe_names{
+    "none", "window", "panel", "card", "button", "accent_button", "command_button",
+    "choice", "editor", "menu_item", "selection", "progress", "tool_tip"};
+static_assert(glass_recipe_names.size() == static_cast<std::size_t>(ControlVisualRole::count) + 1U,
+              "none, then one choice per recipe role");
 
 const PrimitiveParameterDeclaration glass_parameters[] = {
     {"blur", PrimitiveParameterKind::number, 0.0, 8.0, 6.0, {}},
     {"tint", PrimitiveParameterKind::colour, 0.0, 0.0, 0.0, {255, 255, 255, 64}},
     {"corner", PrimitiveParameterKind::number, 0.0, 64.0, 0.0, {}},
+    {"recipe", PrimitiveParameterKind::choice, 0.0, 0.0, 0.0, {}, false, glass_recipe_names},
 };
 
 const PrimitiveDescriptor glass_descriptor{
     "glass", EngineVersion{0, 2}, glass_roles, {}, glass_parameters, PrimitiveCost{48U, 64U, 0U}, Insets{}, 0U};
 
-// Four lanes, premultiplied RGBA, per pixel.
-constexpr std::size_t lanes = 4U;
-
-// One box pass: `lines` lines of `length` pixels, each pixel's lanes
-// `node` elements apart and each line `line` elements apart (the same in
-// the source and the result), averaged over windows of 2 × half + 1
-// pixels into length − 2 × half pixels per line.
-struct BoxPass final {
-    std::size_t lines{};
-    std::size_t length{};
-    std::size_t line{};
-    std::size_t node{};
-};
-
-// Runs `pass` from `from` into `to`, distinct buffers holding every
-// element the pass reads or writes. Each average is rounded once.
-void box_pass(std::span<const std::uint32_t> from, std::span<std::uint32_t> to, const BoxPass& pass,
-              std::uint32_t half) noexcept {
-    const std::size_t width = static_cast<std::size_t>(half) * 2U + 1U;
-    const std::size_t outputs = pass.length - (width - 1U);
-    for (std::size_t line = 0U; line < pass.lines; ++line) {
-        const std::size_t first = line * pass.line;
-        std::array<std::uint32_t, lanes> sums{};
-        for (std::size_t node = 0U; node < width; ++node) {
-            const std::size_t at = first + node * pass.node;
-            for (std::size_t lane = 0U; lane < lanes; ++lane) sums[lane] = sums[lane] + from[at + lane];
-        }
-        for (std::size_t output = 0U; output < outputs; ++output) {
-            const std::size_t write = first + output * pass.node;
-            for (std::size_t lane = 0U; lane < lanes; ++lane) {
-                to[write + lane] = (sums[lane] + half) / static_cast<std::uint32_t>(width);
-            }
-            if (output + 1U == outputs) break;
-            // Slide the window one pixel: add the next, drop the first.
-            const std::size_t entering = first + (output + width) * pass.node;
-            const std::size_t leaving = first + output * pass.node;
-            for (std::size_t lane = 0U; lane < lanes; ++lane) {
-                sums[lane] = sums[lane] + from[entering + lane] - from[leaving + lane];
-            }
-        }
-    }
-}
+constexpr std::size_t lanes = box_blur_lanes;
 
 // The blurred backplane under the destination: its pixels from the start
-// of `pixels` (one of the two work buffers), rows `stride` elements apart.
+// of `pixels` (the work's first image), rows `stride` elements apart.
 struct Blurred final {
     std::span<const std::uint32_t> pixels{};
     std::size_t stride{};
 };
 
-// Blurs `backplane` (the destination, `width` pixels wide, grown by
-// 3 × half on every side) through `first` and `second` (each sized to the
-// backplane's pixels × 4), and says where the result lies.
-Blurred blur_backplane(const PartRaster& backplane, std::uint32_t half, std::size_t width,
-                       std::vector<std::uint32_t>& first, std::vector<std::uint32_t>& second) noexcept {
+// Blurs `backplane` (the destination grown by 3 × half on every side)
+// through `work` (prepared for the backplane's pixels, four lanes), and
+// says where the result lies.
+Blurred blur_backplane(const PartRaster& backplane, std::uint32_t half, BoxBlurWork& work) noexcept {
     const std::span<const std::uint8_t> bytes = backplane.pixels();
     const std::size_t columns = backplane.extent().width;
     const std::size_t rows = backplane.extent().height;
@@ -100,26 +72,12 @@ Blurred blur_backplane(const PartRaster& backplane, std::uint32_t half, std::siz
     for (std::size_t row = 0U; row < rows; ++row) {
         const std::size_t read = row * backplane.row_bytes();
         const std::size_t write = row * stride;
-        for (std::size_t element = 0U; element < stride; ++element) first[write + element] = bytes[read + element];
+        for (std::size_t element = 0U; element < stride; ++element) {
+            work.first[write + element] = bytes[read + element];
+        }
     }
-    if (half == 0U) return Blurred{first, stride};
-    const std::size_t step = static_cast<std::size_t>(half) * 2U;
-    // Across, three times: first → second → first → second.
-    BoxPass across{rows, columns, stride, lanes};
-    box_pass(first, second, across, half);
-    across.length = across.length - step;
-    box_pass(second, first, across, half);
-    across.length = across.length - step;
-    box_pass(first, second, across, half);
-    // Down, three times over the destination's columns: second → first →
-    // second → first.
-    BoxPass down{width, rows, lanes, stride};
-    box_pass(second, first, down, half);
-    down.length = down.length - step;
-    box_pass(first, second, down, half);
-    down.length = down.length - step;
-    box_pass(second, first, down, half);
-    return Blurred{first, stride};
+    blur_three_boxes(work, columns, rows, lanes, half);
+    return Blurred{work.first, stride};
 }
 
 double unit_lane(std::uint32_t value) noexcept {
@@ -130,12 +88,8 @@ double unit_lane(std::uint32_t value) noexcept {
 } // namespace
 
 std::uint32_t glass_box_half(double blur, double scale) noexcept {
-    const double sigma = blur * scale * 0.5;
-    const double width = std::sqrt(4.0 * sigma * sigma + 1.0);
-    const double half = std::round((width - 1.0) * 0.5);
-    if (!(half > 0.0)) return 0U;
-    const std::uint32_t pixels = static_cast<std::uint32_t>(std::min(half, 1024.0));
-    return pixels;
+    const std::uint32_t half = box_blur_half(blur, scale);
+    return half;
 }
 
 const PrimitiveDescriptor& GlassPrimitive::descriptor() const noexcept {
@@ -147,6 +101,14 @@ PartShape GlassPrimitive::shape(const PrimitiveParameterBlock& parameters) const
     rounded.kind = PartShapeKind::rounded_rectangle;
     rounded.corner_radius = parameters.values[glass_corner].number;
     return rounded;
+}
+
+std::optional<ControlVisualRole> GlassPrimitive::theme_material(
+    const PrimitiveParameterBlock& parameters) const noexcept {
+    const double position = parameters.values[glass_recipe].number;
+    if (!(position >= 1.0)) return std::nullopt;
+    const ControlVisualRole role = static_cast<ControlVisualRole>(static_cast<std::uint8_t>(position - 1.0));
+    return role;
 }
 
 std::optional<std::uint32_t> GlassPrimitive::backplane_margin(const PrimitiveParameterBlock& parameters,
@@ -171,8 +133,7 @@ void GlassPrimitive::fill(const PrimitiveParameterBlock& parameters, const Primi
     // The blurred backplane, when one is lent at the margin this blur reads.
     const std::uint32_t half = glass_box_half(parameters.values[glass_blur].number, scale);
     const std::size_t margin = static_cast<std::size_t>(half) * 3U;
-    std::vector<std::uint32_t> first{};
-    std::vector<std::uint32_t> second{};
+    BoxBlurWork work{};
     Blurred blurred{};
     bool sampled = false;
     if (target.backplane != nullptr && target.backplane_margin == margin) {
@@ -181,18 +142,20 @@ void GlassPrimitive::fill(const PrimitiveParameterBlock& parameters, const Primi
                           backplane.extent().height == height + margin * 2U;
         if (fits) {
             try {
-                const std::size_t elements =
-                    static_cast<std::size_t>(backplane.extent().width) * backplane.extent().height * lanes;
-                first.assign(elements, 0U);
-                second.assign(elements, 0U);
-                blurred = blur_backplane(backplane, half, width, first, second);
+                prepare_box_blur(work, backplane.extent().width, backplane.extent().height, lanes);
+                blurred = blur_backplane(backplane, half, work);
                 sampled = true;
-            } catch (const std::bad_alloc&) {
+            } catch (const std::exception&) {
+                // std::bad_alloc or std::length_error: no backdrop is sampled.
                 sampled = false;
             }
         }
     }
 
+    // The backdrop's colour filter, from the recipe's material (E9.6).
+    const SurfaceMaterial* const lent = target.material;
+    const bool filtered = lent != nullptr && (*lent).colour_filter.has_value();
+    const MaterialColourMatrix filter = filtered ? *(*lent).colour_filter : MaterialColourMatrix{};
     const Unit over = premultiply(tint, 1.0);
     for (std::size_t row = 0U; row < height; ++row) {
         const std::size_t start = row * destination.row_bytes;
@@ -202,6 +165,7 @@ void GlassPrimitive::fill(const PrimitiveParameterBlock& parameters, const Primi
                 const std::size_t at = row * blurred.stride + column * lanes;
                 pixel = Unit{unit_lane(blurred.pixels[at]), unit_lane(blurred.pixels[at + 1U]),
                              unit_lane(blurred.pixels[at + 2U]), unit_lane(blurred.pixels[at + 3U])};
+                if (filtered) pixel = colour_filtered(filter, pixel);
             }
             blend_over(pixel, over);
             const double coverage = shape_coverage(shape, box, scale, static_cast<std::int64_t>(column),

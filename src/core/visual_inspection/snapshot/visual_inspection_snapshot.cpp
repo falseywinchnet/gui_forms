@@ -204,6 +204,44 @@ void append_corner_radii(std::ostringstream& output,
            << ",\"bottom_left\":" << (*radii).bottom_left << '}';
 }
 
+const char* blend_mode_name(MaterialBlendMode value) noexcept {
+    switch (value) {
+    case MaterialBlendMode::normal: return "normal";
+    case MaterialBlendMode::multiply: return "multiply";
+    case MaterialBlendMode::screen: return "screen";
+    }
+    return "unknown";
+}
+
+// The colour filter's 20 entries, row-major (MaterialColourMatrix), or null.
+void append_colour_filter(std::ostringstream& output,
+                          const MaterialColourFilter& filter) {
+    if (!filter) {
+        output << "null";
+        return;
+    }
+    const MaterialColourMatrix& matrix = *filter;
+    output << '[';
+    for (std::size_t index = 0U; index < matrix.values.size(); ++index) {
+        if (index != 0U) output << ',';
+        output << matrix.values[index];
+    }
+    output << ']';
+}
+
+void append_drop_shadow(std::ostringstream& output,
+                        const std::optional<MaterialDropShadow>& shadow) {
+    if (!shadow) {
+        output << "null";
+        return;
+    }
+    output << "{\"offset\":";
+    append_point(output, (*shadow).offset);
+    output << ",\"blur_radius\":" << (*shadow).blur_radius << ",\"color\":";
+    append_color(output, (*shadow).color);
+    output << '}';
+}
+
 void append_material(std::ostringstream& output,
                      const SurfaceMaterial& material) {
     output << "{\"corner_radius\":" << material.corner_radius
@@ -241,6 +279,8 @@ void append_material(std::ostringstream& output,
         output << ",\"image_scale\":" << fill.image_scale
                << ",\"opacity\":" << fill.opacity << ",\"image_mode\":";
         append_json_string(output, image_mode_name(fill.image_mode));
+        output << ",\"blend\":";
+        append_json_string(output, blend_mode_name(fill.blend));
         output << '}';
     }
     output << "],\"shadows\":[";
@@ -284,7 +324,11 @@ void append_material(std::ostringstream& output,
         output << ",\"width\":" << keyline.width
                << ",\"inset\":" << keyline.inset << '}';
     }
-    output << "]}";
+    output << "],\"colour_filter\":";
+    append_colour_filter(output, material.colour_filter);
+    output << ",\"drop_shadow\":";
+    append_drop_shadow(output, material.drop_shadow);
+    output << ",\"filter_blur\":" << material.filter_blur << '}';
 }
 
 void append_operation(std::ostringstream& output,

@@ -92,7 +92,8 @@ public:
     // updated first; a primitive then draws into the record's cached raster.
     // A part without a key leaves no record; a primitive draws it into a
     // raster of its own for this paint. If the primitive refuses the part,
-    // the built-in recipe draws it.
+    // the built-in recipe draws it. A part with a blend (blend_property) is
+    // drawn inside a paint group of that composite.
     void paint(Painter& painter, const Control& control, const PartPaint& part) const;
 
     // The hit region of one part of `control` (E8, T1's hand-off): the
@@ -112,6 +113,9 @@ public:
     [[nodiscard]] Rect text_slot(const Control& control, const PartPaint& part) const noexcept;
 
 private:
+    // paint(), once the part's plan is decided and its blend group begun.
+    void paint_planned(Painter& painter, const Control& control, const PartPaint& part,
+                       const PartPlan& decided) const;
     // E7: an ambient part's time_in_state for this paint, starting its
     // effect on the window's clock, or stopping it and returning the pose
     // when the effect is refused for its area (`area_ok` false) or ambient

@@ -39,6 +39,20 @@ bool valid_material_border(const MaterialBorder& border) noexcept {
             border.style == MaterialBorderStyle::dotted);
 }
 
+// The part filters' reach outside the box (SurfaceMaterial::
+// maximum_filter_reach), or a negative value when one is malformed.
+double filter_reach(const SurfaceMaterial& material) noexcept {
+    if (!std::isfinite(material.filter_blur) || material.filter_blur < 0.0) return -1.0;
+    double reach = material.filter_blur * 1.5;
+    if (material.drop_shadow) {
+        const MaterialDropShadow& shadow = *material.drop_shadow;
+        if (!finite(shadow.offset) || !std::isfinite(shadow.blur_radius) || shadow.blur_radius < 0.0) return -1.0;
+        const double moved = std::max(std::abs(shadow.offset.x), std::abs(shadow.offset.y));
+        reach = reach + moved + shadow.blur_radius * 1.5;
+    }
+    return reach;
+}
+
 bool valid_corner(double radius) noexcept {
     return std::isfinite(radius) && radius >= 0.0 && radius <= 4096.0;
 }
@@ -599,9 +613,16 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
     for (const MaterialKeyline& keyline : material.keylines) {
         if (!valid_material_keyline(keyline)) return false;
     }
+    if (material.colour_filter && !valid_colour_matrix(*material.colour_filter)) return false;
+    const double reach = filter_reach(material);
+    if (reach < 0.0 || reach > SurfaceMaterial::maximum_filter_reach) return false;
     for (const MaterialFillLayer& fill : material.fills) {
         if (fill.coordinate_space != MaterialCoordinateSpace::normalized &&
             fill.coordinate_space != MaterialCoordinateSpace::logical) {
+            return false;
+        }
+        if (fill.blend != MaterialBlendMode::normal && fill.blend != MaterialBlendMode::multiply &&
+            fill.blend != MaterialBlendMode::screen) {
             return false;
         }
         switch (fill.kind) {

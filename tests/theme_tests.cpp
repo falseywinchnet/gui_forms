@@ -5,6 +5,7 @@
 #include <exception>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
@@ -85,6 +86,17 @@ private:
     unsigned& changes_;
 };
 
+// The stock definition, held on the heap. A ThemeDefinition is about
+// 150 KB (336 recipes), and a sanitizer build gives every stack object and
+// temporary of a frame its own slot, so a test holding several in one
+// frame overflows the 1 MB main stack. `new` from the prvalue constructs
+// it in place (guaranteed elision); std::make_unique would bind a stack
+// temporary first.
+std::unique_ptr<ThemeDefinition> held_definition() {
+    std::unique_ptr<ThemeDefinition> held{new ThemeDefinition{windows_professional_theme_definition()}};
+    return held;
+}
+
 void set_solid_recipe(ThemeDefinition& definition, ControlVisualRole role,
                       ControlSurfaceState state, bool selected, Color color) {
     ControlRoleRecipes& recipes =
@@ -132,24 +144,26 @@ void test_default_theme_has_complete_state_matrix() {
 }
 
 void test_structural_tokens_are_validated_atomically() {
-    ThemeDefinition invalid = windows_professional_theme_definition();
+    std::unique_ptr<ThemeDefinition> held = held_definition();
+    ThemeDefinition& invalid = *held;
     invalid.id = "invalid-structure";
     invalid.structure.spacing.large = invalid.structure.spacing.xsmall;
     bool rejected{};
     try {
-        static_cast<void>(Theme::create(invalid));
+        static_cast<void>(Theme::create(std::move(invalid)));
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
     require(rejected,
             "unordered structural spacing tokens must be rejected");
 
-    invalid = windows_professional_theme_definition();
-    invalid.structure.typography.title.size =
+    held = held_definition();
+    ThemeDefinition& untypeset = *held;
+    untypeset.structure.typography.title.size =
         std::numeric_limits<double>::quiet_NaN();
     rejected = false;
     try {
-        static_cast<void>(Theme::create(std::move(invalid)));
+        static_cast<void>(Theme::create(std::move(untypeset)));
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
@@ -166,7 +180,8 @@ void test_window_theme_replacement_and_control_inheritance_are_atomic() {
     window.perform_layout();
     static_cast<void>(window.take_damage());
 
-    ThemeDefinition custom_definition = windows_professional_theme_definition();
+    std::unique_ptr<ThemeDefinition> held = held_definition();
+    ThemeDefinition& custom_definition = *held;
     custom_definition.id = "test-atomic";
     ControlVisualRecipe& custom_normal = custom_definition
         .roles[static_cast<std::size_t>(ControlVisualRole::button)]
@@ -255,7 +270,8 @@ void test_editor_selection_menu_and_progress_roles_reach_stock_controls() {
     constexpr Color menu_color = Color::rgba(71, 97, 119);
     constexpr Color progress_track = Color::rgba(89, 113, 137);
     constexpr Color progress_fill = Color::rgba(107, 131, 157);
-    ThemeDefinition definition = windows_professional_theme_definition();
+    std::unique_ptr<ThemeDefinition> held = held_definition();
+    ThemeDefinition& definition = *held;
     definition.id = "stock-role-routing";
     set_solid_recipe(definition, ControlVisualRole::editor,
                      ControlSurfaceState::normal, false, editor_color);

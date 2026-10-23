@@ -2270,8 +2270,8 @@ private:
 public:
     // The shared blend for a group's composite.
     static gui_forms::detail::PartCompositeBlend part_blend(const PaintGroupComposite composite) noexcept {
-        if (composite == PaintGroupComposite::plus) return gui_forms::detail::PartCompositeBlend::plus;
-        return gui_forms::detail::PartCompositeBlend::source_over;
+        const gui_forms::detail::PartCompositeBlend blend = gui_forms::detail::part_composite_blend(composite);
+        return blend;
     }
     // Paint groups (Painter::begin_group). An isolated group draws into its
     // level's scratch rows (the group's clipped rows across the target's full

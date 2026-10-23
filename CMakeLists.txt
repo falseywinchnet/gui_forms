@@ -159,6 +159,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/primitives/light/glass_primitive.cpp
     src/core/window/backplane/backplane_composite.cpp
     src/core/window/backplane/window_backplane.cpp
+    src/core/engine/primitives/kernel/box_blur.cpp
     src/core/engine/primitives/kernel/pixel_kernel.cpp
     src/core/engine/part_shape/part_shape.cpp
     src/core/engine/part_table/engine_part_table.cpp
@@ -168,6 +169,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/theme_rules/built_in_rules.cpp
     src/core/engine/motion_value/motion_value.cpp
     src/core/engine/motion_clock/motion_clock.cpp
+    src/core/surface_material/colour_matrix/colour_matrix.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/presets/material_presets.cpp
     src/core/surface_material/types/surface_material_types.cpp
@@ -2293,6 +2295,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_fill_shape_tests tests/engine_fill_shape_tests.cpp)
     target_link_libraries(gui_forms_engine_fill_shape_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_fill_shape_tests COMMAND gui_forms_engine_fill_shape_tests)
+    add_executable(gui_forms_engine_filter_blend_tests tests/engine_filter_blend_tests.cpp)
+    target_link_libraries(gui_forms_engine_filter_blend_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_filter_blend_tests COMMAND gui_forms_engine_filter_blend_tests)
 
     add_executable(gui_forms_damage_clip_tests tests/damage_clip_tests.cpp)
     target_link_libraries(gui_forms_damage_clip_tests PRIVATE gui_forms_controls)
