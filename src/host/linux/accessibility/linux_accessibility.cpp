@@ -61,7 +61,7 @@ AtkObject* application_root = nullptr;
 std::size_t bridge_count = 0;
 AtkObject* root_object() { return application_root; }
 const gchar* toolkit_name() { return "GUI.Forms"; }
-const gchar* toolkit_version() { return "0.1"; }
+const gchar* toolkit_version() { return "0.2"; }
 
 AtkRole native_role(SemanticRole role) {
     switch (role) {

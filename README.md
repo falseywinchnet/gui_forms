@@ -267,7 +267,7 @@ Per-platform toolchain setup and every build option are in
 ```cmake
 cmake_minimum_required(VERSION 3.25)
 project(MyForms LANGUAGES CXX)
-find_package(GUIForms 0.1 CONFIG REQUIRED COMPONENTS Application)
+find_package(GUIForms 0.2 CONFIG REQUIRED COMPONENTS Application)
 add_executable(app main.cpp)
 target_compile_features(app PRIVATE cxx_std_20)
 target_link_libraries(app PRIVATE GUIForms::Application)

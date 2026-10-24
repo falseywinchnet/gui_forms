@@ -84,7 +84,7 @@ from the repository root. Each Python script prints its full options with
   installer on Windows, a `tar.gz` and Debian package on Linux, plus
   `SHA256SUMS.txt` and a `packages-<platform>.json` receipt. `--dry-run`
   prints the plan; `--no-installer` writes archives only.
-  `python3 tools/package_programs.py --build-dir build --version 0.1.0 --out dist`
+  `python3 tools/package_programs.py --build-dir build --version 0.2.0 --out dist`
 
 `tools/smoke_package.py`
 : Extracts each packaged program, launches it with `--smoke-test` and the

@@ -144,7 +144,7 @@ class ReferencePages:
         toc: str = ''.join(links)
         self.pages[filename] = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>' + escape(title) + ' · GUI.Forms</title><link rel="stylesheet" href="reference.css"></head><body>'
-            '<header><a href="index.html">GUI.Forms · C++ API reference</a><span>0.1 · Native, retained, CPU rendered</span></header>'
+            '<header><a href="index.html">GUI.Forms · C++ API reference</a><span>0.2 · Native, retained, CPU rendered</span></header>'
             '<div class="layout"><aside><nav aria-label="Reference navigation"><label for="api-search">Search the API</label>'
             '<input id="api-search" type="search" placeholder="Type, member, or header…" autocomplete="off">'
             '<a href="index.html">Namespaces &amp; types</a><a href="coverage.html">Contract coverage</a><small>On this page</small>' + toc +
