@@ -1,8 +1,9 @@
 # Stage F: font substitution for requested families
 
 Release: 0.2 Verified. Depends on: nothing. Feeds R, S and H.
-Status 2026-10-12: not started. Authority: `planning/FORWARD_PROGRAMME.md`
-§3 F.
+Status 2026-10-23: started. The plan's eleven decisions are accepted (below);
+F1, the measurement tool, is in progress. Authority:
+`planning/FORWARD_PROGRAMME.md` §3 F.
 
 Read [the shared brief](../README.md) first.
 
@@ -103,3 +104,70 @@ corpus, sizes, tolerance and results under `results/`.
 - `planning/interview/GUI_FORMS_INTERVIEW_LEDGER.md` GF004
 - `assets/fonts/ATTRIBUTION.md`
 - `planning/DESIGN_LANGUAGE_SPECIFICATION.md` §6.1
+
+## Plan
+
+F0, the plan, is accepted. F1 builds the measurement tool
+(`tools/font_metrics_differential/`) and needs no new faces. F3 commits the
+approved faces as files. F2 adds the substitution table, registers and
+packages F3's faces, and fixes the silent host-font substitution
+(decision 10). F4 reruns the measurement from the bundled copies and records
+the gate with its named exceptions (decisions 16 and 17).
+
+## Owner decisions, 2026-10-23
+
+The owner accepted every recommendation of the F0 plan.
+
+4. **Microsoft Sans Serif** maps to **Arimo**. Arial, Arimo's metric target,
+   shares 284 of 319 Latin advances with it.
+5. **Tahoma** maps to whichever of Arimo and Selawik shows the smaller corpus
+   line-width deviation in F1's measurement. Both are recorded, and no face is
+   added for Tahoma.
+6. **Downloads.** Arimo, Tinos and Selawik are requested. Each download still
+   needs the owner's approval with its exact file, pinned source, size and
+   licence.
+7. **Missing styles** (Selawik has no italic) resolve to the nearest style of
+   the mapped family, reported as style-substituted. There is no synthetic
+   bold or oblique.
+8. **Tolerance.** A `metric_compatible` mapping has identical advances in font
+   units over the corpus coverage, identical line breaks, and a line height
+   within 1 px of the reference's. A `nearest` mapping has a mean corpus
+   line-width deviation within 5% at every size; its line breaks and line
+   height are recorded but not gated. Every measurement is our engine's
+   (decision 9).
+9. **Our engine against our engine for widths and line heights** (revised
+   2026-10-23). The reference font's file goes through the same pinned
+   FreeType and HarfBuzz code as the substitute's. GUI.Forms never renders
+   through GDI or any other host renderer, so no host is the reference. GDI's
+   measurements are kept in the results as information for stages R and S,
+   outside F's gate.
+10. **Unmapped families** (refines decision 2). Host bytes are accepted only
+    when the face the host selected has the requested name. Otherwise the
+    family resolves to the content face and the result reports `substituted`.
+    Today the Windows path registers whatever face GDI selects under the
+    requested name, which silently uses an arbitrary host font; F2 fixes it.
+11. **Generic names.** The table maps `sans-serif` to Carlito (the content
+    role), `serif` to Tinos and `monospace` to Cousine (the monospace role),
+    plus aliases such as "MS Sans Serif", "Helvetica" and the Segoe UI weight
+    names.
+12. **Table form.** A versioned JSON data file is generated into a fixed
+    record array at build time, so C# and Web.Forms read the same file.
+13. **Body face (M9)** stays open. Carlito is Calibri's substitute whatever M9
+    decides.
+14. **Portsmouth Mono** is the Consolas target only, registered under its own
+    family. Cousine remains the monospace role face (design language §6.1).
+
+## Owner decisions, 2026-10-23 (from F1's measurements)
+
+15. **Segoe UI maps to Selawik, classed `nearest`.** Selawik shares only a few
+    advances with Segoe UI (3 of 291 for Semibold), so it cannot be
+    `metric_compatible`; its corpus lines are 1 to 3 px shorter.
+16. **All of Tahoma maps to Selawik** (refines decision 5). Regular is within
+    the `nearest` tolerance (-1.0%). Tahoma Bold is -7.0% against Selawik Bold
+    (Arimo Bold is -6.0%); it is a named exception in F4's gate rather than a
+    reason to split the family.
+17. **Named exceptions for the small misses.** Arimo Bold's µ (1229 against
+    Arial Bold's 1180 units), Arimo Bold Italic's line breaks (4 of 90
+    paragraph sets) and Carlito Bold Italic's line breaks (2 of 90, from
+    kerning) are named exceptions in F4's gate. Those styles stay
+    `metric_compatible`.

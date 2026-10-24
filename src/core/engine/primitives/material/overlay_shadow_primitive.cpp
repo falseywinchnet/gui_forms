@@ -22,7 +22,7 @@ namespace {
 const PartRole overlay_shadow_roles[] = {PartRole::shadow};
 
 // The declared cost is the most the load check admits, as the material's;
-// the real bake is bounded by its estimate (accepts).
+// the real bake is bounded by its effort (accepts).
 const PrimitiveDescriptor overlay_shadow_descriptor{
     "overlay_shadow",
     EngineVersion{0, 2},
@@ -73,8 +73,8 @@ bool OverlayShadowPrimitive::accepts(const PrimitiveParameterBlock&, const Primi
     PrimitiveTarget baked = target;
     if (plan.across.outcome == SliceAxisOutcome::sliced) baked.logical_size.width = plan.reference_size.width;
     if (plan.down.outcome == SliceAxisOutcome::sliced) baked.logical_size.height = plan.reference_size.height;
-    const double estimate = material_bake_estimate(material, baked, overlay_shadow_outset);
-    const bool within = estimate <= maximum_material_bake_nanoseconds;
+    const BakeEffort effort = material_bake_effort(material, baked, overlay_shadow_outset);
+    const bool within = effort <= maximum_material_bake_effort;
     return within;
 }
 

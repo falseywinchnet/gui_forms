@@ -5,6 +5,7 @@
 #include FT_FREETYPE_H
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <cstdlib>
 #include <limits>
@@ -294,6 +295,66 @@ void test_exact_primary_metrics(const std::span<const std::byte> font) {
     require(refused, "nonfinite metric size refused before native conversion");
 }
 
+// The fixture face with its hhea line gap set to `gap` font units. The
+// bundled faces have none, so this is how a face with a gap (Calibri and
+// Consolas have one) reaches the one line-height rule. The table directory
+// is read in place: a 12-byte header, then 16-byte records of tag,
+// checksum, offset and length; the line gap is hhea's signed 16-bit field
+// at byte 8. The stale checksum is not read by FreeType.
+std::vector<std::byte> with_line_gap(const std::span<const std::byte> font, const std::int16_t gap) {
+    std::vector<std::byte> result(font.begin(), font.end());
+    require(result.size() >= 12U, "font table directory header");
+    const std::size_t tables = (static_cast<std::size_t>(result[4]) << 8U) | static_cast<std::size_t>(result[5]);
+    require(result.size() >= 12U + 16U * tables, "font table directory records");
+    for (std::size_t index = 0U; index < tables; ++index) {
+        const std::size_t record = 12U + 16U * index;
+        const bool hhea = result[record] == std::byte{'h'} && result[record + 1U] == std::byte{'h'} &&
+            result[record + 2U] == std::byte{'e'} && result[record + 3U] == std::byte{'a'};
+        if (!hhea) continue;
+        std::size_t offset = 0U;
+        for (std::size_t byte = 0U; byte < 4U; ++byte)
+            offset = (offset << 8U) | static_cast<std::size_t>(result[record + 8U + byte]);
+        require(offset + 10U <= result.size(), "hhea table in the font");
+        const std::uint16_t encoded = static_cast<std::uint16_t>(gap);
+        result[offset + 8U] = static_cast<std::byte>(encoded >> 8U);
+        result[offset + 9U] = static_cast<std::byte>(encoded & 0xFFU);
+        return result;
+    }
+    require(false, "font has an hhea table");
+    return result;
+}
+
+// TextBox and prepared text share one line-height rule: the line box is the
+// larger of the shaped height and ascent + descent + the primary face's
+// rounded line gap. With a face that has a gap, a prepared row and the line
+// box TextBox builds from resolve() are the same height, and include it.
+void test_line_gap_rule(const std::span<const std::byte> font) {
+    const std::vector<std::byte> gapped = with_line_gap(font, 250);
+    Fixture fixture(gapped);
+    Worker worker{fixture};
+    std::thread thread(&Worker::run, &worker);
+    thread.join();
+    require(worker.status == gf::PreparedTextStatus::success, "a face with a line gap shapes");
+    compare_rows(fixture);
+
+    const gf::PreparedTextMetrics metrics = detail::prepared_device_metrics(fixture.key.text.font, fixture.key.text.scale);
+    gf::FontSpec device_font = fixture.key.text.font;
+    device_font.size = static_cast<double>(metrics.device_size_26_6) / 64.0;
+    device_font.letter_spacing *= fixture.key.text.scale;
+    text::HarfBuzzFontEngine engine{};
+    const std::optional<gf::FontFaceId> face =
+        engine.register_typeface(device_font.role, device_font.weight, device_font.italic, gapped);
+    require(face.has_value(), "the gapped face registers as the primary");
+    const gf::ResolvedTextLayout resolved = engine.resolve("office \xc3\xa1", device_font);
+    const std::optional<text::PrimaryLineMetrics> primary = engine.primary_line_metrics(device_font);
+    require(primary.has_value() && (*primary).line_gap_device > 0.0, "the face's rounded line gap is not zero");
+    require(resolved.line_gap == (*primary).line_gap_device, "resolve() reports the primary face's line gap");
+    const double line_box = std::max(1.0, std::max(resolved.logical_size.height,
+        resolved.ascent + resolved.descent + resolved.line_gap));
+    const detail::PreparedWindowGeometryRow& row = (*fixture.batch).geometry[0];
+    require(line_box == row.height_device, "a TextBox line box and a prepared row are the same height");
+}
+
 void test_rows(const std::span<const std::byte> font, const std::span<const std::byte> arabic,
     const std::span<const std::byte> hebrew) {
     Fixture fixture(font, 512U, false, arabic, hebrew);
@@ -554,6 +615,7 @@ int main(const int argc, char** argv) {
         test_blank_placement(font);
         test_placement_sizes(font);
         test_exact_primary_metrics(font);
+        test_line_gap_rule(font);
         test_failures(font);
         test_zero_limits(font);
         test_late_coverage(font);

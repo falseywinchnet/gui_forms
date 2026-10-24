@@ -45,6 +45,11 @@ struct ResolvedTextLayout final {
     Size logical_size{};
     double ascent{};
     double descent{};
+    // The preferred primary face's line gap at this size: what its line
+    // height, rounded to whole pixels, adds to its rounded ascent and
+    // descent, never negative. A line box is the larger of the logical
+    // height and ascent + descent + line_gap, for TextBox and prepared text
+    // alike.
     double line_gap{};
     std::string primary_family;
     std::vector<ResolvedFontRun> runs;

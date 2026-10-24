@@ -40,6 +40,8 @@
 #include "gui_forms/gui_forms.hpp"
 
 #include "../src/core/engine/feature_samples/engine_feature_samples.hpp"
+#include "../src/core/image/png_writer.hpp"
+#include "../src/core/text/composite/text_composite.hpp"
 
 #include <algorithm>
 #include <array>
@@ -267,13 +269,32 @@ struct SubjectFixture final {
     std::size_t diagnostics{};
 };
 
+// The backplane a window is drawn on: the professional theme's (light), or
+// for the specimen sheet a dark one (its window and panel recipes a dark
+// solid), applied before a sample writes its theme.
+enum class Backplane : std::uint8_t { light, dark };
+
+void use_backplane(ThemeDefinition& definition, Backplane backplane) {
+    if (backplane == Backplane::light) return;
+    SurfaceMaterial dark{};
+    dark.fills.clear();
+    dark.fills.push_back(MaterialFillLayer::solid(Color::rgba(34, 38, 46)));
+    const ControlVisualRole roles[] = {ControlVisualRole::window, ControlVisualRole::panel};
+    for (const ControlVisualRole role : roles) {
+        ControlRoleRecipes& recipes = definition.roles[static_cast<std::size_t>(role)];
+        for (ControlVisualRecipe& recipe : recipes.ordinary) recipe.material = dark;
+        for (ControlVisualRecipe& recipe : recipes.selected) recipe.material = dark;
+    }
+}
+
 std::unique_ptr<SubjectFixture> make_subject(const EnginePrimitive& primitive, double scale,
-                                             AnatomyStateSet states) {
+                                             AnatomyStateSet states, Backplane backplane = Backplane::light) {
     const PrimitiveDescriptor& descriptor = primitive.descriptor();
     require(!descriptor.roles.empty(), std::string(descriptor.name) + " paints at least one role");
     const PartRole role = descriptor.roles[0];
     ThemeDefinition definition = windows_professional_theme_definition();
     definition.id = "engine-gate";
+    use_backplane(definition, backplane);
     ThemeRule rule{};
     rule.label = "gate";
     rule.level = CascadeLevel::theme_sheet;
@@ -454,23 +475,24 @@ struct SampleFixture final {
 
 // The professional theme as the sample writes it, for the image `image`.
 // Held on the heap, as a definition is never kept on a test's stack.
-std::unique_ptr<ThemeDefinition> sample_definition(const EngineFeatureSample& sample, ImageId image) {
+std::unique_ptr<ThemeDefinition> sample_definition(const EngineFeatureSample& sample, ImageId image,
+                                                   Backplane backplane = Backplane::light) {
     std::unique_ptr<ThemeDefinition> held(new ThemeDefinition(windows_professional_theme_definition()));
     ThemeDefinition& definition = *held;
     definition.id = "engine-gate-sample";
+    use_backplane(definition, backplane);
     engine_samples::FeatureSampleInputs inputs{};
     inputs.image = image;
     sample.write_theme(inputs, definition);
     return held;
 }
 
-// The sample's window at `scale`: its image loaded first, then its theme,
-// laid out and painted once.
-std::unique_ptr<SampleFixture> make_sample(const EngineFeatureSample& sample, double scale) {
+// A sample's window at `scale` with its subject of `role`, before a theme.
+std::unique_ptr<SampleFixture> shell_window(PartRole role, double scale) {
     std::unique_ptr<SampleFixture> fixture = std::make_unique<SampleFixture>();
     SampleFixture& made = *fixture;
     made.root = make_control<Panel>(StableId("root"));
-    made.subject = make_control<Subject>(StableId(std::string(engine_samples::feature_sample_subject)), sample.role);
+    made.subject = make_control<Subject>(StableId(std::string(engine_samples::feature_sample_subject)), role);
     (*made.subject).overflow = engine_samples::feature_sample_overflow;
     (*made.subject).set_requested_bounds(Rect{0.0, 0.0, 136.0, 68.0});
     (*made.root).add_child(made.subject);
@@ -478,17 +500,33 @@ std::unique_ptr<SampleFixture> make_sample(const EngineFeatureSample& sample, do
     Window& window = *made.window;
     window.motion_clock().set_time_source(&made.time);
     window.set_scale(scale);
-    const std::vector<std::byte> pixels = engine_samples::feature_sample_image_pixels();
-    const std::uint32_t side = engine_samples::feature_sample_image_side;
-    const ImageLoadResult loaded = window.load_bgra32_premultiplied(side, side, side * 4U, pixels);
-    require(static_cast<bool>(loaded), std::string(sample.name) + ": the sample image loads");
-    const std::unique_ptr<ThemeDefinition> definition = sample_definition(sample, loaded.image);
-    window.set_theme(Theme::create(*definition));
+    return fixture;
+}
+
+// Lays the window out and paints it once.
+void first_paint(SampleFixture& made) {
+    Window& window = *made.window;
     made.diagnostics = window.theme().engine().rules().diagnostics().size();
     window.perform_layout();
     made.painter.reset();
     window.paint(made.painter);
     static_cast<void>(window.take_damage());
+}
+
+// The sample's window at `scale`: its image loaded first, then its theme,
+// laid out and painted once.
+std::unique_ptr<SampleFixture> make_sample(const EngineFeatureSample& sample, double scale,
+                                           Backplane backplane = Backplane::light) {
+    std::unique_ptr<SampleFixture> fixture = shell_window(sample.role, scale);
+    SampleFixture& made = *fixture;
+    Window& window = *made.window;
+    const std::vector<std::byte> pixels = engine_samples::feature_sample_image_pixels();
+    const std::uint32_t side = engine_samples::feature_sample_image_side;
+    const ImageLoadResult loaded = window.load_bgra32_premultiplied(side, side, side * 4U, pixels);
+    require(static_cast<bool>(loaded), std::string(sample.name) + ": the sample image loads");
+    const std::unique_ptr<ThemeDefinition> definition = sample_definition(sample, loaded.image, backplane);
+    window.set_theme(Theme::create(*definition));
+    first_paint(made);
     return fixture;
 }
 
@@ -500,9 +538,22 @@ struct SampleImage final {
     std::uint64_t hash{};
 };
 
+struct SpecimenSink;
+void write_tile(SpecimenSink& sink, Window& window, const std::string& group, const std::string& name,
+                const std::string& frame, double scale, Backplane backplane, std::uint64_t hash);
+
+// Where a sample's images also go as specimen tiles (null: nowhere).
+struct SpecimenTarget final {
+    SpecimenSink* sink{};
+    double scale{};
+    Backplane backplane{Backplane::light};
+    std::string name{};
+};
+
 // The whole window painted once more (an empty request would paint only
-// the damage), every command hashed.
-SampleImage take_image(Window& window, const std::string& frame) {
+// the damage), every command hashed; with a specimen target, also written
+// as a tile.
+SampleImage take_image(Window& window, const std::string& frame, const SpecimenTarget* specimen) {
     GatePainter painter{};
     painter.placed = true;
     static_cast<void>(window.paint(painter, sample_window_area));
@@ -511,6 +562,10 @@ SampleImage take_image(Window& window, const std::string& frame) {
     image.rasters = painter.rasters;
     image.painter_calls = painter.painter_calls;
     image.hash = painter.hash.value;
+    if (specimen != nullptr) {
+        write_tile(*(*specimen).sink, window, "sample", (*specimen).name, frame, (*specimen).scale,
+                   (*specimen).backplane, image.hash);
+    }
     return image;
 }
 
@@ -531,11 +586,11 @@ bool is_motion_frame(std::uint32_t frame) {
 
 // Drives the sample as its drive says, and takes its images in order.
 std::vector<SampleImage> drive_sample(SampleFixture& made, const EngineFeatureSample& sample,
-                                      const std::string& subject) {
+                                      const std::string& subject, const SpecimenTarget* specimen = nullptr) {
     Window& window = *made.window;
     std::vector<SampleImage> images{};
     settle(window, made.time, made.painter, subject);
-    images.push_back(take_image(window, "rest"));
+    images.push_back(take_image(window, "rest", specimen));
     if (sample.drive == FeatureSampleDrive::pointer) {
         // The engine reads the pointer only over a hot part (GIVEN B1-1):
         // the part turns hot as a control's does when the pointer enters it.
@@ -543,7 +598,7 @@ std::vector<SampleImage> drive_sample(SampleFixture& made, const EngineFeatureSa
         (*made.subject).invalidate(Dirty::paint);
         move_to(window, engine_samples::feature_sample_pointer);
         settle(window, made.time, made.painter, subject + " at the pointer");
-        images.push_back(take_image(window, "pointer"));
+        images.push_back(take_image(window, "pointer", specimen));
     }
     if (sample.drive == FeatureSampleDrive::hot_motion) {
         (*made.subject).states.insert(AnatomyState::hot);
@@ -551,10 +606,10 @@ std::vector<SampleImage> drive_sample(SampleFixture& made, const EngineFeatureSa
         const std::uint32_t last = engine_samples::feature_sample_motion_frames.back();
         for (std::uint32_t frame = 1U; frame <= last; ++frame) {
             static_cast<void>(run_frame(window, made.time, made.painter));
-            if (is_motion_frame(frame)) images.push_back(take_image(window, motion_frame_name(frame)));
+            if (is_motion_frame(frame)) images.push_back(take_image(window, motion_frame_name(frame), specimen));
         }
         settle(window, made.time, made.painter, subject + " hot");
-        images.push_back(take_image(window, "hot"));
+        images.push_back(take_image(window, "hot", specimen));
     }
     return images;
 }
@@ -1104,6 +1159,486 @@ void write_manifest() {
     require(written == text.size() && closed == 0, std::string("the manifest is written whole: ") + path);
 }
 
+// -- the specimen sheet (GUI_FORMS_ENGINE_GATE_SPECIMEN=<directory>) -----------
+//
+// With the variable set, the test also writes the owner's specimen sheet's
+// images: every primitive at rest at scales 1 and 2, every feature sample's
+// images at scales 1 and 2, a finish sweep and the starting tokens, each on
+// the light and the dark backplane, as PNGs, and specimen.js listing them
+// with their hashes (the gate's own for the light primitive and sample
+// tiles). It draws through the same windows as the gate, and composites
+// with the engine's one blend (detail::composite_part_raster), as the
+// hosts' painters do. Text, box shadows and lines are not drawn: no sample
+// draws them, and the built-in recipe's are the hosts' own.
+
+// A painter compositing into premultiplied RGBA pixels at the window's
+// scale: part rasters and paint groups through the engine's blend, solid
+// fills by premultiplied source-over, clips as rectangles (rounded where
+// asked).
+class SpecimenPainter final : public Painter {
+public:
+    SpecimenPainter(std::uint32_t width, std::uint32_t height, double scale) : width_(width), height_(height),
+                                                                               scale_(scale) {
+        Layer base{};
+        base.pixels.assign(static_cast<std::size_t>(width) * height, 0U);
+        layers_.push_back(std::move(base));
+        State first{};
+        first.clip = Rect{0.0, 0.0, static_cast<double>(width), static_cast<double>(height)};
+        states_.push_back(first);
+    }
+    void save() override { states_.push_back(states_.back()); }
+    void restore() override {
+        if (states_.size() > 1U) states_.pop_back();
+    }
+    void translate(Point offset) override {
+        State& state = states_.back();
+        state.offset = Point{state.offset.x + offset.x, state.offset.y + offset.y};
+    }
+    void clip_rect(Rect rect) override { narrow(rect, false, 0.0); }
+    void clip_rounded_rect(Rect rect, double radius) override { narrow(rect, true, radius); }
+    void begin_group(const PaintGroup& group) override {
+        save();
+        clip_rect(group.bounds);
+        Layer layer{};
+        layer.pixels.assign(static_cast<std::size_t>(width_) * height_, 0U);
+        layer.opacity = group.opacity;
+        layer.composite = group.composite;
+        layer.clip = states_.back().clip;
+        layers_.push_back(std::move(layer));
+    }
+    void end_group() override {
+        if (layers_.size() < 2U) return;
+        Layer finished = std::move(layers_.back());
+        layers_.pop_back();
+        detail::PartRasterSource source{};
+        source.pixels = std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(finished.pixels.data()),
+                                                      finished.pixels.size() * 4U);
+        source.width = width_;
+        source.height = height_;
+        source.row_bytes = static_cast<std::size_t>(width_) * 4U;
+        source.blend = detail::part_composite_blend(finished.composite);
+        detail::TextCompositeClip clip{};
+        clip.rect = finished.clip;
+        static_cast<void>(detail::composite_part_raster(source, target(), clip,
+                                                        detail::part_composite_opacity(finished.opacity)));
+        restore();
+    }
+    void fill_rect(Rect rect, Color color) override {
+        const Rect device = Rect::intersection(to_device(rect), states_.back().clip);
+        if (device.empty()) return;
+        const std::uint32_t alpha = color.alpha;
+        const std::uint32_t red = (color.red * alpha + 127U) / 255U;
+        const std::uint32_t green = (color.green * alpha + 127U) / 255U;
+        const std::uint32_t blue = (color.blue * alpha + 127U) / 255U;
+        const std::uint32_t left = static_cast<std::uint32_t>(pixel_edge(device.x));
+        const std::uint32_t top = static_cast<std::uint32_t>(pixel_edge(device.y));
+        const std::uint32_t right = static_cast<std::uint32_t>(pixel_edge(device.x + device.width));
+        const std::uint32_t bottom = static_cast<std::uint32_t>(pixel_edge(device.y + device.height));
+        std::vector<std::uint32_t>& pixels = layers_.back().pixels;
+        for (std::uint32_t row = top; row < bottom && row < height_; ++row) {
+            for (std::uint32_t column = left; column < right && column < width_; ++column) {
+                std::uint32_t& pixel = pixels[static_cast<std::size_t>(row) * width_ + column];
+                pixel = over(pixel, red, green, blue, alpha);
+            }
+        }
+    }
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point, Point, Color, double) override {}
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId, Rect, double) override {}
+    void draw_box_shadow(Rect, double, Point, double, double, Color) override {}
+    void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin, double opacity) override {
+        composite(*raster, Rect{origin.x, origin.y, 0.0, 0.0}, false, opacity);
+    }
+    void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination,
+                                 double opacity) override {
+        composite(*raster, destination, true, opacity);
+    }
+
+    // The composited image: premultiplied RGBA bytes, row after row.
+    [[nodiscard]] std::span<const std::byte> image_bytes() const {
+        const std::vector<std::uint32_t>& pixels = layers_.front().pixels;
+        return std::as_bytes(std::span<const std::uint32_t>(pixels.data(), pixels.size()));
+    }
+
+private:
+    struct State final {
+        Point offset{};
+        // In device pixels.
+        Rect clip{};
+        bool rounded{};
+        Rect rounded_rect{};
+        double radius{};
+    };
+    struct Layer final {
+        std::vector<std::uint32_t> pixels{};
+        double opacity{1.0};
+        PaintGroupComposite composite{PaintGroupComposite::source_over};
+        Rect clip{};
+    };
+
+    // A fill's edge on the device pixel boundary nearest it, first snapped
+    // to 1/256 of a pixel, so that two slices meeting at one logical edge
+    // (a gradient drawn as slices) meet on one pixel boundary whatever
+    // rounding each edge's arithmetic carried.
+    static long pixel_edge(double position) {
+        const double snapped = std::round(position * 256.0) / 256.0;
+        return std::lround(snapped);
+    }
+    static std::uint32_t over(std::uint32_t pixel, std::uint32_t red, std::uint32_t green, std::uint32_t blue,
+                              std::uint32_t alpha) {
+        const std::uint32_t keep = 255U - alpha;
+        const std::uint32_t r = red + ((pixel & 0xFFU) * keep + 127U) / 255U;
+        const std::uint32_t g = green + (((pixel >> 8U) & 0xFFU) * keep + 127U) / 255U;
+        const std::uint32_t b = blue + (((pixel >> 16U) & 0xFFU) * keep + 127U) / 255U;
+        const std::uint32_t a = alpha + ((pixel >> 24U) * keep + 127U) / 255U;
+        const std::uint32_t joined = std::min(r, 255U) | (std::min(g, 255U) << 8U) | (std::min(b, 255U) << 16U) |
+                                     (std::min(a, 255U) << 24U);
+        return joined;
+    }
+    Rect to_device(Rect rect) const {
+        const State& state = states_.back();
+        const Rect device{(rect.x + state.offset.x) * scale_, (rect.y + state.offset.y) * scale_,
+                          rect.width * scale_, rect.height * scale_};
+        return device;
+    }
+    void narrow(Rect rect, bool rounded, double radius) {
+        State& state = states_.back();
+        const Rect device = to_device(rect);
+        state.clip = Rect::intersection(state.clip, device);
+        if (!rounded) return;
+        state.rounded = true;
+        state.rounded_rect = device;
+        state.radius = radius * scale_;
+    }
+    detail::TextCompositeTarget target() {
+        detail::TextCompositeTarget made{};
+        std::vector<std::uint32_t>& pixels = layers_.back().pixels;
+        made.pixels = std::span<std::uint32_t>(pixels.data(), pixels.size());
+        made.width = width_;
+        made.height = height_;
+        made.stride = width_;
+        made.order = detail::TextPixelOrder::rgba;
+        return made;
+    }
+    void composite(const PartRaster& raster, Rect destination, bool scaled, double opacity) {
+        // A raster made for another scale is not drawn, as on the hosts.
+        if (raster.scale().value != scale_) return;
+        const DeviceExtent extent = raster.extent();
+        const State& state = states_.back();
+        // Corners on the device pixels nearest them (SkiaRaster).
+        const long long left = std::llround((destination.x + state.offset.x) * scale_);
+        const long long top = std::llround((destination.y + state.offset.y) * scale_);
+        const long long right = std::llround((destination.x + destination.width + state.offset.x) * scale_);
+        const long long bottom = std::llround((destination.y + destination.height + state.offset.y) * scale_);
+        if (scaled && (right <= left || bottom <= top)) return;
+        detail::PartRasterSource source{};
+        source.pixels = raster.pixels();
+        source.width = extent.width;
+        source.height = extent.height;
+        source.row_bytes = raster.row_bytes();
+        source.left = left;
+        source.top = top;
+        if (scaled) {
+            source.shown_width = static_cast<std::uint32_t>(right - left);
+            source.shown_height = static_cast<std::uint32_t>(bottom - top);
+        }
+        detail::TextCompositeClip clip{};
+        clip.rect = state.clip;
+        clip.rounded = state.rounded;
+        clip.rounded_rect = state.rounded_rect;
+        clip.radius = state.radius;
+        static_cast<void>(detail::composite_part_raster(source, target(), clip,
+                                                        detail::part_composite_opacity(opacity)));
+    }
+
+    std::uint32_t width_;
+    std::uint32_t height_;
+    double scale_;
+    std::vector<Layer> layers_{};
+    std::vector<State> states_{};
+};
+
+// Where the specimen is written, and its listing (specimen.js entries).
+struct SpecimenSink final {
+    std::string directory{};
+    std::vector<std::string> entries{};
+};
+
+std::string json_text(std::string_view text) {
+    std::string quoted = "\"";
+    for (const char character : text) {
+        if (character == '"' || character == '\\') quoted += '\\';
+        quoted += character;
+    }
+    quoted += '"';
+    return quoted;
+}
+
+std::string backplane_name(Backplane backplane) {
+    return backplane == Backplane::light ? "light" : "dark";
+}
+
+// Paints the whole window through a SpecimenPainter, writes it as
+// <group>-<name>-<frame>-<scale>-<backplane>.png, and lists it.
+void write_tile(SpecimenSink& sink, Window& window, const std::string& group, const std::string& name,
+                const std::string& frame, double scale, Backplane backplane, std::uint64_t hash) {
+    const std::uint32_t width = static_cast<std::uint32_t>(std::lround(sample_window_area.width * scale));
+    const std::uint32_t height = static_cast<std::uint32_t>(std::lround(sample_window_area.height * scale));
+    SpecimenPainter painter(width, height, scale);
+    static_cast<void>(window.paint(painter, sample_window_area));
+    image::PngEncodeInput input{};
+    input.width = width;
+    input.height = height;
+    input.row_bytes = static_cast<std::uint64_t>(width) * 4U;
+    input.pixels = painter.image_bytes();
+    input.order = image::PngChannelOrder::rgba;
+    input.alpha = image::PngSourceAlpha::premultiplied;
+    std::vector<std::byte> encoded{};
+    require(image::encode_png(input, encoded), name + ": the specimen tile encodes");
+    std::ostringstream scale_text;
+    scale_text << std::fixed << std::setprecision(0) << scale;
+    const std::string file = group + '-' + name + '-' + frame + '-' + scale_text.str() + '-' +
+                             backplane_name(backplane) + ".png";
+    const std::string path = sink.directory + '/' + file;
+    std::FILE* const out = std::fopen(path.c_str(), "wb");
+    require(out != nullptr, "the specimen tile can be written: " + path);
+    const std::size_t written = std::fwrite(encoded.data(), 1U, encoded.size(), out);
+    const int closed = std::fclose(out);
+    require(written == encoded.size() && closed == 0, "the specimen tile is written whole: " + path);
+    std::ostringstream entry;
+    entry << "{\"group\":" << json_text(group) << ",\"name\":" << json_text(name) << ",\"frame\":"
+          << json_text(frame) << ",\"scale\":" << scale_text.str() << ",\"backplane\":"
+          << json_text(backplane_name(backplane)) << ",\"file\":" << json_text(file) << ",\"hash\":"
+          << json_text(hex(hash)) << '}';
+    sink.entries.push_back(entry.str());
+}
+
+constexpr std::array<double, 2> specimen_scales{1.0, 2.0};
+constexpr std::array<Backplane, 2> specimen_backplanes{Backplane::light, Backplane::dark};
+
+// Every primitive at rest, as the gate draws it; the label is the gate's
+// hash (the part rasters composited).
+void specimen_primitives(SpecimenSink& sink) {
+    for (const EnginePrimitive* const primitive : builtin_primitive_registry().primitives()) {
+        const std::string name((*primitive).descriptor().name);
+        for (const double scale : specimen_scales) {
+            for (const Backplane backplane : specimen_backplanes) {
+                std::unique_ptr<SubjectFixture> fixture = make_subject(*primitive, scale, AnatomyStateSet{}, backplane);
+                SubjectFixture& made = *fixture;
+                const std::uint64_t hash = made.painter.hash.value;
+                settle(*made.window, made.time, made.painter, name + " specimen");
+                write_tile(sink, *made.window, "primitive", name, "rest", scale, backplane, hash);
+            }
+        }
+    }
+}
+
+// Every feature sample's images, as the gate draws them.
+void specimen_samples(SpecimenSink& sink) {
+    for (const EngineFeatureSample& sample : engine_samples::builtin_feature_samples()) {
+        for (const double scale : specimen_scales) {
+            for (const Backplane backplane : specimen_backplanes) {
+                std::unique_ptr<SampleFixture> fixture = make_sample(sample, scale, backplane);
+                SpecimenTarget target{&sink, scale, backplane, std::string(sample.name)};
+                static_cast<void>(drive_sample(*fixture, sample, std::string(sample.name) + " specimen", &target));
+            }
+        }
+    }
+}
+
+// A window drawing `material` on the subject's face with the material
+// primitive, at `scale`; settled.
+std::unique_ptr<SampleFixture> material_window(const SurfaceMaterial& material, double scale, Backplane backplane,
+                                               const std::vector<PropertyTransition>& transitions) {
+    std::unique_ptr<ThemeDefinition> held(new ThemeDefinition(windows_professional_theme_definition()));
+    ThemeDefinition& definition = *held;
+    definition.id = "engine-gate-specimen";
+    use_backplane(definition, backplane);
+    ControlRoleRecipes& button = definition.roles[static_cast<std::size_t>(ControlVisualRole::button)];
+    for (ControlVisualRecipe& recipe : button.ordinary) recipe.material = material;
+    for (ControlVisualRecipe& recipe : button.selected) recipe.material = material;
+    ThemeRule rule{};
+    rule.label = "specimen";
+    rule.level = CascadeLevel::theme_sheet;
+    rule.selector.stable_id = std::string(engine_samples::feature_sample_subject);
+    rule.selector.role = PartRole::face;
+    rule.declarations.push_back(RuleDeclaration::primitive("material"));
+    rule.declarations.push_back(RuleDeclaration::choice_value("recipe", "button"));
+    rule.declarations.push_back(RuleDeclaration::choice_value("shape", "rounded_rectangle"));
+    rule.transitions = transitions;
+    definition.rules.rules.push_back(rule);
+    std::unique_ptr<SampleFixture> fixture = shell_window(PartRole::face, scale);
+    SampleFixture& made = *fixture;
+    (*made.window).set_theme(Theme::create(definition));
+    require((*made.window).theme().engine().rules().diagnostics().empty(), "the specimen theme compiles cleanly");
+    first_paint(made);
+    settle(*made.window, made.time, made.painter, "specimen");
+    return fixture;
+}
+
+std::uint64_t placed_hash(Window& window) {
+    const SampleImage image = take_image(window, "rest", nullptr);
+    return image.hash;
+}
+
+std::string amount_name(double value) {
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(2) << value;
+    return text.str();
+}
+
+// The finish sweep (E9.6, owner option A1): f = 0, 0.25, 0.5, 0.75 and 1 on
+// three faces; at f the top half lifts finish_lift f, the break darkens
+// finish_break_darkening f, the shine's alpha is finish_shine_alpha f.
+void specimen_finish(SpecimenSink& sink) {
+    struct Base final {
+        const char* name;
+        Color top;
+        Color bottom;
+    };
+    const Base bases[] = {
+        {"sky", Color::rgba(196, 220, 244), Color::rgba(92, 156, 222)},
+        {"leaf", Color::rgba(176, 222, 168), Color::rgba(72, 148, 84)},
+        {"graphite", Color::rgba(132, 138, 150), Color::rgba(52, 56, 66)},
+    };
+    const double sweep[] = {0.0, 0.25, 0.5, 0.75, 1.0};
+    for (const Base& base : bases) {
+        for (const double finish : sweep) {
+            SurfaceMaterial material{};
+            material.fills.clear();
+            const std::vector<GradientStop> stops{GradientStop{0.0, base.top}, GradientStop{1.0, base.bottom}};
+            material.fills.push_back(MaterialFillLayer::linear(Point{0.0, 0.0}, Point{0.0, 1.0}, stops));
+            material.border = MaterialBorder{Color::rgba(40, 52, 66), 1.0};
+            material.corner_radius = engine_samples::feature_sample_corner_radius;
+            material.finish = finish;
+            for (const Backplane backplane : specimen_backplanes) {
+                std::unique_ptr<SampleFixture> fixture = material_window(material, 2.0, backplane, {});
+                Window& window = *(*fixture).window;
+                write_tile(sink, window, "finish", base.name, amount_name(finish), 2.0, backplane, placed_hash(window));
+            }
+        }
+    }
+}
+
+// A transition moving `property` to `target` while the part is hot, and
+// back to 0 at rest.
+PropertyTransition hot_move(std::string_view property, double target, MotionCurve curve) {
+    PropertyTransition transition{};
+    transition.property = std::string(property);
+    PresentationState hot{};
+    hot.when.push_back(AnatomyState::hot);
+    hot.target = target;
+    PresentationState rest{};
+    transition.states.push_back(hot);
+    transition.states.push_back(rest);
+    transition.curve = curve;
+    return transition;
+}
+
+// Turns the subject hot and writes a tile after each of `frames` 16 ms
+// frames (counted from the change), then once settled.
+void specimen_strip(SpecimenSink& sink, SampleFixture& made, const std::string& name, Backplane backplane,
+                    std::span<const std::uint32_t> frames) {
+    Window& window = *made.window;
+    write_tile(sink, window, "token", name, "t000", 2.0, backplane, placed_hash(window));
+    (*made.subject).states.insert(AnatomyState::hot);
+    (*made.subject).invalidate(Dirty::paint);
+    const std::uint32_t last = frames.back();
+    std::size_t next = 0U;
+    for (std::uint32_t frame = 1U; frame <= last; ++frame) {
+        static_cast<void>(run_frame(window, made.time, made.painter));
+        if (next < frames.size() && frames[next] == frame) {
+            write_tile(sink, window, "token", name, motion_frame_name(frame), 2.0, backplane, placed_hash(window));
+            next = next + 1U;
+        }
+    }
+}
+
+// The starting tokens as specimens: the blur cap (reach 8: filter_blur up
+// to 8 / 1.5), the 400 ms ceiling (a 600 ms move stops at 400), and the
+// overshoot cap (a spring at 8 %).
+void specimen_tokens(SpecimenSink& sink) {
+    const double blurs[] = {1.0, 2.0, 4.0, SurfaceMaterial::maximum_filter_reach / 1.5};
+    for (const double blur : blurs) {
+        SurfaceMaterial material{};
+        material.fills.clear();
+        const std::vector<GradientStop> stops{GradientStop{0.0, Color::rgba(214, 92, 118)},
+                                              GradientStop{0.5, Color::rgba(236, 184, 64)},
+                                              GradientStop{1.0, Color::rgba(92, 156, 222)}};
+        material.fills.push_back(MaterialFillLayer::linear(Point{0.0, 0.0}, Point{1.0, 0.0}, stops));
+        material.corner_radius = engine_samples::feature_sample_corner_radius;
+        material.filter_blur = blur;
+        for (const Backplane backplane : specimen_backplanes) {
+            std::unique_ptr<SampleFixture> fixture = material_window(material, 2.0, backplane, {});
+            Window& window = *(*fixture).window;
+            write_tile(sink, window, "token", "blur", amount_name(blur), 2.0, backplane, placed_hash(window));
+        }
+    }
+    SurfaceMaterial face{};
+    face.fills.clear();
+    face.fills.push_back(MaterialFillLayer::linear(Point{0.0, 0.0}, Point{0.0, 1.0},
+                                                   std::vector<GradientStop>{
+                                                       GradientStop{0.0, Color::rgba(232, 238, 246)},
+                                                       GradientStop{1.0, Color::rgba(92, 156, 222)}}));
+    face.border = MaterialBorder{Color::rgba(40, 52, 66), 1.0};
+    face.corner_radius = engine_samples::feature_sample_corner_radius;
+    // 600 ms asked, 400 ms given. The move starts on the first frame after
+    // the change (16 ms): frames at 96 to 384 ms, at rest by 416, and still
+    // at rest at 592, where a 600 ms move would be moving yet.
+    const std::uint32_t ceiling_frames[] = {6U, 12U, 18U, 24U, 26U, 37U};
+    const std::uint32_t spring_frames[] = {2U, 4U, 6U, 8U, 10U, 12U, 16U, 20U};
+    for (const Backplane backplane : specimen_backplanes) {
+        const std::vector<PropertyTransition> long_move{
+            hot_move(translate_x_property, 8.0, MotionCurve::timed(milliseconds(600), MotionEasing::linear))};
+        std::unique_ptr<SampleFixture> ceiling = material_window(face, 2.0, backplane, long_move);
+        specimen_strip(sink, *ceiling, "ceiling", backplane, ceiling_frames);
+        const std::vector<PropertyTransition> springy{
+            hot_move(translate_y_property, 6.0, MotionCurve::spring(milliseconds(160), maximum_motion_overshoot))};
+        std::unique_ptr<SampleFixture> spring = material_window(face, 2.0, backplane, springy);
+        specimen_strip(sink, *spring, "overshoot", backplane, spring_frames);
+    }
+}
+
+// specimen.js: the tiles and the engine's constants the sheet labels.
+void write_specimen_listing(const SpecimenSink& sink) {
+    std::string text = "// Written by gui_forms_engine_gate_tests (GUI_FORMS_ENGINE_GATE_SPECIMEN).\n";
+    text += "window.SPECIMEN = {\n  constants: {";
+    std::ostringstream constants;
+    constants << "\"finish_lift\":" << finish_lift << ",\"finish_break_darkening\":" << finish_break_darkening
+              << ",\"finish_shine_alpha\":" << finish_shine_alpha
+              << ",\"maximum_motion_overshoot\":" << maximum_motion_overshoot
+              << ",\"maximum_filter_reach\":" << SurfaceMaterial::maximum_filter_reach
+              << ",\"maximum_glow_reach\":" << SurfaceMaterial::maximum_glow_reach
+              << ",\"maximum_ambient_frames_per_second\":" << maximum_ambient_frames_per_second
+              << ",\"maximum_ambient_window_fraction\":" << maximum_ambient_window_fraction
+              << ",\"motion_duration_ceiling_ms\":"
+              << std::chrono::duration_cast<milliseconds>(motion_duration_ceiling).count();
+    text += constants.str() + "},\n  tiles: [\n";
+    for (std::size_t index = 0U; index < sink.entries.size(); ++index) {
+        text += "    " + sink.entries[index] + (index + 1U < sink.entries.size() ? ",\n" : "\n");
+    }
+    text += "  ]\n};\n";
+    const std::string path = sink.directory + "/specimen.js";
+    std::FILE* const out = std::fopen(path.c_str(), "wb");
+    require(out != nullptr, "the specimen listing can be written: " + path);
+    const std::size_t written = std::fwrite(text.data(), 1U, text.size(), out);
+    const int closed = std::fclose(out);
+    require(written == text.size() && closed == 0, "the specimen listing is written whole: " + path);
+}
+
+void write_specimen() {
+    const char* const directory = std::getenv("GUI_FORMS_ENGINE_GATE_SPECIMEN");
+    if (directory == nullptr || *directory == '\0') return;
+    SpecimenSink sink{};
+    sink.directory = directory;
+    specimen_primitives(sink);
+    specimen_samples(sink);
+    specimen_finish(sink);
+    specimen_tokens(sink);
+    write_specimen_listing(sink);
+}
+
 } // namespace
 
 int main() {
@@ -1113,5 +1648,6 @@ int main() {
     ribbon_rests_after_motion();
     ribbon_without_motion();
     write_manifest();
+    write_specimen();
     return 0;
 }
