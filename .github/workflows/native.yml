@@ -26,9 +26,11 @@ permissions:
   actions: read
 concurrency:
   # The daily schedule has its own group, so it and a push to main never
-  # cancel each other.
+  # cancel each other. A newer push to a branch cancels the branch's older
+  # run, but a push to main waits for the previous main run: that run
+  # publishes its release and leaves the receipts a tag carries.
   group: gui-forms-${{ github.event_name == 'schedule' && 'daily' || github.head_ref || github.ref_name }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   house-style:
     runs-on: ubuntu-24.04

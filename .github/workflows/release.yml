@@ -50,7 +50,8 @@ concurrency:
   # calls of one run never cancel each other, and one for native.yml's daily
   # schedule, so it and a push to main never cancel each other either.
   group: gui-forms-release-${{ github.event_name == 'schedule' && 'daily-' || '' }}${{ github.head_ref || github.ref_name }}-${{ inputs.platform }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  # Never on main or a tag: an older main run still publishes (native.yml).
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') && github.ref != 'refs/heads/main' }}
 jobs:
   prepare:
     # This workflow's own schedule is the weekly prune; native.yml's daily
