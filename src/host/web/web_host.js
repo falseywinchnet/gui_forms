@@ -6,6 +6,12 @@ addToLibrary({
   $GFWeb: {
     canvas: null,
     context: null,
+    gl: null,
+    texture: null,
+    textureWidth: 0,
+    textureHeight: 0,
+    directUpload: true,
+    staging: null,
     frame: null,
     rafPending: false,
     timer: 0,
@@ -34,6 +40,83 @@ addToLibrary({
     modifiers(event) {
       return (event.shiftKey ? 1 : 0) | (event.ctrlKey ? 2 : 0) | (event.altKey ? 4 : 0) |
              (event.metaKey ? 8 : 0);
+    },
+    // WebGL2 presentation: the raster's damaged rectangles are uploaded into a
+    // texture the size of the canvas, and one triangle draws it texel for
+    // texel. Without WebGL2 the page falls back to putImageData.
+    setupGL(canvas) {
+      const gl = canvas.getContext('webgl2', {alpha: false, antialias: false, depth: false,
+                                              stencil: false, desynchronized: true,
+                                              preserveDrawingBuffer: false});
+      if (!gl) return null;
+      const shader = (type, source) => {
+        const object = gl.createShader(type);
+        gl.shaderSource(object, source);
+        gl.compileShader(object);
+        return object;
+      };
+      const program = gl.createProgram();
+      gl.attachShader(program, shader(gl.VERTEX_SHADER, `#version 300 es
+        void main() {
+          vec2 corner = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+          gl_Position = vec4(corner * 2.0 - 1.0, 0.0, 1.0);
+        }`));
+      gl.attachShader(program, shader(gl.FRAGMENT_SHADER, `#version 300 es
+        precision highp float;
+        uniform highp sampler2D frame;
+        out vec4 color;
+        void main() {
+          ivec2 size = textureSize(frame, 0);
+          ivec2 texel = ivec2(int(gl_FragCoord.x), size.y - 1 - int(gl_FragCoord.y));
+          color = vec4(texelFetch(frame, texel, 0).rgb, 1.0);
+        }`));
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
+      gl.useProgram(program);
+      gl.bindVertexArray(gl.createVertexArray());
+      GFWeb.texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, GFWeb.texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      canvas.addEventListener('webglcontextlost', (event) => event.preventDefault());
+      canvas.addEventListener('webglcontextrestored', () => {
+        GFWeb.gl = GFWeb.setupGL(canvas);
+        GFWeb.textureWidth = GFWeb.textureHeight = 0;
+        _gf_web_resize(GFWeb.width, GFWeb.height, GFWeb.scale);
+      });
+      return gl;
+    },
+    uploadGL(pixels, stride, left, top, columns, rows, width, height) {
+      const gl = GFWeb.gl;
+      if (GFWeb.textureWidth !== width || GFWeb.textureHeight !== height) {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        GFWeb.textureWidth = width;
+        GFWeb.textureHeight = height;
+      }
+      if (GFWeb.directUpload) {
+        // Straight from wasm memory: ROW_LENGTH walks the raster's stride.
+        try {
+          gl.pixelStorei(gl.UNPACK_ROW_LENGTH, stride >> 2);
+          gl.texSubImage2D(gl.TEXTURE_2D, 0, left, top, columns, rows, gl.RGBA, gl.UNSIGNED_BYTE,
+                           HEAPU8, pixels + top * stride + left * 4);
+          gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
+          return;
+        } catch (error) {
+          // Some browsers refuse views of a SharedArrayBuffer; copy instead.
+          gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
+          GFWeb.directUpload = false;
+        }
+      }
+      const rowBytes = columns * 4;
+      if (!GFWeb.staging || GFWeb.staging.length < rowBytes * rows)
+        GFWeb.staging = new Uint8Array(rowBytes * rows);
+      for (let row = 0; row < rows; ++row) {
+        const start = pixels + (top + row) * stride + left * 4;
+        GFWeb.staging.set(HEAPU8.subarray(start, start + rowBytes), row * rowBytes);
+      }
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, left, top, columns, rows, gl.RGBA, gl.UNSIGNED_BYTE,
+                       GFWeb.staging, 0);
     },
     tick() {
       GFWeb.rafPending = false;
@@ -113,6 +196,14 @@ addToLibrary({
       new ResizeObserver(() => GFWeb.resize()).observe(canvas);
       window.addEventListener('resize', () => GFWeb.resize());
       window.addEventListener('pagehide', () => _gf_web_close());
+      // Frame costs since the previous call, for measurement from the console.
+      Module['guiFormsStats'] = () => {
+        const at = _gf_web_stats() >> 3;
+        const [ticks, frames, update, live, paint, present, pixels] = HEAPF64.subarray(at, at + 7);
+        return {ticks, frames, update, live, paint, present, pixels,
+                perFrame: frames ? {update: update / frames, live: live / frames, paint: paint / frames,
+                                    present: present / frames, pixels: pixels / frames} : null};
+      };
     }
   },
 
@@ -121,7 +212,8 @@ addToLibrary({
     const id = Module['guiFormsCanvas'] || 'gui-forms-canvas';
     GFWeb.canvas = typeof id === 'string' ? document.getElementById(id) : id;
     if (!GFWeb.canvas) throw new Error('GUI.Forms: no canvas element "' + id + '"');
-    GFWeb.context = GFWeb.canvas.getContext('2d', {alpha: false, desynchronized: true});
+    GFWeb.gl = Module['guiFormsCanvas2D'] ? null : GFWeb.setupGL(GFWeb.canvas);
+    if (!GFWeb.gl) GFWeb.context = GFWeb.canvas.getContext('2d', {alpha: false, desynchronized: true});
     const [w, h, s] = GFWeb.measure();
     GFWeb.width = w; GFWeb.height = h; GFWeb.scale = s;
     HEAPF64[width >> 3] = w;
@@ -162,6 +254,10 @@ addToLibrary({
     }
     const columns = right - left, rows = bottom - top;
     if (columns <= 0 || rows <= 0) return;
+    if (GFWeb.gl) {
+      GFWeb.uploadGL(pixels, stride, left, top, columns, rows, width, height);
+      return;
+    }
     const bytes = columns * 4 * rows;
     if (!GFWeb.frame || GFWeb.frame.data.length < bytes || GFWeb.frame.width !== columns ||
         GFWeb.frame.height !== rows) {
@@ -179,12 +275,31 @@ addToLibrary({
     GFWeb.context.putImageData(GFWeb.frame, left, top);
   },
 
+  // After the rectangles of one present: draws the texture to the canvas.
+  gf_web_js_present_end__deps: ['$GFWeb'],
+  gf_web_js_present_end: () => {
+    const gl = GFWeb.gl;
+    if (!gl || !GFWeb.textureWidth) return;
+    gl.viewport(0, 0, GFWeb.canvas.width, GFWeb.canvas.height);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  },
+
   gf_web_js_set_title__deps: ['$UTF8ToString'],
   gf_web_js_set_title: (title) => { document.title = UTF8ToString(title); },
 
   gf_web_js_set_cursor__deps: ['$GFWeb'],
   gf_web_js_set_cursor: (kind) => {
-    if (GFWeb.canvas) GFWeb.canvas.style.cursor = GFWeb.cursors[kind] || 'default';
+    GFWeb.cursorKind = kind;
+    if (GFWeb.canvas && !GFWeb.cursorHidden)
+      GFWeb.canvas.style.cursor = GFWeb.cursors[kind] || 'default';
+  },
+
+  // A page may hide the pointer over its own canvas, though never move it.
+  gf_web_js_hide_cursor__deps: ['$GFWeb'],
+  gf_web_js_hide_cursor: (hidden) => {
+    GFWeb.cursorHidden = !!hidden;
+    if (GFWeb.canvas)
+      GFWeb.canvas.style.cursor = hidden ? 'none' : GFWeb.cursors[GFWeb.cursorKind || 0] || 'default';
   },
 
   gf_web_js_pointer_capture__deps: ['$GFWeb'],

@@ -1,10 +1,11 @@
 // The browser host. It follows the X11 host's frame sequence (gather live
 // frames, take damage, compose, paint, present the rectangle set, report) and
 // replaces Xlib with a canvas: web_host.js forwards DOM input here through the
-// exported gf_web_* entry points and presents raster rectangles with
-// putImageData. The event loop is the browser's; ticks are requested through
-// gf_web_js_schedule (requestAnimationFrame, or a timer for later deadlines),
-// so a window with no damage, no live surface and no deadline costs nothing.
+// exported gf_web_* entry points and presents raster rectangles through a
+// WebGL2 texture (putImageData without WebGL2). The event loop is the
+// browser's; ticks are requested through gf_web_js_schedule
+// (requestAnimationFrame, or a timer for later deadlines), so a window with no
+// damage, no live surface and no deadline costs nothing.
 #include "gui_forms/platform/web_host.hpp"
 #include "../../core/host/frame_capture/frame_capture.hpp"
 #include "../../core/damage/device_damage/device_damage.hpp"
@@ -34,8 +35,10 @@ void gf_web_js_attach(double* width, double* height, double* scale);
 void gf_web_js_schedule(int milliseconds);
 void gf_web_js_present(const unsigned char* pixels, int stride, int left, int top,
                        int right, int bottom, int canvas_width, int canvas_height);
+void gf_web_js_present_end();
 void gf_web_js_set_title(const char* title);
 void gf_web_js_set_cursor(int kind);
+void gf_web_js_hide_cursor(int hidden);
 void gf_web_js_pointer_capture(int captured, int pointer_id);
 void gf_web_js_write_clipboard(const char* text);
 void gf_web_js_full_screen();
@@ -109,6 +112,17 @@ struct Wake final {
 
 class NativeWindow;
 
+// Frame costs since the page last read them (gf_web_stats): ticks, presented
+// frames, then milliseconds in update, live-frame composition, retained
+// painting and presentation, and device pixels presented.
+struct FrameStats final {
+  double ticks{}, frames{}, update_ms{}, live_ms{}, paint_ms{}, present_ms{}, pixels{};
+};
+FrameStats frame_stats{};
+double milliseconds_since(const std::chrono::steady_clock::time_point started) {
+  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+}
+
 class Services final : public HostServices {
 public:
   explicit Services(NativeWindow& window) : HostServices(web_capabilities()), window_(window) {}
@@ -124,6 +138,17 @@ protected:
   }
   HostServiceStatus set_cursor_impl(CursorKind cursor) override {
     gf_web_js_set_cursor(static_cast<int>(cursor));
+    return {};
+  }
+  // The pointer can be hidden over the canvas; a page cannot move it.
+  CursorCapabilities cursor_capabilities_impl() const noexcept override { return {true, false}; }
+  CursorStatus cursor_authority_impl(const Window&, bool) const noexcept override { return {}; }
+  CursorStatus hide_cursor_impl() noexcept override {
+    gf_web_js_hide_cursor(1);
+    return {};
+  }
+  CursorStatus restore_cursor_impl() noexcept override {
+    gf_web_js_hide_cursor(0);
     return {};
   }
   HostServiceStatus set_pointer_capture_impl(bool captured, std::uint64_t pointer_id) override {
@@ -401,6 +426,7 @@ bool NativeWindow::present(const std::span<const Rect> requested, PresentedArea&
                             static_cast<std::uint64_t>(bottom - top);
     ++copied.rectangles;
   }
+  if (copied.rectangles != 0U) gf_web_js_present_end();
   copied.copy_nanoseconds += static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::steady_clock::now() - started).count());
   return true;
@@ -428,6 +454,8 @@ void NativeWindow::update() {
   const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
   raster.begin_frame(screen);
   compose_live_frames();
+  frame_stats.live_ms += milliseconds_since(started);
+  const std::chrono::steady_clock::time_point paint_started = std::chrono::steady_clock::now();
   std::optional<PaintReceipt> receipt{};
   if (!damage.empty()) {
     receipt = (*entry.model).paint(raster, damage.rectangles());
@@ -435,10 +463,15 @@ void NativeWindow::update() {
     for (std::size_t index = 0; index < painted.size(); ++index) screen.add(painted[index]);
   }
   raster.end_frame();
+  frame_stats.paint_ms += milliseconds_since(paint_started);
   live_frames.clear();
   if (!damage.empty() && !receipt) return;
   PresentedArea copied;
+  const std::chrono::steady_clock::time_point present_started = std::chrono::steady_clock::now();
   if (!present(screen.rectangles(), copied)) return;
+  frame_stats.present_ms += milliseconds_since(present_started);
+  frame_stats.frames += 1.0;
+  frame_stats.pixels += static_cast<double>(copied.device_pixels);
   const std::uint64_t elapsed = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::steady_clock::now() - started).count());
   if (regions_taken) live_region_lost = false;
@@ -558,9 +591,12 @@ bool NativeWindow::report_presented(const std::optional<PaintReceipt>& receipt,
 void Runtime::step() {
   const std::vector<std::shared_ptr<NativeWindow>> snapshot = windows;
   int wait = -1;
+  frame_stats.ticks += 1.0;
   for (const std::shared_ptr<NativeWindow>& entry : snapshot) {
     NativeWindow& window = *entry;
+    const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
     window.update();
+    frame_stats.update_ms += milliseconds_since(started);
     if (window.closed) continue;
     // The live clock: a registered live surface is sampled every display frame.
     if ((*window.entry.model).has_live_surface_presentations()) wait = 0;
@@ -582,6 +618,19 @@ using gui_forms::host::web_detail::primary;
 namespace gf = gui_forms;
 
 extern "C" {
+// Returns the frame costs gathered since the last call (seven doubles, in
+// FrameStats order) and starts a new interval. The page reads them through
+// Module.guiFormsStats().
+EMSCRIPTEN_KEEPALIVE const double* gf_web_stats() {
+  static double values[7]{};
+  const gf::host::web_detail::FrameStats& stats = gf::host::web_detail::frame_stats;
+  const double copy[7] = {stats.ticks, stats.frames, stats.update_ms, stats.live_ms,
+                          stats.paint_ms, stats.present_ms, stats.pixels};
+  std::copy(std::begin(copy), std::end(copy), std::begin(values));
+  gf::host::web_detail::frame_stats = {};
+  return values;
+}
+
 EMSCRIPTEN_KEEPALIVE void gf_web_tick() {
   if (gf::host::web_detail::runtime != nullptr) (*gf::host::web_detail::runtime).step();
 }
