@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Carry main's test receipt to a release tag of the same tree.
+"""Carry an earlier run's test receipt to a release tag or main push of the same tree.
 
 A `v*` tag names a commit main has already built and tested: native.yml's
 programs job for each platform ran every test of the programs build on that
@@ -13,10 +13,24 @@ rebuilds from the compiler cache, packages under the tag's version and
 installs and launches what it packaged: the version enters only the
 package metadata, so the tested binaries are the ones packaged.
 
+`merged` does the same for a push to main that merges a pull request
+(the owner's choice of 2026-10-23, planning/BUILD_SIZE_PLAN_2026-10-23.md).
+Branch protection merges a pull request only when it is up to date with
+main, so the merge commit's tree is its head's: the second parent. The
+pull request's native.yml run on that head tested this tree. Its programs
+job ran the tests the native job's validated list does not name
+(tools/native_tests.py), and the native job, which main's reuses, passed
+the rest. `merged` copies that programs job's receipt, with a comment
+naming the run and saying what it covers, and main's programs job skips
+its ctest run. Main thus trusts native_tests.py's name match between the
+native and programs builds; the daily scheduled native.yml run on main
+reuses nothing and runs every test, as the backstop for it. A tag of that
+commit then carries main's receipt, comment and all.
+
 The receipt is taken only when the job succeeded and the receipt reports at
 least one test and no failure or error. Otherwise nothing is written, the
-step output reused is false, and the tag runs every test as before. A main
-run whose programs job has not finished is not waited for.
+step output reused is false, and the job runs every test as before. A run
+whose programs job has not finished is not waited for.
 """
 from __future__ import annotations
 import argparse
@@ -49,10 +63,24 @@ class GitHubRuns:
         runs: list[dict[str, Any]] = listing['workflow_runs']
         return runs
 
+    def pull_request_runs(self, head: str) -> list[dict[str, Any]]:
+        listing: dict[str, Any] = self.api('actions/workflows/native.yml/runs?event=pull_request&head_sha=' + head
+                                           + '&per_page=' + str(RUNS_READ))
+        runs: list[dict[str, Any]] = listing['workflow_runs']
+        return runs
+
     def commit_tree(self, revision: str) -> str:
         commit: dict[str, Any] = self.api('git/commits/' + revision)
         tree: str = commit['tree']['sha']
         return tree
+
+    def commit_parents(self, revision: str) -> list[str]:
+        commit: dict[str, Any] = self.api('git/commits/' + revision)
+        parents: list[str] = []
+        parent: dict[str, Any]
+        for parent in commit.get('parents', []):
+            parents.append(str(parent['sha']))
+        return parents
 
     def jobs(self, run: int) -> list[dict[str, Any]]:
         listing: dict[str, Any] = self.api('actions/runs/' + str(run) + '/jobs?per_page=100')
@@ -96,6 +124,20 @@ def receipt_in_zip(data: bytes, platform: str) -> str | None:
     return None
 
 
+def packaged_revision(data: bytes, platform: str) -> str | None:
+    """The source revision packages-<platform>.json in a receipts zip records, or None."""
+    wanted: str = 'packages-' + platform + '.json'
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        name: str
+        for name in archive.namelist():
+            if name.rsplit('/', 1)[-1] == wanted:
+                record: Any = json.loads(archive.read(name).decode('utf-8'))
+                if isinstance(record, dict) and isinstance(record.get('revision'), str):
+                    return str(record['revision'])
+                return None
+    return None
+
+
 def receipt_passed(text: str) -> bool:
     """Whether a ctest JUnit receipt reports at least one test and no failure or error."""
     try:
@@ -112,14 +154,54 @@ def receipt_passed(text: str) -> bool:
     return int(tests) > 0 and int(failures) == 0 and int(errors) == 0
 
 
-def with_provenance(text: str, run: int, tree: str) -> str:
-    """The receipt with a comment after its XML declaration naming the run it came from."""
+def main_comment(run: int, tree: str) -> str:
     comment: str = ('<!-- carried from native.yml run ' + str(run) + ' on main, tree ' + tree
                     + ': the tag has the same tree, so these are its tests -->')
+    return comment
+
+
+def pull_request_comment(run: int, tree: str) -> str:
+    comment: str = ('<!-- carried from native.yml pull-request run ' + str(run) + ', tree ' + tree
+                    + ': main merged that head, so these are its tests. They are the tests not in the'
+                    + " validated list of this tree's native job (tools/native_tests.py), which passed the rest -->")
+    return comment
+
+
+def with_provenance(text: str, comment: str) -> str:
+    """The receipt with comment, which names the run it came from, after its XML declaration."""
     if text.startswith('<?xml'):
         end: int = text.index('?>') + 2
         return text[:end] + '\n' + comment + text[end:]
     return comment + '\n' + text
+
+
+def carry(platform: str, dist: Path, run_id: int, tree: str, comment: str, runs: GitHubRuns) -> bool:
+    """Copy run_id's passing programs receipt for platform into dist under comment; whether it did.
+
+    The run's packages receipt names the revision it built and packaged (a
+    pull request's test merge commit, or a push's own commit); its tree
+    must be tree.
+    """
+    job: dict[str, Any] | None = programs_job(runs.jobs(run_id), platform)
+    if job is None or job.get('conclusion') != 'success':
+        print('Run ' + str(run_id) + ' has this tree but no successful programs job for ' + platform, flush=True)
+        return False
+    artifact: int | None = runs.artifact(run_id, 'gui-forms-receipts-' + platform)
+    if artifact is None:
+        print('Run ' + str(run_id) + ' has no unexpired receipts for ' + platform, flush=True)
+        return False
+    data: bytes = runs.download(artifact)
+    revision: str | None = packaged_revision(data, platform)
+    if revision is None or runs.commit_tree(revision) != tree:
+        print('Run ' + str(run_id) + ' did not package tree ' + tree + ' for ' + platform, flush=True)
+        return False
+    text: str | None = receipt_in_zip(data, platform)
+    if text is None or not receipt_passed(text):
+        print('Run ' + str(run_id) + "'s ctest receipt for " + platform + ' is missing or not a pass', flush=True)
+        return False
+    dist.mkdir(parents=True, exist_ok=True)
+    (dist / ('ctest-' + platform + '.xml')).write_text(with_provenance(text, comment), encoding='utf-8')
+    return True
 
 
 def find(platform: str, dist: Path, tree: str, runs: GitHubRuns) -> int | None:
@@ -133,29 +215,45 @@ def find(platform: str, dist: Path, tree: str, runs: GitHubRuns) -> int | None:
         if runs.commit_tree(str(run['head_sha'])) != tree:
             continue
         run_id: int = int(run['id'])
-        job: dict[str, Any] | None = programs_job(runs.jobs(run_id), platform)
-        if job is None or job.get('conclusion') != 'success':
-            print('Run ' + str(run_id) + ' has this tree but no successful programs job for ' + platform, flush=True)
+        if not carry(platform, dist, run_id, tree, main_comment(run_id, tree), runs):
             continue
-        artifact: int | None = runs.artifact(run_id, 'gui-forms-receipts-' + platform)
-        if artifact is None:
-            print('Run ' + str(run_id) + ' has no unexpired receipts for ' + platform, flush=True)
-            continue
-        text: str | None = receipt_in_zip(runs.download(artifact), platform)
-        if text is None or not receipt_passed(text):
-            print('Run ' + str(run_id) + "'s ctest receipt for " + platform + ' is missing or not a pass', flush=True)
-            continue
-        dist.mkdir(parents=True, exist_ok=True)
-        (dist / ('ctest-' + platform + '.xml')).write_text(with_provenance(text, run_id, tree), encoding='utf-8')
         print('Carrying the tests of main run ' + str(run_id) + ' for tree ' + tree, flush=True)
         return run_id
     print('No main run tested tree ' + tree + ' on ' + platform + '; the tag runs every test', flush=True)
     return None
 
 
-def checkout_tree() -> str:
-    tree: str = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD^{tree}'], text=True).strip()
-    return tree
+def merged(platform: str, dist: Path, revision: str, tree: str, runs: GitHubRuns) -> int | None:
+    """Copy the merged pull request's passing receipt for this tree into dist; its run, or None."""
+    parents: list[str] = runs.commit_parents(revision)
+    if len(parents) != 2:
+        print(revision + ' does not merge a pull request; main runs every test', flush=True)
+        return None
+    head: str = parents[1]
+    if runs.commit_tree(head) != tree:
+        print('The merged head ' + head + ' has another tree; main runs every test', flush=True)
+        return None
+    run: dict[str, Any]
+    for run in runs.pull_request_runs(head):
+        if run.get('path') != '.github/workflows/native.yml' or run.get('event') != 'pull_request':
+            continue
+        if run.get('head_sha') != head or run.get('head_repository', {}).get('full_name') != runs.repository:
+            continue
+        run_id: int = int(run['id'])
+        if not carry(platform, dist, run_id, tree, pull_request_comment(run_id, tree), runs):
+            continue
+        print('Carrying the tests of pull-request run ' + str(run_id) + ' for tree ' + tree, flush=True)
+        return run_id
+    print('No pull-request run tested tree ' + tree + ' on ' + platform + '; main runs every test', flush=True)
+    return None
+
+
+def checkout_field(format_code: str) -> str:
+    # git show --format, not rev-parse HEAD^{tree}: MSYS2's argument
+    # conversion can turn the braces into HEAD^tree (tools/ci_reuse.py).
+    field: str = subprocess.check_output(['git', '-C', str(ROOT), 'show', '-s', '--format=' + format_code, 'HEAD'],
+                                         text=True).strip()
+    return field
 
 
 def write_output(name: str, value: str) -> None:
@@ -170,13 +268,22 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands: Any = parser.add_subparsers(dest='command', required=True)
     find_parser: argparse.ArgumentParser = commands.add_parser('find', help="carry main's receipt for this tree")
-    find_parser.add_argument('--platform', required=True)
-    find_parser.add_argument('--dist', type=Path, required=True)
-    find_parser.add_argument('--repo', default=os.environ.get('GITHUB_REPOSITORY'))
+    merged_parser: argparse.ArgumentParser = commands.add_parser(
+        'merged', help="carry the merged pull request's receipt for this tree")
+    command_parser: argparse.ArgumentParser
+    for command_parser in (find_parser, merged_parser):
+        command_parser.add_argument('--platform', required=True)
+        command_parser.add_argument('--dist', type=Path, required=True)
+        command_parser.add_argument('--repo', default=os.environ.get('GITHUB_REPOSITORY'))
     args: argparse.Namespace = parser.parse_args(argv)
     if not args.repo:
-        parser.error('find needs --repo or GITHUB_REPOSITORY')
-    run: int | None = find(args.platform, args.dist, checkout_tree(), GitHubRuns(args.repo))
+        parser.error(args.command + ' needs --repo or GITHUB_REPOSITORY')
+    runs: GitHubRuns = GitHubRuns(args.repo)
+    run: int | None
+    if args.command == 'find':
+        run = find(args.platform, args.dist, checkout_field('%T'), runs)
+    else:
+        run = merged(args.platform, args.dist, checkout_field('%H'), checkout_field('%T'), runs)
     write_output('reused', 'true' if run is not None else 'false')
     write_output('run', str(run) if run is not None else '')
     return 0

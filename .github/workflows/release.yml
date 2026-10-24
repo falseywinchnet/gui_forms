@@ -10,8 +10,9 @@ name: GUI.Forms programs and release
 # programs job then adds the objects the native job just compiled for the same
 # tree (the native cache archive), so the toolkit and tests are compiled once
 # per platform and run, rather than twice. native.yml then publishes, once all
-# four have packaged (publish-release.yml). Tags, manual dispatch and the weekly prune still start
-# it directly, with only the Actions caches.
+# four have packaged (publish-release.yml). native.yml's daily scheduled run on
+# main calls it the same way and publishes nothing. Tags, manual dispatch and the
+# weekly prune still start it directly, with only the Actions caches.
 on:
   workflow_call:
     inputs:
@@ -46,12 +47,15 @@ permissions:
   actions: read
 concurrency:
   # One group per platform when native.yml calls it for each, so the four
-  # calls of one run never cancel each other.
-  group: gui-forms-release-${{ github.head_ref || github.ref_name }}-${{ inputs.platform }}
+  # calls of one run never cancel each other, and one for native.yml's daily
+  # schedule, so it and a push to main never cancel each other either.
+  group: gui-forms-release-${{ github.event_name == 'schedule' && 'daily-' || '' }}${{ github.head_ref || github.ref_name }}-${{ inputs.platform }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 jobs:
   prepare:
-    if: github.event_name != 'schedule'
+    # This workflow's own schedule is the weekly prune; native.yml's daily
+    # schedule calls it from_native to build and test every platform.
+    if: github.event_name != 'schedule' || inputs.from_native
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -323,20 +327,25 @@ jobs:
           key: ${{ steps.objects.outputs.cache-primary-key }}
       # A pull request called from native.yml runs only the tests its native
       # job did not pass on this tree: those of the Gallery, the demoboard and
-      # any the native job skipped (tools/native_tests.py). Pushes to main,
-      # which publish the release record, and direct runs test everything.
-      # A release tag names a tree main has already tested: its programs job
-      # for this platform ran every test. The tag carries that job's ctest
-      # receipt instead of running them again, and still packages and smoke
-      # tests under its own version (tools/release_tests.py). With no such
-      # run, or one that has not finished, the tag runs every test.
-      - name: Carry main's tests of this tree
+      # any the native job skipped (tools/native_tests.py).
+      # A push to main merges an up-to-date pull request, so it has the tree
+      # that pull request's run tested: main's native job reuses that run's
+      # validation, and this job carries that run's programs receipt (the
+      # rest of the tests) instead of running them again (owner's choice,
+      # 2026-10-23). A release tag names a tree main has already tested and
+      # carries main's receipt the same way. Both still package and smoke
+      # test under their own version (tools/release_tests.py). With no such
+      # run, or one that has not finished, the job runs every test. The daily
+      # scheduled run and direct runs always test everything: the schedule is
+      # the backstop for native_tests.py's name match.
+      - name: Carry the tests of this tree from an earlier run
         id: tested
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (inputs.from_native && github.event_name == 'push' && github.ref == 'refs/heads/main')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python gui_forms/tools/release_tests.py find --platform "${{ matrix.platform }}" --dist dist
+          COMMAND: ${{ startsWith(github.ref, 'refs/tags/v') && 'find' || 'merged' }}
+        run: python gui_forms/tools/release_tests.py "$COMMAND" --platform "${{ matrix.platform }}" --dist dist
       - name: Test
         if: steps.tested.outputs.reused != 'true'
         env:
@@ -419,7 +428,7 @@ jobs:
   prune:
     # Dry report only: deleting cache pre-releases stays a manual
     # `python3 tools/prune_cache_releases.py --apply` by a maintainer.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: inputs.from_native != true && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

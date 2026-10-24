@@ -3,6 +3,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The daily full run on main reuses nothing: every native job validates
+  # afresh, and the programs, Sanitizers and docs jobs build and test
+  # everything. It is the backstop for what a push to main carries from the
+  # merged pull request's run (tools/release_tests.py, tools/ci_tree_receipt.py):
+  # the name match of tools/native_tests.py and the change selection of
+  # tools/change_selection.py. It publishes nothing.
+  schedule:
+    - cron: '41 3 * * *'
   workflow_dispatch:
     inputs:
       force_validation:
@@ -17,7 +25,9 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: gui-forms-${{ github.head_ref || github.ref_name }}
+  # The daily schedule has its own group, so it and a push to main never
+  # cancel each other.
+  group: gui-forms-${{ github.event_name == 'schedule' && 'daily' || github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   house-style:
@@ -51,9 +61,14 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_ci_build.py
           python3 -B -m unittest discover -s tools -p test_engine_gate.py
           python3 -B -m unittest discover -s tools -p test_ci_cache.py
+          python3 -B -m unittest discover -s tools -p test_ci_tree_receipt.py
           python3 -B -m unittest discover -s tools -p test_change_selection.py
           python3 -B -m unittest discover -s tools -p test_native_tests.py
           python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv stx_cng fuzz
+  # The site depends only on the tree (docs/requirements.txt pins its
+  # toolchain), so a tree an earlier run of this repository built passes
+  # without building it again (tools/ci_tree_receipt.py); the job still
+  # reports success under its own name. The daily schedule always builds.
   docs:
     runs-on: ubuntu-24.04
     steps:
@@ -61,14 +76,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Find an earlier build of this tree's documentation
+        id: receipt
+        if: github.event_name != 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/ci_tree_receipt.py lookup --kind docs --job docs
       - name: Install the documentation toolchain
+        if: steps.receipt.outputs.reused != 'true'
         run: python3 -m pip install -r docs/requirements.txt
       - name: Build the documentation site with warnings as errors
+        if: steps.receipt.outputs.reused != 'true'
         run: sphinx-build -W --keep-going -b html docs docs/_build/html
       - uses: actions/upload-artifact@v4
+        if: steps.receipt.outputs.reused != 'true'
         with:
           name: gui-forms-docs-html
           path: docs/_build/html
+          retention-days: 30
+      # A job that reused a build records the run it carried.
+      - name: Record this tree's documentation build
+        id: record
+        env:
+          CARRIED: ${{ steps.receipt.outputs.producer-run }}
+          COVERAGE: ${{ steps.receipt.outputs.coverage }}
+        run: python3 tools/ci_tree_receipt.py write --kind docs --out .ci/tree-receipt ${CARRIED:+--carried-from "$CARRIED" --coverage "$COVERAGE"}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.record.outputs.artifact }}
+          path: .ci/tree-receipt/receipt.json
           retention-days: 30
   # House style section 5: memory errors and undefined behaviour are defects,
   # tests included. The suite (on a pull request, the tests its changes can
@@ -99,26 +135,43 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # A push to main has the tree of the up-to-date pull request it merges,
+      # whose run passed this job on the tests its changed paths can affect
+      # (owner's choice, 2026-10-23: the sanitizers need to run only on new
+      # code). The job then carries that run's receipt, builds and tests
+      # nothing, and passes under its own name (tools/ci_tree_receipt.py). The
+      # daily schedule looks up nothing and runs the whole suite, the backstop
+      # for tools/change_selection.py.
+      - name: Find an earlier run that passed this tree
+        id: receipt
+        if: github.event_name != 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python gui_forms/tools/ci_tree_receipt.py lookup --kind sanitize --job "Sanitizers (Linux, ASan + UBSan + LSan)"
       # The Ubuntu mirror is sometimes slow (7-11 minutes for 30 MB), so the
       # downloaded Ubuntu packages are kept in an Actions cache, refreshed once
       # per runner image; only main saves it (tools/install_linux_ci_packages.sh).
       - name: Name the Linux package cache
+        if: steps.receipt.outputs.reused != 'true'
         id: linux-image
         run: echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v4
+        if: steps.receipt.outputs.reused != 'true'
         id: linux-packages
         with:
           path: ${{ runner.temp }}/apt-archives
           key: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-${{ steps.linux-image.outputs.image }}
           restore-keys: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-
       - name: Install Linux dependencies
+        if: steps.receipt.outputs.reused != 'true'
         run: sh gui_forms/tools/install_linux_ci_packages.sh toolkit "$RUNNER_TEMP/apt-archives"
       - uses: actions/cache/save@v4
-        if: github.event_name != 'pull_request' && steps.linux-packages.outputs.cache-hit != 'true'
+        if: github.event_name != 'pull_request' && steps.linux-packages.outputs.cache-hit != 'true' && steps.receipt.outputs.reused != 'true'
         with:
           path: ${{ runner.temp }}/apt-archives
           key: ${{ steps.linux-packages.outputs.cache-primary-key }}
       - name: Configure compiler cache
+        if: steps.receipt.outputs.reused != 'true'
         run: |
           echo "CCACHE_DIR=$PWD/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$PWD" >> "$GITHUB_ENV"
@@ -132,6 +185,7 @@ jobs:
       # a pull request's merge commit, so the message is read from the head
       # commit by name (the full history holds it); a push reads its own.
       - name: Choose the sanitizer debug information
+        if: steps.receipt.outputs.reused != 'true'
         id: debug-info
         env:
           HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -152,6 +206,7 @@ jobs:
       # and only line-table runs find or pack a seed: a full -g hunt starts from
       # main's cache and leaves no seed behind for a line-table run to restore.
       - uses: actions/cache/restore@v4
+        if: steps.receipt.outputs.reused != 'true'
         id: sanitizer-cache
         with:
           path: |
@@ -165,12 +220,12 @@ jobs:
             gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-
       - name: Find sanitizer objects of the nearest branch
         id: seed
-        if: steps.debug-info.outputs.mode == 'lines'
+        if: steps.debug-info.outputs.mode == 'lines' && steps.receipt.outputs.reused != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python gui_forms/tools/ci_sanitizer_seed.py find
       - uses: actions/download-artifact@v4
-        if: steps.seed.outputs.seeded == 'true'
+        if: steps.seed.outputs.seeded == 'true' && steps.receipt.outputs.reused != 'true'
         with:
           github-token: ${{ github.token }}
           run-id: ${{ steps.seed.outputs.producer-run }}
@@ -178,7 +233,7 @@ jobs:
           path: .ci/sanitizer-seed
           merge-multiple: true
       - name: Replace the restored objects with the seed (every test still runs)
-        if: steps.seed.outputs.seeded == 'true'
+        if: steps.seed.outputs.seeded == 'true' && steps.receipt.outputs.reused != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python gui_forms/tools/ci_sanitizer_seed.py restore --artifact-id "${{ steps.seed.outputs.artifact-id }}"
@@ -187,6 +242,7 @@ jobs:
       # CMake, the toolchain, the core headers or this workflow). A push to
       # main runs the whole suite.
       - name: Build and test under the sanitizers
+        if: steps.receipt.outputs.reused != 'true'
         env:
           CHANGED_FROM: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -205,16 +261,30 @@ jobs:
       # A run that built nothing (a change no test reads, such as a
       # documentation-only one) passes: ci_build.py's build record says so.
       - name: Check stack frames
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.receipt.outputs.reused != 'true' }}
         run: python gui_forms/tools/stack_frames.py check --tree .build/native-linux-x64/gui-forms-sanitize --jobs 4 --top 15
       - name: Report cache statistics
-        if: always()
+        if: always() && steps.receipt.outputs.reused != 'true'
         run: ccache --show-stats --verbose
+      # What passed this tree: this run's build record, or the run it carried.
+      - name: Record this tree's sanitizer run
+        id: record
+        if: success()
+        env:
+          CARRIED: ${{ steps.receipt.outputs.producer-run }}
+          COVERAGE: ${{ steps.receipt.outputs.coverage }}
+        run: python gui_forms/tools/ci_tree_receipt.py write --kind sanitize --out .ci/tree-receipt --build-record .build/native-linux-x64/gui-forms-sanitize.record.json ${CARRIED:+--carried-from "$CARRIED" --coverage "$COVERAGE"}
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ${{ steps.record.outputs.artifact }}
+          path: .ci/tree-receipt/receipt.json
+          retention-days: 30
       - name: Pack the sanitizer objects as the next run's seed
-        if: success() && steps.debug-info.outputs.mode == 'lines'
+        if: success() && steps.debug-info.outputs.mode == 'lines' && steps.receipt.outputs.reused != 'true'
         run: python gui_forms/tools/ci_sanitizer_seed.py pack
       - uses: actions/upload-artifact@v4
-        if: success() && steps.debug-info.outputs.mode == 'lines'
+        if: success() && steps.debug-info.outputs.mode == 'lines' && steps.receipt.outputs.reused != 'true'
         with:
           name: gui-sanitize-ccache-linux-x64
           path: |
@@ -223,13 +293,14 @@ jobs:
           compression-level: 0
           retention-days: 7
       # The saved cache is this build's working set, not every generation up
-      # to CCACHE_MAXSIZE (planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1). A
-      # push to main builds everything, so the set is complete.
+      # to CCACHE_MAXSIZE (planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1). Main
+      # saves it when it builds everything: the daily schedule, and a push
+      # that carried no pull request's receipt.
       - name: Keep only the compiler cache entries this build used
-        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.receipt.outputs.reused != 'true'
         run: python gui_forms/tools/ci_cache.py evict --since "$GUI_FORMS_JOB_START"
       - uses: actions/cache/save@v4
-        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.receipt.outputs.reused != 'true'
         with:
           path: |
             .ccache
@@ -254,7 +325,7 @@ jobs:
       runner: macos-15
       platform: macos-arm64
       shell: bash
-      force_validation: ${{ inputs.force_validation == true }}
+      force_validation: ${{ inputs.force_validation == true || github.event_name == 'schedule' }}
       package_windows_toolchain: ${{ inputs.package_windows_toolchain == true }}
     permissions:
       contents: write
@@ -268,7 +339,7 @@ jobs:
       runner: ubuntu-24.04
       platform: linux-x64
       shell: bash
-      force_validation: ${{ inputs.force_validation == true }}
+      force_validation: ${{ inputs.force_validation == true || github.event_name == 'schedule' }}
       package_windows_toolchain: ${{ inputs.package_windows_toolchain == true }}
     permissions:
       contents: write
@@ -282,7 +353,7 @@ jobs:
       runner: ubuntu-24.04-arm
       platform: linux-arm64
       shell: bash
-      force_validation: ${{ inputs.force_validation == true }}
+      force_validation: ${{ inputs.force_validation == true || github.event_name == 'schedule' }}
       package_windows_toolchain: ${{ inputs.package_windows_toolchain == true }}
     permissions:
       contents: write
@@ -296,7 +367,7 @@ jobs:
       runner: windows-2022
       platform: windows-x64
       shell: 'msys2 {0}'
-      force_validation: ${{ inputs.force_validation == true }}
+      force_validation: ${{ inputs.force_validation == true || github.event_name == 'schedule' }}
       package_windows_toolchain: ${{ inputs.package_windows_toolchain == true }}
     permissions:
       contents: write
