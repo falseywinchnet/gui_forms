@@ -81,7 +81,7 @@ V  WYSIWYG theme designer ─────────────── needs T4
 
 State on 2026-10-23: A, T1 and T2 are complete (T2 sealed with its gate
 identical on four hosts, `results/2026-10-23-t2-engine-gate`), and so is Z
-below; F starts now. T1 to T4 are the spine; T3, T5, L and C are unblocked.
+below; F is in progress. T1 to T4 are the spine; T3, T5, L and C are unblocked.
 FD and DP were added on 2026-10-12 to match the public roadmap's 0.4 release;
 the owner accepted their gates on 2026-10-13.
 
@@ -135,7 +135,8 @@ through that API.
 
 ### F. Font substitution
 
-Status (2026-10-23): not started; starting now. Its gate declares 0.2.
+Status (2026-10-23): in progress: F1 tool, faces and table merged or merging;
+F4 gate pending. Its gate declares 0.2.
 
 Applications, Windows Forms programs and web pages request families GUI.Forms
 does not bundle (Segoe UI, Tahoma, Microsoft Sans Serif, Arial, Helvetica,
@@ -145,6 +146,19 @@ to bundled, metric-compatible faces (Carlito for Calibri already ships).
 Gate: a metrics differential for each mapped family (advance widths, line
 metrics, line breaks on a fixed corpus) against the reference face, within a
 recorded tolerance; licences recorded in `assets/fonts/ATTRIBUTION.md`.
+
+Today (2026-10-23): the owner accepted the stage plan (stage brief decisions 4
+to 14). The measurement tool, `tools/font_metrics_differential`, compares
+each reference font with its substitute through our own engine on both sides,
+with no host renderer as the reference. Its first runs are recorded in
+`results/2026-10-23-f1-metrics-harness`:
+- Cousine and Tinos match their references exactly.
+- Carlito and Arimo match apart from kerning and one glyph.
+- Selawik is a near substitute only.
+- No face comes within 5% of Tahoma Bold.
+
+The owner approved downloading Arimo, Tinos and Selawik; F3 adds them, and
+the substitution table is next.
 
 ## 4. The theming spine
 

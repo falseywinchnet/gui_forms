@@ -572,6 +572,8 @@ void TextBox::rebuild_multiline_rows(const double width) {
     multiline_width_ = -1.0;
     document_width_ = 0.0;
     const ResolvedTextLayout metrics = resolve_text_layout_utf8("Mg", font);
+    // The line box rule prepared text uses: the shaped height, or ascent,
+    // descent and the primary face's line gap, whichever is larger.
     line_height_ = std::max(1.0, std::max(metrics.logical_size.height,
         metrics.ascent + metrics.descent + metrics.line_gap));
     line_ascent_ = metrics.ascent > 0.0 ? metrics.ascent : font.size;
