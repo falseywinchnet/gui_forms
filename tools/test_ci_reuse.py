@@ -106,6 +106,18 @@ class ReuseTests(unittest.TestCase):
         fixture.identity['revision'] = 'merge-commit'
         self.assertTrue(self.lookup(fixture))
 
+    def test_a_job_of_the_per_platform_reusable_workflow_is_found(self) -> None:
+        # native.yml calls native-platform.yml once per platform; the job's name
+        # is the calling job's, then " / build".
+        fixture: FixtureAPI = FixtureAPI()
+        fixture.job['name'] = 'native (ubuntu-24.04, linux-x64, bash) / build'
+        self.assertTrue(self.lookup(fixture))
+
+    def test_another_platforms_job_is_not_taken(self) -> None:
+        fixture: FixtureAPI = FixtureAPI()
+        fixture.job['name'] = 'native (ubuntu-24.04-arm, linux-arm64, bash) / build'
+        self.assertFalse(self.lookup(fixture))
+
     def test_changed_receipt_inputs_are_rejected(self) -> None:
         key: str
         for key in ('tree', 'compiler', 'environment', 'platform'):

@@ -5,11 +5,12 @@ name: GUI.Forms programs and release
 # release from main. Pull requests stop after the smoke. Toolchain and cache
 # restoration mirror native.yml so the published compiler cache can match.
 #
-# Pushes to main and pull requests run this workflow from native.yml, after
-# the native jobs (from_native): each programs job then adds the objects its
-# platform's native job just compiled for the same tree (the native cache
-# archive), so the toolkit and tests are compiled once per platform and run,
-# rather than twice. Tags, manual dispatch and the weekly prune still start
+# Pushes to main and pull requests run this workflow from native.yml, once per
+# platform (platform), after that platform's native job (from_native): the
+# programs job then adds the objects the native job just compiled for the same
+# tree (the native cache archive), so the toolkit and tests are compiled once
+# per platform and run, rather than twice. native.yml then publishes, once all
+# four have packaged (publish-release.yml). Tags, manual dispatch and the weekly prune still start
 # it directly, with only the Actions caches.
 on:
   workflow_call:
@@ -18,6 +19,17 @@ on:
         description: Add the calling run's native cache archive to the restored objects
         type: boolean
         default: false
+      platform:
+        description: Build only this platform's programs, and leave publishing to the caller
+        type: string
+        default: ''
+    outputs:
+      version:
+        value: ${{ jobs.prepare.outputs.version }}
+      tag:
+        value: ${{ jobs.prepare.outputs.tag }}
+      publish:
+        value: ${{ jobs.prepare.outputs.publish }}
   push:
     tags: ['v*']
   workflow_dispatch:
@@ -33,7 +45,9 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: gui-forms-release-${{ github.head_ref || github.ref_name }}
+  # One group per platform when native.yml calls it for each, so the four
+  # calls of one run never cancel each other.
+  group: gui-forms-release-${{ github.head_ref || github.ref_name }}-${{ inputs.platform }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 jobs:
   prepare:
@@ -44,6 +58,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
       publish: ${{ steps.version.outputs.publish }}
+      matrix: ${{ steps.platforms.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -59,28 +74,33 @@ jobs:
         env:
           PUBLISH_REQUESTED: ${{ inputs.publish }}
         run: python3 tools/publication_version.py
+      # Every platform, or only the one native.yml asked for.
+      - name: Choose the platforms
+        id: platforms
+        env:
+          PLATFORM: ${{ inputs.platform }}
+        run: |
+          python3 - <<'EOF'
+          import json
+          import os
+          platforms = [
+              {"runner": "macos-15", "platform": "macos-arm64", "host": "MACOS", "shell": "bash"},
+              {"runner": "windows-2022", "platform": "windows-x64", "host": "WINDOWS", "shell": "msys2 {0}"},
+              {"runner": "ubuntu-24.04", "platform": "linux-x64", "host": "LINUX", "shell": "bash"},
+              {"runner": "ubuntu-24.04-arm", "platform": "linux-arm64", "host": "LINUX", "shell": "bash"},
+          ]
+          requested = os.environ.get("PLATFORM", "")
+          chosen = [entry for entry in platforms if requested in ("", entry["platform"])]
+          if not chosen:
+              raise SystemExit("unknown platform: " + requested)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("matrix=" + json.dumps({"include": chosen}) + chr(10))
+          EOF
   programs:
     needs: prepare
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - runner: macos-15
-            platform: macos-arm64
-            host: MACOS
-            shell: bash
-          - runner: windows-2022
-            platform: windows-x64
-            host: WINDOWS
-            shell: 'msys2 {0}'
-          - runner: ubuntu-24.04
-            platform: linux-x64
-            host: LINUX
-            shell: bash
-          - runner: ubuntu-24.04-arm
-            platform: linux-arm64
-            host: LINUX
-            shell: bash
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     env:
@@ -370,35 +390,18 @@ jobs:
           name: gui-forms-ctest-log-${{ matrix.platform }}
           path: .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log
           if-no-files-found: warn
+  # A call for one platform leaves publishing to its caller, which waits for
+  # all four.
   release:
-    if: needs.prepare.outputs.publish == 'true'
+    if: inputs.platform == '' && needs.prepare.outputs.publish == 'true'
     needs: [prepare, programs]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    concurrency:
-      group: gui-forms-publication
-      cancel-in-progress: false
+    uses: ./.github/workflows/publish-release.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+      version: ${{ needs.prepare.outputs.version }}
     permissions:
       contents: write
       actions: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: gui-forms-programs-*
-          merge-multiple: true
-          path: dist
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: gui-forms-receipts-*
-          merge-multiple: true
-          path: receipts
-      - name: Publish exactly the tested revision
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-        run: python3 tools/publish_tested_release.py --artifacts dist --receipts receipts
   prune:
     # Dry report only: deleting cache pre-releases stays a manual
     # `python3 tools/prune_cache_releases.py --apply` by a maintainer.

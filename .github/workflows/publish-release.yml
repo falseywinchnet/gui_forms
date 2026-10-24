@@ -1,0 +1,44 @@
+name: GUI.Forms publish release
+# Publishes the tested packages of the calling run as one release: release.yml
+# for a tag or a dispatch, native.yml on main once every platform's programs job
+# has packaged. The packages and receipts are the calling run's artifacts.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: gui-forms-publication
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gui-forms-programs-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gui-forms-receipts-*
+          merge-multiple: true
+          path: receipts
+      - name: Publish exactly the tested revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python3 tools/publish_tested_release.py --artifacts dist --receipts receipts
