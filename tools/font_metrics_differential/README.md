@@ -75,6 +75,34 @@ At a size, FreeType rounds the ascender up, the descender down and the height
 to the nearest pixel (`GRID_FIT_METRICS`). The line gap is that height less
 the ascender and descender, never below zero.
 
+## Snapshots and the cross-host gate (stage F decision 18)
+
+```text
+gui_forms_font_metrics_differential --reference <face.ttf> --candidate <face.ttf>
+    --corpus <corpus.txt> --request-family <name>
+    --request-style regular|bold|italic|bold_italic --snapshot <snapshot.txt>
+```
+
+This writes the reference's engine measurement as a text snapshot
+(`metric_snapshot.cpp`, schema `gui_forms.font_metrics_snapshot.v1`). The
+snapshot records the table request it stands for, the corpus's content
+digest, and the candidate's measurement digest. It holds measurements only:
+advances in font units, then each size's line metrics, string widths and line
+starts. The tool reads the snapshot back before writing it. The committed
+snapshots are in `reference_snapshots/`, one per gated request.
+
+`tests/font_metrics_gate_tests.cpp` (`gui_forms_font_metrics_gate_tests`)
+is the gate, and it runs on every host. It measures each bundled candidate
+that the substitution table names, and requires the candidate's digest to
+equal the recorded one. It then compares the candidate with the snapshot
+under the class's criteria and the table's named exceptions. A named
+exception must still fail its criterion and stay within its limit. On
+Windows, an installed reference whose SHA-256 matches its snapshot is
+measured again and must reproduce the snapshot. To re-measure after a
+change to the table, the engine or the corpus, rerun the snapshot command for
+each row of `results/2026-10-23-f-font-substitution`. Review the differences
+before committing them.
+
 ## Rules
 
 - Reference fonts are oracles. They are read by path (for example from

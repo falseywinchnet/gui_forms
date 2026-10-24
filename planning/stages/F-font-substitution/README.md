@@ -171,3 +171,17 @@ The owner accepted every recommendation of the F0 plan.
     paragraph sets) and Carlito Bold Italic's line breaks (2 of 90, from
     kerning) are named exceptions in F4's gate. Those styles stay
     `metric_compatible`.
+
+## Owner decision, 2026-10-23 (F4's cross-host gate)
+
+18. **Commit metric snapshots** (owner decision F4-1, option 1). The
+    snapshots hold measurements only, never font bytes: advances in font
+    units, and corpus line widths, breaks and heights per size. Each also
+    names its reference file's SHA-256 and version. On every host, a
+    render-area ctest (`gui_forms_font_metrics_gate_tests`) measures the
+    bundled candidates against the snapshots, with the class tolerances and
+    the named exceptions. The Windows job also re-measures each installed
+    reference whose SHA-256 matches its snapshot. The snapshot files and
+    `assets/fonts/ATTRIBUTION.md` state the provenance: how the snapshots were
+    measured, from which file hashes, and that no font data is included. The
+    record is `results/2026-10-23-f-font-substitution`.

@@ -72,6 +72,31 @@ struct FontSubstitution final {
     std::string_view evidence;
 };
 
+// A criterion of the metric gate (stage F, step F4): the comparison of a
+// bundled candidate against a reference face's committed snapshot.
+enum class FontGateCriterion : std::uint8_t {
+    // Code points whose advance differs, counted.
+    advances,
+    // Paragraph line-break sets that differ, summed over every gate size.
+    line_breaks,
+    // Line height difference in pixels at any gate size.
+    line_height,
+    // The largest absolute mean line-width deviation at any gate size, as a
+    // fraction of the reference width.
+    line_width,
+};
+
+// A named exception (decisions 16 and 17): one style of a substitution may
+// fail one criterion, within `limit`, in the criterion's own unit. The gate
+// fails an exception whose criterion passes, so stale exceptions surface.
+struct FontGateException final {
+    std::string_view requested;
+    FontFaceStyle style{FontFaceStyle::regular};
+    FontGateCriterion criterion{FontGateCriterion::advances};
+    double limit{0.0};
+    std::string_view note;
+};
+
 // One request's answer. Every view points into the static table except
 // `requested`, which borrows the caller's string.
 struct FontFamilyResolution final {
@@ -105,5 +130,7 @@ struct FontFamilyResolution final {
 [[nodiscard]] std::span<const FontSubstitution> font_substitutions() noexcept;
 [[nodiscard]] const char* font_resolution_source_name(FontResolutionSource source) noexcept;
 [[nodiscard]] const char* font_mapping_class_name(FontMappingClass mapping) noexcept;
+[[nodiscard]] std::span<const FontGateException> font_gate_exceptions() noexcept;
+[[nodiscard]] const char* font_gate_criterion_name(FontGateCriterion criterion) noexcept;
 
 } // namespace gui_drawing

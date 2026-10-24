@@ -163,3 +163,17 @@ Stage F's substitution table, `font-substitution.json` beside these files,
 names every face it maps to. GUI.Drawing's raster module ships them in its
 `fonts` directory and loads each face the first time a request resolves to
 it. The SDK installs the whole font directory.
+
+## Metric snapshots (stage F gate)
+
+`tools/font_metrics_differential/reference_snapshots/` holds one text file
+per gated request (owner decision F4-1, stage F decision 18). Each is the
+bundled engine's measurement of one Windows reference face: its advances in
+font units, its line metrics, and the corpus line widths, line breaks and
+heights at each gate size. They were measured on 2026-10-23 by
+`gui_forms_font_metrics_differential --snapshot` from the files in
+`C:\Windows\Fonts` of a Windows 11 machine. Each snapshot names its reference
+file by name, version, byte count and SHA-256; the hashes are also listed in
+`results/2026-10-23-f-font-substitution`. **No font data is included**: no
+outlines, glyph programs, tables or other bytes of any reference face are in
+the repository. The reference faces were read in place and never copied.

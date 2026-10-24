@@ -1,6 +1,6 @@
 {
   "schema": "gui_forms.font_substitution.v1",
-  "description": "Stage F's font substitution table. A requested family resolves to a bundled family: its own name first, then a substitution, an alias or a generic name. A family named nowhere here is unmapped: host bytes are accepted only when the host's face has the requested name, otherwise the content family substitutes. Every face file lives beside this file. The build generates a fixed record array from it (cmake/FontSubstitution.cmake); C# and Web.Forms read the same file.",
+  "description": "Stage F's font substitution table. A requested family resolves to a bundled family: its own name first, then a substitution, an alias or a generic name. A family named nowhere here is unmapped: host bytes are accepted only when the host's face has the requested name, otherwise the content family substitutes. Every face file lives beside this file. The build generates a fixed record array from it (cmake/FontSubstitution.cmake); C# and Web.Forms read the same file. An exception names a gate criterion a measured style may fail, and its limit: advances (mismatched code points), line_breaks (differing paragraph line-break sets over every size), line_height (px) or line_width (largest absolute mean deviation at any size).",
   "content_family": "Carlito",
   "families": [
     {
@@ -84,7 +84,7 @@
       "class": "metric_compatible",
       "evidence": "results/2026-10-23-f1-metrics-harness/calibri-carlito-*.json",
       "exceptions": [
-        {"style": "bold_italic", "note": "2 of 90 paragraph line-break sets differ (kerning); decision 17"}
+        {"style": "bold_italic", "criterion": "line_breaks", "limit": 2, "note": "2 of 90 paragraph line-break sets differ (kerning), decision 17"}
       ]
     },
     {
@@ -93,8 +93,8 @@
       "class": "metric_compatible",
       "evidence": "results/2026-10-23-f1-metrics-harness/arial-arimo-*.json",
       "exceptions": [
-        {"style": "bold", "note": "U+00B5 advances 1229 against 1180 units; decision 17"},
-        {"style": "bold_italic", "note": "4 of 90 paragraph line-break sets differ; decision 17"}
+        {"style": "bold", "criterion": "advances", "limit": 1, "note": "U+00B5 advances 1229 against 1180 units, decision 17"},
+        {"style": "bold_italic", "criterion": "line_breaks", "limit": 4, "note": "4 of 90 paragraph line-break sets differ, decision 17"}
       ]
     },
     {
@@ -124,7 +124,7 @@
       "class": "nearest",
       "evidence": "results/2026-10-23-f1-metrics-harness/tahoma-selawik-*.json",
       "exceptions": [
-        {"style": "bold", "note": "mean line width -7.0% against Tahoma Bold, outside the 5% bound; decision 16"}
+        {"style": "bold", "criterion": "line_width", "limit": 0.071, "note": "mean line width -7.0% against Tahoma Bold, outside the 5% bound, decision 16"}
       ]
     },
     {

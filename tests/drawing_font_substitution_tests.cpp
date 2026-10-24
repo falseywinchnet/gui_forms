@@ -135,6 +135,29 @@ void table_records_are_consistent(const std::filesystem::path& font_directory) {
     }
 }
 
+// Decisions 16 and 17: the named gate exceptions, each on a measured
+// substitution's existing face, one per style and criterion.
+void gate_exceptions_name_measured_faces() {
+    const std::span<const gui_drawing::FontGateException> exceptions = gui_drawing::font_gate_exceptions();
+    CHECK(exceptions.size() == 4U);
+    std::set<std::string> keys;
+    for (const gui_drawing::FontGateException& exception : exceptions) {
+        const FontFamilyResolution resolution = gui_drawing::resolve_font_family(exception.requested, exception.style);
+        CHECK(resolution.source == FontResolutionSource::substitution);
+        CHECK(resolution.face_style == exception.style);
+        CHECK(exception.limit > 0.0 && !exception.note.empty());
+        const std::string key = std::string(exception.requested) + '\x1f' +
+                                static_cast<char>('0' + static_cast<int>(exception.style)) +
+                                gui_drawing::font_gate_criterion_name(exception.criterion);
+        CHECK(keys.insert(key).second);
+    }
+    const gui_drawing::FontGateException& tahoma = exceptions[3];
+    CHECK(tahoma.requested == "Tahoma" && tahoma.style == FontFaceStyle::bold);
+    CHECK(tahoma.criterion == gui_drawing::FontGateCriterion::line_width && tahoma.limit == 0.071);
+    CHECK(std::strcmp(gui_drawing::font_gate_criterion_name(gui_drawing::FontGateCriterion::line_breaks),
+                      "line_breaks") == 0);
+}
+
 } // namespace
 
 int main(int argument_count, char** arguments) {
@@ -143,5 +166,6 @@ int main(int argument_count, char** arguments) {
     missing_styles_resolve_to_the_nearest_face();
     unmapped_families_fall_back_to_the_content_family();
     table_records_are_consistent(std::filesystem::path(arguments[1]));
+    gate_exceptions_name_measured_faces();
     return 0;
 }

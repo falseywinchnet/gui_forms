@@ -375,6 +375,7 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
         tools/font_metrics_differential/engine_measurement.cpp
         tools/font_metrics_differential/differential_compare.cpp
         tools/font_metrics_differential/differential_report.cpp
+        tools/font_metrics_differential/metric_snapshot.cpp
     )
     if(WIN32)
         target_sources(gui_forms_font_metrics_differential PRIVATE
@@ -2539,6 +2540,15 @@ if(GUI_FORMS_BUILD_TESTS)
         add_test(NAME gui_forms_font_metrics_differential_tests COMMAND gui_forms_font_metrics_differential_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts"
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/font_metrics_differential/corpus/forms_latin_v1.txt")
+        # Stage F's metric gate (step F4): bundled candidates against the
+        # committed reference snapshots, on every host.
+        add_executable(gui_forms_font_metrics_gate_tests tests/font_metrics_gate_tests.cpp)
+        target_link_libraries(gui_forms_font_metrics_gate_tests PRIVATE
+            gui_forms_font_metrics_differential gui_drawing_core)
+        add_test(NAME gui_forms_font_metrics_gate_tests COMMAND gui_forms_font_metrics_gate_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/font_metrics_differential/corpus/forms_latin_v1.txt"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/font_metrics_differential/reference_snapshots")
 
         add_executable(gui_forms_bounded_shape_workspace_tests tests/bounded_shape_workspace_tests.cpp)
         target_link_libraries(gui_forms_bounded_shape_workspace_tests PRIVATE gui_forms_text_engine)
