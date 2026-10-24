@@ -9,9 +9,9 @@
 0.2 is the "Verified" series. Each item in it has a recorded gate: tests
 that measure it on every host it applies to (Windows x64, macOS arm64, Linux
 x64 and Linux arm64), and a record under `results/` saying what was
-measured. The demonstration
-programs are the same three as in 0.1: the control Gallery, the
-fixture-backed Explore preview and the Correspondence mail mockup.
+measured. The demonstration programs are the same three as in 0.1: the
+control Gallery, the fixture-backed Explore preview and the Correspondence
+mail mockup.
 
 ## Breaking changes
 
