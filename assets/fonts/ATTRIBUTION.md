@@ -97,3 +97,67 @@ monochrome face is deliberately bounded to fallback proof until GUI.Drawing
 admits and measures a color-font raster policy.
 
 Noto Sans Arabic, Hebrew, Devanagari, Bengali and Gurmukhi are unmodified Noto Project font files under SIL OFL 1.1. See OFL-Noto.txt and language-font-provenance.json for source URLs and byte hashes.
+
+## Font substitution faces (stage F)
+
+The owner approved these downloads on 2026-10-23 for stage F's substitution
+table (`planning/stages/F-font-substitution/`). Each file was downloaded into
+its own empty directory and checked against the upstream size and git blob
+SHA-1 before use. Its SHA-256 is recorded below. The faces are byte-identical
+to upstream; only the Selawik files are renamed. The F1 metrics differential
+against the Windows reference faces is in
+`results/2026-10-23-f1-metrics-harness`.
+
+**Arimo 1.33** is metric-compatible with Arial, and is the substitute for
+Arial, Helvetica and Microsoft Sans Serif.
+- Source: `googlefonts/arimo` commit
+  `4a6255f269916ae7ad3fc2706b0935e7621396b8`, files `fonts/ttf/`.
+- Licence: SIL OFL 1.1, retained as `OFL-Arimo.txt` (upstream `OFL.txt`,
+  SHA-256 `c46fda6859efb80c0a3c1faa868908a3d2fcb26eb7fd9602d73bebeec21bca3a`).
+
+| File | Bytes | Git blob SHA-1 | SHA-256 |
+|---|---|---|---|
+| `Arimo-Regular.ttf` | 478712 | `d6b78c111a336f8c42e4cf5b6546c7b3386146cd` | `41b22bc8f0b51f932825d37bc55b5eb6ba67dfe599a626e4aff2b43b624f9f8c` |
+| `Arimo-Bold.ttf` | 485872 | `6453fed1dd86ed03fd2a5b4060d26e01ad4f57a4` | `d7a8b187cf8444d4cfee102e8eae9e3043682fd5106d5d33ed677fe268a0e2ba` |
+| `Arimo-Italic.ttf` | 502332 | `1e7b31c2b59ae634d4e1fd0acf52ff7c2cf7c796` | `ffdf690e4357a392e4edcc3df0b3adb0302920f75e54f2e6eec355afbe7edcba` |
+| `Arimo-BoldItalic.ttf` | 508508 | `e7c5924ae3e8fbd2585c4ef73f620caa22b2a3ba` | `77c967d49d4ef4a63c39fbcd1e27892102e503e35a20983cb058430c4f268b34` |
+
+**Tinos 1.340** is metric-compatible with Times New Roman, and is the
+substitute for Times New Roman and CSS `serif`.
+- Source: `googlefonts/tinos` commit
+  `3b4482a99b80ea5fc75f187b1be3120a3f5905b3`, files `fonts/ttf/`.
+- Licence: SIL OFL 1.1, retained as `OFL-Tinos.txt` (upstream `OFL.txt`,
+  SHA-256 `cb3382d4643e8b02c12e322c220a3c76a5020d667e4fd4e7c75e744cca6caa6b`).
+
+| File | Bytes | Git blob SHA-1 | SHA-256 |
+|---|---|---|---|
+| `Tinos-Regular.ttf` | 521588 | `893a1b525962984481aee5ce275516d384eb4865` | `60a0e8ef0c04dd5dd69ffe91025fa2ae5836cbd35600a82ba031977557e2cb61` |
+| `Tinos-Bold.ttf` | 597880 | `887fc97a95d30a08190217b6075a5e0a0f92bec7` | `393269dbab8899f938db19783eca5eac92eb431f7ae0ab45b8349ca895f1a06b` |
+| `Tinos-Italic.ttf` | 565016 | `5aed4f3757537bf334ca89dd6893063a3ef9ecc9` | `5942266ed398b155d7dc23e36833e7ec6be988f2439bdbeb8ef1bede808eaa91` |
+| `Tinos-BoldItalic.ttf` | 578976 | `a9abd086816f68d6eb3672f1d0babd1db1807d4a` | `a5de79f0fe863ea0954757acb3d47b3ccd0a930ce3dd5b97230cd3866790a06e` |
+
+**Selawik 1.01** is Microsoft's open fallback for Segoe UI, and a near
+substitute for Segoe UI and Tahoma Regular.
+- Source: the `microsoft/Selawik` release 1.01 archive `Selawik_Release.zip`
+  (530652 bytes, SHA-256
+  `3f62c51e05e3b5a1e6241cf92a371f0be2ea1183aa87b30718bbd40832a8d423`). The
+  repository's tag 1.01 is commit
+  `b65ff9ce7c4673e75ec5c622924a6b6f61f2f876`. Its tree holds only sources,
+  and GitHub publishes no digest for the 2015 archive.
+- Bundled: the Regular, Semibold and Bold TTFs. The archive's Light and
+  Semilight faces and its web formats are not bundled. Selawik has no italic
+  styles.
+- Licence: SIL OFL 1.1, retained as `OFL-Selawik.txt` (the tag's
+  `LICENSE.txt`, git blob SHA-1 `ac8fdb956049621af2aecd3a8253c38789748c4a`,
+  SHA-256 `77b7c2506d4efb22e09c8ccf10159f4956eab3ef7c007fef95de136bcf45300c`).
+  "Selawik" is a Reserved Font Name, which an unmodified copy keeps.
+
+| File | Archive name | Bytes | SHA-256 |
+|---|---|---|---|
+| `Selawik-Regular.ttf` | `selawk.ttf` | 44224 | `e9d98518d8ac2817782a9a382430463a2e0793ea68350b695bb727d9a830ee1c` |
+| `Selawik-Semibold.ttf` | `selawksb.ttf` | 44192 | `0a9e9d0549a10f24bef9b3a29e06fe6e0b5c21e7a784c503b048a307841a7783` |
+| `Selawik-Bold.ttf` | `selawkb.ttf` | 44068 | `f0db5e174a90e0956ad7d2844bdca1d5e6da92ec65b2c04e57ba9b180668c904` |
+
+None of these faces is registered or packaged yet. Stage F's substitution
+table (phase F2) registers them, and adds them to the install set and to
+`THIRD_PARTY_NOTICES.md`.
