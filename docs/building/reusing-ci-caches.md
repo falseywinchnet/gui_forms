@@ -82,20 +82,64 @@ On a pull request, the programs job reads that list from its platform's
 archive and runs only the tests of its own build that are not on it
 (`tools/native_tests.py select`). Those are the Gallery and demoboard tests,
 which the native configuration leaves out, and any test the native job
-skipped. A manifest without the list runs every test. Pushes to `main`, which
-publish the release record, and direct runs of the programs workflow still
-run every test.
+skipped. A manifest without the list runs every test. Direct runs of the
+programs workflow and `native.yml`'s daily scheduled run on `main` run every
+test.
+
+## Jobs that carry an earlier run of the same tree
+
+Branch protection merges a pull request only when it is up to date with
+`main`, so a push to `main` has the tree that pull request's last run tested.
+Since 2026-10-23 (the owner's choice), the push carries that run's results
+instead of repeating them, and every job still passes under its own name:
+
+| Job | Carried with | What the push then does |
+|---|---|---|
+| native | `ci_promote.py lookup`, `ci_reuse.py lookup` | promotes or restores the tested archive |
+| programs | `release_tests.py merged` | copies the pull request's programs ctest receipt; builds, packages and smoke tests under its own version; runs no tests |
+| Sanitizers | `ci_tree_receipt.py lookup --kind sanitize` | builds and tests nothing |
+| docs | `ci_tree_receipt.py lookup --kind docs` | builds nothing |
+
+`release_tests.py merged` takes the merge commit's second parent as the pull
+request's head, which must have this tree, and a `pull_request` run of
+`native.yml` on that head, in this repository, whose programs job for the
+platform succeeded. The packages receipt of that job must name a revision of
+this tree, and its ctest receipt must report at least one test and no
+failure. The carried receipt gains a comment naming the run and saying what
+it covers: the tests not in the validated list of the tree's native job,
+which passed the rest. A release tag carries `main`'s receipt the same way
+(`release_tests.py find`), comment and all.
+
+`ci_tree_receipt.py` records, for each passing docs and Sanitizers job, a
+receipt artifact `gui-tree-<kind>-<tree>`: the tree, the revision checked
+out, the run, what it covered (for the sanitizers, `ci_build.py`'s build
+record: `everything`, `selected` or `nothing`) and, for a job that carried
+one, the run it carried. A lookup accepts only an older `native.yml` run of
+this repository, not a fork's, whose job of that name succeeded, whose
+artifact digest and receipt match this tree and run, and whose head has the
+tree or whose recorded revision merges its head (`merge_of_head`). A pull
+request's Sanitizers run covers only the tests its changed paths can affect,
+and the push to `main` accepts that: the sanitizers need to run only on new
+code. A failed lookup runs the job.
+
+The daily scheduled run on `main` (03:41 UTC) carries nothing: the native
+jobs validate afresh (`force_validation`), and the programs, Sanitizers and
+docs jobs build and test everything. It is the backstop for the two rules
+the carried results rely on, `native_tests.py`'s name match and
+`change_selection.py`'s selection, and it publishes nothing. It has its own
+concurrency group, so it and a push to `main` never cancel each other.
 
 ## The sanitizer job's cache
 
-The sanitizer job always builds and runs the whole suite; it never reuses a
-result. Its compiler cache crosses the branch boundary through an artifact:
+Its compiler cache crosses the branch boundary through an artifact:
 each successful job uploads its `.ccache` as `gui-sanitize-ccache-linux-x64`
 (kept seven days), and the next job takes the newest one of the nearest
 branch (`tools/ci_sanitizer_seed.py`): a pull request's own earlier push,
 then the branch it is stacked on; on `main`, the merged pull request's head.
-Without one it keeps `main`'s Actions cache. Only pushes to `main` save
-Actions caches for the sanitizer, native object and programs object caches;
+Without one it keeps `main`'s Actions cache. Only `main` saves Actions
+caches for the sanitizer, native object and programs object caches (a
+sanitizer job that carried a pull request's result built nothing, so the
+daily run and pushes that carried nothing refresh it);
 pull requests restore `main`'s, so per-run entries no longer evict the
 dependency caches from the repository's 10 GB.
 
