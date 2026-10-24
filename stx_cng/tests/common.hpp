@@ -27,6 +27,22 @@ inline constexpr Pattern patterns[] = {Pattern::ramp, Pattern::steps, Pattern::r
                                        Pattern::noise, Pattern::sparse_noise, Pattern::flat};
 
 // Tightly packed samples of `image` following `pattern`; the seed varies noise.
+// One sample of `pattern` at (x, y) in `channel`; `noise` is the generator's
+// next value, which the noise patterns use.
+inline std::uint32_t pattern_value(Pattern pattern, std::uint32_t width, std::uint32_t noise, std::uint32_t state,
+                                   std::size_t x, std::size_t y, std::size_t channel) {
+    switch (pattern) {
+    case Pattern::ramp: return static_cast<std::uint32_t>(3 * x + y + 67 * channel);
+    case Pattern::steps: return x < width / 2 ? 0U : 255U;
+    case Pattern::repeats: return static_cast<std::uint32_t>((x % 7) * 19 + channel * 31);
+    case Pattern::noise: return noise;
+    case Pattern::sparse_noise: return (state >> 20) % 5 == 0 ? noise : static_cast<std::uint32_t>(x / 9 * 13 + y);
+    case Pattern::flat: return channel == 3 ? 255U : 40U;
+    }
+    // A pattern outside the enumeration is noise.
+    return noise;
+}
+
 inline std::vector<std::byte> generate(stx_cng::CngImage image, Pattern pattern, std::uint32_t seed) {
     std::size_t channels = static_cast<std::size_t>(image.channels);
     std::vector<std::byte> samples(static_cast<std::size_t>(image.width) * image.height * channels);
@@ -37,15 +53,7 @@ inline std::vector<std::byte> generate(stx_cng::CngImage image, Pattern pattern,
         std::size_t channel = index % channels;
         std::size_t x = pixel % image.width;
         std::size_t y = pixel / image.width;
-        std::uint32_t value = state >> 24;
-        switch (pattern) {
-        case Pattern::ramp: value = static_cast<std::uint32_t>(3 * x + y + 67 * channel); break;
-        case Pattern::steps: value = x < image.width / 2 ? 0U : 255U; break;
-        case Pattern::repeats: value = static_cast<std::uint32_t>((x % 7) * 19 + channel * 31); break;
-        case Pattern::noise: break;
-        case Pattern::sparse_noise: value = (state >> 20) % 5 == 0 ? value : static_cast<std::uint32_t>(x / 9 * 13 + y); break;
-        case Pattern::flat: value = channel == 3 ? 255U : 40U; break;
-        }
+        const std::uint32_t value = pattern_value(pattern, image.width, state >> 24, state, x, y, channel);
         samples[index] = static_cast<std::byte>(value & 255U);
     }
     return samples;
