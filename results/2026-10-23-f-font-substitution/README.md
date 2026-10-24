@@ -1,5 +1,8 @@
 # Stage F, F4: the font substitution gate (2026-10-23)
 
+**F gate recorded 2026-10-23.** CI run 40049449883 on commit 3dfb3137
+(PR #305) passed on all four native hosts; see "Cross-host record".
+
 This is the record of stage F's gate. Every substitution in the final table,
 `assets/fonts/font-substitution.json`, is measured against its Windows
 reference face. The measurement is by our own engine on both sides (decision
@@ -213,6 +216,18 @@ UndefinedBehaviorSanitizer.
 ## Cross-host record
 
 The `native` job of `.github/workflows/native.yml` runs the gate on macOS 15
-(arm64), Ubuntu 24.04 (x64 and arm64) and Windows Server 2022 (x64). The
-stage gate is green when all four pass on the commit that adds this record.
-0.2 may then be declared.
+(arm64), Ubuntu 24.04 (x64 and arm64) and Windows Server 2022 (x64).
+
+GitHub Actions run 40049449883, on commit 3dfb3137 (PR #305, the commit that
+added this record), passed every job:
+
+| Host | Runner | `gui_forms_font_metrics_gate_tests` |
+|---|---|---|
+| linux-x64 | ubuntu-24.04 | passed, 0.70 s |
+| linux-arm64 | ubuntu-24.04-arm | passed, 0.58 s |
+| macos-arm64 | macos-15 | passed, 0.79 s |
+| windows-x64 | windows-2022 | passed, 3.30 s, with the installed references measured again |
+
+Every host therefore reproduced every candidate's measurement digest, and the
+results above hold on all four. With this record, F's gate is met and 0.2
+Verified is complete.

@@ -26,15 +26,16 @@ details are under [Done and tested](#done-and-tested).
 
 ## 0.2 Verified
 
-0.2 is declared when the font substitution gate is recorded; the rest is done.
+0.2 is complete: the font substitution gate was recorded on 2026-10-23.
 
 - **Accessibility verified on every host** (done). Client tests read the
   Gallery through each platform's own accessibility API (AX on macOS, MSAA
   and UI Automation on Windows, AT-SPI on Linux); Windows has a UI Automation
   provider; text fields expose editable text ranges on every host; and every
   native host advertises the capability.
-- **Font substitution** (in progress). Families that applications ask for
-  map to bundled faces with matching metrics.
+- **Font substitution** (done). Families that applications ask for map to
+  bundled faces with matching metrics, measured on every host
+  (`results/2026-10-23-f-font-substitution`).
 - **Articulated controls** (done). Every control is built from named parts
   with states and public geometry, described by one schema that the C++ API,
   form documents, themes and the visual tools share.

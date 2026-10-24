@@ -1,8 +1,10 @@
 # Stage F: font substitution for requested families
 
 Release: 0.2 Verified. Depends on: nothing. Feeds R, S and H.
-Status 2026-10-23: started. The plan's eleven decisions are accepted (below);
-F1, the measurement tool, is in progress. Authority:
+Status 2026-10-23: complete. The gate is recorded in
+`results/2026-10-23-f-font-substitution` (CI run 40049449883 on 3dfb3137,
+passed on linux-x64, linux-arm64, macos-arm64 and windows-x64). F1 (#301),
+F3 (#302), F2 (#304) and F4 (#305) are done. Authority:
 `planning/FORWARD_PROGRAMME.md` §3 F.
 
 Read [the shared brief](../README.md) first.
