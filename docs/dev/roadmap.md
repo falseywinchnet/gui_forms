@@ -26,27 +26,35 @@ details are under [Done and tested](#done-and-tested).
 
 ## 0.2 Verified
 
-- **Accessibility verified on every host.** Tests read each platform's own
-  accessibility API; Windows gains a UI Automation provider and text fields
-  expose editable text ranges; then the capability is advertised.
-- **Font substitution.** Families that applications ask for map to bundled
-  faces with matching metrics.
-- **Articulated controls.** Every control is built from named parts with
-  states and public geometry, described by one schema that the C++ API, form
-  documents, themes and the visual tools share.
+0.2 is declared when the font substitution gate is recorded; the rest is done.
+
+- **Accessibility verified on every host** (done). Client tests read the
+  Gallery through each platform's own accessibility API (AX on macOS, MSAA
+  and UI Automation on Windows, AT-SPI on Linux); Windows has a UI Automation
+  provider; text fields expose editable text ranges on every host; and every
+  native host advertises the capability.
+- **Font substitution** (in progress). Families that applications ask for
+  map to bundled faces with matching metrics.
+- **Articulated controls** (done). Every control is built from named parts
+  with states and public geometry, described by one schema that the C++ API,
+  form documents, themes and the visual tools share.
+- **Owned compression and image codecs on every host** (done): one zlib, an
+  owned PNG codec, CNG native resources and CONV interpolation, all GPL-free.
 
 ## 0.3 Themeable
 
-- **A theme engine.** Themes are data: properties, layered effects,
+- **A theme engine** (done). Themes are data: properties, layered effects,
   transitions and state machines, and bounded expressions with pointer
   position and application values as inputs. New kinds of effect are added to
-  the engine in C++. An idle window still draws nothing.
+  the engine in C++. An idle window still draws nothing. Its gate is
+  recorded: identical pixels on every host and no frames once a window
+  settles.
 - **CSS-syntax themes** addressed to the named parts.
 - **The default theme**, in light and dark, following the
   design-language specification (`planning/DESIGN_LANGUAGE_SPECIFICATION.md`).
 - **Windows-familiar themes** beside it.
 - **Compositor cooperation:** transparency, glass and behind-window materials
-  where the host provides them.
+  where the host provides them, with reflection and full-fidelity glass.
 
 ## 0.4 Flexible
 
@@ -101,6 +109,9 @@ The API is declared stable only when all of the following hold:
 The full plan, with a measured gate for each stage, is
 `planning/FORWARD_PROGRAMME.md`.
 
+Future note, not a stage: distribution near 1.0 is expected to move to
+rolling releases with pinnable caches, likely hosted off GitHub.
+
 ## Milestones
 
 The implementation programme is a chain of independently testable contracts.
@@ -141,6 +152,14 @@ gates as their own rows. "Done" means the deliverable exists and a test in
 - One text engine (HarfBuzz shaping, FreeType light auto-hinting, shared
   sRGB blending) with identical output on macOS, Windows and Linux, enforced
   by a hash-compared identity test. Skia is built without any font backend.
+- Owned compression and image codecs on every host: one zlib (`stx_zlib`),
+  an owned PNG codec (`stx_png`), CNG as the native resource format with PNG
+  kept for interchange (`stx_cng`), and CONV interpolation (`stx_conv`). WIC
+  decoding is removed and FreeType is built without zlib.
+- The theme engine: a cascade of rules over named parts, layered materials,
+  effect primitives with declared cost bounds, transitions and settling
+  motion, idle-time bakes, and procedural materials, with identical pixels on
+  every host and no frames once a window settles.
 - Forms-like focus, Tab order, focus scopes, mnemonics, accept/cancel
   targets, validation, pointer capture, deferred input during paint.
 - One UI thread per window, a bounded FIFO dispatcher, synchronous `invoke`,

@@ -29,15 +29,15 @@ stage's brief, then the documents the brief lists under "Read first".
 Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 `tools/make_roadmap_svg.py`). Everything listed is before 1.0.
 
-| Stage | Brief | Release | Depends on (gates recorded) | Status 2026-10-13 |
+| Stage | Brief | Release | Depends on (gates recorded) | Status 2026-10-23 |
 |---|---|---|---|---|
-| A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | started 2026-10-19: Windows: MSAA client test over the whole Gallery (A-W1, `results/2026-10-19-a-w1-msaa-gallery`), UI Automation provider (A-W2) and its Gallery client test (A-W3, `results/2026-10-20-a-w3-uia-gallery`); Linux: AT-SPI client tests A-L1 (#192) and the whole Gallery A-L2 (#197, `results/2026-10-20-a-l2-linux-gallery`); macOS: in-process and out-of-process AX tests registered (#194, #195), gate run recorded (`results/2026-10-20-a-macos`); editable text ranges next; capability not yet advertised |
-| F | [Font substitution](F-font-substitution/README.md) | 0.2 Verified | none | started 2026-10-23: plan accepted (brief decisions 4 to 14); F1 measurement tool `tools/font_metrics_differential`, first runs `results/2026-10-23-f1-metrics-harness`, engine against engine (Cousine and Tinos exact; Carlito and Arimo exact but for kerning and one glyph; Selawik nearest only; Tahoma Bold has no face within 5%); Arimo, Tinos and Selawik downloaded with approval, F3 adds them |
+| A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | complete 2026-10-23: client tests read the whole Gallery through MSAA and UI Automation (`results/2026-10-19-a-w1-msaa-gallery`, `results/2026-10-20-a-w3-uia-gallery`), AT-SPI (`results/2026-10-20-a-l2-linux-gallery`) and AX (`results/2026-10-20-a-macos`); editable text ranges on all three hosts (#263, #271, #273); every native host advertises the capability (#277); the macOS AX client settles before it reads (#249, #266, #275) |
+| F | [Font substitution](F-font-substitution/README.md) | 0.2 Verified | none | in progress: F1 tool, faces and table merged or merging; F4 gate pending. Its gate declares 0.2 (owner decision 2026-10-23). Started 2026-10-23: plan accepted (brief decisions 4 to 17); F1 measurement tool `tools/font_metrics_differential`, first runs `results/2026-10-23-f1-metrics-harness`, engine against engine (Cousine and Tinos exact; Carlito and Arimo exact but for kerning and one glyph; Selawik nearest only; Tahoma Bold has no face within 5%); Arimo, Tinos and Selawik downloaded with approval, F3 adds them |
 | T1 | [Anatomy: articulated controls and one schema](T1-anatomy/README.md) | 0.2 Verified | none | complete 2026-10-13 (`results/2026-10-13-t1-anatomy-gate`): 60 of 60 controls; item systems, per-part states, interactions, schema export and one-name-three-spellings merged; owner signed off, and declared T1 sealed once the follow-on DP and host work (#80, #81) was in |
-| T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | interview answered 2026-10-19; plan E1–E11 accepted (`T2-engine-core/PLAN.md`); E1 revision then E2 next |
+| T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | sealed 2026-10-23 (`results/2026-10-23-t2-engine-gate/SEALED.md`; gate run 40027309396: 4 hosts, 144 images, 308 sample images, 77 features, 0 differences, 0 busy idle counters): E1 to E11 plus E7r, E9.6 and E10; bake costs measured on a quiet machine (#293) |
 | T3 | [Theme language front end](T3-theme-language/README.md) | 0.3 Themeable | T1, T2 | not started |
 | T4 | [Default theme and Windows-familiar themes](T4-default-theme/README.md) | 0.3 Themeable | T1, T2, T3 | design decided, build not started |
-| T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | not started |
+| T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | not started; reflection and full-fidelity glass moved here from T2 (owner decision 2026-10-23) |
 | L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | not started; ready (T1 gate recorded) |
 | FD | [Form documents](FD-form-documents/README.md) | 0.4 Flexible | T1, T3 | not started; format decided |
 | DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | in progress: rectangle sets painted and presented on every host, paint contract version 2 (#59 to #78); X11 direct live frames in #80; Windows gate recorded (`results/2026-10-13-dp-gate-windows`), macOS and X11 records pending PlaySuite's runs against #80 |
@@ -48,7 +48,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | RB | [Ribbon framework: study, interview, decisions, plan](RB-ribbon/README.md) | to be placed by its plan | none to start | complete 2026-10-14: study, interview round 001, 27 decisions and the plan, accepted by the owner; the ribbon is built in W (`RB-ribbon/PLAN.md`), phase 0 first |
 | DK | [Docking and windowing: study, interview, decisions, plan](DK-docking/README.md) | to be placed by its plan | none to start | started 2026-10-14 (admitted by the owner, matrix row 43): complete 2026-10-17: studies, interview round 001 (43 decisions, look studies published) and the plan, accepted by the owner; built in a DK window-layer stage (W0) and in W (`DK-docking/PLAN.md`) |
 | DG | [Diagram control: study, interview, decisions, plan](DG-diagram/README.md) | to be placed by its plan | none to start | started 2026-10-19 (matrix row 55): study written; the interview waits for the owner |
-| Z | [Owned zlib replacement: study and threat model](Z-zlib/README.md) | to be placed after owner review | none for study; owner acceptance before code | added 2026-10-19 at the owner's request; phase 1 source audit recorded in `results/2026-10-19-zlib`; decisions accepted then PNG revised to owned codec; source reuse authorized; phase 2 inflate implemented for review; owner started PNG phase, private sample decoder implemented for review; verification gates open |
+| Z | [Owned zlib replacement: study and threat model](Z-zlib/README.md) | 0.2 Verified (done; owner decision 2026-10-23) | none for study; owner acceptance before code | complete: stx_zlib and stx_png in production on every host, WIC decoding removed, FreeType built without zlib (GA record #240, `Z-zlib/GA_RECORD.md`); then stx_conv (CONV interpolation, the face-variant generator) and CNG (the native resource format, PNG kept for interchange; #270, #276) |
 | D | [Interface builder](D-interface-builder/README.md) | 0.7 Designers | T3, L, FD | not started |
 | H | [HTML import and layout designer](H-html-import/README.md) | 0.7 Designers | L, T3 | earlier attempt discarded |
 | V | [Theme designer](V-theme-designer/README.md) | 0.7 Designers | T4, D core | not started |
@@ -58,21 +58,18 @@ A, F, T1 and DP could start at once. A and F run beside everything else. T1
 to T4 are the spine: almost every later stage reads the anatomy and the
 engine.
 
-**Where to pick up (2026-10-13).** T1 is complete; its gate is recorded and
-the owner has declared it sealed. The next spine stage is **T2, the engine
-core**, now unblocked; T1's decision 6 hands it two items (hit regions
-derived from part geometry, and text published as layout slots), listed in
-the T1 brief's hand-off. **L** is also unblocked; **C** waits for T2 and
-**FD** for T3. **DP** is open only for its macOS and X11 gate records (see
-its brief), and A and F have not started. **W** started on 2026-10-14 under
-the owner's ruling that the atom vocabulary is the canonical source (design
-language §12.7): new controls use only vocabulary atoms and paint through the
-by-role path `paint_part`, so they can be built before T4. Open pull requests at hand-off:
-#80 (X11 draws opaque live frames directly, DP) and #81 (stacked on it:
-`ApplicationWindowHandle::request_client_size`, the portable native resize
-request). Read `planning/stages/T1-anatomy/README.md` "Hand-off" before
-starting T2, T3, L, FD or C: the schema, the name rules and the anatomy API
-those stages build on are summarized there.
+**Where to pick up (2026-10-23).** A, T1, T2 and Z are complete: A's
+client tests read the Gallery through each host's own accessibility API and
+every native host advertises the capability; T2 is sealed with its gate
+identical on four hosts. **F, font substitution, is in progress** (F1 tool, faces and table merged or merging; F4 gate pending); 0.2 Verified
+(A, F and T1) is declared when F's gate is recorded. The next spine stage is
+**T3, the theme language front end**, now unblocked by T2; **T5** and **C**
+are also unblocked (T5 now carries reflection and full-fidelity glass), and
+**L** has been ready since T1. **W** continues under the by-role paint path
+(ruling 2026-10-14), and **DP** is open only for its macOS and X11 gate
+records. Read `planning/stages/T2-engine-core/README.md` and its gate record
+before starting T3, T4, T5 or C, and `planning/stages/T1-anatomy/README.md`
+"Hand-off" before T3, L, FD or C.
 
 When a stage starts or a gate is recorded, update the status column here, the
 stage brief's status line, and the stage board linked from `AGENTS.md`.
