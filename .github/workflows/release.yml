@@ -69,6 +69,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_publication_version.py
           python3 -B -m unittest discover -s tools -p test_package_programs.py
           python3 -B -m unittest discover -s tools -p test_prune_cache_releases.py
+          python3 -B -m unittest discover -s tools -p test_release_tests.py
       - name: Select one tested publication version
         id: version
         env:
@@ -324,7 +325,20 @@ jobs:
       # job did not pass on this tree: those of the Gallery, the demoboard and
       # any the native job skipped (tools/native_tests.py). Pushes to main,
       # which publish the release record, and direct runs test everything.
+      # A release tag names a tree main has already tested: its programs job
+      # for this platform ran every test. The tag carries that job's ctest
+      # receipt instead of running them again, and still packages and smoke
+      # tests under its own version (tools/release_tests.py). With no such
+      # run, or one that has not finished, the tag runs every test.
+      - name: Carry main's tests of this tree
+        id: tested
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python gui_forms/tools/release_tests.py find --platform "${{ matrix.platform }}" --dist dist
       - name: Test
+        if: steps.tested.outputs.reused != 'true'
         env:
           GUI_FORMS_FONT_DIR: ${{ github.workspace }}/gui_forms/assets/fonts
           NARROW: ${{ inputs.from_native && github.event_name == 'pull_request' }}
