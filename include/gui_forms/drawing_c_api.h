@@ -205,6 +205,49 @@ typedef struct gd_error_view {
 } gd_error_view;
 
 /*
+ * Stage F font resolution: how a font's requested family was answered.
+ * BUNDLED to GENERIC come from the substitution table
+ * (assets/fonts/font-substitution.json); a family it does not name is
+ * UNMAPPED until a raster module asks the host, which makes it HOST (a host
+ * face with the requested name) or CONTENT (the content family substitutes).
+ */
+typedef enum gd_font_source {
+    GD_FONT_SOURCE_BUNDLED = 0,
+    GD_FONT_SOURCE_SUBSTITUTION = 1,
+    GD_FONT_SOURCE_ALIAS = 2,
+    GD_FONT_SOURCE_GENERIC = 3,
+    GD_FONT_SOURCE_UNMAPPED = 4,
+    GD_FONT_SOURCE_HOST = 5,
+    GD_FONT_SOURCE_CONTENT = 6
+} gd_font_source;
+
+typedef enum gd_font_mapping {
+    GD_FONT_MAPPING_NONE = 0,
+    GD_FONT_MAPPING_METRIC_COMPATIBLE = 1,
+    GD_FONT_MAPPING_NEAREST = 2
+} gd_font_mapping;
+
+/*
+ * The caller sets struct_size. family and face_file point into the static
+ * table of the library that answered and stay valid while it is loaded;
+ * both are empty for UNMAPPED and HOST.
+ * The styles are the bold (1) and italic (2) bits: face_style differs from
+ * requested_style when the family lacks that face and its nearest is drawn.
+ * face_loaded is 1 when the raster module registered the face for drawing on
+ * the calling thread.
+ */
+typedef struct gd_font_resolution {
+    uint32_t struct_size;
+    uint32_t source;
+    uint32_t mapping;
+    uint32_t requested_style;
+    uint32_t face_style;
+    uint32_t face_loaded;
+    gd_string_view family;
+    gd_string_view face_file;
+} gd_font_resolution;
+
+/*
  * Private same-build renderer attachment. The callbacks receive GUI.Drawing
  * C++ object addresses only after the handle registry has validated kind,
  * lifetime, owner thread, and disposal. This seam keeps gd_get_api_v0 and the
@@ -224,6 +267,8 @@ typedef struct gd_raster_service_v0 {
     gd_result (*measure_string)(const void* font, const void* format,
                                 gd_string_view text, double layout_width,
                                 gd_size* measured);
+    /* Stage F: resolves and registers the font's face on the calling thread. */
+    gd_result (*resolve_font)(const void* font, gd_font_resolution* resolution);
 } gd_raster_service_v0;
 
 typedef struct gd_api_v0 {
@@ -445,6 +490,12 @@ typedef struct gd_api_v0 {
     /* M12-P27 submits a coherent frame directly to a retained host endpoint. */
     gd_result (*native_surface_publish_retained)(uintptr_t surface, uint32_t kind,
                                                  gd_handle bitmap);
+    /*
+     * Stage F: how the font's family resolves. With a raster service it is
+     * the face drawn on the calling thread, after any host lookup; without
+     * one it is the substitution table's answer and nothing is loaded.
+     */
+    gd_result (*font_resolve)(gd_handle font, gd_font_resolution* resolution);
 } gd_api_v0;
 
 /*

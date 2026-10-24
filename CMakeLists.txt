@@ -441,6 +441,33 @@ if(GUI_FORMS_BUILD_TEXT_MASKS)
     set_target_properties(gui_forms_text_masks_impl PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
+# Stage F's font substitution table. Configure validates it and lists the
+# faces and licences it names (for the raster module's font directory); the
+# build regenerates the C++ records whenever the JSON file changes.
+include(cmake/FontSubstitution.cmake)
+set(GUI_FORMS_FONT_SUBSTITUTION_TABLE ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/font-substitution.json)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${GUI_FORMS_FONT_SUBSTITUTION_TABLE})
+gui_forms_font_substitution_read(
+    JSON ${GUI_FORMS_FONT_SUBSTITUTION_TABLE}
+    FONT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts
+    FILES GUI_FORMS_SUBSTITUTION_FONT_FILES
+    LICENCES GUI_FORMS_SUBSTITUTION_FONT_LICENCES)
+set(GUI_FORMS_FONT_SUBSTITUTION_RECORDS
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/font_substitution/font_substitution_table.inc)
+add_custom_command(
+    OUTPUT ${GUI_FORMS_FONT_SUBSTITUTION_RECORDS}
+    COMMAND ${CMAKE_COMMAND}
+        -DTABLE=${GUI_FORMS_FONT_SUBSTITUTION_TABLE}
+        -DFONT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts
+        -DOUTPUT=${GUI_FORMS_FONT_SUBSTITUTION_RECORDS}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_font_substitution.cmake
+    DEPENDS
+        ${GUI_FORMS_FONT_SUBSTITUTION_TABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FontSubstitution.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_font_substitution.cmake
+    COMMENT "Generating the font substitution records"
+    VERBATIM)
+
 # GUI.Drawing is a renderer-free compatibility substrate.  It deliberately
 # remains separate from the retained GUI.Forms core and from every host and
 # raster adapter so consumers can use its value/resource semantics alone.
@@ -452,6 +479,8 @@ add_library(gui_drawing_core STATIC
     src/core/drawing/brush/solid_brush.cpp
     src/core/drawing/color/color.cpp
     src/core/drawing/font/font.cpp
+    src/core/drawing/font_substitution/font_substitution.cpp
+    ${GUI_FORMS_FONT_SUBSTITUTION_RECORDS}
     src/core/drawing/geometry/point_i/point_i.cpp
     src/core/drawing/geometry/point_f/point_f.cpp
     src/core/drawing/geometry/rect_i/rect_i.cpp
@@ -472,6 +501,8 @@ target_include_directories(gui_drawing_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+target_include_directories(gui_drawing_core PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/font_substitution)
 target_compile_features(gui_drawing_core PUBLIC cxx_std_20)
 set_target_properties(gui_drawing_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -991,15 +1022,21 @@ if(GUI_FORMS_ENABLE_SKIA)
         set_target_properties(gui_drawing_raster_c_api PROPERTIES PREFIX "")
         target_link_libraries(gui_drawing_raster_c_api PRIVATE advapi32)
     endif()
+    # Every face the substitution table names, with its licence, the table
+    # itself and the attribution, beside the raster module (stage F).
+    set(gui_drawing_raster_fonts
+        ${GUI_FORMS_SUBSTITUTION_FONT_FILES}
+        ${GUI_FORMS_SUBSTITUTION_FONT_LICENCES}
+        font-substitution.json
+        ATTRIBUTION.md)
+    list(TRANSFORM gui_drawing_raster_fonts PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/)
     add_custom_command(TARGET gui_drawing_raster_c_api POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
             "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf
-            "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts/PortsmouthRapids.ttf"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf
-            "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts/PortsmouthRapids-Bold.ttf"
+            ${gui_drawing_raster_fonts}
+            "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts"
+        VERBATIM
     )
 endif()
 
@@ -2123,6 +2160,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_drawing_core_tests tests/drawing_core_tests.cpp)
     target_link_libraries(gui_drawing_core_tests PRIVATE gui_drawing_core)
     add_test(NAME gui_drawing_core_tests COMMAND gui_drawing_core_tests)
+    add_executable(gui_drawing_font_substitution_tests tests/drawing_font_substitution_tests.cpp)
+    target_link_libraries(gui_drawing_font_substitution_tests PRIVATE gui_drawing_core)
+    add_test(NAME gui_drawing_font_substitution_tests
+             COMMAND gui_drawing_font_substitution_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
 
     add_executable(gui_forms_canvas_tests tests/canvas_tests.cpp)
     target_link_libraries(gui_forms_canvas_tests PRIVATE gui_forms_controls)
@@ -3495,6 +3536,7 @@ if(GUI_FORMS_BUILD_TESTS)
         target_compile_definitions(gui_drawing_skia_tests PRIVATE
             GUI_DRAWING_TEST_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf"
             GUI_DRAWING_TEST_BOLD_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf"
+            GUI_DRAWING_TEST_ITALIC_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Italic.ttf"
         )
         target_link_libraries(gui_drawing_skia_tests PRIVATE gui_drawing_skia gui_forms_core)
         target_include_directories(gui_drawing_skia_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)

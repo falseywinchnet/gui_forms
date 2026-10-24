@@ -26,6 +26,8 @@ Types
      - Brush is the disposable renderer-neutral base whose only rendering contract is an immutable BrushSnapshot.
    * - :cpp:class:`BrushSnapshot <gui_drawing::BrushSnapshot>`
      - BrushSnapshot is the complete renderer-neutral union record for solid, hatch, gradient, path-gradient, or texture recipes.
+   * - :cpp:class:`BundledFontFace <gui_drawing::BundledFontFace>`
+     -  
    * - :cpp:class:`Color <gui_drawing::Color>`
      - gui_drawing::Color is a compact empty/known/ARGB value with deterministic named/HTML parsing and explicit linear-sRGB, XYZ D65, OKLab, and OKLCH conversion support.
    * - :cpp:class:`ColorBlend <gui_drawing::ColorBlend>`
@@ -36,8 +38,12 @@ Types
      - DrawingObject is the thread-affine disposable base for mutable drawing resources, with explicit alive/disposing/disposed transitions and controlled serialized handoff.
    * - :cpp:class:`Font <gui_drawing::Font>`
      - Font retains validated UTF-8 family, bounded size, style bits, unit, and charset without exposing a platform font object.
+   * - :cpp:class:`FontFamilyResolution <gui_drawing::FontFamilyResolution>`
+     - One request's answer.
    * - :cpp:class:`FontSnapshot <gui_drawing::FontSnapshot>`
      - FontSnapshot carries family, size, style bits, unit, and charset without a platform font handle.
+   * - :cpp:class:`FontSubstitution <gui_drawing::FontSubstitution>`
+     -  
    * - :cpp:class:`GraphicsPath <gui_drawing::GraphicsPath>`
      - GraphicsPath is a bounded retained vector-geometry state machine with explicit figure boundaries, line/quadratic/cubic/polygon/rectangle/ellipse/arc/pie vocabulary, affine transformation, hit testing, cloning, bounds, and immutable snapshots.
    * - :cpp:class:`GraphicsRecorder <gui_drawing::GraphicsRecorder>`
@@ -375,6 +381,22 @@ Types
 
 .. cpp:namespace:: gui_drawing
 
+.. cpp:struct:: BundledFontFace final
+
+   ``#include <gui_forms/drawing/font_substitution/font_substitution.hpp>``
+
+   .. cpp:member:: std::string_view family
+
+   .. cpp:member:: FontFaceStyle style
+
+      Default: ``{FontFaceStyle::regular}``.
+
+   .. cpp:member:: std::string_view file
+
+      A file name inside the bundled font directory.
+
+.. cpp:namespace:: gui_drawing
+
 .. cpp:class:: Color final
 
    ``#include <gui_forms/drawing/color/color.hpp>``
@@ -598,6 +620,40 @@ Types
 
 .. cpp:namespace:: gui_drawing
 
+.. cpp:struct:: FontFamilyResolution final
+
+   ``#include <gui_forms/drawing/font_substitution/font_substitution.hpp>``
+
+   One request's answer. Every view points into the static table except ``requested``, which borrows the caller's string.
+
+   .. cpp:member:: std::string_view requested
+
+   .. cpp:member:: FontResolutionSource source
+
+      Default: ``{FontResolutionSource::unmapped}``.
+
+   .. cpp:member:: FontMappingClass mapping
+
+      Default: ``{FontMappingClass::none}``.
+
+   .. cpp:member:: std::string_view family
+
+      The bundled family and the face file drawn; both empty for unmapped and host answers.
+
+   .. cpp:member:: std::string_view face_file
+
+   .. cpp:member:: FontFaceStyle requested_style
+
+      Default: ``{FontFaceStyle::regular}``.
+
+   .. cpp:member:: FontFaceStyle face_style
+
+      Differs from requested_style when the family lacks the requested face and its nearest face is used instead (decision 7: no synthesis). Default: ``{FontFaceStyle::regular}``.
+
+   .. cpp:member:: std::string_view measured_as
+
+.. cpp:namespace:: gui_drawing
+
 .. cpp:struct:: FontSnapshot final
 
    ``#include <gui_forms/drawing/font/font.hpp>``
@@ -619,6 +675,34 @@ Types
    .. cpp:member:: std::uint8_t charset
 
       Default: ``{1}``.
+
+.. cpp:namespace:: gui_drawing
+
+.. cpp:struct:: FontSubstitution final
+
+   ``#include <gui_forms/drawing/font_substitution/font_substitution.hpp>``
+
+   .. cpp:member:: std::string_view requested
+
+      As written in the table; requests match it ignoring ASCII case.
+
+   .. cpp:member:: std::string_view family
+
+   .. cpp:member:: FontResolutionSource source
+
+      substitution, alias or generic. Default: ``{FontResolutionSource::substitution}``.
+
+   .. cpp:member:: FontMappingClass mapping
+
+      Default: ``{FontMappingClass::none}``.
+
+   .. cpp:member:: std::string_view measured_as
+
+      The substitution whose measurement this record shares: the record's own request, an alias's target, or empty for a generic name.
+
+   .. cpp:member:: std::string_view evidence
+
+      The differential reports that justify the class, relative to the repository root; empty for a generic name.
 
 .. cpp:namespace:: gui_drawing
 
@@ -2234,6 +2318,52 @@ Enumerations
 
 .. cpp:namespace:: gui_drawing
 
+.. cpp:enum-class:: FontFaceStyle
+
+   ``#include <gui_forms/drawing/font_substitution/font_substitution.hpp>``
+
+   .. cpp:enumerator:: regular
+
+   .. cpp:enumerator:: bold
+
+   .. cpp:enumerator:: italic
+
+   .. cpp:enumerator:: bold_italic
+
+.. cpp:namespace:: gui_drawing
+
+.. cpp:enum-class:: FontMappingClass
+
+   ``#include <gui_forms/drawing/font_substitution/font_substitution.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: metric_compatible
+
+   .. cpp:enumerator:: nearest
+
+.. cpp:namespace:: gui_drawing
+
+.. cpp:enum-class:: FontResolutionSource
+
+   ``#include <gui_forms/drawing/font_substitution/font_substitution.hpp>``
+
+   .. cpp:enumerator:: bundled
+
+   .. cpp:enumerator:: substitution
+
+   .. cpp:enumerator:: alias
+
+   .. cpp:enumerator:: generic
+
+   .. cpp:enumerator:: unmapped
+
+   .. cpp:enumerator:: host
+
+   .. cpp:enumerator:: content
+
+.. cpp:namespace:: gui_drawing
+
 .. cpp:enum-class:: FontStyle
 
    ``#include <gui_forms/drawing/types/drawing_types.hpp>``
@@ -2484,6 +2614,32 @@ Functions, constants and aliases
    Reduces OKLCH chroma only, preserving lightness, hue, and alpha. The mapped value is deterministic to 24 binary-search iterations and reports both the requested and committed colors so a dialog can disclose gamut mapping.
 
 .. cpp:function:: const SystemPalette& default_system_palette() noexcept
+
+.. cpp:namespace:: gui_drawing
+
+``#include <gui_forms/drawing/font_substitution/font_substitution.hpp>``
+
+.. cpp:function:: FontFaceStyle font_face_style(std::uint32_t font_style) noexcept
+
+   The face style of a FontStyle value: its bold and italic bits.
+
+.. cpp:function:: FontFamilyResolution resolve_font_family(std::string_view requested, FontFaceStyle style) noexcept
+
+   The table's answer for a family and style. Matching ignores ASCII case only. An empty or unknown name is ``unmapped``.
+
+.. cpp:function:: FontFamilyResolution content_font_resolution(std::string_view requested, FontFaceStyle style) noexcept
+
+   The content family's face for an unmapped request no host face answers, reported as ``content``.
+
+.. cpp:function:: std::string_view content_font_family() noexcept
+
+.. cpp:function:: std::span<const BundledFontFace> bundled_font_faces() noexcept
+
+.. cpp:function:: std::span<const FontSubstitution> font_substitutions() noexcept
+
+.. cpp:function:: const char* font_resolution_source_name(FontResolutionSource source) noexcept
+
+.. cpp:function:: const char* font_mapping_class_name(FontMappingClass mapping) noexcept
 
 .. cpp:namespace:: gui_forms
 
