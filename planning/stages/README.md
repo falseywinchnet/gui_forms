@@ -32,7 +32,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | Stage | Brief | Release | Depends on (gates recorded) | Status 2026-10-23 |
 |---|---|---|---|---|
 | A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | complete 2026-10-23: client tests read the whole Gallery through MSAA and UI Automation (`results/2026-10-19-a-w1-msaa-gallery`, `results/2026-10-20-a-w3-uia-gallery`), AT-SPI (`results/2026-10-20-a-l2-linux-gallery`) and AX (`results/2026-10-20-a-macos`); editable text ranges on all three hosts (#263, #271, #273); every native host advertises the capability (#277); the macOS AX client settles before it reads (#249, #266, #275) |
-| F | [Font substitution](F-font-substitution/README.md) | 0.2 Verified | none | in progress: F1 tool, faces and table merged or merging; F4 gate pending. Its gate declares 0.2 (owner decision 2026-10-23). Started 2026-10-23: plan accepted (brief decisions 4 to 17); F1 measurement tool `tools/font_metrics_differential`, first runs `results/2026-10-23-f1-metrics-harness`, engine against engine (Cousine and Tinos exact; Carlito and Arimo exact but for kerning and one glyph; Selawik nearest only; Tahoma Bold has no face within 5%); Arimo, Tinos and Selawik downloaded with approval, F3 adds them |
+| F | [Font substitution](F-font-substitution/README.md) | 0.2 Verified | none | complete 2026-10-23: gate recorded in `results/2026-10-23-f-font-substitution` (CI run 40049449883, all four native hosts); it declares 0.2. Earlier: plan accepted (brief decisions 4 to 17); F1 measurement tool `tools/font_metrics_differential`, first runs `results/2026-10-23-f1-metrics-harness`, engine against engine (Cousine and Tinos exact; Carlito and Arimo exact but for kerning and one glyph; Selawik nearest only; Tahoma Bold has no face within 5%); Arimo, Tinos and Selawik downloaded with approval, F3 adds them |
 | T1 | [Anatomy: articulated controls and one schema](T1-anatomy/README.md) | 0.2 Verified | none | complete 2026-10-13 (`results/2026-10-13-t1-anatomy-gate`): 60 of 60 controls; item systems, per-part states, interactions, schema export and one-name-three-spellings merged; owner signed off, and declared T1 sealed once the follow-on DP and host work (#80, #81) was in |
 | T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | sealed 2026-10-23 (`results/2026-10-23-t2-engine-gate/SEALED.md`; gate run 40027309396: 4 hosts, 144 images, 308 sample images, 77 features, 0 differences, 0 busy idle counters): E1 to E11 plus E7r, E9.6 and E10; bake costs measured on a quiet machine (#293) |
 | T3 | [Theme language front end](T3-theme-language/README.md) | 0.3 Themeable | T1, T2 | not started |
@@ -61,8 +61,9 @@ engine.
 **Where to pick up (2026-10-23).** A, T1, T2 and Z are complete: A's
 client tests read the Gallery through each host's own accessibility API and
 every native host advertises the capability; T2 is sealed with its gate
-identical on four hosts. **F, font substitution, is in progress** (F1 tool, faces and table merged or merging; F4 gate pending); 0.2 Verified
-(A, F and T1) is declared when F's gate is recorded. The next spine stage is
+identical on four hosts. **F, font substitution, is complete**: its gate is recorded in
+`results/2026-10-23-f-font-substitution`, so 0.2 Verified (A, F and T1) is
+complete. The next spine stage is
 **T3, the theme language front end**, now unblocked by T2; **T5** and **C**
 are also unblocked (T5 now carries reflection and full-fidelity glass), and
 **L** has been ready since T1. **W** continues under the by-role paint path

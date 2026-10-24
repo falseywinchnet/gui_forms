@@ -242,4 +242,40 @@ void write_report(std::ostream& output, std::string_view corpus_name,
                   const FaceMeasurement& reference, const FaceMeasurement& candidate,
                   const Differential& differential);
 
+// A reference face's engine measurement kept as text (brief decision 18):
+// measured once from a Windows reference file, identified by its SHA-256,
+// with no font data, so the gate compares bundled candidates with it on hosts
+// that lack the reference face. The candidate digest is the measurement the
+// bundled candidate produced when the snapshot was made; every host must
+// reproduce it.
+struct MetricSnapshot final {
+    // The substitution table request this reference stands for: a style name
+    // (regular, bold, italic or bold_italic) and the requested family.
+    std::string request_style{};
+    std::string request_family{};
+    std::string corpus_name{};
+    // corpus_digest of the corpus the snapshot was measured with.
+    std::string corpus_digest{};
+    std::string candidate_file{};
+    std::string candidate_digest{};
+    FaceMeasurement reference{};
+};
+
+// The engine measurement as snapshot records (facts, advances, sizes); GDI
+// measurements are not part of it.
+[[nodiscard]] std::string serialize_measurement(const FaceMeasurement& measurement);
+
+// SHA-256 of the parsed corpus: its sections and entries joined with LF. It
+// names the corpus content, so a checkout's line endings do not change it.
+[[nodiscard]] std::string corpus_digest(const Corpus& corpus);
+
+// SHA-256 of serialize_measurement's text: equal digests mean identical
+// measurements.
+[[nodiscard]] std::string measurement_digest(const FaceMeasurement& measurement);
+
+void write_snapshot(std::ostream& output, const MetricSnapshot& snapshot);
+
+// Validates the whole snapshot text before returning; throws InputRejected.
+[[nodiscard]] MetricSnapshot parse_snapshot(std::string_view text);
+
 } // namespace gui_forms::tools::font_metrics

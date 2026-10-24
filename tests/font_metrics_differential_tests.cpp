@@ -54,6 +54,18 @@ struct CompareCall final {
     }
 };
 
+struct SnapshotCall final {
+    std::string_view text{};
+    void operator()() const { static_cast<void>(font_metrics::parse_snapshot(text)); }
+};
+
+std::string replaced_once(std::string text, std::string_view from, std::string_view to) {
+    const std::size_t at = text.find(from);
+    require(at != std::string::npos, "snapshot fixture text present");
+    text.replace(at, from.size(), to);
+    return text;
+}
+
 void check_digests() {
     require(font_metrics::sha256_hex(as_bytes("")) ==
                 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -76,6 +88,48 @@ void check_corpus_validation() {
     require(rejects(CorpusCall{"OK\n[strings]\nOK\n[paragraphs]\nwords\n"}), "text before a section rejected");
     require(rejects(CorpusCall{"[strings]\nOK\n"}), "corpus without paragraphs rejected");
     require(rejects(CorpusCall{""}), "empty corpus rejected");
+}
+
+// Snapshots (brief decision 18) read back as the measurement they were
+// written from, and malformed snapshots are rejected whole.
+void check_snapshots(const font_metrics::Corpus& corpus, const font_metrics::FaceMeasurement& carlito) {
+    const font_metrics::Corpus crlf = font_metrics::parse_corpus("[strings]\r\nOK\r\n[paragraphs]\r\none two\r\n");
+    const font_metrics::Corpus lf = font_metrics::parse_corpus("[strings]\nOK\n[paragraphs]\none two\n");
+    require(font_metrics::corpus_digest(crlf) == font_metrics::corpus_digest(lf), "corpus digest ignores line ends");
+    require(font_metrics::corpus_digest(lf) != font_metrics::corpus_digest(corpus), "corpus digest names content");
+
+    font_metrics::MetricSnapshot snapshot{};
+    snapshot.request_style = "bold_italic";
+    snapshot.request_family = "Times New Roman";
+    snapshot.corpus_name = "forms_latin_v1.txt";
+    snapshot.corpus_digest = font_metrics::corpus_digest(corpus);
+    snapshot.candidate_file = carlito.facts.file_name;
+    snapshot.candidate_digest = font_metrics::measurement_digest(carlito);
+    snapshot.reference = carlito;
+    std::ostringstream written{};
+    font_metrics::write_snapshot(written, snapshot);
+    const std::string text = written.str();
+    const font_metrics::MetricSnapshot read = font_metrics::parse_snapshot(text);
+    require(read.request_style == "bold_italic" && read.request_family == "Times New Roman", "snapshot request");
+    require(read.corpus_digest == snapshot.corpus_digest && read.candidate_file == "Carlito-Regular.ttf",
+            "snapshot corpus and candidate");
+    require(font_metrics::measurement_digest(read.reference) == snapshot.candidate_digest,
+            "a snapshot reads back as its measurement");
+    require(font_metrics::serialize_measurement(read.reference) == font_metrics::serialize_measurement(carlito),
+            "a snapshot's records round trip");
+    const std::string crlf_text = replaced_once(text, "\nface\n", "\r\nface\r\n");
+    require(!rejects(SnapshotCall{crlf_text}), "a CRLF checkout of a snapshot reads");
+
+    require(rejects(SnapshotCall{text.substr(0U, text.size() / 2U)}), "a truncated snapshot is rejected");
+    require(rejects(SnapshotCall{text.substr(0U, text.size() - 1U)}), "a snapshot without its last newline is rejected");
+    require(rejects(SnapshotCall{text + "end\n"}), "records after the end are rejected");
+    require(rejects(SnapshotCall{replaced_once(text, "font_metrics_snapshot.v1", "font_metrics_snapshot.v2")}),
+            "another schema is rejected");
+    require(rejects(SnapshotCall{replaced_once(text, "\nsizes 6\n", "\nsizes 5\n")}), "a wrong size count is rejected");
+    require(rejects(SnapshotCall{replaced_once(text, "\nadvance 20 1 ", "\nadvance 20 1 x")}),
+            "a malformed advance is rejected");
+    require(rejects(SnapshotCall{replaced_once(text, "\nadvance 20 1 ", "\nadvance 20  1 ")}),
+            "an empty field is rejected");
 }
 
 void check_face_validation(const std::vector<std::byte>& carlito) {
@@ -170,6 +224,7 @@ int main(int count, char** values) {
         const font_metrics::FaceMeasurement cousine =
             font_metrics::measure_face("Cousine-Regular.ttf", cousine_bytes, corpus, false);
         check_self_comparison(carlito);
+        check_snapshots(corpus, carlito);
         check_wider_face(carlito, cousine);
         check_gdi_measurement(carlito);
         std::cout << "font metrics differential tests passed\n";

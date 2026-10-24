@@ -40,6 +40,8 @@ Types
      - Font retains validated UTF-8 family, bounded size, style bits, unit, and charset without exposing a platform font object.
    * - :cpp:class:`FontFamilyResolution <gui_drawing::FontFamilyResolution>`
      - One request's answer.
+   * - :cpp:class:`FontGateException <gui_drawing::FontGateException>`
+     - A named exception (decisions 16 and 17): one style of a substitution may fail one criterion, within ``limit``, in the criterion's own unit.
    * - :cpp:class:`FontSnapshot <gui_drawing::FontSnapshot>`
      - FontSnapshot carries family, size, style bits, unit, and charset without a platform font handle.
    * - :cpp:class:`FontSubstitution <gui_drawing::FontSubstitution>`
@@ -651,6 +653,30 @@ Types
       Differs from requested_style when the family lacks the requested face and its nearest face is used instead (decision 7: no synthesis). Default: ``{FontFaceStyle::regular}``.
 
    .. cpp:member:: std::string_view measured_as
+
+.. cpp:namespace:: gui_drawing
+
+.. cpp:struct:: FontGateException final
+
+   ``#include <gui_forms/drawing/font_substitution/font_substitution.hpp>``
+
+   A named exception (decisions 16 and 17): one style of a substitution may fail one criterion, within ``limit``, in the criterion's own unit. The gate fails an exception whose criterion passes, so stale exceptions surface.
+
+   .. cpp:member:: std::string_view requested
+
+   .. cpp:member:: FontFaceStyle style
+
+      Default: ``{FontFaceStyle::regular}``.
+
+   .. cpp:member:: FontGateCriterion criterion
+
+      Default: ``{FontGateCriterion::advances}``.
+
+   .. cpp:member:: double limit
+
+      Default: ``{0.0}``.
+
+   .. cpp:member:: std::string_view note
 
 .. cpp:namespace:: gui_drawing
 
@@ -2332,6 +2358,20 @@ Enumerations
 
 .. cpp:namespace:: gui_drawing
 
+.. cpp:enum-class:: FontGateCriterion
+
+   ``#include <gui_forms/drawing/font_substitution/font_substitution.hpp>``
+
+   .. cpp:enumerator:: advances
+
+   .. cpp:enumerator:: line_breaks
+
+   .. cpp:enumerator:: line_height
+
+   .. cpp:enumerator:: line_width
+
+.. cpp:namespace:: gui_drawing
+
 .. cpp:enum-class:: FontMappingClass
 
    ``#include <gui_forms/drawing/font_substitution/font_substitution.hpp>``
@@ -2640,6 +2680,10 @@ Functions, constants and aliases
 .. cpp:function:: const char* font_resolution_source_name(FontResolutionSource source) noexcept
 
 .. cpp:function:: const char* font_mapping_class_name(FontMappingClass mapping) noexcept
+
+.. cpp:function:: std::span<const FontGateException> font_gate_exceptions() noexcept
+
+.. cpp:function:: const char* font_gate_criterion_name(FontGateCriterion criterion) noexcept
 
 .. cpp:namespace:: gui_forms
 

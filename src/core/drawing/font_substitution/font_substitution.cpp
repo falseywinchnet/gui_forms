@@ -7,8 +7,8 @@
 namespace gui_drawing {
 namespace {
 
-// generated_content_font_family, generated_bundled_font_faces and
-// generated_font_substitutions, from assets/fonts/font-substitution.json.
+// generated_content_font_family, generated_bundled_font_faces,
+// generated_font_substitutions and generated_gate_exceptions, from assets/fonts/font-substitution.json.
 #include "font_substitution_table.inc"
 
 [[nodiscard]] constexpr char ascii_folded(const char value) noexcept {
@@ -114,6 +114,10 @@ std::span<const FontSubstitution> font_substitutions() noexcept {
     return generated_font_substitutions;
 }
 
+std::span<const FontGateException> font_gate_exceptions() noexcept {
+    return generated_gate_exceptions;
+}
+
 const char* font_resolution_source_name(const FontResolutionSource source) noexcept {
     switch (source) {
     case FontResolutionSource::bundled: return "bundled";
@@ -132,6 +136,16 @@ const char* font_mapping_class_name(const FontMappingClass mapping) noexcept {
     case FontMappingClass::none: return "none";
     case FontMappingClass::metric_compatible: return "metric_compatible";
     case FontMappingClass::nearest: return "nearest";
+    }
+    return "unknown";
+}
+
+const char* font_gate_criterion_name(const FontGateCriterion criterion) noexcept {
+    switch (criterion) {
+    case FontGateCriterion::advances: return "advances";
+    case FontGateCriterion::line_breaks: return "line_breaks";
+    case FontGateCriterion::line_height: return "line_height";
+    case FontGateCriterion::line_width: return "line_width";
     }
     return "unknown";
 }
