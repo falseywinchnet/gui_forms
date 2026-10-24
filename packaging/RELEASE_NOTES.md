@@ -1,37 +1,124 @@
 <!-- Appended verbatim after the generated header by tools/publish_tested_release.py.
      Keep "Breaking changes" separate from "Other changes"; group "Other changes" by
      control or area; attach one screenshot for anything visual. Rewrite this file for
-     each release series; the generated header carries version, commit and platforms. -->
+     each release series; the generated header carries version, commit and platforms.
+     The 0.1 series' notes are kept in docs/release/0.1.md. -->
 
 ## Focus
 
-First downloadable builds of the GUI.Forms demonstration programs: the control
-Gallery, the fixture-backed Explore preview, and the Correspondence mail
-mockup. These are proving-slice
-programs, not products; they exist so the toolkit can be inspected without a
-compiler.
+0.2 is the "Verified" series. Each item in it has a recorded gate: tests
+that measure it on every host it applies to (Windows x64, macOS arm64, Linux
+x64 and Linux arm64), and a record under `results/` saying what was
+measured. The demonstration
+programs are the same three as in 0.1: the control Gallery, the
+fixture-backed Explore preview and the Correspondence mail mockup.
 
 ## Breaking changes
 
-- None. This is the first published series.
+- **The CMake package is 0.2.** Its version file accepts only the same minor
+  version, so `find_package(GUIForms 0.1 ...)` no longer finds it. Ask for
+  `find_package(GUIForms 0.2 CONFIG ...)`. The shared libraries still carry
+  `SOVERSION 0`, and as in 0.1 there is no binary promise between releases:
+  rebuild against each new SDK.
+- **Images are admitted by format, not only as PNG.**
+  `ImageRegistry::load_image` and `replace_image` take a CNG or PNG file and
+  choose the decoder by its signature. Image resources and their views
+  report `ImageMetadata` (width, height, alpha and decoded byte count) in
+  place of `PngMetadata`, which only `validate_png` reports now.
+  `load_png` and `replace_png` remain, for PNG only.
+- **Optional values replace `has_*` flags** where the flag could disagree
+  with the value beside it:
+  - `ErrorProviderChange::has_error` is gone; it was always
+    `!error.empty()`.
+  - `ImageAttributesSnapshot::color_matrix` is a `std::optional`, and
+    `has_color_matrix` is gone.
+  - `HostClipboardImageResult::image` is a `std::optional`, and `has_image`
+    is gone.
+  - In stx_vorbis, `OggPacket::granule` and `page_granule`, and
+    `OggStreamEnd::granule`, are optionals; `has_granule` and
+    `page_has_granule` are gone.
+- **Removed:** `Command::set_key_tip` and `CommandState::key_tip`. The ribbon
+  has no KeyTips, and nothing else read them.
 
 ## Other changes
 
-### Gallery
-- Packaged for macOS (an ad hoc signed bundle and a `.pkg`), Windows (a
-  portable folder and a per-user installer) and Linux (`.tar.gz` and `.deb`).
+### Controls
+- Controls are articulated. Each registry control declares its named parts
+  and states in one schema (`manifests/control-schema.json`), and its parts
+  publish their geometry. A test lays out every Gallery page and reads each
+  part's geometry from it. When the gate was recorded, that covered 60 of 60
+  controls (`results/2026-10-13-t1-anatomy-gate`).
 
-### Explore (preview)
-- The `file_manager_demoboard` ships as "GUI.Forms Explore (preview)"; its
-  STATUS.md state (D0-D6 measured partial, D7/D8/D10 not started) applies.
+### Accessibility
+- Verified on every host through the platform's own accessibility API.
+  Client tests read the whole Gallery as an assistive technology would and
+  compare every control with the semantic tree it publishes: role, name, state,
+  value and actions. Each control's default action is performed through the
+  same API. Windows is read through MSAA and UI Automation, Linux through
+  AT-SPI and macOS through AX. Windows gains a UI Automation provider.
+  Records: `results/2026-10-19-a-w1-msaa-gallery`,
+  `results/2026-10-20-a-w3-uia-gallery`,
+  `results/2026-10-20-a-l2-linux-gallery` and `results/2026-10-20-a-macos`.
+- Text fields expose editable text ranges on every host (ATK Text, UI
+  Automation TextPattern and the AppKit text attributes), each with client
+  tests.
+- Every native host advertises `HostCapability::accessibility`.
 
-### Correspondence
-- A mail-client mockup over in-memory fixtures; it reads no real mail,
-  files or network.
+### Fonts
+- Families that applications ask for map to bundled faces. The table is
+  `assets/fonts/font-substitution.json`:
+  - **Metric-compatible:** Calibri to Carlito, Arial to Arimo, Times New
+    Roman to Tinos and Courier New to Cousine. Every advance is identical in
+    font units, every line break is the same, and line height is within 1 px
+    at every measured size.
+  - **Nearest:** Microsoft Sans Serif to Arimo, Tahoma, Segoe UI and Segoe UI
+    Semibold to Selawik, and Consolas to Portsmouth Mono. The mean line width
+    is within 5% of the reference face at every measured size.
+
+  Every pair is measured against the Windows reference face on all four
+  hosts (`results/2026-10-23-f-font-substitution`).
+- Four styles pass only under a named, measured exception:
+  - Calibri bold italic: 2 of 90 line-break sets differ.
+  - Arial bold: one advance differs (U+00B5).
+  - Arial bold italic: 4 of 90 line-break sets differ.
+  - Tahoma bold: lines are 7.05% shorter at the worst size.
+- Arimo, Tinos and Selawik are bundled, under the SIL Open Font License.
+- `resolve_font_family` reports how each request was resolved: by the
+  family's own name, a substitution, an alias, a generic name, or the
+  content family when nothing matches. A host face is used only under its
+  own name, never in place of another family.
+
+### Images and compression
+- One zlib, owned by the project (stx_zlib), and an owned PNG codec
+  (stx_png) on every host. CI checks the link map of every static archive
+  the toolkit links, and Skia's, and fails on any other zlib, FreeType's
+  bundled gzip or libpng.
+- Windows no longer decodes images through WIC, and windowscodecs is no
+  longer linked.
+- CNG is the native resource format and PNG stays for interchange. The
+  clipboard and GUI.Drawing still use PNG.
+- stx_conv's CONV interpolation prepares the sized variants of image faces:
+  enlargements use the CONV interpolant, and reductions use pixel-area
+  averaging.
+- The compression and image code is free of GPL-licensed code.
+
+### Engine core
+- The engine core of the 0.3 theme engine is sealed. On all four hosts,
+  144 primitive images and 308 feature-sample images were pixel-identical,
+  with no differences between hosts (`results/2026-10-23-t2-engine-gate`).
+- Baking work is held to an effort budget.
+- The idle checks count no frames once a window settles: an idle window
+  draws nothing.
+
+### Themes and text masks
+- `Theme::create` takes its `ThemeDefinition` by const reference.
+  Existing calls still compile, and the definition is copied into the theme.
+- `TextMaskLimit` gains `cache_entries`. The mask cache's entry count had
+  been reported as `metadata_bytes`.
 
 ### Release pipeline
-- Builds, tests, packages and smoke-launches each program on macOS, Windows
-  and Linux runners before anything is uploaded.
+- As in 0.1, each program is built, tested, packaged and smoke-launched on
+  macOS, Windows and Linux runners before anything is uploaded.
 
 ## Known limits
 
@@ -43,4 +130,8 @@ compiler.
   More info, Run anyway.
 - Linux: X11 is required (XWayland works); the DEB declares X11, Xcursor and
   ATK dependencies.
-- Fonts ship with each program; no host fonts are read.
+- Explore (preview) is still a fixture-backed proving slice;
+  `file_manager_demoboard/STATUS.md` states what is measured.
+- Fonts ship with each program. A family that the substitution table does
+  not name is taken from the host only when the host has a face of exactly
+  that name; otherwise the bundled content face (Carlito) is used.

@@ -5,7 +5,7 @@
 <polygon points="2.0,2.0 154.2,2.0 172.2,29.0 154.2,56.0 2.0,56.0 2.0,29.0" fill="#2f8f5b" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>
 <text x="78.1" y="27" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">0.1</text>
 <text x="78.1" y="45" text-anchor="middle" font-size="13" fill="#ffffff">Shipped</text>
-<polygon points="154.2,2.0 306.5,2.0 324.5,29.0 306.5,56.0 154.2,56.0 172.2,29.0" fill="#3d6fbd" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>
+<polygon points="154.2,2.0 306.5,2.0 324.5,29.0 306.5,56.0 154.2,56.0 172.2,29.0" fill="#2f8f5b" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>
 <text x="239.4" y="27" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">0.2</text>
 <text x="239.4" y="45" text-anchor="middle" font-size="13" fill="#ffffff">Verified</text>
 <polygon points="306.5,2.0 458.8,2.0 476.8,29.0 458.8,56.0 306.5,56.0 324.5,29.0" fill="#3d6fbd" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>

@@ -34,11 +34,11 @@ STAGES = [
         "Hosts: macOS, Windows, X11",
         "Installed SDK, cached builds",
     ]),
-    ("0.2", "Verified", "stage", [
-        "Accessibility verified on every host (done)",
+    ("0.2", "Verified", "shipped", [
+        "Accessibility verified on every host",
         "Font substitution",
-        "Articulated controls: named parts, one schema (done)",
-        "Owned compression and image codecs (done)",
+        "Articulated controls: named parts, one schema",
+        "Owned compression and image codecs",
     ]),
     ("0.3", "Themeable", "stage", [
         "Theme engine (done)",
