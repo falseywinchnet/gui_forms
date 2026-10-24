@@ -921,6 +921,8 @@ Types
 
    .. cpp:member:: double line_gap
 
+      The preferred primary face's line gap at this size: what its line height, rounded to whole pixels, adds to its rounded ascent and descent, never negative. A line box is the larger of the logical height and ascent + descent + line_gap, for TextBox and prepared text alike.
+
    .. cpp:member:: std::string primary_family
 
    .. cpp:member:: std::vector<ResolvedFontRun> runs

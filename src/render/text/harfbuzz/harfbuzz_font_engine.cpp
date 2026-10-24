@@ -1039,23 +1039,39 @@ void HarfBuzzFontEngine::set_diagnostic_failure(TextLayoutFailure failure, std::
 }
 #endif
 
+namespace {
+
+// The one line-height rule's inputs for a face at `font`'s size: its
+// ascender, descender and line gap from FreeType's size metrics, which round
+// the face's hhea values to whole pixels (ascender up, descender down, line
+// height to nearest). The gap is what the rounded line height adds to the
+// rounded ascender and descender, never negative. Prepared text and
+// resolve() (TextBox's line box) both read it, so they agree for faces with
+// a line gap. Throws when FreeType cannot size the face.
+PrimaryLineMetrics sized_line_metrics(FT_Face face, FontFaceId id, const FontSpec font) {
+    const double bounded_size = std::clamp(font.size, 1.0, 4096.0);
+    const long long fixed_size = std::llround(bounded_size * 64.0);
+    const FT_F26Dot6 size = static_cast<FT_F26Dot6>(fixed_size);
+    const FT_Error sized = FT_Set_Char_Size(face, 0, size, 72U, 72U);
+    if (sized != 0 || (*face).size == nullptr) throw std::runtime_error("Primary line size setup failed");
+    const FT_Size_Metrics& metrics = (*(*face).size).metrics;
+    PrimaryLineMetrics result{};
+    result.face = id;
+    result.ascent_device = static_cast<double>(metrics.ascender) / 64.0;
+    result.descent_device = -static_cast<double>(metrics.descender) / 64.0;
+    const double native_height = static_cast<double>(metrics.height) / 64.0;
+    const double gap = native_height - result.ascent_device - result.descent_device;
+    result.line_gap_device = std::max(0.0, gap);
+    return result;
+}
+
+} // namespace
+
 std::optional<PrimaryLineMetrics> HarfBuzzFontEngine::primary_line_metrics(const FontSpec font) {
     if (!valid_font_spec(font)) throw std::invalid_argument("Invalid primary line font");
     for (Impl::Face& face : (*impl_).faces) {
         if (!face.role || *face.role != font.role || face.weight != font.weight || face.italic != font.italic) continue;
-        const double bounded_size = std::clamp(font.size, 1.0, 4096.0);
-        const long long fixed_size = std::llround(bounded_size * 64.0);
-        const FT_F26Dot6 size = static_cast<FT_F26Dot6>(fixed_size);
-        const FT_Error sized = FT_Set_Char_Size(face.face, 0, size, 72U, 72U);
-        if (sized != 0 || (*face.face).size == nullptr) throw std::runtime_error("Primary line size setup failed");
-        const FT_Size_Metrics& metrics = (*(*face.face).size).metrics;
-        PrimaryLineMetrics result{};
-        result.face = face.id;
-        result.ascent_device = static_cast<double>(metrics.ascender) / 64.0;
-        result.descent_device = -static_cast<double>(metrics.descender) / 64.0;
-        const double native_height = static_cast<double>(metrics.height) / 64.0;
-        const double gap = native_height - result.ascent_device - result.descent_device;
-        result.line_gap_device = std::max(0.0, gap);
+        const PrimaryLineMetrics result = sized_line_metrics(face.face, face.id, font);
         return result;
     }
     return std::nullopt;
@@ -1079,8 +1095,10 @@ ResolvedTextLayout HarfBuzzFontEngine::resolve(std::string_view utf8,
     result.logical_size = {shaped.width, shaped.height};
     result.ascent = shaped.ascent;
     result.descent = shaped.descent;
-    result.line_gap = std::max(
-        0.0, shaped.height - shaped.ascent - shaped.descent);
+    // The line gap is the preferred primary face's, by the rule prepared
+    // text uses (sized_line_metrics); the shaped height carries none.
+    const Impl::Face& primary = *candidates.front();
+    result.line_gap = sized_line_metrics(primary.face, primary.id, font).line_gap_device;
     result.missing_clusters = shaped.missing_clusters;
     result.status = shaped.missing_primary_face
         ? TextResolutionStatus::missing_primary_face
