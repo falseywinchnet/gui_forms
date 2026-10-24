@@ -54,7 +54,17 @@ struct stb_vorbis final {
     stb_vorbis(void* const buffer, const std::size_t size, const bool external)
         : externally_owned(external), arena(buffer, size, std::pmr::null_memory_resource()),
           pool(external ? &arena : std::pmr::new_delete_resource()),
-          resource(external ? &pool : std::pmr::new_delete_resource()), section(file), comments(resource) {
+#if defined(__wasm32__)
+          // Emscripten's wasm32 libc++ unsynchronized_pool_resource faults in
+          // release() after ordinary decodes (a recorded allocation sequence
+          // replayed against the bare pool reproduces it). There the decoder
+          // allocates from the heap; Limits still caps it at the caller's
+          // buffer size, which keeps holding the handle itself.
+          resource(std::pmr::new_delete_resource()),
+#else
+          resource(external ? &pool : std::pmr::new_delete_resource()),
+#endif
+          section(file), comments(resource) {
         if (external) limits.memory_bytes = std::min(limits.memory_bytes, size);
     }
     bool externally_owned{false};

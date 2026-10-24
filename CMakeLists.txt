@@ -8,7 +8,14 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
 endif()
 project(GUIForms VERSION 0.1.0 LANGUAGES C CXX)
 
-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR
+# The web host is built by Emscripten, whose clang is its own pinned snapshot;
+# the emsdk release is the contract there (docs/WEB_HOST.md).
+set(GUI_FORMS_EMSDK_VERSION "6.0.13")
+if(EMSCRIPTEN)
+    if(NOT EMSCRIPTEN_VERSION VERSION_EQUAL GUI_FORMS_EMSDK_VERSION)
+        message(FATAL_ERROR "The GUI.Forms web host requires emsdk ${GUI_FORMS_EMSDK_VERSION}")
+    endif()
+elseif(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR
    NOT CMAKE_CXX_COMPILER_VERSION MATCHES "^22\\.1\\.")
     message(FATAL_ERROR "GUI.Forms requires LLVM 22.1.x; use cmake/llvm22.cmake")
 endif()
@@ -38,6 +45,7 @@ option(GUI_FORMS_ENABLE_WINDOWS_HOST "Build the native Win32 host" ${WIN32})
 option(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB
        "Enable bounded transactional DIB frames in the Windows development host" OFF)
 option(GUI_FORMS_ENABLE_LINUX_HOST "Build the native X11 host with the private CPU renderer" OFF)
+option(GUI_FORMS_ENABLE_WEB_HOST "Build the Emscripten browser host with the private CPU renderer" OFF)
 # ADR-004: the Skia painter, the C drawing API and the Win32 host all draw
 # text with the shared HarfBuzz/FreeType engine.
 if(GUI_FORMS_ENABLE_SKIA OR GUI_FORMS_ENABLE_WINDOWS_HOST)
@@ -709,11 +717,19 @@ if(GUI_FORMS_ENABLE_SKIA)
     option(GUI_FORMS_SKIA_PREBUILT
            "Use already-built Skia archives instead of invoking the host build"
            OFF)
+    # Skia's wasm toolchain names its archives lib<name>.wasm.a.
+    if(EMSCRIPTEN)
+        set(GUI_FORMS_SKIA_ARCHIVE_SUFFIX ".wasm.a")
+        set(GUI_FORMS_SKIA_BUILD_SCRIPT build_skia_cpu_wasm.sh)
+    else()
+        set(GUI_FORMS_SKIA_ARCHIVE_SUFFIX ".a")
+        set(GUI_FORMS_SKIA_BUILD_SCRIPT build_skia_cpu.sh)
+    endif()
     set(GUI_FORMS_SKIA_ARCHIVES
-        ${GUI_FORMS_SKIA_OUT}/libskia.a
-        ${GUI_FORMS_SKIA_OUT}/libskcms.a
-        ${GUI_FORMS_SKIA_OUT}/libpng.a
-        ${GUI_FORMS_SKIA_OUT}/libzlib.a
+        ${GUI_FORMS_SKIA_OUT}/libskia${GUI_FORMS_SKIA_ARCHIVE_SUFFIX}
+        ${GUI_FORMS_SKIA_OUT}/libskcms${GUI_FORMS_SKIA_ARCHIVE_SUFFIX}
+        ${GUI_FORMS_SKIA_OUT}/libpng${GUI_FORMS_SKIA_ARCHIVE_SUFFIX}
+        ${GUI_FORMS_SKIA_OUT}/libzlib${GUI_FORMS_SKIA_ARCHIVE_SUFFIX}
     )
 
     if(GUI_FORMS_SKIA_PREBUILT)
@@ -726,10 +742,10 @@ if(GUI_FORMS_ENABLE_SKIA)
         add_custom_command(
             OUTPUT ${GUI_FORMS_SKIA_ARCHIVES}
             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
-            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh ${GUI_FORMS_SKIA_OUT}
+            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/${GUI_FORMS_SKIA_BUILD_SCRIPT} ${GUI_FORMS_SKIA_OUT}
             DEPENDS
                 ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh
+                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/${GUI_FORMS_SKIA_BUILD_SCRIPT}
                 ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_cpu_args.gn
                 ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_png_only.patch
             COMMENT "Building pinned CPU-only, PNG-only Skia"
@@ -741,7 +757,7 @@ if(GUI_FORMS_ENABLE_SKIA)
     foreach(archive IN ITEMS skia skcms png zlib)
         add_library(gui_forms_${archive}_archive STATIC IMPORTED GLOBAL)
         set_target_properties(gui_forms_${archive}_archive PROPERTIES
-            IMPORTED_LOCATION ${GUI_FORMS_SKIA_OUT}/lib${archive}.a
+            IMPORTED_LOCATION ${GUI_FORMS_SKIA_OUT}/lib${archive}${GUI_FORMS_SKIA_ARCHIVE_SUFFIX}
         )
         add_dependencies(gui_forms_${archive}_archive gui_forms_skia_dependency)
     endforeach()
@@ -1022,6 +1038,33 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     install(EXPORT GUIFormsApplicationTargets FILE GUIFormsApplicationTargets.cmake
         NAMESPACE GUIForms:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
     install(DIRECTORY assets/fonts/ DESTINATION ${CMAKE_INSTALL_DATADIR}/GUIForms/fonts)
+endif()
+
+if(GUI_FORMS_ENABLE_WEB_HOST)
+    if(NOT EMSCRIPTEN OR NOT GUI_FORMS_ENABLE_SKIA)
+        message(FATAL_ERROR "The web host requires Emscripten and the private CPU Skia adapter")
+    endif()
+    # The browser host draws with the same Skia CPU raster and HarfBuzz/FreeType
+    # text as the X11 host; web_host.js is the page side.
+    add_library(gui_forms_host_web STATIC src/host/web/web_host.cpp)
+    target_link_libraries(gui_forms_host_web PUBLIC gui_forms_core gui_forms_controls gui_forms_skia)
+    target_link_options(gui_forms_host_web INTERFACE
+        "--js-library=${CMAKE_CURRENT_SOURCE_DIR}/src/host/web/web_host.js")
+    set_property(TARGET gui_forms_host_web APPEND PROPERTY INTERFACE_LINK_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/host/web/web_host.js")
+    add_library(gui_forms_application STATIC src/runtime/application_bundle.cpp src/runtime/application/application.cpp)
+    add_library(GUIForms::Application ALIAS gui_forms_application)
+    set_target_properties(gui_forms_application PROPERTIES EXPORT_NAME Application OUTPUT_NAME gui_forms_application)
+    target_include_directories(gui_forms_application PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    target_compile_features(gui_forms_application PUBLIC cxx_std_20)
+    target_compile_definitions(gui_forms_application PRIVATE GUI_FORMS_APPLICATION_WEB=1)
+    target_link_libraries(gui_forms_application PUBLIC
+        "$<LINK_LIBRARY:WHOLE_ARCHIVE,gui_forms_core,gui_drawing_core,gui_forms_controls,gui_forms_host_web,gui_forms_skia>")
+    if(TARGET gui_forms_text_engine)
+        target_link_libraries(gui_forms_application PUBLIC gui_forms_text_engine freetype harfbuzz)
+    endif()
 endif()
 
 if(GUI_FORMS_ENABLE_WINDOWS_HOST)
@@ -3049,9 +3092,17 @@ if(GUI_FORMS_BUILD_AUDIO)
     include(cmake/Audio.cmake)
 endif()
 
+# A shared Application carries its own Core, so a consumer must not link a
+# second, static one. The web Application is a static archive over that same
+# Core (Emscripten has no shared libraries): it and Core link once together.
+if(GUI_FORMS_ENABLE_WEB_HOST)
+    set(GUI_FORMS_APPLICATION_LINKAGE static)
+else()
+    set(GUI_FORMS_APPLICATION_LINKAGE application)
+endif()
 if(TARGET gui_forms_application)
     target_link_libraries(gui_forms_application PUBLIC GUIForms::Threading)
-    set_property(TARGET gui_forms_application PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE application)
+    set_property(TARGET gui_forms_application PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE ${GUI_FORMS_APPLICATION_LINKAGE})
     set_property(TARGET gui_forms_application APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 endif()
 

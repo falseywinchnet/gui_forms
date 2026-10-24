@@ -11,6 +11,8 @@
 #include "gui_forms/platform/windows_host.hpp"
 #elif defined(GUI_FORMS_APPLICATION_LINUX)
 #include "gui_forms/platform/linux_host.hpp"
+#elif defined(GUI_FORMS_APPLICATION_WEB)
+#include "gui_forms/platform/web_host.hpp"
 #endif
 
 namespace gui_forms {
@@ -230,6 +232,8 @@ HostCapabilities Application::capabilities() {
     const HostCapabilities result = host::windows_capabilities();
 #elif defined(GUI_FORMS_APPLICATION_LINUX)
     const HostCapabilities result = host::linux_capabilities();
+#elif defined(GUI_FORMS_APPLICATION_WEB)
+    const HostCapabilities result = host::web_capabilities();
 #else
     const HostCapabilities result{HostCapabilities::current_protocol_version, "unsupported", HostCapability::none};
 #endif
@@ -269,6 +273,12 @@ ApplicationResult Application::run(std::vector<ApplicationWindow> windows) {
     std::vector<host::LinuxApplicationWindow> native{};
     prepare(windows, bridges, failure, native);
     result.native_exit_code = host::run_linux_application(std::move(native));
+#elif defined(GUI_FORMS_APPLICATION_WEB)
+    // Returns only on failure: on success the page's event loop owns the
+    // windows and this frame is abandoned (see run_web_application).
+    std::vector<host::WebApplicationWindow> native{};
+    prepare(windows, bridges, failure, native);
+    result.native_exit_code = host::run_web_application(std::move(native));
 #else
     result.error = ApplicationError::unsupported;
 #endif

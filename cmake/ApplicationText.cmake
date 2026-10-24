@@ -21,7 +21,7 @@ function(gui_forms_application_text consumer implementation public_name)
     target_link_libraries(gui_forms_application PRIVATE
         "$<LINK_LIBRARY:WHOLE_ARCHIVE,${implementation}>")
     target_link_libraries(${consumer} INTERFACE GUIForms::Application)
-    set_property(TARGET ${consumer} PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE application)
+    set_property(TARGET ${consumer} PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE ${GUI_FORMS_APPLICATION_LINKAGE})
     set_property(TARGET ${consumer} APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 endfunction()
 

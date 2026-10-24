@@ -81,6 +81,12 @@ if(WIN32)
 elseif(APPLE)
     target_compile_definitions(gui_forms_audio PRIVATE MA_ENABLE_COREAUDIO)
     target_link_libraries(gui_forms_audio PRIVATE "-framework CoreAudio" "-framework AudioToolbox" "-framework CoreFoundation")
+elseif(EMSCRIPTEN)
+    # Web Audio. miniaudio's AudioWorklet path blocks in emscripten_sleep while
+    # the worklet starts (it needs -sASYNCIFY, which wasm exceptions exclude),
+    # so the device uses its ScriptProcessor path until a non-blocking worklet
+    # start replaces it.
+    target_compile_definitions(gui_forms_audio PRIVATE MA_ENABLE_WEBAUDIO)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_definitions(gui_forms_audio PRIVATE MA_ENABLE_ALSA)
 else()
