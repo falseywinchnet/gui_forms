@@ -3,7 +3,9 @@
 # same arguments as every native host (skia_cpu_args.gn). Needs emsdk on PATH
 # (EMSDK set by emsdk_env.sh). Objects are built with -pthread and SIMD128 so
 # they link into the threaded web build; libpng's setjmp uses WebAssembly
-# exception handling, as the program's C++ exceptions do.
+# exception handling, as the program's C++ exceptions do. Skia's wasm config
+# turns its vector types scalar (SKVX_DISABLE_SIMD); here SkVx keeps its
+# SIMD128 path.
 set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 skia_dir="$script_dir/skia"
@@ -15,7 +17,7 @@ cat >> "$output_dir/args.gn" <<ARGS
 target_cpu = "wasm"
 skia_emsdk_dir = "$EMSDK"
 skia_enable_fontmgr_empty = true
-extra_cflags = [ "-msimd128", "-sSUPPORT_LONGJMP=wasm" ]
+extra_cflags = [ "-msimd128", "-sSUPPORT_LONGJMP=wasm", "-USKVX_DISABLE_SIMD" ]
 ARGS
 # Skia's wasm toolchain first runs bin/activate-emsdk, which installs its own
 # pinned emsdk under third_party/externals/emsdk. skia_emsdk_dir names the
