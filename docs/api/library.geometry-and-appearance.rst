@@ -3350,7 +3350,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one.
+   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one. ``specificity``, when set, is the rule's specificity in place of the one its selector gives (T3 engine change EC2): a rule expanded from CSS's ``:is()`` takes its most specific argument's. A class or stable-ID rule with a given specificity then needs a class or an ID in it rather than in its selector; an inline style still needs its selector's stable ID.
 
    .. cpp:member:: std::string label
 
@@ -3359,6 +3359,8 @@ Types
       Default: ``{CascadeLevel::theme_sheet}``.
 
    .. cpp:member:: RuleSelector selector
+
+   .. cpp:member:: std::optional<RuleSpecificity> specificity
 
    .. cpp:member:: std::vector<RuleDeclaration> declarations
 

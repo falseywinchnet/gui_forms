@@ -212,6 +212,7 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/tokenizer/theme_tokenizer.cpp
     src/core/theme_language/syntax_tree/theme_syntax_tree.cpp
     src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
+    src/core/theme_language/selector/theme_selector.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
     src/core/docking/dock_layout/dock_layout.cpp
@@ -2524,6 +2525,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_syntax_tests tests/theme_language/theme_syntax_tests.cpp)
     target_link_libraries(gui_forms_theme_syntax_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_syntax_tests COMMAND gui_forms_theme_syntax_tests)
+
+    add_executable(gui_forms_theme_selector_tests tests/theme_language/theme_selector_tests.cpp)
+    target_link_libraries(gui_forms_theme_selector_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_theme_selector_tests COMMAND gui_forms_theme_selector_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)

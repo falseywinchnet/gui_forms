@@ -410,6 +410,18 @@ Both are decided.
    are honoured. Another program without that inline style accepts the
    same theme.
 
+### Phase decisions approved by the owner (2026-10-25)
+
+1. **Number limits (P1).** A number token has at most 19 significant
+   digits, and is either zero or of a magnitude from 1e-40 up to but not
+   including 1e40. Anything else is an error: E108 `number_too_precise` or
+   E109 `number_out_of_range`. The owner approved them as recorded in
+   PLAN.md section 1.2.
+2. **Phases in plan order.** P3 and the later phases go on in plan order,
+   one PR per phase with its gate, each based on main, without stopping
+   between phases. Work stops only at an owner decision or a genuine
+   blocker.
+
 ## Read first
 
 - `planning/DESIGN_LANGUAGE_SPECIFICATION.md` §1.2, §8.2, §9.6, §12.1 item 1,
