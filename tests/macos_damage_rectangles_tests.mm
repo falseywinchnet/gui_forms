@@ -8,18 +8,28 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <span>
+#include <spawn.h>
 #include <stdexcept>
 #include <string>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <vector>
 
+extern char** environ;
+
 // Stage DP gate on macOS: two distant damaged rectangles paint their sum, not
-// their bounding box; AppKit hands the host exactly that rectangle set to
-// copy; and no pixel outside them changes in the presented frame. The record
-// is results/2026-10-25-dp-gate-macos.
+// their bounding box, and no pixel outside them changes on the screen. The
+// screen is read twice: through the operating system's screen capture
+// (/usr/sbin/screencapture, what the display shows) and through AppKit's
+// cached display of the view (the host's raster). AppKit coalesces the
+// host's per-rectangle display requests, so what it copies to the screen is
+// reported as measured, not assumed. The record is
+// results/2026-10-25-dp-gate-macos.
 
 // Existing private native diagnostics and occlusion hooks, not a public API addition.
 @interface NSView (DamageRectanglesProbe)
@@ -52,15 +62,15 @@ private:
     Color color_{};
 };
 
-// The presented frame, read back through AppKit's cached display: `width` x
-// `height` device pixels, four sRGB bytes each, top row first.
+// A read-back image: `width` x `height` device pixels, four sRGB bytes each,
+// top row first.
 struct Capture final {
     NSInteger width{0};
     NSInteger height{0};
     std::vector<std::uint8_t> rgba{};
 };
 
-enum class Stage { first_frame, drain, settle, changed };
+enum class Stage { first_frame, drain, settle, changed, shown };
 
 struct State final {
     std::shared_ptr<ColorBlock> root{};
@@ -74,7 +84,12 @@ struct State final {
     std::uint32_t settle_steps{0};
     std::uint64_t previous_presented{0};
     MetricsSnapshot before_metrics{};
-    Capture before{};
+    MetricsSnapshot after_metrics{};
+    // What AppKit handed drawRect: for the measured frame (host diagnostics).
+    double native_dirty_area{0.0};
+    double cg_clip_bounds_area{0.0};
+    Capture raster_before{};
+    Capture screen_before{};
     double scale{1.0};
     bool finished{false};
     bool host_closed{false};
@@ -86,11 +101,12 @@ struct DeferredStep final {
 
 NSWindow* find_window() {
     NSWindow* result = nil;
+    NSString* const title = [NSString stringWithUTF8String:window_title];
     NSArray<NSWindow*>* const windows = NSApp.windows;
     const NSUInteger count = windows.count;
     for (NSUInteger index = 0; index < count; ++index) {
         NSWindow* const candidate = [windows objectAtIndex:index];
-        if ([candidate.title isEqualToString:[NSString stringWithUTF8String:window_title]]) {
+        if ([candidate.title isEqualToString:title]) {
             result = candidate;
             break;
         }
@@ -117,9 +133,41 @@ void enqueue(const std::shared_ptr<State>& state) {
     dispatch_after_f(when, dispatch_get_main_queue(), context, run_step);
 }
 
-// Reads the presented raster while the model is occluded, so the cached
-// display copies the last frame and paints nothing (counters unchanged).
-Capture capture_occluded(State& state, NSView* const view) {
+// The bitmap's pixels as sRGB bytes. Both read-backs go through this one
+// conversion, so a before and after pair compares like with like.
+Capture capture_from_bitmap(NSBitmapImageRep* const bitmap) {
+    Capture result{};
+    result.width = bitmap.pixelsWide;
+    result.height = bitmap.pixelsHigh;
+    require(result.width > 0 && result.height > 0 && result.width <= 4096 && result.height <= 4096,
+        "bounded read-back extent");
+    const std::size_t count = static_cast<std::size_t>(result.width) * static_cast<std::size_t>(result.height);
+    result.rgba.resize(count * 4U);
+    NSColorSpace* const color_space = NSColorSpace.sRGBColorSpace;
+    for (NSInteger row = 0; row < result.height; ++row) {
+        const std::size_t offset = static_cast<std::size_t>(row) * static_cast<std::size_t>(result.width) * 4U;
+        for (NSInteger column = 0; column < result.width; ++column) {
+            NSColor* const color = [[bitmap colorAtX:column y:row] colorUsingColorSpace:color_space];
+            require(color != nil, "read-back color conversion");
+            const std::array<double, 4> components{static_cast<double>(color.redComponent),
+                static_cast<double>(color.greenComponent), static_cast<double>(color.blueComponent),
+                static_cast<double>(color.alphaComponent)};
+            const std::size_t pixel = offset + static_cast<std::size_t>(column) * 4U;
+            for (std::size_t channel = 0; channel < components.size(); ++channel) {
+                require(std::isfinite(components[channel]), "finite read-back color");
+                const double bounded = std::clamp(components[channel], 0.0, 1.0);
+                const long value = std::lround(bounded * 255.0);
+                result.rgba[pixel + channel] = static_cast<std::uint8_t>(value);
+            }
+        }
+    }
+    return result;
+}
+
+// Reads the host's raster while the model is occluded, so the cached display
+// copies the last frame and paints nothing (counters unchanged). Unocclusion
+// afterwards asks for one whole-window frame (notifyOcclusion:).
+Capture capture_raster(State& state, NSView* const view) {
     [view notifyOcclusion:YES];
     require((*state.model).occluded(), "occlusion hook did not reach the model");
     const MetricsSnapshot before = (*state.model).metrics_snapshot();
@@ -128,30 +176,7 @@ Capture capture_occluded(State& state, NSView* const view) {
         NSBitmapImageRep* const bitmap = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
         require(bitmap != nil, "AppKit bitmap allocation");
         [view cacheDisplayInRect:view.bounds toBitmapImageRep:bitmap];
-        result.width = bitmap.pixelsWide;
-        result.height = bitmap.pixelsHigh;
-        require(result.width > 0 && result.height > 0 && result.width <= 2048 && result.height <= 2048,
-            "bounded snapshot extent");
-        const std::size_t count = static_cast<std::size_t>(result.width) * static_cast<std::size_t>(result.height);
-        result.rgba.resize(count * 4U);
-        NSColorSpace* const color_space = NSColorSpace.sRGBColorSpace;
-        for (NSInteger row = 0; row < result.height; ++row) {
-            const std::size_t offset = static_cast<std::size_t>(row) * static_cast<std::size_t>(result.width) * 4U;
-            for (NSInteger column = 0; column < result.width; ++column) {
-                NSColor* const color = [[bitmap colorAtX:column y:row] colorUsingColorSpace:color_space];
-                require(color != nil, "snapshot color conversion");
-                const std::array<double, 4> components{static_cast<double>(color.redComponent),
-                    static_cast<double>(color.greenComponent), static_cast<double>(color.blueComponent),
-                    static_cast<double>(color.alphaComponent)};
-                const std::size_t pixel = offset + static_cast<std::size_t>(column) * 4U;
-                for (std::size_t channel = 0; channel < components.size(); ++channel) {
-                    require(std::isfinite(components[channel]), "finite snapshot color");
-                    const double bounded = std::clamp(components[channel], 0.0, 1.0);
-                    const long value = std::lround(bounded * 255.0);
-                    result.rgba[pixel + channel] = static_cast<std::uint8_t>(value);
-                }
-            }
-        }
+        result = capture_from_bitmap(bitmap);
     }
     const MetricsSnapshot after = (*state.model).metrics_snapshot();
     require(after.paint_passes == before.paint_passes, "the occluded readback painted");
@@ -159,15 +184,57 @@ Capture capture_occluded(State& state, NSView* const view) {
     return result;
 }
 
-// Pixels that differ between two captures, counted by whether the pixel's
-// centre (in logical units, `scale` device pixels per unit) lies in a block.
+// Reads the view's area of the display through /usr/sbin/screencapture. The
+// child is waited for with waitpid, not a run loop, so no main-queue step
+// runs while it works.
+Capture capture_screen(NSWindow* const window, NSView* const view, const char* const name) {
+    const NSRect in_window = [view convertRect:view.bounds toView:nil];
+    const NSRect on_screen = [window convertRectToScreen:in_window];
+    NSArray<NSScreen*>* const screens = NSScreen.screens;
+    require(screens.count > 0, "no screen");
+    // screencapture -R takes points from the main display's top-left corner;
+    // AppKit's screen coordinates start at its bottom-left corner.
+    const double main_height = static_cast<double>([screens objectAtIndex:0].frame.size.height);
+    const long left = std::lround(on_screen.origin.x);
+    const long top = std::lround(main_height - (on_screen.origin.y + on_screen.size.height));
+    const long width = std::lround(on_screen.size.width);
+    const long height = std::lround(on_screen.size.height);
+    const std::string region = std::to_string(left) + "," + std::to_string(top) + "," +
+        std::to_string(width) + "," + std::to_string(height);
+    const std::string path = std::string(NSTemporaryDirectory().UTF8String) + "gui_forms_dp_" +
+        std::to_string(static_cast<long>(getpid())) + "_" + name + ".png";
+    std::array<std::string, 7> arguments{"/usr/sbin/screencapture", "-x", "-R", region, "-t", "png", path};
+    std::array<char*, 8> argv{};
+    for (std::size_t index = 0; index < arguments.size(); ++index) argv[index] = arguments[index].data();
+    argv[arguments.size()] = nullptr;
+    pid_t child = 0;
+    const int spawned = posix_spawn(&child, argv[0], nullptr, nullptr, argv.data(), environ);
+    require(spawned == 0, "screencapture did not start");
+    int status = 0;
+    const pid_t waited = waitpid(child, &status, 0);
+    require(waited == child && WIFEXITED(status) && WEXITSTATUS(status) == 0, "screencapture failed");
+    Capture result{};
+    @autoreleasepool {
+        NSData* const data = [NSData dataWithContentsOfFile:[NSString stringWithUTF8String:path.c_str()]];
+        require(data != nil, "screencapture wrote no image");
+        NSBitmapImageRep* const bitmap = [NSBitmapImageRep imageRepWithData:data];
+        require(bitmap != nil, "screencapture image does not decode");
+        result = capture_from_bitmap(bitmap);
+    }
+    std::remove(path.c_str());
+    return result;
+}
+
+// Pixels that differ between two read-backs, counted by whether the pixel's
+// centre (in logical units; `scale` device pixels per unit) lies in a block.
 struct ChangedPixels final {
     std::size_t inside{0};
     std::size_t outside{0};
 };
 bool centre_inside(const NSInteger column, const NSInteger row, const double scale,
                    const std::span<const gui_forms::Rect> blocks) {
-    const gui_forms::Point centre{(static_cast<double>(column) + 0.5) / scale, (static_cast<double>(row) + 0.5) / scale};
+    const gui_forms::Point centre{(static_cast<double>(column) + 0.5) / scale,
+                                  (static_cast<double>(row) + 0.5) / scale};
     for (std::size_t index = 0; index < blocks.size(); ++index) {
         if (blocks[index].contains(centre)) return true;
     }
@@ -175,7 +242,7 @@ bool centre_inside(const NSInteger column, const NSInteger row, const double sca
 }
 ChangedPixels changed_pixels(const Capture& before, const Capture& after, const double scale,
                              const std::span<const gui_forms::Rect> blocks) {
-    require(before.width == after.width && before.height == after.height, "captures differ in extent");
+    require(before.width == after.width && before.height == after.height, "read-backs differ in extent");
     ChangedPixels changed{};
     for (NSInteger row = 0; row < before.height; ++row) {
         for (NSInteger column = 0; column < before.width; ++column) {
@@ -197,6 +264,17 @@ ChangedPixels changed_pixels(const Capture& before, const Capture& after, const 
     return changed;
 }
 
+// The red channel at logical point (x, y) of a read-back.
+std::uint8_t red_at(const Capture& capture, const double scale, const double x, const double y) {
+    const std::size_t column = static_cast<std::size_t>(x * scale);
+    const std::size_t row = static_cast<std::size_t>(y * scale);
+    require(column < static_cast<std::size_t>(capture.width) && row < static_cast<std::size_t>(capture.height),
+        "sample outside the read-back");
+    const std::size_t pixel = (row * static_cast<std::size_t>(capture.width) + column) * 4U;
+    const std::uint8_t red = capture.rgba[pixel];
+    return red;
+}
+
 // One numeric field of the host's private diagnostics JSON.
 double host_number(NSView* const view, const std::string& name) {
     const std::string snapshot = [view hostJSON];
@@ -208,15 +286,11 @@ double host_number(NSView* const view, const std::string& name) {
     return value;
 }
 
-void measure(State& state, NSView* const view) {
-    const MetricsSnapshot after = (*state.model).metrics_snapshot();
-    // What AppKit handed drawRect: for the frame just presented.
-    const double native_dirty = host_number(view, "last_native_dirty_area");
-    const double clip_bounds = host_number(view, "last_cg_clip_bounds_area");
-    const bool layer_backed = view.layer != nil;
-    const long redraw_policy = static_cast<long>(view.layerContentsRedrawPolicy);
-    const Capture captured = capture_occluded(state, view);
+void measure(State& state, NSWindow* const window, NSView* const view) {
+    const Capture screen_after = capture_screen(window, view, "after");
+    const Capture raster_after = capture_raster(state, view);
     const MetricsSnapshot& before = state.before_metrics;
+    const MetricsSnapshot& after = state.after_metrics;
     const double sum = state.blocks[0].area() + state.blocks[1].area();
     const double painted = after.painted_damage_area - before.painted_damage_area;
     const double bounding = after.paint_bounding_area - before.paint_bounding_area;
@@ -225,22 +299,28 @@ void measure(State& state, NSView* const view) {
     const std::uint64_t pixels = after.retained_pixels_presented - before.retained_pixels_presented;
     const double device_pixels_per_unit = state.scale * state.scale;
     const std::uint64_t expected_pixels = static_cast<std::uint64_t>(std::llround(sum * device_pixels_per_unit));
-    const ChangedPixels changed = changed_pixels(state.before, captured, state.scale, state.blocks);
+    const ChangedPixels raster = changed_pixels(state.raster_before, raster_after, state.scale, state.blocks);
+    const ChangedPixels screen = changed_pixels(state.screen_before, screen_after, state.scale, state.blocks);
+    const bool layer_backed = view.layer != nil;
+    const long redraw_policy = static_cast<long>(view.layerContentsRedrawPolicy);
     std::cout << "dp-gate|host=macos|scale=" << state.scale << "|sum_area=" << sum << "|painted_area=" << painted
               << "|bounding_area=" << bounding << "|presents=" << presents << "|rectangles_presented=" << rectangles
               << "|pixels_presented=" << pixels << "|expected_pixels=" << expected_pixels
-              << "|changed_inside=" << changed.inside << "|changed_outside=" << changed.outside
-              << "|native_dirty_area=" << native_dirty << "|cg_clip_bounds_area=" << clip_bounds
+              << "|native_dirty_area=" << state.native_dirty_area
+              << "|cg_clip_bounds_area=" << state.cg_clip_bounds_area
+              << "|raster_changed_inside=" << raster.inside << "|raster_changed_outside=" << raster.outside
+              << "|screen_changed_inside=" << screen.inside << "|screen_changed_outside=" << screen.outside
               << "|wants_layer=" << (view.wantsLayer ? 1 : 0) << "|layer_backed=" << (layer_backed ? 1 : 0)
               << "|layer_contents_redraw_policy=" << redraw_policy << '\n';
     require(presents == 1U, "two distant changes did not present one frame");
     const double difference = painted - sum;
     require(difference < 1.0e-6 && difference > -1.0e-6, "painted area differs from the rectangles' sum");
     require(bounding > painted * 10.0, "the rectangles are not distant: the test cannot tell a sum from a box");
-    require(rectangles == 2U, "the host did not receive the two-rectangle set");
-    require(pixels == expected_pixels, "the host copied more than the two rectangles");
-    require(changed.outside == 0U, "a pixel outside the damaged rectangles changed");
-    require(changed.inside == static_cast<std::size_t>(expected_pixels), "the damaged rectangles did not change");
+    require(rectangles >= 1U && pixels >= expected_pixels, "the host copied less than the two rectangles");
+    require(raster.outside == 0U && screen.outside == 0U, "a pixel outside the damaged rectangles changed");
+    require(raster.inside == static_cast<std::size_t>(expected_pixels) &&
+            screen.inside == static_cast<std::size_t>(expected_pixels),
+            "the damaged rectangles did not change in the raster and on the screen");
 }
 
 void advance(State& state) {
@@ -251,14 +331,11 @@ void advance(State& state) {
         if (lease.presented_revision == 0) return;
         state.scale = static_cast<double>(window.backingScaleFactor);
         require(std::isfinite(state.scale) && state.scale >= 0.5 && state.scale <= 4.0, "backing scale supported");
-        state.before = capture_occluded(state, window.contentView);
-        // The occluded readback hands drawRect: the whole view while the
-        // model declines to paint, and the host keeps that as pending
-        // damage. One whole-window frame (the same pixels) presents it, so
-        // the measured frame holds only the two changes.
+        [window orderFrontRegardless];
+        state.raster_before = capture_raster(state, window.contentView);
+        // Unocclusion asks for one whole-window frame (the same pixels); let
+        // it present, so the measured frame holds only the two changes.
         state.previous_presented = (*state.model).paint_lease_snapshot().presented_revision;
-        (*state.root).invalidate(Dirty::paint);
-        [window.contentView collectDamage];
         set_stage(state, Stage::drain);
         return;
     }
@@ -273,9 +350,14 @@ void advance(State& state) {
         return;
     }
     if (state.stage == Stage::settle) {
-        // Let any further frame the window asks for land before the baseline.
+        // Let the window server show the drained frame before the baseline.
         ++state.settle_steps;
         if (state.settle_steps < 4U) return;
+        state.screen_before = capture_screen(window, view, "before");
+        const double root_red = static_cast<double>(red_at(state.screen_before, state.scale, 200.0, 150.0));
+        const double block_red = static_cast<double>(red_at(state.screen_before, state.scale, 30.0, 25.0));
+        require(root_red - block_red > 60.0,
+            "the screen capture does not show the window (no Screen Recording permission, or covered)");
         const PaintLeaseSnapshot lease = (*state.model).paint_lease_snapshot();
         state.previous_presented = lease.presented_revision;
         state.before_metrics = (*state.model).metrics_snapshot();
@@ -285,9 +367,21 @@ void advance(State& state) {
         set_stage(state, Stage::changed);
         return;
     }
-    const PaintLeaseSnapshot lease = (*state.model).paint_lease_snapshot();
-    if (lease.presented_revision <= state.previous_presented) return;
-    measure(state, view);
+    if (state.stage == Stage::changed) {
+        const PaintLeaseSnapshot lease = (*state.model).paint_lease_snapshot();
+        if (lease.presented_revision <= state.previous_presented) return;
+        // Taken at once: the host's diagnostics describe its last drawRect:.
+        state.after_metrics = (*state.model).metrics_snapshot();
+        state.native_dirty_area = host_number(view, "last_native_dirty_area");
+        state.cg_clip_bounds_area = host_number(view, "last_cg_clip_bounds_area");
+        state.settle_steps = 0;
+        set_stage(state, Stage::shown);
+        return;
+    }
+    // Let the window server show the measured frame before reading the screen.
+    ++state.settle_steps;
+    if (state.settle_steps < 4U) return;
+    measure(state, window, view);
     state.finished = true;
     close_fixture(state);
 }
@@ -339,14 +433,13 @@ int main() {
         const std::shared_ptr<State> state = std::make_shared<State>();
         const Color rest = Color::rgba(90, 90, 90);
         (*state).root = make_control<ColorBlock>(StableId("dp.root"), Color::rgba(230, 230, 230));
-        const std::shared_ptr<ColorBlock>& root = (*state).root;
         (*state).top_left = make_control<ColorBlock>(StableId("dp.top-left"), rest);
         (*state).bottom_right = make_control<ColorBlock>(StableId("dp.bottom-right"), rest);
         (*state).blocks = {gui_forms::Rect{10.0, 10.0, 40.0, 30.0}, gui_forms::Rect{340.0, 250.0, 40.0, 30.0}};
         (*(*state).top_left).set_requested_bounds((*state).blocks[0]);
         (*(*state).bottom_right).set_requested_bounds((*state).blocks[1]);
-        (*root).add_child((*state).top_left);
-        (*root).add_child((*state).bottom_right);
+        (*(*state).root).add_child((*state).top_left);
+        (*(*state).root).add_child((*state).bottom_right);
         gui_forms::host::MacHostOptions options{};
         options.title = window_title;
         options.initial_size = {400, 300};
@@ -354,7 +447,8 @@ int main() {
         options.print_metrics_on_close = false;
         options.host_ready = Ready{state};
         options.closed = Closed{state};
-        std::unique_ptr<gui_forms::Window> model = std::make_unique<gui_forms::Window>(root, options.initial_size);
+        std::unique_ptr<gui_forms::Window> model =
+            std::make_unique<gui_forms::Window>((*state).root, options.initial_size);
         (*state).model = model.get();
         const int result = gui_forms::host::run_macos(std::move(model), std::move(options));
         (*state).host_closed = true;

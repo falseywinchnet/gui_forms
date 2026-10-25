@@ -847,6 +847,10 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     std::vector<std::size_t> _liveFrameSources;
     std::vector<GFRect> _liveRegions;
     std::vector<GFRect> _uncoveredDamage;
+    // Per drawRect: on a reusable raster, the pending live presentations'
+    // destinations and the parts of the uncovered damage inside them.
+    std::vector<GFRect> _liveDestinations;
+    std::vector<GFRect> _liveExposure;
     // A presentation region was taken but its pixels never reached a
     // presented raster. The next pass copies complete clips.
     BOOL _liveRegionLost;
@@ -2793,6 +2797,18 @@ void post_perform_close(NSWindow* window) {
         }
     }
     if (drawnCount == 0) _uncoveredDamage.push_back(nativeDamage);
+    if (reusableRaster) {
+        // Paint the gathered set, not AppKit's coalesced request: outside the
+        // model's damage (already in _pendingDamage) and the live surfaces,
+        // the raster holds this frame's pixels, which AppKit copies unchanged.
+        _liveDestinations.clear();
+        for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
+            _liveDestinations.push_back(update.destination);
+        }
+        _liveExposure.clear();
+        gui_forms::detail::append_within_live_destinations(_uncoveredDamage, _liveDestinations, _liveExposure);
+        _uncoveredDamage.swap(_liveExposure);
+    }
     for (const GFRect rectangle : _uncoveredDamage) _pendingDamage.add(rectangle);
     bool liveOnly = _pendingDamage.empty();
     if (narrowedAny && !liveOnly) {
