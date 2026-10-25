@@ -3352,6 +3352,13 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_macos_exposure_tests PRIVATE gui_forms_host_macos)
         add_test(NAME gui_forms_macos_exposure_tests COMMAND gui_forms_macos_exposure_tests)
 
+        # Stage DP gate on macOS (results/2026-10-25-dp-gate-macos).
+        add_executable(gui_forms_macos_damage_rectangles_tests tests/macos_damage_rectangles_tests.mm)
+        target_compile_options(gui_forms_macos_damage_rectangles_tests PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_macos_damage_rectangles_tests PRIVATE gui_forms_host_macos)
+        add_test(NAME gui_forms_macos_damage_rectangles_tests COMMAND gui_forms_macos_damage_rectangles_tests)
+        set_tests_properties(gui_forms_macos_damage_rectangles_tests PROPERTIES TIMEOUT 60)
+
         add_executable(gui_forms_macos_display_link_tests tests/macos_display_link_tests.mm)
         target_compile_options(gui_forms_macos_display_link_tests PRIVATE -fobjc-arc)
         target_link_libraries(gui_forms_macos_display_link_tests PRIVATE gui_forms_host_macos gui_forms_controls)
@@ -3474,6 +3481,7 @@ if(GUI_FORMS_BUILD_TESTS)
         foreach(native_fixture IN ITEMS
                 gui_forms_macos_clipboard_image_tests
                 gui_forms_macos_exposure_tests
+                gui_forms_macos_damage_rectangles_tests
                 gui_forms_macos_idle_visibility_tests
                 gui_forms_macos_host_close_tests
                 gui_forms_macos_multi_window_tests
