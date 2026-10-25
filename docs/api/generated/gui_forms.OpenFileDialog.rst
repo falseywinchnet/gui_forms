@@ -104,8 +104,10 @@ gui_forms::OpenFileDialog
 
    .. rubric:: Notes
 
-   A :cpp:func:`file_ok <gui_forms::OpenFileDialog::file_ok>` handler may dispose or destroy the dialog, or destroy the owner
-   window; :cpp:func:`show_dialog <gui_forms::OpenFileDialog::show_dialog>` then returns ``cancel`` without touching either. Each
+   A :cpp:func:`file_ok <gui_forms::OpenFileDialog::file_ok>` handler may dispose or destroy the dialog; :cpp:func:`show_dialog <gui_forms::OpenFileDialog::show_dialog>` then
+   returns ``cancel`` without touching it. A handler that cancels and destroys
+   the owner window also ends the call with ``cancel``, since the dialog cannot
+   be shown again. Each
    request has its own identity, unique in the process, so a dialog may be shown
    while another component's host dialog is on the modal stack. The name part of
    a path follows the rules of the platform the program runs on: Windows splits

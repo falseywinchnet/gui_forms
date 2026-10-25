@@ -71,9 +71,10 @@ public:
     // cancelled, and none when the dialog could not be shown, with status()
     // saying why (unsupported without a host or without `dialogs`). Only ok
     // changes file_names. A file_ok handler that cancels shows the dialog
-    // again; one that disposes or destroys the dialog, or destroys `owner`,
-    // ends the call with cancel. Throws std::logic_error for a disposed
-    // dialog, for one already showing, and off the window's UI thread.
+    // again, or returns cancel if it also destroyed `owner`; one that
+    // disposes or destroys the dialog ends the call with cancel. Throws
+    // std::logic_error for a disposed dialog, for one already showing, and
+    // off the window's UI thread.
     DialogResult show_dialog(Window& owner);
 
     // Restores every setting to its default and forgets the chosen paths.
