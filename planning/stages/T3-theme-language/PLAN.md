@@ -400,13 +400,13 @@ refined in P1):
 | Class | Severity | Codes |
 |---|---|---|
 | E1xx lexical | error | `invalid_utf8` (E101), `nul_byte`, `unterminated_string`, `unterminated_comment`, `escape_not_admitted`, `bad_url`, `token_not_admitted`, `number_too_precise`, `number_out_of_range` (E109); numbered in this order in P1 |
-| E2xx structure | error | `unexpected_token`, `unbalanced_block`, `declaration_outside_rule`, `import_after_rules`, `important_in_keyframes`, `nesting_not_admitted` |
+| E2xx structure | error | `unexpected_token` (E201), `unbalanced_block`, `declaration_outside_rule`, `import_after_rules`, `important_in_keyframes`, `nesting_not_admitted` (E206); numbered in this order in P2 |
 | E3xx selector | error | `selector_syntax`, `combinator_not_admitted`, `pseudo_class_not_admitted` (`:not()` and the rest), `attribute_selector_not_admitted` |
 | E4xx value | error | `value_syntax`, `value_wrong_kind`, `value_out_of_range`, `unit_not_admitted`, `value_form_not_admitted`, `keyword_unknown`, `too_many_layers`, `expression_invalid` (with the engine's `ExpressionDefect`), `variable_undefined`, `variable_cycle`, `keyframes_undefined`, `transition_invalid`, `resource_unknown`, `variable_kind_mismatch` |
 | E5xx limit | error | `sheet_too_large`, `too_many_rules`, `too_many_declarations`, `nesting_too_deep`, `string_too_long`, `too_many_imports`, `expression_over_budget`, `too_many_variable_combinations`, and the derived limits of section 6 |
 | E6xx package | error | `manifest_invalid`, `sheet_hash_mismatch`, `import_not_installed`, `import_hash_mismatch`, `import_cycle`, `published_value_invalid` |
 | E7xx reserved | error | `reserved_input_set` |
-| W1xx unknown name | warning | `unknown_property`, `unknown_primitive`, `unknown_function`, `unknown_at_rule`, `unknown_media_feature`, `unknown_selector_name`, `property_not_admitted` |
+| W1xx unknown name | warning | `unknown_property`, `unknown_primitive`, `unknown_function`, `unknown_at_rule` (W104, P2), `unknown_media_feature`, `unknown_selector_name`, `property_not_admitted`; numbered W101 to W107 in this order |
 | W2xx colour | warning | `literal_colour_unremappable` |
 | W3xx version | warning | `needs_newer_engine` (the sheet or a rule), `keyword_from_newer_engine` |
 | W4xx inline | warning | `inline_with_theme`, once per window (E1) |
@@ -514,6 +514,17 @@ limits, the E2xx codes, and the serializer. Shared with FD. Gate: the
 round-trip corpus (every fixture, plus real-world CSS files' formatting:
 comments everywhere, CRLF, a byte-order mark, no final newline) returns
 identical bytes; every structural defect is located. 2 PRs.
+*Done in one PR:* the tree stores its nodes in document order, each
+followed by its descendants and carrying its subtree's end, so no node
+links to another; each node is a token range plus a content range. The
+nesting limit counts every open `{`, `(`, `[` and function, a rule's
+block included. At-rule names and `!important` match ASCII
+case-insensitively, as in CSS. An unknown at-rule (W104) is kept with its
+block unparsed, and like any item other than `@import` it ends the
+imports. An empty value parses; P4 judges it. The parser stops at the
+first error and closes the nodes it has open there, so even a stopped
+tree writes back the sheet. In the code, a warning's enumerator is 1000
+plus its number, keeping W104 apart from E104.
 
 **P3. Selectors.** Every form of section 1.4, names looked up through the
 schema (`registered_name`) and `manifests/control-schema.json`, standard

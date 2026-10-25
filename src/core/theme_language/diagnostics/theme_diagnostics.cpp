@@ -35,9 +35,21 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::token_not_admitted:
     case DiagnosticCode::number_too_precise:
     case DiagnosticCode::number_out_of_range:
+    case DiagnosticCode::unexpected_token:
+    case DiagnosticCode::unbalanced_block:
+    case DiagnosticCode::declaration_outside_rule:
+    case DiagnosticCode::import_after_rules:
+    case DiagnosticCode::important_in_keyframes:
+    case DiagnosticCode::nesting_not_admitted:
     case DiagnosticCode::sheet_too_large:
+    case DiagnosticCode::too_many_rules:
+    case DiagnosticCode::too_many_declarations:
+    case DiagnosticCode::nesting_too_deep:
     case DiagnosticCode::string_too_long:
+    case DiagnosticCode::too_many_imports:
         return DiagnosticSeverity::error;
+    case DiagnosticCode::unknown_at_rule:
+        return DiagnosticSeverity::warning;
     }
     // A value outside the enumeration is treated as the stricter class.
     return DiagnosticSeverity::error;
@@ -54,8 +66,19 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
     case DiagnosticCode::token_not_admitted: return "token_not_admitted";
     case DiagnosticCode::number_too_precise: return "number_too_precise";
     case DiagnosticCode::number_out_of_range: return "number_out_of_range";
+    case DiagnosticCode::unexpected_token: return "unexpected_token";
+    case DiagnosticCode::unbalanced_block: return "unbalanced_block";
+    case DiagnosticCode::declaration_outside_rule: return "declaration_outside_rule";
+    case DiagnosticCode::import_after_rules: return "import_after_rules";
+    case DiagnosticCode::important_in_keyframes: return "important_in_keyframes";
+    case DiagnosticCode::nesting_not_admitted: return "nesting_not_admitted";
     case DiagnosticCode::sheet_too_large: return "sheet_too_large";
+    case DiagnosticCode::too_many_rules: return "too_many_rules";
+    case DiagnosticCode::too_many_declarations: return "too_many_declarations";
+    case DiagnosticCode::nesting_too_deep: return "nesting_too_deep";
     case DiagnosticCode::string_too_long: return "string_too_long";
+    case DiagnosticCode::too_many_imports: return "too_many_imports";
+    case DiagnosticCode::unknown_at_rule: return "unknown_at_rule";
     }
     return "unknown";
 }
@@ -63,7 +86,9 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
 std::string diagnostic_code_label(DiagnosticCode code) {
     const DiagnosticSeverity severity = diagnostic_severity(code);
     std::string label = severity == DiagnosticSeverity::error ? "E" : "W";
-    const std::uint16_t number = static_cast<std::uint16_t>(code);
+    // A warning's enumerator value carries 1000 above its number.
+    const std::uint16_t value = static_cast<std::uint16_t>(code);
+    const std::uint16_t number = static_cast<std::uint16_t>(value % 1000U);
     label += std::to_string(number);
     return label;
 }
