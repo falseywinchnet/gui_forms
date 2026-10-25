@@ -268,6 +268,11 @@ struct RouteResult final {
     ProbeColour opaque{};
     ProbeColour caption{};
     bool clear_hits_window{};
+    // DwmGetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE) once the case is
+    // applied: whether the attribute can be read, so that an adapter can
+    // learn it exists without setting it, and the type it reads back.
+    HRESULT read_status{S_OK};
+    int read_type{-1};
     LRESULT hit_test{};
 };
 
@@ -356,6 +361,8 @@ bool run_case(HINSTANCE instance, POINT origin, const ProbeCase& probe, HWND awa
         settle(composition_waits);
     }
     result.active = GetForegroundWindow() == window;
+    result.read_status =
+        DwmGetWindowAttribute(window, DWMWA_SYSTEMBACKDROP_TYPE, &result.read_type, sizeof(result.read_type));
 
     POINT client_origin{0, 0};
     ClientToScreen(window, &client_origin);
@@ -419,9 +426,11 @@ void print_case(const ProbeCase& probe, const RouteResult& result) {
     print_colour("half", result.half);
     print_colour("opaque", result.opaque);
     print_colour("caption", result.caption);
-    std::printf(",\"clear_hits_window\":%s,\"hit_test\":\"%s\",\"per_pixel_alpha\":%s,\"material_shown\":%s}\n",
+    std::printf(",\"clear_hits_window\":%s,\"hit_test\":\"%s\",\"read_status\":\"0x%08lx\",\"read_type\":%d,"
+                "\"per_pixel_alpha\":%s,\"material_shown\":%s}\n",
                 result.clear_hits_window ? "true" : "false", hit_test_name(result.hit_test),
-                per_pixel_alpha ? "true" : "false", material_shown ? "true" : "false");
+                static_cast<unsigned long>(result.read_status), result.read_type, per_pixel_alpha ? "true" : "false",
+                material_shown ? "true" : "false");
 }
 
 // The build, for the record only: HKLM\...\Windows NT\CurrentVersion

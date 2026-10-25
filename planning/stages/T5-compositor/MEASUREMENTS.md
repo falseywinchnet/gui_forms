@@ -20,7 +20,8 @@ the host presents today. The client has three columns:
 For each case it shows a fresh window, waits 40 compositions (`DwmFlush`),
 and reads the composed screen with a one-pixel `BitBlt` from the screen DC
 at each column's centre and in the caption. It asks `WindowFromPoint` and
-`WM_NCHITTEST` about a point over the clear column. It then activates
+`WM_NCHITTEST` about a point over the clear column, and reads
+`DWMWA_SYSTEMBACKDROP_TYPE` back with `DwmGetWindowAttribute`. It then activates
 another window and reads the clear column again. Over the backdrop, a
 client whose alpha DWM honours composes to (0, 160, 0), (100, 80, 0) and
 (0, 0, 220). It prints one JSON line per case and one with the settings.
@@ -77,13 +78,17 @@ What this shows:
    included. An earlier run withdrew with `DWMSBT_NONE` instead, and that
    left a plain white caption. `DWMSBT_AUTO` is what a window that never
    set the attribute has.
-5. **Input.** A clear pixel still hits the window (`HTCLIENT`, and
+5. **The attribute reads back.** `DwmGetWindowAttribute` returns
+   `DWMWA_SYSTEMBACKDROP_TYPE` with `S_OK`: 0 (`DWMSBT_AUTO`) on a window
+   that never set it, and the type a case set. An adapter can learn that
+   the attribute exists without setting it.
+6. **Input.** A clear pixel still hits the window (`HTCLIENT`, and
    `WindowFromPoint` returns the window) on every route, as owner decision
    T5-Q6 requires: no click-through.
 
 For the adapter: blur behind with an empty region enables the client's
 alpha for every non-opaque grant. `DWMWA_SYSTEMBACKDROP_TYPE` (main window
-2, transient 3) selects a material on build 22621 and later, and
+2, transient 3) selects a material where the attribute reads back, and
 `DWMSBT_AUTO` goes with withdrawing. `opaque` withdraws everything. One
 mechanism serves every grant, so changing between grants never changes
 the frame.
