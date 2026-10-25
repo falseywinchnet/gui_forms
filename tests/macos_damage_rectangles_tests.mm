@@ -23,6 +23,7 @@
 
 // Existing private native diagnostics and occlusion hooks, not a public API addition.
 @interface NSView (DamageRectanglesProbe)
+- (std::string)hostJSON;
 - (void)collectDamage;
 - (void)notifyOcclusion:(BOOL)occluded;
 @end
@@ -59,9 +60,10 @@ struct Capture final {
     std::vector<std::uint8_t> rgba{};
 };
 
-enum class Stage { first_frame, settle, changed };
+enum class Stage { first_frame, drain, settle, changed };
 
 struct State final {
+    std::shared_ptr<ColorBlock> root{};
     std::shared_ptr<ColorBlock> top_left{};
     std::shared_ptr<ColorBlock> bottom_right{};
     std::array<gui_forms::Rect, 2> blocks{};
@@ -195,8 +197,24 @@ ChangedPixels changed_pixels(const Capture& before, const Capture& after, const 
     return changed;
 }
 
+// One numeric field of the host's private diagnostics JSON.
+double host_number(NSView* const view, const std::string& name) {
+    const std::string snapshot = [view hostJSON];
+    const std::string marker = "\"" + name + "\":";
+    const std::size_t position = snapshot.find(marker);
+    require(position != std::string::npos, "native diagnostic missing");
+    const std::string digits = snapshot.substr(position + marker.size());
+    const double value = std::stod(digits);
+    return value;
+}
+
 void measure(State& state, NSView* const view) {
     const MetricsSnapshot after = (*state.model).metrics_snapshot();
+    // What AppKit handed drawRect: for the frame just presented.
+    const double native_dirty = host_number(view, "last_native_dirty_area");
+    const double clip_bounds = host_number(view, "last_cg_clip_bounds_area");
+    const bool layer_backed = view.layer != nil;
+    const long redraw_policy = static_cast<long>(view.layerContentsRedrawPolicy);
     const Capture captured = capture_occluded(state, view);
     const MetricsSnapshot& before = state.before_metrics;
     const double sum = state.blocks[0].area() + state.blocks[1].area();
@@ -211,7 +229,10 @@ void measure(State& state, NSView* const view) {
     std::cout << "dp-gate|host=macos|scale=" << state.scale << "|sum_area=" << sum << "|painted_area=" << painted
               << "|bounding_area=" << bounding << "|presents=" << presents << "|rectangles_presented=" << rectangles
               << "|pixels_presented=" << pixels << "|expected_pixels=" << expected_pixels
-              << "|changed_inside=" << changed.inside << "|changed_outside=" << changed.outside << '\n';
+              << "|changed_inside=" << changed.inside << "|changed_outside=" << changed.outside
+              << "|native_dirty_area=" << native_dirty << "|cg_clip_bounds_area=" << clip_bounds
+              << "|wants_layer=" << (view.wantsLayer ? 1 : 0) << "|layer_backed=" << (layer_backed ? 1 : 0)
+              << "|layer_contents_redraw_policy=" << redraw_policy << '\n';
     require(presents == 1U, "two distant changes did not present one frame");
     const double difference = painted - sum;
     require(difference < 1.0e-6 && difference > -1.0e-6, "painted area differs from the rectangles' sum");
@@ -231,15 +252,28 @@ void advance(State& state) {
         state.scale = static_cast<double>(window.backingScaleFactor);
         require(std::isfinite(state.scale) && state.scale >= 0.5 && state.scale <= 4.0, "backing scale supported");
         state.before = capture_occluded(state, window.contentView);
-        state.settle_steps = 0;
-        set_stage(state, Stage::settle);
+        // The occluded readback hands drawRect: the whole view while the
+        // model declines to paint, and the host keeps that as pending
+        // damage. One whole-window frame (the same pixels) presents it, so
+        // the measured frame holds only the two changes.
+        state.previous_presented = (*state.model).paint_lease_snapshot().presented_revision;
+        (*state.root).invalidate(Dirty::paint);
+        [window.contentView collectDamage];
+        set_stage(state, Stage::drain);
         return;
     }
     require(window != nil && window.contentView != nil, "native fixture window disappeared");
     NSView* const view = window.contentView;
     require(static_cast<double>(window.backingScaleFactor) == state.scale, "backing scale changed during the fixture");
+    if (state.stage == Stage::drain) {
+        const PaintLeaseSnapshot drained = (*state.model).paint_lease_snapshot();
+        if (drained.presented_revision <= state.previous_presented) return;
+        state.settle_steps = 0;
+        set_stage(state, Stage::settle);
+        return;
+    }
     if (state.stage == Stage::settle) {
-        // Let any frame that unocclusion asks for land before the baseline.
+        // Let any further frame the window asks for land before the baseline.
         ++state.settle_steps;
         if (state.settle_steps < 4U) return;
         const PaintLeaseSnapshot lease = (*state.model).paint_lease_snapshot();
@@ -304,8 +338,8 @@ int main() {
     try {
         const std::shared_ptr<State> state = std::make_shared<State>();
         const Color rest = Color::rgba(90, 90, 90);
-        const std::shared_ptr<ColorBlock> root =
-            make_control<ColorBlock>(StableId("dp.root"), Color::rgba(230, 230, 230));
+        (*state).root = make_control<ColorBlock>(StableId("dp.root"), Color::rgba(230, 230, 230));
+        const std::shared_ptr<ColorBlock>& root = (*state).root;
         (*state).top_left = make_control<ColorBlock>(StableId("dp.top-left"), rest);
         (*state).bottom_right = make_control<ColorBlock>(StableId("dp.bottom-right"), rest);
         (*state).blocks = {gui_forms::Rect{10.0, 10.0, 40.0, 30.0}, gui_forms::Rect{340.0, 250.0, 40.0, 30.0}};
