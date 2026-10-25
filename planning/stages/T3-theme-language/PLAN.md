@@ -1,9 +1,11 @@
 # Stage T3 plan: the theme language front end
 
-Status 2026-10-25: proposed, for the owner's review. No parser code exists
-yet. The decisions it builds on are in [`README.md`](README.md), "Owner
-decisions, interview round 001 (2026-10-25)", cited here by their letters
-(A1 to E3). Where this plan and a decision disagree, the decision governs.
+Status 2026-10-25: revised to interview round 002, for the owner's last
+review before P1. No parser code exists yet. The decisions it builds on are
+in [`README.md`](README.md): "Owner decisions, interview round 001
+(2026-10-25)", cited here by their letters (A1 to E3), and "Owner
+decisions, interview round 002 (2026-10-25)", cited as R2-01 to R2-21.
+Where this plan and a decision disagree, the decision governs.
 The engine vocabulary it lowers onto is listed in
 [`../T2-engine-core/CSS_COVERAGE.md`](../T2-engine-core/CSS_COVERAGE.md);
 the rule types it fills are in
@@ -22,7 +24,7 @@ error refuses the whole theme and leaves the previous one running; a warning
 drops one declaration (B2, B3). The same tokenizer, tree and lowering serve
 inline styles (E1) and, later, form documents (FD decision 1).
 
-T3 is mostly front end, but the decisions need six things the engine
+T3 is mostly front end, but the decisions need seven things the engine
 cannot say today. Each is a phase of its own below, marked
 **engine change**, with T2's tests run beside T3's:
 
@@ -34,6 +36,7 @@ cannot say today. Each is a phase of its own below, marked
 | EC4 | colour values carry the colour role they came from; colour roles become vocabulary atoms; the high-contrast pass remaps by role, or by position for a literal | A4 | P8 |
 | EC5 | the part's text-role size as an engine input, and a part's text role as a rule property | em units (A3); `font: <role>` | P8 |
 | EC6 | two `!important` levels, a colour-only forced high-contrast pass, and inline styles owned by controls | E1 | P9 |
+| EC7 | custom properties resolved per part by the cascade: a declaration that reads `var()` stays unresolved until the part's cascade, and the part cache keys on the resolved values | R2-05 | P12 |
 
 ## 1. The grammar in outline
 
@@ -57,7 +60,7 @@ The token kinds are CSS Syntax §4's, restricted:
 | Kind | Notes |
 |---|---|
 | `whitespace`, `comment` | kept as tokens, so the tree can reproduce every byte |
-| `ident`, `function` (an ident followed by `(`), `at_keyword`, `hash` | names; escapes are not admitted outside strings (proposed, open question 16) |
+| `ident`, `function` (an ident followed by `(`), `at_keyword`, `hash` | names; escapes are not admitted outside strings (R2-16) |
 | `string` | `"..."` or `'...'`, at most 4 KiB (E2); an unterminated string is an error |
 | `number`, `percentage`, `dimension` | the number is converted once, correctly rounded, to `double` |
 | `delim`, `colon`, `semicolon`, `comma`, `[`, `]`, `(`, `)`, `{`, `}` | |
@@ -106,11 +109,11 @@ combinators). The forms, and the `RuleSelector` field each fills:
 | stable ID | `#player-play` | `stable_id` (stable IDs keep their own spelling) |
 | class | `.primary` | `classes` (valid style class names) |
 | part | `::part(scroll-thumb)` | `part` (the declared part name) |
-| part role | `::role(face)` | `role` (proposed, open question 4) |
+| part role | `::role(face)` | `role` (R2-04) |
 | custom state | `:state(drop-accepted)` | `states` |
 | standard state | `:hover` `:active` `:focus` `:focus-visible` `:checked` `:indeterminate` `:disabled` `:enabled` `:read-only` `:invalid` `:open` `:default` | `states`: `hot`, `pressed`, `focused`, `focus_visible`, `checked`, `indeterminate`, `disabled`, `enabled`, `read_only`, `invalid`, `open`, `preselect` |
 | either of | `button:is(:hover, :focus-visible)::part(face)` | expanded: one rule per argument |
-| selector list | `button, check-box { ... }` | expanded: one rule per selector (proposed, open question 15) |
+| selector list | `button, check-box { ... }` | expanded: one rule per selector, each with its own specificity (R2-15) |
 
 - Every other published state is written `:state(<kebab-name>)`:
   `:state(drag-proximate)`.
@@ -123,8 +126,8 @@ combinators). The forms, and the `RuleSelector` field each fills:
   (descendant, `>`, `+`, `~`) and nesting `&` are errors: they are not this
   language (B1).
 - An unknown control type, part, state or pseudo-class name is a warning
-  that drops the rule (B3; open question 8 asks the owner to confirm this
-  reading).
+  that drops the rule (B3, R2-08). A custom control's own state is such an
+  unknown name for now (R2-13).
 - Specificity is the engine's (`RuleSpecificity`): stable IDs, classes,
   control types, parts, states.
 
@@ -138,32 +141,34 @@ rule's important declarations into a sibling rule at the important level
 
 - **Numbers and units** (A3): plain numbers; `px` (logical units); `%` only
   where CSS defines percentages (gradient stops, colour alpha, opacity,
-  `background-position`, `background-size`, keyframe offsets, and radii, see
-  open question 11); `em`, relative to the part's text-role size (EC5);
+  `background-position`, `background-size`, keyframe offsets, and radii,
+  where a percentage is of the shorter side, R2-11); `em`, relative to the part's text-role size (EC5);
   `ms` and `s` for durations; `deg`, `rad`, `turn` for angles; `dppx` and
   `x` in `@media (resolution)`. `rem`, `vw`, `vh`, `vmin`, `vmax`, `ch`,
   `ex` and every other unit are errors.
 - **Colours** (A4):
-  - roles first: `role(<role>)` or `role(<pair> foreground)` and
-    `role(<pair> background)` (open question 3 has the vocabulary and the
-    form);
+  - roles first (R2-03): design language §5.4's pairs are `ColourRole`
+    atoms. `role(<pair>)` gives the pair's foreground in `color` and its
+    background in `background`; `role(<pair> foreground)` and
+    `role(<pair> background)` pick one anywhere. A theme's palette is a
+    `:root` block of role declarations
+    (`:root { ink-on-paper: #1b2733 on #ffffff; }`);
   - literals: `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `rgba()`,
     `hsl()`, `hsla()` (both comma and space forms), `transparent`, and
-    `color-mix(in srgb, a p%, b)`. Named colours other than `transparent`
-    and `currentcolor` are not admitted (proposed; they are a large table
-    with no relation to the role model).
+    `color-mix(in srgb, a p%, b)`, and every CSS named colour (R2-21),
+    which is a literal like any other.
   - A literal in a text or edge position (`color`, `border-color`, keyline
     and ring colours) is a warning, `literal_colour_unremappable`: forced
     high contrast replaces it with its position's high-contrast colour,
     losing the relation the author meant. The declaration still applies.
-- **Custom properties** (A5): `--name: <tokens>` and `var(--name)`,
-  `var(--name, fallback)`. They are substituted at compile time (open
-  question 5 has the scope). Engine inputs are reserved names:
-  `--pointer-x`, `--pointer-y`, `--time-in-state`, `--display-scale`,
-  `--text-scale`, and every published application value the manifest
-  declares (open question 6). A theme that declares one of them is an error.
-  A `var()` of an undefined name with no fallback is a bad value (error),
-  and so is a cycle.
+- **Custom properties** (A5, R2-05): `--name: <tokens>` and `var(--name)`,
+  `var(--name, fallback)`. They cascade per part like any property,
+  `!important` included (section 1.11, EC7). Engine inputs are reserved
+  names: `--pointer-x`, `--pointer-y`, `--time-in-state`,
+  `--display-scale`, `--text-scale`, and every published application value
+  the manifest lists (R2-06). A theme that declares one of them is an
+  error. A `var()` of a name that no rule in the compilation defines, with
+  no fallback, is a bad value (error), and so is a cycle.
 - **Expressions**: `calc()`, `clamp()`, `min()`, `max()` (CSS), and the
   engine functions `mix(a, b, t)`, `smoothstep(e0, e1, x)`,
   `choose(c, a, b)`, `less(a, b)`, `less-equal`, `greater`,
@@ -184,13 +189,13 @@ rule's important declarations into a sibling rule at the important level
 - **Keywords**: a known property's keyword that the engine does not have
   (`shape: hexagon`) is a bad value (error), unless the sheet or rule
   declares a newer engine than the running one, when it is a warning
-  (open question 7).
+  (R2-07).
 
 ### 1.7 Lowering CSS names onto the engine
 
 Property names are CSS's where CSS has the property (A1), written kebab-case;
 engine-named properties fill what CSS lacks, unprefixed as in the agreed
-scenario (`shape: circle`; open question 7). Shorthands are expanded into
+scenario (`shape: circle`; R2-07). Shorthands are expanded into
 longhands by the lowering; the tree keeps the shorthand as written (A2).
 
 A rule that declares only material fields selects the `material` primitive
@@ -248,16 +253,17 @@ means the built-in recipe's value.
   `cubic-bezier()`, `steps(n, jump-start | jump-end)`, and the engine's
   `follow(<time constant>)`, `spring(<response>, <damping>)`,
   `decay(<time constant>)` (C2). `ease-in` and `ease-out` match the
-  nearest engine easing (CSS_COVERAGE "nearest-easing matching"); open
-  question 17 asks whether to lower them to their exact `cubic-bezier()`
-  instead.
+  lower to their exact CSS `cubic-bezier()` (R2-17).
 - **States** come only from published states (C1). The compiler builds a
   part's presentational state machine (`PropertyTransition`) from the rule
   that declares the transition and the rules that refine it: the same
   selector with more states, declaring the same property. Their states are
   ordered most precedent first, because the engine's machine takes the
-  first state that matches. The limitation and the alternative are open
-  question 18.
+  first state that matches. The first version groups only these
+  refinements (R2-18): another rule's state value, such as
+  `.primary:hover { scale: 1.05 }` under a transition declared on `button`,
+  gets its own instant machine. Joining curves and state values across
+  rules is a later engine phase, if themes need it.
 - **`@keyframes`** with `animation` on a state rule: `from` becomes the
   state's `enter_from`, the stops between become `PresentationState::stops`
   (at most 4; more is an error), and `to` becomes the target.
@@ -279,14 +285,14 @@ means the built-in recipe's value.
   `x`). Conditions join with `and`; a comma list expands the block once per
   query. `not`, `only`, `or` and media types other than `all` and `screen`
   are errors. An unknown media feature is a warning (the block is skipped).
-  The condition is carried on each rule and evaluated per window (EC3; open
-  question 19).
+  The condition is carried on each rule and evaluated per window, and parts
+  are re-resolved on a change (EC3, R2-19).
 - **`@import "<installed theme name>";`** (D2): resolved only among
   installed packs whose hashes check; no paths, no URLs, no network. The
   imported theme's rules come before the importing sheet's, as in CSS. A
   name not installed, a hash that fails, or a cycle is an error. At most 16
   imports (E2), counted over the whole import closure of one theme, each
-  installed theme once (open question 20).
+  installed theme once (R2-20).
 - **`@keyframes <name>`**: names are unique per sheet; a second definition
   replaces the first, as in CSS. An `animation` naming no defined keyframes
   is a bad value (error).
@@ -305,8 +311,44 @@ background: role(accent background); border-radius: 6px !important;
 Sources: the control's C++ call and the form document's `style` attribute.
 The control owns its compiled inline style; it survives theme replacement.
 A defect in it refuses that inline style only, with the control's previous
-inline style kept. The form, the C++ name (`Control::set_style` already
-exists for WinForms' `ControlStyles`) and the ownership are open question 10.
+inline style kept. The C++ entry point is
+`Control::set_inline_style(std::string_view)` (R2-10); WinForms'
+`set_style(ControlStyles, bool)` is unchanged.
+
+### 1.11 Custom properties through the cascade (EC7)
+
+R2-05: a theme's custom properties are resolved per part by the same
+cascade as properties, so a restyle sheet's `button { --radius: 8px; }`
+changes buttons only, and every rule that reads `var(--radius)` on a
+button's parts follows. A selector with no part (`button`) matches every
+part of the control, so no inheritance between parts is needed; custom
+properties do not inherit from one control to another (inheritance stays
+only for text and colour roles).
+
+- **Compiled form.** A custom property definition is a declaration of its
+  own kind: a name, its tokens, its level (`!important` splits it as any
+  declaration). A declaration that reads `var()` is kept as a deferred
+  declaration: its tokens, the custom properties it reads, and the value
+  kind its property needs.
+- **Checked at compile time** (B2: bad values fail). Every definition of a
+  name visible to the compilation is known, so the compiler substitutes
+  each candidate definition (and the fallback) into each deferred
+  declaration that reads it and lowers the result: a candidate that gives
+  a bad value, an expression over budget or more than 4,096 tokens is an
+  error, as it would be written out. Candidates multiply when one value
+  reads several names; their product is bounded (section 8.2, question 1).
+- **Resolved per part.** The part's cascade picks the winning definition of
+  each name, then substitutes into the winning deferred declarations and
+  lowers them with the same lowering code. Resolution runs on discrete
+  changes (states, theme, media, inline style), never per frame, and the
+  lowered result is cached by the identities of the winning definitions,
+  so parts that resolve alike lower once.
+- **Cache.** The part raster cache already keys on resolved values
+  (parameters and, after EC1, the material assembly), so deferred values
+  need no new key: two parts whose `--radius` resolves alike share a bake.
+- **Across compilations.** An inline style compiles separately from the
+  theme, so its definitions cannot be checked against a theme compiled
+  later. Section 8.2, question 1, proposes the rule.
 
 ## 2. Diagnostics
 
@@ -362,8 +404,8 @@ E4xx; `unknown_primitive` and `unknown_parameter` are W1xx;
 never reached. `duplicate_declaration` does not arise: as in CSS, the later
 of two declarations of one property in one rule wins, with no diagnostic.
 The engine's refusals that a theme author cannot fix
-(`primitive_over_budget`, `primitive_cost_unbounded`) and
-`primitive_role_mismatch` are open question 8.
+(`primitive_over_budget`, `primitive_cost_unbounded`) are W1xx warnings,
+and `primitive_role_mismatch` is an E4xx error (R2-08).
 
 At most 1,000 diagnostic records are kept per compilation; the rest are
 counted (a derived limit, section 6).
@@ -425,7 +467,8 @@ builds it.
 Each phase is one to three PRs on main, each with its own gate; stacks stay
 at most two deep. Code lives in `src/core/theme_language/` (one substantial
 type per directory: `source_text`, `tokenizer`, `syntax_tree`, `selector`,
-`value`, `lowering`, `diagnostics`, `package`), internal until stage V
+`value`, `lowering`, `custom_properties`, `diagnostics`, `package`),
+internal until stage V
 (E3). The documented seam is one public entry point,
 `include/gui_forms/theme/theme_compiler/theme_compiler.hpp`: compile a
 package, get a `Theme` or a refusal, with the diagnostics.
@@ -456,11 +499,15 @@ conformance fixture per selector form and per refused form; specificity and
 level of each. 1 to 2 PRs.
 
 **P4. Values and expressions.** Numbers and units (em parsed, lowered in
-P8), colour literals and `color-mix()`, custom properties with the
-substitution limits, reserved inputs (E7xx), and expressions compiled to
-`ExpressionInstruction` programs with constant folding. Gate: value
-fixtures for every form; budget overruns are errors; folded and unfolded
-programs give the same bits. 2 PRs.
+P8), colour literals, named colours and `color-mix()`, custom property
+definitions and `var()` parsed with the substitution limits and the
+compile-time candidate check of section 1.11, reserved inputs (E7xx), and
+expressions compiled to `ExpressionInstruction` programs with constant
+folding. Until P12 resolves custom properties per part, a `var()` with
+exactly one candidate definition is substituted at compile time, and one
+with several is refused with a temporary `not_yet_built` error, so no
+interim meaning ships. Gate: value fixtures for every form; budget overruns
+are errors; folded and unfolded programs give the same bits. 2 PRs.
 
 **P5. Lowering onto today's engine.** `primitive`, `shape`, `blend`,
 primitive parameters by name, static `opacity`, `scale` and `translate`,
@@ -473,7 +520,8 @@ hash equal. 1 PR.
 **P6. Authored materials (engine change EC1) and their CSS.** The engine
 first: a rule's material fields cascade one by one, as parameters do, and
 the material primitive bakes the material assembled from the winning
-fields, cached by that assembly's identity (open question 2). Then the CSS
+fields, cached by that assembly's identity (R2-02). A field no rule sets
+keeps the part's built-in recipe value, the cascade's floor. Then the CSS
 of CSS_COVERAGE §1 to §3, §5, §7 to §11 and §14 `color`, with the
 shorthands. Gate: a fixture per row; for each, a sheet and the equivalent
 C++ material bake to identical pixels; the material cache's counters show
@@ -487,8 +535,8 @@ from a sheet with the same frames as the C++ rules in
 (E7r's counter). 2 PRs.
 
 **P8. Colour roles, em, text roles and `@media` (engine changes EC3, EC4,
-EC5).** Colour roles as vocabulary atoms and the theme's palette (open
-question 3); colour values that remember their role; the high-contrast
+EC5).** Colour roles as vocabulary atoms and the theme's `:root` palette
+(R2-03); colour values that remember their role; the high-contrast
 remap by role, or by position for a literal; the text-role size input and
 em; `font: <role>`; media conditions on rules, evaluated per window and
 re-resolved on a change (a discrete event: nothing per frame). Gate:
@@ -500,7 +548,8 @@ theme. 3 PRs.
 **P9. Inline styles and `!important` (engine change EC6).** The two
 important levels, the split of important declarations, the colour-only
 high-contrast pass that keeps inline important non-colour declarations,
-control-owned inline styles, the C++ entry point, and `inline_with_theme`.
+control-owned inline styles, `Control::set_inline_style`, and
+`inline_with_theme` (once per window).
 FD's `style` attribute calls the same entry point when FD lands. Gate: a
 cascade fixture for each case of E1 (neither important, theme only, inline
 only, both), each under normal and forced high contrast; a refused inline
@@ -508,11 +557,23 @@ style keeps the previous one. 2 PRs.
 
 **P10. Packages, imports and atomic replacement.** The manifest (a bounded
 JSON reader under `src/core/`, fuzzed, in the pattern of the XML reader),
-content hashes (open question 12), the installed-pack index, `@import`
+SHA-256 content hashes, first-party with the standard test vectors
+(R2-12), the installed-pack index, `@import`
 closure, and refusal semantics through the public entry point. Gate:
 package fixtures for each E6xx code; a refused theme leaves the running
 `Theme` object installed and every window's focus, capture, selection and
 active edit unchanged; a good swap preserves them too (RC003). 2 to 3 PRs.
+
+**P12. Custom properties through the cascade (engine change EC7).** The
+engine first: custom property definitions and deferred declarations in the
+compiled rules, the per-part resolution of section 1.11 with `!important`
+under E1, and the cache of lowered results by winning definitions. Then
+the compiler drops P4's temporary refusal. Gate: the owner's restyle
+example (a second sheet's `button { --radius: 8px; }` changes buttons and
+nothing else, through every rule reading `var(--radius)`); an inline
+`!important` definition beating a theme's; a counter showing one lowering
+per distinct resolution and none while a transition runs; candidate
+errors at compile time. 2 PRs.
 
 **P11. The gate.** Complete the conformance corpus and its coverage table,
 the malformed and hostile suite, a recorded fuzz run, and the user
@@ -521,7 +582,8 @@ documentation of the language (`docs/user/theme-language.md`). Record under
 
 Order: P1, P2, P3 and P4 in sequence; P5 after P4; P6, P7 and P8 after P5,
 in any order (P8 last is simplest, since colour roles touch P6's fields);
-P9 after P5; P10 after P5; P11 last. FD can start from P2.
+P9 after P5; P10 after P5; P12 after P6 and P9 (it resolves material
+fields and needs the important levels); P11 last. FD can start from P2.
 
 ## 6. The final gate
 
@@ -536,7 +598,8 @@ Per the brief, recorded under `results/`:
 2. **Malformed input**: one fixture per error and warning code, checking the
    code, the line, the column and that the running theme is untouched.
 3. **Hostile input**: each owner limit (E2) at its value passes and one past
-   it is refused; and the derived limits, proposed here (open question 14):
+   it is refused; and the derived limits, accepted as starting values
+   (R2-14):
    at most 32 arguments in one `:is()`; at most 1,024 custom properties per
    sheet; a substituted value at most 4,096 tokens (no expansion
    explosion through nested `var()`); at most 64 `@keyframes` per sheet; at
@@ -583,144 +646,63 @@ Per the brief, recorded under `results/`:
 - **Foreign data** (§9): the manifest and sheets are untrusted input; the
   JSON reader states its limits as the XML reader does.
 
-## 8. Open questions
+## 8. Decisions and open questions
 
-Numbered, each with a recommendation. The owner answers; nothing here is
-decided.
+### 8.1 Decided in round 002
 
-1. **File extension and media type** (left open on 2026-10-13).
-   (a) `.css`, `text/css`: every editor highlights it, but it says "browser
-   CSS". (b) `.gftheme`, `text/x.gui-forms.theme`: unambiguous, no
-   highlighting. (c) `.theme.css` for sheets, with the manifest's `format`
-   field (`"gui-forms-theme/1"`) naming the dialect, `text/css` on the wire,
-   and `theme.json` for the manifest. **Recommend (c)**: editors highlight
-   it, the inner suffix says what it is, and the manifest lists its sheets,
-   so nothing is discovered by extension. Inline styles and form documents
-   need no extension.
-2. **How a rule carries a material (EC1).** (a) Each material field
-   cascades on its own, as parameters do, and the engine assembles the
-   part's material from the winning fields, cached by the assembly's
-   identity. (b) A rule carries a whole material, and the last matching
-   rule's material wins whole, so a `:hover` rule restates every layer. (c)
-   CSS writes into the theme's recipe table by recipe family and state.
-   **Recommend (a)**: it is CSS's behaviour (a hover rule changes only its
-   background); (b) surprises every CSS author, and (c) addresses families,
-   not parts.
-3. **Colour roles: vocabulary and form.** No colour-role atom exists in code
-   (design language §5.4's set is proposed). (a) §5.4's pairs become
-   `ColourRole` atoms; a theme's palette is a `:root` block of role
-   declarations (`ink-on-paper: #1b2733 on #ffffff;`); `role(<pair>)`
-   gives the foreground in `color` and the background in `background`, and
-   `role(<pair> foreground | background)` picks one anywhere. (b) The same
-   atoms, with the palette in the manifest JSON. (c) `role()` reads only the
-   recipe's own colours (`text`, `muted-text`, `glyph`, `focus-ring`,
-   `default-ring`, `accent(n)`), with no new atoms. **Recommend (a)**: A4
-   says roles "and its pairs", the palette stays in the sheet the designer
-   edits, and the atoms are a vocabulary decision the owner makes once.
-4. **Addressing a part role.** Design language §8.2 binds appearance to
-   (part role, state), and `RuleSelector::role` exists, but the decided
-   selector set has no role form. (a) `::role(<role>)`. (b) `::part()`
-   matches a name or a role. (c) No role form in the first version.
-   **Recommend (a)**: explicit, and (b) is ambiguous where a part's name
-   equals another role.
-5. **The scope of a theme's custom properties.** (a) Global only: defined in
-   `:root`, substituted everywhere. (b) Global plus rule-local: a rule's own
-   `--x` shadows the global one inside that rule; no per-part cascade. (c)
-   Full CSS: each part sees the cascaded value, resolved per part, which
-   needs the engine to carry deferred values. **Recommend (b)** now, with
-   (c) only if a real theme needs it; the scenario's `--glow` is (b).
-6. **Declaring published values.** The theme must name the application
-   values it reads (`ThemeRuleSheet::published_values`), and A5 makes them
-   read-only. (a) The manifest lists them; `var(--level)` reads one. (b) A
-   reserved prefix (`--app-level`). (c) Any `var()` the theme does not
-   define is a published value. **Recommend (a)**: explicit and static; (c)
-   turns a typo into a silent input.
-7. **Engine-named properties and newer keywords.** (a) Unprefixed, as in the
-   agreed scenario (`shape: circle`), versioned with the engine; a keyword
-   the engine lacks is an error, or a warning when the sheet declares a
-   newer engine. (b) A `-gf-` prefix on every engine-named property.
-   **Recommend (a)**: it is what the owner saw; the warning rule keeps
-   newer themes loadable on older engines (B3).
-8. **Classifying what B2 does not name.** (a) An unknown control type, part,
-   state or pseudo-class name is a warning that drops the rule (B3: "an
-   unknown name"). (b) `primitive_role_mismatch` (a known primitive on a
-   part role it cannot paint) is an error, a bad value. (c)
-   `primitive_over_budget` and `primitive_cost_unbounded` are warnings: the
-   author cannot fix a registry fact, and the part falls back as E8c
-   decided. (d) A property the language refuses by decision (`clip-path`,
-   `rotate`, layout properties) is a warning, `property_not_admitted`.
-   **Recommend (a) to (d) as written.**
-9. **Theme `!important` under forced high contrast.** (a) It does not
-   survive the pass; only inline `!important` non-colour declarations do.
-   (b) Theme `!important` non-colour declarations survive too.
-   **Recommend (a)**: the owner's guarantee is to the program designer's
-   inline rules.
-10. **Inline styles: form, ownership and name.** (a) A declaration list,
-    then optional part blocks with the control's selector implied (section
-    1.10); the control owns the compiled result, so no stable ID is needed
-    and it survives theme replacement; the `inline_with_theme` warning once
-    per window. (b) Declarations only, applied to every part of the control.
-    And the C++ name: `Control::set_style(std::string_view)` overloads the
-    existing WinForms `set_style(ControlStyles, bool)`; `set_inline_style`
-    does not. **Recommend (a)**, with the owner choosing the name;
-    `set_inline_style` is clearer, `set_style` is what the owner wrote.
-11. **Percentage radii.** The engine draws circular corners only. (a) A
-    percentage is of the shorter side, so 50 % on any box is a pill (a
-    stated difference from CSS's ellipse). (b) Percentage radii are a bad
-    value. **Recommend (a)**: A3 admits percentages where CSS defines them,
-    and the shape keywords already cover circles and pills exactly.
-12. **Content hashes.** (a) SHA-256, first-party (no new dependency), with
-    the standard test vectors. (b) BLAKE3. **Recommend (a)**: universal
-    tooling can produce the manifest's hashes.
-13. **Custom control states.** T1 decision 2 lets a custom control declare
-    states, but `RuleSelector::states` holds only the closed `AnatomyState`
-    set. (a) Defer: in the first version `:state()` of a custom state is an
-    unknown name (a warning). (b) Extend the selector in P3. **Recommend
-    (a)**, consistent with C1's first version.
-14. **The derived limits** of section 6 (32 `:is()` arguments, 1,024 custom
-    properties, 4,096 tokens per substituted value, 64 `@keyframes`, 1,000
-    diagnostic records). They are not owner numbers. **Recommend accepting
-    them** as starting values, each an error when exceeded, as E2's are.
-15. **Selector lists** (`a, b { }`). B1 names `:is()` but not the comma.
-    (a) Admit them, one rule per selector, each with its own specificity, as
-    CSS does. (b) Refuse them; `:is()` covers the need. **Recommend (a)**:
-    every CSS author writes them.
-16. **Escapes.** (a) CSS escapes only inside strings; names are plain
-    kebab-case ASCII. (b) Full CSS escapes everywhere. **Recommend (a)**:
-    names are registered words (T1 decision 8), and escapes in names only
-    hide them.
-17. **`ease-in` and `ease-out`.** The engine has no easing of that name.
-    (a) Lower them to their exact CSS `cubic-bezier()` (now present). (b)
-    The nearest closed easing, as CSS_COVERAGE first proposed. **Recommend
-    (a)**: exact, and no engine change.
-18. **Transitions across rules.** CSS cascades a part's `transition` and its
-    property values separately, so `.primary:hover { scale: 1.05 }` animates
-    with a `transition` declared on `button`. The engine keeps a
-    transition's states and curve in one record. (a) The first version
-    groups only refinements of the transition rule's own selector (more
-    states, same everything else); another rule's state value gets its own
-    instant machine. (b) An engine change that cascades curves and state
-    values separately and joins them per part. **Recommend (a)** first, and
-    (b) as a later phase if themes need it.
-19. **Where `@media` is evaluated (EC3).** (a) Each rule carries its
-    condition and the engine evaluates it per window, re-resolving parts on
-    a change. (b) The compiler compiles one rule set per environment and
-    swaps them. **Recommend (a)**: windows share a theme but not a scale,
-    and a change is a discrete event either way.
-20. **Counting the 16 imports.** (a) Over the whole import closure of one
-    theme, each installed theme counted once. (b) Per sheet. **Recommend
-    (a)**: it bounds the total work, which is the limit's purpose.
-21. **Smaller proposals, as one set.** Named colours other than
-    `transparent` and `currentcolor` are not admitted; `initial` means the
-    built-in recipe's value; `isolation` is accepted and changes nothing;
-    `animation-direction` and `animation-fill-mode` other than their
-    defaults are errors in the first version; the log line of section 2;
-    `inline_with_theme` once per window. **Recommend accepting the set**;
-    the owner may pull out any item.
+The 21 questions of the first version are decided; the README records each
+with the owner's words. In short:
+
+| | Decision |
+|---|---|
+| R2-01 | `.theme.css` sheets, a `theme.json` manifest, the dialect named in the manifest's `format` field; `text/css` on the wire |
+| R2-02 | each material field cascades on its own; the engine assembles the part's material, with the built-in recipe as the floor (EC1) |
+| R2-03 | §5.4's pairs become `ColourRole` atoms; the palette is a `:root` block |
+| R2-04 | `::role(<role>)` |
+| R2-05 | custom properties resolve per part through the full cascade, `!important` included (EC7, P12) |
+| R2-06 | published values a theme reads are listed in the manifest |
+| R2-07 | engine-named properties are plain names; an unknown keyword is an error, or a warning under a newer declared engine |
+| R2-08 | unknown selector names warn and drop the rule; `primitive_role_mismatch` errors; the budget refusals warn; refused properties warn (`property_not_admitted`) |
+| R2-09 | theme `!important` does not survive forced high contrast |
+| R2-10 | inline styles: declarations plus part blocks, owned by the control; `Control::set_inline_style(std::string_view)` |
+| R2-11 | a percentage radius is of the shorter side |
+| R2-12 | SHA-256, first-party |
+| R2-13 | custom control states deferred (an unknown name for now) |
+| R2-14 | the derived limits of section 6 |
+| R2-15 | selector lists admitted, each selector with its own specificity |
+| R2-16 | escapes only inside strings |
+| R2-17 | `ease-in` and `ease-out` lower to their exact `cubic-bezier()` |
+| R2-18 | a transition groups the refinements of its own rule only; joining across rules is a later engine phase |
+| R2-19 | `@media` conditions evaluated per window |
+| R2-20 | the 16 imports counted over the whole import closure |
+| R2-21 | the smaller set, with every CSS named colour admitted as a literal |
+
+### 8.2 Open, from round 002's answers
+
+R2-05 raises one question the first version did not have.
+
+1. **Checking deferred custom properties.** Inside one compilation every
+   candidate definition is checked (section 1.11). Two things remain.
+   First, the candidates a value can take multiply when it reads several
+   names: (a) bound the product at 256 per declaration, beyond which the
+   declaration is an error (a derived limit, like R2-14's), or (b) check
+   each name's candidates on their own and accept that a combination may
+   fail at resolution. Second, an inline style is compiled apart from the
+   theme, so its definition of `--radius` cannot be checked against a theme
+   installed later: (c) at resolution, a deferred declaration whose winning
+   substitution is a bad value falls back to the next declaration down the
+   cascade (finally the built-in recipe), is counted, and the later of the
+   two compilations reports a warning, `variable_kind_mismatch`, naming
+   both sources; or (d) refuse the later compilation as an error.
+   **Recommend (a) and (c)**: (a) keeps every value in one compilation
+   checked before anything runs, as B2 wants, and (c) keeps a theme swap
+   from being refused because of an application's inline style, which the
+   theme author cannot see.
 
 ## 9. Size
 
-Eleven phases, P1 to P11, of about 20 to 24 PRs in all: P1 2, P2 2, P3 1
-to 2, P4 2, P5 1, P6 3, P7 2, P8 3, P9 2, P10 2 to 3, P11 1 to 2. Of them,
-about 7 change the engine (EC1 to EC6) and run T2's tests with T3's. No
+Twelve phases, P1 to P12, of about 22 to 26 PRs in all: P1 2, P2 2, P3 1
+to 2, P4 2, P5 1, P6 3, P7 2, P8 3, P9 2, P10 2 to 3, P12 2, P11 1 to 2.
+Of them, about 9 change the engine (EC1 to EC7) and run T2's tests with
+T3's. Round 002 added P12 (EC7, 2 PRs); no other phase changed size. No
 timing is claimed.

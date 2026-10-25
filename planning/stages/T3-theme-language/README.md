@@ -2,9 +2,9 @@
 
 Release: 0.3 Themeable. Depends on: T1 (part and state names), T2 (the
 engine's properties, primitives, inputs and expressions). Unblocks T4, FD, D,
-H, V. Status 2026-10-25: interview round 001 answered (below); the phased
-build plan, [`PLAN.md`](PLAN.md), awaits the owner's review. No parser code
-yet. Authority:
+H, V. Status 2026-10-25: interview rounds 001 and 002 answered (below); the
+phased build plan, [`PLAN.md`](PLAN.md), is revised to them and awaits the
+owner's last review before P1. No parser code yet. Authority:
 `planning/FORWARD_PROGRAMME.md` §4 T3; design language §12.1 item 1.
 
 Read [the shared brief](../README.md) first.
@@ -138,8 +138,8 @@ Record the fixture coverage and fuzz run under `results/`.
 4. **Forms share this syntax.** Form documents (FD) use the same CSS-family
    syntax and the same parser and round-trip machinery.
 
-Still open, minor: the file extension and media type for theme documents.
-Proposed in [`PLAN.md`](PLAN.md), "Open questions", item 1.
+The file extension and media type, left open here, were decided in round
+002 (item 01, below).
 
 ## Owner decisions, interview round 001 (2026-10-25)
 
@@ -266,7 +266,7 @@ compiles onto the engine's present vocabulary and grows with it.
       level, comes from the high-contrast colours. Only inline
       `!important` declarations that are not colours (shape, radii,
       motion, effects) survive the pass; theme `!important` does not
-      (PLAN.md, open question 9, asks the owner to confirm).
+      (confirmed in round 002, item 09).
     - **The engine change** (PLAN.md, phase P9): `CascadeLevel` gains
       `important_theme_sheet` after `inline_style` and
       `important_inline_style` after `forced_high_contrast`; the compiler
@@ -282,6 +282,105 @@ compiles onto the engine's present vocabulary and grows with it.
   within T2's operation budget. Exceeding one is an ERROR (B2).
 - **E3.** The parser is internal now, with a documented seam, and becomes
   public when stage V starts.
+
+## Owner decisions, interview round 002 (2026-10-25)
+
+The owner's answers to the 21 open questions of [`PLAN.md`](PLAN.md)
+(first version, #316), relayed by the coordinator from the interview form's
+export of 2026-10-25. The owner's notes are quoted verbatim. PLAN.md,
+"Decisions", now carries each as decided, and its phases follow them.
+
+Accepted as recommended:
+
+- **01.** Sheets are `.theme.css`; the manifest is `theme.json`; the
+  manifest's `format` field names the dialect (`"gui-forms-theme/1"`).
+  `text/css` on the wire; nothing is discovered by extension.
+- **03.** Design language §5.4's pairs become `ColourRole` vocabulary
+  atoms. A theme's palette is a `:root` block of role declarations in the
+  sheet. `role(<pair>)` gives the foreground in `color` and the background
+  in `background`; `role(<pair> foreground | background)` picks one
+  anywhere.
+- **04.** A part role is addressed as `::role(<role>)`.
+- **06.** The published application values a theme reads are listed in its
+  manifest.
+- **07.** Engine-named properties are plain names, versioned with the
+  engine. A keyword the engine lacks is an error, or a warning when the
+  sheet or rule declares a newer engine.
+- **08.** As the plan proposed: an unknown control type, part, state or
+  pseudo-class name is a warning that drops the rule;
+  `primitive_role_mismatch` is an error; `primitive_over_budget` and
+  `primitive_cost_unbounded` are warnings; a property refused by decision
+  (`clip-path`, `rotate`, layout properties) is a warning,
+  `property_not_admitted`.
+- **09.** Theme `!important` does not survive forced high contrast; only
+  inline `!important` non-colour declarations do.
+- **11.** A percentage radius is a percentage of the shorter side (50 % on
+  any box is a pill, a stated difference from CSS's ellipse).
+- **12.** Content hashes are SHA-256, first-party, with the standard test
+  vectors.
+- **13.** Custom control states are deferred: `:state()` of a custom state
+  is an unknown name (a warning) for now.
+- **14.** The derived limits are accepted as starting values: 32 `:is()`
+  arguments, 1,024 custom properties per sheet, 4,096 tokens per
+  substituted value, 64 `@keyframes` per sheet, 1,000 diagnostic records.
+  Exceeding one is an error.
+- **15.** Selector lists are admitted: one rule per selector, each with its
+  own specificity.
+- **16.** CSS escapes only inside strings; names are plain kebab-case ASCII.
+- **17.** `ease-in` and `ease-out` lower to their exact CSS
+  `cubic-bezier()`.
+- **18.** The first version groups a transition with the refinements of its
+  own rule only. Joining curves and state values across rules is a later
+  engine phase, if themes need it.
+- **19.** `@media` is evaluated per window: each rule carries its condition,
+  and parts are re-resolved on a change.
+- **20.** The 16 imports are counted over a theme's whole import closure,
+  each installed theme once.
+
+Changed or clarified:
+
+- **02. Materials: each material field cascades on its own** (option 1),
+  and the engine assembles the part's material from the winning fields.
+  The owner's note: "clarify if 3 is an expansion of 1 for me. "
+  - The answer, recorded: option 3 (CSS writing into the theme's recipe
+    table by recipe family and surface state) is not an expansion of
+    option 1. Option 1 works per part, with the part's built-in recipe as
+    the cascade floor: a field no rule sets keeps the recipe's value. A
+    broad selector such as `button:hover::part(face)` (or
+    `::role(face):hover`) already reaches every part that family
+    addressing would, and narrower selectors refine it. Option 3 would only
+    add a second, coarser route to the same parts.
+- **05. Custom properties: the full CSS cascade per part** (option 3). A
+  theme's custom properties are resolved per part by the same cascade as
+  properties, including `!important` under the E1 rule. The owner's note:
+  "if i understand this correctly, this is tangential to stylish/userstyles
+  type stylesheet problems. I think I want 1, but i might want 3. check
+  with me." The coordinator checked; the owner's answer is option 3.
+  - The owner's reason: restyling a program by a system or user sheet (the
+    Stylish/userstyles problem). Example: a restyle sheet's
+    `button { --radius: 8px; }` changes buttons only, and every rule that
+    reads `var(--radius)` on those parts follows.
+  - This is an engine change: values that read a custom property stay
+    unresolved until each part's cascade, and the part cache keys on the
+    resolved values. PLAN.md adds it as engine change EC7, phase P12.
+  - It raises one new question, how a deferred value is checked when it
+    reads several names or comes from an inline style compiled apart from
+    the theme: PLAN.md, section 8.2.
+- **10. Inline styles: option (a)**, a declaration list plus optional part
+  blocks with the control's own selector implied. The control owns the
+  compiled result, so no stable ID is needed and it survives theme
+  replacement. The C++ name is `Control::set_inline_style(std::string_view)`
+  (the recommendation), leaving WinForms' `set_style(ControlStyles, bool)`
+  as it is.
+- **21. The smaller set: accepted, with one change.** The owner's note:
+  "named colours from css are admitted." Every CSS named colour is a
+  literal colour, so a named colour used as a text or edge colour gets the
+  same `literal_colour_unremappable` warning as any other literal. The rest
+  stands: `initial` means the built-in recipe's value; `isolation` is
+  accepted and changes nothing; `animation-direction` and
+  `animation-fill-mode` other than their defaults are errors in the first
+  version; the diagnostic log line of PLAN.md section 2; and
+  `inline_with_theme` is issued once per window.
 
 ## Read first
 
