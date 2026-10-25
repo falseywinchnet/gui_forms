@@ -207,6 +207,12 @@ add_library(gui_forms_core STATIC
     src/core/xml/xml_characters/xml_characters.cpp
     src/core/xml/xml_reader/xml_reader.cpp
     src/core/xml/xml_writer/xml_writer.cpp
+    src/core/theme_language/source_text/theme_source_text.cpp
+    src/core/theme_language/diagnostics/theme_diagnostics.cpp
+    src/core/theme_language/number/theme_number.cpp
+    src/core/theme_language/tokenizer/theme_tokenizer.cpp
+    src/core/theme_language/syntax_tree/theme_syntax_tree.cpp
+    src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
     src/core/docking/dock_layout/dock_layout.cpp
@@ -2507,6 +2513,25 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_xml_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_xml_tests COMMAND gui_forms_xml_tests)
 
+    # The theme language (stage T3): numbers, tokens, diagnostics, the syntax
+    # tree, and the deterministic mutation run over the tokenizer and parser.
+    add_executable(gui_forms_theme_number_tests tests/theme_language/theme_number_tests.cpp)
+    target_link_libraries(gui_forms_theme_number_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_theme_number_tests COMMAND gui_forms_theme_number_tests)
+
+    add_executable(gui_forms_theme_tokenizer_tests tests/theme_language/theme_tokenizer_tests.cpp)
+    target_link_libraries(gui_forms_theme_tokenizer_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_theme_tokenizer_tests COMMAND gui_forms_theme_tokenizer_tests)
+
+    add_executable(gui_forms_theme_syntax_tests tests/theme_language/theme_syntax_tests.cpp)
+    target_link_libraries(gui_forms_theme_syntax_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_theme_syntax_tests COMMAND gui_forms_theme_syntax_tests)
+
+    add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
+    target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
+    target_compile_definitions(gui_forms_theme_sheet_fuzz_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    add_test(NAME gui_forms_theme_sheet_fuzz_tests COMMAND gui_forms_theme_sheet_fuzz_tests)
+
     add_executable(gui_forms_dock_layout_tests tests/dock_layout_tests.cpp)
     target_link_libraries(gui_forms_dock_layout_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_dock_layout_tests COMMAND gui_forms_dock_layout_tests)
@@ -2860,6 +2885,16 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_layout_panel_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_layout_panel_tests
              COMMAND gui_forms_layout_panel_tests)
+
+    # The layout fixture corpus against checked-in Chromium references
+    # (planning/stages/L-layout/PLAN.md section 6). The corpus path on the
+    # command line also selects this test when the corpus changes.
+    add_executable(gui_forms_layout_corpus_tests
+        tests/layout_corpus_tests.cpp
+    )
+    target_link_libraries(gui_forms_layout_corpus_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_layout_corpus_tests
+             COMMAND gui_forms_layout_corpus_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/layout_corpus)
 
     add_executable(gui_forms_responsive_track_panel_tests
         tests/responsive_track_panel_tests.cpp
@@ -3691,6 +3726,43 @@ if(GUI_FORMS_BUILD_FUZZERS)
             -fno-omit-frame-pointer
         )
         target_link_options(gui_forms_png_registry_fuzz PRIVATE
+            -fsanitize=address,undefined
+        )
+    endif()
+
+    # The theme sheet tokenizer and parser (stage T3), from their own sources.
+    add_executable(gui_forms_theme_sheet_fuzz
+        fuzz/theme_sheet_fuzz.cpp
+        src/core/theme_language/source_text/theme_source_text.cpp
+        src/core/theme_language/diagnostics/theme_diagnostics.cpp
+        src/core/theme_language/number/theme_number.cpp
+        src/core/theme_language/tokenizer/theme_tokenizer.cpp
+        src/core/theme_language/syntax_tree/theme_syntax_tree.cpp
+        src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
+        src/core/xml/xml_characters/xml_characters.cpp
+        src/core/xml/types/xml_types.cpp
+    )
+    target_include_directories(gui_forms_theme_sheet_fuzz PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_compile_features(gui_forms_theme_sheet_fuzz PRIVATE cxx_std_20)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_theme_sheet_fuzz PRIVATE
+            -fsanitize=fuzzer,address,undefined
+            -fno-omit-frame-pointer
+        )
+        target_link_options(gui_forms_theme_sheet_fuzz PRIVATE
+            -fsanitize=fuzzer,address,undefined
+        )
+    else()
+        target_compile_definitions(gui_forms_theme_sheet_fuzz PRIVATE
+            GUI_FORMS_FUZZ_STANDALONE=1
+        )
+        target_compile_options(gui_forms_theme_sheet_fuzz PRIVATE
+            -fsanitize=address,undefined
+            -fno-omit-frame-pointer
+        )
+        target_link_options(gui_forms_theme_sheet_fuzz PRIVATE
             -fsanitize=address,undefined
         )
     endif()
