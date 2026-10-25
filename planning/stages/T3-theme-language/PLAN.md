@@ -59,15 +59,19 @@ The token kinds are CSS Syntax §4's, restricted:
 
 | Kind | Notes |
 |---|---|
+| `byte_order_mark` | a leading U+FEFF, kept for the round trip (P1) |
 | `whitespace`, `comment` | kept as tokens, so the tree can reproduce every byte |
 | `ident`, `function` (an ident followed by `(`), `at_keyword`, `hash` | names; escapes are not admitted outside strings (R2-16) |
 | `string` | `"..."` or `'...'`, at most 4 KiB (E2); an unterminated string is an error |
-| `number`, `percentage`, `dimension` | the number is converted once, correctly rounded, to `double` |
+| `number`, `percentage`, `dimension` | the number is converted once, correctly rounded, to `double`, by a first-party conversion (`number/`); at most 19 significant digits and a magnitude below 1e40 and at least 1e-40 (zero excepted), else `number_too_precise` or `number_out_of_range` (P1) |
 | `delim`, `colon`, `semicolon`, `comma`, `[`, `]`, `(`, `)`, `{`, `}` | |
 | `url` | only as the function `url("resource:<name>")` with a quoted string (E8c decision on inline images, option A); an unquoted `url(...)` token is an error |
 
-`<!--`, `-->` and `\` outside a string are errors. A token is a kind and a
-byte range; its line and column are computed from a line-start table only
+`<!--`, `-->` and `\` outside a string are errors. Bytes that form no
+admitted token are an `invalid` token beside their diagnostic, so the
+tokens always cover the sheet. A token is a kind and a byte range (16
+bytes; a sheet of n bytes has at most n tokens, reserved before the
+loop); its line and column are computed from a line-start table only
 when a diagnostic needs them.
 
 ### 1.3 Sheet structure
@@ -395,7 +399,7 @@ refined in P1):
 
 | Class | Severity | Codes |
 |---|---|---|
-| E1xx lexical | error | `invalid_utf8`, `nul_byte`, `unterminated_string`, `unterminated_comment`, `escape_not_admitted`, `bad_url`, `token_not_admitted` |
+| E1xx lexical | error | `invalid_utf8` (E101), `nul_byte`, `unterminated_string`, `unterminated_comment`, `escape_not_admitted`, `bad_url`, `token_not_admitted`, `number_too_precise`, `number_out_of_range` (E109); numbered in this order in P1 |
 | E2xx structure | error | `unexpected_token`, `unbalanced_block`, `declaration_outside_rule`, `import_after_rules`, `important_in_keyframes`, `nesting_not_admitted` |
 | E3xx selector | error | `selector_syntax`, `combinator_not_admitted`, `pseudo_class_not_admitted` (`:not()` and the rest), `attribute_selector_not_admitted` |
 | E4xx value | error | `value_syntax`, `value_wrong_kind`, `value_out_of_range`, `unit_not_admitted`, `value_form_not_admitted`, `keyword_unknown`, `too_many_layers`, `expression_invalid` (with the engine's `ExpressionDefect`), `variable_undefined`, `variable_cycle`, `keyframes_undefined`, `transition_invalid`, `resource_unknown`, `variable_kind_mismatch` |
@@ -481,7 +485,7 @@ builds it.
 
 Each phase is one to three PRs on main, each with its own gate; stacks stay
 at most two deep. Code lives in `src/core/theme_language/` (one substantial
-type per directory: `source_text`, `tokenizer`, `syntax_tree`, `selector`,
+type per directory: `source_text`, `number`, `tokenizer`, `syntax_tree`, `selector`,
 `value`, `lowering`, `custom_properties`, `diagnostics`, `package`),
 internal until stage V
 (E3). The documented seam is one public entry point,
@@ -498,6 +502,11 @@ first-party correctly rounded conversion). The fuzz target starts here:
 `fuzz/theme_sheet_fuzz.cpp`, standalone mode as a test beside
 `png_registry_fuzz.cpp`. Gate: a token fixture per kind; every lexical
 defect with its line and column; tokens cover the input exactly. 2 PRs.
+*Done in one PR:* the conversion is first-party (no repository code uses
+`from_chars` for `double`): Clinger's fast path, else exact long division
+with ties to even, checked against fixed bit patterns on every host and
+against the host's `strtod`. Diagnostics keep the first 1,000 records and
+count the rest.
 
 **P2. The syntax tree and the round trip.** The parser (rules, declaration
 lists, at-rule blocks, `!important`), the nesting, rule and declaration
