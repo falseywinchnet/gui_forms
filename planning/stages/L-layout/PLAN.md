@@ -302,17 +302,24 @@ struct LayoutConstraint final {
 };
 ```
 
-- A new virtual `Size measure_intrinsic(const LayoutConstraint& constraint)`
-  on `Control`. The base implementation maps the query onto today's
-  `measure(Size)`: `max_content` and `min_content` pass the practical
-  unbounded extent and zero respectively, so every existing control keeps
-  working unchanged.
-- Text-bearing controls (`Label`, the `ButtonBase` family, `CheckBox`,
-  `RadioButton`, single-line `TextBox`, `LinkLabel`) implement it from the
-  text engine: max-content is the unwrapped line, min-content the widest
-  unbreakable segment, and height for a definite width is the wrapped
-  height. That is the measurement flex basis, automatic minimums and grid
-  intrinsic tracks need.
+- A protected virtual `Size measure_intrinsic(const LayoutConstraint&
+  constraint)` on `Control`, called through the public cached entry
+  `measure_for_layout` (section 3.2). The base implementation maps the
+  query onto today's `measure(Size)`: both content kinds pass the practical
+  unbounded extent, so a control that cannot rewrap reports its preferred
+  size as both its min-content and its max-content size, as a replaced
+  element does in CSS, and every existing control keeps working unchanged.
+  (A zero extent for min-content would report zero for every fixed-size
+  control, because `measure(Size)` clamps to `available`, and let a flex
+  item with `min-width: auto` shrink to nothing; L1 record.) A definite
+  axis reports exactly its extent.
+- Text that rewraps implements it from the text engine: `Label`'s
+  max-content is its widest unwrapped paragraph, its min-content the
+  widest unbreakable segment, and its height for a definite width the
+  wrapped height. The `ButtonBase` family (`Button`, `CheckBox`,
+  `RadioButton`, `LinkLabel`) and the single-line `TextBox` never rewrap,
+  so the base answer is theirs. That is the measurement flex basis,
+  automatic minimums and grid intrinsic tracks need.
 
 ### 3.2 A measure cache per control
 
@@ -324,9 +331,11 @@ struct LayoutConstraint final {
 - The window's own measure result is kept, not discarded, so a container's
   later query for the same constraint is a cache hit.
 - Counters in `MetricsSnapshot`: `measure_cache_hits`,
-  `measure_cache_misses`, and the largest number of measure callbacks one
-  control received in one pass. A test reads them; "fast" is never claimed
-  without them.
+  `measure_cache_misses`, `maximum_measures_per_control_pass` (the most
+  misses one control answered in one layout pass), `layout_boundary_stops`
+  and `layout_measure_clamps`. They count calls through
+  `measure_for_layout`; today's containers call `measure` directly until
+  L6 rebases them. A test reads them; "fast" is never claimed without them.
 
 ### 3.3 Invalidation
 
@@ -334,7 +343,12 @@ struct LayoutConstraint final {
   the parent's own size depends on its content on that axis (auto-sized,
   or content-sized by its own parent). Otherwise the parent is marked for
   arrange only. A container whose size is definite on both axes is a
-  layout boundary: measure dirtiness stops there.
+  layout boundary: measure dirtiness stops there. The rule is stated by
+  each container, not inferred: `Control::size_depends_on_content()` and
+  `Control::sizes_children_from_content()` both default to `true`, which
+  keeps today's propagation exactly, and the first ancestor for which
+  neither holds is the boundary. The L3 to L5 containers state their
+  answers; L6 decides the existing containers'.
 - Container properties declare their effects: a gap, direction or track
   list change is `invalidation::bounds` on the container; a per-child style
   change (grow, placement, alignment) is measure on the container and
@@ -377,15 +391,21 @@ struct LayoutConstraint final {
   column lines, `justify-*` `start`/`end`, block `text-align: start` and
   `left`/`right` insets follow CSS. Bidirectional text inside a text
   control stays the text engine's. The existing containers and Dock/Anchor
-  adopt the property in phase L6.
+  adopt the property in phase L6, which also registers it as a property
+  (descriptor, schema entry and changed event); L1 adds it to `Control`
+  only.
 - **Display scale** (question 8). Layout is computed in logical units and
   is identical at every scale: text measurement for layout uses the shipped
   engine's unhinted advances, so a scale change never dirties layout.
   Arranged bounds stay unsnapped logical doubles; device-pixel snapping is
   the painter's, by rounding each edge (not the width), so neighbours share
-  an edge with no gap or overlap. Phase L1 records how paint snaps today
-  and changes it to edge rounding if it differs. A test lays out the same
-  tree at scale 1, 1.25, 1.5 and 2 and requires identical logical boxes.
+  an edge with no gap or overlap. Phase L1 recorded how paint snaps today
+  (`results/2026-10-25-l1-layout-contract/`): none of the three painters
+  rounds each edge. The change is required (L-Q8) but is not on track L:
+  the standby worker makes it in its own PR after DP closes, with the
+  golden updates, from that record's brief (coordinator, 2026-10-25).
+  Layout keeps publishing unsnapped boxes. A test lays out the same tree
+  at scale 1, 1.25, 1.5 and 2 and requires identical logical boxes.
 - **Text-driven sizes.** Sizes that come from text come from measurement
   (section 3.1), through the bundled engine and F's substitution table;
   `effective_text_scale` changes are `invalidation::text_content`, which
@@ -598,8 +618,14 @@ the core suite) passes unchanged under the sanitizer. 3 PRs.
 
 **L2. Layout value parser.** The admitted declarations of sections 2.2 to
 2.5 over T3 P1's tokens, into typed style records, with exact
-diagnostics for refused forms. Depends on T3 P1. Gate: one conformance
-fixture per property and per refused form. 1 to 2 PRs.
+diagnostics for refused forms. Depends on T3 P1 and on T3 P4's value
+codes. The refusals use T3's E4xx codes as T3 defines them in its single
+code list (`src/core/theme_language/diagnostics/`, owned by T3): E401
+`value_syntax`, E402 `value_wrong_kind`, E403 `value_out_of_range`, E404
+`unit_not_admitted`, E405 `value_form_not_admitted`, E406
+`keyword_unknown`. L2 defines no codes; one it lacks is asked of T3
+through the coordinator (coordinator, 2026-10-25). Gate: one conformance fixture per property and per refused
+form. 1 to 2 PRs.
 
 **L3. Flex.** `flex_solver` and `FlexLayoutPanel`. Gate: the flex corpus
 (about 40 fixtures) within tolerance at every profile; the 10,000-child
@@ -711,7 +737,9 @@ answered (b) with "warn on this behavior, but allow", and 10, answered
   grow, shrink and `fr`, never added to lengths; `ItemIndex`, `LineIndex`,
   `TrackIndex` and `GridLine` (one-based, possibly negative) distinct from
   each other and from runtime ids. The public control API keeps `Rect` and
-  `Size` in logical units, as the surrounding code does.
+  `Size` in logical units, as the surrounding code does. L1 added
+  `LogicalLength`, the one type its contract uses; the others arrive with
+  the solvers that use them.
 - **Records with capacity and live length** (§1, §5): item, line and track
   workspaces state both; indexing never grows them.
 - **Caller-owned output** (§4): solvers fill the caller's `Rect` span and
