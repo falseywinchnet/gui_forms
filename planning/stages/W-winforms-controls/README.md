@@ -383,13 +383,17 @@ Reviews and fixes: #157, #167, #177.
 
 ### Next batch
 
-Ordered by how often Windows Forms applications use them. None paints, so
-none needs a vocabulary atom; each is a component over a host service that
-every host already answers or refuses.
+Ordered by how often Windows Forms applications use them. None needs a
+vocabulary atom: the four dialogs paint nothing (each is a component over a
+host service that every host already answers or refuses), and the grid's
+columns paint with roles that exist.
 
-1. **`OpenFileDialog`**, with the shared `CommonDialog` and `FileDialog`
-   bases: the Windows Forms filter string, filter index, file names, initial
-   directory, multiple selection and a cancellable `file_ok`.
+1. **`OpenFileDialog`**: the Windows Forms filter string, file names, title,
+   initial directory, multiple selection and a cancellable `file_ok`.
+   `CommonDialog` and `FileDialog` do not become public bases: nothing needs
+   them at run time (house style §7), so the two file dialogs share the
+   filter parser instead. The filter index waits for the host request to
+   carry one.
 2. **`SaveFileDialog`**: default extension, add extension, overwrite prompt.
 3. **`FolderBrowserDialog`**.
 4. **`ColorDialog`**, over the host's colour dialog.
