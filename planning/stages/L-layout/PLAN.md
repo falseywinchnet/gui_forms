@@ -1,7 +1,10 @@
 # Stage L plan: real dynamic layout (flex, grid, flow)
 
-Status 2026-10-25: proposed, for the owner's review. No code until the
-open questions in section 9 are answered. Authority:
+Status 2026-10-25: accepted. The owner answered section 9 the same day
+(README, "Owner decisions, interview round 001"): every question as
+recommended except 6 (the containing block is the nearest positioned
+ancestor, with a warning) and 10 (both Chromium packages approved). The
+plan below is revised to those answers. Authority:
 `planning/FORWARD_PROGRAMME.md` §4 L and [`README.md`](README.md); where
 this plan and a recorded owner decision disagree, the decision governs.
 
@@ -220,10 +223,26 @@ types, `column` multicol, `white-space` beyond `normal`, `nowrap` and
 ### 2.5 Positioning and lengths, shared by all three
 
 - `position: absolute` with `inset`, `left`, `top`, `right`, `bottom`,
-  `width`, `height`: out of flow, placed in the container's padding box
-  after the in-flow items (question 6 on the containing block).
+  `width`, `height`: out of flow, placed after the in-flow items.
   `position: relative` offsets an item after layout without moving its
-  neighbours.
+  neighbours, and makes it a positioned box.
+- **Containing block versus owner** (decision L-Q6). An absolute child's
+  containing block is the padding box of its nearest positioned ancestor
+  (a box with `position` other than `static`; the window's client area
+  when there is none), as CSS. Ownership does not change: the direct
+  parent still owns the child and assigns its slot with
+  `set_child_layout`. The parent computes the child's rectangle against
+  the ancestor's padding box, converts it into its own client coordinates
+  and assigns it; the child is never reparented and the ancestor never
+  writes to it.
+- When the containing block is not the direct parent, the layout pass
+  records a structured warning, `containing_block_not_parent`, with the
+  child's and the ancestor's stable IDs, in the nonfatal-diagnostic form
+  T3 uses (a severity, a code, the nodes). The window keeps these in a
+  queryable list (`Window::layout_diagnostics()`); one is recorded when a
+  child's containing block resolution changes, not on every pass. The
+  owner: "warn on this behavior, but allow."
+- The dependency on the ancestor is explicit and bounded (section 3.3).
 - Lengths: `px` (logical units), `%` of the containing box where CSS
   defines one, `fr` in grid tracks, the content keywords, and linear
   `calc()` of a length and a percentage (`calc(100% - 24px)`); `min()`,
@@ -322,6 +341,19 @@ struct LayoutConstraint final {
   arrange on its children, never a re-measure of the child itself.
 - Order is deterministic: items in (order, child index); grid
   auto-placement in document order; absolute children after in-flow ones.
+- **Containing-block dependency** (L-Q6). A positioned ancestor keeps a
+  list of its out-of-flow dependents (weak references to the parents that
+  resolved a child against it), rebuilt by each arrange that resolves
+  them, at most 4,096 per ancestor; above that the ancestor marks its
+  whole subtree for arrange instead, and counts it. When the ancestor's
+  arranged padding box changes, each dependent parent is marked for
+  arrange. Arrange runs top-down, so the ancestor's new geometry is known
+  before its descendants arrange, and the dependency is satisfied in the
+  same pass; it adds no pass and cannot loop, because the dependency only
+  points down the tree. Tests: resizing the ancestor moves a
+  `bottom: 0` grandchild in one arrange pass; removing the positioned
+  property re-resolves to the next ancestor and records a new warning;
+  disposing the ancestor leaves no stale dependent.
 
 ### 3.4 Passes and inspection
 
@@ -418,7 +450,7 @@ library only, following the approach the README records:
 The Web.Forms compiler and its HTML profile stay behind (owner
 decision 1).
 
-### 6.2 Getting Chromium (needs the owner's approval)
+### 6.2 Getting Chromium (approved, L-Q10)
 
 - **Source:** Google's Chrome for Testing builds, the `chrome-headless-shell`
   package (the same Blink layout as Chrome, packaged for automation).
@@ -429,14 +461,15 @@ decision 1).
   `https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.39/linux64/chrome-headless-shell-linux64.zip`,
   124,203,329 bytes (118.4 MiB) compressed; storage MD5
   `BCeU3QHA1ApziO+HAcq6Qw==`.
-- **Optional, local on Shadow Windows (question 10):**
+- **Local reference runs on the owner's Windows machine:**
   `https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.39/win64/chrome-headless-shell-win64.zip`,
   124,737,213 bytes (119.0 MiB); storage MD5 `WE4q4OzDOhF+ww0U5f6BYA==`.
-- Sizes and hashes were read from the storage server's response headers
-  only; nothing was downloaded. The unpacked size is not measured. The
-  SHA-256 is recorded in `chromium_pin.json` at the first approved
-  download. A later pin change is an owner-approved event that regenerates
-  every reference and reports the differences.
+- Both packages are approved (decision L-Q10). Each is pinned by version
+  and SHA-256 in `chromium_pin.json`, and the hash is verified before
+  use. Each is unpacked into its own new, empty directory outside the
+  repository; scripts receive its paths as arguments. Nothing else is
+  downloaded. A later pin change is an owner-approved event that
+  regenerates every reference and reports the differences.
 
 ### 6.3 Where it runs (question 11)
 
@@ -491,8 +524,8 @@ decision 1).
   Chromium rounds to 1/64 px per operation and GUI.Forms computes in
   doubles, so a nested `fr` split can differ by a few 1/64 steps; 0.05 is
   about three of them.
-- Text fixtures: every edge within 0.5 logical px (half a logical pixel,
-  so a box is never a whole pixel off) and the first baseline within 1.0 px,
+- Text fixtures: every edge within 0.51 logical px and the first baseline
+  within 1.0 px (decision L-Q9),
   reported in the typography class. Differences from shaping or line
   breaking stay in that class, separate from geometry.
 - The report records, per class, the count over tolerance and the largest
@@ -547,10 +580,12 @@ stacks stay at most two deep. Every container phase runs the W checklist.
 plus a minimal `style` reader for the declarations that already exist:
 widths, heights, margins, padding), `gui_forms_layout_corpus_tests`, and
 a first corpus that describes today's `FlowLayoutPanel` and
-`TableLayoutPanel` behaviour. Gate: the comparison's own tests pass; with
-the owner's approval of the download, the `layout-oracle` job writes the
-first references and the corpus test reports them, honestly, on four
-hosts. 2 PRs.
+`TableLayoutPanel` behaviour. Gate: the comparison's own tests pass; the
+first references are captured with the approved package (L-Q10) and the
+corpus test reports against them, honestly, on four hosts; the
+`layout-oracle` job regenerates them on Linux. One PR per phase from here
+on (coordinator, 2026-10-25); the PR counts below are the earlier
+estimate of the work.
 
 **L1. The contract.** `LayoutConstraint` and `measure_intrinsic`, text
 controls' min- and max-content, the measure cache and its counters, layout
@@ -600,10 +635,12 @@ Recorded under `results/<date>-l-layout-gate/`: the corpus listing, the
 profiles, the tolerances, the Chromium pin and hash, the per-node report
 and the counters. Any pattern of recorded differences goes to the owner.
 
-## 9. Open questions for the owner
+## 9. Questions put to the owner (answered 2026-10-25)
 
-Each has a recommendation; the coordinator turns them into an interview
-page.
+Kept as asked. The answers are in README, "Owner decisions, interview
+round 001": the recommendation was chosen for every question except 6,
+answered (b) with "warn on this behavior, but allow", and 10, answered
+(b).
 
 1. **Container model.** (a) Three typed containers, `FlexLayoutPanel`,
    `GridLayoutPanel` and `BlockFlowPanel`, over one shared solver library;
@@ -639,8 +676,8 @@ page.
    pixels in layout, so layout differs per scale. **Recommend (a).**
 9. **Fixture format and tolerance.** (a) Well-formed HTML fragments read
    by both Chromium and the core XML reader; 0.05 px per edge for box
-   fixtures, 0.5 px per edge and 1.0 px baseline for text fixtures;
-   (b) the same format with one tolerance of 0.5 px for everything;
+   fixtures, 0.51 px per edge and 1.0 px baseline for text fixtures;
+   (b) the same format with one tolerance of 0.51 px for everything;
    (c) wait for FD and write fixtures as form documents.
    **Recommend (a).**
 10. **The Chromium download.** (a) Approve
@@ -698,6 +735,6 @@ page.
 ## 11. Size
 
 Eight phases, L0 to L7, of about 17 to 20 PRs: L0 2, L1 3, L2 1 to 2,
-L3 3, L4 3 to 4, L5 2 to 3, L6 2, L7 1. L2 waits for T3 P1; L0 and L1 can
-start as soon as the owner answers. The corpus grows with each phase to at
+L3 3, L4 3 to 4, L5 2 to 3, L6 2, L7 1. L2 waits for T3 P1; L0 and L1 start
+first. The corpus grows with each phase to at
 least 100 fixtures. No timing is claimed.

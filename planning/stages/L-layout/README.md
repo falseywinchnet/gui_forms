@@ -1,8 +1,8 @@
 # Stage L: real dynamic layout (flex, grid, flow)
 
 Release: 0.4 Flexible. Depends on: T1. Unblocks FD, D and H. Status
-2026-10-25: plan proposed ([`PLAN.md`](PLAN.md)), awaiting the owner's
-answers to its section 9; no code. T1's gate is recorded
+2026-10-25: plan accepted ([`PLAN.md`](PLAN.md)); interview round 001
+answered (below); L0 next. T1's gate is recorded
 (`results/2026-10-13-t1-anatomy-gate`). Authority: `planning/FORWARD_PROGRAMME.md` §4 L.
 
 Read [the shared brief](../README.md) first.
@@ -98,11 +98,58 @@ per-node report under `results/`.
 2. **Chromium is a test oracle only**, never called by GUI.Forms code at
    import or run time.
 
+## Owner decisions, interview round 001 (2026-10-25)
+
+The owner answered the 15 questions of [`PLAN.md`](PLAN.md) §9 on
+2026-10-25 (relayed by the coordinator). Fourteen follow the
+recommendation; questions 6 and 10 do not.
+
+| | Decision |
+|---|---|
+| L-Q1 | Three typed containers over one shared solver library: `FlexLayoutPanel`, `GridLayoutPanel`, `BlockFlowPanel` |
+| L-Q2 | `FlowLayoutPanel` and `TableLayoutPanel` keep their behaviour; their insides are rebuilt on the new solvers wherever their existing tests pass unchanged |
+| L-Q3 | Flex automatic minimum size as CSS: an item's minimum is its content minimum unless `min-width` or `min-height` says otherwise |
+| L-Q4 | Block margin collapsing by CSS 2.1 §8.3.1, without floats |
+| L-Q5 | Floats left out of L; HTML import reports them as unsupported |
+| L-Q6 | **An absolutely positioned child's containing block is the nearest positioned ancestor, as CSS.** The owner, verbatim: "warn on this behavior, but allow." See below |
+| L-Q7 | An inherited `LayoutDirection` on every control; new containers first, existing containers and Dock/Anchor in L6 |
+| L-Q8 | Layout is independent of display scale; edges are snapped to device pixels only when painting, by edge rounding |
+| L-Q9 | Fixtures are well-formed HTML fragments read by both Chromium and the core XML reader; tolerance 0.05 logical px per edge for box fixtures, 0.51 px per edge and 1.0 px on the first baseline for text fixtures |
+| L-Q10 | **Both Chrome for Testing 155.0.8059.39 packages are approved**: `chrome-headless-shell-linux64.zip` (124,203,329 bytes) for the Linux CI job, and `chrome-headless-shell-win64.zip` (124,737,213 bytes) for local reference runs on the owner's Windows machine. See below |
+| L-Q11 | References are checked into the repository; every host compares against them without Chromium; a Linux job regenerates and checks them and is not a required check |
+| L-Q12 | The solvers lay out records; item systems realize only visible items; no virtualizing container |
+| L-Q13 | DK's binary split solver is kept as it is |
+| L-Q14 | Layout values: `px`, `%`, `fr`, the content keywords and linear `calc()`; `em` resolved to px when importing; `min()`, `max()`, `clamp()` later |
+| L-Q15 | `grid-template-areas` and `grid-area` in phase L4; named lines left out |
+
+**L-Q6 in detail** (owner and coordinator, 2026-10-25):
+
+- Ownership does not change. The direct parent still owns the child and
+  assigns its layout slot; only the containing block used to compute the
+  child's geometry is the ancestor's padding box. The slot is converted
+  into the parent's client coordinates before it is assigned.
+- When the containing block is not the direct parent, the layout pass
+  issues a structured warning (`containing_block_not_parent`), in the same
+  nonfatal-diagnostic vocabulary T3 uses: a severity, a code, the child's
+  and the ancestor's stable IDs. It is queryable, not only logged, and is
+  reported once per change of resolution, not on every pass.
+- Re-layout follows the ancestor's geometry. The dependency is explicit
+  (the ancestor records its out-of-flow dependents during arrange) and
+  bounded (a counted limit per ancestor, and it runs inside the same
+  top-down pass), and it is tested.
+
+**L-Q10 in detail**: each package is pinned by version and SHA-256, and
+its hash is verified before use. Each is unpacked into its own new, empty
+directory outside the repository, and its paths are passed as arguments.
+Nothing else is downloaded.
+
 ## Read first
 
 - `docs/user/layout.md`
 - `planning/interview/GUI_FORMS_INTERVIEW_LEDGER.md` GF006, GF008
 - `file_manager/web_forms/experiments/FIDELITY_ORACLE_001.md` and
-  `STAGE3_NATIVE_PROJECTION_001.md`
+  `STAGE3_NATIVE_PROJECTION_001.md`: not in this repository, so not read
+  (`AGENTS.md`: this subtree never inspects sources outside it); the
+  summary above under "What exists today" is what L designs from
 - `experiments/M12P11_LAYOUT_TRANSACTIONS.md`,
   `experiments/M12P12_MUTATION_SAFE_LAYOUT.md`
