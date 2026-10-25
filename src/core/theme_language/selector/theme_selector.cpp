@@ -10,8 +10,6 @@
 
 #include "theme_selector.hpp"
 
-#include "gui_forms/schema/types/schema_types.hpp"
-
 #include <optional>
 #include <string>
 #include <utility>
@@ -73,16 +71,6 @@ template <std::size_t Count>
 // The registered (snake_case) name a kebab-case name writes, or an empty
 // string when it is not one: a name written with '_', upper case or any
 // other character names nothing.
-[[nodiscard]] std::string registered_from_kebab(std::string_view written) {
-    std::string registered(written);
-    for (char& character : registered) {
-        if (character == '_') return {};
-        if (character == '-') character = '_';
-    }
-    if (!is_registered_name(registered)) return {};
-    return registered;
-}
-
 [[nodiscard]] RuleSpecificity added(RuleSpecificity left, RuleSpecificity right) noexcept {
     RuleSpecificity sum{};
     sum.ids = left.ids + right.ids;
@@ -253,7 +241,7 @@ bool SelectorPass::read_simple() {
             return false;
         }
         const std::string_view name = token_text(index_);
-        const std::string registered = registered_from_kebab(name);
+        const std::string registered = registered_name_from_kebab(name);
         frame.compound_started = true;
         const bool known = !registered.empty() && find_control(vocabulary_, registered) != nullptr;
         if (!known) {
@@ -368,7 +356,7 @@ bool SelectorPass::read_pseudo() {
         frame.compound_started = true;
         index_ = argument.after;
         const std::string_view written = token_text(argument.name);
-        const std::string registered = registered_from_kebab(written);
+        const std::string registered = registered_name_from_kebab(written);
         const std::optional<AnatomyState> state =
             registered.empty() ? std::optional<AnatomyState>{} : anatomy_state_from_name(registered);
         if (!state) {
@@ -434,7 +422,7 @@ bool SelectorPass::read_pseudo_element(std::uint32_t name_token) {
     frame.compound_started = true;
     index_ = argument.after;
     const std::string_view written = token_text(argument.name);
-    const std::string registered = registered_from_kebab(written);
+    const std::string registered = registered_name_from_kebab(written);
     if (registered.empty()) {
         note_unknown(argument.name, written);
         return true;
@@ -575,7 +563,7 @@ bool SelectorPass::materialize(const Alternative& alternative, RuleSpecificity s
     for (std::uint32_t position = 0U; position < alternative.count; ++position) {
         const Simple& simple = workspace_.simples[alternative.simples[position]];
         if (simple.kind == SimpleKind::control_type || simple.kind == SimpleKind::part) {
-            const std::string registered = registered_from_kebab(simple.name);
+            const std::string registered = registered_name_from_kebab(simple.name);
             std::string& field = simple.kind == SimpleKind::part ? selector.part : selector.control_type;
             if (!field.empty() && field != registered) {
                 report(DiagnosticCode::selector_syntax, simple.token,

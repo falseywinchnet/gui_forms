@@ -19,9 +19,9 @@ namespace gui_forms::theme_language {
 enum class DiagnosticSeverity : std::uint8_t { error, warning };
 
 // Each code's number is its stable record; its class is its hundreds digit
-// (PLAN.md section 2): E1xx lexical, E2xx structure, E3xx selectors, E5xx
-// limits, W1xx unknown names. Later phases add the other classes. An error's enumerator
-// value is its number; a warning's is 1000 plus its number, so W104 and
+// (PLAN.md section 2): E1xx lexical, E2xx structure, E3xx selectors, E4xx
+// values, E5xx limits, E7xx reserved names, W1xx unknown names. Later
+// phases add the other classes. An error's enumerator value is its number; a warning's is 1000 plus its number, so W104 and
 // E104 stay distinct values.
 enum class DiagnosticCode : std::uint16_t {
     // E1xx lexical.
@@ -62,6 +62,29 @@ enum class DiagnosticCode : std::uint16_t {
     // `:where()`, `:has()`, the structural ones, `::before` and the rest.
     pseudo_class_not_admitted = 303,
     attribute_selector_not_admitted = 304,
+    // E4xx values (B2: a bad value fails). 406, 407, 411, 412 and 414
+    // (keyword_unknown, too_many_layers, keyframes_undefined,
+    // transition_invalid, variable_kind_mismatch) arrive with the phases
+    // that lower properties, motion and inline styles.
+    // A value whose tokens are not a component of the admitted forms.
+    value_syntax = 401,
+    // An operand or argument of the wrong kind: units that do not agree, a
+    // colour where a number is needed.
+    value_wrong_kind = 402,
+    // A number outside the range its position admits.
+    value_out_of_range = 403,
+    // A unit outside the language: `rem`, `vw`, `ch` and the rest.
+    unit_not_admitted = 404,
+    // A CSS form outside the language, such as `hwb()`, `sin()`, `attr()`
+    // or `color-mix()` in a space other than srgb.
+    value_form_not_admitted = 405,
+    // An expression the engine's compiler refuses (other than its budget).
+    expression_invalid = 408,
+    // A var() of a name no rule defines, with no fallback.
+    variable_undefined = 409,
+    variable_cycle = 410,
+    // A `url("resource:<name>")` the theme's resources do not list.
+    resource_unknown = 413,
     // E5xx limits (T3 decision E2).
     sheet_too_large = 501,
     too_many_rules = 502,
@@ -69,13 +92,29 @@ enum class DiagnosticCode : std::uint16_t {
     nesting_too_deep = 504,
     string_too_long = 505,
     too_many_imports = 506,
-    // 507 and 508 (expression_over_budget, too_many_variable_combinations)
-    // arrive with P4 and P12. The derived limits of PLAN.md section 6:
+    // An expression whose program has more than
+    // maximum_expression_operations instructions or needs a deeper stack
+    // than maximum_expression_stack.
+    expression_over_budget = 507,
+    // 508 (too_many_variable_combinations) arrives with P12. The derived
+    // limits of PLAN.md section 6:
     // more than maximum_is_arguments arguments in one `:is()`.
     too_many_is_arguments = 509,
     // An expanded selector of more than maximum_simple_selectors simple
     // selectors.
     selector_too_long = 510,
+    // More than maximum_custom_properties distinct custom property names.
+    too_many_custom_properties = 511,
+    // A value of more than maximum_substituted_tokens tokens once its var()s
+    // are substituted.
+    substitution_too_long = 512,
+    // E7xx reserved names: a theme that defines an engine input or a
+    // published value (R2-06).
+    reserved_input_set = 701,
+    // E999 is temporary: a form a later phase gives its meaning, refused
+    // until then so that no interim meaning ships (PLAN.md P4: a custom
+    // property with several definitions, until P12).
+    not_yet_built = 999,
     // W1xx unknown names (B3): the item is dropped and the rest applies.
     // An at-rule other than @import, @media and @keyframes; its block is
     // skipped.

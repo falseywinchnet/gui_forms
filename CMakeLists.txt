@@ -213,6 +213,8 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/syntax_tree/theme_syntax_tree.cpp
     src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
     src/core/theme_language/selector/theme_selector.cpp
+    src/core/theme_language/custom_properties/theme_custom_properties.cpp
+    src/core/theme_language/value/theme_value.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
     src/core/docking/dock_layout/dock_layout.cpp
@@ -2529,6 +2531,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_selector_tests tests/theme_language/theme_selector_tests.cpp)
     target_link_libraries(gui_forms_theme_selector_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_selector_tests COMMAND gui_forms_theme_selector_tests)
+    add_executable(gui_forms_theme_value_tests tests/theme_language/theme_value_tests.cpp)
+    target_link_libraries(gui_forms_theme_value_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_theme_value_tests COMMAND gui_forms_theme_value_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
@@ -3720,7 +3725,8 @@ if(GUI_FORMS_BUILD_FUZZERS)
         )
     endif()
 
-    # The theme sheet tokenizer and parser (stage T3), from their own sources.
+    # The theme sheet tokenizer, parser and value reader (stage T3), from
+    # their own sources.
     add_executable(gui_forms_theme_sheet_fuzz
         fuzz/theme_sheet_fuzz.cpp
         src/core/theme_language/source_text/theme_source_text.cpp
@@ -3729,6 +3735,11 @@ if(GUI_FORMS_BUILD_FUZZERS)
         src/core/theme_language/tokenizer/theme_tokenizer.cpp
         src/core/theme_language/syntax_tree/theme_syntax_tree.cpp
         src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
+        src/core/theme_language/custom_properties/theme_custom_properties.cpp
+        src/core/theme_language/value/theme_value.cpp
+        src/core/engine/engine_expression/engine_expression.cpp
+        src/core/anatomy/types/anatomy_types.cpp
+        src/core/schema/types/schema_types.cpp
         src/core/xml/xml_characters/xml_characters.cpp
         src/core/xml/types/xml_types.cpp
     )

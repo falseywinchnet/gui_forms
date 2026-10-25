@@ -45,14 +45,28 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::combinator_not_admitted:
     case DiagnosticCode::pseudo_class_not_admitted:
     case DiagnosticCode::attribute_selector_not_admitted:
+    case DiagnosticCode::value_syntax:
+    case DiagnosticCode::value_wrong_kind:
+    case DiagnosticCode::value_out_of_range:
+    case DiagnosticCode::unit_not_admitted:
+    case DiagnosticCode::value_form_not_admitted:
+    case DiagnosticCode::expression_invalid:
+    case DiagnosticCode::variable_undefined:
+    case DiagnosticCode::variable_cycle:
+    case DiagnosticCode::resource_unknown:
     case DiagnosticCode::sheet_too_large:
     case DiagnosticCode::too_many_rules:
     case DiagnosticCode::too_many_declarations:
     case DiagnosticCode::nesting_too_deep:
     case DiagnosticCode::string_too_long:
     case DiagnosticCode::too_many_imports:
+    case DiagnosticCode::expression_over_budget:
     case DiagnosticCode::too_many_is_arguments:
     case DiagnosticCode::selector_too_long:
+    case DiagnosticCode::too_many_custom_properties:
+    case DiagnosticCode::substitution_too_long:
+    case DiagnosticCode::reserved_input_set:
+    case DiagnosticCode::not_yet_built:
         return DiagnosticSeverity::error;
     case DiagnosticCode::unknown_at_rule:
     case DiagnosticCode::unknown_selector_name:
@@ -83,14 +97,28 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
     case DiagnosticCode::combinator_not_admitted: return "combinator_not_admitted";
     case DiagnosticCode::pseudo_class_not_admitted: return "pseudo_class_not_admitted";
     case DiagnosticCode::attribute_selector_not_admitted: return "attribute_selector_not_admitted";
+    case DiagnosticCode::value_syntax: return "value_syntax";
+    case DiagnosticCode::value_wrong_kind: return "value_wrong_kind";
+    case DiagnosticCode::value_out_of_range: return "value_out_of_range";
+    case DiagnosticCode::unit_not_admitted: return "unit_not_admitted";
+    case DiagnosticCode::value_form_not_admitted: return "value_form_not_admitted";
+    case DiagnosticCode::expression_invalid: return "expression_invalid";
+    case DiagnosticCode::variable_undefined: return "variable_undefined";
+    case DiagnosticCode::variable_cycle: return "variable_cycle";
+    case DiagnosticCode::resource_unknown: return "resource_unknown";
     case DiagnosticCode::sheet_too_large: return "sheet_too_large";
     case DiagnosticCode::too_many_rules: return "too_many_rules";
     case DiagnosticCode::too_many_declarations: return "too_many_declarations";
     case DiagnosticCode::nesting_too_deep: return "nesting_too_deep";
     case DiagnosticCode::string_too_long: return "string_too_long";
     case DiagnosticCode::too_many_imports: return "too_many_imports";
+    case DiagnosticCode::expression_over_budget: return "expression_over_budget";
     case DiagnosticCode::too_many_is_arguments: return "too_many_is_arguments";
     case DiagnosticCode::selector_too_long: return "selector_too_long";
+    case DiagnosticCode::too_many_custom_properties: return "too_many_custom_properties";
+    case DiagnosticCode::substitution_too_long: return "substitution_too_long";
+    case DiagnosticCode::reserved_input_set: return "reserved_input_set";
+    case DiagnosticCode::not_yet_built: return "not_yet_built";
     case DiagnosticCode::unknown_at_rule: return "unknown_at_rule";
     case DiagnosticCode::unknown_selector_name: return "unknown_selector_name";
     }
