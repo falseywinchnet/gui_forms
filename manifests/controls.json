@@ -232,7 +232,7 @@
       "type": "DataGridView",
       "header": "gui_forms/controls/data_grid_view/data_grid_view.hpp",
       "category": "Selection from a list",
-      "purpose": "Grid of text, check box, combo box and button columns over unbound, virtual or BindingSource rows identified by stable row IDs, with cell or row selection kept by ID, in-place editing and only visible rows realized.",
+      "purpose": "Grid of text, check box, combo box, button and image columns over unbound, virtual or BindingSource rows identified by stable row IDs, with cell or row selection kept by ID, in-place editing and only visible rows realized.",
       "winforms": "DataGridView",
       "status": "provisional",
       "gallery_page": "tree-and-object-views",

@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -149,6 +150,21 @@ std::vector<std::byte> make_tile_surface() {
     return pixels;
 }
 
+// The project grid's image column: the test card previews each PNG file.
+void install_grid_previews(Window& window, ImageId preview) {
+    const std::shared_ptr<DataGridView> grid =
+        std::dynamic_pointer_cast<DataGridView>(window.find("gallery.tree.grid"));
+    if (!grid) return;
+    const std::optional<std::size_t> kind = (*grid).column_index("kind");
+    const std::optional<std::size_t> image = (*grid).column_index("preview");
+    if (!kind || !image) return;
+    for (std::size_t position = 0U; position < (*grid).row_count(); ++position) {
+        const DataGridViewRowPosition row{position};
+        if ((*grid).cell_text(row, *kind) != "PNG image") continue;
+        static_cast<void>((*grid).set_cell_value(row, *image, BindingValue{preview}));
+    }
+}
+
 // Image fixtures and dialog buttons for the migrated pages; byte-for-byte the
 // setup the Complete Showcase performed, addressed by the renamed stable ids.
 void install_page_fixtures(Window& window) {
@@ -177,6 +193,7 @@ void install_page_fixtures(Window& window) {
                 (*picture).set_image(loaded.image);
             }
         }
+        install_grid_previews(window, loaded.image);
     }
     const ImageLoadResult icon_normal =
         load_folder_icon(window, Color::rgba(72, 132, 183),
