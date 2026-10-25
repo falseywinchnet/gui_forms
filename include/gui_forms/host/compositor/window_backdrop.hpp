@@ -112,8 +112,8 @@ struct CompositorState final {
 struct WindowBackdropRequest final {
     static constexpr std::size_t maximum_entries = 3U;
 
-    std::array<WindowBackdrop, maximum_entries> entries{WindowBackdrop::opaque, WindowBackdrop::opaque,
-                                                         WindowBackdrop::opaque};
+    // Value-initialized: every entry `opaque`, the enumeration's first.
+    std::array<WindowBackdrop, maximum_entries> entries{};
     std::size_t length{1U};
 
     [[nodiscard]] static WindowBackdropRequest preferring(WindowBackdrop preferred) noexcept;
