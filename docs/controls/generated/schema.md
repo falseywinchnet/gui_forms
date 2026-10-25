@@ -2828,6 +2828,12 @@ Interactions beyond every control's: none.
 | `balloon_tip_closed` | none |
 | `menu_item_invoked` | `MenuItemInvocation` |
 
+## `open_file_dialog` (OpenFileDialog, component)
+
+| Interaction | Payload |
+|---|---|
+| `file_ok` | `FileDialogOk`, by reference |
+
 ## `image_list` (ImageList, component)
 
 | Interaction | Payload |

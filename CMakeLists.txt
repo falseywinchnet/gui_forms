@@ -613,6 +613,8 @@ add_library(gui_forms_controls STATIC
     src/controls/data_grid_view/data_grid_view_row_order.cpp
     src/controls/task_dialog/task_dialog.cpp
     src/controls/notify_icon/notify_icon.cpp
+    src/controls/file_dialog/file_dialog_types.cpp
+    src/controls/open_file_dialog/open_file_dialog.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
     src/controls/ribbon_font_control/ribbon_font_control.cpp
@@ -2823,6 +2825,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_notify_icon_tests tests/notify_icon_tests.cpp)
     target_link_libraries(gui_forms_notify_icon_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_notify_icon_tests COMMAND gui_forms_notify_icon_tests)
+    add_executable(gui_forms_open_file_dialog_tests tests/open_file_dialog_tests.cpp)
+    target_link_libraries(gui_forms_open_file_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_open_file_dialog_tests COMMAND gui_forms_open_file_dialog_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)

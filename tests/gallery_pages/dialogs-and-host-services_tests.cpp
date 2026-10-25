@@ -70,6 +70,13 @@ void test_dialogs_and_host_services(gui_forms::Window& window,
     require((*(*dialog).ok_button()).perform_click() && !(*dialog).is_open() &&
                 (*sample).font().role == FontRole::monospace && window.focus_scope_depth() == 0U,
             "OK restyles the sample and closes the dialog");
+
+    // Open file goes through the OpenFileDialog component.
+    click(window, window.find("gallery.host.dialog.0"));
+    require((*status).text().find("1 path · /tmp/alpha.txt") != std::string::npos &&
+                services.snapshot().dialog_requests == 5U &&
+                services.dialog_trace().find("dialog=open_file") != std::string::npos,
+            "the OpenFileDialog specimen publishes its one accepted path");
 }
 
 } // namespace gallery_pages_tests

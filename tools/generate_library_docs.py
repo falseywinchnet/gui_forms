@@ -148,6 +148,7 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
 # library page: property inspection with PropertyGrid, instrument records with
 # InstrumentRack, metrics and visual inspection with the diagnostic views.
 AREA_TO_CATEGORY: dict[str, str] = {
+    "components": "Components",
     "inspection": "Value setting",
     "instrument": "Value setting",
     "metrics": "Diagnostics",
@@ -172,7 +173,7 @@ CATEGORY_DESCRIPTIONS: dict[str, str] = {
     "Drawing": "Owner-drawn, live and raster surfaces.",
     "Diagnostics": "Metrics, easing, typography and visual-inspection views.",
     "Components": "Nonvisual components: bindings, providers, image lists, "
-                  "timers and semantic feedback.",
+                  "timers, semantic feedback and the host's file dialogs.",
 }
 
 

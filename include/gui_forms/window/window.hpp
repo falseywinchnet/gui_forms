@@ -778,6 +778,7 @@ private:
     void repaint_for_image_removal();
     friend class BindingSource;
     friend class NotifyIcon;
+    friend class OpenFileDialog;
     friend class BindingContext;
     friend class detail::PopupAttachment;
     friend class ThemeEngine;

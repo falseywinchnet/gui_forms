@@ -2241,6 +2241,25 @@ void example() {
 }
 }  // namespace doc_example_ObjectView_2
 
+namespace doc_example_OpenFileDialog_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    gf::OpenFileDialog dialog;
+    dialog.set_title("Open recordings");
+    dialog.set_filter("Recordings|*.wav;*.flac|All files|*.*");
+    dialog.set_multiselect(true);
+    const gf::DialogResult result = dialog.show_dialog(window);
+    if (result == gf::DialogResult::ok) {
+        for (const std::string& path : dialog.file_names()) {
+            static_cast<void>(path);
+        }
+    } else if (result == gf::DialogResult::none) {
+        // Without a host, dialog.status().error is gf::HostServiceError::unsupported.
+    }
+}
+}  // namespace doc_example_OpenFileDialog_1
+
 namespace doc_example_PageSet_1 {
 void example() {
     gf::PageSet pages;
@@ -4011,6 +4030,7 @@ int main() {
     failures += run("NumericUpDown example 2", &doc_example_NumericUpDown_2::example);
     failures += run("ObjectView example 1", &doc_example_ObjectView_1::example);
     failures += run("ObjectView example 2", &doc_example_ObjectView_2::example);
+    failures += run("OpenFileDialog example 1", &doc_example_OpenFileDialog_1::example);
     failures += run("PageSet example 1", &doc_example_PageSet_1::example);
     failures += run("PageSet example 2", &doc_example_PageSet_2::example);
     failures += run("PageStrip example 1", &doc_example_PageStrip_1::example);
