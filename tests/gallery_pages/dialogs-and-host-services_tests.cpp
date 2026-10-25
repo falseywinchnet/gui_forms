@@ -77,6 +77,13 @@ void test_dialogs_and_host_services(gui_forms::Window& window,
                 services.snapshot().dialog_requests == 5U &&
                 services.dialog_trace().find("dialog=open_file") != std::string::npos,
             "the OpenFileDialog specimen publishes its one accepted path");
+
+    // Save file goes through the SaveFileDialog component.
+    cancel_save = false;
+    click(window, window.find("gallery.host.dialog.2"));
+    require((*status).text().find("1 path · /tmp/gui-forms-evidence.txt") != std::string::npos &&
+                services.snapshot().dialog_requests == 6U,
+            "the SaveFileDialog specimen publishes its accepted path");
 }
 
 } // namespace gallery_pages_tests

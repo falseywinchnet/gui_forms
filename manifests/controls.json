@@ -932,6 +932,28 @@
       "doc": "api/generated/gui_forms.TaskDialog.rst"
     },
     {
+      "id": "open_file_dialog",
+      "type": "OpenFileDialog",
+      "header": "gui_forms/components/open_file_dialog/open_file_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "The host's dialog for choosing existing files, with a Windows Forms filter string, multiple selection and a cancellable file_ok, shown modally through HostServices.",
+      "winforms": "OpenFileDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.OpenFileDialog.rst"
+    },
+    {
+      "id": "save_file_dialog",
+      "type": "SaveFileDialog",
+      "header": "gui_forms/components/save_file_dialog/save_file_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "The host's dialog for choosing where to save a file, with a Windows Forms filter string, a default extension, an overwrite prompt and a cancellable file_ok, shown modally through HostServices.",
+      "winforms": "SaveFileDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.SaveFileDialog.rst"
+    },
+    {
       "id": "tool_tip",
       "type": "ToolTip",
       "header": "gui_forms/components/tool_tip/tool_tip.hpp",
@@ -1073,17 +1095,6 @@
       "status": "provisional",
       "gallery_page": "dialogs-and-host-services",
       "doc": "api/generated/gui_forms.NotifyIcon.rst"
-    },
-    {
-      "id": "open_file_dialog",
-      "type": "OpenFileDialog",
-      "header": "gui_forms/components/open_file_dialog/open_file_dialog.hpp",
-      "category": "Components",
-      "purpose": "The host's dialog for choosing existing files, with a Windows Forms filter string, multiple selection and a cancellable file_ok, shown modally through HostServices.",
-      "winforms": "OpenFileDialog",
-      "status": "provisional",
-      "gallery_page": "dialogs-and-host-services",
-      "doc": "api/generated/gui_forms.OpenFileDialog.rst"
     },
     {
       "id": "image_list",

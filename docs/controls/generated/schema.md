@@ -2684,6 +2684,18 @@ Properties beyond every control's: none.
 | `verification_changed` | `bool` |
 | `radio_button_changed` | `std::string` |
 
+## `open_file_dialog` (OpenFileDialog, component)
+
+| Interaction | Payload |
+|---|---|
+| `file_ok` | `FileDialogOk`, by reference |
+
+## `save_file_dialog` (SaveFileDialog, component)
+
+| Interaction | Payload |
+|---|---|
+| `file_ok` | `FileDialogOk`, by reference |
+
 ## `tool_tip` (ToolTip, component)
 
 | Interaction | Payload |
@@ -2827,12 +2839,6 @@ Interactions beyond every control's: none.
 | `balloon_tip_clicked` | none |
 | `balloon_tip_closed` | none |
 | `menu_item_invoked` | `MenuItemInvocation` |
-
-## `open_file_dialog` (OpenFileDialog, component)
-
-| Interaction | Payload |
-|---|---|
-| `file_ok` | `FileDialogOk`, by reference |
 
 ## `image_list` (ImageList, component)
 

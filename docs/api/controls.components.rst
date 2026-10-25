@@ -5,7 +5,7 @@
 Components
 ==========
 
-Nonvisual components: bindings, providers, image lists, timers, semantic feedback and the host's file dialogs.
+Nonvisual components: bindings, providers, image lists, timers and semantic feedback.
 
 .. list-table::
    :class: autosummary longtable
@@ -19,8 +19,6 @@ Nonvisual components: bindings, providers, image lists, timers, semantic feedbac
      - Runs work on a worker thread and reports progress and completion on the UI thread.
    * - :cpp:class:`NotifyIcon <gui_forms::NotifyIcon>`
      - An icon in the desktop's notification area, with clicks, a menu and notification text.
-   * - :cpp:class:`OpenFileDialog <gui_forms::OpenFileDialog>`
-     - The host's dialog for choosing one or more existing files.
    * - :cpp:class:`ImageList <gui_forms::ImageList>`
      - A keyed collection of images that buttons, trees and object views share.
    * - :cpp:class:`ErrorProvider <gui_forms::ErrorProvider>`
@@ -43,7 +41,6 @@ Nonvisual components: bindings, providers, image lists, timers, semantic feedbac
    generated/gui_forms.Timer
    generated/gui_forms.BackgroundWorker
    generated/gui_forms.NotifyIcon
-   generated/gui_forms.OpenFileDialog
    generated/gui_forms.ImageList
    generated/gui_forms.ErrorProvider
    generated/gui_forms.HelpProvider
@@ -77,10 +74,6 @@ Related types
      - ErrorProviderChange is the post-commit payload for a target error transition, carrying stable identity and the current message, which is empty once the error is cleared.
    * - :cpp:class:`ErrorProviderSnapshot <gui_forms::ErrorProviderSnapshot>`
      - ErrorProviderSnapshot is a deterministic provider diagnostic aggregate containing every mapped icon record plus authoritative live-error and presented-overlay counts.
-   * - :cpp:class:`FileDialogFilterParse <gui_forms::FileDialogFilterParse>`
-     - The result of parsing a filter string: the host filters in order, or the first error with no filters.
-   * - :cpp:class:`FileDialogOk <gui_forms::FileDialogOk>`
-     - Raised by a file dialog after the user accepts and before the dialog takes the names (Windows Forms' FileOk).
    * - :cpp:class:`HelpProviderSnapshot <gui_forms::HelpProviderSnapshot>`
      - HelpProviderSnapshot is a deterministic diagnostic aggregate of authored mappings, effective mappings, total requests, and handled requests.
    * - :cpp:class:`HelpRequestEvent <gui_forms::HelpRequestEvent>`
@@ -249,32 +242,6 @@ Related types
    .. cpp:member:: std::size_t live_errors
 
    .. cpp:member:: std::size_t presented_icons
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:struct:: FileDialogFilterParse final
-
-   ``#include <gui_forms/components/file_dialog_types/file_dialog_types.hpp>``
-
-   The result of parsing a filter string: the host filters in order, or the first error with no filters.
-
-   .. cpp:member:: FileDialogFilterError error
-
-      Default: ``{FileDialogFilterError::none}``.
-
-   .. cpp:member:: std::vector<HostFileDialogFilter> filters
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:struct:: FileDialogOk final
-
-   ``#include <gui_forms/components/file_dialog_types/file_dialog_types.hpp>``
-
-   Raised by a file dialog after the user accepts and before the dialog takes the names (Windows Forms' FileOk). ``file_names`` holds the chosen paths and stays valid for the handler's call only. Setting ``cancel`` keeps the dialog's old names and shows the dialog again with the same settings, where Windows Forms keeps its dialog open.
-
-   .. cpp:member:: std::span<const std::string> file_names
-
-   .. cpp:member:: bool cancel
 
 .. cpp:namespace:: gui_forms
 
@@ -449,24 +416,6 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:enum-class:: FileDialogFilterError
-
-   ``#include <gui_forms/components/file_dialog_types/file_dialog_types.hpp>``
-
-   .. cpp:enumerator:: none
-
-   .. cpp:enumerator:: unpaired_label
-
-   .. cpp:enumerator:: empty_pattern
-
-   .. cpp:enumerator:: unsupported_pattern
-
-   .. cpp:enumerator:: invalid_text
-
-   .. cpp:enumerator:: too_many
-
-.. cpp:namespace:: gui_forms
-
 .. cpp:enum-class:: HelpNavigator
 
    ``#include <gui_forms/components/help_provider/help_provider.hpp>``
@@ -519,22 +468,6 @@ Enumerations
 
 Functions, constants and aliases
 --------------------------------
-
-.. cpp:namespace:: gui_forms
-
-``#include <gui_forms/components/file_dialog_types/file_dialog_types.hpp>``
-
-.. cpp:function:: FileDialogFilterParse parse_file_dialog_filter(std::string_view filter)
-
-   Parses a filter in Windows Forms' syntax, ``label|patterns|label|patterns``, where patterns are separated by ``;`` and spaces around a pattern are ignored: "Text files|*.txt;*.log|All files|*.*". ``*.extension`` becomes the host filter's extension (without the dot; ``*.tar.gz`` gives ``tar.gz``), and ``*`` and ``*.*`` become ``*``, which every host reads as any file. An empty string is no filter: the host shows every file.
-
-.. cpp:function:: bool file_dialog_text_valid(std::string_view text)
-
-   Whether ``text`` may be a dialog's title, directory or name: valid UTF-8 without NUL, of at most HostServices::maximum_dialog_text_bytes.
-
-.. cpp:function:: std::string file_dialog_name_part(std::string_view path)
-
-   The last component of a host path: the file's name without its directory, by the path rules of the platform the program runs on (Windows accepts ``\`` and ``/``, the others ``/`` only). Empty for a path that ends in a separator.
 
 .. cpp:namespace:: gui_forms
 

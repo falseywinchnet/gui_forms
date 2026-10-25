@@ -5681,6 +5681,22 @@
       ]
     },
     {
+      "id": "open_file_dialog",
+      "type": "OpenFileDialog",
+      "kind": "component",
+      "interactions": [
+        {"name": "file_ok", "payload": "FileDialogOk", "mutable_payload": true}
+      ]
+    },
+    {
+      "id": "save_file_dialog",
+      "type": "SaveFileDialog",
+      "kind": "component",
+      "interactions": [
+        {"name": "file_ok", "payload": "FileDialogOk", "mutable_payload": true}
+      ]
+    },
+    {
       "id": "tool_tip",
       "type": "ToolTip",
       "kind": "component",
@@ -6086,14 +6102,6 @@
         {"name": "balloon_tip_clicked", "payload": "", "mutable_payload": false},
         {"name": "balloon_tip_closed", "payload": "", "mutable_payload": false},
         {"name": "menu_item_invoked", "payload": "MenuItemInvocation", "mutable_payload": false}
-      ]
-    },
-    {
-      "id": "open_file_dialog",
-      "type": "OpenFileDialog",
-      "kind": "component",
-      "interactions": [
-        {"name": "file_ok", "payload": "FileDialogOk", "mutable_payload": true}
       ]
     },
     {

@@ -779,6 +779,7 @@ private:
     friend class BindingSource;
     friend class NotifyIcon;
     friend class OpenFileDialog;
+    friend class SaveFileDialog;
     friend class BindingContext;
     friend class detail::PopupAttachment;
     friend class ThemeEngine;
