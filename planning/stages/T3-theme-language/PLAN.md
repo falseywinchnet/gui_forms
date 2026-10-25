@@ -376,7 +376,7 @@ Every diagnostic has:
 - a **severity**: `error` (the theme, or the inline style, is refused) or
   `warning` (one declaration, or one rule, is dropped);
 - a **code**: a stable number and snake_case name, such as
-  `E401 value_out_of_range`, for search and tests;
+  `E403 value_out_of_range`, for search and tests;
 - a **location**: the file (the sheet's name inside its package, such as
   `aurora/main.theme.css`; `inline:<control path>` for `set_style`; the form
   document's path for a `style` attribute), the byte offset, and the line
@@ -391,7 +391,7 @@ written once to the log on standard error in the library's trace form, so a
 developer sees it in the console (B2):
 
 ```text
-gui-forms-theme=error|code:E401 value_out_of_range|file:aurora/main.theme.css|line:12|column:9|rule:button:active::part(face)|property:scale|detail:3
+gui-forms-theme=error|code:E403 value_out_of_range|file:aurora/main.theme.css|line:12|column:9|rule:button:active::part(face)|property:scale|detail:3
 ```
 
 The classes (proposed codes; the numbering is the record, names may be
