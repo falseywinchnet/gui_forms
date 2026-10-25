@@ -210,6 +210,8 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/diagnostics/theme_diagnostics.cpp
     src/core/theme_language/number/theme_number.cpp
     src/core/theme_language/tokenizer/theme_tokenizer.cpp
+    src/core/theme_language/syntax_tree/theme_syntax_tree.cpp
+    src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
     src/core/docking/dock_layout/dock_layout.cpp
@@ -2509,8 +2511,8 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_xml_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_xml_tests COMMAND gui_forms_xml_tests)
 
-    # The theme language (stage T3): numbers, tokens and diagnostics, and the
-    # tokenizer's deterministic mutation run.
+    # The theme language (stage T3): numbers, tokens, diagnostics, the syntax
+    # tree, and the deterministic mutation run over the tokenizer and parser.
     add_executable(gui_forms_theme_number_tests tests/theme_language/theme_number_tests.cpp)
     target_link_libraries(gui_forms_theme_number_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_number_tests COMMAND gui_forms_theme_number_tests)
@@ -2518,6 +2520,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_tokenizer_tests tests/theme_language/theme_tokenizer_tests.cpp)
     target_link_libraries(gui_forms_theme_tokenizer_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_tokenizer_tests COMMAND gui_forms_theme_tokenizer_tests)
+
+    add_executable(gui_forms_theme_syntax_tests tests/theme_language/theme_syntax_tests.cpp)
+    target_link_libraries(gui_forms_theme_syntax_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_theme_syntax_tests COMMAND gui_forms_theme_syntax_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
@@ -3709,13 +3715,15 @@ if(GUI_FORMS_BUILD_FUZZERS)
         )
     endif()
 
-    # The theme sheet tokenizer (stage T3), from its own sources.
+    # The theme sheet tokenizer and parser (stage T3), from their own sources.
     add_executable(gui_forms_theme_sheet_fuzz
         fuzz/theme_sheet_fuzz.cpp
         src/core/theme_language/source_text/theme_source_text.cpp
         src/core/theme_language/diagnostics/theme_diagnostics.cpp
         src/core/theme_language/number/theme_number.cpp
         src/core/theme_language/tokenizer/theme_tokenizer.cpp
+        src/core/theme_language/syntax_tree/theme_syntax_tree.cpp
+        src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
         src/core/xml/xml_characters/xml_characters.cpp
         src/core/xml/types/xml_types.cpp
     )

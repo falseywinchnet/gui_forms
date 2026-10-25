@@ -19,8 +19,10 @@ namespace gui_forms::theme_language {
 enum class DiagnosticSeverity : std::uint8_t { error, warning };
 
 // Each code's number is its stable record; its class is its hundreds digit
-// (PLAN.md section 2): E1xx lexical, E5xx limits. Later phases add the
-// other classes.
+// (PLAN.md section 2): E1xx lexical, E2xx structure, E5xx limits, W1xx
+// unknown names. Later phases add the other classes. An error's enumerator
+// value is its number; a warning's is 1000 plus its number, so W104 and
+// E104 stay distinct values.
 enum class DiagnosticCode : std::uint16_t {
     // E1xx lexical.
     invalid_utf8 = 101,
@@ -37,9 +39,31 @@ enum class DiagnosticCode : std::uint16_t {
     number_too_precise = 108,
     // A number that is not zero and lies outside the admitted magnitudes.
     number_out_of_range = 109,
+    // E2xx structure: the first one found stops the parse (B2).
+    // A token where the sheet's structure admits none of its kind.
+    unexpected_token = 201,
+    // A `{`, `(`, `[` or function never closed, or a closer with no opener
+    // or the wrong one.
+    unbalanced_block = 202,
+    // A declaration's `;` outside every rule's block.
+    declaration_outside_rule = 203,
+    // An `@import` after another item.
+    import_after_rules = 204,
+    important_in_keyframes = 205,
+    // A rule or at-rule inside a rule's block, or an at-rule inside an
+    // at-rule's block (B1).
+    nesting_not_admitted = 206,
     // E5xx limits (T3 decision E2).
     sheet_too_large = 501,
+    too_many_rules = 502,
+    too_many_declarations = 503,
+    nesting_too_deep = 504,
     string_too_long = 505,
+    too_many_imports = 506,
+    // W1xx unknown names (B3): the item is dropped and the rest applies.
+    // An at-rule other than @import, @media and @keyframes; its block is
+    // skipped.
+    unknown_at_rule = 1104,
 };
 
 [[nodiscard]] DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept;
