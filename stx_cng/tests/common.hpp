@@ -26,7 +26,6 @@ enum class Pattern : std::uint8_t { ramp, steps, repeats, noise, sparse_noise, f
 inline constexpr Pattern patterns[] = {Pattern::ramp, Pattern::steps, Pattern::repeats,
                                        Pattern::noise, Pattern::sparse_noise, Pattern::flat};
 
-// Tightly packed samples of `image` following `pattern`; the seed varies noise.
 // One sample of `pattern` at (x, y) in `channel`; `noise` is the generator's
 // next value, which the noise patterns use.
 inline std::uint32_t pattern_value(Pattern pattern, std::uint32_t width, std::uint32_t noise, std::uint32_t state,
@@ -43,6 +42,7 @@ inline std::uint32_t pattern_value(Pattern pattern, std::uint32_t width, std::ui
     return noise;
 }
 
+// Tightly packed samples of `image` following `pattern`; the seed varies noise.
 inline std::vector<std::byte> generate(stx_cng::CngImage image, Pattern pattern, std::uint32_t seed) {
     std::size_t channels = static_cast<std::size_t>(image.channels);
     std::vector<std::byte> samples(static_cast<std::size_t>(image.width) * image.height * channels);
