@@ -2884,6 +2884,16 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_layout_panel_tests
              COMMAND gui_forms_layout_panel_tests)
 
+    # The layout fixture corpus against checked-in Chromium references
+    # (planning/stages/L-layout/PLAN.md section 6). The corpus path on the
+    # command line also selects this test when the corpus changes.
+    add_executable(gui_forms_layout_corpus_tests
+        tests/layout_corpus_tests.cpp
+    )
+    target_link_libraries(gui_forms_layout_corpus_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_layout_corpus_tests
+             COMMAND gui_forms_layout_corpus_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/layout_corpus)
+
     add_executable(gui_forms_responsive_track_panel_tests
         tests/responsive_track_panel_tests.cpp
     )
