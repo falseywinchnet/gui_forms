@@ -1,0 +1,501 @@
+#include "theme_tokenizer.hpp"
+
+#include "../number/theme_number.hpp"
+#include "../../xml/xml_characters/xml_characters.hpp"
+
+#include <string>
+#include <utility>
+
+namespace gui_forms::theme_language {
+
+namespace {
+
+// One code point read at a byte position: its scalar value and byte count.
+// length is 0 at the end of the text, and for bytes that are not
+// well-formed UTF-8 (those are diagnosed by the encoding pass).
+struct CodePoint final {
+    std::uint32_t scalar{};
+    std::size_t length{};
+};
+
+[[nodiscard]] CodePoint code_point_at(std::string_view text, std::size_t offset) noexcept {
+    CodePoint result{};
+    if (offset >= text.size()) return result;
+    const unsigned char byte = static_cast<unsigned char>(text[offset]);
+    if (byte < 0x80U) {
+        result.scalar = byte;
+        result.length = 1U;
+        return result;
+    }
+    const detail::XmlDecodedCharacter decoded = detail::decode_xml_utf8(text, offset);
+    result.scalar = decoded.scalar;
+    result.length = decoded.length;
+    return result;
+}
+
+[[nodiscard]] bool digit(std::uint32_t scalar) noexcept { return scalar >= '0' && scalar <= '9'; }
+
+[[nodiscard]] bool letter(std::uint32_t scalar) noexcept {
+    const bool lower = scalar >= 'a' && scalar <= 'z';
+    const bool upper = scalar >= 'A' && scalar <= 'Z';
+    return lower || upper;
+}
+
+// CSS Syntax §4.2: an ident-start code point is a letter, '_' or any
+// non-ASCII code point; an ident code point adds digits and '-'.
+[[nodiscard]] bool name_start(CodePoint point) noexcept {
+    if (point.length == 0U) return false;
+    const bool start = letter(point.scalar) || point.scalar == '_' || point.scalar >= 0x80U;
+    return start;
+}
+
+[[nodiscard]] bool name_character(CodePoint point) noexcept {
+    const bool character = name_start(point) || digit(point.scalar) || point.scalar == '-';
+    return point.length != 0U && character;
+}
+
+[[nodiscard]] bool whitespace_byte(char byte) noexcept {
+    const bool space = byte == ' ' || byte == '\t' || byte == '\n' || byte == '\r' || byte == '\f';
+    return space;
+}
+
+[[nodiscard]] bool newline_byte(char byte) noexcept {
+    const bool newline = byte == '\n' || byte == '\r' || byte == '\f';
+    return newline;
+}
+
+// The tokenizer over one sheet. It borrows the text, the output buffer and
+// the diagnostics for one call of tokenize_theme_sheet; `cursor` borrows
+// the line table, which outlives it.
+class SheetTokenizer final {
+public:
+    SheetTokenizer(const ThemeSource& source, ThemeTokenBuffer& buffer, const LineStartTable& lines,
+                   ThemeDiagnosticList& diagnostics) noexcept
+        : source_(source), text_(source.text), buffer_(buffer), diagnostics_(diagnostics), cursor_(lines, text_) {}
+
+    void run();
+
+private:
+    [[nodiscard]] CodePoint at(std::size_t offset) const noexcept { return code_point_at(text_, offset); }
+    [[nodiscard]] bool starts_with(std::size_t offset, std::string_view prefix) const noexcept {
+        const bool matches = text_.substr(offset, prefix.size()) == prefix;
+        return matches;
+    }
+    // CSS §4.3.9 and §4.3.10, without escapes (round 002 item 16).
+    [[nodiscard]] bool starts_identifier(std::size_t offset) const noexcept;
+    [[nodiscard]] bool starts_number(std::size_t offset) const noexcept;
+    // The end of the name starting at `offset`.
+    [[nodiscard]] std::size_t name_end(std::size_t offset) const noexcept;
+    // The end of the number starting at `offset` (CSS §4.3.12).
+    [[nodiscard]] std::size_t number_end(std::size_t offset) const noexcept;
+
+    void emit(TokenKind kind, std::size_t first, std::size_t end, std::uint8_t flags = 0U);
+    void report(DiagnosticCode code, std::size_t offset, std::string detail);
+
+    // Each consumes one token at `index_` and advances past it.
+    void consume_whitespace();
+    void consume_comment();
+    void consume_string();
+    void consume_hash();
+    void consume_at_keyword();
+    void consume_ident_like();
+    void consume_bad_url(std::size_t first);
+    void consume_numeric();
+    void consume_invalid_bytes();
+
+    const ThemeSource& source_;
+    std::string_view text_{};
+    ThemeTokenBuffer& buffer_;
+    ThemeDiagnosticList& diagnostics_;
+    SourcePositionCursor cursor_;
+    std::size_t index_{};
+};
+
+bool SheetTokenizer::starts_identifier(std::size_t offset) const noexcept {
+    const CodePoint first = at(offset);
+    if (first.length == 0U) return false;
+    if (first.scalar == '-') {
+        const CodePoint second = at(offset + 1U);
+        const bool starts = name_start(second) || (second.length != 0U && second.scalar == '-');
+        return starts;
+    }
+    return name_start(first);
+}
+
+bool SheetTokenizer::starts_number(std::size_t offset) const noexcept {
+    const CodePoint first = at(offset);
+    if (first.length == 0U) return false;
+    const CodePoint second = at(offset + 1U);
+    if (first.scalar == '+' || first.scalar == '-') {
+        if (second.length != 0U && digit(second.scalar)) return true;
+        const CodePoint third = at(offset + 2U);
+        const bool point_then_digit =
+            second.length != 0U && second.scalar == '.' && third.length != 0U && digit(third.scalar);
+        return point_then_digit;
+    }
+    if (first.scalar == '.') {
+        const bool fraction = second.length != 0U && digit(second.scalar);
+        return fraction;
+    }
+    return digit(first.scalar);
+}
+
+std::size_t SheetTokenizer::name_end(std::size_t offset) const noexcept {
+    std::size_t end = offset;
+    while (end < text_.size()) {
+        const CodePoint point = at(end);
+        if (!name_character(point)) break;
+        end += point.length;
+    }
+    return end;
+}
+
+std::size_t SheetTokenizer::number_end(std::size_t offset) const noexcept {
+    const std::size_t size = text_.size();
+    std::size_t end = offset;
+    if (end < size && (text_[end] == '+' || text_[end] == '-')) ++end;
+    while (end < size && digit(static_cast<unsigned char>(text_[end]))) ++end;
+    if (end + 1U < size && text_[end] == '.' && digit(static_cast<unsigned char>(text_[end + 1U]))) {
+        end += 1U;
+        while (end < size && digit(static_cast<unsigned char>(text_[end]))) ++end;
+    }
+    if (end < size && (text_[end] == 'e' || text_[end] == 'E')) {
+        std::size_t exponent = end + 1U;
+        if (exponent < size && (text_[exponent] == '+' || text_[exponent] == '-')) ++exponent;
+        if (exponent < size && digit(static_cast<unsigned char>(text_[exponent]))) {
+            end = exponent;
+            while (end < size && digit(static_cast<unsigned char>(text_[end]))) ++end;
+        }
+    }
+    return end;
+}
+
+void SheetTokenizer::emit(TokenKind kind, std::size_t first, std::size_t end, std::uint8_t flags) {
+    Token token{};
+    token.kind = kind;
+    token.flags = flags;
+    token.offset = ByteOffset{static_cast<std::uint32_t>(first)};
+    token.length = ByteLength{static_cast<std::uint32_t>(end - first)};
+    buffer_.tokens.push_back(token);
+    index_ = end;
+}
+
+void SheetTokenizer::report(DiagnosticCode code, std::size_t offset, std::string detail) {
+    ThemeDiagnostic diagnostic{};
+    diagnostic.code = code;
+    diagnostic.file = std::string(source_.file);
+    diagnostic.position = cursor_.locate(ByteOffset{static_cast<std::uint32_t>(offset)});
+    diagnostic.detail = std::move(detail);
+    diagnostics_.add(std::move(diagnostic));
+}
+
+void SheetTokenizer::consume_whitespace() {
+    const std::size_t first = index_;
+    std::size_t end = first;
+    while (end < text_.size() && whitespace_byte(text_[end])) ++end;
+    emit(TokenKind::whitespace, first, end);
+}
+
+void SheetTokenizer::consume_comment() {
+    const std::size_t first = index_;
+    const std::size_t close = text_.find("*/", first + 2U);
+    if (close == std::string_view::npos) {
+        report(DiagnosticCode::unterminated_comment, first, {});
+        emit(TokenKind::invalid, first, text_.size());
+        return;
+    }
+    emit(TokenKind::comment, first, close + 2U);
+}
+
+void SheetTokenizer::consume_string() {
+    const std::size_t first = index_;
+    const char quote = text_[first];
+    const std::size_t size = text_.size();
+    std::size_t end = first + 1U;
+    bool closed = false;
+    while (end < size) {
+        const char byte = text_[end];
+        if (byte == quote) {
+            closed = true;
+            break;
+        }
+        // An unescaped line break ends the string unterminated (CSS's bad
+        // string), before the break.
+        if (newline_byte(byte)) break;
+        if (byte == '\\') {
+            ++end;
+            if (end >= size) break;
+            // An escaped line break continues the string; CR LF is one.
+            if (text_[end] == '\r' && end + 1U < size && text_[end + 1U] == '\n') {
+                end += 2U;
+                continue;
+            }
+            const CodePoint escaped = at(end);
+            end += escaped.length == 0U ? 1U : escaped.length;
+            continue;
+        }
+        ++end;
+    }
+    if (!closed) {
+        report(DiagnosticCode::unterminated_string, first, {});
+        emit(TokenKind::invalid, first, end);
+        return;
+    }
+    const std::size_t content = end - first - 1U;
+    if (content > maximum_string_bytes) {
+        report(DiagnosticCode::string_too_long, first, std::to_string(content));
+        emit(TokenKind::invalid, first, end + 1U);
+        return;
+    }
+    emit(TokenKind::string, first, end + 1U);
+}
+
+void SheetTokenizer::consume_hash() {
+    const std::size_t first = index_;
+    const CodePoint next = at(first + 1U);
+    if (!name_character(next)) {
+        emit(TokenKind::delim, first, first + 1U);
+        return;
+    }
+    const std::uint8_t flags = starts_identifier(first + 1U) ? token_flag_hash_identifier : std::uint8_t{0U};
+    const std::size_t end = name_end(first + 1U);
+    emit(TokenKind::hash, first, end, flags);
+}
+
+void SheetTokenizer::consume_at_keyword() {
+    const std::size_t first = index_;
+    if (!starts_identifier(first + 1U)) {
+        emit(TokenKind::delim, first, first + 1U);
+        return;
+    }
+    const std::size_t end = name_end(first + 1U);
+    emit(TokenKind::at_keyword, first, end);
+}
+
+void SheetTokenizer::consume_bad_url(std::size_t first) {
+    // CSS §4.3.14: the remnants run to the closing parenthesis, or the end.
+    const std::size_t close = text_.find(')', first);
+    const std::size_t end = close == std::string_view::npos ? text_.size() : close + 1U;
+    report(DiagnosticCode::bad_url, first, {});
+    emit(TokenKind::invalid, first, end);
+}
+
+void SheetTokenizer::consume_ident_like() {
+    const std::size_t first = index_;
+    const std::size_t end = name_end(first);
+    if (end >= text_.size() || text_[end] != '(') {
+        emit(TokenKind::ident, first, end);
+        return;
+    }
+    const std::string_view name = text_.substr(first, end - first);
+    const bool url = name.size() == 3U && (name[0] == 'u' || name[0] == 'U') && (name[1] == 'r' || name[1] == 'R') &&
+                     (name[2] == 'l' || name[2] == 'L');
+    if (url) {
+        // Only url("...") is admitted (PLAN.md section 1.2): after the
+        // parenthesis and any whitespace, a quote must follow.
+        std::size_t next = end + 1U;
+        while (next < text_.size() && whitespace_byte(text_[next])) ++next;
+        const bool quoted = next < text_.size() && (text_[next] == '"' || text_[next] == '\'');
+        if (!quoted) {
+            consume_bad_url(first);
+            return;
+        }
+    }
+    emit(TokenKind::function, first, end + 1U);
+}
+
+void SheetTokenizer::consume_numeric() {
+    const std::size_t first = index_;
+    const std::size_t numeric = number_end(first);
+    const std::string_view number_text = text_.substr(first, numeric - first);
+    const NumberConversion conversion = convert_theme_number(number_text);
+    TokenKind kind = TokenKind::number;
+    std::size_t end = numeric;
+    if (starts_identifier(numeric)) {
+        kind = TokenKind::dimension;
+        end = name_end(numeric);
+    } else if (numeric < text_.size() && text_[numeric] == '%') {
+        kind = TokenKind::percentage;
+        end = numeric + 1U;
+    }
+    if (conversion.defect != NumberDefect::none) {
+        const DiagnosticCode code = conversion.defect == NumberDefect::too_precise ? DiagnosticCode::number_too_precise
+                                                                                   : DiagnosticCode::number_out_of_range;
+        report(code, first, std::string(number_text));
+        emit(TokenKind::invalid, first, end);
+        return;
+    }
+    ThemeNumber value{};
+    value.value = conversion.value;
+    value.numeric_length = ByteLength{static_cast<std::uint32_t>(numeric - first)};
+    value.integer = conversion.integer;
+    const std::uint32_t position = static_cast<std::uint32_t>(buffer_.numbers.size());
+    buffer_.numbers.push_back(value);
+    emit(kind, first, end);
+    buffer_.tokens.back().number = position;
+}
+
+void SheetTokenizer::consume_invalid_bytes() {
+    // A run of bytes that are not well-formed UTF-8, or NUL bytes; the
+    // encoding pass has reported them.
+    const std::size_t first = index_;
+    std::size_t end = first;
+    while (end < text_.size()) {
+        if (text_[end] == '\0') {
+            ++end;
+            continue;
+        }
+        const CodePoint point = at(end);
+        if (point.length != 0U) break;
+        ++end;
+    }
+    emit(TokenKind::invalid, first, end);
+}
+
+void SheetTokenizer::run() {
+    const std::size_t size = text_.size();
+    if (starts_with(0U, "\xEF\xBB\xBF")) emit(TokenKind::byte_order_mark, 0U, 3U);
+    while (index_ < size) {
+        const char byte = text_[index_];
+        const std::size_t first = index_;
+        if (whitespace_byte(byte)) {
+            consume_whitespace();
+        } else if (starts_with(first, "/*")) {
+            consume_comment();
+        } else if (byte == '"' || byte == '\'') {
+            consume_string();
+        } else if (byte == '#') {
+            consume_hash();
+        } else if (byte == '(') {
+            emit(TokenKind::left_paren, first, first + 1U);
+        } else if (byte == ')') {
+            emit(TokenKind::right_paren, first, first + 1U);
+        } else if (byte == '[') {
+            emit(TokenKind::left_square, first, first + 1U);
+        } else if (byte == ']') {
+            emit(TokenKind::right_square, first, first + 1U);
+        } else if (byte == '{') {
+            emit(TokenKind::left_brace, first, first + 1U);
+        } else if (byte == '}') {
+            emit(TokenKind::right_brace, first, first + 1U);
+        } else if (byte == ',') {
+            emit(TokenKind::comma, first, first + 1U);
+        } else if (byte == ':') {
+            emit(TokenKind::colon, first, first + 1U);
+        } else if (byte == ';') {
+            emit(TokenKind::semicolon, first, first + 1U);
+        } else if (starts_with(first, "<!--") || starts_with(first, "-->")) {
+            const std::size_t length = byte == '<' ? 4U : 3U;
+            report(DiagnosticCode::token_not_admitted, first, std::string(text_.substr(first, length)));
+            emit(TokenKind::invalid, first, first + length);
+        } else if (starts_number(first)) {
+            consume_numeric();
+        } else if (starts_identifier(first)) {
+            consume_ident_like();
+        } else if (byte == '@') {
+            consume_at_keyword();
+        } else if (byte == '\\') {
+            report(DiagnosticCode::escape_not_admitted, first, {});
+            emit(TokenKind::invalid, first, first + 1U);
+        } else if (byte == '\0' || at(first).length == 0U) {
+            consume_invalid_bytes();
+        } else {
+            // Every non-ASCII code point starts a name, so a delim is ASCII.
+            emit(TokenKind::delim, first, first + 1U);
+        }
+    }
+}
+
+// The encoding pass (house style §3: validate the whole buffer before the
+// kernel): one diagnostic per run of ill-formed UTF-8 bytes and per NUL.
+void report_encoding_defects(const ThemeSource& source, const LineStartTable& lines,
+                             ThemeDiagnosticList& diagnostics) {
+    const std::string_view text = source.text;
+    SourcePositionCursor cursor(lines, text);
+    std::size_t index = 0U;
+    bool in_invalid_run = false;
+    while (index < text.size()) {
+        if (text[index] == '\0') {
+            ThemeDiagnostic diagnostic{};
+            diagnostic.code = DiagnosticCode::nul_byte;
+            diagnostic.file = std::string(source.file);
+            diagnostic.position = cursor.locate(ByteOffset{static_cast<std::uint32_t>(index)});
+            diagnostics.add(std::move(diagnostic));
+            in_invalid_run = false;
+            ++index;
+            continue;
+        }
+        const CodePoint point = code_point_at(text, index);
+        if (point.length != 0U) {
+            in_invalid_run = false;
+            index += point.length;
+            continue;
+        }
+        if (!in_invalid_run) {
+            ThemeDiagnostic diagnostic{};
+            diagnostic.code = DiagnosticCode::invalid_utf8;
+            diagnostic.file = std::string(source.file);
+            diagnostic.position = cursor.locate(ByteOffset{static_cast<std::uint32_t>(index)});
+            diagnostics.add(std::move(diagnostic));
+            in_invalid_run = true;
+        }
+        ++index;
+    }
+}
+
+} // namespace
+
+std::string_view token_kind_name(TokenKind kind) noexcept {
+    switch (kind) {
+    case TokenKind::byte_order_mark: return "byte_order_mark";
+    case TokenKind::whitespace: return "whitespace";
+    case TokenKind::comment: return "comment";
+    case TokenKind::ident: return "ident";
+    case TokenKind::function: return "function";
+    case TokenKind::at_keyword: return "at_keyword";
+    case TokenKind::hash: return "hash";
+    case TokenKind::string: return "string";
+    case TokenKind::number: return "number";
+    case TokenKind::percentage: return "percentage";
+    case TokenKind::dimension: return "dimension";
+    case TokenKind::delim: return "delim";
+    case TokenKind::colon: return "colon";
+    case TokenKind::semicolon: return "semicolon";
+    case TokenKind::comma: return "comma";
+    case TokenKind::left_square: return "left_square";
+    case TokenKind::right_square: return "right_square";
+    case TokenKind::left_paren: return "left_paren";
+    case TokenKind::right_paren: return "right_paren";
+    case TokenKind::left_brace: return "left_brace";
+    case TokenKind::right_brace: return "right_brace";
+    case TokenKind::invalid: return "invalid";
+    }
+    return "unknown";
+}
+
+TokenizeOutcome tokenize_theme_sheet(const ThemeSource& source, ThemeTokenBuffer& buffer, LineStartTable& lines,
+                                     ThemeDiagnosticList& diagnostics) {
+    buffer.tokens.clear();
+    buffer.numbers.clear();
+    lines.clear();
+    const std::string_view text = source.text;
+    if (text.size() > maximum_sheet_bytes) {
+        ThemeDiagnostic diagnostic{};
+        diagnostic.code = DiagnosticCode::sheet_too_large;
+        diagnostic.file = std::string(source.file);
+        diagnostic.detail = std::to_string(text.size());
+        diagnostics.add(std::move(diagnostic));
+        return TokenizeOutcome::refused_too_large;
+    }
+    lines.reset(text);
+    // Every token holds at least one byte; a number takes at least two
+    // bytes but the first.
+    buffer.tokens.reserve(text.size());
+    buffer.numbers.reserve(text.size() / 2U + 1U);
+    report_encoding_defects(source, lines, diagnostics);
+    SheetTokenizer tokenizer(source, buffer, lines, diagnostics);
+    tokenizer.run();
+    return TokenizeOutcome::tokens_cover_sheet;
+}
+
+} // namespace gui_forms::theme_language
