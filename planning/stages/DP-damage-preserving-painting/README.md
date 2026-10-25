@@ -16,7 +16,24 @@ the check. Remaining for the gate: the macOS and X11 records under
 `results/`. PlaySuite's screen checks already pass the "no pixel outside the
 damaged rectangles changes" condition on both (macOS through screencapture,
 X11 through xwd in the Lima guest, against #77); the records wait for their
-re-runs against #80. Authority: the "Damage-preserving painting" and
+re-runs against #80.
+
+Status 2026-10-25 (#320): the X11 and macOS records are written, from CI
+runs 40234395220 and 40239056547
+(`results/2026-10-25-dp-gate-x11`, `results/2026-10-25-dp-gate-macos`).
+New gate tests, `damage_rectangles_gate` in `gui_forms_linux_host_tests` and
+`gui_forms_macos_damage_rectangles_tests`, compare the raster and the screen
+before and after two distant changes. X11 meets every condition: it paints
+2,400 against a 99,900 bounding box, copies the two rectangles, and changes
+0 pixels outside them. macOS first painted AppKit's union, because AppKit
+merges the host's two display requests into one rectangle on a layer-backed
+view. #320 moves retained damage onto the 6e9a8171 live-surface rule, so
+macOS now paints 2,400 too and changes 0 pixels outside, on the screen
+(`screencapture`) and in the raster. Its copy is still AppKit's union over
+unchanged pixels (1 rectangle, 99,900 pixels), not the rectangle set.
+Whether that meets "hosts that support partial present receive the
+rectangle set" is the owner's decision, and the stage is not complete until
+it is made. Authority: the "Damage-preserving painting" and
 "Presentation availability record" rows of the milestone table in
 `docs/dev/roadmap.md`, and `planning/PAINT_PIPELINE_AVAILABILITY.md`. The
 forward programme has no section for this stage; this brief and the stage
