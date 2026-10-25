@@ -38,7 +38,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | T3 | [Theme language front end](T3-theme-language/README.md) | 0.3 Themeable | T1, T2 | rounds 001 and 002 answered; plan awaits last review |
 | T4 | [Default theme and Windows-familiar themes](T4-default-theme/README.md) | 0.3 Themeable | T1, T2, T3 | design decided, build not started |
 | T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | not started; reflection and full-fidelity glass moved here from T2 (owner decision 2026-10-23) |
-| L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | not started; ready (T1 gate recorded) |
+| L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | plan proposed 2026-10-25 (`L-layout/PLAN.md`), awaiting the owner's answers; no code |
 | FD | [Form documents](FD-form-documents/README.md) | 0.4 Flexible | T1, T3 | not started; format decided |
 | DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | in progress: rectangle sets painted and presented on every host, paint contract version 2 (#59 to #78); X11 direct live frames in #80; Windows gate recorded (`results/2026-10-13-dp-gate-windows`), macOS and X11 records pending PlaySuite's runs against #80 |
 | W | [Windows Forms control coverage (.NET 8+ only)](W-winforms-controls/README.md) | 0.4 Flexible to 0.6 Bindings | T4, or the by-role paint path (ruling 2026-10-14) | started 2026-10-14: catalogue regenerated from the official surface; by-role paint path in place |
