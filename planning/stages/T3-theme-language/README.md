@@ -401,6 +401,14 @@ Both are decided.
    - The owner chose this (the coordinator's recommendation) over the
      plan's proposed fallback, which would have dropped the declaration at
      resolution with a warning.
+3. **The reverse case: the new theme is refused.** When a newly installed
+   theme (including by live switch) reads, as the wrong type, a custom
+   property that an existing inline style defines, the NEW THEME is refused
+   for that program. The previous theme stays, and the error names the
+   conflicting inline style (control and property). The reason is the same:
+   the newly added piece is at fault, and a program designer's inline rules
+   are honoured. Another program without that inline style accepts the
+   same theme.
 
 ## Read first
 

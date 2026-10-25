@@ -356,8 +356,14 @@ only for text and colour roles).
   diagnostic (`variable_kind_mismatch`, naming both sources) reaches the
   console, the control keeps its previous inline style, and the theme stays
   active and unchanged. Nothing is half-applied. A form document's `style`
-  attribute follows the same rule. The owner's reason: it keeps "bad values
-  fail", because the newly added piece is the one at fault.
+  attribute follows the same rule. The reverse case is refused the same
+  way: a theme installed later (including by live switch) whose deferred
+  declarations read an existing inline definition as the wrong type is
+  refused for that program, the previous theme stays, and the error names
+  the inline style's control and property; another program without that
+  inline style accepts the same theme. The owner's reason: it keeps "bad
+  values fail", because the newly added piece is the one at fault, and a
+  program designer's inline rules are honoured.
 
 ## 2. Diagnostics
 
@@ -701,6 +707,12 @@ answered it on 2026-10-25 (README, "Round 002 addendum"):
   stays active and unchanged, and nothing is half-applied. The form
   document's `style` attribute follows the same rule. This is the plan's
   option (d), not its recommended fallback (c).
+- **R2-addendum 3.** The reverse case: a newly installed theme (including
+  by live switch) that reads, as the wrong type, a custom property an
+  existing inline style defines is refused for that program. The previous
+  theme stays, and the error names the conflicting inline style (control
+  and property). Another program without that inline style accepts the
+  same theme.
 
 The question as it was put:
 
