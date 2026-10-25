@@ -336,7 +336,8 @@ only for text and colour roles).
   declaration that reads it and lowers the result: a candidate that gives
   a bad value, an expression over budget or more than 4,096 tokens is an
   error, as it would be written out. Candidates multiply when one value
-  reads several names; their product is bounded (section 8.2, question 1).
+  reads several names: at most 256 combinations per declaration; more is
+  an error (R2-addendum 1).
 - **Resolved per part.** The part's cascade picks the winning definition of
   each name, then substitutes into the winning deferred declarations and
   lowers them with the same lowering code. Resolution runs on discrete
@@ -346,9 +347,17 @@ only for text and colour roles).
 - **Cache.** The part raster cache already keys on resolved values
   (parameters and, after EC1, the material assembly), so deferred values
   need no new key: two parts whose `--radius` resolves alike share a bake.
-- **Across compilations.** An inline style compiles separately from the
-  theme, so its definitions cannot be checked against a theme compiled
-  later. Section 8.2, question 1, proposes the rule.
+- **Across compilations** (R2-addendum 2). An inline style compiles apart
+  from the theme. When it is compiled, each of its custom property
+  definitions is checked against every deferred declaration of the active
+  theme that reads the name and could match the control's parts. A
+  definition that gives one of them a bad value refuses the inline style as
+  an error: `Control::set_inline_style` returns an error result, the
+  diagnostic (`variable_kind_mismatch`, naming both sources) reaches the
+  console, the control keeps its previous inline style, and the theme stays
+  active and unchanged. Nothing is half-applied. A form document's `style`
+  attribute follows the same rule. The owner's reason: it keeps "bad values
+  fail", because the newly added piece is the one at fault.
 
 ## 2. Diagnostics
 
@@ -383,8 +392,8 @@ refined in P1):
 | E1xx lexical | error | `invalid_utf8`, `nul_byte`, `unterminated_string`, `unterminated_comment`, `escape_not_admitted`, `bad_url`, `token_not_admitted` |
 | E2xx structure | error | `unexpected_token`, `unbalanced_block`, `declaration_outside_rule`, `import_after_rules`, `important_in_keyframes`, `nesting_not_admitted` |
 | E3xx selector | error | `selector_syntax`, `combinator_not_admitted`, `pseudo_class_not_admitted` (`:not()` and the rest), `attribute_selector_not_admitted` |
-| E4xx value | error | `value_syntax`, `value_wrong_kind`, `value_out_of_range`, `unit_not_admitted`, `value_form_not_admitted`, `keyword_unknown`, `too_many_layers`, `expression_invalid` (with the engine's `ExpressionDefect`), `variable_undefined`, `variable_cycle`, `keyframes_undefined`, `transition_invalid`, `resource_unknown` |
-| E5xx limit | error | `sheet_too_large`, `too_many_rules`, `too_many_declarations`, `nesting_too_deep`, `string_too_long`, `too_many_imports`, `expression_over_budget`, and the derived limits of section 6 |
+| E4xx value | error | `value_syntax`, `value_wrong_kind`, `value_out_of_range`, `unit_not_admitted`, `value_form_not_admitted`, `keyword_unknown`, `too_many_layers`, `expression_invalid` (with the engine's `ExpressionDefect`), `variable_undefined`, `variable_cycle`, `keyframes_undefined`, `transition_invalid`, `resource_unknown`, `variable_kind_mismatch` |
+| E5xx limit | error | `sheet_too_large`, `too_many_rules`, `too_many_declarations`, `nesting_too_deep`, `string_too_long`, `too_many_imports`, `expression_over_budget`, `too_many_variable_combinations`, and the derived limits of section 6 |
 | E6xx package | error | `manifest_invalid`, `sheet_hash_mismatch`, `import_not_installed`, `import_hash_mismatch`, `import_cycle`, `published_value_invalid` |
 | E7xx reserved | error | `reserved_input_set` |
 | W1xx unknown name | warning | `unknown_property`, `unknown_primitive`, `unknown_function`, `unknown_at_rule`, `unknown_media_feature`, `unknown_selector_name`, `property_not_admitted` |
@@ -602,8 +611,9 @@ Per the brief, recorded under `results/`:
    (R2-14):
    at most 32 arguments in one `:is()`; at most 1,024 custom properties per
    sheet; a substituted value at most 4,096 tokens (no expansion
-   explosion through nested `var()`); at most 64 `@keyframes` per sheet; at
-   most 1,000 diagnostic records kept. Inputs built to be slow (deep
+   explosion through nested `var()`); at most 256 candidate combinations
+   per declaration that reads `var()` (R2-addendum 1); at most 64
+   `@keyframes` per sheet; at most 1,000 diagnostic records kept. Inputs built to be slow (deep
    nesting at the limit, maximal expansions) finish within a fixed count of
    operations per input byte, measured by a counter, never by time.
 4. **Fuzzing**: `fuzz/theme_sheet_fuzz.cpp`, built standalone as a ctest
@@ -677,9 +687,22 @@ with the owner's words. In short:
 | R2-20 | the 16 imports counted over the whole import closure |
 | R2-21 | the smaller set, with every CSS named colour admitted as a literal |
 
-### 8.2 Open, from round 002's answers
+### 8.2 Decided in the round 002 addendum
 
-R2-05 raises one question the first version did not have.
+R2-05 raised one question the first version did not have. The owner
+answered it on 2026-10-25 (README, "Round 002 addendum"):
+
+- **R2-addendum 1.** At most 256 candidate combinations per declaration
+  that reads `var()`; beyond that is an error
+  (`too_many_variable_combinations`).
+- **R2-addendum 2.** An inline style whose custom property the active theme
+  reads as the wrong type is refused as an error: `set_inline_style`
+  returns an error result, the diagnostic reaches the console, the theme
+  stays active and unchanged, and nothing is half-applied. The form
+  document's `style` attribute follows the same rule. This is the plan's
+  option (d), not its recommended fallback (c).
+
+The question as it was put:
 
 1. **Checking deferred custom properties.** Inside one compilation every
    candidate definition is checked (section 1.11). Two things remain.

@@ -363,9 +363,9 @@ Changed or clarified:
   - This is an engine change: values that read a custom property stay
     unresolved until each part's cascade, and the part cache keys on the
     resolved values. PLAN.md adds it as engine change EC7, phase P12.
-  - It raises one new question, how a deferred value is checked when it
+  - It raised one new question, how a deferred value is checked when it
     reads several names or comes from an inline style compiled apart from
-    the theme: PLAN.md, section 8.2.
+    the theme (PLAN.md, section 8.2). Answered in the addendum below.
 - **10. Inline styles: option (a)**, a declaration list plus optional part
   blocks with the control's own selector implied. The control owns the
   compiled result, so no stable ID is needed and it survives theme
@@ -381,6 +381,26 @@ Changed or clarified:
   `animation-fill-mode` other than their defaults are errors in the first
   version; the diagnostic log line of PLAN.md section 2; and
   `inline_with_theme` is issued once per window.
+
+### Round 002 addendum (2026-10-25)
+
+The owner's answers to PLAN.md section 8.2, relayed by the coordinator.
+Both are decided.
+
+1. **At most 256 candidate combinations per declaration that reads
+   `var()`.** Beyond that is an ERROR.
+2. **An inline style that the theme reads as the wrong type is refused.**
+   When an inline style defines a custom property that the theme reads as
+   the wrong type, the INLINE STYLE is refused as an error:
+   `Control::set_inline_style()` returns an error result and the
+   diagnostic reaches the console. The theme stays active and unchanged,
+   and no declaration is half-applied. The same rule applies to the form
+   document's `style` attribute.
+   - The reason: it keeps the owner's "bad values fail" rule, because the
+     newly added piece is the one at fault.
+   - The owner chose this (the coordinator's recommendation) over the
+     plan's proposed fallback, which would have dropped the declaration at
+     resolution with a warning.
 
 ## Read first
 
