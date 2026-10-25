@@ -88,17 +88,16 @@ Read from the code on main (`d6111581`), not only from the docs.
   (`include/gui_forms/xml/xml_reader/`, DK decision 43). It has no JSON
   reader and no CSS tokenizer yet (T3 P1 builds the tokenizer).
 
-The earlier oracle (`file_manager/web_forms/experiments/FIDELITY_ORACLE_001.md`,
-in `falseywinchnet/file_manager`) is a Python module of about 1,500 lines
-(`web_forms/src/web_forms_compiler/fidelity.py`) with a standard-library
-DevTools client: it launches Chromium `--headless=new` with a fresh
-profile, injects a capture expression that reads boxes, clips, text and
-baselines, materials and eight raster samples per stable ID, and compares
-against a normalized native snapshot with per-class tolerances (geometry
-and clip 0.51 logical px, baseline 1.0, raster summed RGBA 120). Its File
-Manager run found zero structure, state and material mismatches over 119
-nodes, 69 nodes over the geometry tolerance, 23 over typography and 32
-over raster, all kept visible.
+The earlier fidelity oracle and its reports are not in this repository.
+What this repository records of it is the summary in [`README.md`](README.md):
+it compared a real Chromium layout against the GUI.Forms retained tree node
+by node, kept structure, state, geometry, typography, material and raster
+differences separate, and never folded a difference into a parity claim
+(on the File Manager source: zero structure, state and material
+mismatches over 119 nodes; 69 nodes over the geometry tolerance, 23 over
+typography, 32 over raster). This plan designs the oracle of section 6
+from that approach and from what is in this repository; it uses no code
+or text from the earlier one.
 
 ## 2. What L builds
 
@@ -389,15 +388,18 @@ struct LayoutConstraint final {
 
 ## 6. The oracle
 
-### 6.1 What moves into `tools/`
+### 6.1 What `tools/` gains
 
-`tools/layout_oracle/` (Python, standard library only, as the original):
+Owner decision 1 moves the oracle into this repository. Its source is not
+here, so `tools/layout_oracle/` is written new, in Python with the standard
+library only, following the approach the README records:
 
-- `devtools.py`: the DevTools socket client from `fidelity.py`.
-- `capture.py`: launches the pinned Chromium headless shell with the
-  original's isolation flags (fresh profile, `--disable-gpu`,
-  `--hide-scrollbars`, `--force-color-profile=srgb`, no network or
-  component updates) plus `--font-render-hinting=none`; sets the viewport
+- `devtools.py`: a small Chrome DevTools Protocol client over a local
+  WebSocket.
+- `capture.py`: launches the pinned Chromium headless shell isolated (a
+  fresh profile, `--disable-gpu`, `--hide-scrollbars`,
+  `--force-color-profile=srgb`, no network or component updates,
+  `--font-render-hinting=none`); sets the viewport
   and device scale through `Emulation.setDeviceMetricsOverride`; reads
   `getBoundingClientRect()` (Chromium's 1/64-px `LayoutUnit` precision),
   the first baseline of text leaves and the used font for every element
@@ -413,7 +415,7 @@ struct LayoutConstraint final {
 - `test_layout_oracle.py`: the comparison's own tests on synthetic
   snapshots, run in CI with the other tool tests.
 
-The Web.Forms compiler, its IR and its HTML profile stay behind (owner
+The Web.Forms compiler and its HTML profile stay behind (owner
 decision 1).
 
 ### 6.2 Getting Chromium (needs the owner's approval)
@@ -475,8 +477,8 @@ decision 1).
   the same file. A shared template supplies the reset (`box-sizing:
   border-box`, zero margins and borders, the root font).
 - Profiles per fixture: viewports 320 x 240, 800 x 600, 1280 x 800 and
-  1450 x 850 (the earlier oracle's pin); device scale 1 and 2; text scale
-  100 % and 150 % for text fixtures; `ltr` and `rtl` for the fixtures marked
+  1440 x 900; device scale 1 and 2; text scale 100 % and 150 % for text
+  fixtures; `ltr` and `rtl` for the fixtures marked
   bidirectional.
 - `data-gf-expected-difference="<reason>"` on a node records a known
   difference; the report still lists it.
@@ -489,8 +491,8 @@ decision 1).
   Chromium rounds to 1/64 px per operation and GUI.Forms computes in
   doubles, so a nested `fr` split can differ by a few 1/64 steps; 0.05 is
   about three of them.
-- Text fixtures: every edge within 0.51 logical px (the earlier oracle's
-  strict geometry tolerance) and the first baseline within 1.0 px,
+- Text fixtures: every edge within 0.5 logical px (half a logical pixel,
+  so a box is never a whole pixel off) and the first baseline within 1.0 px,
   reported in the typography class. Differences from shaping or line
   breaking stay in that class, separate from geometry.
 - The report records, per class, the count over tolerance and the largest
@@ -637,8 +639,8 @@ page.
    pixels in layout, so layout differs per scale. **Recommend (a).**
 9. **Fixture format and tolerance.** (a) Well-formed HTML fragments read
    by both Chromium and the core XML reader; 0.05 px per edge for box
-   fixtures, 0.51 px per edge and 1.0 px baseline for text fixtures;
-   (b) the same format with one tolerance of 0.51 px for everything;
+   fixtures, 0.5 px per edge and 1.0 px baseline for text fixtures;
+   (b) the same format with one tolerance of 0.5 px for everything;
    (c) wait for FD and write fixtures as form documents.
    **Recommend (a).**
 10. **The Chromium download.** (a) Approve
