@@ -37,7 +37,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | sealed 2026-10-23 (`results/2026-10-23-t2-engine-gate/SEALED.md`; gate run 40027309396: 4 hosts, 144 images, 308 sample images, 77 features, 0 differences, 0 busy idle counters): E1 to E11 plus E7r, E9.6 and E10; bake costs measured on a quiet machine (#293) |
 | T3 | [Theme language front end](T3-theme-language/README.md) | 0.3 Themeable | T1, T2 | rounds 001 and 002 answered; plan awaits last review |
 | T4 | [Default theme and Windows-familiar themes](T4-default-theme/README.md) | 0.3 Themeable | T1, T2, T3 | design decided, build not started |
-| T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | not started; reflection and full-fidelity glass moved here from T2 (owner decision 2026-10-23) |
+| T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | plan proposed ([PLAN.md](T5-compositor/PLAN.md)), awaiting the owner's answers; reflection and full-fidelity glass moved here from T2 (owner decision 2026-10-23) |
 | L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | not started; ready (T1 gate recorded) |
 | FD | [Form documents](FD-form-documents/README.md) | 0.4 Flexible | T1, T3 | not started; format decided |
 | DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | in progress: rectangle sets painted and presented on every host, paint contract version 2 (#59 to #78); X11 direct live frames in #80; Windows gate recorded (`results/2026-10-13-dp-gate-windows`), macOS and X11 records pending PlaySuite's runs against #80 |
