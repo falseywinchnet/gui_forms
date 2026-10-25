@@ -2807,7 +2807,17 @@ void post_perform_close(NSWindow* window) {
         }
         _liveExposure.clear();
         gui_forms::detail::append_within_live_destinations(_uncoveredDamage, _liveDestinations, _liveExposure);
-        _uncoveredDamage.swap(_liveExposure);
+        bool livePending{false};
+        for (const GFRect region : _liveRegions) {
+            if (!region.empty()) livePending = true;
+        }
+        // A pure copy request (activation, deminiaturize, re-exposure) leaves
+        // nothing to paint, and empty frame damage would mean the whole raster
+        // (a prepared frame clears its candidate). Keep AppKit's rectangles
+        // then, as the host did before.
+        if (!_pendingDamage.empty() || !_liveExposure.empty() || livePending) {
+            _uncoveredDamage.swap(_liveExposure);
+        }
     }
     for (const GFRect rectangle : _uncoveredDamage) _pendingDamage.add(rectangle);
     bool liveOnly = _pendingDamage.empty();

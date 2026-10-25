@@ -119,9 +119,23 @@ void close_fixture(State& state) {
     const std::function<void()> request_close = state.close;
     if (request_close) request_close();
 }
+const char* stage_name(const Stage stage) {
+    switch (stage) {
+    case Stage::first_frame: return "first_frame";
+    case Stage::drain: return "drain";
+    case Stage::settle: return "settle";
+    case Stage::changed: return "changed";
+    case Stage::shown: return "shown";
+    }
+    return "unknown";
+}
+// Each stage prints when it starts, so a timeout names the stage it stopped in.
 void set_stage(State& state, const Stage stage) {
     state.stage = stage;
     state.deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    std::uint64_t presented = 0;
+    if (state.model != nullptr) presented = (*state.model).paint_lease_snapshot().presented_revision;
+    std::cout << "dp-gate-stage|" << stage_name(stage) << "|presented_revision=" << presented << std::endl;
 }
 void run_step(void* const context);
 void enqueue(const std::shared_ptr<State>& state) {
@@ -213,6 +227,7 @@ Capture capture_screen(NSWindow* const window, NSView* const view, const char* c
     int status = 0;
     const pid_t waited = waitpid(child, &status, 0);
     require(waited == child && WIFEXITED(status) && WEXITSTATUS(status) == 0, "screencapture failed");
+    std::cout << "dp-gate-capture|" << name << "|region=" << region << std::endl;
     Capture result{};
     @autoreleasepool {
         NSData* const data = [NSData dataWithContentsOfFile:[NSString stringWithUTF8String:path.c_str()]];
@@ -335,7 +350,11 @@ void advance(State& state) {
         state.raster_before = capture_raster(state, window.contentView);
         // Unocclusion asks for one whole-window frame (the same pixels); let
         // it present, so the measured frame holds only the two changes.
+        // A repaint of unchanged content keeps the presented revision, so a
+        // model invalidation gives the drain a revision to wait for.
         state.previous_presented = (*state.model).paint_lease_snapshot().presented_revision;
+        (*state.root).invalidate(Dirty::paint);
+        [window.contentView collectDamage];
         set_stage(state, Stage::drain);
         return;
     }
@@ -391,7 +410,10 @@ void run_step(void* const context) {
     if ((*state).host_closed || (*state).finished) return;
     @try {
         try {
-            require(std::chrono::steady_clock::now() < (*state).deadline, "bounded native stage timed out");
+            if (std::chrono::steady_clock::now() >= (*state).deadline) {
+                throw std::runtime_error(std::string("bounded native stage timed out in ") +
+                    stage_name((*state).stage));
+            }
             advance(*state);
             if (!(*state).finished && !(*state).host_closed) enqueue(state);
         } catch (const std::exception& error) {
