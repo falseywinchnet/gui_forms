@@ -1063,6 +1063,10 @@ private:
     [[nodiscard]] bool has_any_runnable_layout_dirty() const noexcept;
     [[nodiscard]] bool has_popup_layout_dirty() const noexcept;
     void note_suspended_layout_request(Control& control) noexcept;
+    // Marks the ancestors of a control whose layout became dirty, up to and
+    // including the first layout boundary (Control::size_depends_on_content):
+    // measure and arrange below the boundary, arrange only at it.
+    void mark_layout_ancestors(Control& control) noexcept;
     void commit_layout_requests_recursive(const Control::Ptr& control) noexcept;
     [[nodiscard]] Dirty recompute_subtree_dirty(const Control::Ptr& control) noexcept;
     void clear_layout_dirty_subtree(const Control::Ptr& control) noexcept;
@@ -1256,6 +1260,10 @@ private:
     bool layout_dirty_{true};
     bool hit_test_dirty_{true};
     bool in_layout_{};
+    // Advances at the start of each bounded layout pass and once after the
+    // last, so Control::measure_for_layout counts one control's measure
+    // callbacks per pass, and calls between passes apart from either.
+    std::uint64_t layout_pass_sequence_{1U};
     bool in_paint_{};
     std::uint64_t content_revision_{1U};
     std::uint64_t rendered_revision_{};
