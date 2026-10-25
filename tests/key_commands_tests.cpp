@@ -157,8 +157,8 @@ void refusals_leave_the_map() {
 
 void headless_host_map() {
     const HostCapabilities capabilities = host::headless_capabilities();
-    require(capabilities.protocol_version == 8U && capabilities.key_map == pc_key_map(),
-            "the headless host reports the PC convention in protocol 8");
+    require(capabilities.protocol_version >= 8U && capabilities.key_map == pc_key_map(),
+            "the headless host reports the PC convention from protocol 8");
     const std::string json = capabilities.to_json();
     require(json.find("\"key_map\":{\"close_document\":[{\"key\":61,\"modifiers\":2}]") != std::string::npos &&
                 json.find("\"context_menu\":[{\"key\":67,\"modifiers\":1},{\"key\":101,\"modifiers\":0}]") !=

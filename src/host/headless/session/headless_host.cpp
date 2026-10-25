@@ -2,6 +2,7 @@
 #include "gui_forms/detail/bound_member_function.hpp"
 
 #include <sstream>
+#include <variant>
 
 namespace gui_forms::host {
 HeadlessHost::HeadlessHost(Window& window)
@@ -55,7 +56,19 @@ void HeadlessHost::observe_dispatch(
          << " drag_events=" << snapshot.drag_events
          << " drag_drops=" << snapshot.drag_drops
          << " closed=" << (snapshot.closed ? 1 : 0)
-         << " shutdown=" << (snapshot.shutdown ? 1 : 0) << '\n';
+         << " shutdown=" << (snapshot.shutdown ? 1 : 0);
+    // Compositor reports (stage T5) add the state and the window's grant;
+    // other lines are unchanged.
+    if (std::holds_alternative<HostCompositorEvent>(event.payload)) {
+        const CompositorState& state = (*window_).compositor_state();
+        const WindowBackdropGrant& grant = (*window_).backdrop_grant();
+        line << " compositor_generation=" << state.generation.value
+             << " compositing=" << compositor_presence_name(state.compositing)
+             << " backdrop=" << window_backdrop_name(grant.granted)
+             << " reason=" << window_backdrop_reason_name(grant.reason)
+             << " native_backdrop=" << window_backdrop_name(services_.native_backdrop());
+    }
+    line << '\n';
     trace_ += line.str();
 }
 

@@ -29,7 +29,14 @@ HostCapabilities headless_capabilities() {
                 HostCapability::window_frames |
                 HostCapability::screen_pointer |
                 HostCapability::window_at_point |
-                HostCapability::window_ordering,
+                HostCapability::window_ordering |
+                // The reference host simulates the compositor: tests report
+                // its state (HostCompositorEvent) and the services record the
+                // backdrop applied.
+                HostCapability::transparent_windows |
+                HostCapability::window_backdrops |
+                HostCapability::compositor_notifications |
+                HostCapability::presentation_preferences,
             // The reference host reports the PC convention.
             pc_key_map()};
 }

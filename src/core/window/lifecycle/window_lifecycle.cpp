@@ -172,6 +172,8 @@ void Window::set_presentation_settings(PresentationSettings settings) {
     // its paint starts its effect again.
     if (ambient_switched_off) motion_clock_.stop_ambient(false);
     presentation_changed_.emit(presentation_settings_);
+    // High contrast and reduced transparency withdraw a backdrop (stage T5).
+    refresh_backdrop();
 }
 
 void Window::set_theme(std::shared_ptr<const Theme> theme) {

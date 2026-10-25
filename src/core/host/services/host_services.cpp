@@ -321,6 +321,37 @@ HostServices::HostServices(HostCapabilities capabilities)
     snapshot_.capabilities = std::move(capabilities);
 }
 
+HostServiceStatus HostServices::apply_window_backdrop(WindowBackdrop backdrop) {
+    HostCapability needed = HostCapability::none;
+    switch (backdrop) {
+    case WindowBackdrop::opaque:
+        needed = HostCapability::none;
+        break;
+    case WindowBackdrop::transparent:
+        needed = HostCapability::transparent_windows;
+        break;
+    case WindowBackdrop::window_material:
+    case WindowBackdrop::transient_material:
+        needed = HostCapability::window_backdrops;
+        break;
+    default: {
+        // A value outside the enumeration names nothing to apply.
+        HostServiceStatus refused = reject(HostServiceError::invalid_argument);
+        return refused;
+    }
+    }
+    HostServiceStatus status = validate_request(needed);
+    if (!status.accepted()) return status;
+    status = apply_window_backdrop_impl(backdrop);
+    return status;
+}
+
+HostServiceStatus HostServices::apply_window_backdrop_impl(WindowBackdrop backdrop) {
+    HostServiceStatus status{};
+    if (backdrop != WindowBackdrop::opaque) status.error = HostServiceError::unsupported;
+    return status;
+}
+
 HostServiceStatus HostServices::validate_request(HostCapability capability) noexcept {
     HostServiceStatus status;
     if (std::this_thread::get_id() != ui_thread_) {

@@ -372,6 +372,10 @@ ApplicationResult Application::run(std::vector<ApplicationWindow> windows) {
     if (!running_scope.acquired()) return {ApplicationError::already_running};
     ApplicationResult result = validate(windows);
     if (!result.accepted()) return result;
+    // Before any native window exists (stage T5).
+    for (ApplicationWindow& entry : windows) {
+        if (entry.options.non_opaque) static_cast<void>((*entry.model).declare_non_opaque());
+    }
     BridgeScope bridges{};
     const std::shared_ptr<CallbackFailure> failure = std::make_shared<CallbackFailure>();
     const std::shared_ptr<detail::ApplicationRunState> run_state =
