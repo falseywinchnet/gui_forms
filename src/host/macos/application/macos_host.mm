@@ -2031,10 +2031,13 @@ void post_perform_close(NSWindow* window) {
         [self stopDisplayLink];
         [self armWakeTimer];
     } else {
-        _pendingDamage.add(GFRect{0.0, 0.0, self.bounds.size.width, self.bounds.size.height});
+        // What changed while hidden is in _pendingDamage (an occluded draw
+        // keeps it, since the model declines to paint) or still in the model.
+        // The raster holds the last presentation everywhere else.
         [self collectDamage];
         // AppKit may consume a display request while our model is still hidden.
-        // Rearm native presentation even when no new model damage was produced.
+        // Rearm native presentation even when no new model damage was produced;
+        // with nothing owed, that draw copies the raster and paints nothing.
         [self setNeedsDisplay:YES];
         [self startDisplayLinkIfNeeded];
     }
@@ -2720,11 +2723,18 @@ void post_perform_close(NSWindow* window) {
                               dirtyRect.size.width, dirtyRect.size.height};
     const bool modelClean = (*_model).paint_lease_snapshot().state ==
         gui_forms::PaintLeaseState::clean;
-    bool reusableRaster = _rasterHasContent == YES && _hostOccluded == NO && modelClean;
+    // The raster still holds the last presentation, at this size and scale.
+    bool frontHeld = _rasterHasContent == YES && modelClean;
 #if defined(GUI_FORMS_PREPARED_TEXT)
-    reusableRaster = reusableRaster && _raster.prepared_front_matches(logicalSize, scale);
+    frontHeld = frontHeld && _raster.prepared_front_matches(logicalSize, scale);
     const PaintReceipt previousReceipt = _raster.prepared_front_receipt();
 #endif
+    const bool reusableRaster = frontHeld && _hostOccluded == NO;
+    // While hidden the model declines to paint. AppKit's rectangles then ask
+    // for a copy (an exposure or a snapshot); kept as retained damage, they
+    // would be repainted by the first visible frame. Live frames still
+    // compose while hidden, so a pending one keeps the ordinary path.
+    const bool occludedCopy = frontHeld && _hostOccluded == YES && _pendingLivePresentations.empty();
     // Copying only a presentation region needs a raster that still holds the
     // previous presentation of that placement.
     const bool regionsUsable = reusableRaster && _liveRegionLost == NO;
@@ -2787,7 +2797,7 @@ void post_perform_close(NSWindow* window) {
     NSInteger drawnCount = 0;
     [self getRectsBeingDrawn:&drawnRects count:&drawnCount];
     _uncoveredDamage.clear();
-    for (NSInteger index = 0; index < drawnCount; ++index) {
+    for (NSInteger index = 0; index < drawnCount && !occludedCopy; ++index) {
         const NSRect rect = drawnRects[index];
         const GFRect dirty{rect.origin.x, rect.origin.y, rect.size.width, rect.size.height};
         if (reusableRaster) {
@@ -2796,8 +2806,15 @@ void post_perform_close(NSWindow* window) {
             _uncoveredDamage.push_back(dirty);
         }
     }
-    if (drawnCount == 0) _uncoveredDamage.push_back(nativeDamage);
-    if (reusableRaster) {
+    if (drawnCount == 0 && !occludedCopy) _uncoveredDamage.push_back(nativeDamage);
+    // Nothing owed and no live frame: AppKit's request is a copy of the raster
+    // as it stands, and this draw prepares and paints nothing.
+    bool copyOnly = occludedCopy && _pendingDamage.empty();
+    if (reusableRaster && _pendingDamage.empty() && _pendingLivePresentations.empty()) {
+        copyOnly = true;
+        _uncoveredDamage.clear();
+    }
+    if (reusableRaster && !copyOnly) {
         // Paint the gathered set, not AppKit's coalesced request: outside the
         // model's damage (already in _pendingDamage) and the live surfaces,
         // the raster holds this frame's pixels, which AppKit copies unchanged.
@@ -2811,10 +2828,9 @@ void post_perform_close(NSWindow* window) {
         for (const GFRect region : _liveRegions) {
             if (!region.empty()) livePending = true;
         }
-        // A pure copy request (activation, deminiaturize, re-exposure) leaves
-        // nothing to paint, and empty frame damage would mean the whole raster
-        // (a prepared frame clears its candidate). Keep AppKit's rectangles
-        // then, as the host did before.
+        // Live frames narrowed to nothing leave nothing to paint, and empty
+        // frame damage would mean the whole raster (a prepared frame clears its
+        // candidate). Keep AppKit's rectangles then, as the host did before.
         if (!_pendingDamage.empty() || !_liveExposure.empty() || livePending) {
             _uncoveredDamage.swap(_liveExposure);
         }
@@ -2846,12 +2862,17 @@ void post_perform_close(NSWindow* window) {
         }
         narrowedAny = false;
     }
-    bool frameReady{true};
+    // A copy-only draw begins no frame: the front is presented as it stands,
+    // with no candidate, receipt or acknowledgement.
+    bool frameReady{!copyOnly};
 #if defined(GUI_FORMS_PREPARED_TEXT)
-    const gui_forms::PreparedTextStatus admission = imagesReady
-        ? _raster.begin_prepared_frame(logicalSize, scale, frameDamage)
-        : gui_forms::PreparedTextStatus::resource_failure;
-    frameReady = admission == gui_forms::PreparedTextStatus::success;
+    gui_forms::PreparedTextStatus admission = gui_forms::PreparedTextStatus::success;
+    if (frameReady) {
+        admission = imagesReady
+            ? _raster.begin_prepared_frame(logicalSize, scale, frameDamage)
+            : gui_forms::PreparedTextStatus::resource_failure;
+    }
+    frameReady = frameReady && admission == gui_forms::PreparedTextStatus::success;
     if (frameReady) {
         // Admission clears the candidate instead of copying the presented
         // front when damage spans the raster (resize, revocation, full live
@@ -2875,7 +2896,7 @@ void post_perform_close(NSWindow* window) {
         }
     }
 #else
-    _raster.begin_frame(frameDamage);
+    if (frameReady) _raster.begin_frame(frameDamage);
 #endif
     _lastFrameDamageBoundsArea = frameDamage.bounds().area();
     const std::chrono::steady_clock::time_point preparedAt =

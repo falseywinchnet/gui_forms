@@ -30,6 +30,10 @@ extern char** environ;
 // host's per-rectangle display requests, so what it copies to the screen is
 // reported as measured, not assumed. The record is
 // results/2026-10-25-dp-gate-macos.
+//
+// Then becoming visible again: after a change made while hidden, the first
+// visible frame repaints that change only, and with nothing changed it
+// repaints nothing (AppKit's whole-view request is a copy of the raster).
 
 // Existing private native diagnostics and occlusion hooks, not a public API addition.
 @interface NSView (DamageRectanglesProbe)
@@ -70,7 +74,7 @@ struct Capture final {
     std::vector<std::uint8_t> rgba{};
 };
 
-enum class Stage { first_frame, drain, settle, changed, shown };
+enum class Stage { first_frame, drain, settle, changed, shown, hidden, revealed, bare_reveal };
 
 struct State final {
     std::shared_ptr<ColorBlock> root{};
@@ -126,6 +130,9 @@ const char* stage_name(const Stage stage) {
     case Stage::settle: return "settle";
     case Stage::changed: return "changed";
     case Stage::shown: return "shown";
+    case Stage::hidden: return "hidden";
+    case Stage::revealed: return "revealed";
+    case Stage::bare_reveal: return "bare_reveal";
     }
     return "unknown";
 }
@@ -397,10 +404,56 @@ void advance(State& state) {
         set_stage(state, Stage::shown);
         return;
     }
-    // Let the window server show the measured frame before reading the screen.
+    if (state.stage == Stage::shown) {
+        // Let the window server show the measured frame before reading the screen.
+        ++state.settle_steps;
+        if (state.settle_steps < 4U) return;
+        measure(state, window, view);
+        set_stage(state, Stage::hidden);
+        return;
+    }
+    if (state.stage == Stage::hidden) {
+        // One block changes while the window is hidden.
+        [view notifyOcclusion:YES];
+        state.before_metrics = (*state.model).metrics_snapshot();
+        (*state.top_left).set_color(Color::rgba(40, 160, 60));
+        const PaintLeaseSnapshot hidden = (*state.model).paint_lease_snapshot();
+        require(hidden.state == PaintLeaseState::occluded_dirty, "a change while hidden is not owed as occluded_dirty");
+        [view collectDamage];
+        state.previous_presented = hidden.presented_revision;
+        [view notifyOcclusion:NO];
+        set_stage(state, Stage::revealed);
+        return;
+    }
+    if (state.stage == Stage::revealed) {
+        const PaintLeaseSnapshot lease = (*state.model).paint_lease_snapshot();
+        if (lease.presented_revision <= state.previous_presented) return;
+        const MetricsSnapshot after = (*state.model).metrics_snapshot();
+        const double painted = after.painted_damage_area - state.before_metrics.painted_damage_area;
+        const double block = state.blocks[0].area();
+        std::cout << "dp-reveal|changed_while_hidden|painted_area=" << painted << "|block_area=" << block
+                  << "|presents=" << (after.frames_presented - state.before_metrics.frames_presented) << '\n';
+        const double difference = painted - block;
+        require(difference < 1.0e-6 && difference > -1.0e-6,
+            "becoming visible repainted more than what changed while hidden");
+        // Hidden and shown again with nothing changed.
+        state.before_metrics = after;
+        [view notifyOcclusion:YES];
+        [view notifyOcclusion:NO];
+        state.settle_steps = 0;
+        set_stage(state, Stage::bare_reveal);
+        return;
+    }
+    // Let the whole-view display request of the reveal be drawn.
     ++state.settle_steps;
     if (state.settle_steps < 4U) return;
-    measure(state, window, view);
+    const MetricsSnapshot after = (*state.model).metrics_snapshot();
+    const double painted = after.painted_damage_area - state.before_metrics.painted_damage_area;
+    const std::uint64_t passes = after.paint_passes - state.before_metrics.paint_passes;
+    const double native_dirty = host_number(view, "last_native_dirty_area");
+    std::cout << "dp-reveal|unchanged|painted_area=" << painted << "|paint_passes=" << passes
+              << "|native_dirty_area=" << native_dirty << '\n';
+    require(painted == 0.0 && passes == 0U, "becoming visible with nothing changed repainted");
     state.finished = true;
     close_fixture(state);
 }
