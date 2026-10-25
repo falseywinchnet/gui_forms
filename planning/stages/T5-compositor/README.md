@@ -1,8 +1,9 @@
 # Stage T5: compositor cooperation
 
 Release: 0.3 Themeable. Depends on: T2. Runs in parallel with T3 and T4.
-Status 2026-10-12: not started. Authority: `planning/FORWARD_PROGRAMME.md`
-§4 T5.
+Status 2026-10-25: plan proposed ([`PLAN.md`](PLAN.md)), awaiting the
+owner's answers to its open questions; no code. Authority:
+`planning/FORWARD_PROGRAMME.md` §4 T5.
 
 Read [the shared brief](../README.md) first.
 
@@ -81,8 +82,9 @@ Record per host, including X11 with and without a compositor, under
 
 ## Open decisions (ask, do not decide)
 
-None recorded. The Windows 7 (Aero-like) Windows-familiar theme (T4) will be
-the first theme to request behind-window glass.
+None recorded yet; the plan's section 8 lists Q1 to Q16 for the owner.
+The Windows 7 (Aero-like) Windows-familiar theme (T4) will be the first
+theme to request behind-window glass.
 
 ## Read first
 
