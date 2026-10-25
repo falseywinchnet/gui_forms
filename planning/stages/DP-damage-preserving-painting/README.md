@@ -2,7 +2,11 @@
 
 Release: 0.4 Flexible. Depends on: nothing; it can start now. It matters
 more once the engine (T2) animates small parts such as a cursor sheen or an
-ambient progress fill. Status 2026-10-13: rectangle-set paint on every host
+ambient progress fill. Status: **complete 2026-10-25** (#320; the gate
+records are `results/2026-10-13-dp-gate-windows`,
+`results/2026-10-25-dp-gate-x11` and `results/2026-10-25-dp-gate-macos`, and
+the owner accepted macOS's copy as recorded, decision 6). History: on
+2026-10-13, rectangle-set paint on every host
 (#59, #60), presentation counters (#71, #74), the Windows live frame
 sequence (#72, confirmed on screen by the owner), the availability record and
 transactional partial present (#73), the X11 frame sequence (#76), the copy
@@ -31,9 +35,8 @@ view. #320 moves retained damage onto the 6e9a8171 live-surface rule, so
 macOS now paints 2,400 too and changes 0 pixels outside, on the screen
 (`screencapture`) and in the raster. Its copy is still AppKit's union over
 unchanged pixels (1 rectangle, 99,900 pixels), not the rectangle set.
-Whether that meets "hosts that support partial present receive the
-rectangle set" is the owner's decision, and the stage is not complete until
-it is made. Authority: the "Damage-preserving painting" and
+The owner accepted that as recorded on 2026-10-25 (decision 6), and the
+stage is complete. Authority: the "Damage-preserving painting" and
 "Presentation availability record" rows of the milestone table in
 `docs/dev/roadmap.md`, and `planning/PAINT_PIPELINE_AVAILABILITY.md`. The
 forward programme has no section for this stage; this brief and the stage
@@ -147,6 +150,17 @@ of `PAINT_PIPELINE_AVAILABILITY.md` "Acceptance" still pass. Record under
    `live_present_duration_nanoseconds`), so the comparison is a number. The
    availability record follows, so PlaySuite can check per host whether
    sparse damage reaches the screen.
+
+## Owner decision, 2026-10-25
+
+6. **The macOS copy is accepted as recorded** (owner, 2026-10-25:
+   "accept"). The macOS host paints the gathered rectangle set. AppKit
+   merges the host's per-rectangle display requests into their union on a
+   layer-backed view, and the copy to the screen is that union over pixels
+   the frame left unchanged, so the screen changes only inside the set
+   (`results/2026-10-25-dp-gate-macos`). This meets the gate's "hosts that
+   support partial present receive the rectangle set" for macOS. The
+   `PAINT_PIPELINE_AVAILABILITY.md` macOS row records the same.
 
 ## Read first
 
