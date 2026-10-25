@@ -1,8 +1,8 @@
 # Stage T5 plan: compositor cooperation
 
-Status 2026-10-25: proposed, for the owner's review. No T5 code exists
-yet, and none is written until the open questions in section 8 are
-answered. The brief is [`README.md`](README.md); the authority is
+Status 2026-10-25: accepted. The owner took the recommendation (option 1)
+on every question in section 8; the decisions are recorded in the
+README as T5-Q1 to T5-Q16, with the owner's open concern about Wayland. The brief is [`README.md`](README.md); the authority is
 `planning/FORWARD_PROGRAMME.md` §4 T5. Where this plan and a recorded owner
 decision disagree, the decision governs.
 
@@ -414,7 +414,12 @@ packing, `_NET_WM_CM_Sn` presence and the XFixes notifications. Gate:
 `gui_forms_linux_compositor_tests` under Xvfb with no compositor (grant
 `opaque`, `no_compositor`, alpha 255), with `xcompmgr` running (grant
 `transparent`), and across `xcompmgr` stopping and starting (two
-`backdrop_changed` events in order), recorded. 2 PRs.
+`backdrop_changed` events in order), recorded. The XWayland case is
+measured too (owner concern beside T5-Q9): whether `_NET_WM_CM_S0` is
+owned, whether the depth-32 visual is offered, and the grant that
+follows, under a headless Weston running Xwayland in CI if the
+coordinator admits that package, and otherwise on a desktop machine.
+2 PRs.
 
 **C5. The engine join.** The backdrop base of 4.1, glass over a clear
 backplane (4.2), `reduced_transparency` and the high-contrast and
@@ -472,7 +477,8 @@ transparency effects off, then high contrast on); macOS on `macos-15`
 (every backdrop, and reduced transparency where the runner allows setting
 it; otherwise on the bench with the owner's agreement); X11 under Xvfb
 without a compositor, with `xcompmgr`, and across it stopping and
-starting. Every state must end in a rendered window and no error.
+starting; and X11 under XWayland, with its compositor detection and
+depth-32 visual recorded per desktop measured. Every state must end in a rendered window and no error.
 
 ## 7. House-style points
 
@@ -513,9 +519,10 @@ starting. Every state must end in a rendered window and no error.
 - **Docs agree with the build.** The capability table changes in the PR
   that changes what a host advertises.
 
-## 8. Open questions for the owner
+## 8. Questions for the owner (answered 2026-10-25)
 
-Each is a numbered option list with a recommendation (marked **R**).
+Each is a numbered option list with a recommendation (marked **R**). The
+owner chose **R**, option 1, on all sixteen (README, T5-Q1 to T5-Q16).
 
 **Q1. The backdrop vocabulary.**
 1. Portable purposes, a closed set: `opaque`, `transparent`,
