@@ -618,12 +618,13 @@ the core suite) passes unchanged under the sanitizer. 3 PRs.
 
 **L2. Layout value parser.** The admitted declarations of sections 2.2 to
 2.5 over T3 P1's tokens, into typed style records, with exact
-diagnostics for refused forms. Depends on T3 P1. The refusals use T3's
-E4xx value codes, which L2 adds to T3's `DiagnosticCode` in T3's table
-order and T3 reuses at P4: E401 `value_syntax`, E402 `value_wrong_kind`,
-E403 `value_out_of_range`, E404 `unit_not_admitted`, E405
-`value_form_not_admitted`, E406 `keyword_unknown` (coordinator,
-2026-10-25). Gate: one conformance fixture per property and per refused
+diagnostics for refused forms. Depends on T3 P1 and on T3 P4's value
+codes. The refusals use T3's E4xx codes as T3 defines them in its single
+code list (`src/core/theme_language/diagnostics/`, owned by T3): E401
+`value_syntax`, E402 `value_wrong_kind`, E403 `value_out_of_range`, E404
+`unit_not_admitted`, E405 `value_form_not_admitted`, E406
+`keyword_unknown`. L2 defines no codes; one it lacks is asked of T3
+through the coordinator (coordinator, 2026-10-25). Gate: one conformance fixture per property and per refused
 form. 1 to 2 PRs.
 
 **L3. Flex.** `flex_solver` and `FlexLayoutPanel`. Gate: the flex corpus
