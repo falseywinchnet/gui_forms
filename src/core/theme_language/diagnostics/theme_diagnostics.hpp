@@ -62,10 +62,10 @@ enum class DiagnosticCode : std::uint16_t {
     // `:where()`, `:has()`, the structural ones, `::before` and the rest.
     pseudo_class_not_admitted = 303,
     attribute_selector_not_admitted = 304,
-    // E4xx values (B2: a bad value fails). 406, 407, 411, 412 and 414
-    // (keyword_unknown, too_many_layers, keyframes_undefined,
-    // transition_invalid, variable_kind_mismatch) arrive with the phases
-    // that lower properties, motion and inline styles.
+    // E4xx values (B2: a bad value fails). 407, 411, 412 and 414
+    // (too_many_layers, keyframes_undefined, transition_invalid,
+    // variable_kind_mismatch) arrive with the phases that lower layers,
+    // motion and inline styles.
     // A value whose tokens are not a component of the admitted forms.
     value_syntax = 401,
     // An operand or argument of the wrong kind: units that do not agree, a
@@ -78,6 +78,9 @@ enum class DiagnosticCode : std::uint16_t {
     // A CSS form outside the language, such as `hwb()`, `sin()`, `attr()`
     // or `color-mix()` in a space other than srgb.
     value_form_not_admitted = 405,
+    // A keyword the property's position does not list, such as an unknown
+    // choice of a primitive parameter (raised from P5, the lowering).
+    keyword_unknown = 406,
     // An expression the engine's compiler refuses (other than its budget).
     expression_invalid = 408,
     // A var() of a name no rule defines, with no fallback.
@@ -116,12 +119,19 @@ enum class DiagnosticCode : std::uint16_t {
     // property with several definitions, until P12).
     not_yet_built = 999,
     // W1xx unknown names (B3): the item is dropped and the rest applies.
+    // A property name the language does not know; the declaration is
+    // dropped.
+    unknown_property = 1101,
     // An at-rule other than @import, @media and @keyframes; its block is
     // skipped.
     unknown_at_rule = 1104,
     // A control type, part, role, state or pseudo-class the vocabulary does
     // not know; the rule is dropped.
     unknown_selector_name = 1106,
+    // A known CSS property the language leaves out, such as `float`,
+    // `grid-template` or `aspect-ratio`; the declaration is dropped, with
+    // the property named.
+    property_not_admitted = 1107,
 };
 
 [[nodiscard]] DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept;

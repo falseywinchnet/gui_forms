@@ -40,6 +40,7 @@ using gui_forms::engine_input_position;
 using gui_forms::published_value_position;
 using gui_forms::theme_language::CustomPropertyTable;
 using gui_forms::theme_language::DiagnosticCode;
+using gui_forms::theme_language::DiagnosticSeverity;
 using gui_forms::theme_language::LineStartTable;
 using gui_forms::theme_language::ParseOutcome;
 using gui_forms::theme_language::ReservedInputs;
@@ -67,6 +68,8 @@ using gui_forms::theme_language::ValueToken;
 using gui_forms::theme_language::ValueUnit;
 using gui_forms::theme_language::VariableSubstitution;
 using gui_forms::theme_language::diagnostic_code_name;
+using gui_forms::theme_language::diagnostic_code_label;
+using gui_forms::theme_language::diagnostic_severity;
 using gui_forms::theme_language::maximum_custom_properties;
 using gui_forms::theme_language::named_colour;
 using gui_forms::theme_language::parse_theme_sheet;
@@ -746,9 +749,42 @@ void test_expression_budgets() {
             "33 nested expression groups are refused");
 }
 
+// The codes' numbers, names and severities that other stages raise (the
+// code list has one definition, in the diagnostics source): the value
+// errors, and the property warnings the lowering raises.
+struct ValueCodeCase final {
+    DiagnosticCode code{};
+    std::string_view label{};
+    std::string_view name{};
+    DiagnosticSeverity severity{};
+};
+
+void test_value_codes() {
+    const std::array<ValueCodeCase, 12> cases{{
+        {DiagnosticCode::value_syntax, "E401", "value_syntax", DiagnosticSeverity::error},
+        {DiagnosticCode::value_wrong_kind, "E402", "value_wrong_kind", DiagnosticSeverity::error},
+        {DiagnosticCode::value_out_of_range, "E403", "value_out_of_range", DiagnosticSeverity::error},
+        {DiagnosticCode::unit_not_admitted, "E404", "unit_not_admitted", DiagnosticSeverity::error},
+        {DiagnosticCode::value_form_not_admitted, "E405", "value_form_not_admitted", DiagnosticSeverity::error},
+        {DiagnosticCode::keyword_unknown, "E406", "keyword_unknown", DiagnosticSeverity::error},
+        {DiagnosticCode::expression_invalid, "E408", "expression_invalid", DiagnosticSeverity::error},
+        {DiagnosticCode::variable_undefined, "E409", "variable_undefined", DiagnosticSeverity::error},
+        {DiagnosticCode::variable_cycle, "E410", "variable_cycle", DiagnosticSeverity::error},
+        {DiagnosticCode::resource_unknown, "E413", "resource_unknown", DiagnosticSeverity::error},
+        {DiagnosticCode::unknown_property, "W101", "unknown_property", DiagnosticSeverity::warning},
+        {DiagnosticCode::property_not_admitted, "W107", "property_not_admitted", DiagnosticSeverity::warning},
+    }};
+    for (const ValueCodeCase& entry : cases) {
+        require(diagnostic_code_label(entry.code) == entry.label, entry.name);
+        require(diagnostic_code_name(entry.code) == entry.name, entry.name);
+        require(diagnostic_severity(entry.code) == entry.severity, entry.name);
+    }
+}
+
 } // namespace
 
 int main() {
+    test_value_codes();
     test_numbers_and_units();
     test_components();
     test_colours();

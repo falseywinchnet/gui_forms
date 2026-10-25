@@ -576,10 +576,14 @@ are errors; folded and unfolded programs give the same bits. 2 PRs.
 - **Codes.** The E4xx codes it raises take their numbers in the order of
   section 2's table: `value_syntax` E401, `value_wrong_kind` E402,
   `value_out_of_range` E403, `unit_not_admitted` E404,
-  `value_form_not_admitted` E405, `expression_invalid` E408,
+  `value_form_not_admitted` E405, `keyword_unknown` E406 (defined here for
+  the layout stage's use, raised from P5), `expression_invalid` E408,
   `variable_undefined` E409, `variable_cycle` E410 and `resource_unknown`
-  E413. E406, E407, E411, E412 and E414 keep their numbers for the phases
-  that raise them. Also `expression_over_budget` E507,
+  E413. E407, E411, E412 and E414 keep their numbers for the phases that
+  raise them. `unknown_property` W101 and `property_not_admitted` W107 are
+  defined here too, for the layout stage, and raised from P5. The
+  diagnostics source is the single definition of the code list; other
+  stages raise its codes and define none of their own. Also `expression_over_budget` E507,
   `too_many_custom_properties` E511, `substitution_too_long` E512,
   `reserved_input_set` E701, and the temporary `not_yet_built` E999, which
   P12 removes.
