@@ -1,5 +1,8 @@
 #include "pages.hpp"
 
+#include <array>
+#include <cstdint>
+#include <cstdio>
 #include <variant>
 
 namespace gui_forms::gallery::pages {
@@ -54,6 +57,7 @@ private:
     void on_path_dialog(int index, const CommandInvocation& invocation);
     void show_open_file_dialog(bool multiple);
     void show_save_file_dialog();
+    void show_color_dialog();
     void on_service(int index);
 
     [[nodiscard]] HostServices* services() const;
@@ -70,10 +74,12 @@ private:
     std::array<Command, 4> message_commands_{};
     std::array<Command, 5> dialog_commands_{};
     std::array<Command, 5> service_commands_{};
-    // Open file, Open multiple and Save file show these components; the
-    // folder and colour buttons send typed HostServices requests directly.
+    // Open file, Open multiple, Save file and Choose color show these
+    // components; the folder button sends a typed HostServices request
+    // directly.
     std::shared_ptr<OpenFileDialog> open_file_dialog_;
     std::shared_ptr<SaveFileDialog> save_file_dialog_;
+    std::shared_ptr<ColorDialog> color_dialog_;
     std::shared_ptr<Label> status_;
     std::shared_ptr<TextBox> clipboard_;
     Command choose_font_{};
@@ -333,6 +339,9 @@ void HostServicesPage::build_paths(const std::shared_ptr<Surface>& body) {
     (*save_file_dialog_).set_filter("Text evidence|*.txt");
     (*save_file_dialog_).set_default_ext("txt");
     (*save_file_dialog_).set_file_name("gui-forms-evidence");
+    color_dialog_ = std::make_shared<ColorDialog>();
+    (*color_dialog_).set_title("Choose an accent color");
+    (*color_dialog_).set_color(Color::rgba(0x27U, 0x74U, 0xB8U));
     (*paths).add_at(label("gallery.host.paths.note",
                           "Cancel never overwrites the last accepted path, choice, or color.",
                           11.0, 400, muted), {24.0, 98.0, 700.0, 24.0});
@@ -399,8 +408,7 @@ void HostServicesPage::on_path_dialog(const int index,
         show_dialog(invocation,
                     HostFolderDialogRequest{"Choose an evidence directory", {}});
     } else {
-        show_dialog(invocation,
-                    HostColorDialogRequest{"Choose an accent color", 0x2774B8FFU, false});
+        show_color_dialog();
     }
 }
 
@@ -444,6 +452,33 @@ void HostServicesPage::show_save_file_dialog() {
         return;
     }
     publish_accepted("1 path · " + (*save_file_dialog_).file_name());
+}
+
+void HostServicesPage::show_color_dialog() {
+    Window* const window = (*status_).attached_window();
+    if (window == nullptr) {
+        (*status_).set_text("Host rejected request · unsupported");
+        return;
+    }
+    const DialogResult result = (*color_dialog_).show_dialog(*window);
+    if (result == DialogResult::none) {
+        (*status_).set_text(std::string("Host rejected request · ") +
+                            host_service_error_name((*color_dialog_).status().error));
+        return;
+    }
+    if (result != DialogResult::ok) {
+        publish_cancelled();
+        return;
+    }
+    // The colour as the host contract spells it, 0xRRGGBBAA.
+    const Color chosen = (*color_dialog_).color();
+    const std::uint32_t rgba = (static_cast<std::uint32_t>(chosen.red) << 24U) |
+                               (static_cast<std::uint32_t>(chosen.green) << 16U) |
+                               (static_cast<std::uint32_t>(chosen.blue) << 8U) |
+                               static_cast<std::uint32_t>(chosen.alpha);
+    std::array<char, 16> encoded{};
+    std::snprintf(encoded.data(), encoded.size(), "#%08X", rgba);
+    publish_accepted(std::string("color ") + encoded.data());
 }
 
 void HostServicesPage::on_service(const int index) {

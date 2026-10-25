@@ -558,6 +558,22 @@ void example() {
 }
 }  // namespace doc_example_ColorCommand_1
 
+namespace doc_example_ColorDialog_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    gf::ColorDialog dialog;
+    dialog.set_color(gf::Color::rgba(0x27U, 0x74U, 0xB8U));
+    const gf::DialogResult result = dialog.show_dialog(window);
+    if (result == gf::DialogResult::ok) {
+        const gf::Color accent = dialog.color();
+        static_cast<void>(accent);
+    } else if (result == gf::DialogResult::none) {
+        // Without a host, dialog.status().error is gf::HostServiceError::unsupported.
+    }
+}
+}  // namespace doc_example_ColorDialog_1
+
 namespace doc_example_ColorValueEditor_1 {
 void example() {
     std::shared_ptr<gf::ColorValueEditor> tint =
@@ -3970,6 +3986,7 @@ int main() {
     failures += run("ChoiceGroup example 1", &doc_example_ChoiceGroup_1::example);
     failures += run("ChoiceGroup example 2", &doc_example_ChoiceGroup_2::example);
     failures += run("ColorCommand example 1", &doc_example_ColorCommand_1::example);
+    failures += run("ColorDialog example 1", &doc_example_ColorDialog_1::example);
     failures += run("ColorValueEditor example 1", &doc_example_ColorValueEditor_1::example);
     failures += run("ColorValueEditor example 2", &doc_example_ColorValueEditor_2::example);
     failures += run("ComboBox example 1", &doc_example_ComboBox_1::example);

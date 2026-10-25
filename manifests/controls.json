@@ -954,6 +954,17 @@
       "doc": "api/generated/gui_forms.SaveFileDialog.rst"
     },
     {
+      "id": "color_dialog",
+      "type": "ColorDialog",
+      "header": "gui_forms/components/color_dialog/color_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "The host's dialog for choosing a color, opaque unless alpha is allowed, shown modally through HostServices.",
+      "winforms": "ColorDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.ColorDialog.rst"
+    },
+    {
       "id": "tool_tip",
       "type": "ToolTip",
       "header": "gui_forms/components/tool_tip/tool_tip.hpp",

@@ -5697,6 +5697,12 @@
       ]
     },
     {
+      "id": "color_dialog",
+      "type": "ColorDialog",
+      "kind": "component",
+      "interactions": []
+    },
+    {
       "id": "tool_tip",
       "type": "ToolTip",
       "kind": "component",
