@@ -54,6 +54,7 @@ private:
     void on_path_dialog(int index, const CommandInvocation& invocation);
     void show_open_file_dialog(bool multiple);
     void show_save_file_dialog();
+    void show_folder_browser_dialog();
     void on_service(int index);
 
     [[nodiscard]] HostServices* services() const;
@@ -70,10 +71,12 @@ private:
     std::array<Command, 4> message_commands_{};
     std::array<Command, 5> dialog_commands_{};
     std::array<Command, 5> service_commands_{};
-    // Open file, Open multiple and Save file show these components; the
-    // folder and colour buttons send typed HostServices requests directly.
+    // Open file, Open multiple, Save file and Choose folder show these
+    // components; the colour button sends a typed HostServices request
+    // directly.
     std::shared_ptr<OpenFileDialog> open_file_dialog_;
     std::shared_ptr<SaveFileDialog> save_file_dialog_;
+    std::shared_ptr<FolderBrowserDialog> folder_browser_dialog_;
     std::shared_ptr<Label> status_;
     std::shared_ptr<TextBox> clipboard_;
     Command choose_font_{};
@@ -333,6 +336,8 @@ void HostServicesPage::build_paths(const std::shared_ptr<Surface>& body) {
     (*save_file_dialog_).set_filter("Text evidence|*.txt");
     (*save_file_dialog_).set_default_ext("txt");
     (*save_file_dialog_).set_file_name("gui-forms-evidence");
+    folder_browser_dialog_ = std::make_shared<FolderBrowserDialog>();
+    (*folder_browser_dialog_).set_description("Choose an evidence directory");
     (*paths).add_at(label("gallery.host.paths.note",
                           "Cancel never overwrites the last accepted path, choice, or color.",
                           11.0, 400, muted), {24.0, 98.0, 700.0, 24.0});
@@ -396,8 +401,7 @@ void HostServicesPage::on_path_dialog(const int index,
     } else if (index == 2) {
         show_save_file_dialog();
     } else if (index == 3) {
-        show_dialog(invocation,
-                    HostFolderDialogRequest{"Choose an evidence directory", {}});
+        show_folder_browser_dialog();
     } else {
         show_dialog(invocation,
                     HostColorDialogRequest{"Choose an accent color", 0x2774B8FFU, false});
@@ -444,6 +448,25 @@ void HostServicesPage::show_save_file_dialog() {
         return;
     }
     publish_accepted("1 path · " + (*save_file_dialog_).file_name());
+}
+
+void HostServicesPage::show_folder_browser_dialog() {
+    Window* const window = (*status_).attached_window();
+    if (window == nullptr) {
+        (*status_).set_text("Host rejected request · unsupported");
+        return;
+    }
+    const DialogResult result = (*folder_browser_dialog_).show_dialog(*window);
+    if (result == DialogResult::none) {
+        (*status_).set_text(std::string("Host rejected request · ") +
+                            host_service_error_name((*folder_browser_dialog_).status().error));
+        return;
+    }
+    if (result != DialogResult::ok) {
+        publish_cancelled();
+        return;
+    }
+    publish_accepted("1 path · " + (*folder_browser_dialog_).selected_path());
 }
 
 void HostServicesPage::on_service(const int index) {

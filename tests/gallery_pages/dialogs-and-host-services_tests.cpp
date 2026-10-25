@@ -84,6 +84,12 @@ void test_dialogs_and_host_services(gui_forms::Window& window,
     require((*status).text().find("1 path · /tmp/gui-forms-evidence.txt") != std::string::npos &&
                 services.snapshot().dialog_requests == 6U,
             "the SaveFileDialog specimen publishes its accepted path");
+
+    // Choose folder goes through the FolderBrowserDialog component.
+    click(window, window.find("gallery.host.dialog.3"));
+    require((*status).text().find("1 path · /tmp/evidence") != std::string::npos &&
+                services.snapshot().dialog_requests == 7U,
+            "the FolderBrowserDialog specimen publishes its chosen folder");
 }
 
 } // namespace gallery_pages_tests

@@ -1595,6 +1595,22 @@ void example() {
 }
 }  // namespace doc_example_FlowLayoutPanel_2
 
+namespace doc_example_FolderBrowserDialog_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    gf::FolderBrowserDialog dialog;
+    dialog.set_description("Choose where the exports go");
+    const gf::DialogResult result = dialog.show_dialog(window);
+    if (result == gf::DialogResult::ok) {
+        const std::string& folder = dialog.selected_path();
+        static_cast<void>(folder);
+    } else if (result == gf::DialogResult::none) {
+        // Without a host, dialog.status().error is gf::HostServiceError::unsupported.
+    }
+}
+}  // namespace doc_example_FolderBrowserDialog_1
+
 namespace doc_example_FontCommand_1 {
 void example() {
     std::shared_ptr<gf::Command> font = std::make_shared<gf::Command>("doc.font", "Font");
@@ -4016,6 +4032,7 @@ int main() {
     failures += run("FlagsValueEditor example 2", &doc_example_FlagsValueEditor_2::example);
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
+    failures += run("FolderBrowserDialog example 1", &doc_example_FolderBrowserDialog_1::example);
     failures += run("FontCommand example 1", &doc_example_FontCommand_1::example);
     failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
     failures += run("GalleryCommand example 1", &doc_example_GalleryCommand_1::example);

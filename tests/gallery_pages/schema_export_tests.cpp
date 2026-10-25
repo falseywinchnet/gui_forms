@@ -747,6 +747,7 @@ void test_schema_export() {
     const std::shared_ptr<NotifyIcon> notify_icon = std::make_shared<NotifyIcon>(window);
     const std::shared_ptr<OpenFileDialog> open_file_dialog = std::make_shared<OpenFileDialog>();
     const std::shared_ptr<SaveFileDialog> save_file_dialog = std::make_shared<SaveFileDialog>();
+    const std::shared_ptr<FolderBrowserDialog> folder_browser_dialog = std::make_shared<FolderBrowserDialog>();
     const std::shared_ptr<ErrorProvider> error_provider = std::make_shared<ErrorProvider>(window);
     const std::shared_ptr<HelpProvider> help_provider = std::make_shared<HelpProvider>(window);
     const std::shared_ptr<SemanticFeedback> feedback = std::make_shared<SemanticFeedback>(window);
@@ -769,6 +770,7 @@ void test_schema_export() {
     record_component("notify_icon", *notify_icon, records);
     record_component("open_file_dialog", *open_file_dialog, records);
     record_component("save_file_dialog", *save_file_dialog, records);
+    record_component("folder_browser_dialog", *folder_browser_dialog, records);
     record_component("image_list", *image_list, records);
     record_component("error_provider", *error_provider, records);
     record_component("help_provider", *help_provider, records);

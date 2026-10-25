@@ -21,6 +21,8 @@ Anchored popups, tooltips, owned dialogs and the host's file and colour dialogs.
      - The host's dialog for choosing one or more existing files.
    * - :cpp:class:`SaveFileDialog <gui_forms::SaveFileDialog>`
      - The host's dialog for choosing where to save a file.
+   * - :cpp:class:`FolderBrowserDialog <gui_forms::FolderBrowserDialog>`
+     - The host's dialog for choosing a folder.
    * - :cpp:class:`ToolTip <gui_forms::ToolTip>`
      - A provider of short help text that pops up when the pointer rests on a control or the control receives keyboard focus.
    * - :cpp:class:`RibbonToolTip <gui_forms::RibbonToolTip>`
@@ -34,6 +36,7 @@ Anchored popups, tooltips, owned dialogs and the host's file and colour dialogs.
    generated/gui_forms.TaskDialog
    generated/gui_forms.OpenFileDialog
    generated/gui_forms.SaveFileDialog
+   generated/gui_forms.FolderBrowserDialog
    generated/gui_forms.ToolTip
    generated/gui_forms.RibbonToolTip
 

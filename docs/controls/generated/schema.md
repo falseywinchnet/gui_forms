@@ -2696,6 +2696,10 @@ Properties beyond every control's: none.
 |---|---|
 | `file_ok` | `FileDialogOk`, by reference |
 
+## `folder_browser_dialog` (FolderBrowserDialog, component)
+
+Interactions: none.
+
 ## `tool_tip` (ToolTip, component)
 
 | Interaction | Payload |
