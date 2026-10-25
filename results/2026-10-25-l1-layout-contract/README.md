@@ -86,8 +86,48 @@ edges come from fractional scales (1.25, 1.5) and from distributed free space
 (the corpus's `space-around` and `space-evenly` fixtures). Section 4's rule,
 round each edge so neighbours share an edge, therefore differs from all
 three. The painters belong to the Skia and host owners (`AGENTS.md`), so L1
-records the difference and does not change them; the change is put to the
-coordinator.
+records the difference and does not change them.
+
+**Decided (coordinator, 2026-10-25):** edge rounding is required (owner
+decision L-Q8) and is made in a separate PR off track L, by the standby
+worker after DP closes, with the golden updates. Layout keeps publishing
+unsnapped logical boxes. This section is that PR's brief.
+
+### Brief for the painter change
+
+The code that changes:
+
+- `src/render/skia/raster/skia_raster.cpp`: `make_paint` (antialiasing on
+  for every fill and stroke) and the rectangle entry points `fill_rect`,
+  `stroke_rect`, `fill_rounded_rect` and `stroke_rounded_rect`, which draw
+  at logical coordinates under `canvas.scale(scale)`. Edge rounding means
+  mapping each edge to device pixels, rounding it, and drawing the rounded
+  device rectangle without antialiasing. Rounded corners and paths keep
+  their antialiasing.
+- `src/host/windows/application/windows_host.cpp`: `DibPainter::pixel_rect`
+  (floor left and top, ceil right and bottom) and its users, `fill_rect`
+  first, plus the clip rectangles at the two `std::floor(clip.x * scale_)`
+  sites.
+- `src/render/coregraphics/raster/coregraphics_raster.cpp`:
+  `CoreGraphicsRaster::fill_rect` and `to_cg_rect`.
+
+The tests that read painted pixels, by painter. Their expected pixels can
+move wherever an edge is fractional in device pixels: at scale 1.25 or 1.5,
+or with a fractional logical edge at any scale. Tests drawn only at integer
+edges and integer scales keep their expectations.
+
+| Painter | Tests |
+|---|---|
+| `SkiaRaster` | `canvas_raster_tests`, `engine_gate_tests` (and the cross-host engine-gate manifests, `results/2026-10-22-t2-engine-gate/` and `results/2026-10-23-t2-engine-gate/`), `layered_material_raster_tests`, `opaque_live_surface_raster_tests`, `part_composite_identity_tests`, `prepared_text_skia_tests`, `retained_draw_cache_raster_tests`, `text_identity_raster_tests`, `src/render/skia/skia_raster_smoke.cpp` |
+| `DibPainter` | `windows_canvas_raster_tests`, `windows_content_pixels_tests`, `windows_control_snapshot_tests`, `windows_damage_rectangles_tests`, `windows_part_composite_tests`, `windows_text_tests`, and the DP record `results/2026-10-13-dp-gate-windows/` |
+| `CoreGraphicsRaster` | `layered_material_raster_tests` (its macOS branch), `src/render/coregraphics/coregraphics_raster_smoke.cpp` |
+
+Display traces (`tests/gallery_pages/display_trace_tests.cpp`) record
+logical commands, not pixels, and do not move. Text glyph coverage
+(`glyph_run_raster_tests`) does not go through the rectangle path. The list
+comes from searching `tests/` for the three painters. The PR that makes
+the change must run each listed test before and after, and record which
+expectations moved and why.
 
 ## Gate
 
