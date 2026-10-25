@@ -2285,7 +2285,9 @@ Related types
 
       Default: ``3U``.
 
-   .. cpp:member:: std::array<WindowBackdrop, maximum_entries> entries{WindowBackdrop::opaque, WindowBackdrop::opaque,
+   .. cpp:member:: std::array<WindowBackdrop, maximum_entries> entries
+
+      Value-initialized: every entry ``opaque``, the enumeration's first.
 
    .. cpp:member:: std::size_t length
 
