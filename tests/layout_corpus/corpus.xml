@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The layout fixture corpus (planning/stages/L-layout/PLAN.md section 6).
+     Every fixture is laid out at every profile. Tolerances are logical
+     pixels per box edge (owner decision L-Q9); reference-drift bounds how
+     far a regenerated Chromium reference may move from the checked-in one
+     (one LayoutUnit, 1/64 px). -->
+<layout-corpus>
+  <profiles>
+    <profile viewport="320x240" scale="1"/>
+    <profile viewport="800x600" scale="1"/>
+    <profile viewport="1280x800" scale="1"/>
+    <profile viewport="1440x900" scale="1"/>
+    <profile viewport="320x240" scale="2"/>
+    <profile viewport="800x600" scale="2"/>
+    <profile viewport="1280x800" scale="2"/>
+    <profile viewport="1440x900" scale="2"/>
+  </profiles>
+  <tolerance box-edge="0.05" text-edge="0.51" baseline="1.0" reference-drift="0.015625"/>
+  <fixtures>
+    <fixture name="flow/align-center"/>
+    <fixture name="flow/align-flex-end"/>
+    <fixture name="flow/column-reverse"/>
+    <fixture name="flow/column-wrap"/>
+    <fixture name="flow/grow-single-line"/>
+    <fixture name="flow/grow-wrapped"/>
+    <fixture name="flow/justify-center"/>
+    <fixture name="flow/justify-flex-end"/>
+    <fixture name="flow/justify-space-around"/>
+    <fixture name="flow/justify-space-between"/>
+    <fixture name="flow/justify-space-evenly"/>
+    <fixture name="flow/margins"/>
+    <fixture name="flow/nested"/>
+    <fixture name="flow/nowrap-overflow"/>
+    <fixture name="flow/row-reverse"/>
+    <fixture name="flow/row-wrap"/>
+    <fixture name="flow/stretch-single-line"/>
+    <fixture name="table/auto-placement"/>
+    <fixture name="table/auto-tracks-normal"/>
+    <fixture name="table/auto-tracks-start"/>
+    <fixture name="table/fixed-tracks"/>
+    <fixture name="table/fraction-tracks"/>
+    <fixture name="table/mixed-tracks"/>
+    <fixture name="table/self-alignment"/>
+    <fixture name="table/spans"/>
+    <fixture name="table/stretched-cells"/>
+  </fixtures>
+</layout-corpus>
