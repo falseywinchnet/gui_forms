@@ -262,6 +262,54 @@ void example() {
 }
 }  // namespace doc_example_BindingSource_2
 
+namespace doc_example_BlockFlowPanel_1 {
+void example() {
+    std::shared_ptr<gf::BlockFlowPanel> stack =
+        gf::make_control<gf::BlockFlowPanel>(gf::StableId("stack"));
+    std::vector<std::shared_ptr<gf::Button>> buttons;
+    for (int index = 0; index < 3; ++index) {
+        std::shared_ptr<gf::Button> button = gf::make_control<gf::Button>(
+            gf::StableId("stack.button" + std::to_string(index)), "Button");
+        (*button).set_requested_bounds({0.0, 0.0, 10.0, 20.0});
+        (*button).set_margin({0.0, 10.0, 0.0, 10.0});
+        (*stack).add_child(button);
+        buttons.push_back(button);
+    }
+
+    gf::Window window(stack, {200.0, 100.0});
+    window.perform_layout();
+    // each button is 200 wide and 20 high, at y 10, 40 and 70
+}
+}  // namespace doc_example_BlockFlowPanel_1
+
+namespace doc_example_BlockFlowPanel_2 {
+void example() {
+    std::shared_ptr<gf::BlockFlowPanel> row =
+        gf::make_control<gf::BlockFlowPanel>(gf::StableId("row"));
+    (*row).set_text_align(gf::TextAlignment::center);
+    gf::BlockFlowItemLayout atomic{};
+    atomic.level = gf::BlockFlowLevel::inline_level;
+    atomic.width = gf::SizeValue{gf::SizeKind::length_percentage,
+                                 gf::LengthPercentage{gf::LogicalLength{80.0}, 0.0}};
+    atomic.height = gf::SizeValue{gf::SizeKind::length_percentage,
+                                  gf::LengthPercentage{gf::LogicalLength{20.0}, 0.0}};
+    std::vector<std::shared_ptr<gf::Button>> buttons;
+    for (int index = 0; index < 3; ++index) {
+        std::shared_ptr<gf::Button> button = gf::make_control<gf::Button>(
+            gf::StableId("row.button" + std::to_string(index)), "Button");
+        (*button).set_margin({});
+        (*row).add_child(button);
+        (*row).set_item_layout(*button, atomic);
+        buttons.push_back(button);
+    }
+
+    gf::Window window(row, {200.0, 60.0});
+    window.perform_layout();
+    // buttons 0 and 1 at x 20 and 100 on the first line (y 0); button 2
+    // centred at x 60 on the second line (y 20)
+}
+}  // namespace doc_example_BlockFlowPanel_2
+
 namespace doc_example_BreadcrumbTrail_1 {
 void example() {
     std::shared_ptr<gf::BreadcrumbTrail> trail =
@@ -4103,6 +4151,8 @@ int main() {
     failures += run("BindingNavigator example 1", &doc_example_BindingNavigator_1::example);
     failures += run("BindingSource example 1", &doc_example_BindingSource_1::example);
     failures += run("BindingSource example 2", &doc_example_BindingSource_2::example);
+    failures += run("BlockFlowPanel example 1", &doc_example_BlockFlowPanel_1::example);
+    failures += run("BlockFlowPanel example 2", &doc_example_BlockFlowPanel_2::example);
     failures += run("BreadcrumbTrail example 1", &doc_example_BreadcrumbTrail_1::example);
     failures += run("BreadcrumbTrail example 2", &doc_example_BreadcrumbTrail_2::example);
     failures += run("Button example 1", &doc_example_Button_1::example);

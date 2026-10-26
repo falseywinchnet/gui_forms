@@ -602,6 +602,17 @@
       "doc": "api/generated/gui_forms.GridLayoutPanel.rst"
     },
     {
+      "id": "block_flow_panel",
+      "type": "BlockFlowPanel",
+      "header": "gui_forms/controls/scrollable_control/container_control/block_flow_panel/block_flow_panel.hpp",
+      "category": "Layout",
+      "purpose": "CSS block formatting context: block items stacked with collapsing margins and auto horizontal margins, and runs of inline items broken into line boxes with text-align, a line strut and vertical-align, nested panels sharing margins, and right-to-left lines.",
+      "winforms": "GUI.Forms-only",
+      "status": "stable",
+      "gallery_page": "css-layout-panels",
+      "doc": "api/generated/gui_forms.BlockFlowPanel.rst"
+    },
+    {
       "id": "table_layout_panel",
       "type": "TableLayoutPanel",
       "header": "gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp",

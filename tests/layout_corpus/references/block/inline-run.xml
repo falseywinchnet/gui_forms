@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<layout-reference fixture="block/inline-run" chromium="155.0.8059.39" platform="win64">
+  <profile viewport="320x240" scale="1">
+    <node id="root" x="0" y="0" width="320" height="240"/>
+    <node id="w" x="8" y="8" width="304" height="60"/>
+    <node id="w-0" x="8" y="8" width="90" height="20"/>
+    <node id="w-1" x="98" y="8" width="90" height="20"/>
+    <node id="w-2" x="188" y="8" width="90" height="20"/>
+    <node id="w-3" x="8" y="28" width="90" height="20"/>
+    <node id="w-4" x="98" y="28" width="90" height="20"/>
+    <node id="w-5" x="188" y="28" width="90" height="20"/>
+    <node id="w-6" x="8" y="48" width="90" height="20"/>
+    <node id="w-7" x="98" y="48" width="90" height="20"/>
+    <node id="w-8" x="188" y="48" width="90" height="20"/>
+    <node id="after" x="8" y="68" width="304" height="10"/>
+  </profile>
+  <profile viewport="800x600" scale="1">
+    <node id="root" x="0" y="0" width="800" height="600"/>
+    <node id="w" x="8" y="8" width="784" height="40"/>
+    <node id="w-0" x="8" y="8" width="90" height="20"/>
+    <node id="w-1" x="98" y="8" width="90" height="20"/>
+    <node id="w-2" x="188" y="8" width="90" height="20"/>
+    <node id="w-3" x="278" y="8" width="90" height="20"/>
+    <node id="w-4" x="368" y="8" width="90" height="20"/>
+    <node id="w-5" x="458" y="8" width="90" height="20"/>
+    <node id="w-6" x="548" y="8" width="90" height="20"/>
+    <node id="w-7" x="638" y="8" width="90" height="20"/>
+    <node id="w-8" x="8" y="28" width="90" height="20"/>
+    <node id="after" x="8" y="48" width="784" height="10"/>
+  </profile>
+  <profile viewport="1280x800" scale="1">
+    <node id="root" x="0" y="0" width="1280" height="800"/>
+    <node id="w" x="8" y="8" width="1264" height="20"/>
+    <node id="w-0" x="8" y="8" width="90" height="20"/>
+    <node id="w-1" x="98" y="8" width="90" height="20"/>
+    <node id="w-2" x="188" y="8" width="90" height="20"/>
+    <node id="w-3" x="278" y="8" width="90" height="20"/>
+    <node id="w-4" x="368" y="8" width="90" height="20"/>
+    <node id="w-5" x="458" y="8" width="90" height="20"/>
+    <node id="w-6" x="548" y="8" width="90" height="20"/>
+    <node id="w-7" x="638" y="8" width="90" height="20"/>
+    <node id="w-8" x="728" y="8" width="90" height="20"/>
+    <node id="after" x="8" y="28" width="1264" height="10"/>
+  </profile>
+  <profile viewport="1440x900" scale="1">
+    <node id="root" x="0" y="0" width="1440" height="900"/>
+    <node id="w" x="8" y="8" width="1424" height="20"/>
+    <node id="w-0" x="8" y="8" width="90" height="20"/>
+    <node id="w-1" x="98" y="8" width="90" height="20"/>
+    <node id="w-2" x="188" y="8" width="90" height="20"/>
+    <node id="w-3" x="278" y="8" width="90" height="20"/>
+    <node id="w-4" x="368" y="8" width="90" height="20"/>
+    <node id="w-5" x="458" y="8" width="90" height="20"/>
+    <node id="w-6" x="548" y="8" width="90" height="20"/>
+    <node id="w-7" x="638" y="8" width="90" height="20"/>
+    <node id="w-8" x="728" y="8" width="90" height="20"/>
+    <node id="after" x="8" y="28" width="1424" height="10"/>
+  </profile>
+  <profile viewport="320x240" scale="2">
+    <node id="root" x="0" y="0" width="320" height="240"/>
+    <node id="w" x="8" y="8" width="304" height="60"/>
+    <node id="w-0" x="8" y="8" width="90" height="20"/>
+    <node id="w-1" x="98" y="8" width="90" height="20"/>
+    <node id="w-2" x="188" y="8" width="90" height="20"/>
+    <node id="w-3" x="8" y="28" width="90" height="20"/>
+    <node id="w-4" x="98" y="28" width="90" height="20"/>
+    <node id="w-5" x="188" y="28" width="90" height="20"/>
+    <node id="w-6" x="8" y="48" width="90" height="20"/>
+    <node id="w-7" x="98" y="48" width="90" height="20"/>
+    <node id="w-8" x="188" y="48" width="90" height="20"/>
+    <node id="after" x="8" y="68" width="304" height="10"/>
+  </profile>
+  <profile viewport="800x600" scale="2">
+    <node id="root" x="0" y="0" width="800" height="600"/>
+    <node id="w" x="8" y="8" width="784" height="40"/>
+    <node id="w-0" x="8" y="8" width="90" height="20"/>
+    <node id="w-1" x="98" y="8" width="90" height="20"/>
+    <node id="w-2" x="188" y="8" width="90" height="20"/>
+    <node id="w-3" x="278" y="8" width="90" height="20"/>
+    <node id="w-4" x="368" y="8" width="90" height="20"/>
+    <node id="w-5" x="458" y="8" width="90" height="20"/>
+    <node id="w-6" x="548" y="8" width="90" height="20"/>
+    <node id="w-7" x="638" y="8" width="90" height="20"/>
+    <node id="w-8" x="8" y="28" width="90" height="20"/>
+    <node id="after" x="8" y="48" width="784" height="10"/>
+  </profile>
+  <profile viewport="1280x800" scale="2">
+    <node id="root" x="0" y="0" width="1280" height="800"/>
+    <node id="w" x="8" y="8" width="1264" height="20"/>
+    <node id="w-0" x="8" y="8" width="90" height="20"/>
+    <node id="w-1" x="98" y="8" width="90" height="20"/>
+    <node id="w-2" x="188" y="8" width="90" height="20"/>
+    <node id="w-3" x="278" y="8" width="90" height="20"/>
+    <node id="w-4" x="368" y="8" width="90" height="20"/>
+    <node id="w-5" x="458" y="8" width="90" height="20"/>
+    <node id="w-6" x="548" y="8" width="90" height="20"/>
+    <node id="w-7" x="638" y="8" width="90" height="20"/>
+    <node id="w-8" x="728" y="8" width="90" height="20"/>
+    <node id="after" x="8" y="28" width="1264" height="10"/>
+  </profile>
+  <profile viewport="1440x900" scale="2">
+    <node id="root" x="0" y="0" width="1440" height="900"/>
+    <node id="w" x="8" y="8" width="1424" height="20"/>
+    <node id="w-0" x="8" y="8" width="90" height="20"/>
+    <node id="w-1" x="98" y="8" width="90" height="20"/>
+    <node id="w-2" x="188" y="8" width="90" height="20"/>
+    <node id="w-3" x="278" y="8" width="90" height="20"/>
+    <node id="w-4" x="368" y="8" width="90" height="20"/>
+    <node id="w-5" x="458" y="8" width="90" height="20"/>
+    <node id="w-6" x="548" y="8" width="90" height="20"/>
+    <node id="w-7" x="638" y="8" width="90" height="20"/>
+    <node id="w-8" x="728" y="8" width="90" height="20"/>
+    <node id="after" x="8" y="28" width="1424" height="10"/>
+  </profile>
+</layout-reference>

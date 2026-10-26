@@ -17,6 +17,37 @@
   </profiles>
   <tolerance box-edge="0.05" text-edge="0.51" baseline="1.0" reference-drift="0.015625"/>
   <fixtures>
+    <fixture name="block/auto-margin-one-side"/>
+    <fixture name="block/auto-margins-center"/>
+    <fixture name="block/block-in-grid"/>
+    <fixture name="block/empty-block"/>
+    <fixture name="block/empty-chain"/>
+    <fixture name="block/flex-in-block"/>
+    <fixture name="block/form-pattern"/>
+    <fixture name="block/inline-margins"/>
+    <fixture name="block/inline-run"/>
+    <fixture name="block/inline-run-varied"/>
+    <fixture name="block/line-height-strut"/>
+    <fixture name="block/max-height-margins"/>
+    <fixture name="block/min-height-margins"/>
+    <fixture name="block/min-max-height"/>
+    <fixture name="block/min-max-width"/>
+    <fixture name="block/mixed-inline-block"/>
+    <fixture name="block/nested-collapse-bottom"/>
+    <fixture name="block/nested-collapse-top"/>
+    <fixture name="block/over-constrained"/>
+    <fixture name="block/padding-separates"/>
+    <fixture name="block/percent-heights"/>
+    <fixture name="block/percent-widths"/>
+    <fixture name="block/right-to-left-blocks"/>
+    <fixture name="block/right-to-left-lines"/>
+    <fixture name="block/shrink-to-fit"/>
+    <fixture name="block/sibling-margins"/>
+    <fixture name="block/stacking"/>
+    <fixture name="block/text-align"/>
+    <fixture name="block/text-align-overflow"/>
+    <fixture name="block/vertical-align-middle"/>
+    <fixture name="block/vertical-align-top-bottom"/>
     <fixture name="flex/align-content-center"/>
     <fixture name="flex/align-content-flex-end"/>
     <fixture name="flex/align-content-normal"/>

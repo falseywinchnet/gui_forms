@@ -6,7 +6,8 @@ namespace gui_forms::gallery::pages {
 
 // Owner of the CSS Layout Panels page: the containers of stage L that lay
 // their children out by CSS rules, each as one group of specimens: the
-// FlexLayoutPanel group (phase L3), then the GridLayoutPanel group (L4).
+// FlexLayoutPanel group (phase L3), the GridLayoutPanel group (L4) and the
+// BlockFlowPanel group (L5).
 class CssLayoutPanelsPage final : public gui_forms::Component {
 public:
     CssLayoutPanelsPage(const std::shared_ptr<Surface>& page,
@@ -21,6 +22,7 @@ public:
                        {26.0, 52.0, 920.0, 24.0});
         build_flex(page);
         build_grid(page);
+        build_block(page);
     }
 
 private:
@@ -159,6 +161,61 @@ private:
                 spanning.placement.column_start.number = 2;
                 (*cards).set_item_layout(*item, spanning);
             }
+        }
+    }
+
+    // Stacked blocks whose margins collapse, the middle one narrowed and
+    // centred by auto margins; and a centred line of inline buttons that
+    // wraps, one of them taller and aligned on the line's middle.
+    void build_block(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> block_group = group(
+            "gallery.css-layout.block.group",
+            "BlockFlowPanel · collapsing margins · auto margins · centred inline lines",
+            {930.0, 124.0});
+        (*page).add_at(block_group, {24.0, 532.0, 930.0, 124.0});
+
+        std::shared_ptr<BlockFlowPanel> stack = make_control<BlockFlowPanel>(
+            StableId("gallery.css-layout.block.stack"));
+        (*stack).set_accessible_name("Stacked blocks");
+        (*block_group).add_at(stack, {18.0, 36.0, 400.0, 76.0});
+        constexpr std::array<const char*, 3> captions{"Block", "Auto margins", "Block"};
+        for (std::size_t index = 0U; index < captions.size(); ++index) {
+            std::shared_ptr<Button> item = make_control<Button>(
+                StableId("gallery.css-layout.block.stack.item." + std::to_string(index)), captions[index]);
+            (*item).set_visual_style(index == 1U ? ButtonVisualStyle::accent : ButtonVisualStyle::command);
+            (*item).set_requested_bounds({0.0, 0.0, 0.0, 20.0});
+            // 4 above and below: neighbours' margins collapse to 4.
+            (*item).set_margin({0.0, 4.0, 0.0, 4.0});
+            (*stack).add_child(item);
+            if (index == 1U) {
+                BlockFlowItemLayout centred{};
+                centred.max_width = SizeValue{SizeKind::length_percentage, LengthPercentage{LogicalLength{200.0}, 0.0}};
+                centred.auto_margin.left = true;
+                centred.auto_margin.right = true;
+                (*stack).set_item_layout(*item, centred);
+            }
+        }
+
+        std::shared_ptr<BlockFlowPanel> line = make_control<BlockFlowPanel>(
+            StableId("gallery.css-layout.block.line"));
+        (*line).set_accessible_name("Centred inline line");
+        (*line).set_text_align(TextAlignment::center);
+        (*block_group).add_at(line, {436.0, 36.0, 476.0, 76.0});
+        for (std::size_t index = 0U; index < 6U; ++index) {
+            const bool tall = index == 2U;
+            std::shared_ptr<Button> item = make_control<Button>(
+                StableId("gallery.css-layout.block.line.item." + std::to_string(index)),
+                tall ? std::string("Middle") : "Inline " + std::to_string(index + 1U));
+            (*item).set_visual_style(tall ? ButtonVisualStyle::accent : ButtonVisualStyle::standard);
+            (*item).set_margin({0.0, 0.0, 6.0, 0.0});
+            (*line).add_child(item);
+            BlockFlowItemLayout atomic{};
+            atomic.level = BlockFlowLevel::inline_level;
+            atomic.width = SizeValue{SizeKind::length_percentage, LengthPercentage{LogicalLength{90.0}, 0.0}};
+            atomic.height = SizeValue{SizeKind::length_percentage,
+                                      LengthPercentage{LogicalLength{tall ? 30.0 : 22.0}, 0.0}};
+            if (tall) atomic.vertical_align = InlineVerticalAlignment::middle;
+            (*line).set_item_layout(*item, atomic);
         }
     }
 

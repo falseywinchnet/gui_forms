@@ -74,10 +74,42 @@ void test_css_layout_panels(gui_forms::Window& window) {
     require(grid_group && (*grid_group).arranged_bounds().y + (*grid_group).arranged_bounds().height <= 660.0,
             "the grid group must fit the page body");
 
+    // The stacked blocks: 4 px margins collapse to 4 between neighbours,
+    // and the middle block is 200 px wide and centred.
+    const std::shared_ptr<BlockFlowPanel> stack =
+        std::dynamic_pointer_cast<BlockFlowPanel>(window.find("gallery.css-layout.block.stack"));
+    const Control::Ptr first_block = window.find("gallery.css-layout.block.stack.item.0");
+    const Control::Ptr middle_block = window.find("gallery.css-layout.block.stack.item.1");
+    require(stack && first_block && middle_block, "the page must retain its stacked BlockFlowPanel");
+    const Rect stack_bounds = (*stack).arranged_bounds();
+    const Rect first_bounds = (*first_block).arranged_bounds();
+    const Rect middle_bounds = (*middle_block).arranged_bounds();
+    require(std::abs(first_bounds.y - 4.0) < 1.0e-6 && std::abs(first_bounds.width - stack_bounds.width) < 1.0e-6 &&
+                std::abs(middle_bounds.y - (first_bounds.y + first_bounds.height + 4.0)) < 1.0e-6 &&
+                std::abs(middle_bounds.width - 200.0) < 1.0e-6 &&
+                std::abs(middle_bounds.x - (stack_bounds.width - 200.0) / 2.0) < 1.0e-6,
+            "stacked blocks must collapse their margins and centre the narrowed block");
+
+    // The inline line: four 96 px margin boxes fit 476 px; the rest wrap,
+    // and every line is centred.
+    const std::shared_ptr<BlockFlowPanel> line =
+        std::dynamic_pointer_cast<BlockFlowPanel>(window.find("gallery.css-layout.block.line"));
+    require(line && (*line).layout_snapshot().lines().size() == 2U && (*line).layout_snapshot().lines()[0].count == 4U,
+            "the inline line must hold four buttons and wrap the other two");
+    const Control::Ptr first_inline = window.find("gallery.css-layout.block.line.item.0");
+    require(first_inline && std::abs((*first_inline).arranged_bounds().x - (476.0 - 384.0) / 2.0) < 1.0e-6,
+            "the first line must be centred");
+
+    const Control::Ptr block_group = window.find("gallery.css-layout.block.group");
+    require(block_group && (*block_group).arranged_bounds().y + (*block_group).arranged_bounds().height <= 660.0,
+            "the block group must fit the page body");
+
     const std::string semantics = window.semantic_snapshot().to_json();
     require(semantics.find("Growing flex row") != std::string::npos &&
                 semantics.find("Centred flex column") != std::string::npos &&
                 semantics.find("Named grid areas") != std::string::npos &&
+                semantics.find("Stacked blocks") != std::string::npos &&
+                semantics.find("Centred inline line") != std::string::npos &&
                 semantics.find("Auto-fill grid cards") != std::string::npos,
             "the flex and grid specimens must publish their named group semantics");
 }

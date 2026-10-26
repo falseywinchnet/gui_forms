@@ -42,10 +42,22 @@ Related types
      - A margin or an inset: ``auto`` or a length-percentage, which may be negative.
    * - :cpp:class:`AvailableExtent <gui_forms::AvailableExtent>`
      - One axis of a layout constraint.
+   * - :cpp:class:`BlockFlowContainerInput <gui_forms::BlockFlowContainerInput>`
+     -  
+   * - :cpp:class:`BlockFlowItemInput <gui_forms::BlockFlowItemInput>`
+     - One item's inputs.
+   * - :cpp:class:`BlockFlowItemResult <gui_forms::BlockFlowItemResult>`
+     - One item's result.
+   * - :cpp:class:`BlockFlowLayoutWorkspace <gui_forms::BlockFlowLayoutWorkspace>`
+     - Caller-owned storage solve_block_flow fills, reused from layout to layout (house style section 5): ``items`` has one record per input item, in input order; ``lines`` the line boxes in order.
+   * - :cpp:class:`BlockFlowLine <gui_forms::BlockFlowLine>`
+     - One line box, its items being items[first, first + count).
    * - :cpp:class:`BoxAlignment <gui_forms::BoxAlignment>`
      - CSS Box Alignment's six properties, shared by flex and grid containers and their items.
    * - :cpp:class:`BoxSides <gui_forms::BoxSides>`
      - Top, right, bottom and left, CSS's shorthand order.
+   * - :cpp:class:`CollapsedMargin <gui_forms::CollapsedMargin>`
+     - A set of adjoining vertical margins (8.3.1): the largest positive margin and the most negative one; the collapsed margin is their sum.
    * - :cpp:class:`ComponentContainer <gui_forms::ComponentContainer>`
      - ComponentContainer owns a unique ordered set of shared components and disposes the captured ownership sequence exactly once.
    * - :cpp:class:`Control::Parts <gui_forms::Control::Parts>`
@@ -138,6 +150,8 @@ Related types
      - LayoutTransactionState exposes suspension depth, deferred work, and requested-versus-committed revisions without leaking a host layout engine.
    * - :cpp:class:`LengthPercentage <gui_forms::LengthPercentage>`
      - A length and a percentage of the box CSS names for the property, summed: ``24px`` is {24, 0}, ``50%`` is {0, 50}, ``calc(100% - 24px)`` is {-24, 100}.
+   * - :cpp:class:`LineStrut <gui_forms::LineStrut>`
+     - The strut every line box starts with (10.8.1): the container's ascent and descent above and below the baseline, as its font and line height give them, and the x-height ``vertical-align: middle`` aligns to.
    * - :cpp:class:`LogicalLength <gui_forms::LogicalLength>`
      - A layout length in logical units (device-independent pixels), the unit of every retained bound.
    * - :cpp:class:`MnemonicText <gui_forms::MnemonicText>`
@@ -251,6 +265,150 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: BlockFlowContainerInput final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   .. cpp:member:: double width
+
+      The content box's width the items are placed in.
+
+   .. cpp:member:: TextAlignment text_align
+
+      Default: ``{TextAlignment::start}``.
+
+   .. cpp:member:: LayoutDirection layout_direction
+
+      Left to right or right to left; ``inherit`` reads as left to right. Default: ``{LayoutDirection::left_to_right}``.
+
+   .. cpp:member:: LineStrut strut
+
+   .. cpp:member:: bool shares_leading_margin
+
+      Whether the container's top margin adjoins its first item's (8.3.1: it is not a formatting-context root and has no top padding). Then the margins before the first line box or nonempty block collapse through the container's top: they are published as leading_margin and the items are placed without them.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BlockFlowItemInput final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   One item's inputs.
+
+   .. cpp:member:: BlockFlowLevel level
+
+      Default: ``{BlockFlowLevel::block}``.
+
+   .. cpp:member:: double width
+
+      The used border-box size.
+
+   .. cpp:member:: double height
+
+   .. cpp:member:: BoxSides<double> margin
+
+      Resolved margins. A block item's ``auto`` left or right margin is flagged and its length ignored; vertical and inline-level ``auto`` margins are zero, as CSS computes them.
+
+   .. cpp:member:: bool auto_margin_left
+
+   .. cpp:member:: bool auto_margin_right
+
+   .. cpp:member:: CollapsedMargin leading_inner
+
+      A block item whose content shares this container's margins (a nested block flow container that is not a formatting-context root): the margins of its content collapsing through its top edge and through its bottom edge, its own margins excluded.
+
+   .. cpp:member:: CollapsedMargin trailing_inner
+
+   .. cpp:member:: bool collapses_through
+
+      Whether the item's top and bottom margins are adjoining (8.3.1: an empty block with zero height). Then leading_inner holds all of its content's margins and trailing_inner is empty.
+
+   .. cpp:member:: InlineVerticalAlignment vertical_align
+
+      Default: ``{InlineVerticalAlignment::baseline}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BlockFlowItemResult final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   One item's result.
+
+   .. cpp:member:: Rect bounds
+
+      The border box in the container's content box.
+
+   .. cpp:member:: std::uint32_t line
+
+      Its line, for an inline-level item; no_block_flow_line for a block.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: BlockFlowLayoutWorkspace final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   Caller-owned storage solve_block_flow fills, reused from layout to layout (house style section 5): :cpp:func:`items <gui_forms::BlockFlowLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`lines <gui_forms::BlockFlowLayoutWorkspace::lines>` the line boxes in order. Its storage grows only when the item or line count does.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const BlockFlowItemResult> items() const& noexcept
+
+   .. cpp:function:: std::span<const BlockFlowLine> lines() const& noexcept
+
+   .. cpp:function:: double content_height() const noexcept
+
+      The block end of the last line box or nonempty block, where the content ends before its trailing margins.
+
+   .. cpp:function:: CollapsedMargin leading_margin() const noexcept
+
+      The margins that collapsed through the container's top (empty unless the container shares its leading margin).
+
+   .. cpp:function:: CollapsedMargin trailing_margin() const noexcept
+
+      The margins after the content's end: the last block's bottom margin with whatever collapses with it. A container whose bottom margin adjoins them passes them on; any other adds their collapsed sum to its height.
+
+   .. cpp:function:: bool leading_open() const noexcept
+
+      Whether no line box or nonempty block closed the leading margins: with a shared leading margin, every item's margins are then in leading_margin and the container can collapse through.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void reserve(std::size_t count)
+
+      Reserves storage for ``count`` items and as many lines, so a later layout of at most that many allocates nothing.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BlockFlowLine final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   One line box, its items being items[first, first + count).
+
+   .. cpp:member:: std::uint32_t first
+
+   .. cpp:member:: std::uint32_t count
+
+   .. cpp:member:: double top
+
+   .. cpp:member:: double height
+
+   .. cpp:member:: double baseline
+
+      The baseline, from the line's top.
+
+   .. cpp:member:: double used_width
+
+      The items' margin boxes' summed width, and the inline offset text-align gave them, from the line's start edge.
+
+   .. cpp:member:: double offset
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: BoxAlignment final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -296,6 +454,34 @@ Related types
    .. cpp:member:: Value bottom
 
    .. cpp:member:: Value left
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CollapsedMargin final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   A set of adjoining vertical margins (8.3.1): the largest positive margin and the most negative one; the collapsed margin is their sum.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: double collapsed() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void adjoin(double margin) noexcept
+
+      Adjoins one more margin or set.
+
+   .. cpp:function:: void adjoin(const CollapsedMargin& other) noexcept
+
+   .. cpp:member:: double positive
+
+   .. cpp:member:: double negative
+
+      Zero or less.
 
 .. cpp:namespace:: gui_forms
 
@@ -1255,6 +1441,20 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: LineStrut final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   The strut every line box starts with (10.8.1): the container's ascent and descent above and below the baseline, as its font and line height give them, and the x-height ``vertical-align: middle`` aligns to. A zero strut is a point on the baseline (CSS's strut of a zero-size font).
+
+   .. cpp:member:: double ascent
+
+   .. cpp:member:: double descent
+
+   .. cpp:member:: double x_height
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:class:: LogicalLength final
 
    ``#include <gui_forms/layout/types/layout_types.hpp>``
@@ -1663,6 +1863,36 @@ Enumerations
    .. cpp:enumerator:: min_content
 
    .. cpp:enumerator:: max_content
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: BlockFlowIntrinsicKind
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   .. cpp:enumerator:: min_content
+
+   .. cpp:enumerator:: max_content
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: BlockFlowLevel
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   .. cpp:enumerator:: block
+
+   .. cpp:enumerator:: inline_level
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: BlockFlowSolveOutcome
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   .. cpp:enumerator:: solved
+
+   .. cpp:enumerator:: refused_too_many_items
 
 .. cpp:namespace:: gui_forms
 
@@ -2336,6 +2566,26 @@ Functions, constants and aliases
 ``#include <gui_forms/control/static_tree/control_factory/control_factory.hpp>``
 
 .. cpp:function:: Control::Ptr build_static_tree(const StaticNode& node, const ControlFactory& factory)
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+.. cpp:function:: BlockFlowSolveOutcome solve_block_flow(const BlockFlowContainerInput& container, std::span<const BlockFlowItemInput> items, BlockFlowLayoutWorkspace& workspace)
+
+   Lays the items out. ``items`` is borrowed for the call. On refusal the workspace is cleared.
+
+.. cpp:function:: double block_flow_intrinsic_width(std::span<const BlockFlowItemInput> items, BlockFlowIntrinsicKind kind) noexcept
+
+   The container's min-content or max-content width (CSS Sizing 3): the widest block item's margin box, and of each inline run the widest item (min-content, every item boundary being a break) or the items' sum (max-content). Each item's ``width`` is its contribution for that kind.
+
+.. cpp:var:: constexpr std::size_t maximum_block_flow_items
+
+   The most items one container lays out (PLAN section 5). Value: ``65'536U``.
+
+.. cpp:var:: constexpr std::uint32_t no_block_flow_line
+
+   Value: ``0xFFFF'FFFFU``.
 
 .. cpp:namespace:: gui_forms
 

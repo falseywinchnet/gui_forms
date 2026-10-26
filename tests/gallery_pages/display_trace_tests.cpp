@@ -319,7 +319,9 @@ struct PageDigest final {
 // paint chunks reused; on typography-and-inspection the inspected
 // specimen's RuntimeId, its generation and the control count. Nothing else
 // changed. Phase L4's grid specimens changed css-layout-panels, and the
-// same counts on states-and-diagnostics and typography-and-inspection.
+// same counts on states-and-diagnostics and typography-and-inspection;
+// phase L5's block specimens (and the page header's BlockFlowPanel entry)
+// did the same.
 //
 // Main's ThreadExceptionDialog, OpenFileDialog and SaveFileDialog lines on
 // dialogs-and-host-services, and its TabControl images on tabs-and-pages,
@@ -333,7 +335,7 @@ struct PageDigest final {
 // states-and-diagnostics, typography-and-inspection.
 //
 // typography-and-inspection's entry is the trace with the RuntimeId the
-// specimen has when this test runs first (#1296 since L4 on main); the digest
+// specimen has when this test runs first (#1309 since L5 on main); the digest
 // changes whenever a page made before it makes a control more or less.
 constexpr std::array<PageDigest, 30> expected_digests{{
     {"basics", 0x39b168d11c02f1a0ULL},
@@ -344,7 +346,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"ranges-and-progress", 0x3fce5fb922ccc1b3ULL},
     {"containers-and-focus", 0x3db877c0a3a4159dULL},
     {"animation-laboratory", 0x5cdbb66bceae7737ULL},
-    {"states-and-diagnostics", 0xd90932ae5609f4bfULL},
+    {"states-and-diagnostics", 0xfa56642764242581ULL},
     {"text-and-input", 0x355fc10c66b1625aULL},
     {"collections-and-popups", 0xed03175675f86512ULL},
     {"values-and-spinners", 0xc39e52352d46689fULL},
@@ -355,7 +357,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"dates-and-calendar", 0x7ca7f0d58684b984ULL},
     {"dialogs-and-host-services", 0x795ab0672bc3aa46ULL},
     {"retained-layout-panels", 0xeb41e855ad458af7ULL},
-    {"css-layout-panels", 0xc0d2aae7d521b590ULL},
+    {"css-layout-panels", 0x18ca033e533b040dULL},
     {"dock-and-anchor", 0x62078a167b51337fULL},
     {"commands-and-menus", 0xea7a7b2ac5c63701ULL},
     {"tree-and-object-views", 0x7a6a3c9d088ac325ULL},
@@ -364,7 +366,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"responsive-layouts", 0x30aba8f5526dfd0cULL},
     {"anchored-popups", 0xc8319f42bf15c17aULL},
     {"live-surfaces", 0xe474c9d97d329af1ULL},
-    {"typography-and-inspection", 0x56c4b90fb62f45c4ULL},
+    {"typography-and-inspection", 0x46004ceab020a55dULL},
     {"semantic-feedback", 0x48ae5da6e449bdc4ULL},
 }};
 

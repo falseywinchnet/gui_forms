@@ -21,6 +21,8 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
      - A container that lays its children out as a CSS flex container: lines of items that grow, shrink and align along a row or column.
    * - :cpp:class:`GridLayoutPanel <gui_forms::GridLayoutPanel>`
      - A container that lays its children out as a CSS grid container: items placed in rows and columns of sized tracks, by line, by area name or automatically.
+   * - :cpp:class:`BlockFlowPanel <gui_forms::BlockFlowPanel>`
+     - A container that lays its children out as a CSS block formatting context: blocks stacked with collapsing margins, and runs of inline items broken into lines.
    * - :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>`
      - A container that arranges its children in a grid of sized rows and columns.
    * - :cpp:class:`ResponsiveTrackPanel <gui_forms::ResponsiveTrackPanel>`
@@ -44,6 +46,7 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
    generated/gui_forms.FlowLayoutPanel
    generated/gui_forms.FlexLayoutPanel
    generated/gui_forms.GridLayoutPanel
+   generated/gui_forms.BlockFlowPanel
    generated/gui_forms.TableLayoutPanel
    generated/gui_forms.ResponsiveTrackPanel
    generated/gui_forms.ScaledPanel
@@ -59,6 +62,10 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`BlockFlowItemLayout <gui_forms::BlockFlowItemLayout>`
+     - One child's block flow properties (CSS's names; PLAN section 2.4).
+   * - :cpp:class:`BlockFlowSharedMargins <gui_forms::BlockFlowSharedMargins>`
+     - The margins a nested BlockFlowPanel's content shares with the block flow that lays it out (CSS 2.1 8.3.1), its own margins excluded.
    * - :cpp:class:`CommandOverflowGroupResult <gui_forms::CommandOverflowGroupResult>`
      -  
    * - :cpp:class:`CommandOverflowGroupSpec <gui_forms::CommandOverflowGroupSpec>`
@@ -135,6 +142,64 @@ Related types
      - Stage T1 anatomy, as dot members: the scrollable parts and the cell grid.
    * - :cpp:class:`TableLayoutStyle <gui_forms::TableLayoutStyle>`
      - TableLayoutStyle pairs absolute, autosize, or percentage sizing policy with its validated authored value.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BlockFlowItemLayout final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/block_flow_panel/block_flow_panel.hpp>``
+
+   One child's block flow properties (CSS's names; PLAN section 2.4). The panel keeps one per child, keyed by its runtime id and dropped when the child leaves. Margins are the child's own ``margin``; ``auto_margin`` marks the sides that are ``auto`` instead, which matters only for a block item's left and right (CSS 2.1 10.3.3; any other ``auto`` margin is zero). The child's minimum_size and maximum_size bound its used size as its own min and max sizes do.
+
+   .. cpp:member:: BlockFlowLevel level
+
+      ``display: block`` (the default) or an atomic inline box, CSS's ``inline-block``. Default: ``{BlockFlowLevel::block}``.
+
+   .. cpp:member:: SizeValue width
+
+      CSS width: ``auto`` fills the panel less the margins for a block item and shrinks to fit the content for an inline one; a length or a percentage of the panel's content width is definite.
+
+   .. cpp:member:: SizeValue height
+
+      CSS height: ``auto`` is the content's height at the used width; a length, or a percentage of a definite panel height (otherwise ``auto``).
+
+   .. cpp:member:: SizeValue min_width
+
+   .. cpp:member:: SizeValue min_height
+
+   .. cpp:member:: SizeValue max_width
+
+      Default: ``{SizeKind::none, {}}``.
+
+   .. cpp:member:: SizeValue max_height
+
+      Default: ``{SizeKind::none, {}}``.
+
+   .. cpp:member:: BoxSides<bool> auto_margin
+
+   .. cpp:member:: InlineVerticalAlignment vertical_align
+
+      An inline item's alignment on its line. Default: ``{InlineVerticalAlignment::baseline}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BlockFlowSharedMargins final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/block_flow_panel/block_flow_panel.hpp>``
+
+   The margins a nested BlockFlowPanel's content shares with the block flow that lays it out (CSS 2.1 8.3.1), its own margins excluded.
+
+   .. cpp:member:: CollapsedMargin leading
+
+      Collapsing through its top edge (empty with top padding).
+
+   .. cpp:member:: CollapsedMargin trailing
+
+      Collapsing through its bottom edge (empty with bottom padding, or when its own minimum or maximum changed its content's height).
+
+   .. cpp:member:: bool open
+
+      No line box or nonempty block closed the leading margins: at a zero height the panel's own top and bottom margins adjoin.
 
 .. cpp:namespace:: gui_forms
 
