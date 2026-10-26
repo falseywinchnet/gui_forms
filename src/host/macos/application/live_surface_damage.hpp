@@ -95,4 +95,23 @@ inline void append_uncovered_live_damage(const Rect dirty, const double scale,
     uncovered.insert(uncovered.end(), fragments.begin(), fragments.end());
 }
 
+// On a raster that still holds the last presentation, the rectangles AppKit
+// hands drawRect: are copy requests: AppKit coalesces the host's
+// setNeedsDisplayInRect: calls (into one rectangle on a layer-backed view),
+// and outside the host's own damage the raster already holds the frame's
+// pixels (stage DP decision 2: compose the gathered set, then copy). Only
+// where a live surface is composed (a frame that is not opaque, or an overlay
+// above one) do they still need retained painting. Appends to `kept` the
+// parts of each `requested` rectangle inside one of `destinations`.
+inline void append_within_live_destinations(const std::span<const Rect> requested,
+                                            const std::span<const Rect> destinations,
+                                            std::vector<Rect>& kept) {
+    for (const Rect rectangle : requested) {
+        for (const Rect destination : destinations) {
+            const Rect inside = Rect::intersection(rectangle, destination);
+            if (!inside.empty()) kept.push_back(inside);
+        }
+    }
+}
+
 } // namespace gui_forms::detail
