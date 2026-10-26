@@ -45,10 +45,12 @@ struct BasicControlStyle final {
 
 // The recipe families a theme supplies. `tool_tip` (owner decision RB-38,
 // design language 12.9) is the face and edge of plain and enhanced
-// tooltips, beside `card` and `menu_item`.
+// tooltips, beside `card` and `menu_item`. `link` and `visited_link` (owner
+// decision W-Q5) are a hyperlink's text, chosen by the link's visited flag;
+// hover keeps the normal link colour, and a link draws no plate.
 enum class ControlVisualRole : std::uint8_t {
     window, panel, card, button, accent_button, command_button, choice,
-    editor, menu_item, selection, progress, tool_tip, count,
+    editor, menu_item, selection, progress, tool_tip, link, visited_link, count,
 };
 enum class ControlSurfaceState : std::uint8_t {
     normal, hot, pressed, pending, invalid, disabled, deactivated, count,

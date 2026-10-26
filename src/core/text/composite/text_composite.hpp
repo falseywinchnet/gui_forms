@@ -80,8 +80,13 @@ enum class TextCompositeMode : std::uint8_t { source_over, source };
 // (PaintGroupComposite, E9.6), in bytes, each product rounded once:
 //   multiply: (s × (255 − αd) + d × (255 − αs) + s × d + 127) / 255,
 //   screen:   s + d − (s × d + 127) / 255,
-//   alpha:    αs + αd − (αs × αd + 127) / 255 (255 on an opaque target).
-enum class PartCompositeBlend : std::uint8_t { source_over, plus, multiply, screen };
+//   alpha:    αs + αd − (αs × αd + 127) / 255 (255 on an opaque target);
+// or copy (PaintGroupComposite::copy, stage T5): the target replaced by the
+// weighted source, transparent source pixels included, each channel
+// (s × w + 32640) / 65280 + (d × (65280 − w) + 32640) / 65280, clamped at
+// 255, so that full weight writes the source exactly (alpha 255 on an
+// opaque target).
+enum class PartCompositeBlend : std::uint8_t { source_over, plus, multiply, screen, copy };
 
 // The same blend for the theme engine's part rasters (T2 plan, "One blend";
 // GIVEN A2-2 and C1-1). A part raster is premultiplied RGBA8, memory order
@@ -107,8 +112,8 @@ struct PartRasterSource final {
     // beyond the source's edges.
     std::uint32_t shown_width{};
     std::uint32_t shown_height{};
-    // How the weighted source joins the target: source-over, or added
-    // channel by channel (a plus paint group, E7r).
+    // How the weighted source joins the target (PartCompositeBlend). Copy
+    // writes every target pixel within the source's extent and the clip.
     PartCompositeBlend blend{PartCompositeBlend::source_over};
 };
 
@@ -123,8 +128,10 @@ struct PartRasterSource final {
 //   s' = (s * w + 32640) / 65280
 //   out = s' + (destination * (255 - alpha') + 127) / 255
 // where alpha' is s' of the source alpha; an opaque target is written with
-// alpha 255. The plus blend writes min(255, s' + destination) instead. A fully opaque raster at full opacity and full coverage is
-// copied exactly. The result never exceeds 255 for a premultiplied source,
+// alpha 255. The plus blend writes min(255, s' + destination) instead; copy
+// writes as PartCompositeBlend states, transparent source pixels included.
+// A fully opaque raster at full opacity and full coverage is copied
+// exactly. The result never exceeds 255 for a premultiplied source,
 // and is clamped for one that is not. Validates everything before writing;
 // no allocation, no partial write on failure. Source and target must not
 // overlap.

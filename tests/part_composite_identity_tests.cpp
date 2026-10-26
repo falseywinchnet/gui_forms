@@ -1,6 +1,7 @@
 #include "gui_forms/gui_forms.hpp"
 #include "skia_raster.hpp"
 #include "part_composite_scene.hpp"
+#include "compositor_presentation_scene.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -88,6 +89,27 @@ int main() {
             }
         }
     }
+    // The copy group (stage T5): the group's image replaces what lay
+    // beneath it, its clear pixels included.
+    for (std::size_t scale = 0U; scale < scene::scales.size(); ++scale) {
+        render::SkiaRaster raster{};
+        require(raster.resize(scene::scene_size, scene::scales[scale]), "raster allocated");
+        DamageRegion damage{};
+        damage.add({0.0, 0.0, scene::scene_size.width, scene::scene_size.height});
+        raster.begin_frame(damage);
+        scene::paint_copy_scene(raster);
+        raster.end_frame();
+        const std::uint8_t* const bytes = static_cast<const std::uint8_t*>(raster.pixels());
+        require(bytes != nullptr, "raster readable");
+        require(scene::copy_scene_holds(bytes, raster.row_bytes(), text_identity::Order::rgba, scene::scales[scale],
+                                        true),
+                "a copy group replaces what lies beneath it");
+    }
+    // A window's presented frame by its backdrop grant (stage T5, C1).
+    render::SkiaRaster factory{};
+    const compositor_presentation::PresentationCheck presented =
+        compositor_presentation::check_presentation(factory, true);
+    require(presented.passed, presented.failure);
     if (printing) return 0;
     require(!mismatch, "the Skia composite differs from the cross-platform expectation");
     std::cout << "part composite identity tests passed\n";

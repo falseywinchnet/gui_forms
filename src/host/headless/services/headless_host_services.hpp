@@ -35,6 +35,15 @@ public:
     void simulate_tray_icon_event(HostTrayIconEvent event);
     // The choice the next show_tray_menu returns; empty dismisses the menu.
     void queue_tray_menu_choice(std::string chosen_id);
+    // The simulated native window's backdrop: what apply_window_backdrop
+    // last applied (opaque until then). Every application, accepted or
+    // failed, appends "backdrop=<name> accepted=<0|1>" and a newline to
+    // backdrop_trace().
+    [[nodiscard]] WindowBackdrop native_backdrop() const noexcept { return native_backdrop_; }
+    [[nodiscard]] const std::string& backdrop_trace() const noexcept { return backdrop_trace_; }
+    // The next non-opaque application fails with backend_failure and leaves
+    // the native backdrop unchanged, as a native call that failed would.
+    void fail_next_backdrop() noexcept { fail_next_backdrop_ = true; }
 
 protected:
     [[nodiscard]] HostMonitorResult query_monitors_impl() override;
@@ -60,6 +69,7 @@ protected:
         HostTrayIconId icon_id, const HostTrayNotificationRequest& request) override;
     [[nodiscard]] HostTrayMenuResult show_tray_menu_impl(
         HostTrayIconId icon_id, const HostTrayMenuRequest& request) override;
+    [[nodiscard]] HostServiceStatus apply_window_backdrop_impl(WindowBackdrop backdrop) override;
 
 private:
     struct TrayIcon final {
@@ -79,6 +89,9 @@ private:
     std::vector<TrayIcon> tray_icons_;
     std::deque<std::string> tray_menu_choices_;
     std::string tray_trace_;
+    WindowBackdrop native_backdrop_{WindowBackdrop::opaque};
+    std::string backdrop_trace_;
+    bool fail_next_backdrop_{};
 };
 
 } // namespace gui_forms::host

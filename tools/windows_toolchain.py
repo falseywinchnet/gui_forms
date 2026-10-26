@@ -189,7 +189,7 @@ def pack(msys_root: Path, destination: Path, spec: dict[str, Any], producer: dic
     archive: Path = destination / ARCHIVE_NAME
     write_archive(msys_root, archive)
     manifest: dict[str, Any] = {
-        'schema': 1, 'repository': 'falseywinchnet/gui_forms', 'platform': PLATFORM,
+        'schema': 1, 'repository': 'malkuth-software/gui_forms', 'platform': PLATFORM,
         'archive': ARCHIVE_NAME, 'archive_sha256': file_digest(archive),
         'archive_bytes': archive.stat().st_size, 'compression': 'zstd level ' + str(ZSTD_LEVEL),
         'spec_sha256': spec_digest(spec), 'spec': spec, 'layout': LAYOUT,

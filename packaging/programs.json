@@ -10,7 +10,7 @@
   "vendor": {
     "name": "Rainstar",
     "maintainer": "Joshuah Rainstar <noreply@rainstar.invalid>",
-    "repository": "falseywinchnet/gui_forms",
+    "repository": "malkuth-software/gui_forms",
     "bundle_prefix": "org.rainstar.guiforms",
     "deb_prefix": "rainstar-guiforms",
     "windows_install_root": "$LOCALAPPDATA\\Rainstar\\GUI.Forms",

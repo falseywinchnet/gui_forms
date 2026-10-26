@@ -101,6 +101,12 @@ public:
         return tray_icon_events_;
     }
     [[nodiscard]] bool tray_icon_live(HostTrayIconId icon_id) const noexcept;
+    // Applies a window's backdrop grant to the native window (stage T5).
+    // The window calls it only when its granted backdrop changes. `opaque`
+    // needs no capability, and an adapter must not fail it; `transparent`
+    // needs transparent_windows, and the two materials window_backdrops. A
+    // refused or failed request leaves the native window as it was.
+    [[nodiscard]] HostServiceStatus apply_window_backdrop(WindowBackdrop backdrop);
     void shutdown() noexcept;
 
     [[nodiscard]] HostServicesSnapshot snapshot() const;
@@ -145,6 +151,10 @@ protected:
         HostTrayIconId icon_id, const HostTrayNotificationRequest& request);
     [[nodiscard]] virtual HostTrayMenuResult show_tray_menu_impl(
         HostTrayIconId icon_id, const HostTrayMenuRequest& request);
+    // Called with a backdrop whose capability the host advertises. The
+    // default accepts `opaque`, which needs nothing native, and refuses the
+    // rest as unsupported.
+    [[nodiscard]] virtual HostServiceStatus apply_window_backdrop_impl(WindowBackdrop backdrop);
     // Adapters report native tray events here, on the UI thread. Events for
     // identities that are not live are dropped.
     void publish_tray_icon_event(const HostTrayIconEvent& event);

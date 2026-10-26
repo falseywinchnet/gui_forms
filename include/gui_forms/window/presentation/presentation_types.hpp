@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/types.hpp"
+#include "gui_forms/window/presentation/input_settings.hpp"
 
 #include <compare>
 #include <cstdint>
@@ -23,13 +24,32 @@ struct PresentationSettings final {
     // their static poses. Transitions are not affected; reduced motion,
     // the host's preference, ends them.
     bool ambient_motion{true};
+    // Reduced transparency (stage T5, owner decision T5-Q7): the host's
+    // setting where the host reports it (capability
+    // presentation_preferences), or the application's. With it, or with
+    // high_contrast, a window's backdrop is opaque (WindowBackdropReason).
+    bool reduced_transparency{};
+    // The system's double-click interval, a perceptual duration in
+    // milliseconds: the longest gap between two clicks that the platform
+    // counts as one double-click. A control that tells a slow second click
+    // from a double-click (a list's label edit) compares against it. The
+    // host reports it at attach and again when the system setting changes
+    // (HostInputSettingsEvent); each host's source is listed under "Input
+    // settings" in docs/user/hosts-and-capabilities.md.
+    // `double_click_origin` says whether it is that host value or the stated
+    // default. Between 1 and maximum_double_click_milliseconds.
+    std::uint32_t double_click_milliseconds{default_double_click_milliseconds};
+    SettingOrigin double_click_origin{SettingOrigin::default_value};
     friend constexpr bool operator==(const PresentationSettings& left,
                                      const PresentationSettings& right) noexcept {
         return left.text_scale == right.text_scale &&
                left.high_contrast == right.high_contrast &&
                left.reduced_motion == right.reduced_motion &&
                left.sound_enabled == right.sound_enabled &&
-               left.ambient_motion == right.ambient_motion;
+               left.ambient_motion == right.ambient_motion &&
+               left.reduced_transparency == right.reduced_transparency &&
+               left.double_click_milliseconds == right.double_click_milliseconds &&
+               left.double_click_origin == right.double_click_origin;
     }
 };
 

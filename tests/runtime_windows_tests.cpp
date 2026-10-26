@@ -309,6 +309,24 @@ void test_frames_and_frame_requests() {
             "logical monitors wrong");
 }
 
+// The headless application reports its fixed double-click interval to
+// every window after attach, as a host value.
+void test_headless_input_settings() {
+    Journal journal;
+    ApplicationWindowHandle main;
+    std::vector<HostWindowFrameEvent> frames;
+    std::vector<ApplicationWindow> windows;
+    ApplicationWindow primary = make_entry("main", "", false, {800.0, 600.0});
+    observe(primary, journal, &main, &frames);
+    windows.push_back(std::move(primary));
+    host::HeadlessApplication application(std::move(windows));
+    const Window& model = *application.model(main.id());
+    require(model.presentation_settings().double_click_milliseconds == host::headless_double_click_milliseconds &&
+                model.presentation_settings().double_click_milliseconds == 500U &&
+                model.presentation_settings().double_click_origin == SettingOrigin::host,
+            "the headless host reports its fixed double-click interval");
+}
+
 void test_pointer_window_at_and_ordering() {
     Journal journal;
     ApplicationWindowHandle main;
@@ -442,6 +460,7 @@ int main() {
         test_runtime_open_and_destroy();
         test_runtime_open_refusals_leave_the_entry();
         test_frames_and_frame_requests();
+        test_headless_input_settings();
         test_pointer_window_at_and_ordering();
         test_threads_shutdown_and_capabilities();
         test_primary_close_ends_the_run();

@@ -9,7 +9,8 @@ advertised protocol surface; some native integrations are not advertised yet.
 
 ## The host protocol
 
-`HostCapabilities` carries `protocol_version` (currently 8), a `platform`
+`HostCapabilities` carries `protocol_version` (currently 10; one row per version in
+`host_protocol_revisions`), a `platform`
 string, a bit set of `HostCapability` flags and the host's keyboard-command
 defaults (`key_map`, below). `Application::capabilities()`
 returns the set for the host your program was linked against, before any
@@ -44,9 +45,88 @@ whole record for logs.
 | `screen_pointer` | the pointer's desktop position | yes | yes | yes |
 | `window_at_point` | the application's topmost window at a desktop point | yes | yes | yes |
 | `window_ordering` | bring a window to the front of the application's own windows | yes | yes | yes (the window manager may decline) |
+| `transparent_windows` | a window presented with per-pixel alpha when the compositor allows it | no | yes | no |
+| `window_backdrops` | a system material behind a transparent window | no | yes (Windows 11 22H2 and later) | no |
+| `compositor_notifications` | compositor and preference changes reported at run time | no | yes | no |
+| `presentation_preferences` | the host's high contrast and reduced transparency fed to each window | no | yes | no |
 
 The table reflects the bits each adapter currently advertises; read
 `Application::capabilities()` rather than this page in code.
+
+## Compositor cooperation
+
+A window can ask the window system to show what lies behind it (stage T5,
+`planning/stages/T5-compositor/PLAN.md`). The request names a purpose, not
+a platform material: `WindowBackdrop::opaque` (every window today),
+`transparent` (clear pixels show the desktop, unblurred),
+`window_material` and `transient_material` (the system's materials for a
+main window and for popups). GUI.Forms never reads or blurs the desktop
+itself.
+
+- **Declare it.** Set `ApplicationWindowOptions::non_opaque` (or call
+  `Window::declare_non_opaque` before a host attaches). A window not
+  declared is always opaque, because a host fixes what a native window can
+  show when it creates it.
+- **Ask for it.** `Window::request_backdrop(WindowBackdropRequest)` takes
+  the preferred backdrop and up to two fallbacks
+  (`WindowBackdropRequest::with_fallback`); `opaque` always follows them,
+  and `transparent` is a fallback only when you list it. It returns the
+  `WindowBackdropGrant` in force: the backdrop given and, for the
+  preferred one, the reason (`granted`, `not_declared`, `host_unsupported`,
+  `os_version`, `no_compositor`, `high_contrast`, `reduced_transparency`,
+  `transparency_disabled`, `backend_failure`). An unavailable backdrop is
+  never an error: the window is opaque, drawn by GUI.Forms, and the grant
+  says why.
+- **Follow it.** The request stands. Each host reports its
+  `CompositorState` (whether a compositor runs, what each backdrop needs,
+  the user's transparency, reduced-transparency and high-contrast
+  settings) after attach and whenever it changes; the window resolves its
+  grant again and raises `Window::backdrop_changed` when the backdrop or
+  its reason changes. A compositor stopping turns the window opaque at the
+  next frame.
+- **Accessibility settings win.** High contrast or reduced transparency,
+  the host's (`presentation_preferences`) or set by the application in
+  `PresentationSettings`, withdraw every backdrop.
+
+**Windows.** The client's premultiplied alpha is shown through
+`DwmEnableBlurBehindWindow` with an empty region, which keeps the native
+caption. `window_material` is Mica and `transient_material` is Acrylic,
+through `DWMWA_SYSTEMBACKDROP_TYPE`, where Windows offers it (Windows 11
+22H2 and later); elsewhere they are refused with `os_version`, so list
+`transparent` as a fallback if you want it. While a window is inactive,
+Windows draws its own solid colour in place of Mica or Acrylic. Turning
+transparency effects off in Windows settings counts as reduced
+transparency. High contrast is read from the system. Both are followed
+as they change. Clear pixels still receive the pointer: there is no
+click-through. The measurements behind this are in
+`planning/stages/T5-compositor/MEASUREMENTS.md`.
+
+macOS and X11 do not advertise these capabilities yet; they arrive with
+their phases of stage T5. The headless reference host simulates them
+(`HeadlessApplication::simulate_compositor_state`).
+
+## Input settings
+
+Every host reports the platform's double-click interval after a window
+attaches, and again when the system setting changes (`HostInputSettingsEvent`,
+protocol version 10). The window keeps it in its `PresentationSettings`, the
+record controls already read, as `double_click_milliseconds`. A control that
+must tell a slow second click from a double-click, such as a list starting a
+label edit, compares against it. `double_click_origin` says where the value
+came from: `SettingOrigin::host` for the platform's own setting, or
+`SettingOrigin::default_value` for GUI.Forms' stated default of 400 ms
+(`default_double_click_milliseconds`). The interval is a perceptual duration,
+between 1 and 5000 ms. A report changes only these two fields, so the
+application's own presentation settings stay as they are.
+
+| Host | Source | Refreshed |
+|---|---|---|
+| Windows | `GetDoubleClickTime` | on `WM_SETTINGCHANGE`, when the value moved |
+| macOS | `NSEvent.doubleClickInterval` | on each activation, when the value moved (AppKit posts no change notification, and the setting is changed in System Settings) |
+| Linux X11 | the XSETTINGS manager's `Net/DoubleClickTime` | on the manager's property change, a new manager, or the manager's exit; without a manager, the 400 ms default, reported as a default |
+| Headless | a fixed test value, 500 ms (`host::headless_double_click_milliseconds`) | never |
+
+The X11 host also counts its own clicks with this interval.
 
 ## Keyboard-command defaults
 

@@ -10,6 +10,8 @@ the newest one produced for the nearest branch:
 
 - a pull request: its own head branch (an earlier push), then its base branch
   when that is not main (the pull request it is stacked on);
+- a merge group: the head branch of the pull request its temporary branch
+  names (gh-readonly-queue/<base>/pr-<number>-<base sha>, the group's last);
 - a push to main: the head branches of the pull requests merged into it.
 
 Without such an artifact the job keeps main's Actions cache. A seed is only a
@@ -21,6 +23,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import shutil
 import subprocess
 import tarfile
@@ -33,6 +36,9 @@ ARCHIVE_NAME: str = 'gui-sanitize-ccache.tar'
 DIGEST_NAME: str = ARCHIVE_NAME + '.sha256'
 DOWNLOADS: int = 2
 DOWNLOAD: Path = ROOT / '.ci' / 'sanitizer-seed'
+# A merge group's branch: the base branch, then the last queued pull request
+# and the base commit (SHA-1 or SHA-256).
+QUEUE_REF: re.Pattern[str] = re.compile(r'^refs/heads/gh-readonly-queue/.+/pr-([0-9]+)-[0-9a-f]{40,64}$')
 
 
 def api(endpoint: str) -> Any:
@@ -96,6 +102,27 @@ def merged_head_branches(repository: str, revision: str) -> list[str]:
     return heads
 
 
+def queued_pull_request(ref: str) -> str:
+    """The number of the pull request a merge group's ref names, or '' for any other ref."""
+    found: re.Match[str] | None = QUEUE_REF.match(ref)
+    if found is None:
+        return ''
+    return found.group(1)
+
+
+def queued_head_branches(repository: str, ref: str) -> list[str]:
+    """The head branch of the pull request a merge group's ref names, when it is a branch of this repository."""
+    number: str = queued_pull_request(ref)
+    if not number:
+        return []
+    pull: dict[str, Any] = api('repos/' + repository + '/pulls/' + number)
+    head: dict[str, Any] = pull.get('head') or {}
+    if (head.get('repo') or {}).get('full_name') != repository:
+        return []
+    heads: list[str] = [str(head.get('ref', ''))]
+    return heads
+
+
 def find_seed() -> bool:
     repository: str = os.environ['GITHUB_REPOSITORY']
     event: str = os.environ.get('GITHUB_EVENT_NAME', '')
@@ -103,6 +130,8 @@ def find_seed() -> bool:
     merged: list[str] = []
     if event == 'push':
         merged = merged_head_branches(repository, os.environ['GITHUB_SHA'])
+    elif event == 'merge_group':
+        merged = queued_head_branches(repository, os.environ.get('GITHUB_REF', ''))
     branches: list[str] = candidate_branches(event, os.environ.get('GITHUB_HEAD_REF', ''),
                                              os.environ.get('GITHUB_BASE_REF', ''), merged)
     endpoint: str = 'repos/' + repository + '/actions/artifacts?per_page=100&name=' + ARTIFACT_NAME

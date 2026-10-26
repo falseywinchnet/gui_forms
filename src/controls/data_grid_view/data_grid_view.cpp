@@ -266,6 +266,13 @@ std::string DataGridView::cell_text(DataGridViewRowPosition row, std::size_t col
     if (text.empty() && columns_[column].kind == DataGridViewColumnKind::button) {
         text = columns_[column].button_text;
     }
+    if (columns_[column].kind == DataGridViewColumnKind::image) {
+        // An image cell's text is its column's description while it holds an
+        // image, and empty otherwise.
+        const ImageId* const image = std::get_if<ImageId>(&value);
+        const bool holds_image = image != nullptr && (*image).value != 0U;
+        text = holds_image ? columns_[column].image_description : std::string{};
+    }
     return text;
 }
 
@@ -292,7 +299,7 @@ void DataGridView::reset_row_state() {
     const std::uint64_t before = selection_revision_;
     clear_selection_state();
     anchor_.reset();
-    pressed_button_.reset();
+    pressed_content_.reset();
     first_row_ = 0U;
     apply_current(std::nullopt);
     publish_selection(before);
@@ -400,7 +407,7 @@ void DataGridView::drop_missing_rows(std::optional<std::size_t> former_current) 
         ++selection_revision_;
     }
     if (anchor_ && !find_row((*anchor_).row_id)) anchor_.reset();
-    if (pressed_button_ && !find_row((*pressed_button_).row_id)) pressed_button_.reset();
+    if (pressed_content_ && !find_row((*pressed_content_).row_id)) pressed_content_.reset();
     const std::size_t count = row_count();
     if (first_row_ >= count) first_row_ = 0U;
     if (current_ && !find_row((*current_).row_id)) {
@@ -422,7 +429,7 @@ void DataGridView::drop_missing_rows(std::optional<std::size_t> former_current) 
 void DataGridView::validate_column(const DataGridViewColumn& column) const {
     if (column.name.empty() || contains_dot(column.name) || !validate_utf8(column.name).valid() ||
         !validate_utf8(column.header_text).valid() || !validate_utf8(column.button_text).valid() ||
-        !validate_utf8(column.data_property_name).valid()) {
+        !validate_utf8(column.image_description).valid() || !validate_utf8(column.data_property_name).valid()) {
         throw std::invalid_argument("DataGridView columns require a name without '.' and valid UTF-8");
     }
     if (!std::isfinite(column.width) || !std::isfinite(column.minimum_width) ||
@@ -431,6 +438,10 @@ void DataGridView::validate_column(const DataGridViewColumn& column) const {
     }
     if (column.kind != DataGridViewColumnKind::combo_box && !column.items.empty()) {
         throw std::invalid_argument("DataGridView column items belong to combo box columns only");
+    }
+    if (column.image_layout != DataGridViewImageLayout::normal &&
+        column.image_layout != DataGridViewImageLayout::stretch && column.image_layout != DataGridViewImageLayout::zoom) {
+        throw std::invalid_argument("DataGridView image layout must be normal, stretch or zoom");
     }
     for (const std::string& item : column.items) {
         if (!validate_utf8(item).valid()) {
@@ -797,7 +808,7 @@ void DataGridView::remove_virtual_rows(std::vector<DataGridViewRowId> ids) {
             ++selection_revision_;
         }
         if (anchor_ && (*anchor_).row_id == row.value) anchor_.reset();
-        if (pressed_button_ && (*pressed_button_).row_id == row.value) pressed_button_.reset();
+        if (pressed_content_ && (*pressed_content_).row_id == row.value) pressed_content_.reset();
     }
     if (current_removed) {
         const std::size_t count = virtual_order_.count();
@@ -1015,7 +1026,7 @@ bool DataGridView::sort(std::size_t column, DataGridViewSortDirection direction)
     // The selection, the current cell and the anchor are kept by ID: only
     // the positions change.
     rebuild_row_index();
-    pressed_button_.reset();
+    pressed_content_.reset();
     for (std::size_t index = 0; index < columns_.size(); ++index) {
         columns_[index].sort_glyph = index == column ? direction : DataGridViewSortDirection::none;
     }
@@ -1771,8 +1782,9 @@ bool DataGridView::toggle_check(DataGridViewCellAddress cell) {
     return true;
 }
 
-void DataGridView::click_button(DataGridViewCellAddress cell) {
-    if (columns_[cell.column].kind != DataGridViewColumnKind::button) return;
+void DataGridView::click_content(DataGridViewCellAddress cell) {
+    const DataGridViewColumnKind kind = columns_[cell.column].kind;
+    if (kind != DataGridViewColumnKind::button && kind != DataGridViewColumnKind::image) return;
     const DataGridViewCellEvent clicked = cell_event(key_of(cell));
     cell_content_click_.emit(clicked);
 }
@@ -1786,7 +1798,7 @@ bool DataGridView::activate_current() {
     const DataGridViewColumnKind kind = columns_[cell.column].kind;
     if (kind == DataGridViewColumnKind::check_box) return toggle_check(cell);
     if (kind == DataGridViewColumnKind::button) {
-        click_button(cell);
+        click_content(cell);
         return true;
     }
     const bool begun = begin_edit(true);
@@ -1903,8 +1915,12 @@ void DataGridView::on_pointer(PointerEvent& event) {
         const DataGridViewColumnKind kind = columns_[cell.column].kind;
         if (kind == DataGridViewColumnKind::check_box && placed.cell_check_well.bounds.contains(local)) {
             static_cast<void>(toggle_check(cell));
-        } else if (kind == DataGridViewColumnKind::button && placed.cell_button_face.bounds.contains(local)) {
-            pressed_button_ = key_of(cell);
+        } else if ((kind == DataGridViewColumnKind::button && placed.cell_button_face.bounds.contains(local)) ||
+                   (kind == DataGridViewColumnKind::image && placed.cell_image.present &&
+                    placed.cell_image.bounds.contains(local))) {
+            // Released over the same cell, the press clicks the cell's
+            // content (Windows Forms' CellContentClick).
+            pressed_content_ = key_of(cell);
             invalidate(Dirty::paint | Dirty::semantics);
         } else if (kind == DataGridViewColumnKind::combo_box &&
                    (placed.cell_drop_down.bounds.contains(local) || event.click_count >= 2U)) {
@@ -1924,13 +1940,13 @@ void DataGridView::on_pointer(PointerEvent& event) {
             event.handled = true;
             return;
         }
-        if (pressed_button_) {
-            const CellKey pressed = *pressed_button_;
-            pressed_button_.reset();
+        if (pressed_content_) {
+            const CellKey pressed = *pressed_content_;
+            pressed_content_.reset();
             invalidate(Dirty::paint | Dirty::semantics);
             const std::optional<DataGridViewCellAddress> at = address_of(pressed);
             if (at && hit.zone == HitZone::cell && hit.row == (*at).row && hit.column == (*at).column) {
-                click_button(*at);
+                click_content(*at);
             }
             event.handled = true;
         }
@@ -2287,6 +2303,9 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
                     cell.actions.push_back(SemanticAction::set_value);
                     cell.actions.push_back(SemanticAction::expand);
                 }
+            } else if (definition.kind == DataGridViewColumnKind::image) {
+                // An image is shown, not typed: the cell's value is its
+                // description and it offers no set_value.
             } else {
                 if (!read_only) cell.actions.push_back(SemanticAction::set_value);
             }

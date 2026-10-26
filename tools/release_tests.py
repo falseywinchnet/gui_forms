@@ -15,14 +15,15 @@ package metadata, so the tested binaries are the ones packaged.
 
 `merged` does the same for a push to main that merges a pull request
 (the owner's choice of 2026-10-23, planning/BUILD_SIZE_PLAN_2026-10-23.md).
-Branch protection merges a pull request only when it is up to date with
-main, so the merge commit's tree is its head's: the second parent. The
-pull request's native.yml run on that head tested this tree. Its programs
-job ran the tests the native job's validated list does not name
-(tools/native_tests.py), and the native job, which main's reuses, passed
-the rest. `merged` copies that programs job's receipt, with a comment
-naming the run and saying what it covers, and main's programs job skips
-its ctest run. Main thus trusts native_tests.py's name match between the
+Through the merge queue, main's new commit is the one its merge group's
+native.yml run tested, so that run is taken first. Merged without the
+queue, a pull request is up to date with main, so the merge commit's
+tree is its head's (the second parent), and the pull request's run on
+that head tested this tree. Either run's programs job ran the tests the
+native job's validated list does not name (tools/native_tests.py), and
+the native job, which main's reuses, passed the rest. `merged` copies
+that programs job's receipt, with a comment naming the run and saying
+what it covers, and main's programs job skips its ctest run. Main thus trusts native_tests.py's name match between the
 native and programs builds; the daily scheduled native.yml run on main
 reuses nothing and runs every test, as the backstop for it. A tag of that
 commit then carries main's receipt, comment and all.
@@ -65,6 +66,12 @@ class GitHubRuns:
 
     def pull_request_runs(self, head: str) -> list[dict[str, Any]]:
         listing: dict[str, Any] = self.api('actions/workflows/native.yml/runs?event=pull_request&head_sha=' + head
+                                           + '&per_page=' + str(RUNS_READ))
+        runs: list[dict[str, Any]] = listing['workflow_runs']
+        return runs
+
+    def merge_group_runs(self, revision: str) -> list[dict[str, Any]]:
+        listing: dict[str, Any] = self.api('actions/workflows/native.yml/runs?event=merge_group&head_sha=' + revision
                                            + '&per_page=' + str(RUNS_READ))
         runs: list[dict[str, Any]] = listing['workflow_runs']
         return runs
@@ -167,6 +174,13 @@ def pull_request_comment(run: int, tree: str) -> str:
     return comment
 
 
+def merge_group_comment(run: int, tree: str) -> str:
+    comment: str = ('<!-- carried from native.yml merge-group run ' + str(run) + ', tree ' + tree
+                    + ": main's commit is that merge group's, so these are its tests. They are the tests not in"
+                    + " the validated list of this tree's native job (tools/native_tests.py), which passed the rest -->")
+    return comment
+
+
 def with_provenance(text: str, comment: str) -> str:
     """The receipt with comment, which names the run it came from, after its XML declaration."""
     if text.startswith('<?xml'):
@@ -223,8 +237,27 @@ def find(platform: str, dist: Path, tree: str, runs: GitHubRuns) -> int | None:
     return None
 
 
+def queued(platform: str, dist: Path, revision: str, tree: str, runs: GitHubRuns) -> int | None:
+    """Copy the passing receipt of the merge group whose commit is revision into dist; its run, or None."""
+    run: dict[str, Any]
+    for run in runs.merge_group_runs(revision):
+        if run.get('path') != '.github/workflows/native.yml' or run.get('event') != 'merge_group':
+            continue
+        if run.get('head_sha') != revision or run.get('head_repository', {}).get('full_name') != runs.repository:
+            continue
+        run_id: int = int(run['id'])
+        if not carry(platform, dist, run_id, tree, merge_group_comment(run_id, tree), runs):
+            continue
+        print('Carrying the tests of merge-group run ' + str(run_id) + ' for tree ' + tree, flush=True)
+        return run_id
+    return None
+
+
 def merged(platform: str, dist: Path, revision: str, tree: str, runs: GitHubRuns) -> int | None:
-    """Copy the merged pull request's passing receipt for this tree into dist; its run, or None."""
+    """Copy the passing receipt of the merge group or merged pull request of this tree into dist; its run, or None."""
+    queued_run: int | None = queued(platform, dist, revision, tree, runs)
+    if queued_run is not None:
+        return queued_run
     parents: list[str] = runs.commit_parents(revision)
     if len(parents) != 2:
         print(revision + ' does not merge a pull request; main runs every test', flush=True)
