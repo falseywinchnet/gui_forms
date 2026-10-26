@@ -506,6 +506,20 @@ compatibility module to register the constructs it restores.
   engine's limit) to 1; anything outside is E403. `response` is the
   engine's response time, 1/ω, written as a time.
 
+### Owner decision on a grouped animation's curve (2026-10-27)
+
+- **P7b, option 1, "strict for now".** The engine runs one curve per
+  state machine, and replays a state's entry value and stops only when
+  the machine's state changes. So an `animation` on a rule that refines a
+  transition's rule joins that transition's machine as a state. Its
+  duration, timing function and delay must then equal the host
+  transition's for that property; anything else is E405. An animation
+  with no host transition becomes a machine of its own, with its own
+  curve.
+- Relaxing this later (a per-state curve in the engine, or the host's
+  curve winning) turns an error into accepted sheets, so it breaks no
+  theme (compatibility policy above).
+
 ## Read first
 
 - `planning/DESIGN_LANGUAGE_SPECIFICATION.md` §1.2, §8.2, §9.6, §12.1 item 1,
