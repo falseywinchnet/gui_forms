@@ -24,9 +24,6 @@ enum class ItemEnd : std::uint8_t { left_brace, semicolon, right_brace, end_of_s
 // balances, since it is kept but not read.
 enum class GroupScan : std::uint8_t { component_values, any_balanced };
 
-// The longest detail a diagnostic copies from the sheet.
-constexpr std::size_t maximum_detail_bytes = 64U;
-
 [[nodiscard]] bool is_trivia(TokenKind kind) noexcept {
     return kind == TokenKind::whitespace || kind == TokenKind::comment || kind == TokenKind::byte_order_mark;
 }
@@ -43,33 +40,6 @@ constexpr std::size_t maximum_detail_bytes = 64U;
     if (opener == TokenKind::left_square) return TokenKind::right_square;
     if (opener == TokenKind::left_brace) return TokenKind::right_brace;
     return TokenKind::right_paren;
-}
-
-[[nodiscard]] char lower_ascii(char character) noexcept {
-    const bool upper = character >= 'A' && character <= 'Z';
-    if (!upper) return character;
-    const char lower = static_cast<char>(character - 'A' + 'a');
-    return lower;
-}
-
-// Whether `text` is `lower_name` in any ASCII case; `lower_name` is in
-// lower case.
-[[nodiscard]] bool equals_ascii_folded(std::string_view text, std::string_view lower_name) noexcept {
-    if (text.size() != lower_name.size()) return false;
-    for (std::size_t index = 0U; index < text.size(); ++index) {
-        if (lower_ascii(text[index]) != lower_name[index]) return false;
-    }
-    return true;
-}
-
-// At most maximum_detail_bytes of `text`, cut before a UTF-8 continuation
-// byte so the detail stays whole scalar values.
-[[nodiscard]] std::string clipped_detail(std::string_view text) {
-    if (text.size() <= maximum_detail_bytes) return std::string(text);
-    std::size_t length = maximum_detail_bytes;
-    while (length > 0U && (static_cast<unsigned char>(text[length]) & 0xC0U) == 0x80U) --length;
-    std::string detail(text.substr(0U, length));
-    return detail;
 }
 
 enum class AtRuleName : std::uint8_t { import_rule, media, keyframes, unknown };
@@ -287,7 +257,7 @@ void SheetParser::parse_block_at_rule(std::uint32_t at, SyntaxNodeKind kind) {
 }
 
 void SheetParser::parse_unknown_at_rule(std::uint32_t at) {
-    report(DiagnosticCode::unknown_at_rule, tokens_[at].offset.value, clipped_detail(token_text(at)));
+    report(DiagnosticCode::unknown_at_rule, tokens_[at].offset.value, clipped_theme_detail(token_text(at)));
     const std::uint32_t node = open_node(SyntaxNodeKind::unknown_at_rule, at);
     ++next_;
     const std::uint32_t prelude_first = next_;
@@ -351,7 +321,7 @@ void SheetParser::parse_rule_list_block(SyntaxNodeKind child_kind) {
             return;
         }
         if (kind == TokenKind::at_keyword) {
-            fail_at_token(DiagnosticCode::nesting_not_admitted, next_, clipped_detail(token_text(next_)));
+            fail_at_token(DiagnosticCode::nesting_not_admitted, next_, clipped_theme_detail(token_text(next_)));
             return;
         }
         if (closes_group(kind)) {
@@ -382,7 +352,7 @@ void SheetParser::parse_declaration_block(bool in_keyframes) {
             continue;
         }
         if (kind == TokenKind::at_keyword) {
-            fail_at_token(DiagnosticCode::nesting_not_admitted, next_, clipped_detail(token_text(next_)));
+            fail_at_token(DiagnosticCode::nesting_not_admitted, next_, clipped_theme_detail(token_text(next_)));
             return;
         }
         if (kind != TokenKind::ident) {

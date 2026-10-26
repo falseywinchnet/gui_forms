@@ -827,6 +827,9 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     gui_forms::SubscriptionToken _closeRequestSubscription;
     std::uint64_t _nextHostSequence;
     BOOL _hostAttached;
+    // The double-click interval last reported, in milliseconds; 0 (as the
+    // runtime zeroes ivars) before the first report.
+    std::uint32_t _reportedDoubleClickMilliseconds;
     SkiaRaster _raster;
     BOOL _rasterHasContent;
     DamageRegion _pendingDamage;
@@ -1945,6 +1948,7 @@ void post_perform_close(NSWindow* window) {
                                timestampNanoseconds:host_now_nanoseconds()];
     if (!result.accepted()) return NO;
     _hostAttached = YES;
+    [self reportInputSettings];
     // Initial ordering can precede attachment, when occlusion notifications
     // cannot enter the host session. Establish native state before scheduling.
     NSWindow* nativeWindow = self.window;
@@ -2018,8 +2022,26 @@ void post_perform_close(NSWindow* window) {
                                timestampNanoseconds:host_now_nanoseconds()]);
 }
 
+// NSEvent.doubleClickInterval, reported after attach and again on each
+// activation if it moved: AppKit posts no notification when the user changes
+// it, and the user changes it in System Settings, outside this application.
+- (void)reportInputSettings {
+    if (_hostAttached == NO) return;
+    const NSTimeInterval seconds = NSEvent.doubleClickInterval;
+    const double milliseconds = std::isfinite(seconds) ? std::round(seconds * 1000.0) : 0.0;
+    const double bounded = std::clamp(milliseconds, 1.0,
+                                      static_cast<double>(gui_forms::maximum_double_click_milliseconds));
+    const std::uint32_t interval = static_cast<std::uint32_t>(bounded);
+    if (interval == _reportedDoubleClickMilliseconds) return;
+    const gui_forms::HostInputSettingsEvent input{interval, gui_forms::SettingOrigin::host};
+    const HostDispatchResult reported = [self dispatchHostPayload:input
+                                             timestampNanoseconds:host_now_nanoseconds()];
+    if (reported.accepted()) _reportedDoubleClickMilliseconds = interval;
+}
+
 - (void)notifyActivation:(BOOL)active {
     if (_hostAttached == NO) return;
+    if (active == YES) [self reportInputSettings];
     static_cast<void>([self dispatchHostPayload:HostActivationEvent{active == YES}
                                timestampNanoseconds:host_now_nanoseconds()]);
     [self collectDamage];

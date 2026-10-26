@@ -1,12 +1,10 @@
-// The codec-neutral resource seam: the registry admits CNG and PNG files by
-// signature (load_image, replace_image) with neutral metadata, keeps
-// load_png and replace_png PNG-only, and refuses damaged CNG framing; the
-// ResourcePixelDecoder decodes either encoding through every target layout
-// to the same bytes, which also match an independent reference.
-#include "../../src/core/image/cng_pixels.hpp"
+// The codec-neutral resource seam: the registry admits encoded files by
+// signature (load_image, replace_image; PNG is the only admitted format)
+// with neutral metadata, and refuses files of no admitted format; the
+// ResourcePixelDecoder decodes PNG resources through every target layout to
+// bytes that match an independent reference.
 #include "../../src/core/image/resource_pixels.hpp"
 #include "gui_forms/resources.hpp"
-#include "stx_cng/codec.hpp"
 #include "stx_png/encoder.hpp"
 
 #include <array>
@@ -53,27 +51,6 @@ Bytes rgba_samples() {
     return samples;
 }
 
-Bytes rgb_of(const Bytes& rgba) {
-    Bytes rgb(rgba.size() / 4U * 3U);
-    for (std::size_t pixel = 0; pixel < rgba.size() / 4U; ++pixel) {
-        rgb[pixel * 3U] = rgba[pixel * 4U];
-        rgb[pixel * 3U + 1U] = rgba[pixel * 4U + 1U];
-        rgb[pixel * 3U + 2U] = rgba[pixel * 4U + 2U];
-    }
-    return rgb;
-}
-
-Bytes cng_file(const Bytes& samples, stx_cng::CngChannels channels) {
-    stx_cng::CngImage image{width, height, channels};
-    std::unique_ptr<stx_cng::CngEncoder> encoder = std::make_unique<stx_cng::CngEncoder>();
-    Bytes file(stx_cng::cng_encoded_bound(image));
-    std::uint64_t row_bytes = static_cast<std::uint64_t>(width) * static_cast<std::size_t>(channels);
-    stx_cng::CngEncodeResult encoded = (*encoder).encode(stx_cng::CngEncodeInput{image, row_bytes, samples}, file);
-    require(encoded.error == stx_cng::CngError::none, "fixture: CNG encode");
-    file.resize(encoded.encoded_bytes);
-    return file;
-}
-
 Bytes png_file(const Bytes& rgba, stx_png::PngSourceAlpha alpha) {
     stx_png::PngEncodeInput input{};
     input.width = width;
@@ -86,7 +63,7 @@ Bytes png_file(const Bytes& rgba, stx_png::PngSourceAlpha alpha) {
     return file;
 }
 
-// The expected pixels, computed independently of both codecs.
+// The expected pixels, computed independently of the codec.
 Bytes reference(const Bytes& rgba, image::PixelTarget target) {
     Bytes pixels(rgba.size());
     bool bgra = target.order == image::PixelOrder::bgra;
@@ -124,81 +101,61 @@ ImageResourceView found(const ImageRegistry& registry, ImageLoadResult loaded) {
 }
 
 void test_admission(const Bytes& rgba) {
-    Bytes cng = cng_file(rgba, stx_cng::CngChannels::rgba);
-    Bytes cng_rgb = cng_file(rgb_of(rgba), stx_cng::CngChannels::rgb);
     Bytes png = png_file(rgba, stx_png::PngSourceAlpha::straight);
+    Bytes opaque_file = png_file(rgba, stx_png::PngSourceAlpha::opaque);
     ImageRegistry registry;
 
-    ImageResourceView native = found(registry, registry.load_image(cng));
-    require(native.encoding == ImageResourceEncoding::cng, "CNG encoding recorded");
-    require(native.metadata.width == width && native.metadata.height == height, "CNG dimensions");
-    require(native.metadata.alpha == ImageAlpha::straight, "RGBA CNG has straight alpha");
-    require(native.metadata.decoded_byte_count == static_cast<std::uint64_t>(width) * height * 4U, "CNG decoded bytes");
-    require(native.row_bytes == static_cast<std::uint64_t>(width) * 4U, "CNG sample row bytes");
-    ImageResourceView opaque = found(registry, registry.load_image(cng_rgb));
-    require(opaque.metadata.alpha == ImageAlpha::opaque && opaque.row_bytes == static_cast<std::uint64_t>(width) * 3U,
-            "RGB CNG is opaque with three-byte rows");
     ImageResourceView interchange = found(registry, registry.load_image(png));
-    require(interchange.encoding == ImageResourceEncoding::png && interchange.metadata.alpha == ImageAlpha::straight,
-            "PNG through load_image");
-    ImageResourceView opaque_png = found(registry, registry.load_png(png_file(rgba, stx_png::PngSourceAlpha::opaque)));
-    require(opaque_png.metadata.alpha == ImageAlpha::opaque, "truecolor PNG is opaque");
+    require(interchange.encoding == ImageResourceEncoding::png, "PNG encoding recorded");
+    require(interchange.metadata.width == width && interchange.metadata.height == height, "PNG dimensions");
+    require(interchange.metadata.alpha == ImageAlpha::straight, "RGBA PNG has straight alpha");
+    require(interchange.metadata.decoded_byte_count == static_cast<std::uint64_t>(width) * height * 4U, "decoded bytes");
+    ImageResourceView opaque = found(registry, registry.load_png(opaque_file));
+    require(opaque.metadata.alpha == ImageAlpha::opaque, "truecolor PNG is opaque");
 
-    require(registry.load_png(cng).error == ImageResourceError::invalid_signature, "load_png stays PNG-only");
     Bytes garbage(64, std::byte{0x5a});
-    require(registry.load_image(garbage).error == ImageResourceError::invalid_signature, "neither format refused");
+    require(registry.load_image(garbage).error == ImageResourceError::invalid_signature, "no admitted format refused");
+    require(registry.load_png(garbage).error == ImageResourceError::invalid_signature, "load_png refuses it too");
     require(registry.load_image(Bytes{}).error == ImageResourceError::empty_input, "empty file refused");
-    Bytes truncated(cng.begin(), cng.end() - 1);
-    require(registry.load_image(truncated).error == ImageResourceError::truncated_chunk, "truncated CNG refused");
-    Bytes trailing = cng;
-    trailing.push_back(std::byte{0});
-    require(registry.load_image(trailing).error == ImageResourceError::trailing_data, "trailing byte refused");
-    Bytes damaged = cng;
-    damaged[60] ^= std::byte{0x10};
-    require(registry.load_image(damaged).error == ImageResourceError::crc_mismatch, "damaged band refused");
-    Bytes header = cng;
-    header[16] ^= std::byte{1};
-    require(registry.load_image(header).error == ImageResourceError::crc_mismatch, "damaged header refused");
+    Bytes truncated(png.begin(), png.end() - 1);
+    require(registry.load_image(truncated).error != ImageResourceError::none, "truncated PNG refused");
 
     ImageRegistryLimits narrow{};
     narrow.maximum_width = width - 1U;
     ImageRegistry limited(narrow);
-    require(limited.load_image(cng).error == ImageResourceError::dimension_limit_exceeded, "registry limits apply to CNG");
+    require(limited.load_image(png).error == ImageResourceError::dimension_limit_exceeded, "registry limits apply");
 
     ImageRegistrySnapshot before = registry.snapshot();
-    ImageLoadResult replaced = registry.replace_image(interchange.image, cng);
-    require(static_cast<bool>(replaced) && replaced.image.value != interchange.image.value, "replace_image takes CNG");
-    require(registry.find(replaced.image).has_value() && (*registry.find(replaced.image)).encoding == ImageResourceEncoding::cng,
-            "replaced image is CNG");
+    ImageLoadResult replaced = registry.replace_image(interchange.image, opaque_file);
+    require(static_cast<bool>(replaced) && replaced.image.value != interchange.image.value, "replace_image takes PNG");
     ImageRegistrySnapshot after = registry.snapshot();
-    require(after.encoded_bytes == before.encoded_bytes - png.size() + cng.size(), "replacement accounting");
-    require(registry.replace_png(replaced.image, cng).error == ImageResourceError::invalid_signature,
-            "replace_png stays PNG-only");
+    require(after.encoded_bytes == before.encoded_bytes - png.size() + opaque_file.size(), "replacement accounting");
+    require(registry.replace_png(replaced.image, garbage).error == ImageResourceError::invalid_signature,
+            "replace_png refuses a non-PNG file");
+    require(registry.replace_image(replaced.image, garbage).error == ImageResourceError::invalid_signature,
+            "replace_image refuses a file of no admitted format");
     require(registry.find(replaced.image).has_value(), "refused replacement leaves the image");
-    require(image_resource_error_name(ImageResourceError::invalid_image_data) == "invalid_image_data", "error names");
+    require(image_resource_error_name(ImageResourceError::allocation_failed) == "allocation_failed", "error names");
 }
 
 void test_decoding(const Bytes& rgba) {
     ImageRegistry registry;
-    ImageResourceView native = found(registry, registry.load_image(cng_file(rgba, stx_cng::CngChannels::rgba)));
     ImageResourceView interchange = found(registry, registry.load_image(png_file(rgba, stx_png::PngSourceAlpha::straight)));
     Bytes opaque_rgba = rgba;
     for (std::size_t pixel = 0; pixel < opaque_rgba.size() / 4U; ++pixel) {
         opaque_rgba[pixel * 4U + 3U] = std::byte{255};
     }
-    ImageResourceView opaque = found(registry, registry.load_image(cng_file(rgb_of(rgba), stx_cng::CngChannels::rgb)));
+    ImageResourceView opaque = found(registry, registry.load_image(png_file(opaque_rgba, stx_png::PngSourceAlpha::opaque)));
     std::unique_ptr<image::ResourcePixelDecoder> decoder = std::make_unique<image::ResourcePixelDecoder>();
     for (const image::PixelTarget& target : targets) {
-        Bytes expected = reference(rgba, target);
-        require(decode(*decoder, native, target) == expected, "CNG decode matches the reference");
-        require(decode(*decoder, interchange, target) == expected, "PNG decode matches the reference");
-        require(decode(*decoder, opaque, target) == reference(opaque_rgba, target), "RGB CNG decodes opaque");
+        require(decode(*decoder, interchange, target) == reference(rgba, target), "PNG decode matches the reference");
+        require(decode(*decoder, opaque, target) == reference(opaque_rgba, target), "opaque PNG decodes opaque");
     }
     (*decoder).release();
-    require(decode(*decoder, native, targets[1]) == reference(rgba, targets[1]), "decoder works after release");
+    require(decode(*decoder, interchange, targets[1]) == reference(rgba, targets[1]), "decoder works after release");
 
     Bytes small(static_cast<std::size_t>(width) * height * 4U - 1U);
-    image::ResourcePixelResult refused = (*decoder).decode(native, targets[0], small, static_cast<std::size_t>(width) * 4U);
+    image::ResourcePixelResult refused = (*decoder).decode(interchange, targets[0], small, static_cast<std::size_t>(width) * 4U);
     require(refused.error == image::ResourcePixelError::insufficient_storage, "short destination refused");
     ImageResourceView pixels = found(registry, registry.load_bgra32_premultiplied(
         width, height, static_cast<std::uint64_t>(width) * 4U, reference(rgba, targets[3])));
@@ -207,16 +164,6 @@ void test_decoding(const Bytes& rgba) {
     require((*decoder).decode(pixels, targets[0], destination, static_cast<std::size_t>(width) * 4U).error ==
                 image::ResourcePixelError::unsupported_encoding,
             "BGRA resources are not decoded");
-
-    // The CNG decoder refuses an overlapping destination before writing.
-    Bytes file = cng_file(rgba, stx_cng::CngChannels::rgba);
-    file.resize(static_cast<std::size_t>(width) * height * 4U + file.size());
-    std::span<const std::byte> encoded(file.data(), file.size() - static_cast<std::size_t>(width) * height * 4U);
-    std::span<std::byte> overlapping(file.data(), static_cast<std::size_t>(width) * height * 4U);
-    image::CngPixelDecoder cng;
-    require(cng.decode(encoded, targets[0], overlapping, static_cast<std::size_t>(width) * 4U).error ==
-                image::CngPixelError::invalid_argument,
-            "overlap refused");
 }
 
 } // namespace

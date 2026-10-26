@@ -168,7 +168,7 @@ releases are neither among the five newest nor listed in
 Check out the pinned revision at `gui_forms/` in an empty workspace, then:
 
 ```sh
-gh release download build-<full-sha> --repo falseywinchnet/gui_forms \
+gh release download build-<full-sha> --repo malkuth-software/gui_forms \
     --pattern gui-forms-cache-linux-x64.tar.gz
 sha256sum gui-forms-cache-linux-x64.tar.gz   # compare with the digest you pinned
 tar -xzf gui-forms-cache-linux-x64.tar.gz

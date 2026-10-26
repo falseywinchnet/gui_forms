@@ -21,9 +21,25 @@
 //   and the effect view's material, blending mode, state and appearance.
 //
 // It prints one JSON line per case, then one with the settings the adapter
-// will read. It measures and never judges: it fails only when it cannot
-// make its windows. The verdicts ("per_pixel_alpha", "material_shown") are
-// its reading of the colours, within a tolerance of 12 per channel.
+// will read, then a last line: "macos compositor probe finished". The
+// verdicts ("per_pixel_alpha", "material_shown") are its reading of the
+// colours, within a tolerance of 12 per channel.
+//
+// An effect view follows its window's active state, and an inactive
+// window's material is AppKit's solid inactive colour, so a material is
+// measured only in an active window, as a real application has one. The
+// probe is an application bundle, launched through LaunchServices (`open`,
+// tests/support/run_macos_probe_bundle.sh) for an ordinary activation; it
+// falls back to activateIgnoringOtherApps: only when it is still not
+// active. Each case records the window's isKeyWindow and NSApp.isActive.
+// A material case read while either is false prints no material results,
+// only "not_exercised":"window inactive", and the run then ends with the
+// line "not exercised: window inactive" and fails. Otherwise it measures
+// and never judges: it fails only when it cannot make its windows or open
+// its output.
+//
+// Arguments: `--output <path>` writes the lines to that file instead of
+// standard output (LaunchServices gives a launched bundle no terminal).
 #import <AppKit/AppKit.h>
 #import <ApplicationServices/ApplicationServices.h>
 
@@ -319,6 +335,9 @@ struct CaseReading final {
     NSVisualEffectBlendingMode blending{};
     NSVisualEffectState state{};
     const char* appearance{""};
+    // The window's and the application's activity when the case was read.
+    bool key_window{};
+    bool app_active{};
 };
 
 // Arranges the window for a base: its opacity, background and content
@@ -447,6 +466,8 @@ CaseReading run_case(const ProbeCase& probe, const ProbeWindows& windows) {
         arrange(window, view, probe.then, probe.material);
         spin(0.6);
     }
+    reading.key_window = window.isKeyWindow == YES;
+    reading.app_active = NSApp.isActive == YES;
     read_columns(window, false, reading.clear, reading.half, reading.opaque, reading.composite_read);
     reading.caption = read_caption(window);
     read_columns(window, true, reading.own_clear, reading.own_half, reading.own_opaque, reading.own_read);
@@ -487,58 +508,109 @@ CaseReading run_case(const ProbeCase& probe, const ProbeWindows& windows) {
     return reading;
 }
 
-void print_sample(const char* name, const Sample& sample, bool with_alpha) {
+void print_sample(std::FILE* output, const char* name, const Sample& sample, bool with_alpha) {
     if (!sample.read) {
-        std::printf(",\"%s\":null", name);
+        std::fprintf(output, ",\"%s\":null", name);
         return;
     }
     if (with_alpha) {
-        std::printf(",\"%s\":[%d,%d,%d,%d]", name, sample.red, sample.green, sample.blue, sample.alpha);
+        std::fprintf(output, ",\"%s\":[%d,%d,%d,%d]", name, sample.red, sample.green, sample.blue, sample.alpha);
         return;
     }
-    std::printf(",\"%s\":[%d,%d,%d]", name, sample.red, sample.green, sample.blue);
+    std::fprintf(output, ",\"%s\":[%d,%d,%d]", name, sample.red, sample.green, sample.blue);
 }
 
-void print_case(const ProbeCase& probe, const CaseReading& reading) {
-    std::printf("{\"probe\":\"macos_compositor\",\"case\":\"%s\",\"first\":\"%s\",\"then\":\"%s\","
-                "\"requested_material\":\"%s\",\"composite_read\":%s,\"own_read\":%s",
-                probe.name, base_name(probe.first), base_name(probe.then), probe.material_name,
-                reading.composite_read ? "true" : "false", reading.own_read ? "true" : "false");
-    print_sample("clear", reading.clear, false);
-    print_sample("clear_inactive", reading.clear_inactive, false);
-    print_sample("half", reading.half, false);
-    print_sample("opaque", reading.opaque, false);
-    print_sample("caption", reading.caption, false);
-    print_sample("own_clear", reading.own_clear, true);
-    print_sample("own_half", reading.own_half, true);
-    print_sample("own_opaque", reading.own_opaque, true);
+// Prints one case. Returns false when it is a material case read in an
+// inactive window, which then prints no material results.
+bool print_case(std::FILE* output, const ProbeCase& probe, const CaseReading& reading) {
+    const bool active = reading.key_window && reading.app_active;
+    std::fprintf(output,
+                 "{\"probe\":\"macos_compositor\",\"case\":\"%s\",\"first\":\"%s\",\"then\":\"%s\","
+                 "\"requested_material\":\"%s\",\"key_window\":%s,\"app_active\":%s",
+                 probe.name, base_name(probe.first), base_name(probe.then), probe.material_name,
+                 reading.key_window ? "true" : "false", reading.app_active ? "true" : "false");
+    if (reading.has_effect && !active) {
+        std::fprintf(output, ",\"not_exercised\":\"window inactive\"}\n");
+        return false;
+    }
+    std::fprintf(output, ",\"composite_read\":%s,\"own_read\":%s", reading.composite_read ? "true" : "false",
+                 reading.own_read ? "true" : "false");
+    print_sample(output, "clear", reading.clear, false);
+    print_sample(output, "clear_inactive", reading.clear_inactive, false);
+    print_sample(output, "half", reading.half, false);
+    print_sample(output, "opaque", reading.opaque, false);
+    print_sample(output, "caption", reading.caption, false);
+    print_sample(output, "own_clear", reading.own_clear, true);
+    print_sample(output, "own_half", reading.own_half, true);
+    print_sample(output, "own_opaque", reading.own_opaque, true);
     const bool backdrop_shown = near_rgb(reading.clear, backdrop_rgb[0], backdrop_rgb[1], backdrop_rgb[2]);
     const bool black = near_rgb(reading.clear, 0, 0, 0);
     const bool material_shown = reading.clear.read && !backdrop_shown && !black && reading.has_effect;
-    std::printf(",\"per_pixel_alpha\":%s,\"material_shown\":%s,\"window_at_clear\":\"%s\","
-                "\"click_received\":\"%s\",\"window_opaque\":%s,\"background_alpha\":%.3f,"
-                "\"ignores_mouse_events\":%s",
-                backdrop_shown ? "true" : "false", material_shown ? "true" : "false", reading.window_at_clear,
-                reading.click_received, reading.window_opaque ? "true" : "false",
-                static_cast<double>(reading.background_alpha), reading.ignores_mouse_events ? "true" : "false");
+    std::fprintf(output,
+                 ",\"per_pixel_alpha\":%s,\"material_shown\":%s,\"window_at_clear\":\"%s\","
+                 "\"click_received\":\"%s\",\"window_opaque\":%s,\"background_alpha\":%.3f,"
+                 "\"ignores_mouse_events\":%s",
+                 backdrop_shown ? "true" : "false", material_shown ? "true" : "false", reading.window_at_clear,
+                 reading.click_received, reading.window_opaque ? "true" : "false",
+                 static_cast<double>(reading.background_alpha), reading.ignores_mouse_events ? "true" : "false");
     if (reading.has_effect) {
-        std::printf(",\"effect\":{\"material\":%ld,\"blending\":\"%s\",\"state\":\"%s\",\"appearance\":\"%s\"}",
-                    static_cast<long>(reading.material), blending_name(reading.blending), state_name(reading.state),
-                    reading.appearance);
+        std::fprintf(output,
+                     ",\"effect\":{\"material\":%ld,\"blending\":\"%s\",\"state\":\"%s\",\"appearance\":\"%s\"}",
+                     static_cast<long>(reading.material), blending_name(reading.blending),
+                     state_name(reading.state), reading.appearance);
     }
-    std::printf("}\n");
+    std::fprintf(output, "}\n");
+    return true;
 }
 
-void print_settings() {
+// How the probe became the active application.
+enum class Activation : std::uint8_t {
+    // LaunchServices activated it, or the cooperative request was granted.
+    activate,
+    // only activateIgnoringOtherApps: did.
+    ignoring_other_apps,
+    // neither: every material case will report itself not exercised.
+    none,
+};
+
+const char* activation_name(Activation activation) noexcept {
+    switch (activation) {
+    case Activation::activate: return "activate";
+    case Activation::ignoring_other_apps: return "ignoring_other_apps";
+    case Activation::none: return "none";
+    }
+    return "unknown";
+}
+
+// The cooperative request first (macOS 14 grants it only when the active
+// application yields, which a launch through LaunchServices arranges);
+// activateIgnoringOtherApps: only if the probe is still not active.
+Activation activate_probe() {
+    [NSApp activate];
+    spin(0.5);
+    if (NSApp.isActive == YES) return Activation::activate;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    [NSApp activateIgnoringOtherApps:YES];
+#pragma clang diagnostic pop
+    spin(0.5);
+    if (NSApp.isActive == YES) return Activation::ignoring_other_apps;
+    return Activation::none;
+}
+
+void print_settings(std::FILE* output, Activation activation) {
     NSWorkspace* const workspace = NSWorkspace.sharedWorkspace;
     const NSOperatingSystemVersion version = NSProcessInfo.processInfo.operatingSystemVersion;
     const char* const appearance = appearance_name(NSApp.effectiveAppearance.name);
-    std::printf("{\"probe\":\"macos_compositor\",\"settings\":true,\"os\":\"%ld.%ld.%ld\","
+    std::fprintf(output,
+                "{\"probe\":\"macos_compositor\",\"settings\":true,\"os\":\"%ld.%ld.%ld\",\"activation\":\"%s\","
+                "\"bundle\":%s,"
                 "\"reduce_transparency\":%s,\"increase_contrast\":%s,\"differentiate_without_colour\":%s,"
                 "\"appearance\":\"%s\",\"screen_capture_access\":%s,\"accessibility_trusted\":%s,"
                 "\"window_list_image\":%s,\"screens\":%lu,\"backing_scale\":%.1f}\n",
                 static_cast<long>(version.majorVersion), static_cast<long>(version.minorVersion),
-                static_cast<long>(version.patchVersion),
+                static_cast<long>(version.patchVersion), activation_name(activation),
+                NSBundle.mainBundle.bundleIdentifier != nil ? "true" : "false",
                 workspace.accessibilityDisplayShouldReduceTransparency ? "true" : "false",
                 workspace.accessibilityDisplayShouldIncreaseContrast ? "true" : "false",
                 workspace.accessibilityDisplayShouldDifferentiateWithoutColor ? "true" : "false",
@@ -550,12 +622,26 @@ void print_settings() {
 
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    // The output: standard output, or the file after --output.
+    const char* output_path = nullptr;
+    for (int index = 1; index + 1 < argc; ++index) {
+        if (std::strcmp(argv[index], "--output") == 0) output_path = argv[index + 1];
+    }
+    std::FILE* output = stdout;
+    if (output_path != nullptr) {
+        output = std::fopen(output_path, "w");
+        if (output == nullptr) {
+            std::fprintf(stderr, "the probe opens its output\n");
+            return 1;
+        }
+    }
+    int status = 0;
     @autoreleasepool {
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
         [NSApp finishLaunching];
-        [NSApp activate];
+        const Activation activation = activate_probe();
         ProbeWindows windows{};
         const NSRect backdrop_frame = NSMakeRect(80.0, 160.0, 440.0, 360.0);
         windows.backdrop = [[NSWindow alloc] initWithContentRect:backdrop_frame
@@ -564,6 +650,7 @@ int main() {
                                                            defer:NO];
         if (windows.backdrop == nil) {
             std::fprintf(stderr, "the probe's backdrop window is made\n");
+            if (output != stdout) std::fclose(output);
             return 1;
         }
         windows.backdrop.releasedWhenClosed = NO;
@@ -571,14 +658,23 @@ int main() {
         windows.backdrop.contentView = windows.backdrop_view;
         [windows.backdrop orderFront:nil];
         spin(0.4);
+        bool exercised = true;
         for (const ProbeCase& probe : probe_cases) {
             const CaseReading reading = run_case(probe, windows);
-            print_case(probe, reading);
-            std::fflush(stdout);
+            if (!print_case(output, probe, reading)) exercised = false;
+            std::fflush(output);
         }
-        print_settings();
+        print_settings(output, activation);
         [windows.backdrop orderOut:nil];
         [windows.backdrop close];
+        if (exercised) {
+            std::fprintf(output, "macos compositor probe finished\n");
+        } else {
+            std::fprintf(output, "not exercised: window inactive\n");
+            std::fprintf(stderr, "not exercised: window inactive\n");
+            status = 1;
+        }
     }
-    return 0;
+    if (output != stdout) std::fclose(output);
+    return status;
 }

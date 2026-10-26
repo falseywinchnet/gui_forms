@@ -394,6 +394,9 @@ ApplicationWindowOpenResult ApplicationWindows::open_window(ApplicationWindow&& 
         result.status.error = HostServiceError::unsupported;
         return result;
     }
+    // Before the native window exists (stage T5). A model already bound to
+    // a host session keeps its declaration.
+    if (window.options.non_opaque && window.model) static_cast<void>((*window.model).declare_non_opaque());
     try {
         // The open operation runs the new window's callbacks, which may
         // change the run; keep the callable alive through the call.

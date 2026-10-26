@@ -83,10 +83,11 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
           ("window", "scheduler", "dispatcher", "display", "dirty", "metrics")),
     Group("control-and-component", "Control and component",
           "The base classes every control and nonvisual component derives from, "
-          "with layout, docking, anchoring and validation vocabularies, and the "
+          "with layout, docking, anchoring and validation vocabularies (layout "
+          "constraints, intrinsic sizes and layout direction among them), and the "
           "anatomy each control publishes: named parts, part roles and states, "
           "and the interactions each type raises.",
-          ("control", "component", "anatomy", "schema")),
+          ("control", "component", "anatomy", "schema", "layout")),
     Group("events-values-and-commands", "Events, values and commands",
           "Retained events and owned handlers, application-owned `Value` state, "
           "command bindings and semantic feedback records.",
@@ -146,8 +147,11 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
 
 # Header areas whose types belong beside a stock control rather than on a
 # library page: property inspection with PropertyGrid, instrument records with
-# InstrumentRack, metrics and visual inspection with the diagnostic views.
+# InstrumentRack, metrics and visual inspection with the diagnostic views, and
+# the components area's unregistered headers (the file dialogs' shared types)
+# with the dialogs.
 AREA_TO_CATEGORY: dict[str, str] = {
+    "components": "Dialogs and popups",
     "inspection": "Value setting",
     "instrument": "Value setting",
     "metrics": "Diagnostics",
@@ -168,7 +172,8 @@ CATEGORY_DESCRIPTIONS: dict[str, str] = {
               "containers.",
     "Scrolling": "Scrollable containers and scroll bars.",
     "Menus and commands": "Commands, menu strips and context menus.",
-    "Dialogs and popups": "Anchored popups and tooltips.",
+    "Dialogs and popups": "Anchored popups, tooltips, owned dialogs and the "
+                          "host's file and colour dialogs.",
     "Drawing": "Owner-drawn, live and raster surfaces.",
     "Diagnostics": "Metrics, easing, typography and visual-inspection views.",
     "Components": "Nonvisual components: bindings, providers, image lists, "

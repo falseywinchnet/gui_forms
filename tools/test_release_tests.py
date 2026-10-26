@@ -35,6 +35,7 @@ class FakeRuns:
         self.run_jobs: dict[int, list[dict[str, Any]]] = {}
         self.receipts: dict[int, bytes] = {}
         self.pull_requests: list[dict[str, Any]] = []
+        self.merge_groups: list[dict[str, Any]] = []
         self.parents: dict[str, list[str]] = {}
 
     def add(self, run: int, revision: str, tree: str, job: dict[str, Any] | None, receipt: bytes | None) -> None:
@@ -56,8 +57,22 @@ class FakeRuns:
         if receipt is not None:
             self.receipts[run] = receipt
 
+    def add_merge_group(self, run: int, revision: str, tree: str, job: dict[str, Any] | None,
+                        receipt: bytes | None) -> None:
+        """A merge-group run whose commit is revision."""
+        self.merge_groups.append({'id': run, 'path': '.github/workflows/native.yml', 'event': 'merge_group',
+                                  'head_branch': 'gh-readonly-queue/main/pr-7-' + 'a' * 40, 'head_sha': revision,
+                                  'head_repository': {'full_name': 'owner/repo'}})
+        self.trees[revision] = tree
+        self.run_jobs[run] = [job] if job is not None else []
+        if receipt is not None:
+            self.receipts[run] = receipt
+
     def main_runs(self) -> list[dict[str, Any]]:
         return self.runs
+
+    def merge_group_runs(self, revision: str) -> list[dict[str, Any]]:
+        return self.merge_groups
 
     def pull_request_runs(self, head: str) -> list[dict[str, Any]]:
         return self.pull_requests
@@ -168,6 +183,43 @@ class MergedTests(unittest.TestCase):
         dist: Path = Path(directory.name) / 'dist'
         run: int | None = release_tests.merged(platform, dist, 'merge', 'tree-a', fake)  # type: ignore[arg-type]
         return run, dist
+
+    def test_the_merge_group_of_mains_commit_is_carried_first(self) -> None:
+        fake: FakeRuns = FakeRuns()
+        merged_main(fake)
+        fake.add_pull_request(50, 'head', 'test-merge', 'tree-a', programs('linux-x64'),
+                              receipts_zip('linux-x64', PASSING, 'test-merge'))
+        fake.add_merge_group(60, 'merge', 'tree-a', programs('linux-x64'), receipts_zip('linux-x64', PASSING, 'merge'))
+        run: int | None
+        dist: Path
+        run, dist = self.merged(fake)
+        self.assertEqual(run, 60)
+        text: str = (dist / 'ctest-linux-x64.xml').read_text(encoding='utf-8')
+        self.assertIn('<!-- carried from native.yml merge-group run 60, tree tree-a', text)
+
+    def test_a_queued_merge_of_a_head_behind_main_is_carried(self) -> None:
+        # The pull request's head is behind main: its tree differs, so only
+        # the merge group's run tested main's tree.
+        fake: FakeRuns = FakeRuns()
+        fake.trees['merge'] = 'tree-a'
+        fake.trees['head'] = 'tree-b'
+        fake.parents['merge'] = ['previous', 'head']
+        fake.add_merge_group(60, 'merge', 'tree-a', programs('linux-x64'), receipts_zip('linux-x64', PASSING, 'merge'))
+        self.assertEqual(self.merged(fake)[0], 60)
+
+    def test_a_merge_group_of_another_commit_fork_or_failure_is_not_carried(self) -> None:
+        fake: FakeRuns = FakeRuns()
+        fake.add_merge_group(60, 'other', 'tree-a', programs('linux-x64'), receipts_zip('linux-x64', PASSING, 'other'))
+        fake.trees['merge'] = 'tree-a'
+        self.assertIsNone(self.merged(fake)[0])
+        fork: FakeRuns = FakeRuns()
+        fork.add_merge_group(60, 'merge', 'tree-a', programs('linux-x64'), receipts_zip('linux-x64', PASSING, 'merge'))
+        fork.merge_groups[0]['head_repository'] = {'full_name': 'fork/repo'}
+        self.assertIsNone(self.merged(fork)[0])
+        failed: FakeRuns = FakeRuns()
+        failed.add_merge_group(60, 'merge', 'tree-a', programs('linux-x64', 'failure'),
+                               receipts_zip('linux-x64', PASSING, 'merge'))
+        self.assertIsNone(self.merged(failed)[0])
 
     def test_the_merged_pull_requests_receipt_is_carried_and_named(self) -> None:
         fake: FakeRuns = FakeRuns()

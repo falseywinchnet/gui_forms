@@ -3,14 +3,47 @@
 #include "gui_forms/events/key_commands/key_commands.hpp"
 #include "gui_forms/host/types/host_capability/host_capability.hpp"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
 namespace gui_forms {
 
+// One host protocol version and the feature it added.
+struct HostProtocolRevision final {
+    std::uint32_t version{};
+    const char* feature{};
+};
+
+// The host protocol's versions, one row each, from version 8 (earlier
+// versions are not recorded). The current version is the last row's. A
+// change to the protocol adds a row at the end, so two changes that claim
+// the same version both add the same line and conflict when merged, and
+// the checks below refuse a skipped or repeated version.
+inline constexpr std::array<HostProtocolRevision, 3> host_protocol_revisions{
+    {{8U, "the host's keyboard-command defaults (HostCapabilities::key_map)"},
+    {9U, "the compositor state report (HostCompositorEvent, stage T5)"},
+    {10U, "the platform's input settings (HostInputSettingsEvent: the double-click interval)"},
+}};
+
+// Whether the rows run consecutively from 8, each with a feature.
+constexpr bool host_protocol_revisions_consecutive() noexcept {
+    for (std::size_t index = 0U; index < host_protocol_revisions.size(); ++index) {
+        const HostProtocolRevision& row = host_protocol_revisions[index];
+        if (row.version != 8U + static_cast<std::uint32_t>(index)) return false;
+        if (row.feature == nullptr || row.feature[0] == '\0') return false;
+    }
+    return true;
+}
+
+static_assert(host_protocol_revisions_consecutive(),
+              "host protocol versions are added one row at a time, in order, each with its feature");
+
 struct HostCapabilities final {
-    // 8: the host's keyboard-command defaults (`key_map`).
-    static constexpr std::uint32_t current_protocol_version = 8;
+    // The last row of host_protocol_revisions.
+    static constexpr std::uint32_t current_protocol_version =
+        host_protocol_revisions[host_protocol_revisions.size() - 1U].version;
 
     std::uint32_t protocol_version{current_protocol_version};
     std::string platform{"unknown"};

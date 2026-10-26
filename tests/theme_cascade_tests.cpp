@@ -179,6 +179,32 @@ void specificity_and_ties() {
             "the more specific rule wins although it comes first");
     require(amplitude_of(rules.resolve(face_of("x", none))) == 0.4, "among equals, the later rule wins");
 
+    // A given specificity (EC2) stands in for the selector's: the type rule
+    // given a class and a type beats the later class rule with a state, and
+    // a class rule may then carry no class of its own.
+    ThemeRuleSheet given{};
+    ThemeRule lifted = rule("lifted", CascadeLevel::class_rule, by_type(), bulge(0.3));
+    RuleSpecificity of_class{};
+    of_class.classes = 1U;
+    of_class.types = 1U;
+    lifted.specificity = of_class;
+    given.rules.push_back(lifted);
+    RuleSelector loud_hot = by_class("loud");
+    loud_hot.states.push_back(AnatomyState::hot);
+    given.rules.push_back(rule("loud", CascadeLevel::class_rule, loud_hot, bulge(0.5)));
+    const CompiledThemeRules given_rules = CompiledThemeRules::compile(given, builtin_primitive_registry());
+    require(given_rules.diagnostics().empty(), "a given specificity satisfies the class level");
+    const std::vector<std::string> loud{"loud"};
+    require(amplitude_of(given_rules.resolve(face_of("x", loud, hot_states))) == 0.3,
+            "the given specificity orders the rule within its level");
+    ThemeRule unlifted = rule("unlifted", CascadeLevel::stable_id_rule, by_type(), bulge(0.3));
+    unlifted.specificity = of_class;
+    ThemeRuleSheet missing{};
+    missing.rules.push_back(unlifted);
+    const CompiledThemeRules missing_rules = CompiledThemeRules::compile(missing, builtin_primitive_registry());
+    require(has_diagnostic(missing_rules, RuleDiagnosticKind::selector_missing_level_field, "unlifted"),
+            "a stable-ID rule whose given specificity has no ID is dropped");
+
     // A parameter cascades on its own: a more specific rule for the same
     // primitive sets only the light colour; the amplitude comes from below.
     ThemeRuleSheet split{};
