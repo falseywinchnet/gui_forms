@@ -42,6 +42,16 @@ from the repository root. Each Python script prints its full options with
   scanner; they do not check destruction order.
   `python3 -B tools/check_lifetime_rules.py tests/semantic_tests.cpp`
 
+`tools/check_state_machines.py`
+: The state-machine checker (house style sections 1 and 9). With
+  `--build-dir`, it runs the compiler's switch warnings over a configured
+  ninja tree. The `state-machine-gate` CI job
+  (`.github/workflows/state-machines.yml`) runs it with `--gate`, which
+  fails on any F1 or F2. `--changed-from BASE` checks only the translation
+  units that the C and C++ changes since BASE can affect, and passes at once
+  when there are none. The daily run checks the whole tree.
+  `python3 -B tools/check_state_machines.py --root . --build-dir <tree> --gate --changed-from origin/main`
+
 `tools/sanitizer/lsan.supp`
 : LeakSanitizer suppressions for the `sanitizers` CI job: system libraries
   only, never a first-party frame.
