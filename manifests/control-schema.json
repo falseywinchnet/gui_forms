@@ -6098,6 +6098,14 @@
       ]
     },
     {
+      "id": "open_file_dialog",
+      "type": "OpenFileDialog",
+      "kind": "component",
+      "interactions": [
+        {"name": "file_ok", "payload": "FileDialogOk", "mutable_payload": true}
+      ]
+    },
+    {
       "id": "image_list",
       "type": "ImageList",
       "kind": "component",
