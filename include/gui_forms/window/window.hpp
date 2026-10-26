@@ -1033,6 +1033,10 @@ private:
     void mark_dirty(Control& control, Dirty dirty);
     void mark_paint_dirty(Control& control, Rect local_damage);
     void mark_subtree_dirty(Control& control, Dirty dirty);
+    // Marks for measure the controls a client-size change reaches (see
+    // Window::resize): `control`, and below it each child whose parent
+    // requests no extent on a changed axis.
+    void mark_resized_measure(Control& control, bool width_reaches, bool height_reaches);
     void apply_subtree_dirty(Control& control, Dirty dirty,
                              double& requested_damage_area);
     void mark_child_layout_slot(Control& control);

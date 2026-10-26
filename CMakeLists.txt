@@ -2937,6 +2937,13 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_layout_panel_tests
              COMMAND gui_forms_layout_panel_tests)
 
+    add_executable(gui_forms_window_resize_measure_tests
+        tests/window_resize_measure_tests.cpp
+    )
+    target_link_libraries(gui_forms_window_resize_measure_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_window_resize_measure_tests
+             COMMAND gui_forms_window_resize_measure_tests)
+
     # The layout fixture corpus against checked-in Chromium references
     # (planning/stages/L-layout/PLAN.md section 6). The corpus path on the
     # command line also selects this test when the corpus changes.
