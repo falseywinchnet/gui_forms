@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/anatomy/types/anatomy_types.hpp"
+#include "gui_forms/engine/authored_gradient/authored_gradient.hpp"
 #include "gui_forms/engine/engine_expression/engine_expression.hpp"
 #include "gui_forms/engine/motion_value/motion_value.hpp"
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
@@ -353,7 +354,11 @@ inline constexpr std::size_t material_field_count = static_cast<std::size_t>(Mat
 // names are read; the others stay empty:
 // - background_colour: `colour`, a solid layer under the image layers;
 // - fills: the image layers (gradients, images, patterns), bottom first,
-//   at most SurfaceMaterial::maximum_fill_layers, empty for none;
+//   at most SurfaceMaterial::maximum_fill_layers, empty for none; and
+//   `gradients`, empty, or one per layer: a gradient as a sheet wrote it
+//   (T3 P6b), resolved for the part's box when the material is assembled,
+//   in place of its layer; an entry of kind `solid` keeps its layer as
+//   written;
 // - fill_blend_modes: `blend_modes`, in CSS's order (the top image
 //   layer's first), repeated over the image layers as CSS repeats a short
 //   list; empty for normal;
@@ -373,6 +378,7 @@ struct MaterialDeclaration final {
     MaterialField field{MaterialField::fills};
     bool initial{};
     std::vector<MaterialFillLayer> fills{};
+    std::vector<AuthoredGradient> gradients{};
     std::vector<MaterialBlendMode> blend_modes{};
     std::vector<MaterialShadow> shadows{};
     std::vector<MaterialGlow> glows{};
@@ -387,7 +393,7 @@ struct MaterialDeclaration final {
 
     friend bool operator==(const MaterialDeclaration& left, const MaterialDeclaration& right) noexcept {
         return left.field == right.field && left.initial == right.initial && left.fills == right.fills &&
-               left.blend_modes == right.blend_modes && left.shadows == right.shadows &&
+               left.gradients == right.gradients && left.blend_modes == right.blend_modes && left.shadows == right.shadows &&
                left.glows == right.glows && left.border_style == right.border_style &&
                left.colour == right.colour && left.keylines == right.keylines &&
                left.number == right.number && left.relative == right.relative &&
@@ -402,8 +408,8 @@ struct MaterialDeclaration final {
 // declaration keeps the floor's value. The fills are composed when any
 // fill field is declared: the colour layer (the declared colour, else the
 // floor's bottom layer when it is solid) under the image layers (the
-// declared ones, else the floor's others), which take the declared blend
-// modes; a colour of alpha 0 adds no layer, and with no layer at all the
+// declared ones, each authored gradient resolved for `box`, else the
+// floor's others), which take the declared blend modes; a colour of alpha 0 adds no layer, and with no layer at all the
 // fill is one transparent solid. More than
 // SurfaceMaterial::maximum_fill_layers is no material. The corners are
 // composed when any is declared: each is its declaration's, else the
@@ -418,12 +424,16 @@ struct MaterialDeclaration final {
 // its style is none or its width 0. Four equal edges are drawn as one
 // uniform border, which keeps a dash and rounded corners, and unequal ones
 // as single edges, which a material admits only with square corners
-// (valid_surface_material). Relative corners are
-// resolved against `shorter_side`, the box's shorter side in logical
-// units.
+// (valid_surface_material). `box` is the part's box in logical units:
+// relative corners are fractions of its shorter side.
 void assemble_material(const SurfaceMaterial& floor,
-                       const std::array<const MaterialDeclaration*, material_field_count>& fields,
-                       double shorter_side, SurfaceMaterial& material);
+                       const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
+                       SurfaceMaterial& material);
+
+// Whether assembling `fields` reads the part's box: a relative corner or
+// an authored gradient other than a fixed one (authored_gradient_fixed).
+[[nodiscard]] bool material_fields_read_box(
+    const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept;
 
 // One rule. `label` names it in diagnostics (T3: its source position).
 // `requires_engine`, when set, is the engine version the rule needs, in

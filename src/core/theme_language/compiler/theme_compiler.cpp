@@ -70,16 +70,11 @@ constexpr std::array<std::string_view, 6> later_families{
     "animation", "background", "border", "mask", "outline", "transition",
 };
 
-// CSS blend modes the engine does not composite (CSS_COVERAGE section 7).
-// Sorted.
-constexpr std::array<std::string_view, 15> blend_modes_not_admitted{
-    "color", "color-burn", "color-dodge", "darken", "difference", "exclusion", "hard-light", "hue",
-    "lighten", "luminosity", "overlay", "plus-darker", "plus-lighter", "saturation", "soft-light",
-};
-static_assert(std::is_sorted(blend_modes_not_admitted.begin(), blend_modes_not_admitted.end()),
-              "binary_search needs the table sorted");
-
 constexpr std::array<std::string_view, 3> blend_modes{"normal", "multiply", "screen"};
+
+// The primitive a rule of material fields selects when it names none
+// (owner C7).
+constexpr std::string_view material_primitive_name = "material";
 
 [[nodiscard]] bool listed(std::span<const std::string_view> sorted, std::string_view name) noexcept {
     const bool found = std::binary_search(sorted.begin(), sorted.end(), name);
@@ -105,6 +100,9 @@ enum class PropertyClass : std::uint8_t {
     translate,
     blend,
     isolation,
+    // A material property (P6b): its fields are lowered by the material
+    // lowering.
+    material,
     later,
     not_admitted,
     // A primitive parameter, or an unknown name.
@@ -120,6 +118,7 @@ enum class PropertyClass : std::uint8_t {
     if (name == "translate") return PropertyClass::translate;
     if (name == "mix-blend-mode") return PropertyClass::blend;
     if (name == "isolation") return PropertyClass::isolation;
+    if (material_property(name)) return PropertyClass::material;
     if (listed(later_properties, name) || in_family(later_families, name)) return PropertyClass::later;
     if (listed(not_admitted_properties, name) || in_family(not_admitted_families, name)) {
         return PropertyClass::not_admitted;
@@ -164,6 +163,18 @@ void fold_ascii(std::string_view text, std::string& output) {
     return bytes;
 }
 
+// A material declaration's lowered bytes: a record for it and for each of
+// its layers and gradients, and each stop's bytes.
+[[nodiscard]] std::size_t material_bytes(const MaterialDeclaration& declaration) noexcept {
+    std::size_t records = 1U + declaration.fills.size() + declaration.gradients.size();
+    std::size_t stops = 0U;
+    for (const MaterialFillLayer& layer : declaration.fills) stops += layer.stops.size();
+    for (const AuthoredGradient& gradient : declaration.gradients) stops += gradient.stops.size();
+    records += declaration.blend_modes.size();
+    const std::size_t bytes = records * lowered_record_bytes + stops * sizeof(AuthoredGradientStop);
+    return bytes;
+}
+
 [[nodiscard]] std::size_t transition_bytes(const PropertyTransition& transition) noexcept {
     const std::size_t bytes =
         lowered_record_bytes + transition.property.size() + transition.states.size() * lowered_record_bytes;
@@ -191,7 +202,9 @@ public:
                 VariableSubstitution& substitution, ValueReader& reader,
                 std::vector<LoweredSelector>& lowered_selectors, std::vector<ValueToken>& substituted,
                 ThemeValue& value, std::vector<std::string_view>& parameter_names,
-                std::vector<LoweredDeclaration>& declarations, std::string& folded) noexcept;
+                std::vector<LoweredDeclaration>& declarations, std::vector<MaterialDeclaration>& materials,
+                MaterialLowering& material_lowering, std::vector<MaterialField>& material_fields,
+                std::string& folded) noexcept;
 
     [[nodiscard]] CompileOutcome run();
 
@@ -205,6 +218,8 @@ private:
     [[nodiscard]] bool lower_opacity_or_scale(const SyntaxNode& node, PropertyClass kind);
     [[nodiscard]] bool lower_translate(const SyntaxNode& node);
     [[nodiscard]] bool lower_keyword_property(const SyntaxNode& node, PropertyClass kind);
+    [[nodiscard]] bool lower_material(const SyntaxNode& node);
+    void add_material(MaterialDeclaration declaration);
     [[nodiscard]] bool emit_rule(const PrimitiveSelection& selection, std::uint32_t at);
 
     // Substitutes and reads the declaration's value into value_, the
@@ -240,6 +255,9 @@ private:
     ThemeValue& value_;
     std::vector<std::string_view>& parameter_names_;
     std::vector<LoweredDeclaration>& declarations_;
+    std::vector<MaterialDeclaration>& materials_;
+    MaterialLowering& material_lowering_;
+    std::vector<MaterialField>& material_fields_;
     std::string& folded_;
     SourcePositionCursor cursor_;
     ReservedInputs reserved_{};
@@ -256,11 +274,14 @@ CompilePass::CompilePass(const ThemeCompileInput& input, ThemeRuleSheet& sheet, 
                          VariableSubstitution& substitution, ValueReader& reader,
                          std::vector<LoweredSelector>& lowered_selectors, std::vector<ValueToken>& substituted,
                          ThemeValue& value, std::vector<std::string_view>& parameter_names,
-                         std::vector<LoweredDeclaration>& declarations, std::string& folded) noexcept
+                         std::vector<LoweredDeclaration>& declarations, std::vector<MaterialDeclaration>& materials,
+                         MaterialLowering& material_lowering, std::vector<MaterialField>& material_fields,
+                         std::string& folded) noexcept
     : input_(input), sheet_(sheet), diagnostics_(diagnostics), tokens_(tokens), lines_(lines), tree_(tree),
       custom_properties_(custom_properties), selectors_(selectors), substitution_(substitution), reader_(reader),
       lowered_selectors_(lowered_selectors), substituted_(substituted), value_(value),
-      parameter_names_(parameter_names), declarations_(declarations), folded_(folded),
+      parameter_names_(parameter_names), declarations_(declarations), materials_(materials),
+      material_lowering_(material_lowering), material_fields_(material_fields), folded_(folded),
       cursor_(lines, input.source.text) {}
 
 CompileOutcome CompilePass::run() {
@@ -332,6 +353,7 @@ bool CompilePass::lower_rule(std::size_t rule_index) {
         if (classify(folded_) == PropertyClass::primitive && !select_primitive(node, selection)) return false;
     }
     declarations_.clear();
+    materials_.clear();
     for (std::size_t child = rule_index + 1U; child < end; child = tree_.nodes[child].subtree_end.value) {
         const SyntaxNode& node = tree_.nodes[child];
         const std::uint32_t property = node.tokens.first.value;
@@ -416,6 +438,7 @@ bool CompilePass::lower_declaration(const SyntaxNode& node, PropertyClass kind, 
     case PropertyClass::translate: return lower_translate(node);
     case PropertyClass::blend:
     case PropertyClass::isolation: return lower_keyword_property(node, kind);
+    case PropertyClass::material: return lower_material(node);
     case PropertyClass::later:
         report(DiagnosticCode::not_yet_built, property, property_);
         return false;
@@ -672,7 +695,7 @@ bool CompilePass::lower_keyword_property(const SyntaxNode& node, PropertyClass k
                 known = true;
                 mode = name;
             }
-            if (!known && listed(blend_modes_not_admitted, folded_)) {
+            if (!known && css_blend_mode_not_admitted(folded_)) {
                 report(DiagnosticCode::value_form_not_admitted, first.token, clipped_theme_detail(first.text));
                 return false;
             }
@@ -696,6 +719,56 @@ bool CompilePass::lower_keyword_property(const SyntaxNode& node, PropertyClass k
     return true;
 }
 
+// A material property's fields (P6b): its CSS-wide `initial` resets each
+// field it sets; any other value is lowered by the material lowering.
+bool CompilePass::lower_material(const SyntaxNode& node) {
+    // folded_ holds the property's name, which classify() found listed.
+    const MaterialProperty property = *material_property(folded_);
+    parameter_names_.clear();
+    if (!read_value(node)) return false;
+    const ValueComponent& first = value_.components[0];
+    const WideKeyword wide = wide_keyword();
+    if (wide == WideKeyword::inherit || wide == WideKeyword::outside) {
+        const DiagnosticCode code =
+            wide == WideKeyword::inherit ? DiagnosticCode::value_wrong_kind : DiagnosticCode::value_form_not_admitted;
+        report(code, first.token, clipped_theme_detail(first.text));
+        return false;
+    }
+    if (wide == WideKeyword::initial) {
+        material_property_fields(property, material_fields_);
+        for (const MaterialField field : material_fields_) {
+            MaterialDeclaration reset{};
+            reset.field = field;
+            reset.initial = true;
+            add_material(std::move(reset));
+        }
+        return true;
+    }
+    lower_material_value(property, value_, node.content.first.value, material_lowering_);
+    if (material_lowering_.outcome != MaterialLoweringOutcome::lowered) {
+        MaterialLoweringProblem& problem = material_lowering_.problem;
+        // A keyword the running engine lacks, in a sheet for a newer one,
+        // is dropped with a warning (R2-07).
+        const bool newer = newer_engine_ && problem.code == DiagnosticCode::keyword_unknown;
+        const DiagnosticCode code = newer ? DiagnosticCode::keyword_from_newer_engine : problem.code;
+        report(code, problem.token, std::move(problem.detail));
+        return newer || material_lowering_.outcome == MaterialLoweringOutcome::dropped;
+    }
+    for (MaterialDeclaration& declaration : material_lowering_.declarations) add_material(std::move(declaration));
+    return true;
+}
+
+void CompilePass::add_material(MaterialDeclaration declaration) {
+    // As in CSS, the later declaration of a longhand wins, whichever
+    // property (a shorthand or the longhand) set it.
+    for (std::size_t index = 0U; index < materials_.size(); ++index) {
+        if (materials_[index].field != declaration.field) continue;
+        materials_.erase(materials_.begin() + static_cast<std::ptrdiff_t>(index));
+        break;
+    }
+    materials_.push_back(std::move(declaration));
+}
+
 bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t at) {
     ThemeRule lowered{};
     lowered.label = rule_;
@@ -703,6 +776,10 @@ bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t a
         const std::string_view name =
             selection.primitive == nullptr ? built_in_primitive_name : (*selection.primitive).descriptor().name;
         lowered.declarations.push_back(RuleDeclaration::primitive(name));
+    } else if (!selection.dropped && !materials_.empty() && input_.registry.find(material_primitive_name) != nullptr) {
+        // A rule of material fields and no `primitive` selects the
+        // material primitive (owner C7, 2026-10-26).
+        lowered.declarations.push_back(RuleDeclaration::primitive(material_primitive_name));
     }
     for (LoweredDeclaration& declaration : declarations_) {
         if (declaration.kind == LoweredKind::parameter || declaration.kind == LoweredKind::blend) {
@@ -713,9 +790,11 @@ bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t a
             lowered.transitions.push_back(std::move(declaration.transitions[index]));
         }
     }
-    if (lowered.declarations.empty() && lowered.transitions.empty()) return true;
+    lowered.materials = materials_;
+    if (lowered.declarations.empty() && lowered.transitions.empty() && lowered.materials.empty()) return true;
     std::size_t bytes = lowered_record_bytes + lowered.label.size();
     for (const RuleDeclaration& declaration : lowered.declarations) bytes += declaration_bytes(declaration);
+    for (const MaterialDeclaration& declaration : lowered.materials) bytes += material_bytes(declaration);
     for (const PropertyTransition& transition : lowered.transitions) bytes += transition_bytes(transition);
     for (const LoweredSelector& selector : lowered_selectors_) {
         if (bytes > budget_.bytes) {
@@ -852,7 +931,8 @@ CompileOutcome ThemeCompiler::compile(const ThemeCompileInput& input, ThemeRuleS
     sheet.published_values.clear();
     sheet.requires_engine = current_engine_version;
     CompilePass pass(input, sheet, diagnostics, tokens_, lines_, tree_, custom_properties_, selectors_, substitution_,
-                     reader_, lowered_selectors_, substituted_, value_, parameter_names_, declarations_, folded_);
+                     reader_, lowered_selectors_, substituted_, value_, parameter_names_, declarations_, materials_,
+                     material_lowering_, material_fields_, folded_);
     const CompileOutcome outcome = pass.run();
     if (outcome == CompileOutcome::refused) {
         sheet.rules.clear();

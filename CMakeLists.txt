@@ -150,6 +150,7 @@ add_library(gui_forms_core STATIC
     src/core/theme/part_painting/part_painting.cpp
     src/core/engine/types/engine_types.cpp
     src/core/engine/engine_math/engine_math.cpp
+    src/core/engine/authored_gradient/authored_gradient.cpp
     src/core/engine/engine_expression/engine_expression.cpp
     src/core/engine/primitive_registry/primitive_registry.cpp
     src/core/engine/feature_samples/engine_feature_samples.cpp
@@ -215,6 +216,7 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/selector/theme_selector.cpp
     src/core/theme_language/custom_properties/theme_custom_properties.cpp
     src/core/theme_language/value/theme_value.cpp
+    src/core/theme_language/material/theme_material_lowering.cpp
     src/core/theme_language/compiler/theme_compiler.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
@@ -2543,6 +2545,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_compiler_tests tests/theme_language/theme_compiler_tests.cpp)
     target_link_libraries(gui_forms_theme_compiler_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_theme_compiler_tests COMMAND gui_forms_theme_compiler_tests)
+    add_executable(gui_forms_theme_material_css_tests tests/theme_language/theme_material_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_material_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_material_css_tests COMMAND gui_forms_theme_material_css_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
