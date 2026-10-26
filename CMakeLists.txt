@@ -190,6 +190,7 @@ add_library(gui_forms_core STATIC
     src/core/text/unicode/unicode_grapheme.cpp
     src/core/typography/resolution/typography_resolution.cpp
     src/core/layout/types/layout_types.cpp
+    src/core/layout/style_reader/layout_style_reader.cpp
     src/core/metrics/metrics/metrics.cpp
     src/core/metrics/snapshot/metrics_snapshot.cpp
     src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp
@@ -2940,6 +2941,15 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_layout_contract_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_layout_contract_tests
              COMMAND gui_forms_layout_contract_tests)
+
+    # Stage L, phase L2: the layout style reader, against its conformance
+    # table and the layout corpus's style attributes.
+    add_executable(gui_forms_layout_style_tests
+        tests/layout_style_tests.cpp
+    )
+    target_link_libraries(gui_forms_layout_style_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_layout_style_tests
+             COMMAND gui_forms_layout_style_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/layout_corpus)
 
     add_executable(gui_forms_layout_panel_tests
         tests/layout_panel_tests.cpp
