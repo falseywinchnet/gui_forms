@@ -619,6 +619,7 @@ add_library(gui_forms_controls STATIC
     src/controls/data_grid_view/data_grid_view_row_order.cpp
     src/controls/task_dialog/task_dialog.cpp
     src/controls/notify_icon/notify_icon.cpp
+    src/controls/thread_exception_dialog/thread_exception_dialog.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
     src/controls/ribbon_font_control/ribbon_font_control.cpp
@@ -2209,6 +2210,15 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_windows_part_composite_tests PRIVATE
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_part_composite_tests COMMAND gui_forms_windows_part_composite_tests)
+        # Stage T5, phase C2's measurement: what DWM composes from a
+        # premultiplied client through each documented route. Prints JSON
+        # lines (kept in CI's LastTest.log evidence); fails only when it
+        # cannot make its windows or read the screen.
+        add_executable(gui_forms_windows_compositor_probe tests/windows_compositor_probe.cpp)
+        target_compile_definitions(gui_forms_windows_compositor_probe PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_compositor_probe PRIVATE dwmapi runtimeobject)
+        add_test(NAME gui_forms_windows_compositor_probe COMMAND gui_forms_windows_compositor_probe)
         add_executable(gui_forms_windows_content_pixels_tests tests/windows_content_pixels_tests.cpp)
         target_compile_definitions(gui_forms_windows_content_pixels_tests PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
@@ -2841,6 +2851,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_task_dialog_tests tests/task_dialog_tests.cpp)
     target_link_libraries(gui_forms_task_dialog_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_task_dialog_tests COMMAND gui_forms_task_dialog_tests)
+    add_executable(gui_forms_thread_exception_dialog_tests tests/thread_exception_dialog_tests.cpp)
+    target_link_libraries(gui_forms_thread_exception_dialog_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_thread_exception_dialog_tests COMMAND gui_forms_thread_exception_dialog_tests)
     set_tests_properties(gui_forms_background_worker_tests PROPERTIES TIMEOUT 60)
 
     add_executable(gui_forms_command_chain_tests tests/command_chain_tests.cpp)

@@ -943,6 +943,17 @@
       "doc": "api/generated/gui_forms.TaskDialog.rst"
     },
     {
+      "id": "thread_exception_dialog",
+      "type": "ThreadExceptionDialog",
+      "header": "gui_forms/components/thread_exception_dialog/thread_exception_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "The dialog for an exception the application did not handle: a TaskDialog preset with the error icon, the message, details behind an expander, and Continue and Quit, returned as cancel and abort.",
+      "winforms": "ThreadExceptionDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.ThreadExceptionDialog.rst"
+    },
+    {
       "id": "tool_tip",
       "type": "ToolTip",
       "header": "gui_forms/components/tool_tip/tool_tip.hpp",

@@ -5732,6 +5732,14 @@
       ]
     },
     {
+      "id": "thread_exception_dialog",
+      "type": "ThreadExceptionDialog",
+      "kind": "component",
+      "interactions": [
+        {"name": "closed", "payload": "DialogResult", "mutable_payload": false}
+      ]
+    },
+    {
       "id": "tool_tip",
       "type": "ToolTip",
       "kind": "component",
