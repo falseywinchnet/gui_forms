@@ -12,6 +12,7 @@
 #include "gui_forms/live_surface/wake_connection/live_surface_wake_connection.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/metrics.hpp"
+#include "gui_forms/host/compositor/window_backdrop.hpp"
 #include "gui_forms/host/cursor_interaction/cursor_interaction.hpp"
 #include "gui_forms/resources.hpp"
 #include "gui_forms/scheduler.hpp"
@@ -358,6 +359,46 @@ public:
     void set_active(bool active);
     [[nodiscard]] Event<bool>& active_changed() noexcept {
         return active_changed_;
+    }
+    // Compositor cooperation (stage T5, planning/stages/T5-compositor/
+    // PLAN.md §2). Declares, before a host attaches, that this window may
+    // be presented non-opaque (owner decision T5-Q4);
+    // ApplicationWindowOptions::non_opaque does it for an application
+    // window. False, changing nothing, once a host session has been bound
+    // to the window: a host fixes what a native window can show when it
+    // creates it. UI thread.
+    [[nodiscard]] bool declare_non_opaque();
+    [[nodiscard]] bool non_opaque_declared() const noexcept { return non_opaque_declared_; }
+    // The host's compositor state as last reported. Before any report:
+    // compositing unknown and only `opaque` supported.
+    [[nodiscard]] const CompositorState& compositor_state() const noexcept { return compositor_state_; }
+    // Host-only: the HostSession passes each accepted compositor report
+    // here. With `host_preferences` (capability presentation_preferences) a
+    // change in the host's high-contrast or reduced-transparency setting
+    // is copied into presentation_settings(); a setting the host did not
+    // change keeps what the application set. Then the backdrop grant is
+    // resolved again.
+    void set_compositor_state(const CompositorState& state, bool host_preferences);
+    // Asks for a backdrop (owner decisions T5-Q3 and T5-Q5) and returns
+    // the grant now in force: the request's first entry this window may be
+    // given under the host's state and its presentation settings, else
+    // `opaque`, with the reason the preferred entry was or was not given.
+    // The request stands: the grant is resolved again whenever the state,
+    // the settings or the declaration change. std::invalid_argument,
+    // changing nothing, for a request window_backdrop_request_valid
+    // refuses. UI thread.
+    WindowBackdropGrant request_backdrop(const WindowBackdropRequest& request);
+    [[nodiscard]] const WindowBackdropRequest& backdrop_request() const noexcept { return backdrop_request_; }
+    [[nodiscard]] const WindowBackdropGrant& backdrop_grant() const noexcept { return backdrop_grant_; }
+    // Raised on the UI thread after the grant's backdrop, reason or request
+    // changes (not for a new generation alone), once per change. When the
+    // granted backdrop changes, the backplane's generation has advanced and
+    // the window is marked for repaint before it is raised. A handler may
+    // call request_backdrop; its change raises its own event within this
+    // one, and later handlers of this emission still see this emission's
+    // grant.
+    [[nodiscard]] Event<const WindowBackdropGrant&>& backdrop_changed() noexcept {
+        return backdrop_changed_;
     }
     // Non-owning portable service seam, installed for the lifetime of a
     // HostSession. Renderer-free and headless windows may legitimately return
@@ -1292,6 +1333,18 @@ private:
     std::uint64_t semantic_generation_{1U};
     bool in_semantic_snapshot_{};
     HostServices* host_services_{};
+    // Compositor cooperation (stage T5). `host_session_bound_` is set by the
+    // first HostSession and never cleared; it ends declare_non_opaque.
+    bool host_session_bound_{};
+    bool non_opaque_declared_{};
+    CompositorState compositor_state_{};
+    WindowBackdropRequest backdrop_request_{};
+    WindowBackdropGrant backdrop_grant_{};
+    Event<const WindowBackdropGrant&> backdrop_changed_;
+    // Resolves the grant from the request, the compositor state, the
+    // declaration and the presentation settings, applies a changed backdrop
+    // through the host services, and raises backdrop_changed when it changed.
+    void refresh_backdrop();
     // The keyboard commands' keys, shared with the application's other
     // windows (see key_map); never null.
     std::shared_ptr<KeyBindings> key_bindings_{std::make_shared<KeyBindings>()};

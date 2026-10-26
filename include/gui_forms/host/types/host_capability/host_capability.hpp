@@ -52,6 +52,21 @@ enum class HostCapability : std::uint64_t {
     window_at_point = 1ULL << 26U,
     // Bringing one window to the front of the application's own windows.
     window_ordering = 1ULL << 27U,
+    // Compositor cooperation (stage T5, planning/stages/T5-compositor/
+    // PLAN.md §2.1). Each is true only where the adapter implements it; what
+    // the compositor allows now is the live CompositorState.
+    // A window presented with per-pixel premultiplied alpha, whenever the
+    // compositor state allows it (WindowBackdrop::transparent).
+    transparent_windows = 1ULL << 28U,
+    // A system material behind a transparent window (window_material,
+    // transient_material).
+    window_backdrops = 1ULL << 29U,
+    // Compositor and preference changes reported at run time
+    // (HostCompositorEvent after the first report).
+    compositor_notifications = 1ULL << 30U,
+    // The host's high-contrast and reduced-transparency settings reported
+    // and fed to each window's PresentationSettings (owner decision T5-Q7).
+    presentation_preferences = 1ULL << 31U,
 };
 
 [[nodiscard]] constexpr HostCapability operator|(HostCapability left,

@@ -163,6 +163,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/primitives/light/sheen_primitive.cpp
     src/core/engine/primitives/light/glass_primitive.cpp
     src/core/window/backplane/backplane_composite.cpp
+    src/core/window/backdrop/window_backdrop_grant.cpp
     src/core/window/backplane/window_backplane.cpp
     src/core/engine/primitives/kernel/box_blur.cpp
     src/core/engine/primitives/kernel/pixel_kernel.cpp
@@ -230,6 +231,7 @@ add_library(gui_forms_core STATIC
     src/core/image/color_conversion.cpp
     src/core/interpolation/interpolation.cpp
     src/core/host/frame_capture/frame_capture.cpp
+    src/core/host/compositor/window_backdrop.cpp
     src/core/host/types/host_types.cpp
     src/core/host/types/host_capabilities/host_capabilities.cpp
     src/core/host/types/host_services_snapshot/host_services_snapshot.cpp
@@ -3056,6 +3058,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_runtime_windows_tests tests/runtime_windows_tests.cpp)
     target_link_libraries(gui_forms_runtime_windows_tests PRIVATE gui_forms_host_headless)
     add_test(NAME gui_forms_runtime_windows_tests COMMAND gui_forms_runtime_windows_tests)
+    add_executable(gui_forms_compositor_backdrop_tests tests/compositor_backdrop_tests.cpp)
+    target_link_libraries(gui_forms_compositor_backdrop_tests PRIVATE gui_forms_host_headless)
+    add_test(NAME gui_forms_compositor_backdrop_tests COMMAND gui_forms_compositor_backdrop_tests)
     add_executable(gui_forms_floating_windows_tests tests/floating_windows_tests.cpp)
     target_link_libraries(gui_forms_floating_windows_tests PRIVATE gui_forms_host_headless)
     add_test(NAME gui_forms_floating_windows_tests COMMAND gui_forms_floating_windows_tests)

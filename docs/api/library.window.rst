@@ -730,6 +730,10 @@ Related types
 
       The application's motion switch (design language §9.4 item 3, T2 E7): off, the theme engine's ambient effects stop and their parts rest at their static poses. Transitions are not affected; reduced motion, the host's preference, ends them. Default: ``{true}``.
 
+   .. cpp:member:: bool reduced_transparency
+
+      Reduced transparency (stage T5, owner decision T5-Q7): the host's setting where the host reports it (capability presentation_preferences), or the application's. With it, or with high_contrast, a window's backdrop is opaque (WindowBackdropReason).
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PresentedArea final
