@@ -77,7 +77,7 @@ SOURCE: Path = Path(__file__).resolve().parents[1]
 WORKSPACE: Path = SOURCE.parent
 PIN_PATH: Path = Path(__file__).resolve().parent / 'skia_archive_release.json'
 PROBE_SOURCE: Path = Path(__file__).resolve().parent / 'skia_archive_probe.cpp'
-REPOSITORY: str = 'falseywinchnet/gui_forms'
+REPOSITORY: str = 'malkuth-software/gui_forms'
 SCHEMA: int = 1
 # Changing what the archive holds or how it is laid out changes the identity.
 LAYOUT: int = 1

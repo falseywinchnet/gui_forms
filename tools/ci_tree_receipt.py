@@ -12,7 +12,8 @@ artifact gui-tree-<kind>-<tree>.
 `lookup`, at the start of the same job in a later run, finds that artifact
 for its own tree and accepts it only when:
 - the producer run is an older native.yml run of this repository (a push,
-  a pull request from a branch of it, or a direct run), never a fork's;
+  a merge group, a pull request from a branch of it, or a direct run),
+  never a fork's;
 - the producer's job named --job succeeded;
 - the artifact's digest and the receipt inside it match, and the receipt
   names this tree and the producer run;
@@ -30,12 +31,14 @@ tree leaves a record of what passed it.
 
 A pull request's Sanitizers run builds and tests only what its changed
 paths can affect (tools/ci_build.py --changed-from); its coverage is
-`selected`, or `nothing` when no test reads them. A push to main takes
-that receipt all the same (the owner's choice of 2026-10-23: the
-sanitizers need to run only on new code). Branch protection merges only
-an up-to-date pull request, so its last run selected from main's previous
-commit to this tree. native.yml's daily scheduled run looks up nothing
-and runs the whole suite, as the backstop for tools/change_selection.py.
+`selected`, or `nothing` when no test reads them. A merge group, and the
+push to main that makes its commit main's, take that receipt all the
+same (the owner's choice of 2026-10-23: the sanitizers need to run only
+on new code). A merge group of the pull request's tree carries its run;
+one of another tree (main moved on) selects afresh from the main commit
+it extends (merge_group.base_sha), and main's push then carries the merge
+group's run. native.yml's daily scheduled run looks up nothing and runs
+the whole suite, as the backstop for tools/change_selection.py.
 """
 from __future__ import annotations
 import argparse
@@ -55,7 +58,9 @@ RECEIPT_NAME: str = 'receipt.json'
 RECEIPT_BOUND: int = 64 * 1024
 ARTIFACTS_READ: int = 30
 WORKFLOW: str = '.github/workflows/native.yml'
-TRUSTED_EVENTS: tuple[str, ...] = ('push', 'pull_request', 'workflow_dispatch')
+# A merge group runs on a temporary branch of this repository, the commit
+# main then becomes.
+TRUSTED_EVENTS: tuple[str, ...] = ('push', 'merge_group', 'pull_request', 'workflow_dispatch')
 # What a run covered, from least to most. ci_build.py's build record names
 # the first three for a sanitized build (BUILT_NOTHING, BUILT_SELECTED,
 # BUILT_EVERYTHING); a job that has no narrowing records everything.
