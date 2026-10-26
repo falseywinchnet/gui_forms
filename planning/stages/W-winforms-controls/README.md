@@ -2,7 +2,8 @@
 
 Release: lands across 0.4 Flexible to 0.6 Bindings. Depends on: T4 (new
 controls are built articulated and engine-painted from the start). Feeds S,
-and the 1.0 manifest condition. Status 2026-10-14: started. The catalogue is
+and the 1.0 manifest condition. Status 2026-10-14: started; coverage
+surveyed 2026-10-25 (see "Coverage, 2026-10-25"). The catalogue is
 regenerated from the official surface (deliverable 1); the by-role paint path
 new controls paint through is in place; decision 1 is revised (decision 3).
 Added on the owner's request. Authority: `planning/FORWARD_PROGRAMME.md` §5 W.
@@ -174,6 +175,237 @@ workers, once decision 4's grid work is planned:
 Studied elsewhere first: `PageView` (row 51) in stage DK, because docking
 reuses it; the ribbon (row 54) in stage RB; `Diagram` (row 55) and
 `DataLayout` (row 57, after stage FD) in studies of their own.
+
+## Coverage, 2026-10-25
+
+A survey of every Windows Forms control and UI component in
+`planning/generated/WINFORMS_API_CATALOGUE.tsv` against `manifests/controls.json`,
+the public headers and `tests/`, on `main` at `d6111581`. The types are the
+catalogue's `Control` and `ToolStripItem` descendants (found by their
+`CreateParams`, `DefaultSize`, `OnPaint` and `WndProc` overrides) and its UI
+components; event arguments, enumerations and nested records are counted
+with their owner.
+
+- **done**: a GUI.Forms type covers the control's core use, has tests in
+  `tests/`, and is in the Gallery. Member-level gaps remain, and are the
+  catalogue's business.
+- **partial**: a counterpart exists but lacks a part of the control's core
+  use, named in the row.
+- **missing**: no counterpart.
+
+The catalogue's own `status` column has not been remapped since 2026-10-14
+(it still reads `missing` for `ListView`, `DataGridView`, `MonthCalendar` and
+the strips, all built since); the states below come from the code. Remapping
+the member rows is deliverable 3. "Rows" is the type's own admitted rows.
+
+### Commands, text and labels
+
+| Windows Forms | Rows | GUI.Forms | State |
+|---|---:|---|---|
+| `ButtonBase` | 73 | `ButtonBase` | done |
+| `Button` | 22 | `Button` | done |
+| `CheckBox` | 33 | `CheckBox` | done |
+| `RadioButton` | 30 | `RadioButton` | done |
+| `Label` | 74 | `Label` | done |
+| `LinkLabel` | 55 | `LinkLabel` | done |
+| `TextBoxBase` | 75 | none public | partial: no public base; `TextBox` carries the surface |
+| `TextBox` | 42 | `TextBox` | done (single and multiple lines, auto-complete #123) |
+| `MaskedTextBox` | 102 | `MaskedTextBox` | done (#89) |
+| `RichTextBox` | 128 | none | missing: matrix row 42 places it as a P4 package; its scope is an owner decision |
+
+### Lists, trees and grids
+
+| Windows Forms | Rows | GUI.Forms | State |
+|---|---:|---|---|
+| `ListControl` | 46 | none public | partial: no public base; the list controls carry the surface |
+| `ListBox` | 109 | `ListBox` | done |
+| `CheckedListBox` | 52 | `CheckedListBox` | done |
+| `ComboBox` | 129 | `ComboBox` | done (auto-complete #123, filtering #126) |
+| `ListView` | 181 | `ListView`, `ObjectView` | partial: groups, tile view, label editing, the insertion mark, owner drawing and item tooltips are not supported (#88) |
+| `ColumnHeader` | 27 | `ListViewColumn` records | done |
+| `TreeView` | 137 | `TreeView` | done |
+| `DataGridView` | 513 | `DataGridView` (provisional) | partial: text, check-box, combo-box and button columns; no image or link column (#90, #117, #149) |
+| `DataGridViewTextBoxColumn`, `CheckBoxColumn`, `ComboBoxColumn`, `ButtonColumn` | 68 | `DataGridViewColumnKind` | done |
+| `DataGridViewImageColumn` | 19 | none | missing |
+| `DataGridViewLinkColumn` | 20 | none | missing |
+| `DataGridViewTextBoxEditingControl`, `ComboBoxEditingControl` | 40 | the grid's own editors | partial: not public types |
+| `PropertyGrid` | 141 | `PropertyGrid` | done |
+
+### Values and ranges
+
+| Windows Forms | Rows | GUI.Forms | State |
+|---|---:|---|---|
+| `UpDownBase` | 74 | none public | partial: no public base; the spin parts are shared (`spin_buttons.cpp`) |
+| `NumericUpDown` | 37 | `NumericUpDown` | done |
+| `DomainUpDown` | 22 | `DomainUpDown` | done (#85, #92) |
+| `TrackBar` | 73 | `TrackBar` | done |
+| `ProgressBar` | 68 | `ProgressBar` | done |
+| `ScrollBar`, `HScrollBar`, `VScrollBar` | 75 | the same three | done |
+| `DateTimePicker` | 92 | `DateTimePicker` | done |
+| `MonthCalendar` | 112 | `MonthCalendar` | done (#91) |
+
+### Containers and windows
+
+| Windows Forms | Rows | GUI.Forms | State |
+|---|---:|---|---|
+| `Control` | 439 | `Control` | done (the base) |
+| `ScrollableControl` | 37 | `ScrollableControl` | done |
+| `ContainerControl` | 42 | `ContainerControl` | done |
+| `UserControl` | 25 | `UserControl` | done |
+| `Form` | 224 | `Window`, `Application` | partial: the top level is `Window`, not a control; MDI is excluded |
+| `Panel` | 22 | `Panel` | done |
+| `GroupBox` | 41 | `GroupBox` | done |
+| `FlowLayoutPanel` | 9 | `FlowLayoutPanel` | done |
+| `TableLayoutPanel` | 39 | `TableLayoutPanel` | done |
+| `SplitContainer`, `SplitterPanel` | 130 | the same two | done |
+| `Splitter` | 57 | none | missing: matrix row 45 holds it to a migration facade over `SplitContainer`; building it is an owner decision |
+| `TabControl` | 98 | `TabControl` | partial: tab images (`ImageList`, `ImageIndex`) and owner drawing are not supported (re-based on `PageStrip`, #137) |
+| `TabPage` | 55 | `TabPage` | done |
+
+### Strips and menus
+
+| Windows Forms | Rows | GUI.Forms | State |
+|---|---:|---|---|
+| `ToolStrip` | 156 | `ToolStrip` | done (#86, #93) |
+| `MenuStrip` | 24 | `MenuStrip` | done |
+| `StatusStrip` | 32 | `StatusStrip` | done (#86) |
+| `ContextMenuStrip` | 8 | `ContextMenu` | done |
+| `ToolStripContainer` | 48 | `ToolStripContainer` | done (#93); dragging strips between panels is DK phase D7 |
+| `ToolStripPanel` | 57 | `ToolStripPanel` | done |
+| `ToolStripContentPanel` | 48 | `ToolStripContainer::content_panel()`, a `Panel` | done |
+| `ToolStripPanelRow` | 21 | the panel's rows | partial: not a public type |
+| `ToolStripItem`, `ToolStripDropDownItem` | 246 | item records (`ToolStripItemKind`) | done |
+| `ToolStripButton`, `ToolStripLabel`, `ToolStripSeparator`, `ToolStripDropDownButton`, `ToolStripSplitButton` | 164 | item kinds | done |
+| `ToolStripComboBox`, `ToolStripTextBox`, `ToolStripProgressBar` | 195 | hosted item kinds | done (#93) |
+| `ToolStripControlHost` | 88 | none | partial: the hosted kinds are fixed to the three above; an arbitrary hosted control is not supported |
+| `ToolStripStatusLabel` | 22 | `StatusStrip` labels | done |
+| `ToolStripMenuItem` | 49 | menu items | done |
+| `ToolStripOverflow` | 9 | the strip's overflow menu | done |
+| `ToolStripDropDown`, `ToolStripDropDownMenu` | 135 | `ContextMenu`, `AnchoredPopupLayer` | partial: no public drop-down that hosts arbitrary content |
+| `BindingNavigator` | 33 | `BindingNavigator` | done (#93) |
+
+### Components
+
+| Windows Forms | Rows | GUI.Forms | State |
+|---|---:|---|---|
+| `ToolTip` | 53 | `ToolTip` | done |
+| `ErrorProvider` | 35 | `ErrorProvider` | done |
+| `HelpProvider` | 17 | `HelpProvider` | done |
+| `ImageList` | 21 | `ImageList` | done |
+| `Timer` | 15 | `Timer` | done |
+| `BindingSource` | 91 | `BindingSource` | done |
+| `NotifyIcon` | 31 | `NotifyIcon` (provisional) | done (#97), refused per host where the capability is absent |
+
+`BackgroundWorker` (`System.ComponentModel`, outside the Forms catalogue) is
+`BackgroundWorker`.
+
+### Dialogs
+
+| Windows Forms | Rows | GUI.Forms | State |
+|---|---:|---|---|
+| `CommonDialog` | 12 | none | missing |
+| `FileDialog` | 46 | none | missing |
+| `OpenFileDialog` | 18 | `HostOpenFileDialogRequest` | partial: a host service (`HostServices::show_dialog`) on every host, no Windows Forms-shaped component |
+| `SaveFileDialog` | 12 | `HostSaveFileDialogRequest` | partial: as `OpenFileDialog` |
+| `FolderBrowserDialog` | 31 | `HostFolderDialogRequest` | partial: as `OpenFileDialog` |
+| `ColorDialog` | 21 | `HostColorDialogRequest` | partial: as `OpenFileDialog` |
+| `FontDialog` | 40 | `FontDialog` | done (in the window, bundled faces only) |
+| `TaskDialog` | 9 | `TaskDialog` (provisional) | done (in the window) |
+| `MessageBox` | 22 | `TaskDialog`, `HostMessageDialogRequest` | partial: no `show` facade |
+| `ThreadExceptionDialog` | 5 | none | missing |
+
+### Excluded
+
+`AxHost`, `WebBrowser`, `WebBrowserBase` (ActiveX and browser hosting),
+`MdiClient` (MDI), `PrintPreviewControl`, `PrintPreviewDialog`,
+`PrintDialog`, `PageSetupDialog` (printing), `ComponentEditorPage`
+(design time); `NativeWindow` is a platform-extension review row under
+ADR-001.
+
+### Totals
+
+Of the 93 types in the tables above (rows that name several types count
+each): 68 done, 18 partial, 7 missing. The missing ones are `RichTextBox`, `Splitter`, two `DataGridView` column
+types, `CommonDialog`, `FileDialog` and `ThreadExceptionDialog`; four of the
+partial ones (`OpenFileDialog`, `SaveFileDialog`, `FolderBrowserDialog`,
+`ColorDialog`) lack only the component over an existing host service.
+
+### Advanced candidates
+
+`TreeListView` (row 53) is built (#116); `DataGridView` rows are on stable
+row identity (decision 4, #117) with the adaptive order model (decision 5,
+#149); the advanced editors (row 56) are built: auto-complete (#123), the
+filtering `ComboBox` (#126) and `TokenBox` (#128, #152). `PageView` (row
+51) and the ribbon (row 54) are below. `Diagram` (row 55) has its study
+(stage DG) and waits for the owner's interview; `DataLayout` (row 57) waits
+for stage FD.
+
+### Docking (DK) phases
+
+| Phase | State | PRs |
+|---|---|---|
+| W0 windowing foundation | done | #114 (W0a), #115 (W0b), #119 (W0c), #121 (W0d) |
+| V0 vocabulary and command chain | done | #113; #131, #147 (key maps, routed commands) |
+| P1 `PageSet` | done | #110 |
+| P2 `PageStrip` top and bottom | done | #118 |
+| P3 `PageView` strip preset | done | #120 |
+| P4 document preset | done | #124 |
+| P5 side strips | done | #127 |
+| P6 drag hooks | done | #129 |
+| P7 `NavigationPane` | done | #122 |
+| P8 navigation preset and `TabControl` | half: `TabControl` re-based (#137); the navigation preset waits for the P4 question to be asked again | #137 |
+| D1 layout model and XML | done | #111, #112, #146 |
+| D2 docked layout in one window | done | #130 |
+| D3 dragging in one window | done | #144, #158 |
+| D4 floating windows | done | #168 |
+| D5 auto-hide | done | #145 |
+| D6 documents (cancellable `closing`, close all and close others) | left | |
+| D7 persistence integration, named layouts, `ToolStripContainer` drags | left | |
+| D8 integration and evidence (Gallery docking page, host accessibility, T4 look) | left | |
+
+Reviews and fixes: #170, #173, #176, #184.
+
+### Ribbon (RB) phases
+
+| Phase | State | PRs |
+|---|---|---|
+| 0 vocabulary and shared seams | done | #96 |
+| 1 static ribbon | done | #99 |
+| 2a scaling study | done | #101 (`results/2026-10-14-ribbon-scaling-observation`) |
+| 2b adaptive scaling | done | #139 |
+| 3 galleries and preview | done | #98 |
+| 4 QAT, minimized ribbon, tooltips, state | done | #102 (landed through #108), #107 |
+| 5 contextual tabs and modes | done | #143 |
+| 6 file area and specialized controls | done | #148 |
+| 7 integration and evidence (Gallery ribbon page, form document, host accessibility, T4 look) | left: waits for FD, T4 and stage A's fixture | |
+
+Reviews and fixes: #157, #167, #177.
+
+### Next batch
+
+Ordered by how often Windows Forms applications use them. None needs a
+vocabulary atom: the four dialogs paint nothing (each is a component over a
+host service that every host already answers or refuses), and the grid's
+columns paint with roles that exist.
+
+1. **`OpenFileDialog`**: the Windows Forms filter string, file names, title,
+   initial directory, multiple selection and a cancellable `file_ok`.
+   `CommonDialog` and `FileDialog` do not become public bases: nothing needs
+   them at run time (house style §7), so the two file dialogs share the
+   filter parser instead. The filter index waits for the host request to
+   carry one.
+2. **`SaveFileDialog`**: default extension, add extension, overwrite prompt.
+3. **`FolderBrowserDialog`**.
+4. **`ColorDialog`**, over the host's colour dialog.
+5. **`DataGridViewImageColumn` and `DataGridViewLinkColumn`**: the grid's
+   two missing column kinds, painted by role with the `image` and `label`
+   roles that exist.
+
+Not in the batch, because each needs an owner decision first: `RichTextBox`
+(its scope; matrix row 42), `Splitter` (row 45's facade), a `MessageBox`
+facade (`TaskDialog` and the host message dialog both exist; which one
+`show` uses), and the `ListView` and `TabControl` gaps above, which are
+member depth on existing controls.
 
 ## Read first
 
