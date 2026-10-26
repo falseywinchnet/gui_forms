@@ -1421,11 +1421,13 @@ Types
 
    ``#include <gui_forms/theme/owner_draw/owner_draw.hpp>``
 
-   One item's content to paint (owner decision W-Q6), raised while the control paints, after the item's plate and selection and before its focus cue. ``painter`` is the control's, borrowed for the call, in the control's local coordinates and clipped to ``content``; the handler draws with it and does not keep it. ``content`` is the item's content rectangle in local coordinates. ``index`` is the item's position in the control's model and ``stable_id`` its identity, borrowed for the call. ``states`` are the item's anatomy states, and ``text`` and ``font`` are the colour and font the control's default content uses for them, so that owner-drawn text can match. A handler sets ``draw_default`` to have the control draw its default content over what the handler drew. A handler paints only: it must not change, dispose or re-parent the control, or anything else in its window, while the event is raised.
+   One item's content to paint (owner decision W-Q6), raised while the control paints, after the item's plate and selection and before its focus cue. ``painter`` is the control's, borrowed for the call, in the control's local coordinates and clipped to ``content``; the handler draws with it and does not keep it. ``content`` is the item's content rectangle in local coordinates. ``index`` is the item's position in the control's model and ``stable_id`` its identity, borrowed for the call; ``column`` is the column of a cell in a view with columns (0 for the item's own content, n for its sub-item in column n, as Windows Forms' DrawSubItem), else 0. ``states`` are the item's anatomy states, and ``text`` and ``font`` are the colour and font the control's default content uses for them, so that owner-drawn text can match. A handler sets ``draw_default`` to have the control draw its default content over what the handler drew. A handler paints only: it must not change, dispose or re-parent the control, or anything else in its window, while the event is raised.
 
    .. cpp:member:: Painter& painter
 
    .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::size_t column
 
    .. cpp:member:: std::string_view stable_id
 
