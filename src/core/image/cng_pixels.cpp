@@ -42,8 +42,19 @@ ImageResourceError framing_error(stx_cng::CngError error) noexcept {
     case stx_cng::CngError::trailing_data: return ImageResourceError::trailing_data;
     case stx_cng::CngError::unsupported_dimensions: return ImageResourceError::dimension_limit_exceeded;
     case stx_cng::CngError::invalid_header: return ImageResourceError::invalid_image_header;
-    default: return ImageResourceError::invalid_image_data;
+    // Contract errors framing validation does not raise, and band contents:
+    // the image's data is not what the format allows.
+    case stx_cng::CngError::invalid_argument:
+    case stx_cng::CngError::insufficient_storage:
+    case stx_cng::CngError::overlap:
+    case stx_cng::CngError::invalid_band:
+    case stx_cng::CngError::invalid_sequences:
+    case stx_cng::CngError::invalid_literals:
+    case stx_cng::CngError::entropy_failure: return ImageResourceError::invalid_image_data;
+    case stx_cng::CngError::allocation_failed: return ImageResourceError::allocation_failed;
     }
+    // A code outside the enumeration is reported as invalid data.
+    return ImageResourceError::invalid_image_data;
 }
 
 // round(c * a / 255): 255 is odd, so c * a / 255 is never half way and
