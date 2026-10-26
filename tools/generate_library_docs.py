@@ -147,9 +147,11 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
 
 # Header areas whose types belong beside a stock control rather than on a
 # library page: property inspection with PropertyGrid, instrument records with
-# InstrumentRack, metrics and visual inspection with the diagnostic views.
+# InstrumentRack, metrics and visual inspection with the diagnostic views, and
+# the components area's unregistered headers (the file dialogs' shared types)
+# with the dialogs.
 AREA_TO_CATEGORY: dict[str, str] = {
-    "components": "Components",
+    "components": "Dialogs and popups",
     "inspection": "Value setting",
     "instrument": "Value setting",
     "metrics": "Diagnostics",
@@ -170,11 +172,12 @@ CATEGORY_DESCRIPTIONS: dict[str, str] = {
               "containers.",
     "Scrolling": "Scrollable containers and scroll bars.",
     "Menus and commands": "Commands, menu strips and context menus.",
-    "Dialogs and popups": "Anchored popups and tooltips.",
+    "Dialogs and popups": "Anchored popups, tooltips, owned dialogs and the "
+                          "host's file and colour dialogs.",
     "Drawing": "Owner-drawn, live and raster surfaces.",
     "Diagnostics": "Metrics, easing, typography and visual-inspection views.",
     "Components": "Nonvisual components: bindings, providers, image lists, "
-                  "timers, semantic feedback and the host's file dialogs.",
+                  "timers and semantic feedback.",
 }
 
 

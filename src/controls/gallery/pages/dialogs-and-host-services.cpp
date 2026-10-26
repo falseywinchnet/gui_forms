@@ -59,6 +59,7 @@ private:
     void on_message_dialog(int index, const CommandInvocation& invocation);
     void on_path_dialog(int index, const CommandInvocation& invocation);
     void show_open_file_dialog(bool multiple);
+    void show_save_file_dialog();
     void on_service(int index);
 
     [[nodiscard]] HostServices* services() const;
@@ -75,9 +76,10 @@ private:
     std::array<Command, 4> message_commands_{};
     std::array<Command, 5> dialog_commands_{};
     std::array<Command, 5> service_commands_{};
-    // Open file and Open multiple show this component; the other path and
-    // colour buttons send typed HostServices requests directly.
+    // Open file, Open multiple and Save file show these components; the
+    // folder and colour buttons send typed HostServices requests directly.
     std::shared_ptr<OpenFileDialog> open_file_dialog_;
+    std::shared_ptr<SaveFileDialog> save_file_dialog_;
     std::shared_ptr<Label> status_;
     std::shared_ptr<TextBox> clipboard_;
     Command choose_font_{};
@@ -344,7 +346,7 @@ void HostServicesPage::build_messages(const std::shared_ptr<Surface>& body) {
 void HostServicesPage::build_paths(const std::shared_ptr<Surface>& body) {
     std::shared_ptr<LayoutGroup> paths = group(
         "gallery.host.paths",
-        "Path and color dialogs · OpenFileDialog, typed requests and cancel preservation",
+        "Path and color dialogs · file dialog components, typed requests and cancel preservation",
         {930.0, 142.0});
     (*body).add_at(paths, {24.0, 242.0, 930.0, 142.0});
     for (std::size_t index = 0U; index < path_labels.size(); ++index) {
@@ -364,6 +366,11 @@ void HostServicesPage::build_paths(const std::shared_ptr<Surface>& body) {
     }
     open_file_dialog_ = std::make_shared<OpenFileDialog>();
     (*open_file_dialog_).set_filter("Text and logs|*.txt;*.log|PNG images|*.png");
+    save_file_dialog_ = std::make_shared<SaveFileDialog>();
+    (*save_file_dialog_).set_title("Save GUI.Forms evidence");
+    (*save_file_dialog_).set_filter("Text evidence|*.txt");
+    (*save_file_dialog_).set_default_ext("txt");
+    (*save_file_dialog_).set_file_name("gui-forms-evidence");
     (*paths).add_at(label("gallery.host.paths.note",
                           "Cancel never overwrites the last accepted path, choice, or color.",
                           11.0, 400, muted), {24.0, 98.0, 700.0, 24.0});
@@ -425,13 +432,7 @@ void HostServicesPage::on_path_dialog(const int index,
     if (index <= 1) {
         show_open_file_dialog(index == 1);
     } else if (index == 2) {
-        HostSaveFileDialogRequest request;
-        request.title = "Save GUI.Forms evidence";
-        request.suggested_name = "gui-forms-evidence";
-        request.default_extension = "txt";
-        request.filters = {{"Text evidence", {"txt"}}};
-        request.confirm_overwrite = true;
-        show_dialog(invocation, std::move(request));
+        show_save_file_dialog();
     } else if (index == 3) {
         show_dialog(invocation,
                     HostFolderDialogRequest{"Choose an evidence directory", {}});
@@ -462,6 +463,25 @@ void HostServicesPage::show_open_file_dialog(const bool multiple) {
     const std::span<const std::string> names = (*open_file_dialog_).file_names();
     publish_accepted(std::to_string(names.size()) + " path" + (names.size() == 1U ? "" : "s") + " · " +
                      names.front());
+}
+
+void HostServicesPage::show_save_file_dialog() {
+    Window* const window = (*status_).attached_window();
+    if (window == nullptr) {
+        (*status_).set_text("Host rejected request · unsupported");
+        return;
+    }
+    const DialogResult result = (*save_file_dialog_).show_dialog(*window);
+    if (result == DialogResult::none) {
+        (*status_).set_text(std::string("Host rejected request · ") +
+                            host_service_error_name((*save_file_dialog_).status().error));
+        return;
+    }
+    if (result != DialogResult::ok) {
+        publish_cancelled();
+        return;
+    }
+    publish_accepted("1 path · " + (*save_file_dialog_).file_name());
 }
 
 void HostServicesPage::on_service(const int index) {

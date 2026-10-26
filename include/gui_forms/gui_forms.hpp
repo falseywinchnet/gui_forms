@@ -16,6 +16,7 @@
 #include "gui_forms/component.hpp"
 #include "gui_forms/components/notify_icon/notify_icon.hpp"
 #include "gui_forms/components/open_file_dialog/open_file_dialog.hpp"
+#include "gui_forms/components/save_file_dialog/save_file_dialog.hpp"
 #include "gui_forms/components/thread_exception_dialog/thread_exception_dialog.hpp"
 #include "gui_forms/control.hpp"
 #include "gui_forms/dirty.hpp"
