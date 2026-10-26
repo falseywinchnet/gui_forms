@@ -1,5 +1,6 @@
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/window.hpp"
+#include "../src/host/macos/application/front_reuse.hpp"
 #include "../src/host/macos/application/live_surface_damage.hpp"
 
 #include <array>
@@ -336,8 +337,49 @@ void host_region_helpers() {
 }
 } // namespace
 
+// The macOS host's copy-only draw (a reveal or exposure with nothing owed)
+// needs the front it copies to be the last presentation at the view's size
+// and scale in the model's current epoch, with nothing pending.
+void front_reuse_rule() {
+    detail::FrontReuse held{};
+    held.raster_has_content = true;
+    held.front_matches_extent = true;
+    held.front_surface_epoch = 3U;
+    held.surface_epoch = 3U;
+    held.lease_clean = true;
+    require(detail::front_held(held), "a presented front at the view's extent is held");
+    require(detail::copy_only_draw(held, false, false), "with nothing pending a draw is a copy");
+    require(!detail::copy_only_draw(held, true, false),
+            "pending damage (a failed or discarded candidate keeps it) repaints");
+    require(!detail::copy_only_draw(held, false, true), "a pending live frame composes");
+    detail::FrontReuse lost = held;
+    lost.live_region_lost = true;
+    require(detail::front_held(lost) && !detail::copy_only_draw(lost, false, false),
+            "a lost live region is not copied as it stands");
+    detail::FrontReuse resized = held;
+    resized.front_matches_extent = false;
+    require(!detail::front_held(resized) && !detail::copy_only_draw(resized, false, false),
+            "a front of another size or scale repaints");
+    detail::FrontReuse epoch = held;
+    epoch.surface_epoch = 4U;
+    require(!detail::front_held(epoch) && !detail::copy_only_draw(epoch, false, false),
+            "a front of an earlier surface epoch repaints");
+    detail::FrontReuse unpresented = held;
+    unpresented.front_surface_epoch = 0U;
+    unpresented.surface_epoch = 0U;
+    require(!detail::front_held(unpresented), "a front with no presented receipt is not held");
+    detail::FrontReuse empty = held;
+    empty.raster_has_content = false;
+    require(!detail::front_held(empty), "a reallocated backing is not held");
+    detail::FrontReuse owed = held;
+    owed.lease_clean = false;
+    require(!detail::front_held(owed) && !detail::copy_only_draw(owed, false, false),
+            "damage the model still owes repaints");
+}
+
 int main() {
     description_and_frame_lifetime();
+    front_reuse_rule();
     presentation_region();
     overlay_presentations();
     overlay_share_of_new_frames();
