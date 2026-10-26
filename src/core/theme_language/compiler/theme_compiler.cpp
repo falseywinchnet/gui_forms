@@ -447,7 +447,9 @@ bool CompilePass::lower_declaration(const SyntaxNode& node, PropertyClass kind, 
         return true;
     case PropertyClass::custom:
     case PropertyClass::primitive:
-    case PropertyClass::other: break;
+    case PropertyClass::other:
+    default: // Not a listed PropertyClass: lowered below as an ordinary declaration.
+        break;
     }
     if (selection.primitive != nullptr) {
         const PrimitiveDescriptor& descriptor = (*selection.primitive).descriptor();
