@@ -86,8 +86,10 @@ constexpr std::string_view column_modified = "modified";
 // cells it shows by ID.
 class ProjectFileRows final : public DataGridViewCellValueProvider {
 public:
-    // Name, kind, size, keep, note and the button column's empty value.
-    static constexpr std::size_t column_count = 6U;
+    // Name, kind, size, keep, note, the button column's empty value and the
+    // preview image, which the Gallery's fixtures install once the window
+    // holds the image.
+    static constexpr std::size_t column_count = 7U;
     using FileValues = std::array<BindingValue, column_count>;
     using ValuesById = std::unordered_map<std::string, FileValues>;
 
@@ -97,7 +99,7 @@ public:
             const DataGridViewRowId row{std::string(node.id)};
             const FileValues values{BindingValue{std::string(node.name)}, BindingValue{std::string(node.kind)},
                                     BindingValue{std::string(node.size)}, BindingValue{true},
-                                    BindingValue{std::string(node.note)}, BindingValue{}};
+                                    BindingValue{std::string(node.note)}, BindingValue{}, BindingValue{}};
             values_.emplace(row.value, values);
             order_.push_back(row);
         }
@@ -251,8 +253,8 @@ private:
     }
 
     // A DataGridView over the fixture's files in virtual mode: a text name, a
-    // combo box kind, a read-only size, a check box and a button column. The
-    // rows are the page's, by stable row ID.
+    // combo box kind, a read-only size, a check box, a button and an image
+    // column. The rows are the page's, by stable row ID.
     void build_grid(const std::shared_ptr<Surface>& body) {
         std::shared_ptr<LayoutGroup> grid_group = group(
             "gallery.tree.grid-group", "DataGridView · the project's files as typed, editable columns",
@@ -275,6 +277,8 @@ private:
             {.name = "note", .header_text = "Note", .width = 300.0},
             {.name = "open", .header_text = "", .kind = DataGridViewColumnKind::button, .width = 70.0,
              .button_text = "Open"},
+            {.name = "preview", .header_text = "Preview", .kind = DataGridViewColumnKind::image, .width = 70.0,
+             .image_layout = DataGridViewImageLayout::zoom, .image_description = "Image preview"},
         });
         grid_rows_ = std::make_shared<ProjectFileRows>();
         (*grid_).set_virtual_rows(grid_rows_, (*grid_rows_).order());
@@ -571,13 +575,20 @@ private:
 
     // DataGridView
     void on_grid_value_changed(const DataGridViewCellEvent& event) {
+        // A preview is installed by the Gallery's fixtures, not edited.
+        if ((*grid_).columns()[event.column].kind == DataGridViewColumnKind::image) return;
         (*status_).set_text("Grid cell " + event.row_id.value + "." +
                             (*grid_).columns()[event.column].name + " is now \"" +
                             (*grid_).cell_text(event.row, event.column) + "\"");
     }
 
     void on_grid_content_click(const DataGridViewCellEvent& event) {
-        if ((*grid_).columns()[event.column].kind != DataGridViewColumnKind::button) return;
+        const DataGridViewColumnKind kind = (*grid_).columns()[event.column].kind;
+        if (kind == DataGridViewColumnKind::image) {
+            (*status_).set_text("Preview " + (*grid_).cell_text(event.row, 0U) + " · an image cell's click");
+            return;
+        }
+        if (kind != DataGridViewColumnKind::button) return;
         (*status_).set_text("Open " + (*grid_).cell_text(event.row, 0U) + " · a button cell's click");
     }
 

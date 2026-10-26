@@ -156,7 +156,7 @@ draws them; the built-in path draws none.
 | `background-size`, `background-repeat` | `MaterialImageMode` stretch, tile and nine-patch; `image_scale` | present | |
 | `background-position` | a tiled image fill's `image_anchor` (fractions of the room the box leaves around one tile, as CSS percentages) plus `image_offset` (logical units); gradients place by coordinates | present (E9.6 G3, #291) | A stretched image and a nine-patch cover the box, so they have no position |
 | sized image faces | CONV variants (`image_variant`): one per (resource, device size, scale), made outside the bake | present | |
-| image formats | the resource registry decodes PNG today. CNG is the native resource format and PNG is for interop (owner direction); CNG's codec is in `stx_cng` | present (PNG); CNG wiring follows the intake | |
+| image formats | the resource registry decodes PNG, the only image format (CNG was removed on 2026-10-26, owner direction) | present (PNG) | |
 
 ## 11. Masks and clipping
 

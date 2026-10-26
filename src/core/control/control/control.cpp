@@ -2078,9 +2078,15 @@ void Control::invalidate(Dirty requested_dirty) {
         (*window_).mark_dirty(*this, requested_dirty);
         return;
     }
-    dirty_ |= requested_dirty;
+    add_dirty(requested_dirty);
+    // A detached tree marks no ancestor's own flags, but an ancestor's cached
+    // measure may read this control, so its generation still advances.
+    const bool measure_requested = has_dirty(requested_dirty, Dirty::measure);
     for (Control* current = this; current != nullptr;) {
         (*current).subtree_dirty_ |= requested_dirty;
+        if (measure_requested && current != this) {
+            (*current).advance_measure_generation();
+        }
         if (has_dirty(requested_dirty, Dirty::layout) &&
             (*current).layout_suspend_depth_ != 0U) {
             (*current).layout_deferred_ = true;
@@ -2138,6 +2144,9 @@ void Control::invalidate_subtree(Dirty requested_dirty) {
     for (Ptr visual_parent = parent(); visual_parent;
          visual_parent = (*visual_parent).parent()) {
         (*visual_parent).subtree_dirty_ |= requested_dirty;
+        if (has_dirty(requested_dirty, Dirty::measure)) {
+            (*visual_parent).advance_measure_generation();
+        }
         if (has_dirty(requested_dirty, Dirty::layout) &&
             (*visual_parent).layout_suspend_depth_ != 0U) {
             (*visual_parent).layout_deferred_ = true;
@@ -2150,7 +2159,7 @@ void Control::invalidate_subtree(Dirty requested_dirty) {
 }
 
 void Control::apply_subtree_dirty(Control& control, Dirty requested_dirty) {
-    control.dirty_ |= requested_dirty;
+    control.add_dirty(requested_dirty);
     control.subtree_dirty_ |= requested_dirty;
     if (has_dirty(requested_dirty, Dirty::layout) &&
         control.layout_suspend_depth_ != 0U) {
@@ -2286,6 +2295,99 @@ Size Control::measure(Size available) {
     if (maximum_size_.width > 0.0) result.width = std::min(result.width, maximum_size_.width);
     if (maximum_size_.height > 0.0) result.height = std::min(result.height, maximum_size_.height);
     return result;
+}
+
+Size Control::measure_for_layout(const LayoutConstraint& constraint) {
+    // The cache is UI-thread state, like the tree the answer reads.
+    if (window_ != nullptr) (*window_).require_ui_thread("layout measurement");
+    if (!valid_layout_constraint(constraint)) {
+        throw std::invalid_argument(
+            "GUI.Forms layout constraint extents must be finite and nonnegative");
+    }
+    const std::uint64_t generation = measure_generation_;
+    for (const MeasureCacheEntry& entry : measure_cache_) {
+        if (entry.generation == generation && entry.constraint == constraint) {
+            if (window_ != nullptr) (*window_).metrics().record_measure_cache_hit();
+            const Size cached = entry.result;
+            return cached;
+        }
+    }
+    if (window_ != nullptr) {
+        const std::uint64_t pass = (*window_).layout_pass_sequence_;
+        if (measure_pass_sequence_ != pass) {
+            measure_pass_sequence_ = pass;
+            measure_pass_callbacks_ = 0U;
+        }
+        ++measure_pass_callbacks_;
+        (*window_).metrics().record_measure_cache_miss(measure_pass_callbacks_);
+    }
+    Size measured = measure_intrinsic(constraint);
+    bool clamped = false;
+    if (!std::isfinite(measured.width) || measured.width < 0.0) {
+        measured.width = 0.0;
+        clamped = true;
+    }
+    if (!std::isfinite(measured.height) || measured.height < 0.0) {
+        measured.height = 0.0;
+        clamped = true;
+    }
+    if (clamped && window_ != nullptr) (*window_).metrics().record_layout_measure_clamp();
+    // A callback that invalidated this control made its own answer stale.
+    if (measure_generation_ != generation || !is_alive()) return measured;
+    std::size_t slot = 0U;
+    if (constraint.width.kind == AvailableExtentKind::min_content) {
+        slot = 0U;
+    } else if (constraint.width.kind == AvailableExtentKind::max_content) {
+        slot = 1U;
+    } else {
+        slot = measure_cache_next_general_slot_;
+        measure_cache_next_general_slot_ = slot == 2U ? 3U : 2U;
+    }
+    measure_cache_[slot] = MeasureCacheEntry{constraint, measured, generation};
+    return measured;
+}
+
+Size Control::measure_intrinsic(const LayoutConstraint& constraint) {
+    const Size available = measure_available_size(constraint);
+    Size measured = measure(available);
+    if (constraint.width.kind == AvailableExtentKind::definite) {
+        measured.width = constraint.width.extent.value();
+    }
+    if (constraint.height.kind == AvailableExtentKind::definite) {
+        measured.height = constraint.height.extent.value();
+    }
+    return measured;
+}
+
+bool Control::size_depends_on_content() const noexcept { return true; }
+
+bool Control::sizes_children_from_content() const noexcept { return true; }
+
+void Control::set_layout_direction(LayoutDirection direction) {
+    require_mutable();
+    if (direction != LayoutDirection::inherit &&
+        direction != LayoutDirection::left_to_right &&
+        direction != LayoutDirection::right_to_left) {
+        throw std::invalid_argument("GUI.Forms LayoutDirection value is invalid");
+    }
+    if (layout_direction_ == direction) return;
+    layout_direction_ = direction;
+    // Direction mirrors where children and text are placed, never their
+    // measured sizes; every descendant that inherits it moves.
+    constexpr Dirty effects = Dirty::arrange | Dirty::paint | Dirty::hit_test |
+                              Dirty::semantics | Dirty::accessibility;
+    invalidate_subtree(effects);
+}
+
+LayoutDirection Control::effective_layout_direction() const noexcept {
+    LayoutDirection direction = layout_direction_;
+    Ptr ancestor = parent_.lock();
+    while (direction == LayoutDirection::inherit && ancestor) {
+        direction = (*ancestor).layout_direction_;
+        ancestor = (*ancestor).parent_.lock();
+    }
+    if (direction == LayoutDirection::inherit) direction = LayoutDirection::left_to_right;
+    return direction;
 }
 
 void Control::arrange(Rect final_bounds) {
@@ -2763,6 +2865,19 @@ void Control::on_detached_from_window() noexcept {}
 
 void Control::clear_dirty(Dirty cleared) noexcept {
     dirty_ = without_dirty(dirty_, cleared);
+}
+
+void Control::add_dirty(Dirty added) noexcept {
+    dirty_ |= added;
+    if (has_dirty(added, Dirty::measure)) {
+        advance_measure_generation();
+    }
+}
+
+void Control::advance_measure_generation() noexcept {
+    ++measure_generation_;
+    // Zero marks an empty cache entry, so it is never a current generation.
+    if (measure_generation_ == 0U) ++measure_generation_;
 }
 
 void Control::clear_subtree_dirty(Dirty cleared) noexcept {

@@ -6,6 +6,7 @@
 #include "gui_forms/window.hpp"
 #include "../src/host/windows/application/windows_host.cpp"
 #include "part_composite_scene.hpp"
+#include "compositor_presentation_scene.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -76,6 +77,35 @@ int main() {
                 std::cerr << "only the group past the depth limit is refused\n";
                 return 1;
             }
+        }
+    }
+    // The copy group (stage T5) on the DIB, which keeps no alpha outside a
+    // group: the group's image replaces what lay beneath, opaque.
+    for (std::size_t scale = 0U; scale < scene::scales.size(); ++scale) {
+        host::DibPainter painter;
+        const std::unique_ptr<PaintFramebuffer> framebuffer =
+            painter.create_framebuffer(scene::scene_size, scene::scales[scale]);
+        if (framebuffer == nullptr) {
+            std::cerr << "the copy framebuffer is allocated\n";
+            return 1;
+        }
+        scene::paint_copy_scene((*framebuffer).painter());
+        (*framebuffer).end();
+        const std::uint8_t* const bytes = reinterpret_cast<const std::uint8_t*>((*framebuffer).pixels().data());
+        if (!scene::copy_scene_holds(bytes, (*framebuffer).row_bytes(), text_identity::Order::bgra,
+                                     scene::scales[scale], false)) {
+            std::cerr << "a copy group replaces what lies beneath it\n";
+            return 1;
+        }
+    }
+    // A window's presented frame by its backdrop grant (stage T5, C1).
+    {
+        host::DibPainter factory;
+        const compositor_presentation::PresentationCheck presented =
+            compositor_presentation::check_presentation(factory, false);
+        if (!presented.passed) {
+            std::cerr << presented.failure << '\n';
+            return 1;
         }
     }
     if (printing) return 0;

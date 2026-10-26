@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/event.hpp"
+#include "gui_forms/host/compositor/window_backdrop.hpp"
 #include "gui_forms/host/image/host_image.hpp"
 #include "gui_forms/events.hpp"
 #include "gui_forms/host/types/host_capabilities/host_capabilities.hpp"
@@ -440,6 +441,14 @@ struct HostClosedEvent final {
 
 struct HostShutdownEvent final {};
 
+// The host's compositor and preference state (stage T5): reported once after
+// attach and again whenever it changes (capability compositor_notifications).
+// Each report's generation is later than the last; a report whose opaque
+// backdrop is not supported is refused as invalid_payload.
+struct HostCompositorEvent final {
+    CompositorState state{};
+};
+
 using HostEventPayload = std::variant<
     HostAttachEvent,
     HostResizeEvent,
@@ -453,7 +462,8 @@ using HostEventPayload = std::variant<
     TextInputEvent,
     HostCloseRequest,
     HostClosedEvent,
-    HostShutdownEvent>;
+    HostShutdownEvent,
+    HostCompositorEvent>;
 
 struct HostEvent final {
     std::uint64_t sequence{};

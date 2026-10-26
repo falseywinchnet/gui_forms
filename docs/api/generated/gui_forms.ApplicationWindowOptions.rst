@@ -140,6 +140,10 @@ gui_forms::ApplicationWindowOptions
 
    .. cpp:member:: bool print_metrics_on_close
 
+   .. cpp:member:: bool non_opaque
+
+      The window may be presented non-opaque (stage T5, owner decisions T5-Q3 and T5-Q4): declared before the host creates the native window (Window::declare_non_opaque). The backdrop itself is asked for through Window::request_backdrop, and the window is opaque without it.
+
    .. cpp:member:: std::function<void(Window&, ApplicationWindowHandle)> ready
 
       Runs after this model has an attached host and services. Other windows may not be ready yet. Keep a weak handle for native window requests.

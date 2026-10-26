@@ -82,8 +82,11 @@ SemanticTextUnit semantic_unit(TextUnit unit) noexcept {
     case TextUnit_Format:
     case TextUnit_Page:
     case TextUnit_Document: return SemanticTextUnit::document;
+    default:
+        // A client may send any integer as a TextUnit: an unknown unit moves
+        // by the whole text, as Document does.
+        return SemanticTextUnit::document;
     }
-    return SemanticTextUnit::document;
 }
 
 // The first boundary after `offset`, or none.

@@ -14,17 +14,15 @@ enum class PngColorType : std::uint8_t {
     grayscale_alpha = 4, truecolor_alpha = 6,
 };
 
-// How a registry resource holds its image. CNG is the native resource
-// format and PNG the interchange format (both encoded); premultiplied BGRA
-// is pixels as given.
+// How a registry resource holds its image: a PNG file, or premultiplied
+// BGRA pixels as given.
 enum class ImageResourceEncoding : std::uint8_t {
     png,
     bgra32_premultiplied,
-    cng,
 };
 
 // The alpha a resource's pixels carry: none (every pixel opaque), straight
-// (colour independent of coverage, as in PNG and CNG files) or premultiplied.
+// (colour independent of coverage, as in PNG files) or premultiplied.
 enum class ImageAlpha : std::uint8_t {
     opaque,
     straight,
@@ -61,8 +59,6 @@ enum class ImageResourceError : std::uint8_t {
     missing_idat, missing_iend, trailing_data, unknown_critical_chunk,
     resource_count_exceeded, registry_encoded_limit_exceeded,
     registry_decoded_limit_exceeded, stale_image_id, allocation_failed,
-    // A CNG file's header or band framing (cng_pixels).
-    invalid_image_header, invalid_image_data,
 };
 
 [[nodiscard]] std::string_view image_resource_error_name(
@@ -122,7 +118,7 @@ struct ImageResourceView final {
     ImageId image{};
     ImageResourceEncoding encoding{ImageResourceEncoding::png};
     ImageMetadata metadata{};
-    // The encoded file (png, cng) or the pixels (bgra32_premultiplied).
+    // The encoded file (png) or the pixels (bgra32_premultiplied).
     std::span<const std::byte> encoded{};
     // Bytes per row: of the pixels, or of the file's unfiltered samples.
     std::uint64_t row_bytes{};

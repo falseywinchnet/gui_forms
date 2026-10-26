@@ -35,6 +35,9 @@ public:
     [[nodiscard]] const HostSession& session() const noexcept { return session_; }
     [[nodiscard]] HostServices& services() noexcept { return services_; }
     [[nodiscard]] const HostServices& services() const noexcept { return services_; }
+    // The reference services themselves, for tests that drive or read their
+    // simulated native state (the backdrop, stage T5).
+    [[nodiscard]] HeadlessHostServices& headless_services() noexcept { return services_; }
     [[nodiscard]] const std::string& trace() const noexcept { return trace_; }
 
 private:

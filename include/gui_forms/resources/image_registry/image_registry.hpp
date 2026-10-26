@@ -8,8 +8,8 @@
 
 namespace gui_forms {
 
-// Renderer-neutral ownership for validated CNG and PNG files and
-// premultiplied BGRA bytes. ImageId values are generational; views expire at
+// Renderer-neutral ownership for validated PNG files and premultiplied
+// BGRA bytes. ImageId values are generational; views expire at
 // the next registry mutation.
 class ImageRegistry final {
 public:
@@ -23,9 +23,9 @@ public:
     ImageRegistry(const ImageRegistry&) = delete;
     ImageRegistry& operator=(const ImageRegistry&) = delete;
 
-    // Admits an encoded image file, CNG or PNG, chosen by its signature:
-    // its framing is validated (validate_png, or the CNG framing check) and
-    // its dimensions held to the limits. A file of neither format is
+    // Admits an encoded image file, its format chosen by its signature:
+    // PNG is the only one admitted. Its framing is validated (validate_png)
+    // and its dimensions held to the limits; a file of no admitted format is
     // invalid_signature.
     [[nodiscard]] ImageLoadResult load_image(std::span<const std::byte> encoded);
     // As load_image, for PNG files only.
