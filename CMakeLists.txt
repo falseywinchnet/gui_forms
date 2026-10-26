@@ -1214,6 +1214,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         src/host/windows/services/windows_clipboard_image.cpp
         src/host/windows/services/windows_notify_icons.cpp
         src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
+        src/host/windows/compositor/windows_compositor.cpp
     )
     target_include_directories(gui_forms_host_windows PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/windows
@@ -2040,7 +2041,8 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/services/windows_clipboard_image.cpp
                 src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
-                src/host/windows/raster/dib_frame_store.cpp)
+                src/host/windows/raster/dib_frame_store.cpp
+                src/host/windows/compositor/windows_compositor.cpp)
             target_include_directories(gui_forms_windows_dib_lifecycle_tests PRIVATE
                 include src/host/windows)
             target_compile_definitions(gui_forms_windows_dib_lifecycle_tests PRIVATE
@@ -2062,7 +2064,8 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/services/windows_clipboard_image.cpp
                 src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
-                src/host/windows/raster/dib_frame_store.cpp)
+                src/host/windows/raster/dib_frame_store.cpp
+                src/host/windows/compositor/windows_compositor.cpp)
             target_include_directories(gui_forms_windows_tooltip_tests PRIVATE
                 include src/host/windows)
             target_compile_definitions(gui_forms_windows_tooltip_tests PRIVATE
@@ -2086,6 +2089,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     src/host/windows/services/windows_notify_icons.cpp
                     src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
                     src/host/windows/raster/dib_frame_store.cpp
+                    src/host/windows/compositor/windows_compositor.cpp
                     src/host/windows/raster/prepared_text_compositor.cpp)
                 target_include_directories(gui_forms_windows_prepared_text_tests PRIVATE
                     include src/host/windows)
@@ -2122,6 +2126,17 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_application_native_tests PRIVATE gui_forms_application)
         add_test(NAME gui_forms_application_native_tests COMMAND gui_forms_application_native_tests)
         set_tests_properties(gui_forms_application_native_tests PROPERTIES TIMEOUT 30)
+        if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST)
+            # Stage T5, phase C2's gate: a non-opaque window on the Windows
+            # host through each grant, read off the composed screen.
+            add_executable(gui_forms_windows_compositor_tests tests/windows_compositor_tests.cpp)
+            target_compile_definitions(gui_forms_windows_compositor_tests PRIVATE
+                WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+            target_link_libraries(gui_forms_windows_compositor_tests PRIVATE gui_forms_application dwmapi
+                runtimeobject)
+            add_test(NAME gui_forms_windows_compositor_tests COMMAND gui_forms_windows_compositor_tests)
+            set_tests_properties(gui_forms_windows_compositor_tests PROPERTIES TIMEOUT 60)
+        endif()
         # Stage DK W0 measurement (results/2026-10-18-dk-w0-capture-drag/): it
         # puts windows on the desktop, so it is built but never run by ctest.
         add_executable(gui_forms_frame_drag_probe tests/frame_drag_probe.cpp)

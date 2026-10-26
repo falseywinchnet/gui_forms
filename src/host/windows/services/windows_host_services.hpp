@@ -157,6 +157,12 @@ protected:
         cursor_model_ = nullptr;
     }
 
+    // The granted backdrop on the owner window (stage T5, C2).
+    HostServiceStatus apply_window_backdrop_impl(WindowBackdrop backdrop) override {
+        const HostServiceStatus applied = gui_forms::host::detail::apply_windows_backdrop(owner_, backdrop);
+        return applied;
+    }
+
     HostServiceStatus set_pointer_capture_impl(bool captured,
                                                std::uint64_t) override {
         if (owner_ == nullptr) return {HostServiceError::backend_failure};
