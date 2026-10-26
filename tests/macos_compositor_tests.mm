@@ -515,10 +515,10 @@ int main() {
     GateContext gate{};
     active_gate = &gate;
     const std::shared_ptr<Control> root = make_control<Control>(StableId("compositor.gate.root"));
-    std::unique_ptr<Window> model = std::make_unique<Window>(root, Size{window_width, window_height});
+    std::unique_ptr<Window> model = std::make_unique<Window>(root, gui_forms::Size{window_width, window_height});
     ApplicationWindowOptions options{};
     options.title = gate_title;
-    options.initial_size = Size{window_width, window_height};
+    options.initial_size = gui_forms::Size{window_width, window_height};
     options.non_opaque = true;
     options.ready = GateReady{};
     const ApplicationResult result = Application::run(std::move(model), std::move(options));
