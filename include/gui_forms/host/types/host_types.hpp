@@ -9,6 +9,7 @@
 #include "gui_forms/host/types/host_services_snapshot/host_services_snapshot.hpp"
 #include "gui_forms/host/types/host_session_snapshot/host_session_snapshot.hpp"
 #include "gui_forms/types.hpp"
+#include "gui_forms/window/presentation/input_settings.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -449,6 +450,17 @@ struct HostCompositorEvent final {
     CompositorState state{};
 };
 
+// The platform's input settings that controls read (stage W, ListView label
+// editing): reported after attach and again whenever the system setting
+// changes. The session copies them into the window's PresentationSettings
+// (double_click_milliseconds and double_click_origin), leaving every other
+// field as it is. An interval of 0 or above
+// maximum_double_click_milliseconds is refused as invalid_payload.
+struct HostInputSettingsEvent final {
+    std::uint32_t double_click_milliseconds{default_double_click_milliseconds};
+    SettingOrigin double_click_origin{SettingOrigin::host};
+};
+
 using HostEventPayload = std::variant<
     HostAttachEvent,
     HostResizeEvent,
@@ -463,7 +475,8 @@ using HostEventPayload = std::variant<
     HostCloseRequest,
     HostClosedEvent,
     HostShutdownEvent,
-    HostCompositorEvent>;
+    HostCompositorEvent,
+    HostInputSettingsEvent>;
 
 struct HostEvent final {
     std::uint64_t sequence{};

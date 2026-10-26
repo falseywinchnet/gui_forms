@@ -9,7 +9,8 @@ advertised protocol surface; some native integrations are not advertised yet.
 
 ## The host protocol
 
-`HostCapabilities` carries `protocol_version` (currently 9), a `platform`
+`HostCapabilities` carries `protocol_version` (currently 10; one row per version in
+`host_protocol_revisions`), a `platform`
 string, a bit set of `HostCapability` flags and the host's keyboard-command
 defaults (`key_map`, below). `Application::capabilities()`
 returns the set for the host your program was linked against, before any
@@ -103,6 +104,29 @@ click-through. The measurements behind this are in
 macOS and X11 do not advertise these capabilities yet; they arrive with
 their phases of stage T5. The headless reference host simulates them
 (`HeadlessApplication::simulate_compositor_state`).
+
+## Input settings
+
+Every host reports the platform's double-click interval after a window
+attaches, and again when the system setting changes (`HostInputSettingsEvent`,
+protocol version 10). The window keeps it in its `PresentationSettings`, the
+record controls already read, as `double_click_milliseconds`. A control that
+must tell a slow second click from a double-click, such as a list starting a
+label edit, compares against it. `double_click_origin` says where the value
+came from: `SettingOrigin::host` for the platform's own setting, or
+`SettingOrigin::default_value` for GUI.Forms' stated default of 400 ms
+(`default_double_click_milliseconds`). The interval is a perceptual duration,
+between 1 and 5000 ms. A report changes only these two fields, so the
+application's own presentation settings stay as they are.
+
+| Host | Source | Refreshed |
+|---|---|---|
+| Windows | `GetDoubleClickTime` | on `WM_SETTINGCHANGE`, when the value moved |
+| macOS | `NSEvent.doubleClickInterval` | on each activation, when the value moved (AppKit posts no change notification, and the setting is changed in System Settings) |
+| Linux X11 | the XSETTINGS manager's `Net/DoubleClickTime` | on the manager's property change, a new manager, or the manager's exit; without a manager, the 400 ms default, reported as a default |
+| Headless | a fixed test value, 500 ms (`host::headless_double_click_milliseconds`) | never |
+
+The X11 host also counts its own clicks with this interval.
 
 ## Keyboard-command defaults
 

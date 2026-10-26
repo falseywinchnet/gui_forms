@@ -218,7 +218,9 @@ void test_state_validation_and_json() {
                     "\"reduced_transparency\":false,\"high_contrast\":false}",
             "the state's JSON names every field");
     const HostCapabilities capabilities = host::headless_capabilities();
-    require(capabilities.protocol_version == 9U, "protocol version 9 carries the compositor report");
+    require(capabilities.protocol_version >= 9U && host_protocol_revisions.size() >= 2U &&
+                host_protocol_revisions[1].version == 9U,
+            "protocol version 9 carries the compositor report");
     const std::string capability_json = capabilities.to_json();
     require(capability_json.find("\"transparent_windows\",\"window_backdrops\",\"compositor_notifications\","
                                  "\"presentation_preferences\"") != std::string::npos,
