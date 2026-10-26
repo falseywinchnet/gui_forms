@@ -2204,6 +2204,13 @@ if(GUI_FORMS_BUILD_TESTS)
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_text_tests COMMAND gui_forms_windows_text_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        add_executable(gui_forms_windows_backplane_replay_tests tests/windows_backplane_replay_tests.cpp)
+        target_compile_definitions(gui_forms_windows_backplane_replay_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_backplane_replay_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_backplane_replay_tests COMMAND gui_forms_windows_backplane_replay_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         add_executable(gui_forms_windows_part_composite_tests tests/windows_part_composite_tests.cpp)
         target_compile_definitions(gui_forms_windows_part_composite_tests PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
@@ -3558,6 +3565,11 @@ if(GUI_FORMS_BUILD_TESTS)
             target_compile_definitions(gui_forms_text_identity_raster_tests PRIVATE
                 GUI_FORMS_TEST_CONTROL_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf")
             add_test(NAME gui_forms_text_identity_raster_tests COMMAND gui_forms_text_identity_raster_tests)
+            add_executable(gui_forms_backplane_replay_identity_tests tests/backplane_replay_identity_tests.cpp)
+            target_link_libraries(gui_forms_backplane_replay_identity_tests PRIVATE gui_forms_controls gui_forms_skia)
+            target_compile_definitions(gui_forms_backplane_replay_identity_tests PRIVATE
+                GUI_FORMS_TEST_CONTENT_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf")
+            add_test(NAME gui_forms_backplane_replay_identity_tests COMMAND gui_forms_backplane_replay_identity_tests)
         endif()
         add_executable(gui_forms_retained_draw_cache_raster_tests tests/retained_draw_cache_raster_tests.cpp)
         target_link_libraries(gui_forms_retained_draw_cache_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
