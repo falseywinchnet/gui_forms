@@ -401,7 +401,7 @@ refined in P1):
 |---|---|---|
 | E1xx lexical | error | `invalid_utf8` (E101), `nul_byte`, `unterminated_string`, `unterminated_comment`, `escape_not_admitted`, `bad_url`, `token_not_admitted`, `number_too_precise`, `number_out_of_range` (E109); numbered in this order in P1 |
 | E2xx structure | error | `unexpected_token` (E201), `unbalanced_block`, `declaration_outside_rule`, `import_after_rules`, `important_in_keyframes`, `nesting_not_admitted` (E206); numbered in this order in P2 |
-| E3xx selector | error | `selector_syntax`, `combinator_not_admitted`, `pseudo_class_not_admitted` (`:not()` and the rest), `attribute_selector_not_admitted` |
+| E3xx selector | error | `selector_syntax` (E301), `combinator_not_admitted`, `pseudo_class_not_admitted` (`:not()` and the rest), `attribute_selector_not_admitted` (E304); numbered in this order in P3 |
 | E4xx value | error | `value_syntax`, `value_wrong_kind`, `value_out_of_range`, `unit_not_admitted`, `value_form_not_admitted`, `keyword_unknown`, `too_many_layers`, `expression_invalid` (with the engine's `ExpressionDefect`), `variable_undefined`, `variable_cycle`, `keyframes_undefined`, `transition_invalid`, `resource_unknown`, `variable_kind_mismatch` |
 | E5xx limit | error | `sheet_too_large`, `too_many_rules`, `too_many_declarations`, `nesting_too_deep`, `string_too_long`, `too_many_imports`, `expression_over_budget`, `too_many_variable_combinations`, and the derived limits of section 6 |
 | E6xx package | error | `manifest_invalid`, `sheet_hash_mismatch`, `import_not_installed`, `import_hash_mismatch`, `import_cycle`, `published_value_invalid` |
@@ -532,6 +532,34 @@ pseudo-classes, `:is()` and selector-list expansion, level assignment, and
 EC2 (**engine change**: `ThemeRule` may carry its specificity). Gate: one
 conformance fixture per selector form and per refused form; specificity and
 level of each. 1 to 2 PRs.
+*Done in one PR:*
+- **EC2:** `ThemeRule::specificity`, when set, replaces the computed one.
+  A class or stable-ID rule with a given specificity needs a class or an
+  ID in that specificity rather than in its selector. An inline style still
+  needs its selector's stable ID.
+- **Level from specificity:** a rule's level comes from its specificity, so
+  `:is(#a, button)` puts its `button` expansion at `stable_id_rule` with the
+  ID's specificity. This keeps the README's reason for the three levels: they
+  order exactly as specificity does. Taken from the selector instead, they
+  would contradict CSS's `:is()`.
+- **Vocabulary:** the lowering takes the vocabulary as the caller's span of
+  `ControlAnatomy` records. A part named with a type must be declared by
+  that type (its own parts or its item systems'); a part named without a
+  type must be declared by some type.
+- **Spelling:** type, part, role and state names are lower-case kebab-case,
+  so `track_bar` or `Button` names nothing. Pseudo-class names fold ASCII
+  case, as in CSS.
+- **Unknown names (W106):** an unknown name drops the whole written rule, as
+  CSS drops a rule with an invalid selector, and reading goes on, so a later
+  error still refuses.
+- **Refused names:** a fixed list of CSS pseudo-classes (`:not()`, `:where()`,
+  `:has()`, the structural ones and others) and pseudo-elements
+  (`::before` and others) is E303. Any other name is unknown.
+- **Limits:** E509 is the 32-argument `:is()` limit. E510
+  `selector_too_long` is a new derived limit: at most 32 simple selectors in
+  one expanded selector. It bounds the expansion to a constant per rule. It
+  is a proposed starting value under R2-14, to confirm with the owner.
+  Expansion counts against the rule budget (E502).
 
 **P4. Values and expressions.** Numbers and units (em parsed, lowered in
 P8), colour literals, named colours and `color-mix()`, custom property
