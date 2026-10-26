@@ -3583,6 +3583,10 @@ Enumerations
 
    .. cpp:enumerator:: tool_tip
 
+   .. cpp:enumerator:: link
+
+   .. cpp:enumerator:: visited_link
+
    .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms

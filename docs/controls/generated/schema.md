@@ -32,7 +32,7 @@ Engine inputs: `pointer_x`, `pointer_y`, `time_in_state`, `display_scale`, `text
 
 Values: `accent_index`, `text_orientation`, `dock_region`, `content_color`.
 
-Recipe families: `window`, `panel`, `card`, `button`, `accent_button`, `command_button`, `choice`, `editor`, `menu_item`, `selection`, `progress`, `tool_tip`.
+Recipe families: `window`, `panel`, `card`, `button`, `accent_button`, `command_button`, `choice`, `editor`, `menu_item`, `selection`, `progress`, `tool_tip`, `link`, `visited_link`.
 
 Semantic roles: `generic`, `group`, `static_text`, `button`, `check_box`, `radio_button`, `link`, `text_box`, `list`, `list_item`, `check_list_item`, `combo_box`, `slider`, `scroll_bar`, `progress_bar`, `image`, `tab_group`, `tab`, `split_pane`, `numeric_field`, `tool_tip`, `date_picker`, `calendar`, `date_cell`, `property_grid`, `property_group`, `property_row`, `menu_bar`, `menu_bar_item`, `menu`, `menu_item`, `separator`, `toolbar`, `radio_group`, `split_button`, `menu_button`, `pane`, `tab_panel`, `tree`, `tree_item`, `table`, `row`, `cell`, `column_header`, `row_header`, `tree_grid`, `dialog`, `status_bar`, `live_region`.
 
