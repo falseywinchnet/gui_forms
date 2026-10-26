@@ -5,7 +5,7 @@
 Control and component
 =====================
 
-The base classes every control and nonvisual component derives from, with layout, docking, anchoring and validation vocabularies, and the anatomy each control publishes: named parts, part roles and states, and the interactions each type raises.
+The base classes every control and nonvisual component derives from, with layout, docking, anchoring and validation vocabularies (layout constraints, intrinsic sizes and layout direction among them), and the anatomy each control publishes: named parts, part roles and states, and the interactions each type raises.
 
 .. list-table::
    :class: autosummary longtable
@@ -38,6 +38,8 @@ Related types
      - A bounded set of active standard and custom states.
    * - :cpp:class:`AnatomyValidation <gui_forms::AnatomyValidation>`
      - The result of validate_control_anatomy: the first defect found, or none.
+   * - :cpp:class:`AvailableExtent <gui_forms::AvailableExtent>`
+     - One axis of a layout constraint.
    * - :cpp:class:`ComponentContainer <gui_forms::ComponentContainer>`
      - ComponentContainer owns a unique ordered set of shared components and disposes the captured ownership sequence exactly once.
    * - :cpp:class:`Control::Parts <gui_forms::Control::Parts>`
@@ -62,8 +64,12 @@ Related types
      - One kind of repeated item a control paints (owner decision 5): a list row, a tree node, a details-view column header.
    * - :cpp:class:`ItemSystemIndex <gui_forms::ItemSystemIndex>`
      - Position of an item system in its control type's declaration list.
+   * - :cpp:class:`LayoutConstraint <gui_forms::LayoutConstraint>`
+     - A measure query on both axes.
    * - :cpp:class:`LayoutTransactionState <gui_forms::LayoutTransactionState>`
      - LayoutTransactionState exposes suspension depth, deferred work, and requested-versus-committed revisions without leaking a host layout engine.
+   * - :cpp:class:`LogicalLength <gui_forms::LogicalLength>`
+     - A layout length in logical units (device-independent pixels), the unit of every retained bound.
    * - :cpp:class:`MnemonicText <gui_forms::MnemonicText>`
      - MnemonicText separates rendered UTF-8 from the optional activation scalar parsed from Forms-compatible ampersand notation.
    * - :cpp:class:`OwnerDecorationRecipe <gui_forms::OwnerDecorationRecipe>`
@@ -142,6 +148,20 @@ Related types
    .. cpp:member:: std::size_t item_system
 
       The item system an item defect concerns; zero otherwise.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: AvailableExtent final
+
+   ``#include <gui_forms/layout/types/layout_types.hpp>``
+
+   One axis of a layout constraint. ``extent`` is read only for ``definite`` and ``at_most``, and must then be finite and nonnegative; the content kinds carry a zero extent.
+
+   .. cpp:member:: AvailableExtentKind kind
+
+      Default: ``{AvailableExtentKind::at_most}``.
+
+   .. cpp:member:: LogicalLength extent
 
 .. cpp:namespace:: gui_forms
 
@@ -349,6 +369,18 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: LayoutConstraint final
+
+   ``#include <gui_forms/layout/types/layout_types.hpp>``
+
+   A measure query on both axes. Control::measure_for_layout answers it and caches the answer under exactly this value.
+
+   .. cpp:member:: AvailableExtent width
+
+   .. cpp:member:: AvailableExtent height
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: LayoutTransactionState final
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -362,6 +394,24 @@ Related types
    .. cpp:member:: std::uint64_t requested_revision
 
    .. cpp:member:: std::uint64_t committed_revision
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: LogicalLength final
+
+   ``#include <gui_forms/layout/types/layout_types.hpp>``
+
+   A layout length in logical units (device-independent pixels), the unit of every retained bound. Device pixels appear only where paint snaps edges, so a layout length is never added to a device-pixel quantity by accident.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit constexpr LogicalLength(double value = 0.0) noexcept
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: constexpr double value() const noexcept
 
 .. cpp:namespace:: gui_forms
 
@@ -704,6 +754,20 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: AvailableExtentKind
+
+   ``#include <gui_forms/layout/types/layout_types.hpp>``
+
+   .. cpp:enumerator:: definite
+
+   .. cpp:enumerator:: at_most
+
+   .. cpp:enumerator:: min_content
+
+   .. cpp:enumerator:: max_content
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: BoundsSpecified
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -867,6 +931,18 @@ Enumerations
    .. cpp:enumerator:: name_not_snake_case
 
    .. cpp:enumerator:: duplicate_name
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: LayoutDirection
+
+   ``#include <gui_forms/layout/types/layout_types.hpp>``
+
+   .. cpp:enumerator:: inherit
+
+   .. cpp:enumerator:: left_to_right
+
+   .. cpp:enumerator:: right_to_left
 
 .. cpp:namespace:: gui_forms
 
@@ -1102,6 +1178,34 @@ Functions, constants and aliases
 ``#include <gui_forms/control/static_tree/control_factory/control_factory.hpp>``
 
 .. cpp:function:: Control::Ptr build_static_tree(const StaticNode& node, const ControlFactory& factory)
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/types/layout_types.hpp>``
+
+.. cpp:function:: constexpr AvailableExtent definite_extent(LogicalLength extent) noexcept
+
+.. cpp:function:: constexpr AvailableExtent at_most_extent(LogicalLength extent) noexcept
+
+.. cpp:function:: constexpr AvailableExtent min_content_extent() noexcept
+
+.. cpp:function:: constexpr AvailableExtent max_content_extent() noexcept
+
+.. cpp:function:: constexpr LayoutConstraint layout_constraint_at_most(Size available) noexcept
+
+   The query today's measure(Size available) answers: at most ``available`` on each axis.
+
+.. cpp:function:: bool valid_layout_constraint(const LayoutConstraint& constraint) noexcept
+
+   True when every extent the constraint reads is finite and nonnegative and every content kind carries a zero extent.
+
+.. cpp:function:: Size measure_available_size(const LayoutConstraint& constraint) noexcept
+
+   The ``available`` argument of Control::measure(Size) for a constraint: a definite or at-most axis passes its extent, a content axis the practical unbounded extent.
+
+.. cpp:var:: constexpr double practical_unbounded_extent
+
+   The extent Control::measure(Size) and get_preferred_size(Size{}) already use for "unbounded", kept finite so retained state never holds an infinity. Value: ``1.0e9``.
 
 .. cpp:namespace:: gui_forms
 

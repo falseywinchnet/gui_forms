@@ -156,7 +156,7 @@ Types
 
    .. cpp:function:: ImageLoadResult load_image(std::span<const std::byte> encoded)
 
-      Admits an encoded image file, CNG or PNG, chosen by its signature: its framing is validated (validate_png, or the CNG framing check) and its dimensions held to the limits. A file of neither format is invalid_signature.
+      Admits an encoded image file, its format chosen by its signature: PNG is the only one admitted. Its framing is validated (validate_png) and its dimensions held to the limits; a file of no admitted format is invalid_signature.
 
    .. cpp:function:: ImageLoadResult load_png(std::span<const std::byte> encoded)
 
@@ -276,7 +276,7 @@ Types
 
    .. cpp:member:: std::span<const std::byte> encoded
 
-      The encoded file (png, cng) or the pixels (bgra32_premultiplied).
+      The encoded file (png) or the pixels (bgra32_premultiplied).
 
    .. cpp:member:: std::uint64_t row_bytes
 
@@ -356,8 +356,6 @@ Enumerations
 
    .. cpp:enumerator:: bgra32_premultiplied
 
-   .. cpp:enumerator:: cng
-
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: ImageResourceError
@@ -417,10 +415,6 @@ Enumerations
    .. cpp:enumerator:: stale_image_id
 
    .. cpp:enumerator:: allocation_failed
-
-   .. cpp:enumerator:: invalid_image_header
-
-   .. cpp:enumerator:: invalid_image_data
 
 .. cpp:namespace:: gui_forms
 

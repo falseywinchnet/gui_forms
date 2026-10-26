@@ -109,7 +109,9 @@ FreeType is built without zlib (general-availability record
 (CONV interpolation, the face-variant generator) and `stx_cng` (CNG, the
 native resource format, with PNG kept for interchange; #270, #276). The owner
 placed this work in 0.2 as done (2026-10-23). It does not change other stage
-gates.
+gates. On 2026-10-26 the owner removed CNG ("we can remove it entirely. we
+have our own png and zlib after all"): PNG is the only image codec, and
+`stx_cng` remains in git history.
 
 ## 3. Foundations
 

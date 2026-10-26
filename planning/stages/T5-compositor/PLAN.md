@@ -207,23 +207,27 @@ WindowBackdropGrant    granted backdrop
                        reason: granted | not_declared | host_unsupported |
                                os_version | no_compositor |
                                transparency_disabled | reduced_transparency |
-                               high_contrast | after_shutdown
+                               high_contrast | backend_failure
                        compositor generation it was decided at
 ```
 
 - Resolving a grant is a pure function of the request and the
   `CompositorState`, in the core, tested headless. Adapters report state
   and apply grants; they do not decide.
-- `ApplicationWindowHandle::request_backdrop` returns the grant
-  synchronously, as an explicit result. An undeclared window gets
-  `opaque` with `not_declared`; a call after close gets `after_shutdown`.
+- `Window::request_backdrop` returns the grant synchronously, as an
+  explicit result (the application holds its `Window` in the ready
+  callback, and in C5 the theme asks through the same window). An
+  undeclared window gets `opaque` with `not_declared`. A malformed request
+  (no entries, a repeat, `opaque` before the end) is a programmer error and
+  throws, changing nothing.
 - An `opaque` grant is drawn by GUI.Forms, with the theme's opaque window
   material, rather than left to the compositor's own fallback colour
   (Mica's inactive solid, X11's black): the window always looks like the
   theme, and the pixels are what the frame capture records.
-- Native state is validated before it is changed: if the host call that
-  applies a material fails, the window keeps its previous grant and the
-  failure is reported in the grant's reason.
+- Native state is validated before it is changed: a host call that fails
+  to apply a backdrop leaves the native window as it was; the window then
+  falls back to `opaque` (which an adapter never fails) and the grant's
+  reason says `backend_failure`.
 
 ### 2.4 Changes at run time
 
@@ -241,11 +245,12 @@ WindowBackdropGrant    granted backdrop
   replaced and its generation advanced; then each window's grant is
   resolved again, in window-open order; each window whose grant changed
   raises `backdrop_changed`, advances its backplane generation and damages
-  the whole backplane plane; the next flush paints and presents once. A
-  change that arrives inside an update scope waits for the scope's flush
-  boundary. Handlers that call `request_backdrop` during
-  `backdrop_changed` get a grant against the new state; the event is not
-  raised again for the same generation.
+  the whole backplane plane; the next flush paints and presents once.
+  Host events are dispatched between update scopes, so the repaint joins
+  the next flush. A report that changes only the generation raises
+  nothing. A handler that calls `request_backdrop` during
+  `backdrop_changed` raises its own event within the first; later
+  handlers of the first emission still see its grant.
 - **No error.** A compositor stopping is not a failure: the window turns
   opaque at the next frame and its grant says why.
 
