@@ -1089,6 +1089,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         src/host/macos/services/appkit_host_services.mm
         src/host/macos/services/appkit_clipboard_image.mm
         src/host/macos/services/appkit_status_items.mm
+        src/host/macos/compositor/macos_compositor.mm
     )
     target_include_directories(gui_forms_host_macos PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/macos
@@ -2162,6 +2163,17 @@ if(GUI_FORMS_BUILD_TESTS)
                 runtimeobject)
             add_test(NAME gui_forms_windows_compositor_tests COMMAND gui_forms_windows_compositor_tests)
             set_tests_properties(gui_forms_windows_compositor_tests PROPERTIES TIMEOUT 60)
+        endif()
+        if(GUI_FORMS_ENABLE_MACOS_HOST)
+            # Stage T5, phase C3's gate: a non-opaque window over a green
+            # backdrop, read back from AppKit and off the composed screen.
+            # Serial: it floats its windows over the desktop while it reads.
+            add_executable(gui_forms_macos_compositor_tests tests/macos_compositor_tests.mm)
+            target_compile_options(gui_forms_macos_compositor_tests PRIVATE -fobjc-arc)
+            target_link_libraries(gui_forms_macos_compositor_tests PRIVATE gui_forms_application
+                ${GUI_FORMS_APPKIT} ${GUI_FORMS_COREGRAPHICS})
+            add_test(NAME gui_forms_macos_compositor_tests COMMAND gui_forms_macos_compositor_tests)
+            set_tests_properties(gui_forms_macos_compositor_tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
         endif()
         # Stage DK W0 measurement (results/2026-10-18-dk-w0-capture-drag/): it
         # puts windows on the desktop, so it is built but never run by ctest.
