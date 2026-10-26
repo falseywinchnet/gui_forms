@@ -34,7 +34,7 @@ constexpr gui_forms::Rect bottom_box{24.15, 6.43, 11.6, 10.11 - 6.43};
 constexpr gui_forms::Rect stroked{3.3, 13.6, 14.45, 7.2};
 constexpr double stroke_width = 1.3;
 constexpr gui_forms::Rect gradient_box{24.15, 13.6, 11.6, 7.2};
-constexpr int gradient_dither = 2; // bytes; see check_scene
+constexpr int gradient_dither = 2; // bytes; see gradient_coverage
 constexpr gui_forms::Rect rounded_box{6.35, 24.2, 27.4, 6.6};
 constexpr double rounded_radius = 2.2;
 
@@ -144,18 +144,14 @@ inline bool shared_edge(const PixelImage& image, const double scale, const bool 
 
 // Every pixel of `area` (logical, before the translation) is the background
 // or one ink colour, and some pixel is inked: coverage is all or nothing.
-// An inked pixel may differ from the first by `tolerance` in each byte, for
-// a painter that dithers what it fills; a partly covered pixel differs by far
-// more. The largest difference seen is printed, as evidence of the dither.
 inline bool whole_pixels(const PixelImage& image, const double scale, const gui_forms::Rect area,
-                         const std::uint32_t background, const int tolerance, const char* const name) {
+                         const std::uint32_t background) {
     const int left = device_edge(area.x, translation.x, scale);
     const int top = device_edge(area.y, translation.y, scale);
     const int right = device_edge(area.right(), translation.x, scale);
     const int bottom = device_edge(area.bottom(), translation.y, scale);
     bool inked = false;
     std::uint32_t ink = background;
-    int largest = 0;
     for (int y = top; y < bottom; ++y) {
         for (int x = left; x < right; ++x) {
             const std::uint32_t value = pixel_at(image, x, y);
@@ -165,13 +161,85 @@ inline bool whole_pixels(const PixelImage& image, const double scale, const gui_
                 ink = value;
                 continue;
             }
-            const int distance = channel_distance(value, ink);
-            if (distance > tolerance) return fail_values("a partly covered pixel", scale, x, y, value, ink);
-            largest = std::max(largest, distance);
+            if (value != ink) return fail_values("a partly covered pixel", scale, x, y, value, ink);
         }
     }
     if (!inked) return fail("nothing painted", scale, left, top);
-    std::cout << "edge snapping: " << name << " at scale " << scale << ", largest ink difference " << largest << '\n';
+    return true;
+}
+
+// Each byte's smallest and largest value over a set of pixels.
+struct ByteRange final {
+    std::array<int, 4> low{255, 255, 255, 255};
+    std::array<int, 4> high{0, 0, 0, 0};
+};
+
+inline void widen(ByteRange& range, const std::uint32_t value) {
+    for (std::size_t index = 0; index < 4U; ++index) {
+        const int byte = static_cast<int>((value >> (index * 8U)) & 0xffU);
+        range.low[index] = std::min(range.low[index], byte);
+        range.high[index] = std::max(range.high[index], byte);
+    }
+}
+
+inline bool within(const ByteRange& range, const std::uint32_t value) {
+    for (std::size_t index = 0; index < 4U; ++index) {
+        const int byte = static_cast<int>((value >> (index * 8U)) & 0xffU);
+        if (byte < range.low[index] || byte > range.high[index]) return false;
+    }
+    return true;
+}
+
+// The flat gradient, with its coverage and its colour checked apart. Quartz
+// dithers gradient shading, so the colour inside may vary by a step of its
+// bytes; coverage may not.
+// - Coverage, exact: every pixel inside the rounded device box is inked
+//   (not the background) and every pixel in the two-pixel band around it is
+//   the background, so the box's edges are its rounded edges exactly.
+// - Interior colour: the pixels at least one pixel in from the box's edges
+//   differ from the first by at most `gradient_dither` in each byte.
+// - Edge colour: each pixel on the box's edge lies, byte by byte, within the
+//   range the interior showed, so a painter that does not dither must paint
+//   its edges exactly the interior colour, and a partly covered edge pixel
+//   (tens of levels toward the background) fails either way.
+// The largest interior difference is printed, as evidence of the dither.
+inline bool gradient_coverage(const PixelImage& image, const double scale, const std::uint32_t background) {
+    const int left = device_edge(gradient_box.x, translation.x, scale);
+    const int top = device_edge(gradient_box.y, translation.y, scale);
+    const int right = device_edge(gradient_box.right(), translation.x, scale);
+    const int bottom = device_edge(gradient_box.bottom(), translation.y, scale);
+    if (right - left < 3 || bottom - top < 3) return fail("the gradient box has no interior", scale, left, top);
+    for (int y = top - 2; y < bottom + 2; ++y) {
+        for (int x = left - 2; x < right + 2; ++x) {
+            const bool inside = x >= left && x < right && y >= top && y < bottom;
+            const std::uint32_t value = pixel_at(image, x, y);
+            if (inside && value == background) return fail("a gradient pixel inside its box is not painted", scale, x, y);
+            if (!inside && value != background) {
+                return fail_values("a gradient pixel outside its rounded box", scale, x, y, value, background);
+            }
+        }
+    }
+    const std::uint32_t ink = pixel_at(image, left + 1, top + 1);
+    ByteRange interior{};
+    int largest = 0;
+    for (int y = top + 1; y < bottom - 1; ++y) {
+        for (int x = left + 1; x < right - 1; ++x) {
+            const std::uint32_t value = pixel_at(image, x, y);
+            const int distance = channel_distance(value, ink);
+            if (distance > gradient_dither) return fail_values("the gradient's interior is not flat", scale, x, y, value, ink);
+            largest = std::max(largest, distance);
+            widen(interior, value);
+        }
+    }
+    for (int y = top; y < bottom; ++y) {
+        for (int x = left; x < right; ++x) {
+            const bool edge = x == left || x == right - 1 || y == top || y == bottom - 1;
+            if (!edge) continue;
+            const std::uint32_t value = pixel_at(image, x, y);
+            if (!within(interior, value)) return fail_values("a partly covered gradient edge pixel", scale, x, y, value, ink);
+        }
+    }
+    std::cout << "edge snapping: the gradient at scale " << scale << ", largest interior difference " << largest << '\n';
     return true;
 }
 
@@ -237,12 +305,8 @@ inline bool check_scene(const PixelImage& image, const double scale) {
         device_edge(bottom_box.bottom(), translation.y, scale), background);
     const gui_forms::Rect stroke_area{stroked.x - stroke_width, stroked.y - stroke_width,
                                       stroked.width + stroke_width * 2.0, stroked.height + stroke_width * 2.0};
-    const bool stroke = whole_pixels(image, scale, stroke_area, background, 0, "the stroke");
-    const gui_forms::Rect gradient_area{gradient_box.x - 1.0, gradient_box.y - 1.0,
-                                        gradient_box.width + 2.0, gradient_box.height + 2.0};
-    // Quartz dithers gradient shading, so a flat gradient's pixels may differ
-    // by a step of their bytes; the other painters fill it exactly.
-    const bool gradient = whole_pixels(image, scale, gradient_area, background, gradient_dither, "the gradient");
+    const bool stroke = whole_pixels(image, scale, stroke_area, background);
+    const bool gradient = gradient_coverage(image, scale, background);
     const int rounded_row = device_edge(27.5, translation.y, scale);
     const bool rounded_across = border_on_fill(image, scale, true, rounded_row, rounded_box.x, rounded_box.right(),
         translation.x, device_edge(rounded_box.x - 2.0, translation.x, scale),
