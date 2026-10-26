@@ -177,7 +177,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sh gui_forms/tools/install_linux_ci_packages.sh programs "$RUNNER_TEMP/apt-archives"
       - uses: actions/cache/save@v4
-        if: runner.os == 'Linux' && github.event_name != 'pull_request' && steps.linux-packages.outputs.cache-hit != 'true'
+        if: runner.os == 'Linux' && github.event_name != 'pull_request' && github.event_name != 'merge_group' && steps.linux-packages.outputs.cache-hit != 'true'
         with:
           path: ${{ runner.temp }}/apt-archives
           key: ${{ steps.linux-packages.outputs.cache-primary-key }}
@@ -321,18 +321,18 @@ jobs:
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.objects.outputs.cache-hit != 'true'
         run: python gui_forms/tools/ci_cache.py evict --since "$GUI_FORMS_JOB_START"
       - uses: actions/cache/save@v4
-        if: always() && github.event_name != 'pull_request' && steps.compile.outcome == 'success' && steps.objects.outputs.cache-hit != 'true'
+        if: always() && github.event_name != 'pull_request' && github.event_name != 'merge_group' && steps.compile.outcome == 'success' && steps.objects.outputs.cache-hit != 'true'
         with:
           path: .ccache
           key: ${{ steps.objects.outputs.cache-primary-key }}
-      # A pull request called from native.yml runs only the tests its native
-      # job did not pass on this tree: those of the Gallery, the demoboard and
-      # any the native job skipped (tools/native_tests.py).
-      # A push to main merges an up-to-date pull request, so it has the tree
-      # that pull request's run tested: main's native job reuses that run's
-      # validation, and this job carries that run's programs receipt (the
-      # rest of the tests) instead of running them again (owner's choice,
-      # 2026-10-23). A release tag names a tree main has already tested and
+      # A pull request or a merge group called from native.yml runs only the
+      # tests its native job did not pass on this tree: those of the Gallery,
+      # the demoboard and any the native job skipped (tools/native_tests.py).
+      # A push to main is the commit its merge group tested (or, merged
+      # without the queue, has the tree of the up-to-date pull request it
+      # merges): main's native job reuses that run's validation, and this job
+      # carries that run's programs receipt (the rest of the tests) instead
+      # of running them again (owner's choice, 2026-10-23). A release tag names a tree main has already tested and
       # carries main's receipt the same way. Both still package and smoke
       # test under their own version (tools/release_tests.py). With no such
       # run, or one that has not finished, the job runs every test. The daily
@@ -350,7 +350,7 @@ jobs:
         if: steps.tested.outputs.reused != 'true'
         env:
           GUI_FORMS_FONT_DIR: ${{ github.workspace }}/gui_forms/assets/fonts
-          NARROW: ${{ inputs.from_native && github.event_name == 'pull_request' }}
+          NARROW: ${{ inputs.from_native && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
         run: |
           mkdir -p dist
           selection=ALL

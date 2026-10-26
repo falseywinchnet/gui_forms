@@ -190,6 +190,7 @@ add_library(gui_forms_core STATIC
     src/core/text/unicode/unicode_grapheme.cpp
     src/core/typography/resolution/typography_resolution.cpp
     src/core/layout/types/layout_types.cpp
+    src/core/layout/style_reader/layout_style_reader.cpp
     src/core/metrics/metrics/metrics.cpp
     src/core/metrics/snapshot/metrics_snapshot.cpp
     src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp
@@ -218,6 +219,7 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/selector/theme_selector.cpp
     src/core/theme_language/custom_properties/theme_custom_properties.cpp
     src/core/theme_language/value/theme_value.cpp
+    src/core/theme_language/compiler/theme_compiler.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
     src/core/docking/dock_layout/dock_layout.cpp
@@ -622,8 +624,10 @@ add_library(gui_forms_controls STATIC
     src/controls/data_grid_view/data_grid_view_row_order.cpp
     src/controls/task_dialog/task_dialog.cpp
     src/controls/notify_icon/notify_icon.cpp
+    src/controls/file_dialog/file_dialog_support.cpp
     src/controls/file_dialog/file_dialog_types.cpp
     src/controls/open_file_dialog/open_file_dialog.cpp
+    src/controls/save_file_dialog/save_file_dialog.cpp
     src/controls/thread_exception_dialog/thread_exception_dialog.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
@@ -2545,7 +2549,8 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_xml_tests COMMAND gui_forms_xml_tests)
 
     # The theme language (stage T3): numbers, tokens, diagnostics, the syntax
-    # tree, and the deterministic mutation run over the tokenizer and parser.
+    # tree, selectors, values, the compiler, and the deterministic mutation
+    # run over the tokenizer, parser and value reader.
     add_executable(gui_forms_theme_number_tests tests/theme_language/theme_number_tests.cpp)
     target_link_libraries(gui_forms_theme_number_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_number_tests COMMAND gui_forms_theme_number_tests)
@@ -2564,6 +2569,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_value_tests tests/theme_language/theme_value_tests.cpp)
     target_link_libraries(gui_forms_theme_value_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_value_tests COMMAND gui_forms_theme_value_tests)
+
+    add_executable(gui_forms_theme_compiler_tests tests/theme_language/theme_compiler_tests.cpp)
+    target_link_libraries(gui_forms_theme_compiler_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_compiler_tests COMMAND gui_forms_theme_compiler_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
@@ -2894,6 +2903,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_open_file_dialog_tests tests/open_file_dialog_tests.cpp)
     target_link_libraries(gui_forms_open_file_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_open_file_dialog_tests COMMAND gui_forms_open_file_dialog_tests)
+    add_executable(gui_forms_save_file_dialog_tests tests/save_file_dialog_tests.cpp)
+    target_link_libraries(gui_forms_save_file_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_save_file_dialog_tests COMMAND gui_forms_save_file_dialog_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)
@@ -2929,6 +2941,15 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_layout_contract_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_layout_contract_tests
              COMMAND gui_forms_layout_contract_tests)
+
+    # Stage L, phase L2: the layout style reader, against its conformance
+    # table and the layout corpus's style attributes.
+    add_executable(gui_forms_layout_style_tests
+        tests/layout_style_tests.cpp
+    )
+    target_link_libraries(gui_forms_layout_style_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_layout_style_tests
+             COMMAND gui_forms_layout_style_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/layout_corpus)
 
     add_executable(gui_forms_layout_panel_tests
         tests/layout_panel_tests.cpp

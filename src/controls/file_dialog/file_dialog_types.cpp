@@ -1,5 +1,6 @@
 #include "gui_forms/components/file_dialog_types/file_dialog_types.hpp"
 
+#include "file_dialog_support.hpp"
 #include "gui_forms/host/services/host_services.hpp"
 #include "gui_forms/text.hpp"
 
@@ -23,25 +24,6 @@ std::string_view trimmed(std::string_view text) noexcept {
     return result;
 }
 
-// Characters an extension may not hold: wildcards, path separators, and the
-// characters Windows forbids in a file name.
-bool is_extension_character(char character) noexcept {
-    switch (character) {
-    case '*':
-    case '?':
-    case '/':
-    case '\\':
-    case ':':
-    case '<':
-    case '>':
-    case '"':
-    case '|':
-        return false;
-    default:
-        return true;
-    }
-}
-
 // One pattern as a host extension: `*` for any file, else the text after
 // `*.`. Writes `extension` only when the pattern is supported.
 FileDialogFilterError pattern_extension(std::string_view pattern, std::string& extension) {
@@ -52,9 +34,7 @@ FileDialogFilterError pattern_extension(std::string_view pattern, std::string& e
     }
     if (pattern.size() < 3U || pattern.substr(0U, 2U) != "*.") return FileDialogFilterError::unsupported_pattern;
     const std::string_view rest = pattern.substr(2U);
-    for (const char character : rest) {
-        if (!is_extension_character(character)) return FileDialogFilterError::unsupported_pattern;
-    }
+    if (!detail::file_dialog_extension_valid(rest)) return FileDialogFilterError::unsupported_pattern;
     extension.assign(rest);
     return FileDialogFilterError::none;
 }

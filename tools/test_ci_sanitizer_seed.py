@@ -33,6 +33,28 @@ class CandidateBranchTests(unittest.TestCase):
         self.assertEqual(ci_sanitizer_seed.candidate_branches('push', '', '', ['claude/a', 'main', 'claude/a', 'x']),
                          ['claude/a', 'x'])
 
+    def test_a_merge_group_seeds_from_its_queued_pull_requests_head(self) -> None:
+        self.assertEqual(ci_sanitizer_seed.candidate_branches('merge_group', '', '', ['claude/a']), ['claude/a'])
+
+    def test_a_merge_groups_ref_names_its_pull_request(self) -> None:
+        base: str = '0123456789abcdef0123456789abcdef01234567'
+        self.assertEqual(ci_sanitizer_seed.queued_pull_request('refs/heads/gh-readonly-queue/main/pr-361-' + base),
+                         '361')
+        self.assertEqual(ci_sanitizer_seed.queued_pull_request(
+            'refs/heads/gh-readonly-queue/release/1.0/pr-7-' + base), '7')
+        self.assertEqual(ci_sanitizer_seed.queued_pull_request('refs/heads/main'), '')
+        self.assertEqual(ci_sanitizer_seed.queued_pull_request('refs/heads/gh-readonly-queue/main/pr-7-xyz'), '')
+
+    def test_a_queued_pull_request_from_a_fork_has_no_seed_branch(self) -> None:
+        ref: str = 'refs/heads/gh-readonly-queue/main/pr-7-' + 'a' * 40
+        own: dict[str, Any] = {'head': {'ref': 'claude/a', 'repo': {'full_name': 'owner/repo'}}}
+        with patch.object(ci_sanitizer_seed, 'api', return_value=own):
+            self.assertEqual(ci_sanitizer_seed.queued_head_branches('owner/repo', ref), ['claude/a'])
+        fork: dict[str, Any] = {'head': {'ref': 'claude/a', 'repo': {'full_name': 'someone/repo'}}}
+        with patch.object(ci_sanitizer_seed, 'api', return_value=fork):
+            self.assertEqual(ci_sanitizer_seed.queued_head_branches('owner/repo', ref), [])
+        self.assertEqual(ci_sanitizer_seed.queued_head_branches('owner/repo', 'refs/heads/main'), [])
+
     def test_nothing_else_has_candidates(self) -> None:
         self.assertEqual(ci_sanitizer_seed.candidate_branches('workflow_dispatch', '', '', []), [])
 

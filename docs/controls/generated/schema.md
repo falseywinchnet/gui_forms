@@ -2842,6 +2842,12 @@ Interactions beyond every control's: none.
 |---|---|
 | `file_ok` | `FileDialogOk`, by reference |
 
+## `save_file_dialog` (SaveFileDialog, component)
+
+| Interaction | Payload |
+|---|---|
+| `file_ok` | `FileDialogOk`, by reference |
+
 ## `image_list` (ImageList, component)
 
 | Interaction | Payload |

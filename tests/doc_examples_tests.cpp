@@ -2862,6 +2862,25 @@ void example() {
 }
 }  // namespace doc_example_RibbonToolTip_1
 
+namespace doc_example_SaveFileDialog_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    gf::SaveFileDialog dialog;
+    dialog.set_title("Export report");
+    dialog.set_filter("Reports|*.txt|All files|*.*");
+    dialog.set_default_ext("txt");
+    dialog.set_file_name("summary");
+    const gf::DialogResult result = dialog.show_dialog(window);
+    if (result == gf::DialogResult::ok) {
+        const std::string& path = dialog.file_name();
+        static_cast<void>(path);
+    } else if (result == gf::DialogResult::none) {
+        // Without a host, dialog.status().error is gf::HostServiceError::unsupported.
+    }
+}
+}  // namespace doc_example_SaveFileDialog_1
+
 namespace doc_example_ScaledGroupBox_1 {
 void example() {
     std::shared_ptr<gf::ScaledGroupBox> pad = gf::make_control<gf::ScaledGroupBox>(
@@ -4087,6 +4106,7 @@ int main() {
     failures += run("RibbonFontControl example 1", &doc_example_RibbonFontControl_1::example);
     failures += run("RibbonGallery example 1", &doc_example_RibbonGallery_1::example);
     failures += run("RibbonToolTip example 1", &doc_example_RibbonToolTip_1::example);
+    failures += run("SaveFileDialog example 1", &doc_example_SaveFileDialog_1::example);
     failures += run("ScaledGroupBox example 1", &doc_example_ScaledGroupBox_1::example);
     failures += run("ScaledPanel example 1", &doc_example_ScaledPanel_1::example);
     failures += run("ScrollBar example 1", &doc_example_ScrollBar_1::example);

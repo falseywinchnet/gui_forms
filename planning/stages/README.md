@@ -257,7 +257,7 @@ naming still need a reviewer reading against the full document.
 ## Branches, pull requests and the public site
 
 - Never push to `main`. Work on a `claude/<topic>` branch, open a pull
-  request against `main` on `falseywinchnet/gui_forms`, and let the owner
+  request against `main` on `malkuth-software/gui_forms`, and let the owner
   merge. The owner deletes merged branches.
 - Ask before anything outward-facing: repository settings, releases,
   publishing artifacts other than your own stage board updates.

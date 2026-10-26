@@ -111,17 +111,27 @@ enum class DiagnosticCode : std::uint16_t {
     // A value of more than maximum_substituted_tokens tokens once its var()s
     // are substituted.
     substitution_too_long = 512,
+    // A sheet whose lowered records would take more than
+    // maximum_lowered_bytes (the selector lists and their copies of each
+    // rule's declarations, PLAN.md P5).
+    lowered_sheet_too_large = 513,
     // E7xx reserved names: a theme that defines an engine input or a
     // published value (R2-06).
     reserved_input_set = 701,
     // E999 is temporary: a form a later phase gives its meaning, refused
     // until then so that no interim meaning ships (PLAN.md P4: a custom
-    // property with several definitions, until P12).
+    // property with several definitions, until P12; P5: `!important`, the
+    // at-rules, and the properties of P6 to P8).
     not_yet_built = 999,
     // W1xx unknown names (B3): the item is dropped and the rest applies.
     // A property name the language does not know; the declaration is
     // dropped.
     unknown_property = 1101,
+    // A `primitive:` the registry does not have; its parameters are dropped
+    // with it.
+    unknown_primitive = 1102,
+    // A function the language does not know, as a property's value.
+    unknown_function = 1103,
     // An at-rule other than @import, @media and @keyframes; its block is
     // skipped.
     unknown_at_rule = 1104,
@@ -132,6 +142,16 @@ enum class DiagnosticCode : std::uint16_t {
     // `grid-template` or `aspect-ratio`; the declaration is dropped, with
     // the property named.
     property_not_admitted = 1107,
+    // A registered primitive the engine's budgets refuse (R2-08): one
+    // declaring more than maximum_operations_per_device_pixel operations
+    // per device pixel, or declaring no bound.
+    primitive_over_budget = 1108,
+    primitive_cost_unbounded = 1109,
+    // W3xx versions (R2-07): the sheet declares a newer engine than the
+    // running one, reported once; and, in such a sheet, a keyword the
+    // running engine lacks, whose declaration is dropped.
+    needs_newer_engine = 1301,
+    keyword_from_newer_engine = 1302,
 };
 
 [[nodiscard]] DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept;
@@ -170,6 +190,10 @@ public:
     // Keeps the record if fewer than maximum_diagnostic_records are kept,
     // and counts it either way.
     void add(ThemeDiagnostic diagnostic);
+    // Gives each kept record from position `first_record` on the rule and
+    // the property, where it names none: the lowering names them for the
+    // diagnostics of the stages it calls.
+    void name_context(std::size_t first_record, std::string_view rule, std::string_view property);
     void clear() noexcept;
 
     [[nodiscard]] std::span<const ThemeDiagnostic> records() const& noexcept { return records_; }
