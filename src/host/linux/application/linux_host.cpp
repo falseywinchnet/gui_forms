@@ -152,6 +152,9 @@ struct NativePixels final {
   int right{0};
   int bottom{0};
   std::array<NativeChannel, 4> channels{};
+  // The alpha bits set in every pixel: the ARGB window's alpha mask while
+  // its grant is opaque (alpha 255), else 0.
+  std::uint32_t opaque_bits{0};
 };
 
 unsigned long pack_native_pixel(const unsigned char* const pixel,
@@ -175,7 +178,7 @@ void convert_native_pixels32(XImage& image, const NativePixels& pixels) {
     for (int column = pixels.left; column < pixels.right; ++column) {
       const std::size_t offset = static_cast<std::size_t>(column) * 4U;
       const unsigned long value = pack_native_pixel(pixels.source + source_row + offset, pixels.channels);
-      const std::uint32_t packed = static_cast<std::uint32_t>(value);
+      const std::uint32_t packed = static_cast<std::uint32_t>(value) | pixels.opaque_bits;
       std::memcpy(image.data + destination_row + offset, &packed, sizeof(packed));
     }
   }
@@ -200,7 +203,8 @@ void convert_native_pixels32_bytes(XImage& image, const NativePixels& pixels) {
       const std::uint32_t packed = (static_cast<std::uint32_t>(source[0]) << red) |
                                    (static_cast<std::uint32_t>(source[1]) << green) |
                                    (static_cast<std::uint32_t>(source[2]) << blue) |
-                                   ((static_cast<std::uint32_t>(source[3]) << alpha) & alpha_keep);
+                                   ((static_cast<std::uint32_t>(source[3]) << alpha) & alpha_keep) |
+                                   pixels.opaque_bits;
       std::memcpy(destination, &packed, sizeof(packed));
       source += 4;
       destination += 4;
@@ -213,7 +217,7 @@ void convert_native_pixels_generic(XImage& image, const NativePixels& pixels) {
     for (int column = pixels.left; column < pixels.right; ++column) {
       const std::size_t offset = static_cast<std::size_t>(column) * 4U;
       const unsigned long value = pack_native_pixel(pixels.source + source_row + offset, pixels.channels);
-      XPutPixel(&image, column, row, value);
+      XPutPixel(&image, column, row, value | pixels.opaque_bits);
     }
   }
 }
@@ -256,7 +260,12 @@ bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect>
   if (bytes > 64U * 1024U * 1024U) return false;
   window.presentation.resize(bytes);
   image.data = window.presentation.data();
-  const std::array<unsigned long, 4> masks{image.red_mask, image.green_mask, image.blue_mask, window.alpha_mask};
+  // The raster's alpha is presented only while a non-opaque backdrop is
+  // granted; an ARGB window under an opaque grant presents alpha 255.
+  const unsigned long presented_alpha_mask = window.present_alpha ? window.alpha_mask : 0UL;
+  const std::array<unsigned long, 4> masks{image.red_mask, image.green_mask, image.blue_mask, presented_alpha_mask};
+  if (window.alpha_mask > std::numeric_limits<std::uint32_t>::max()) return false;
+  pixels.opaque_bits = window.present_alpha ? 0U : static_cast<std::uint32_t>(window.alpha_mask);
   for (std::size_t channel = 0; channel < masks.size(); ++channel) {
     if (masks[channel] > std::numeric_limits<std::uint32_t>::max()) return false;
     pixels.channels[channel].mask = masks[channel];

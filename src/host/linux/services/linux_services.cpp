@@ -141,10 +141,16 @@ HostMonitorResult Services::query_monitors_impl() {
   return {{}, {{"x11-screen", frame, frame, 1.0, true}}};
 }
 HostServiceStatus Services::apply_window_backdrop_impl(WindowBackdrop backdrop) {
-  if (backdrop == WindowBackdrop::opaque)
+  // The grant change repaints the whole window, so the next present
+  // follows the new alpha rule.
+  if (backdrop == WindowBackdrop::opaque) {
+    window_.present_alpha = false;
     return {};
-  if (backdrop == WindowBackdrop::transparent && window_.argb)
+  }
+  if (backdrop == WindowBackdrop::transparent && window_.argb) {
+    window_.present_alpha = true;
     return {};
+  }
   return {HostServiceError::backend_failure};
 }
 HostServiceStatus Services::set_cursor_impl(CursorKind cursor) {

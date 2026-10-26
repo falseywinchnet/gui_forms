@@ -175,6 +175,10 @@ public:
   int depth{};
   unsigned long alpha_mask{};
   bool argb{};
+  // The present carries the raster's alpha only while a non-opaque
+  // backdrop is granted (set by the services' apply_window_backdrop);
+  // otherwise an ARGB window presents alpha 255, as an opaque window does.
+  bool present_alpha{};
   // The ARGB window's own colormap, freed after the window; None otherwise.
   Colormap colormap{};
   // The last compositor report's generation; 0 before the first.
