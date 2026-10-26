@@ -44,9 +44,9 @@ whole record for logs.
 | `screen_pointer` | the pointer's desktop position | yes | yes | yes |
 | `window_at_point` | the application's topmost window at a desktop point | yes | yes | yes |
 | `window_ordering` | bring a window to the front of the application's own windows | yes | yes | yes (the window manager may decline) |
-| `transparent_windows` | a window presented with per-pixel alpha when the compositor allows it | no | no | no |
+| `transparent_windows` | a window presented with per-pixel alpha when the compositor allows it | no | no | yes (while a compositing manager runs) |
 | `window_backdrops` | a system material behind a transparent window | no | no | no |
-| `compositor_notifications` | compositor and preference changes reported at run time | no | no | no |
+| `compositor_notifications` | compositor and preference changes reported at run time | no | no | yes |
 | `presentation_preferences` | the host's high contrast and reduced transparency fed to each window | no | no | no |
 
 The table reflects the bits each adapter currently advertises; read
@@ -87,8 +87,22 @@ itself.
   the host's (`presentation_preferences`) or set by the application in
   `PresentationSettings`, withdraw every backdrop.
 
-No native host advertises these capabilities yet; they arrive with the
-Windows, macOS and X11 phases of stage T5. The headless reference host
+**X11.** A window declared non-opaque is made with the screen's 32-bit
+TrueColor visual, whose spare byte XRender names as alpha, and its
+presented pixels carry the frame's premultiplied alpha. Whether a
+compositing manager runs is the owner of `_NET_WM_CM_S<screen>`, followed
+through XFixes as managers start and stop: without one the X server shows
+clear pixels as black, so the window is granted `opaque` with the reason
+`no_compositor`, and `transparent` again once a manager starts. X11 has
+no system material (`window_material` and `transient_material` are
+`host_unsupported`) and no high-contrast or reduced-transparency setting
+to report, so `PresentationSettings` stay the application's. Clear pixels
+still receive the pointer. A server without the 32-bit visual leaves the
+window opaque (`host_unsupported`). The measurements behind this are in
+`planning/stages/T5-compositor/MEASUREMENTS.md`.
+
+The Windows and macOS hosts do not advertise these capabilities yet; they
+arrive with their phases of stage T5. The headless reference host
 simulates them (`HeadlessApplication::simulate_compositor_state`).
 
 ## Keyboard-command defaults

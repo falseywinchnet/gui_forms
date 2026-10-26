@@ -2,6 +2,7 @@
 #include "../accessibility/linux_accessibility.hpp"
 #include "../../../render/skia/raster/skia_raster.hpp"
 #include "../services/x11_tray_icons.hpp"
+#include "../compositor/x11_compositor.hpp"
 #include "gui_forms/platform/linux_host.hpp"
 #include <X11/Xlib.h>
 #include <array>
@@ -60,6 +61,12 @@ public:
 protected:
   HostMonitorResult query_monitors_impl() override;
   HostServiceStatus set_cursor_impl(CursorKind cursor) override;
+  // The granted backdrop (stage T5, C4). The visual was fixed when the
+  // window was made, and the present packs alpha whenever the window has
+  // it, so nothing native changes: `opaque` is always accepted,
+  // `transparent` only for a window made with the ARGB visual, and the
+  // materials never (backend_failure, changing nothing).
+  HostServiceStatus apply_window_backdrop_impl(WindowBackdrop backdrop) override;
   HostServiceStatus set_custom_cursor_impl(const CursorImagesPtr&, const CursorImage&) override;
   void shutdown_impl() noexcept override;
   HostServiceStatus set_pointer_capture_impl(bool captured,
@@ -139,6 +146,11 @@ public:
   bool report_presented(const std::optional<PaintReceipt>& receipt, std::uint64_t elapsed,
                         PresentedArea copied);
   HostDispatchResult dispatch(HostEventPayload payload);
+  // Reports the compositor's state to this window (stage T5, C4): after
+  // attach, and on each XFixes notification about _NET_WM_CM_S<screen>. A
+  // reading that differs from the window's last report only by its
+  // generation is not sent.
+  void report_compositor_state();
   HostDialogResult dialog(const HostDialogRequest &request);
   // The window's frame in desktop units (pixels): the client area at its
   // root position, and the outer frame from _NET_FRAME_EXTENTS when the
@@ -155,6 +167,18 @@ public:
   // windows are released by Runtime::reclaim after they close.
   bool initial{true};
   ::Window xid{};
+  // The window's visual and depth, fixed at creation: the run's ARGB
+  // visual for a window declared non-opaque when the server offers one
+  // (`argb`), else the screen's default. `alpha_mask` is the pixel bits
+  // holding alpha, 0 without the ARGB visual.
+  Visual *visual{};
+  int depth{};
+  unsigned long alpha_mask{};
+  bool argb{};
+  // The ARGB window's own colormap, freed after the window; None otherwise.
+  Colormap colormap{};
+  // The last compositor report's generation; 0 before the first.
+  CompositorGeneration compositor_generation{};
   GC gc{};
   XIC input{};
   Size size;
@@ -248,6 +272,9 @@ public:
   // Created by run_linux_application right after the runtime; destroyed
   // after ~Runtime has closed every window.
   std::unique_ptr<X11Windowing> windowing;
+  // The compositing manager's selection (stage T5, C4). Made after the
+  // display opens; released before it closes, after every window.
+  std::unique_ptr<X11CompositorWatch> compositor;
   ::Window clipboard_owner{};
   std::string clipboard_text;
   HostImage clipboard_image;

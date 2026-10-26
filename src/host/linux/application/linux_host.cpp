@@ -138,6 +138,11 @@ struct NativeChannel final {
   unsigned long maximum{0};
   unsigned shift{0};
 };
+// The channels in the raster's byte order: red, green, blue, then alpha.
+// Alpha's mask is 0 (and the channel contributes nothing) unless the
+// window has the ARGB visual (stage T5, C4), whose pixel carries the
+// raster's premultiplied alpha unchanged.
+inline constexpr std::size_t native_alpha_channel = 3U;
 struct NativePixels final {
   const unsigned char* source{};
   std::size_t source_stride{0};
@@ -146,14 +151,16 @@ struct NativePixels final {
   int top{0};
   int right{0};
   int bottom{0};
-  std::array<NativeChannel, 3> channels{};
+  std::array<NativeChannel, 4> channels{};
 };
 
 unsigned long pack_native_pixel(const unsigned char* const pixel,
-                                 const std::array<NativeChannel, 3>& channels) {
+                                 const std::array<NativeChannel, 4>& channels) {
   unsigned long value = 0;
   for (std::size_t channel = 0; channel < channels.size(); ++channel) {
     const NativeChannel component = channels[channel];
+    if (component.mask == 0)
+      continue;
     const std::uint64_t intensity = static_cast<std::uint64_t>(pixel[channel]);
     const std::uint64_t scaled_value = (intensity * static_cast<std::uint64_t>(component.maximum) + 127U) / 255U;
     const unsigned long scaled = static_cast<unsigned long>(scaled_value);
@@ -175,11 +182,14 @@ void convert_native_pixels32(XImage& image, const NativePixels& pixels) {
 }
 // The common visual: 32-bit pixels in native byte order with 8-bit channels
 // (Xvfb and most TrueColor servers). Each channel is a byte moved into place;
-// no scaling.
+// no scaling. Without an alpha channel the alpha term is masked to 0.
 void convert_native_pixels32_bytes(XImage& image, const NativePixels& pixels) {
   const unsigned red = pixels.channels[0].shift;
   const unsigned green = pixels.channels[1].shift;
   const unsigned blue = pixels.channels[2].shift;
+  const NativeChannel alpha_channel = pixels.channels[native_alpha_channel];
+  const unsigned alpha = alpha_channel.shift;
+  const std::uint32_t alpha_keep = alpha_channel.mask != 0 ? 0xFFFFFFFFU : 0U;
   for (int row = pixels.top; row < pixels.bottom; ++row) {
     const unsigned char* source = pixels.source + static_cast<std::size_t>(row) * pixels.source_stride +
                                   static_cast<std::size_t>(pixels.left) * 4U;
@@ -189,7 +199,8 @@ void convert_native_pixels32_bytes(XImage& image, const NativePixels& pixels) {
     for (int column = pixels.left; column < pixels.right; ++column) {
       const std::uint32_t packed = (static_cast<std::uint32_t>(source[0]) << red) |
                                    (static_cast<std::uint32_t>(source[1]) << green) |
-                                   (static_cast<std::uint32_t>(source[2]) << blue);
+                                   (static_cast<std::uint32_t>(source[2]) << blue) |
+                                   ((static_cast<std::uint32_t>(source[3]) << alpha) & alpha_keep);
       std::memcpy(destination, &packed, sizeof(packed));
       source += 4;
       destination += 4;
@@ -231,9 +242,10 @@ bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect>
   pixels.source_stride = raster.row_bytes();
   PresentationImage owner{};
   Display* const display = window.runtime.display;
-  const int screen = DefaultScreen(display);
-  owner.value = XCreateImage(display, DefaultVisual(display, screen),
-      static_cast<unsigned>(DefaultDepth(display, screen)), ZPixmap, 0, nullptr, width, height, 32, 0);
+  // The window's own visual and depth: the ARGB visual's for a window
+  // made with it (stage T5, C4).
+  owner.value = XCreateImage(display, window.visual, static_cast<unsigned>(window.depth), ZPixmap, 0,
+      nullptr, width, height, 32, 0);
   if (owner.value == nullptr) return false;
   XImage& image = *owner.value;
   const std::size_t maximum_row = static_cast<std::size_t>(width) * 4U;
@@ -244,7 +256,7 @@ bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect>
   if (bytes > 64U * 1024U * 1024U) return false;
   window.presentation.resize(bytes);
   image.data = window.presentation.data();
-  const std::array<unsigned long, 3> masks{image.red_mask, image.green_mask, image.blue_mask};
+  const std::array<unsigned long, 4> masks{image.red_mask, image.green_mask, image.blue_mask, window.alpha_mask};
   for (std::size_t channel = 0; channel < masks.size(); ++channel) {
     if (masks[channel] > std::numeric_limits<std::uint32_t>::max()) return false;
     pixels.channels[channel].mask = masks[channel];
@@ -257,6 +269,8 @@ bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect>
       (image.byte_order == LSBFirst) == (std::endian::native == std::endian::little);
   bool byte_channels = native32;
   for (std::size_t channel = 0; channel < pixels.channels.size(); ++channel) {
+    // An absent alpha channel (mask 0) does not stop the byte path.
+    if (channel == native_alpha_channel && pixels.channels[channel].mask == 0) continue;
     if (pixels.channels[channel].maximum != 255U || pixels.channels[channel].shift % 8U != 0U ||
         pixels.channels[channel].shift > 24U) byte_channels = false;
   }
@@ -578,11 +592,13 @@ Runtime::Runtime() {
   }
   if (keyboard != nullptr)
     XkbFreeKeyboard(keyboard, XkbAllComponentsMask, True);
+  compositor = std::make_unique<X11CompositorWatch>(display, DefaultScreen(display));
 }
 Runtime::~Runtime() {
   for (std::size_t i = 0; i < windows.size(); ++i)
     (*windows[i]).close(HostCloseReason::application, true);
   windows.clear();
+  compositor.reset();
   actions.reset();
   if (input_method != nullptr)
     XCloseIM(input_method);
@@ -643,10 +659,32 @@ NativeWindow::NativeWindow(Runtime &host, LinuxApplicationWindow source)
       std::min(size.width, std::max(64.0, static_cast<double>(DisplayWidth(
                                               runtime.display, screen)) -
                                               16.0));
-  xid =
-      XCreateSimpleWindow(runtime.display, RootWindow(runtime.display, screen),
-                          60, 60, static_cast<unsigned>(size.width),
-                          static_cast<unsigned>(size.height), 0, 0, 0xffffff);
+  visual = DefaultVisual(runtime.display, screen);
+  depth = DefaultDepth(runtime.display, screen);
+  const X11ArgbVisual &argb_visual = (*runtime.compositor).argb();
+  // A window declared non-opaque gets the ARGB visual, which is fixed at
+  // creation (PLAN.md §1.3): its own colormap, and border and background
+  // pixels 0, without which the server answers BadMatch.
+  if ((*entry.model).non_opaque_declared() && argb_visual.found) {
+    colormap = XCreateColormap(runtime.display, RootWindow(runtime.display, screen),
+                               argb_visual.visual, AllocNone);
+    XSetWindowAttributes attributes{};
+    attributes.colormap = colormap;
+    attributes.border_pixel = 0UL;
+    attributes.background_pixel = 0UL;
+    xid = XCreateWindow(runtime.display, RootWindow(runtime.display, screen), 60, 60,
+                        static_cast<unsigned>(size.width), static_cast<unsigned>(size.height), 0,
+                        argb_visual.depth, InputOutput, argb_visual.visual,
+                        CWColormap | CWBorderPixel | CWBackPixel, &attributes);
+    visual = argb_visual.visual;
+    depth = argb_visual.depth;
+    alpha_mask = argb_visual.alpha_mask;
+    argb = true;
+  } else {
+    xid = XCreateSimpleWindow(runtime.display, RootWindow(runtime.display, screen),
+                              60, 60, static_cast<unsigned>(size.width),
+                              static_cast<unsigned>(size.height), 0, 0, 0xffffff);
+  }
   XSelectInput(runtime.display, xid,
                ExposureMask | StructureNotifyMask | FocusChangeMask |
                    PointerMotionMask | ButtonPressMask | ButtonReleaseMask |
@@ -734,15 +772,31 @@ NativeWindow::~NativeWindow() {
     XFreeGC(runtime.display, gc);
   if (xid != 0)
     XDestroyWindow(runtime.display, xid);
+  if (colormap != None)
+    XFreeColormap(runtime.display, colormap);
 }
 HostDispatchResult NativeWindow::dispatch(HostEventPayload payload) {
   return (*session).dispatch({++sequence, now_ns(), std::move(payload)});
+}
+void NativeWindow::report_compositor_state() {
+  if (closed || !session)
+    return;
+  const CompositorGeneration next{compositor_generation.value + 1U};
+  const bool present = (*runtime.compositor).compositor_present();
+  const CompositorState state = x11_compositor_state(present, argb, next);
+  CompositorState unchanged = state;
+  unchanged.generation = (*entry.model).compositor_state().generation;
+  if (compositor_generation.value != 0U && unchanged == (*entry.model).compositor_state())
+    return;
+  compositor_generation = next;
+  static_cast<void>(dispatch(HostCompositorEvent{state}));
 }
 void NativeWindow::attach() {
   (*entry.model).set_dispatch_wake_handler(Wake{runtime.wake_pipe[1]});
   (*entry.model).set_paint_wake_handler(Wake{runtime.wake_pipe[1]});
   if (!dispatch(HostAttachEvent{size, 1.0}).accepted())
     throw std::runtime_error("Linux host attach rejected");
+  report_compositor_state();
   accessibility = std::make_unique<LinuxAccessibility>(runtime.display, xid, *entry.model, entry.options.title);
   if (entry.options.initially_visible)
     action(ActionKind::show);
@@ -1290,6 +1344,14 @@ void NativeWindow::frame_capture_if_due(bool covers_window) {
   close(HostCloseReason::application);
 }
 void Runtime::dispatch(XEvent &event) {
+  // A compositing manager started or stopped: every window reports again,
+  // in window-open order (PLAN.md §2.4).
+  if (compositor && (*compositor).selection_event(event)) {
+    const std::vector<std::shared_ptr<NativeWindow>> reporting = windows;
+    for (std::size_t i = 0; i < reporting.size(); ++i)
+      (*reporting[i]).report_compositor_state();
+    return;
+  }
   if (event.type == SelectionRequest) {
     selection_request(event.xselectionrequest);
     return;
@@ -1473,7 +1535,9 @@ HostCapabilities linux_capabilities() {
               HostCapability::typed_drag_destination |
               HostCapability::runtime_windows | HostCapability::window_frames |
               HostCapability::screen_pointer | HostCapability::window_at_point |
-              HostCapability::window_ordering,
+              HostCapability::window_ordering |
+              HostCapability::transparent_windows |
+              HostCapability::compositor_notifications,
           // X11 desktops follow the PC keyboard convention.
           pc_key_map()};
 }
