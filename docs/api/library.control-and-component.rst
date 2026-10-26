@@ -38,8 +38,14 @@ Related types
      - A bounded set of active standard and custom states.
    * - :cpp:class:`AnatomyValidation <gui_forms::AnatomyValidation>`
      - The result of validate_control_anatomy: the first defect found, or none.
+   * - :cpp:class:`AutoLengthPercentage <gui_forms::AutoLengthPercentage>`
+     - A margin or an inset: ``auto`` or a length-percentage, which may be negative.
    * - :cpp:class:`AvailableExtent <gui_forms::AvailableExtent>`
      - One axis of a layout constraint.
+   * - :cpp:class:`BoxAlignment <gui_forms::BoxAlignment>`
+     - CSS Box Alignment's six properties, shared by flex and grid containers and their items.
+   * - :cpp:class:`BoxSides <gui_forms::BoxSides>`
+     - Top, right, bottom and left, CSS's shorthand order.
    * - :cpp:class:`ComponentContainer <gui_forms::ComponentContainer>`
      - ComponentContainer owns a unique ordered set of shared components and disposes the captured ownership sequence exactly once.
    * - :cpp:class:`Control::Parts <gui_forms::Control::Parts>`
@@ -56,6 +62,28 @@ Related types
      - One application-defined finite state, as written in ``:state(name)``.
    * - :cpp:class:`CustomStateIndex <gui_forms::CustomStateIndex>`
      - Position of an application-defined state in its control type's declaration list.
+   * - :cpp:class:`FlexContainerStyle <gui_forms::FlexContainerStyle>`
+     -  
+   * - :cpp:class:`FlexFactor <gui_forms::FlexFactor>`
+     - Flex factors and grid fractions are unitless and never added to lengths.
+   * - :cpp:class:`FlexItemStyle <gui_forms::FlexItemStyle>`
+     -  
+   * - :cpp:class:`FractionFactor <gui_forms::FractionFactor>`
+     -  
+   * - :cpp:class:`GridContainerStyle <gui_forms::GridContainerStyle>`
+     -  
+   * - :cpp:class:`GridItemStyle <gui_forms::GridItemStyle>`
+     -  
+   * - :cpp:class:`GridLine <gui_forms::GridLine>`
+     -  
+   * - :cpp:class:`GridNamedArea <gui_forms::GridNamedArea>`
+     - One named area of grid-template-areas, as zero-based half-open line ranges of the template's cells.
+   * - :cpp:class:`GridTemplateAreas <gui_forms::GridTemplateAreas>`
+     - grid-template-areas: its dimensions in cells and its areas in the order their first cells are written.
+   * - :cpp:class:`GridTrackList <gui_forms::GridTrackList>`
+     - A grid-template-columns or -rows value.
+   * - :cpp:class:`GridTrackSize <gui_forms::GridTrackSize>`
+     - A track size: one breadth (both ends equal, except that a lone ``<n>fr`` is CSS's ``minmax(auto, <n>fr)``), ``minmax(minimum, maximum)``, or ``fit-content(<length-percentage>)``, whose limit is ``fit_content_limit`` with minimum ``auto`` and maximum ``max-content``.
    * - :cpp:class:`InteractionDeclaration <gui_forms::InteractionDeclaration>`
      - One interaction.
    * - :cpp:class:`InteractionValidation <gui_forms::InteractionValidation>`
@@ -66,8 +94,12 @@ Related types
      - Position of an item system in its control type's declaration list.
    * - :cpp:class:`LayoutConstraint <gui_forms::LayoutConstraint>`
      - A measure query on both axes.
+   * - :cpp:class:`LayoutStyle <gui_forms::LayoutStyle>`
+     -  
    * - :cpp:class:`LayoutTransactionState <gui_forms::LayoutTransactionState>`
      - LayoutTransactionState exposes suspension depth, deferred work, and requested-versus-committed revisions without leaking a host layout engine.
+   * - :cpp:class:`LengthPercentage <gui_forms::LengthPercentage>`
+     - A length and a percentage of the box CSS names for the property, summed: ``24px`` is {24, 0}, ``50%`` is {0, 50}, ``calc(100% - 24px)`` is {-24, 100}.
    * - :cpp:class:`LogicalLength <gui_forms::LogicalLength>`
      - A layout length in logical units (device-independent pixels), the unit of every retained bound.
    * - :cpp:class:`MnemonicText <gui_forms::MnemonicText>`
@@ -86,10 +118,14 @@ Related types
      - Position of a part in its control type's declaration list.
    * - :cpp:class:`RuntimeId <gui_forms::RuntimeId>`
      - RuntimeId is the monotonic process-local identity used for exact retained instances and child operations.
+   * - :cpp:class:`SizeValue <gui_forms::SizeValue>`
+     -  
    * - :cpp:class:`StateField <gui_forms::StateField>`
      - One member of a states record and the standard state it reports.
    * - :cpp:class:`StaticNode <gui_forms::StaticNode>`
      - StaticNode is an inert declarative node containing a registered type name, stable ID, and owned child descriptions.
+   * - :cpp:class:`TrackBreadth <gui_forms::TrackBreadth>`
+     -  
 
 .. cpp:namespace:: gui_forms
 
@@ -151,6 +187,18 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: AutoLengthPercentage final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   A margin or an inset: ``auto`` or a length-percentage, which may be negative.
+
+   .. cpp:member:: bool automatic
+
+   .. cpp:member:: LengthPercentage value
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: AvailableExtent final
 
    ``#include <gui_forms/layout/types/layout_types.hpp>``
@@ -162,6 +210,54 @@ Related types
       Default: ``{AvailableExtentKind::at_most}``.
 
    .. cpp:member:: LogicalLength extent
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BoxAlignment final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   CSS Box Alignment's six properties, shared by flex and grid containers and their items.
+
+   .. cpp:member:: LayoutAlignment justify_content
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment align_content
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment justify_items
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment align_items
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment justify_self
+
+      Default: ``{LayoutAlignment::automatic}``.
+
+   .. cpp:member:: LayoutAlignment align_self
+
+      Default: ``{LayoutAlignment::automatic}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: template <typename Value> BoxSides final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   Top, right, bottom and left, CSS's shorthand order.
+
+   .. cpp:member:: Value top
+
+   .. cpp:member:: Value right
+
+   .. cpp:member:: Value bottom
+
+   .. cpp:member:: Value left
 
 .. cpp:namespace:: gui_forms
 
@@ -313,6 +409,190 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: FlexContainerStyle final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:member:: FlexDirection direction
+
+      Default: ``{FlexDirection::row}``.
+
+   .. cpp:member:: FlexWrap wrap
+
+      Default: ``{FlexWrap::nowrap}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: FlexFactor final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   Flex factors and grid fractions are unitless and never added to lengths.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit constexpr FlexFactor(double value = 0.0) noexcept
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: constexpr double value() const noexcept
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexItemStyle final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:member:: FlexFactor grow
+
+      Default: ``{0.0}``.
+
+   .. cpp:member:: FlexFactor shrink
+
+      Default: ``{1.0}``.
+
+   .. cpp:member:: SizeValue basis
+
+   .. cpp:member:: std::int32_t order
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: FractionFactor final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit constexpr FractionFactor(double value = 0.0) noexcept
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: constexpr double value() const noexcept
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridContainerStyle final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:member:: GridTrackList template_columns
+
+   .. cpp:member:: GridTrackList template_rows
+
+   .. cpp:member:: GridTemplateAreas template_areas
+
+   .. cpp:member:: GridAutoFlow auto_flow
+
+      Default: ``{GridAutoFlow::row}``.
+
+   .. cpp:member:: std::vector<GridTrackSize> auto_columns
+
+      grid-auto-columns and grid-auto-rows; CSS's initial value is one ``auto``. Default: ``{GridTrackSize{}}``.
+
+   .. cpp:member:: std::vector<GridTrackSize> auto_rows
+
+      Default: ``{GridTrackSize{}}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridItemStyle final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:member:: GridLine column_start
+
+   .. cpp:member:: GridLine column_end
+
+   .. cpp:member:: GridLine row_start
+
+   .. cpp:member:: GridLine row_end
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridLine final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:member:: GridLineKind kind
+
+      Default: ``{GridLineKind::automatic}``.
+
+   .. cpp:member:: std::int32_t number
+
+   .. cpp:member:: std::string area
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridNamedArea final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   One named area of grid-template-areas, as zero-based half-open line ranges of the template's cells.
+
+   .. cpp:member:: std::string name
+
+   .. cpp:member:: std::uint32_t row_start
+
+   .. cpp:member:: std::uint32_t row_end
+
+   .. cpp:member:: std::uint32_t column_start
+
+   .. cpp:member:: std::uint32_t column_end
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridTemplateAreas final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   grid-template-areas: its dimensions in cells and its areas in the order their first cells are written. Zero rows is ``none``.
+
+   .. cpp:member:: std::uint32_t rows
+
+   .. cpp:member:: std::uint32_t columns
+
+   .. cpp:member:: std::vector<GridNamedArea> areas
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridTrackList final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   A grid-template-columns or -rows value. ``repeat(<n>, ...)`` is expanded into ``tracks`` when read; the one ``repeat(auto-fill | auto-fit, ...)`` a list may hold is kept apart, to be repeated against the container's size, and is inserted before ``tracks[auto_repeat_index]``.
+
+   .. cpp:member:: std::vector<GridTrackSize> tracks
+
+   .. cpp:member:: AutoRepeatKind auto_repeat
+
+      Default: ``{AutoRepeatKind::none}``.
+
+   .. cpp:member:: std::uint32_t auto_repeat_index
+
+   .. cpp:member:: std::vector<GridTrackSize> auto_repeat_tracks
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridTrackSize final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   A track size: one breadth (both ends equal, except that a lone ``<n>fr`` is CSS's ``minmax(auto, <n>fr)``), ``minmax(minimum, maximum)``, or ``fit-content(<length-percentage>)``, whose limit is ``fit_content_limit`` with minimum ``auto`` and maximum ``max-content``.
+
+   .. cpp:member:: TrackBreadth minimum
+
+   .. cpp:member:: TrackBreadth maximum
+
+   .. cpp:member:: bool fit_content
+
+   .. cpp:member:: LengthPercentage fit_content_limit
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: InteractionDeclaration final
 
    ``#include <gui_forms/schema/types/schema_types.hpp>``
@@ -381,6 +661,66 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: LayoutStyle final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:member:: DisplayKind display
+
+      Default: ``{DisplayKind::inline_level}``.
+
+   .. cpp:member:: PositionKind position
+
+      Default: ``{PositionKind::static_position}``.
+
+   .. cpp:member:: BoxSides<AutoLengthPercentage> inset
+
+   .. cpp:member:: SizeValue width
+
+   .. cpp:member:: SizeValue height
+
+   .. cpp:member:: SizeValue min_width
+
+   .. cpp:member:: SizeValue min_height
+
+   .. cpp:member:: SizeValue max_width
+
+      Default: ``{SizeKind::none, {}}``.
+
+   .. cpp:member:: SizeValue max_height
+
+      Default: ``{SizeKind::none, {}}``.
+
+   .. cpp:member:: BoxSides<AutoLengthPercentage> margin
+
+   .. cpp:member:: BoxSides<LengthPercentage> padding
+
+   .. cpp:member:: LengthPercentage row_gap
+
+      row-gap and column-gap; ``normal`` is zero.
+
+   .. cpp:member:: LengthPercentage column_gap
+
+   .. cpp:member:: BoxAlignment alignment
+
+   .. cpp:member:: FlexContainerStyle flex
+
+   .. cpp:member:: FlexItemStyle flex_item
+
+   .. cpp:member:: GridContainerStyle grid
+
+   .. cpp:member:: GridItemStyle grid_item
+
+   .. cpp:member:: TextAlignment text_align
+
+      Default: ``{TextAlignment::start}``.
+
+   .. cpp:member:: InlineVerticalAlignment vertical_align
+
+      Default: ``{InlineVerticalAlignment::baseline}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: LayoutTransactionState final
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -394,6 +734,20 @@ Related types
    .. cpp:member:: std::uint64_t requested_revision
 
    .. cpp:member:: std::uint64_t committed_revision
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: LengthPercentage final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   A length and a percentage of the box CSS names for the property, summed: ``24px`` is {24, 0}, ``50%`` is {0, 50}, ``calc(100% - 24px)`` is {-24, 100}.
+
+   .. cpp:member:: LogicalLength length
+
+   .. cpp:member:: double percent
+
+      Percent, not a fraction: 50 means half.
 
 .. cpp:namespace:: gui_forms
 
@@ -547,6 +901,20 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: SizeValue final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:member:: SizeKind kind
+
+      Default: ``{SizeKind::automatic}``.
+
+   .. cpp:member:: LengthPercentage value
+
+      Read for length_percentage and fit_content.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: template <typename Record> StateField final
 
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
@@ -572,6 +940,20 @@ Related types
    .. cpp:member:: Rect requested_bounds
 
    .. cpp:member:: std::vector<StaticNode> children
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TrackBreadth final
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:member:: TrackBreadthKind kind
+
+      Default: ``{TrackBreadthKind::automatic}``.
+
+   .. cpp:member:: LengthPercentage length
+
+   .. cpp:member:: FractionFactor fraction
 
 Enumerations
 ------------
@@ -730,6 +1112,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: AutoRepeatKind
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: auto_fill
+
+   .. cpp:enumerator:: auto_fit
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: AutoSizeMode
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -870,6 +1264,24 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: DisplayKind
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: block
+
+   .. cpp:enumerator:: inline_level
+
+   .. cpp:enumerator:: inline_block
+
+   .. cpp:enumerator:: flex
+
+   .. cpp:enumerator:: grid
+
+   .. cpp:enumerator:: none
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: DockStyle
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -906,6 +1318,32 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: FlexDirection
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: row
+
+   .. cpp:enumerator:: row_reverse
+
+   .. cpp:enumerator:: column
+
+   .. cpp:enumerator:: column_reverse
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: FlexWrap
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: nowrap
+
+   .. cpp:enumerator:: wrap
+
+   .. cpp:enumerator:: wrap_reverse
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: GetChildAtPointSkip
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -920,6 +1358,48 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: GridAutoFlow
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: row
+
+   .. cpp:enumerator:: column
+
+   .. cpp:enumerator:: row_dense
+
+   .. cpp:enumerator:: column_dense
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: GridLineKind
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: automatic
+
+   .. cpp:enumerator:: line
+
+   .. cpp:enumerator:: span
+
+   .. cpp:enumerator:: area
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: InlineVerticalAlignment
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: baseline
+
+   .. cpp:enumerator:: middle
+
+   .. cpp:enumerator:: top
+
+   .. cpp:enumerator:: bottom
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: InteractionDefect
 
    ``#include <gui_forms/schema/types/schema_types.hpp>``
@@ -931,6 +1411,36 @@ Enumerations
    .. cpp:enumerator:: name_not_snake_case
 
    .. cpp:enumerator:: duplicate_name
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: LayoutAlignment
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: automatic
+
+   .. cpp:enumerator:: normal
+
+   .. cpp:enumerator:: stretch
+
+   .. cpp:enumerator:: start
+
+   .. cpp:enumerator:: end
+
+   .. cpp:enumerator:: flex_start
+
+   .. cpp:enumerator:: flex_end
+
+   .. cpp:enumerator:: center
+
+   .. cpp:enumerator:: baseline
+
+   .. cpp:enumerator:: space_between
+
+   .. cpp:enumerator:: space_around
+
+   .. cpp:enumerator:: space_evenly
 
 .. cpp:namespace:: gui_forms
 
@@ -1025,6 +1535,70 @@ Enumerations
    .. cpp:enumerator:: image
 
    .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PositionKind
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: static_position
+
+   .. cpp:enumerator:: relative
+
+   .. cpp:enumerator:: absolute
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: SizeKind
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: automatic
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: length_percentage
+
+   .. cpp:enumerator:: min_content
+
+   .. cpp:enumerator:: max_content
+
+   .. cpp:enumerator:: fit_content
+
+   .. cpp:enumerator:: content
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TextAlignment
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: start
+
+   .. cpp:enumerator:: end
+
+   .. cpp:enumerator:: left
+
+   .. cpp:enumerator:: right
+
+   .. cpp:enumerator:: center
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TrackBreadthKind
+
+   ``#include <gui_forms/layout/style/layout_style.hpp>``
+
+   .. cpp:enumerator:: length_percentage
+
+   .. cpp:enumerator:: fraction
+
+   .. cpp:enumerator:: min_content
+
+   .. cpp:enumerator:: max_content
+
+   .. cpp:enumerator:: automatic
 
 .. cpp:namespace:: gui_forms
 
