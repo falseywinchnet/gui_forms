@@ -384,10 +384,12 @@ public:
     // given under the host's state and its presentation settings, else
     // `opaque`, with the reason the preferred entry was or was not given.
     // The request stands: the grant is resolved again whenever the state,
-    // the settings or the declaration change. std::invalid_argument,
-    // changing nothing, for a request window_backdrop_request_valid
-    // refuses. UI thread.
+    // the settings or the declaration change. Until the application makes
+    // one, the window makes its theme's (ThemeWindowBackdrop::request) and
+    // follows each new theme's. std::invalid_argument, changing nothing,
+    // for a request window_backdrop_request_valid refuses. UI thread.
     WindowBackdropGrant request_backdrop(const WindowBackdropRequest& request);
+    // The request in force: the application's, else the theme's.
     [[nodiscard]] const WindowBackdropRequest& backdrop_request() const noexcept { return backdrop_request_; }
     [[nodiscard]] const WindowBackdropGrant& backdrop_grant() const noexcept { return backdrop_grant_; }
     // Raised on the UI thread after the grant's backdrop, reason or request
@@ -1352,12 +1354,21 @@ private:
     bool non_opaque_declared_{};
     CompositorState compositor_state_{};
     WindowBackdropRequest backdrop_request_{};
+    // Whether backdrop_request_ is the application's (request_backdrop)
+    // rather than the theme's.
+    bool application_backdrop_request_{};
     WindowBackdropGrant backdrop_grant_{};
     Event<const WindowBackdropGrant&> backdrop_changed_;
     // Resolves the grant from the request, the compositor state, the
     // declaration and the presentation settings, applies a changed backdrop
     // through the host services, and raises backdrop_changed when it changed.
     void refresh_backdrop();
+    // The material the window's backplane is drawn from (PLAN.md §4.1), by
+    // the presentation and the engine's backplane image alike: the theme's
+    // base for the granted backdrop when it has one, else the window
+    // recipe's material for `context`. Borrowed from theme_, valid until
+    // the theme is replaced.
+    [[nodiscard]] const SurfaceMaterial& backplane_base(const ControlVisualContext& context) const noexcept;
     // The keyboard commands' keys, shared with the application's other
     // windows (see key_map); never null.
     std::shared_ptr<KeyBindings> key_bindings_{std::make_shared<KeyBindings>()};

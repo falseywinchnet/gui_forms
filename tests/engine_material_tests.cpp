@@ -198,14 +198,21 @@ void choices_are_the_recipe_roles() {
     require(descriptor.parameters.size() == 2U && descriptor.parameters[0].name == "recipe",
             "the material's first parameter is its recipe (its shape is E9.6's)");
     const std::span<const std::string_view> choices = descriptor.parameters[0].choices;
-    require(choices.size() == static_cast<std::size_t>(ControlVisualRole::count), "one choice per recipe role");
-    for (std::size_t index = 0U; index < choices.size(); ++index) {
+    const std::size_t roles = static_cast<std::size_t>(ControlVisualRole::count);
+    require(choices.size() == roles + 1U, "one choice per recipe role, then the part's family");
+    for (std::size_t index = 0U; index < roles; ++index) {
         const ControlVisualRole role = static_cast<ControlVisualRole>(index);
         require(choices[index] == control_visual_role_name(role), "the choices are the roles' names in enum order");
         const PrimitiveParameterBlock parameters = recipe(choices[index]);
-        const std::optional<ControlVisualRole> chosen = material_primitive().theme_material(parameters);
-        require(chosen && *chosen == role, "the chosen recipe is the theme material's role");
+        const std::optional<ControlVisualRole> chosen =
+            material_primitive().theme_material(parameters, ControlVisualRole::panel);
+        require(chosen && *chosen == role, "the chosen recipe is the theme material's role, whatever the family");
     }
+    require(choices[roles] == "family", "the last choice is the part's family (EC1)");
+    const PrimitiveParameterBlock defaults = default_parameters(descriptor);
+    const std::optional<ControlVisualRole> family =
+        material_primitive().theme_material(defaults, ControlVisualRole::menu_item);
+    require(family && *family == ControlVisualRole::menu_item, "by default the material draws the part's family");
     require(descriptor.outsets == (Insets{8.0, 8.0, 8.0, 8.0}), "the material draws 8 units outside its box");
     require(descriptor.inputs_read.empty(), "a material reads no inputs, so it never bakes per frame");
     for (const PrimitiveParameterDeclaration& parameter : descriptor.parameters) {
@@ -214,7 +221,7 @@ void choices_are_the_recipe_roles() {
     const EnginePrimitive* const plate = builtin_primitive_registry().find("pill_plate");
     require(plate != nullptr, "the registry has the pill plate");
     const std::optional<ControlVisualRole> pill =
-        (*plate).theme_material(default_parameters((*plate).descriptor()));
+        (*plate).theme_material(default_parameters((*plate).descriptor()), ControlVisualRole::button);
     require(!pill, "a relief primitive draws no theme material");
 }
 

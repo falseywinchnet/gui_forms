@@ -309,11 +309,14 @@ struct PageDigest final {
 
 // Recorded on main at 13d1c7e0, before the theme engine's entry point.
 // typography-and-inspection's entry is main's trace with the RuntimeId the
-// specimen has when this test runs first (#1263 rather than #19747); the
+// specimen has when this test runs first (#1264 rather than #19747); the
 // two traces differ in that number alone. The ThreadExceptionDialog, OpenFileDialog
 // and SaveFileDialog lines on dialogs-and-host-services added controls, which
-// states-and-diagnostics counts (1230 controls) and which moved that
-// RuntimeId, so the three pages were recorded again.
+// states-and-diagnostics counts and which moved that RuntimeId, so the three
+// pages were recorded again. The ListView insertion-mark toggle on
+// checked-collections adds one more (1231 controls, #1264): against main's
+// traces, states-and-diagnostics and typography-and-inspection differ in
+// those two numbers alone.
 constexpr std::array<PageDigest, 29> expected_digests{{
     {"basics", 0x6d537a7173ffd432ULL},
     {"values", 0x9262ff950cdb0bbaULL},
@@ -323,7 +326,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"ranges-and-progress", 0x76a87838f40755cbULL},
     {"containers-and-focus", 0x74609a23b162e4bfULL},
     {"animation-laboratory", 0x2b0eba60f2b03985ULL},
-    {"states-and-diagnostics", 0x753ecd91867fbb4fULL},
+    {"states-and-diagnostics", 0xa15b7667d89073feULL},
     {"text-and-input", 0xf5ae22834f148beeULL},
     {"collections-and-popups", 0xdcfb5edee24a4d9eULL},
     {"values-and-spinners", 0xc6d61a2832ad4bdbULL},
@@ -342,7 +345,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"responsive-layouts", 0xa5fe70ebb0d4051eULL},
     {"anchored-popups", 0x53eef5309813b41aULL},
     {"live-surfaces", 0x5d366debbc32b5ffULL},
-    {"typography-and-inspection", 0x786c3e668165b40bULL},
+    {"typography-and-inspection", 0x23cb695462432639ULL},
     {"semantic-feedback", 0x819d5ed9aa229adaULL},
 }};
 

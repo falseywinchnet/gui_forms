@@ -110,6 +110,10 @@ gui_forms::ListView
          content (Windows Forms' ``OwnerDraw``): see :cpp:func:`draw_item_content <gui_forms::ListView::draw_item_content>`. Throws
          ``std::invalid_argument`` for an unknown mode.
 
+      **insertion_mark** : ``std::optional<ListViewInsertionMark>``, default none, read-only
+         Where the insertion mark stands, as an item's index and whether the mark
+         is after it, or none. See :cpp:func:`show_insertion_mark <gui_forms::ListView::show_insertion_mark>`.
+
       **parts** : ``Parts``, read-only
 
       **realized_items** : ``std::vector<Item>``, read-only
@@ -191,6 +195,12 @@ gui_forms::ListView
         - A helper for a column_click handler: stable-sorts an ordinary view's items by one column's text (ASCII case folded, then byte order) and shows the sort glyph.
       * - :cpp:func:`item_index_at <gui_forms::ListView::item_index_at>`
         - The item under a point in window coordinates, or none.
+      * - :cpp:func:`show_insertion_mark <gui_forms::ListView::show_insertion_mark>`
+        - Shows the insertion mark, the bar an application shows in the gap where a dragged item would drop: before or after an item, which is above or below it in the details and list views and left or right of it in the icon views.
+      * - :cpp:func:`clear_insertion_mark <gui_forms::ListView::clear_insertion_mark>`
+        - Removes the insertion mark.
+      * - :cpp:func:`insertion_mark_at <gui_forms::ListView::insertion_mark_at>`
+        - The mark nearest a point in window coordinates (Windows Forms' ``InsertionMark.NearestIndex``), with the point clamped into the item area: the item under or nearest it, and after it when the point is past the item's middle across the gap.
       * - :cpp:func:`set_column_width <gui_forms::ListView::set_column_width>`
         - Sets one column's width in logical units.
       * - :cpp:func:`set_item_checked <gui_forms::ListView::set_item_checked>`
@@ -257,8 +267,8 @@ gui_forms::ListView
    The select action selects an item; press activates it, or toggles a
    check-box item.
 
-   Not supported yet: groups, the tile view, label editing, the insertion mark,
-   item tooltips, hot-tracking activation, column reordering,
+   Not supported yet: groups, the tile view, label editing, item tooltips,
+   hot-tracking activation, column reordering,
    type-ahead in virtual mode, and wrapping large-icon labels over two lines.
 
    .. rubric:: Examples
@@ -437,6 +447,11 @@ gui_forms::ListView
 
       Sets :cpp:func:`draw_mode <gui_forms::ListView::draw_mode>`; see the property's description above.
 
+   .. cpp:function:: std::optional<ListViewInsertionMark> insertion_mark() const noexcept
+
+      Where the insertion mark stands, as an item's index and whether the mark
+      is after it, or none. See :cpp:func:`show_insertion_mark <gui_forms::ListView::show_insertion_mark>`.
+
    .. cpp:function:: Parts parts() const
 
    .. cpp:function:: std::vector<Item> realized_items() const
@@ -548,6 +563,26 @@ gui_forms::ListView
    .. cpp:function:: std::optional<std::size_t> item_index_at(Point window_point) const
 
       The item under a point in window coordinates, or none.
+
+   .. cpp:function:: bool show_insertion_mark(ListViewInsertionMark mark)
+
+      Shows the insertion mark, the bar an application shows in the gap where
+      a dragged item would drop: before or after an item, which is above or
+      below it in the details and list views and left or right of it in the
+      icon views. It is painted by the theme's drop role and published as the
+      :cpp:func:`insertion_mark <gui_forms::ListView::insertion_mark>` part. Any change to the items or their order clears
+      it. Returns false, clearing any mark, for an index past the items.
+
+   .. cpp:function:: void clear_insertion_mark() noexcept
+
+      Removes the insertion mark.
+
+   .. cpp:function:: std::optional<ListViewInsertionMark> insertion_mark_at(Point window_point) const
+
+      The mark nearest a point in window coordinates (Windows Forms'
+      ``InsertionMark.NearestIndex``), with the point clamped into the item
+      area: the item under or nearest it, and after it when the point is past
+      the item's middle across the gap. None when no item is shown.
 
    .. cpp:function:: void set_column_width(std::size_t column, double width)
 

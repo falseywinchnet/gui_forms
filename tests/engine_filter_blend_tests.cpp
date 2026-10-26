@@ -295,10 +295,10 @@ void glass_recipe() {
     const EnginePrimitive& glass = primitive_named("glass");
     const PrimitiveDescriptor& descriptor = glass.descriptor();
     PrimitiveParameterBlock parameters = default_parameters(descriptor);
-    require(!glass.theme_material(parameters).has_value(), "by default glass reads no recipe");
+    require(!glass.theme_material(parameters, ControlVisualRole::button).has_value(), "by default glass reads no recipe");
     require(set_choice_parameter(parameters, descriptor, "recipe", "button") == ParameterAssignment::assigned,
             "a recipe is a choice");
-    const std::optional<ControlVisualRole> role = glass.theme_material(parameters);
+    const std::optional<ControlVisualRole> role = glass.theme_material(parameters, ControlVisualRole::button);
     require(role.has_value() && *role == ControlVisualRole::button, "the choice names the recipe's role");
     parameters.values[1].colour = Color::rgba(0, 0, 0, 0);
 
