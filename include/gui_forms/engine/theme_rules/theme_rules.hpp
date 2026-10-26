@@ -321,6 +321,7 @@ enum class MaterialField : std::uint8_t {
     fill_blend_modes,
     shadows,
     glows,
+    glow_placements,
     border_top_style,
     border_top_width,
     border_top_colour,
@@ -363,13 +364,16 @@ inline constexpr std::size_t material_field_count = static_cast<std::size_t>(Mat
 //   layer's first), repeated over the image layers as CSS repeats a short
 //   list; empty for normal;
 // - shadows, glows, keylines: the lists;
+// - glow_placements: `glow_placements`, in the glows' order, repeated
+//   over them as CSS repeats a short list (`glow-placement`);
 // - an edge's style: `border_style`, empty for none (CSS's `none`); its
 //   width: `number`, 0 for none; its colour: `colour`;
 // - a corner: `number`, its radius in logical units, or, with `relative`,
 //   a fraction of the box's shorter side (CSS's percentage, R2-11),
 //   resolved when the material is assembled for a part;
 // - colour_filter: `colour_filter`; drop_shadow: `drop_shadow`, empty for
-//   none; mask: `mask`, empty for none;
+//   none; mask: `mask`, empty for none, and `gradients`, empty or one
+//   entry, the mask's authored gradient as for a fill layer;
 // - filter_blur and finish: `number`.
 // `initial`, set, is CSS's `initial`: the field keeps the floor's value,
 // and the declaration still wins over those beneath it; its value members
@@ -382,6 +386,7 @@ struct MaterialDeclaration final {
     std::vector<MaterialBlendMode> blend_modes{};
     std::vector<MaterialShadow> shadows{};
     std::vector<MaterialGlow> glows{};
+    std::vector<MaterialGlowPlacement> glow_placements{};
     std::optional<MaterialBorderStyle> border_style{};
     Color colour{};
     std::vector<MaterialKeyline> keylines{};
@@ -394,7 +399,8 @@ struct MaterialDeclaration final {
     friend bool operator==(const MaterialDeclaration& left, const MaterialDeclaration& right) noexcept {
         return left.field == right.field && left.initial == right.initial && left.fills == right.fills &&
                left.gradients == right.gradients && left.blend_modes == right.blend_modes && left.shadows == right.shadows &&
-               left.glows == right.glows && left.border_style == right.border_style &&
+               left.glows == right.glows && left.glow_placements == right.glow_placements &&
+               left.border_style == right.border_style &&
                left.colour == right.colour && left.keylines == right.keylines &&
                left.number == right.number && left.relative == right.relative &&
                left.colour_filter == right.colour_filter && left.drop_shadow == right.drop_shadow &&
@@ -415,7 +421,9 @@ struct MaterialDeclaration final {
 // composed when any is declared: each is its declaration's, else the
 // floor's (its corner_radii's, else its corner_radius); four equal corners
 // are corner_radius alone, and others corner_radii, with corner_radius the
-// smallest (the built-in path rounds every corner by it). The border's
+// smallest (the built-in path rounds every corner by it). The glows take
+// the declared placements; a mask's authored gradient is resolved for
+// `box`. The border's
 // edges are assembled
 // together when any of their fields is declared: each starts as the
 // floor's (its single edge, else its uniform border; an edge the floor
@@ -431,7 +439,8 @@ void assemble_material(const SurfaceMaterial& floor,
                        SurfaceMaterial& material);
 
 // Whether assembling `fields` reads the part's box: a relative corner or
-// an authored gradient other than a fixed one (authored_gradient_fixed).
+// an authored gradient, of a fill or the mask, other than a fixed one
+// (authored_gradient_fixed).
 [[nodiscard]] bool material_fields_read_box(
     const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept;
 

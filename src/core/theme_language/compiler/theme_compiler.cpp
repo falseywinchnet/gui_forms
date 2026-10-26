@@ -57,12 +57,12 @@ constexpr std::array<std::string_view, 12> not_admitted_families{
     "overflow", "overscroll", "padding", "scroll", "text-decoration", "transform",
 };
 
-// The properties of P6c to P8 (the rest of the authored materials, motion
+// The properties of P6d to P8 (the rest of the authored materials, motion
 // and the colour and font roles): refused with not_yet_built until their
 // phases, so that no interim meaning ships. Sorted. A family's members the
-// material lowering lists (P6b) are lowered before these are consulted.
-constexpr std::array<std::string_view, 8> later_properties{
-    "backdrop-filter", "color", "filter", "font", "glow", "glow-placement", "surface-finish", "text-shadow",
+// material lowering lists (P6b, P6c) are lowered before these are consulted.
+constexpr std::array<std::string_view, 4> later_properties{
+    "backdrop-filter", "color", "font", "text-shadow",
 };
 static_assert(std::is_sorted(later_properties.begin(), later_properties.end()), "binary_search needs the table sorted");
 

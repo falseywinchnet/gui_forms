@@ -1,9 +1,10 @@
 #pragma once
 
-// The material properties' lowering (stage T3, PLAN.md P6b): CSS's
-// background, border, border-radius and box-shadow families, read from a declaration's
-// value, become the engine's material fields (EC1), each CSS longhand one
-// field, so that each cascades as CSS cascades it. The compiler reads the
+// The material properties' lowering (stage T3, PLAN.md P6b and P6c): CSS's
+// background, border, border-radius, box-shadow, filter and mask-image
+// families and the language's glow and surface-finish, read from a
+// declaration's value, become the engine's material fields (EC1), each
+// longhand one field, so that each cascades as CSS cascades it. The compiler reads the
 // value and handles the CSS-wide keywords; this lowers what is left into
 // a result record and reports nothing itself.
 
@@ -58,6 +59,11 @@ enum class MaterialProperty : std::uint8_t {
     border_bottom_right_radius,
     border_bottom_left_radius,
     box_shadow,
+    filter,
+    glow,
+    glow_placement,
+    mask_image,
+    surface_finish,
 };
 
 // The property `name` (lower case) names, or none for another property.

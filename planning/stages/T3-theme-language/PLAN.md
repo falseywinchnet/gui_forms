@@ -838,11 +838,46 @@ one bake per distinct assembly. 3 PRs.
   resolution, the lowering of each property and 28 refusals are tested
   too.
 
-*P6c, still to build:* §5 filters, §8 finish, §9 glow, §10 image layers
-(the manifest's resources bound to the engine's images, with
-`background-size`, `-repeat` and `-position`), §11 masks, `border-image`,
-`double`, `groove` and `ridge` as keyline pairs, and §14's `color`,
-`outline` and `text-shadow`, which need an engine carrier.
+*P6c, filters, finish, glows and gradient masks, done:*
+- **Filters** (§5): `filter: none` or a list of CSS's functions. The
+  engine applies a material's filters in one order (the colour filter,
+  the drop shadow beneath, the blur), so a list lowers when that order
+  draws it. The colour functions compose into one matrix in source order
+  (CSS's amounts, percentages admitted, negative amounts E403); `blur()`s
+  combine in quadrature into `filter_blur` = 2σ; one `drop-shadow()`,
+  with a colour (without one it waits for `currentcolor`, E999), whose
+  colour the colour functions written after it also turn, rounded to 8
+  bits. A `drop-shadow()` after `blur()`, a second `drop-shadow()`,
+  `opacity()` after `drop-shadow()` (the engine's shadow follows the
+  filtered alpha, so it would fade twice) and an SVG filter reference are
+  E405. The colour functions are alpha-preserving affine maps of straight
+  colour (opacity a linear one), which commute with compositing and with
+  the blur; the order the engine draws differs from CSS's only where a
+  function clamps, as one matrix already differs from CSS's per-function
+  clamping (`MaterialColourMatrix`).
+- **Finish** (§8): `surface-finish`, 0 to 1 or a percentage.
+- **Glows** (§9): `glow: none` or up to 2 of a colour with a blur and an
+  optional spread (E407 past them); `glow-placement: [under | over]#`, a
+  new field (`glow_placements`) applied over the assembled glows in their
+  written order and repeated over them as CSS repeats a short list, so a
+  placement alone re-places the floor's glows.
+- **Masks** (§11): `mask-image: none` or one gradient (E407 for more; an
+  image resource is P6d's, E999), resolved like a fill's: when the sheet
+  compiles when it is fixed, else for the part's box at assembly. The
+  mask is the engine's (E9.6): outside the box it extends at its edge
+  value, so a shadow fades with the face beside it, where CSS's default
+  `mask-clip` would clip the shadow away.
+- Gate: seven more rows in `gui_forms_theme_material_css_tests` (colour
+  functions, combined blurs, a drop shadow turned by a later function, a
+  finish, two placed glows, a fixed and a sized mask) bake the pixels of
+  the same C++ material, plus the lowering of each property and 21 more
+  refusals.
+
+*P6d, still to build:* §10 image layers (the manifest's resources bound
+to the engine's images, with `background-size`, `-repeat` and
+`-position`) and image masks, `border-image`, `double`, `groove` and
+`ridge` as keyline pairs, `backdrop-filter` to the glass, and §14's
+`color`, `outline` and `text-shadow`, which need an engine carrier.
 
 **P7. Motion.** `transition`, the timing functions, delays, `@keyframes`,
 `animation`, ambient loops, and the state-machine grouping. Gate: a fixture

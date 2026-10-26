@@ -12,6 +12,7 @@
 #include "gui_forms/gui_forms.hpp"
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -55,6 +56,8 @@ constexpr double pi = 3.14159265358979323846264338327950288;
 const Color red = Color::rgba(255, 0, 0);
 const Color blue = Color::rgba(0, 0, 255);
 const Color green = Color::rgba(0, 128, 0);
+const Color black = Color::rgba(0, 0, 0);
+const Color transparent = Color::rgba(0, 0, 0, 0);
 
 AuthoredGradientStop stop(Color colour) {
     AuthoredGradientStop made{};
@@ -409,13 +412,101 @@ void test_border_lowering() {
     require(all_initial, "border: initial resets the twelve longhands");
 }
 
+void test_filter_lowering() {
+    const std::string_view none_sheet = "#pad::part(face) { filter: none }";
+    const Compilation none = compile(none_sheet);
+    const ThemeRule& none_rule = only_rule(none, none_sheet);
+    const MaterialDeclaration* const none_colour = field_of(none_rule, MaterialField::colour_filter);
+    const MaterialDeclaration* const none_drop = field_of(none_rule, MaterialField::drop_shadow);
+    const MaterialDeclaration* const none_blur = field_of(none_rule, MaterialField::filter_blur);
+    require(none_rule.materials.size() == 3U && none_colour != nullptr && !(*none_colour).colour_filter &&
+                none_drop != nullptr && !(*none_drop).drop_shadow && none_blur != nullptr &&
+                (*none_blur).number == 0.0 && selects_material(none_rule),
+            "filter: none clears the three filter fields");
+
+    const std::string_view blur_sheet = "#pad::part(face) { filter: blur(1.5px) blur(2px) }";
+    const Compilation blurred = compile(blur_sheet);
+    const MaterialDeclaration* const blur = field_of(only_rule(blurred, blur_sheet), MaterialField::filter_blur);
+    require(blur != nullptr && (*blur).number == 5.0, "two blurs combine in quadrature, filter_blur = 2 sigma");
+
+    const std::string_view shadow_sheet = "#pad::part(face) { filter: opacity(50%) drop-shadow(0 1px red) invert(1) }";
+    const Compilation shadowed = compile(shadow_sheet);
+    const ThemeRule& shadow_rule = only_rule(shadowed, shadow_sheet);
+    const MaterialDeclaration* const colour = field_of(shadow_rule, MaterialField::colour_filter);
+    const MaterialDeclaration* const drop = field_of(shadow_rule, MaterialField::drop_shadow);
+    const MaterialColourMatrix expected =
+        MaterialColourMatrix::opacity(0.5).then(MaterialColourMatrix::invert(1.0));
+    require(colour != nullptr && (*colour).colour_filter && *(*colour).colour_filter == expected,
+            "the colour functions compose in source order");
+    require(drop != nullptr && (*drop).drop_shadow && (*(*drop).drop_shadow).offset == Point{0.0, 1.0} &&
+                (*(*drop).drop_shadow).blur_radius == 0.0 &&
+                (*(*drop).drop_shadow).color == Color::rgba(0, 255, 255),
+            "a drop shadow's colour takes the colour functions after it, not those before");
+
+    const std::string_view finish_sheet = "#pad::part(face) { surface-finish: 25% }";
+    const Compilation finished = compile(finish_sheet);
+    const MaterialDeclaration* const finish = field_of(only_rule(finished, finish_sheet), MaterialField::finish);
+    require(finish != nullptr && (*finish).number == 0.25, "surface-finish reads a percentage");
+
+    const std::string_view glow_sheet = "#pad::part(face) { glow: red 2px, 1px 3px blue; glow-placement: over }";
+    const Compilation glowing = compile(glow_sheet);
+    const ThemeRule& glow_rule = only_rule(glowing, glow_sheet);
+    const MaterialDeclaration* const glows = field_of(glow_rule, MaterialField::glows);
+    const MaterialDeclaration* const placements = field_of(glow_rule, MaterialField::glow_placements);
+    require(glows != nullptr && (*glows).glows.size() == 2U && (*glows).glows[0].color == red &&
+                (*glows).glows[0].blur_radius == 2.0 && (*glows).glows[0].spread == 0.0 &&
+                (*glows).glows[1].color == blue && (*glows).glows[1].blur_radius == 1.0 &&
+                (*glows).glows[1].spread == 3.0,
+            "glow reads a colour and a blur and spread, in the written order");
+    require(placements != nullptr && (*placements).glow_placements.size() == 1U &&
+                (*placements).glow_placements[0] == MaterialGlowPlacement::over,
+            "glow-placement reads its list");
+    std::array<const MaterialDeclaration*, material_field_count> fields{};
+    fields[static_cast<std::size_t>(MaterialField::glow_placements)] = placements;
+    fields[static_cast<std::size_t>(MaterialField::glows)] = glows;
+    SurfaceMaterial assembled{};
+    assemble_material(SurfaceMaterial{}, fields, Size{40.0, 24.0}, assembled);
+    require(assembled.glows.size() == 2U && assembled.glows[0].placement == MaterialGlowPlacement::over &&
+                assembled.glows[1].placement == MaterialGlowPlacement::over,
+            "a short placement list repeats over the glows");
+    SurfaceMaterial floor_glows{};
+    floor_glows.glows = {MaterialGlow{}};
+    std::array<const MaterialDeclaration*, material_field_count> placed{};
+    placed[static_cast<std::size_t>(MaterialField::glow_placements)] = placements;
+    assemble_material(floor_glows, placed, Size{40.0, 24.0}, assembled);
+    require(assembled.glows.size() == 1U && assembled.glows[0].placement == MaterialGlowPlacement::over,
+            "a placement applies to the floor's glows");
+
+    const std::string_view fixed_sheet = "#pad::part(face) { mask-image: linear-gradient(black, transparent) }";
+    const Compilation fixed = compile(fixed_sheet);
+    const MaterialDeclaration* const fixed_mask = field_of(only_rule(fixed, fixed_sheet), MaterialField::mask);
+    require(fixed_mask != nullptr && (*fixed_mask).gradients.empty() && (*fixed_mask).mask &&
+                *(*fixed_mask).mask ==
+                    MaterialFillLayer::linear_css_angle(180.0, stops_of({{0.0, black}, {1.0, transparent}})),
+            "a fixed mask gradient is resolved when the sheet compiles");
+    const std::string_view sized_sheet = "#pad::part(face) { mask-image: radial-gradient(circle 10px, black, transparent) }";
+    const Compilation sized = compile(sized_sheet);
+    const MaterialDeclaration* const sized_mask = field_of(only_rule(sized, sized_sheet), MaterialField::mask);
+    require(sized_mask != nullptr && (*sized_mask).gradients.size() == 1U && (*sized_mask).mask,
+            "a mask gradient of lengths waits for the box");
+    std::array<const MaterialDeclaration*, material_field_count> masked{};
+    masked[static_cast<std::size_t>(MaterialField::mask)] = sized_mask;
+    require(material_fields_read_box(masked), "a mask gradient of lengths reads the box");
+    assemble_material(SurfaceMaterial{}, masked, Size{40.0, 24.0}, assembled);
+    require(assembled.mask &&
+                *assembled.mask == MaterialFillLayer::radial(Point{20.0, 12.0}, Size{10.0, 10.0},
+                                                             stops_of({{0.0, black}, {1.0, transparent}}),
+                                                             MaterialCoordinateSpace::logical),
+            "the mask is resolved for the part's box");
+}
+
 struct Refusal final {
     std::string_view sheet{};
     DiagnosticCode code{};
 };
 
 void test_refusals() {
-    const std::array<Refusal, 28> refusals{{
+    const std::array<Refusal, 49> refusals{{
         {"#a { background-image: "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
@@ -450,6 +541,28 @@ void test_refusals() {
         {"#a { box-shadow: 1px 1px -2px red }", DiagnosticCode::value_out_of_range},
         {"#a { box-shadow: 1px 1px red, 1px 1px red, 1px 1px red, 1px 1px red, 1px 1px red }",
          DiagnosticCode::too_many_layers},
+        {"#a { filter: blur(1px) drop-shadow(1px 1px red) }", DiagnosticCode::value_form_not_admitted},
+        {"#a { filter: drop-shadow(1px 1px red) drop-shadow(1px 1px red) }", DiagnosticCode::value_form_not_admitted},
+        {"#a { filter: drop-shadow(1px 1px red) opacity(50%) }", DiagnosticCode::value_form_not_admitted},
+        {"#a { filter: drop-shadow(1px 1px) }", DiagnosticCode::not_yet_built},
+        {"#a { filter: drop-shadow(1px) }", DiagnosticCode::value_syntax},
+        {"#a { filter: drop-shadow(8px 8px 8px red) }", DiagnosticCode::value_out_of_range},
+        {"#a { filter: url(\"resource:icon.check\") }", DiagnosticCode::value_form_not_admitted},
+        {"#a { filter: brightness(-1) }", DiagnosticCode::value_out_of_range},
+        {"#a { filter: blur(10%) }", DiagnosticCode::value_wrong_kind},
+        {"#a { filter: blur(-1px) }", DiagnosticCode::value_out_of_range},
+        {"#a { filter: hue-rotate(2px) }", DiagnosticCode::value_wrong_kind},
+        {"#a { filter: red }", DiagnosticCode::value_wrong_kind},
+        {"#a { surface-finish: 2 }", DiagnosticCode::value_out_of_range},
+        {"#a { surface-finish: 1px }", DiagnosticCode::value_wrong_kind},
+        {"#a { glow: red }", DiagnosticCode::value_syntax},
+        {"#a { glow: 2px }", DiagnosticCode::not_yet_built},
+        {"#a { glow: red 1px, red 1px, red 1px }", DiagnosticCode::too_many_layers},
+        {"#a { glow: red 8px }", DiagnosticCode::value_out_of_range},
+        {"#a { glow-placement: sideways }", DiagnosticCode::keyword_unknown},
+        {"#a { mask-image: linear-gradient(black, white), linear-gradient(black, white) }",
+         DiagnosticCode::too_many_layers},
+        {"#a { mask-image: url(\"resource:icon.check\") }", DiagnosticCode::not_yet_built},
     }};
     for (const Refusal& refusal : refusals) {
         const Compilation compiled = compile(refusal.sheet);
@@ -464,6 +577,11 @@ void test_refusals() {
     require(unknown.outcome == CompileOutcome::compiled && unknown.sheet.rules.empty() &&
                 unknown.diagnostics.size() == 1U && unknown.diagnostics[0].code == DiagnosticCode::unknown_function,
             "an unknown function drops the declaration with a warning");
+    const Compilation unknown_filter = compile("#a { filter: felt(1) }");
+    require(unknown_filter.outcome == CompileOutcome::compiled && unknown_filter.sheet.rules.empty() &&
+                unknown_filter.diagnostics.size() == 1U &&
+                unknown_filter.diagnostics[0].code == DiagnosticCode::unknown_function,
+            "an unknown filter function drops the declaration with a warning");
 }
 
 // -- the gate: a sheet and C++ bake the same pixels ------------------------------------
@@ -639,6 +757,59 @@ std::vector<GateRow> gate_rows() {
     shadows.material.shadows = {shadow_of(Point{0.0, 1.0}, 0.0, 0.0, Color::rgba(255, 255, 255), true),
                                 shadow_of(Point{0.0, 2.0}, 4.0, 0.0, Color::rgba(0, 0, 0, 102), false)};
     rows.push_back(shadows);
+
+    GateRow colours{};
+    colours.declarations = "background: red; filter: grayscale(100%) brightness(0.5)";
+    colours.material.fills = {MaterialFillLayer::solid(red)};
+    colours.material.colour_filter = MaterialColourMatrix::grayscale(1.0).then(MaterialColourMatrix::brightness(0.5));
+    rows.push_back(colours);
+    GateRow blurred{};
+    blurred.declarations = "background: blue; filter: blur(1px) blur(1px)";
+    blurred.material.fills = {MaterialFillLayer::solid(blue)};
+    blurred.material.filter_blur = 2.0 * std::sqrt(2.0);
+    rows.push_back(blurred);
+    GateRow dropped{};
+    dropped.declarations = "background: blue; filter: drop-shadow(1px 2px 2px red) invert(1)";
+    dropped.material.fills = {MaterialFillLayer::solid(blue)};
+    dropped.material.colour_filter = MaterialColourMatrix::invert(1.0);
+    MaterialDropShadow drop{};
+    drop.offset = Point{1.0, 2.0};
+    drop.blur_radius = 2.0;
+    drop.color = Color::rgba(0, 255, 255);
+    dropped.material.drop_shadow = drop;
+    rows.push_back(dropped);
+    GateRow finished{};
+    finished.declarations = "background: blue; surface-finish: 0.5";
+    finished.material.fills = {MaterialFillLayer::solid(blue)};
+    finished.material.finish = 0.5;
+    rows.push_back(finished);
+    GateRow glowing{};
+    glowing.declarations = "background: blue; glow: red 2px 1px, white 1px; glow-placement: over, under";
+    glowing.material.fills = {MaterialFillLayer::solid(blue)};
+    MaterialGlow over_glow{};
+    over_glow.color = red;
+    over_glow.blur_radius = 2.0;
+    over_glow.spread = 1.0;
+    over_glow.placement = MaterialGlowPlacement::over;
+    MaterialGlow under_glow{};
+    under_glow.color = Color::rgba(255, 255, 255);
+    under_glow.blur_radius = 1.0;
+    under_glow.spread = 0.0;
+    under_glow.placement = MaterialGlowPlacement::under;
+    glowing.material.glows = {over_glow, under_glow};
+    rows.push_back(glowing);
+    const std::vector<GradientStop> fading = stops_of({{0.0, black}, {1.0, transparent}});
+    GateRow linear_mask{};
+    linear_mask.declarations = "background: blue; mask-image: linear-gradient(black, transparent)";
+    linear_mask.material.fills = {MaterialFillLayer::solid(blue)};
+    linear_mask.material.mask = MaterialFillLayer::linear_css_angle(180.0, fading);
+    rows.push_back(linear_mask);
+    GateRow radial_mask{};
+    radial_mask.declarations = "background: blue; mask-image: radial-gradient(circle 10px, black, transparent)";
+    radial_mask.material.fills = {MaterialFillLayer::solid(blue)};
+    radial_mask.material.mask =
+        MaterialFillLayer::radial(Point{20.0, 12.0}, Size{10.0, 10.0}, fading, MaterialCoordinateSpace::logical);
+    rows.push_back(radial_mask);
     return rows;
 }
 
@@ -667,6 +838,7 @@ int main() {
     test_conic_geometry();
     test_lowering();
     test_border_lowering();
+    test_filter_lowering();
     test_refusals();
     test_gate();
     if (failures != 0) {

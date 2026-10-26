@@ -217,6 +217,7 @@ constexpr std::array<std::string_view, material_field_count> material_field_name
     "fill_blend_modes",
     "shadows",
     "glows",
+    "glow_placements",
     "border_top_style",
     "border_top_width",
     "border_top_colour",
@@ -283,6 +284,16 @@ void apply_material_declaration(const MaterialDeclaration& declaration, SurfaceM
     switch (declaration.field) {
     case MaterialField::shadows: material.shadows = declaration.shadows; return;
     case MaterialField::glows: material.glows = declaration.glows; return;
+    case MaterialField::glow_placements: {
+        // Over the glows already in place (assemble_material writes the
+        // glows first).
+        const std::vector<MaterialGlowPlacement>& placements = declaration.glow_placements;
+        if (placements.empty()) return;
+        for (std::size_t glow = 0U; glow < material.glows.size(); ++glow) {
+            material.glows[glow].placement = placements[glow % placements.size()];
+        }
+        return;
+    }
     case MaterialField::keylines: material.keylines = declaration.keylines; return;
     case MaterialField::colour_filter: material.colour_filter = declaration.colour_filter; return;
     case MaterialField::drop_shadow: material.drop_shadow = declaration.drop_shadow; return;
@@ -515,6 +526,17 @@ bool material_declaration_admitted(const MaterialDeclaration& declaration) {
         const bool admitted = valid_surface_material(checked);
         return admitted;
     }
+    if (declaration.field == MaterialField::mask && !declaration.gradients.empty()) {
+        const AuthoredGradient& gradient = declaration.gradients.front();
+        if (declaration.gradients.size() != 1U || !declaration.mask) return false;
+        checked.mask = declaration.mask;
+        if (gradient.kind != MaterialFillKind::solid) {
+            if (!valid_authored_gradient(gradient)) return false;
+            resolve_authored_gradient(gradient, sample_box, *checked.mask);
+        }
+        const bool admitted = valid_surface_material(checked);
+        return admitted;
+    }
     if (!edge_field(declaration.field)) {
         apply_material_declaration(declaration, checked);
         const bool admitted = valid_surface_material(checked);
@@ -536,7 +558,8 @@ bool material_fields_read_box(
     for (const MaterialDeclaration* const declaration : fields) {
         if (declaration == nullptr || (*declaration).initial) continue;
         if (corner_field((*declaration).field) && (*declaration).relative) return true;
-        if ((*declaration).field != MaterialField::fills) continue;
+        const bool layers = (*declaration).field == MaterialField::fills || (*declaration).field == MaterialField::mask;
+        if (!layers) continue;
         for (const AuthoredGradient& gradient : (*declaration).gradients) {
             if (gradient.kind != MaterialFillKind::solid && !authored_gradient_fixed(gradient)) return true;
         }
@@ -565,7 +588,16 @@ void assemble_material(const SurfaceMaterial& floor,
             corners = true;
             continue;
         }
+        // The placements apply to the glows, assembled first.
+        if ((*declaration).field == MaterialField::glow_placements) continue;
         apply_material_declaration(*declaration, material);
+    }
+    const MaterialDeclaration* const placements = set_field(fields, MaterialField::glow_placements);
+    if (placements != nullptr) apply_material_declaration(*placements, material);
+    const MaterialDeclaration* const mask = set_field(fields, MaterialField::mask);
+    if (mask != nullptr && material.mask && !(*mask).gradients.empty() &&
+        (*mask).gradients.front().kind != MaterialFillKind::solid) {
+        resolve_authored_gradient((*mask).gradients.front(), box, *material.mask);
     }
     if (fills) compose_fills(floor, fields, box, material);
     if (corners) compose_corners(floor, fields, std::min(box.width, box.height), material);
