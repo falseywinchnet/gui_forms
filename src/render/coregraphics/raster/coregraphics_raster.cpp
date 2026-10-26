@@ -22,20 +22,48 @@ CGRect to_cg_rect(Rect rect) noexcept {
     return CGRectMake(rect.x, rect.y, rect.width, rect.height);
 }
 
-// Edge snapping (owner decision L-Q8, detail::snap_device_edge): the
-// user-space rectangle whose device edges are `rect`'s, each rounded to a
-// whole device pixel. Only an axis-aligned transform snaps; under any other,
-// false, and the caller keeps antialiased geometry.
-bool snapped_user_rect(CGContextRef context, const Rect rect, CGRect& snapped) {
+// Edge snapping (owner decision L-Q8, detail::snap_device_edge): `rect`'s
+// device edges, each rounded to a whole device pixel, as a device-space
+// rectangle. Only an axis-aligned transform on a bitmap snaps; otherwise
+// false, and the caller keeps antialiased geometry. Quartz's device space
+// rises from the bitmap's bottom row, while the rule rounds halves toward
+// the bottom of the y-down surface, so the vertical edges are rounded as
+// distances from the top row (`height` - y) and converted back.
+bool snapped_device_box(CGContextRef context, const Rect rect, CGRect& device_box) {
     const CGAffineTransform transform = CGContextGetCTM(context);
     if (transform.b != 0.0 || transform.c != 0.0 || !rect.finite()) return false;
+    const double height = static_cast<double>(CGBitmapContextGetHeight(context));
+    if (height == 0.0) return false;
     const CGRect device = CGContextConvertRectToDeviceSpace(context, to_cg_rect(rect));
     const double left = gui_forms::detail::snap_device_edge(static_cast<double>(CGRectGetMinX(device)));
-    const double top = gui_forms::detail::snap_device_edge(static_cast<double>(CGRectGetMinY(device)));
     const double right = gui_forms::detail::snap_device_edge(static_cast<double>(CGRectGetMaxX(device)));
-    const double bottom = gui_forms::detail::snap_device_edge(static_cast<double>(CGRectGetMaxY(device)));
-    const CGRect rounded = CGRectMake(left, top, right - left, bottom - top);
-    snapped = CGContextConvertRectToUserSpace(context, rounded);
+    const double top_down_top = gui_forms::detail::snap_device_edge(height - static_cast<double>(CGRectGetMaxY(device)));
+    const double top_down_bottom =
+        gui_forms::detail::snap_device_edge(height - static_cast<double>(CGRectGetMinY(device)));
+    device_box = CGRectMake(left, height - top_down_bottom, right - left, top_down_bottom - top_down_top);
+    return true;
+}
+
+// The user-space rectangle whose device edges are snapped_device_box's.
+bool snapped_user_rect(CGContextRef context, const Rect rect, CGRect& snapped) {
+    CGRect device_box{};
+    if (!snapped_device_box(context, rect, device_box)) return false;
+    snapped = CGContextConvertRectToUserSpace(context, device_box);
+    return true;
+}
+
+// The user-space rectangle for a clip without antialiasing to exactly the
+// pixels of the snapped box: its device edges a quarter pixel inside the
+// whole-pixel edges. Converted back to user space, a whole-pixel edge can
+// land a hair outside its pixel boundary, and Quartz's aliased rectangle
+// clip then takes the next row (seen at scale 1.25). A quarter pixel inside,
+// the clip selects the same pixels whether it samples pixel centres or
+// rounds its edges, outward or to the nearest.
+bool aliased_clip_rect(CGContextRef context, const Rect rect, CGRect& clip) {
+    CGRect device_box{};
+    if (!snapped_device_box(context, rect, device_box)) return false;
+    const CGRect inside = CGRectInset(device_box, 0.25, 0.25);
+    clip = CGContextConvertRectToUserSpace(context, inside);
     return true;
 }
 
@@ -617,7 +645,7 @@ void CoreGraphicsRaster::fill_linear_gradient(
     CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
     CGRect box = to_cg_rect(rect);
-    const bool snapped = snapped_user_rect((*impl_).context, rect, box);
+    const bool snapped = aliased_clip_rect((*impl_).context, rect, box);
     CGContextSaveGState((*impl_).context);
     // A snapped box clips without antialiasing, as a snapped fill covers
     // exactly its pixels; what is drawn inside keeps the painter's setting.
@@ -687,7 +715,7 @@ void CoreGraphicsRaster::fill_linear_gradient_spread(
     }
 
     CGRect box = to_cg_rect(rect);
-    const bool snapped = snapped_user_rect((*impl_).context, rect, box);
+    const bool snapped = aliased_clip_rect((*impl_).context, rect, box);
     CGContextSaveGState((*impl_).context);
     // A snapped box clips without antialiasing, as a snapped fill covers
     // exactly its pixels; what is drawn inside keeps the painter's setting.
@@ -739,7 +767,7 @@ void CoreGraphicsRaster::fill_radial_gradient(
     CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
     CGRect box = to_cg_rect(rect);
-    const bool snapped = snapped_user_rect((*impl_).context, rect, box);
+    const bool snapped = aliased_clip_rect((*impl_).context, rect, box);
     CGContextSaveGState((*impl_).context);
     // A snapped box clips without antialiasing, as a snapped fill covers
     // exactly its pixels; what is drawn inside keeps the painter's setting.

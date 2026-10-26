@@ -8,6 +8,10 @@
 #include <cstdint>
 #include <iostream>
 
+// Quartz dithers gradient shading: a flat gradient's interior varied by 1 in
+// a byte at scale 1 in CI run 40253050874 (macOS).
+constexpr int quartz_gradient_dither = 1;
+
 int main() {
     for (const double scale : edge_snapping::scales) {
         gui_forms::render::CoreGraphicsRaster raster;
@@ -25,7 +29,7 @@ int main() {
         image.height = static_cast<int>(raster.pixel_height());
         image.row_bytes = raster.row_bytes();
         image.bytes = static_cast<const std::uint8_t*>(raster.pixels());
-        if (image.bytes == nullptr || !edge_snapping::check_scene(image, scale)) return 1;
+        if (image.bytes == nullptr || !edge_snapping::check_scene(image, scale, quartz_gradient_dither)) return 1;
     }
     std::cout << "gui_forms_coregraphics_raster_edge_snapping_tests: all tests passed\n";
     return 0;

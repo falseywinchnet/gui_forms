@@ -34,7 +34,6 @@ constexpr gui_forms::Rect bottom_box{24.15, 6.43, 11.6, 10.11 - 6.43};
 constexpr gui_forms::Rect stroked{3.3, 13.6, 14.45, 7.2};
 constexpr double stroke_width = 1.3;
 constexpr gui_forms::Rect gradient_box{24.15, 13.6, 11.6, 7.2};
-constexpr int gradient_dither = 2; // bytes; see gradient_coverage
 constexpr gui_forms::Rect rounded_box{6.35, 24.2, 27.4, 6.6};
 constexpr double rounded_radius = 2.2;
 
@@ -190,20 +189,22 @@ inline bool within(const ByteRange& range, const std::uint32_t value) {
     return true;
 }
 
-// The flat gradient, with its coverage and its colour checked apart. Quartz
-// dithers gradient shading, so the colour inside may vary by a step of its
-// bytes; coverage may not.
+// The flat gradient, with its coverage and its colour checked apart. A
+// painter may dither gradient shading (`dither`, in byte steps: Quartz does,
+// by 1 in run 40253050874; Skia and the DIB painter showed 0, so they pass
+// 0), so the colour inside may vary; coverage may not.
 // - Coverage, exact: every pixel inside the rounded device box is inked
 //   (not the background) and every pixel in the two-pixel band around it is
 //   the background, so the box's edges are its rounded edges exactly.
 // - Interior colour: the pixels at least one pixel in from the box's edges
-//   differ from the first by at most `gradient_dither` in each byte.
+//   differ from the first by at most `dither` in each byte.
 // - Edge colour: each pixel on the box's edge lies, byte by byte, within the
 //   range the interior showed, so a painter that does not dither must paint
 //   its edges exactly the interior colour, and a partly covered edge pixel
 //   (tens of levels toward the background) fails either way.
 // The largest interior difference is printed, as evidence of the dither.
-inline bool gradient_coverage(const PixelImage& image, const double scale, const std::uint32_t background) {
+inline bool gradient_coverage(const PixelImage& image, const double scale, const std::uint32_t background,
+                              const int dither) {
     const int left = device_edge(gradient_box.x, translation.x, scale);
     const int top = device_edge(gradient_box.y, translation.y, scale);
     const int right = device_edge(gradient_box.right(), translation.x, scale);
@@ -226,7 +227,7 @@ inline bool gradient_coverage(const PixelImage& image, const double scale, const
         for (int x = left + 1; x < right - 1; ++x) {
             const std::uint32_t value = pixel_at(image, x, y);
             const int distance = channel_distance(value, ink);
-            if (distance > gradient_dither) return fail_values("the gradient's interior is not flat", scale, x, y, value, ink);
+            if (distance > dither) return fail_values("the gradient's interior is not flat", scale, x, y, value, ink);
             largest = std::max(largest, distance);
             widen(interior, value);
         }
@@ -293,7 +294,9 @@ inline bool border_on_fill(const PixelImage& image, const double scale, const bo
     return true;
 }
 
-inline bool check_scene(const PixelImage& image, const double scale) {
+// `dither`: the byte steps the painter's gradient shading may vary by inside
+// the gradient (gradient_coverage); 0 for a painter that fills it exactly.
+inline bool check_scene(const PixelImage& image, const double scale, const int dither) {
     const std::uint32_t background = pixel_at(image, 0, 0);
     const int row = device_edge(6.0, translation.y, scale);
     const bool across = shared_edge(image, scale, true, row,
@@ -306,7 +309,7 @@ inline bool check_scene(const PixelImage& image, const double scale) {
     const gui_forms::Rect stroke_area{stroked.x - stroke_width, stroked.y - stroke_width,
                                       stroked.width + stroke_width * 2.0, stroked.height + stroke_width * 2.0};
     const bool stroke = whole_pixels(image, scale, stroke_area, background);
-    const bool gradient = gradient_coverage(image, scale, background);
+    const bool gradient = gradient_coverage(image, scale, background, dither);
     const int rounded_row = device_edge(27.5, translation.y, scale);
     const bool rounded_across = border_on_fill(image, scale, true, rounded_row, rounded_box.x, rounded_box.right(),
         translation.x, device_edge(rounded_box.x - 2.0, translation.x, scale),

@@ -130,57 +130,108 @@ SkPaint make_paint(Color color) {
     return paint;
 }
 
-// Edge snapping (owner decision L-Q8, detail::snap_device_edge): the local
-// rectangle whose device edges are `rect`'s, each rounded to a whole device
-// pixel. Only an axis-aligned transform (scale and translation) snaps;
-// under any other, false, and the caller keeps antialiased geometry. At whole
-// device pixels a fill without antialiasing covers exactly the pixels
-// between the edges.
-bool snapped_local_rect(const SkCanvas& canvas, const Rect rect, SkRect& local) {
-    const SkMatrix matrix = canvas.getTotalMatrix();
-    const double scale_x = static_cast<double>(matrix.getScaleX());
-    const double scale_y = static_cast<double>(matrix.getScaleY());
-    if (!matrix.isScaleTranslate() || !rect.finite() || scale_x == 0.0 || scale_y == 0.0) return false;
-    const double translate_x = static_cast<double>(matrix.getTranslateX());
-    const double translate_y = static_cast<double>(matrix.getTranslateY());
-    const double left = gui_forms::detail::snap_device_edge(rect.x * scale_x + translate_x);
-    const double top = gui_forms::detail::snap_device_edge(rect.y * scale_y + translate_y);
-    const double right = gui_forms::detail::snap_device_edge((rect.x + rect.width) * scale_x + translate_x);
-    const double bottom = gui_forms::detail::snap_device_edge((rect.y + rect.height) * scale_y + translate_y);
-    local = SkRect::MakeLTRB(static_cast<SkScalar>((left - translate_x) / scale_x),
-                             static_cast<SkScalar>((top - translate_y) / scale_y),
-                             static_cast<SkScalar>((right - translate_x) / scale_x),
-                             static_cast<SkScalar>((bottom - translate_y) / scale_y));
-    local.sort();
-    return true;
+// Edge snapping (owner decision L-Q8, detail::snap_device_edge) under the
+// canvas transform. `scale_*` and `translate_*` give the device edges that
+// are rounded; `canvas_*` are the canvas's own single-precision values, which
+// Skia applies to what is drawn. SkMatrix holds the caller's translation in
+// single precision, which can carry an edge lying exactly on a half device
+// pixel to the wrong side of it (scale 2, a 0.45 translation: 0.9f is below
+// 0.9). Where the canvas is the frame's scale with the caller's translation,
+// the edges are taken from that translation in double precision instead.
+struct SnapTransform final {
+    bool axis_aligned{false};
+    double scale_x{1.0};
+    double scale_y{1.0};
+    double translate_x{0.0};
+    double translate_y{0.0};
+    double canvas_scale_x{1.0};
+    double canvas_scale_y{1.0};
+    double canvas_translate_x{0.0};
+    double canvas_translate_y{0.0};
+};
+
+// Whether a single-precision device translation is `exact` rounded: within
+// a few parts in a hundred thousand, far below any offset another level of
+// the canvas (a group's device origin, whole pixels) would add.
+bool rounds_to(const double rounded, const double exact) noexcept {
+    const double difference = std::abs(rounded - exact);
+    const bool close_enough = difference <= 1.0e-5 * (1.0 + std::abs(exact));
+    return close_enough;
 }
 
-// The same snapped edges in device space, as whole numbers. An antialiased
-// shape whose edges must cover whole pixels is drawn here, with the canvas
-// transform reset: the local rectangle above, mapped back through the
-// transform in single precision, can land a hair inside a pixel edge, and
-// antialiasing then shows that pixel partly covered.
-bool snapped_device_rect(const SkMatrix& matrix, const Rect rect, SkRect& device) {
+// `frame_scale` is the scale the frame began with and `offset` the logical
+// translation the caller has applied since, in double precision.
+SnapTransform snap_transform(const SkMatrix& matrix, const double frame_scale, const Point offset) {
+    SnapTransform transform{};
     const double scale_x = static_cast<double>(matrix.getScaleX());
     const double scale_y = static_cast<double>(matrix.getScaleY());
-    if (!matrix.isScaleTranslate() || !rect.finite() || scale_x == 0.0 || scale_y == 0.0) return false;
-    const double translate_x = static_cast<double>(matrix.getTranslateX());
-    const double translate_y = static_cast<double>(matrix.getTranslateY());
-    const double left = gui_forms::detail::snap_device_edge(rect.x * scale_x + translate_x);
-    const double top = gui_forms::detail::snap_device_edge(rect.y * scale_y + translate_y);
-    const double right = gui_forms::detail::snap_device_edge((rect.x + rect.width) * scale_x + translate_x);
-    const double bottom = gui_forms::detail::snap_device_edge((rect.y + rect.height) * scale_y + translate_y);
+    if (!matrix.isScaleTranslate() || scale_x == 0.0 || scale_y == 0.0) return transform;
+    transform.axis_aligned = true;
+    transform.canvas_scale_x = scale_x;
+    transform.canvas_scale_y = scale_y;
+    transform.canvas_translate_x = static_cast<double>(matrix.getTranslateX());
+    transform.canvas_translate_y = static_cast<double>(matrix.getTranslateY());
+    transform.scale_x = transform.canvas_scale_x;
+    transform.scale_y = transform.canvas_scale_y;
+    transform.translate_x = transform.canvas_translate_x;
+    transform.translate_y = transform.canvas_translate_y;
+    const SkScalar single_scale = static_cast<SkScalar>(frame_scale);
+    const double exact_x = offset.x * frame_scale;
+    const double exact_y = offset.y * frame_scale;
+    const bool frame_transform = matrix.getScaleX() == single_scale && matrix.getScaleY() == single_scale &&
+        rounds_to(transform.canvas_translate_x, exact_x) && rounds_to(transform.canvas_translate_y, exact_y);
+    if (frame_transform) {
+        transform.scale_x = frame_scale;
+        transform.scale_y = frame_scale;
+        transform.translate_x = exact_x;
+        transform.translate_y = exact_y;
+    }
+    return transform;
+}
+
+// `rect`'s device edges, each rounded to a whole device pixel, in device
+// space. Only an axis-aligned transform (scale and translation) snaps; under
+// any other, false, and the caller keeps antialiased geometry.
+bool snapped_device_rect(const SnapTransform& transform, const Rect rect, SkRect& device) {
+    if (!transform.axis_aligned || !rect.finite()) return false;
+    const double left = gui_forms::detail::snap_device_edge(rect.x * transform.scale_x + transform.translate_x);
+    const double top = gui_forms::detail::snap_device_edge(rect.y * transform.scale_y + transform.translate_y);
+    const double right =
+        gui_forms::detail::snap_device_edge((rect.x + rect.width) * transform.scale_x + transform.translate_x);
+    const double bottom =
+        gui_forms::detail::snap_device_edge((rect.y + rect.height) * transform.scale_y + transform.translate_y);
     device = SkRect::MakeLTRB(static_cast<SkScalar>(left), static_cast<SkScalar>(top),
                               static_cast<SkScalar>(right), static_cast<SkScalar>(bottom));
     device.sort();
     return true;
 }
 
+// The local rectangle the canvas maps to the snapped device edges. At whole
+// device pixels a fill without antialiasing covers exactly the pixels between
+// the edges; it samples pixel centres, so the hair of error the mapping back
+// leaves cannot change a pixel. An antialiased shape is drawn in device
+// space instead (snapped_device_rect, the canvas transform reset), where that
+// hair would show as a partly covered edge pixel.
+bool snapped_local_rect(const SnapTransform& transform, const Rect rect, SkRect& local) {
+    SkRect device{};
+    if (!snapped_device_rect(transform, rect, device)) return false;
+    const double left = static_cast<double>(device.left());
+    const double top = static_cast<double>(device.top());
+    const double right = static_cast<double>(device.right());
+    const double bottom = static_cast<double>(device.bottom());
+    local = SkRect::MakeLTRB(static_cast<SkScalar>((left - transform.canvas_translate_x) / transform.canvas_scale_x),
+                             static_cast<SkScalar>((top - transform.canvas_translate_y) / transform.canvas_scale_y),
+                             static_cast<SkScalar>((right - transform.canvas_translate_x) / transform.canvas_scale_x),
+                             static_cast<SkScalar>((bottom - transform.canvas_translate_y) / transform.canvas_scale_y));
+    local.sort();
+    return true;
+}
+
 // A logical corner radius in device pixels along each axis, no more than
 // half of the device box it rounds.
-SkVector device_radii(const SkMatrix& matrix, const double radius, const SkRect& device) {
-    const double across = std::abs(static_cast<double>(matrix.getScaleX())) * radius;
-    const double down = std::abs(static_cast<double>(matrix.getScaleY())) * radius;
+SkVector device_radii(const SnapTransform& transform, const double radius, const SkRect& device) {
+    const double across = std::abs(transform.scale_x) * radius;
+    const double down = std::abs(transform.scale_y) * radius;
     const double half_width = static_cast<double>(device.width()) * 0.5;
     const double half_height = static_cast<double>(device.height()) * 0.5;
     const SkVector radii = SkVector::Make(static_cast<SkScalar>(std::clamp(across, 0.0, half_width)),
@@ -190,9 +241,9 @@ SkVector device_radii(const SkMatrix& matrix, const double radius, const SkRect&
 
 // The rectangle to draw for a box filled with `paint`: snapped, with
 // antialiasing off, when the transform allows; otherwise the box as given.
-SkRect snapped_box(const SkCanvas& canvas, const Rect rect, SkPaint& paint) {
+SkRect snapped_box(const SnapTransform& transform, const Rect rect, SkPaint& paint) {
     SkRect local = to_sk_rect(rect);
-    if (snapped_local_rect(canvas, rect, local)) paint.setAntiAlias(false);
+    if (snapped_local_rect(transform, rect, local)) paint.setAntiAlias(false);
     return local;
 }
 
@@ -359,6 +410,16 @@ public:
     Size logical_size{};
     double scale{1.0};
     int save_floor{1};
+    // The logical translation the caller has applied since the frame began,
+    // in double precision, and one saved value per open save(); see
+    // SnapTransform. Reset at each frame's start and end.
+    Point offset{};
+    std::vector<Point> saved_offsets;
+
+    [[nodiscard]] SnapTransform snap_transform_of(const SkCanvas& target) const {
+        const SnapTransform transform = snap_transform(target.getTotalMatrix(), scale, offset);
+        return transform;
+    }
     const ImageRegistry* image_registry{};
     std::uint64_t image_registry_revision{std::numeric_limits<std::uint64_t>::max()};
     bool image_registry_synchronized{true};
@@ -521,6 +582,8 @@ void SkiaRaster::begin_frame(const DamageRegion& damage) {
                   static_cast<SkScalar>((*impl_).scale));
     (*canvas).save();
     (*impl_).save_floor = (*canvas).getSaveCount();
+    (*impl_).offset = Point{};
+    (*impl_).saved_offsets.clear();
 
     if (!damage.empty()) {
         SkRegion region;
@@ -572,6 +635,8 @@ void SkiaRaster::end_frame() {
         (*canvas).restoreToCount(1);
     }
     (*impl_).text_clips.clear();
+    (*impl_).offset = Point{};
+    (*impl_).saved_offsets.clear();
 }
 
 #if defined(GUI_FORMS_PREPARED_TEXT)
@@ -787,6 +852,7 @@ void SkiaRaster::save() {
             const Impl::TextClipState copy = *state;
             (*impl_).text_clips.push_back(copy);
         }
+        (*impl_).saved_offsets.push_back((*impl_).offset);
         (*canvas).save();
     }
 }
@@ -797,6 +863,10 @@ void SkiaRaster::restore() {
         if ((*impl_).current_text_clip(*canvas) != nullptr && (*impl_).text_clips.size() > 1U) {
             (*impl_).text_clips.pop_back();
         }
+        if (!(*impl_).saved_offsets.empty()) {
+            (*impl_).offset = (*impl_).saved_offsets.back();
+            (*impl_).saved_offsets.pop_back();
+        }
         (*canvas).restore();
     }
 }
@@ -804,6 +874,8 @@ void SkiaRaster::restore() {
 void SkiaRaster::translate(Point offset) {
     if (SkCanvas* canvas = (*impl_).canvas()) {
         (*canvas).translate(static_cast<SkScalar>(offset.x), static_cast<SkScalar>(offset.y));
+        (*impl_).offset.x += offset.x;
+        (*impl_).offset.y += offset.y;
     }
 }
 
@@ -837,7 +909,7 @@ void SkiaRaster::clip_rounded_rect(Rect rect, double radius) {
 void SkiaRaster::fill_rect(Rect rect, Color color) {
     if (SkCanvas* canvas = (*impl_).canvas()) {
         SkPaint paint = make_paint(color);
-        const SkRect box = snapped_box(*canvas, rect, paint);
+        const SkRect box = snapped_box((*impl_).snap_transform_of(*canvas), rect, paint);
         (*canvas).drawRect(box, paint);
     }
 }
@@ -846,11 +918,11 @@ void SkiaRaster::fill_rounded_rect(Rect rect, double radius, Color color) {
     if (SkCanvas* canvas = (*impl_).canvas()) {
         // The bounds snap, in device space; the corners keep their
         // antialiasing.
-        const SkMatrix matrix = (*canvas).getTotalMatrix();
+        const SnapTransform transform = (*impl_).snap_transform_of(*canvas);
         SkRect device{};
-        if (snapped_device_rect(matrix, rect, device)) {
+        if (snapped_device_rect(transform, rect, device)) {
             const double bounded = std::clamp(radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5));
-            const SkVector radii = device_radii(matrix, bounded, device);
+            const SkVector radii = device_radii(transform, bounded, device);
             (*canvas).save();
             (*canvas).resetMatrix();
             (*canvas).drawRRect(SkRRect::MakeRectXY(device, radii.x(), radii.y()), make_paint(color));
@@ -870,11 +942,12 @@ void SkiaRaster::stroke_rect(Rect rect, Color color, double width) {
         // The stroke is centred on the edges. Snapped, it is the ring between
         // its snapped outer and inner edges, filled without antialiasing.
         const double half = width * 0.5;
+        const SnapTransform transform = (*impl_).snap_transform_of(*canvas);
         SkRect outer{};
         SkRect inner{};
         const bool snapped = std::isfinite(half) && half > 0.0 &&
-            snapped_local_rect(*canvas, outset_rect(rect, half), outer) &&
-            snapped_local_rect(*canvas, outset_rect(rect, -half), inner);
+            snapped_local_rect(transform, outset_rect(rect, half), outer) &&
+            snapped_local_rect(transform, outset_rect(rect, -half), inner);
         if (snapped) {
             SkPathBuilder ring(SkPathFillType::kEvenOdd);
             ring.addRect(outer);
@@ -898,22 +971,22 @@ void SkiaRaster::stroke_rounded_rect(Rect rect, double radius, Color color,
         // its snapped outer and inner bounds, in device space as a rounded
         // fill snaps its bounds; the corners keep their antialiasing.
         const double half = width * 0.5;
-        const SkMatrix matrix = (*canvas).getTotalMatrix();
+        const SnapTransform transform = (*impl_).snap_transform_of(*canvas);
         SkRect outer{};
         SkRect inner{};
         const bool snapped = std::isfinite(half) && half > 0.0 &&
-            snapped_device_rect(matrix, outset_rect(rect, half), outer) &&
-            snapped_device_rect(matrix, outset_rect(rect, -half), inner);
+            snapped_device_rect(transform, outset_rect(rect, half), outer) &&
+            snapped_device_rect(transform, outset_rect(rect, -half), inner);
         if (snapped) {
             const double bounded = std::clamp(radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5));
-            const SkVector outer_radii = device_radii(matrix, bounded + half, outer);
+            const SkVector outer_radii = device_radii(transform, bounded + half, outer);
             const SkRRect outer_shape = SkRRect::MakeRectXY(outer, outer_radii.x(), outer_radii.y());
             (*canvas).save();
             (*canvas).resetMatrix();
             if (inner.isEmpty()) {
                 (*canvas).drawRRect(outer_shape, paint);
             } else {
-                const SkVector inner_radii = device_radii(matrix, std::max(0.0, bounded - half), inner);
+                const SkVector inner_radii = device_radii(transform, std::max(0.0, bounded - half), inner);
                 const SkRRect inner_shape = SkRRect::MakeRectXY(inner, inner_radii.x(), inner_radii.y());
                 (*canvas).drawDRRect(outer_shape, inner_shape, paint);
             }
@@ -954,7 +1027,7 @@ void SkiaRaster::fill_linear_gradient_spread(
     SkPaint paint;
     paint.setAntiAlias(true);
     paint.setShader(std::move(shader));
-    const SkRect box = snapped_box(*canvas, rect, paint);
+    const SkRect box = snapped_box((*impl_).snap_transform_of(*canvas), rect, paint);
     (*canvas).drawRect(box, paint);
 }
 
@@ -975,7 +1048,7 @@ void SkiaRaster::fill_radial_gradient(
     paint.setShader(std::move(shader));
     (*canvas).save();
     SkRect box = to_sk_rect(rect);
-    const bool snapped = snapped_local_rect(*canvas, rect, box);
+    const bool snapped = snapped_local_rect((*impl_).snap_transform_of(*canvas), rect, box);
     (*canvas).clipRect(box, SkClipOp::kIntersect, !snapped);
     (*canvas).translate(static_cast<SkScalar>(center.x),
                       static_cast<SkScalar>(center.y));
