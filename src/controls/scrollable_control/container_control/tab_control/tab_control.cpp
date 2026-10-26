@@ -904,7 +904,8 @@ std::vector<TabControl::Item> TabControl::realized_items() const {
 namespace {
 
 // The events TabControl adds to those of ContainerControl, in declaration order.
-constexpr std::array<InteractionDeclaration, 1> tab_control_interactions{{
+constexpr std::array<InteractionDeclaration, 2> tab_control_interactions{{
+    {.name = "draw_item_content", .payload = "ItemContentPaint", .mutable_payload = true},
     {.name = "selected_index_changed", .payload = "TabSelectionChange", .mutable_payload = false},
 }};
 

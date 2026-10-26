@@ -2120,7 +2120,8 @@ std::vector<ListView::Column> ListView::realized_columns() const {
 namespace {
 
 // The events ListView adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 6> list_view_interactions{{
+constexpr std::array<InteractionDeclaration, 7> list_view_interactions{{
+    {.name = "draw_item_content", .payload = "ItemContentPaint", .mutable_payload = true},
     {.name = "selection_changed", .payload = "ListViewSelectionChange", .mutable_payload = false},
     {.name = "item_activated", .payload = "ListViewItemActivation", .mutable_payload = false},
     {.name = "item_checking", .payload = "ListViewItemCheck", .mutable_payload = true},

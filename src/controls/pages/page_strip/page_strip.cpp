@@ -2362,7 +2362,8 @@ std::vector<PageStrip::Item> PageStrip::realized_items() const {
 namespace {
 
 // The events PageStrip adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 6> page_strip_interactions{{
+constexpr std::array<InteractionDeclaration, 7> page_strip_interactions{{
+    {.name = "draw_item_content", .payload = "ItemContentPaint", .mutable_payload = true},
     {.name = "page_invoked", .payload = "PageInvocation", .mutable_payload = false},
     {.name = "page_close_requested", .payload = "PageCloseRequest", .mutable_payload = true},
     {.name = "page_pin_requested", .payload = "PagePinRequest", .mutable_payload = true},
