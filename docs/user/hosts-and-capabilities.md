@@ -44,10 +44,10 @@ whole record for logs.
 | `screen_pointer` | the pointer's desktop position | yes | yes | yes |
 | `window_at_point` | the application's topmost window at a desktop point | yes | yes | yes |
 | `window_ordering` | bring a window to the front of the application's own windows | yes | yes | yes (the window manager may decline) |
-| `transparent_windows` | a window presented with per-pixel alpha when the compositor allows it | no | yes | no |
-| `window_backdrops` | a system material behind a transparent window | no | yes (Windows 11 22H2 and later) | no |
-| `compositor_notifications` | compositor and preference changes reported at run time | no | yes | no |
-| `presentation_preferences` | the host's high contrast and reduced transparency fed to each window | no | yes | no |
+| `transparent_windows` | a window presented with per-pixel alpha when the compositor allows it | yes | yes | no |
+| `window_backdrops` | a system material behind a transparent window | yes | yes (Windows 11 22H2 and later) | no |
+| `compositor_notifications` | compositor and preference changes reported at run time | yes | yes | no |
+| `presentation_preferences` | the host's high contrast and reduced transparency fed to each window | yes | yes | no |
 
 The table reflects the bits each adapter currently advertises; read
 `Application::capabilities()` rather than this page in code.
@@ -87,6 +87,19 @@ itself.
   the host's (`presentation_preferences`) or set by the application in
   `PresentationSettings`, withdraw every backdrop.
 
+**macOS.** A window declared non-opaque is made inside a container view
+holding an `NSVisualEffectView` behind the window's own view, so that a
+backdrop can change without moving that view. `transparent` makes the
+window non-opaque on a clear background; `window_material` shows the
+effect view at `underWindowBackground` and `transient_material` at
+`popover`, blending behind the window and following its active state.
+The window server always composites. The accessibility option "Reduce
+transparency" is reduced transparency and is followed as it changes;
+with it on, AppKit draws every material as a solid colour. "Increase
+contrast" is not reported as high contrast. Clear pixels still receive
+the pointer: there is no click-through. The measurements behind this are
+in `planning/stages/T5-compositor/MEASUREMENTS.md`.
+
 **Windows.** The client's premultiplied alpha is shown through
 `DwmEnableBlurBehindWindow` with an empty region, which keeps the native
 caption. `window_material` is Mica and `transient_material` is Acrylic,
@@ -100,8 +113,8 @@ as they change. Clear pixels still receive the pointer: there is no
 click-through. The measurements behind this are in
 `planning/stages/T5-compositor/MEASUREMENTS.md`.
 
-macOS and X11 do not advertise these capabilities yet; they arrive with
-their phases of stage T5. The headless reference host simulates them
+X11 does not advertise these capabilities yet; it arrives with its
+phase of stage T5. The headless reference host simulates them
 (`HeadlessApplication::simulate_compositor_state`).
 
 ## Keyboard-command defaults

@@ -12,6 +12,7 @@
 #include "../../../core/damage/device_damage/device_damage.hpp"
 #include "../../../render/skia/raster/skia_raster.hpp"
 #include "../../../core/host/frame_capture/frame_capture.hpp"
+#include "../compositor/macos_compositor.hpp"
 
 #include <algorithm>
 #include <array>
@@ -824,6 +825,8 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     std::unique_ptr<Window> _model;
     std::unique_ptr<HostSession> _hostSession;
     std::unique_ptr<HostServices> _hostServices;
+    // The last compositor report's generation; 0 before the first (T5).
+    gui_forms::CompositorGeneration _compositorGeneration;
     gui_forms::SubscriptionToken _closeRequestSubscription;
     std::uint64_t _nextHostSequence;
     BOOL _hostAttached;
@@ -922,6 +925,14 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 - (void)notifyScaleChanged;
 - (void)notifyDisplaysChanged;
 - (void)screenParametersChanged:(NSNotification*)notification;
+// Stage T5: the accessibility display options changed (reduce
+// transparency); the compositor state is reported again.
+- (void)accessibilityDisplayOptionsChanged:(NSNotification*)notification;
+- (void)reportCompositorState;
+// The view the native window shows: this view, or the backdrop container
+// holding it for a window declared non-opaque (make_macos_content_view).
+// Called once, when the window is made.
+- (NSView*)hostContentView;
 - (void)collectDamage;
 - (void)drainPostedWork;
 - (void)armWakeTimer;
@@ -1832,6 +1843,8 @@ void post_perform_close(NSWindow* window) {
         presentation.extensions.partial_present = true;
         (*_model).declare_presentation(presentation);
         _hostServices = gui_forms::host::make_macos_host_services();
+        gui_forms::host::detail::bind_macos_backdrop_view(*_hostServices, self);
+        _compositorGeneration = gui_forms::CompositorGeneration{};
         _hostSession = std::make_unique<HostSession>(
             *_model, gui_forms::host::macos_capabilities(), _hostServices.get());
         _nextHostSequence = 1;
@@ -1931,6 +1944,12 @@ void post_perform_close(NSWindow* window) {
                selector:@selector(screenParametersChanged:)
                    name:NSApplicationDidChangeScreenParametersNotification
                  object:nil];
+        // Posted on the workspace's own centre, never the default one.
+        [NSWorkspace.sharedWorkspace.notificationCenter
+            addObserver:self
+               selector:@selector(accessibilityDisplayOptionsChanged:)
+                   name:NSWorkspaceAccessibilityDisplayOptionsDidChangeNotification
+                 object:nil];
     }
     return self;
 }
@@ -1953,9 +1972,38 @@ void post_perform_close(NSWindow* window) {
     _initialHostOccluded = nativeVisible ? NO : YES;
     [self notifyOcclusion:_initialHostOccluded];
     [self notifyDisplaysChanged];
+    [self reportCompositorState];
     [self collectDamage];
     [self startDisplayLinkIfNeeded];
     return YES;
+}
+
+- (NSView*)hostContentView {
+    const bool nonOpaque = _model != nullptr && (*_model).non_opaque_declared();
+    NSView* const content = gui_forms::host::detail::make_macos_content_view(self, nonOpaque);
+    return content;
+}
+
+- (void)accessibilityDisplayOptionsChanged:(NSNotification*)notification {
+    (void)notification;
+    [self reportCompositorState];
+    [self collectDamage];
+}
+
+// Reports the window server's state to the window (stage T5, C3): after
+// attach, and whenever the accessibility display options change. A reading
+// that differs from the window's last report only by its generation is not
+// sent.
+- (void)reportCompositorState {
+    if (_hostAttached == NO || _model == nullptr) return;
+    const gui_forms::CompositorGeneration next{_compositorGeneration.value + 1U};
+    const gui_forms::CompositorState state = gui_forms::host::detail::read_macos_compositor_state(next);
+    gui_forms::CompositorState unchanged = state;
+    unchanged.generation = (*_model).compositor_state().generation;
+    if (_compositorGeneration.value != 0U && unchanged == (*_model).compositor_state()) return;
+    _compositorGeneration = next;
+    static_cast<void>([self dispatchHostPayload:gui_forms::HostCompositorEvent{state}
+                           timestampNanoseconds:host_now_nanoseconds()]);
 }
 
 - (void)installCloseRequestHandler:(std::function<void(HostCloseRequest&)>)handler {
@@ -2216,6 +2264,7 @@ void post_perform_close(NSWindow* window) {
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [NSWorkspace.sharedWorkspace.notificationCenter removeObserver:self];
     [self stopDisplayLink];
     [_displayLink invalidate];
     _displayLink = nil;
@@ -2610,6 +2659,8 @@ void post_perform_close(NSWindow* window) {
 }
 - (void)prepareForShutdown {
     [self stopDisplayLink];
+    // No compositor report reaches a session that is shutting down.
+    [NSWorkspace.sharedWorkspace.notificationCenter removeObserver:self];
     if (_wakeSource != nil) {
         dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
                                   DISPATCH_TIME_FOREVER, 0);
@@ -3691,7 +3742,11 @@ HostCapabilities macos_capabilities() {
                 HostCapability::window_frames |
                 HostCapability::screen_pointer |
                 HostCapability::window_at_point |
-                HostCapability::window_ordering,
+                HostCapability::window_ordering |
+                HostCapability::transparent_windows |
+                HostCapability::window_backdrops |
+                HostCapability::compositor_notifications |
+                HostCapability::presentation_preferences,
             macos_key_map()};
 }
 
@@ -4016,7 +4071,7 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         }
         [nativeWindow setContentMinSize:NSMakeSize(options.minimum_size.width,
                                             options.minimum_size.height)];
-        [nativeWindow setContentView:view];
+        [nativeWindow setContentView:[view hostContentView]];
         [nativeWindow center];
         if ([view initializeHost] == NO) {
             [view prepareForShutdown];
