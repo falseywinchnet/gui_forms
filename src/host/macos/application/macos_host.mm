@@ -3046,8 +3046,14 @@ void post_perform_close(NSWindow* window) {
         CGDataProviderRef provider = CGDataProviderCreateWithData(
             nullptr, pixels, _raster.byte_size(), nullptr);
         CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+        // An opaque window presents opaque pixels, as the other hosts do: the
+        // frame's alpha reaches the window server only while a non-opaque
+        // backdrop is granted (stage T5).
+        const bool windowOpaque = self.window == nil || self.window.opaque == YES;
+        const CGImageAlphaInfo alphaInfo =
+            windowOpaque ? kCGImageAlphaNoneSkipLast : kCGImageAlphaPremultipliedLast;
         const CGBitmapInfo bitmapInfo = static_cast<CGBitmapInfo>(
-            static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) |
+            static_cast<CGBitmapInfo>(alphaInfo) |
             static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Big));
         CGImageRef image = CGImageCreate(
             _raster.pixel_width(), _raster.pixel_height(), 8, 32,

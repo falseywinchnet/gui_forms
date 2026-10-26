@@ -85,12 +85,16 @@ HostServiceStatus apply_macos_backdrop(NSView* raster, WindowBackdrop backdrop) 
         if (effect != nil) effect.hidden = YES;
         window.backgroundColor = NSColor.windowBackgroundColor;
         window.opaque = YES;
+        // The raster presents opaque pixels again (the view reads the
+        // window's opacity when it draws).
+        raster.needsDisplay = YES;
         [window invalidateShadow];
         return {};
     }
     window.opaque = NO;
     window.backgroundColor = NSColor.clearColor;
     window.ignoresMouseEvents = NO;
+    raster.needsDisplay = YES;
     if (!material) {
         if (effect != nil) effect.hidden = YES;
         [window invalidateShadow];
