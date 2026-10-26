@@ -1,5 +1,9 @@
 #include "pages.hpp"
 
+#include <exception>
+#include <stdexcept>
+#include <string>
+#include <utility>
 #include <variant>
 
 namespace gui_forms::gallery::pages {
@@ -44,6 +48,8 @@ private:
     void build_task_dialog(const std::shared_ptr<Surface>& body);
     void on_show_task_dialog();
     void on_task_dialog_closed(const TaskDialogResult& result);
+    void on_show_exception_dialog();
+    void on_exception_dialog_closed(DialogResult result);
     void build_notify_icon(const std::shared_ptr<Surface>& body);
     void on_toggle_notify_icon();
     void on_notify();
@@ -81,6 +87,9 @@ private:
     Command task_dialog_command_{};
     std::shared_ptr<Button> task_dialog_button_;
     std::shared_ptr<TaskDialog> task_dialog_;
+    Command exception_dialog_command_{};
+    std::shared_ptr<Button> exception_dialog_button_;
+    std::shared_ptr<ThreadExceptionDialog> exception_dialog_;
     Command notify_toggle_command_{};
     Command notify_message_command_{};
     std::shared_ptr<Command> notify_menu_command_;
@@ -106,10 +115,11 @@ HostServicesPage::HostServicesPage(const std::shared_ptr<Surface>& body) {
 }
 
 // A TaskDialog: an owned dialog built from GUI.Forms controls inside the
-// window, the same on every host.
+// window, the same on every host; beside it, the ThreadExceptionDialog preset
+// over a TaskDialog, reporting an exception the specimen throws and catches.
 void HostServicesPage::build_task_dialog(const std::shared_ptr<Surface>& body) {
     std::shared_ptr<LayoutGroup> group_box = group(
-        "gallery.host.task-dialog", "TaskDialog · in-window owned dialog, the same on every host",
+        "gallery.host.task-dialog", "TaskDialog and ThreadExceptionDialog · in-window owned dialogs, the same on every host",
         {930.0, 96.0});
     (*body).add_at(group_box, {24.0, 648.0, 930.0, 96.0});
     task_dialog_command_.set_text("Show task dialog");
@@ -118,9 +128,16 @@ void HostServicesPage::build_task_dialog(const std::shared_ptr<Surface>& body) {
     (*task_dialog_button_).set_visual_style(ButtonVisualStyle::accent);
     (*task_dialog_button_).bind(task_dialog_command_);
     (*group_box).add_at(task_dialog_button_, {24.0, 40.0, 202.0, 38.0});
+    exception_dialog_command_.set_text("Show exception dialog");
+    exception_dialog_command_.set_description("Report a caught exception in a ThreadExceptionDialog");
+    exception_dialog_button_ =
+        make_control<Button>(StableId("gallery.host.exception-dialog.show"), "Show exception dialog");
+    (*exception_dialog_button_).set_visual_style(ButtonVisualStyle::command);
+    (*exception_dialog_button_).bind(exception_dialog_command_);
+    (*group_box).add_at(exception_dialog_button_, {238.0, 40.0, 202.0, 38.0});
     (*group_box).add_at(label("gallery.host.task-dialog.note",
-                              "Heading, text, icon, radio buttons, a check box, details and a footnote; the result arrives in closed.",
-                              11.0, 400, muted), {244.0, 46.0, 660.0, 24.0});
+                              "Each reports its result in closed: a button ID, or cancel and abort.",
+                              11.0, 400, muted), {458.0, 46.0, 446.0, 24.0});
     task_dialog_ = make_control<TaskDialog>(StableId("gallery.host.task-dialog.dialog"));
     TaskDialogPage page;
     page.caption = "Export evidence";
@@ -139,6 +156,27 @@ void HostServicesPage::build_task_dialog(const std::shared_ptr<Surface>& body) {
     (*task_dialog_).set_page(std::move(page));
     on(task_dialog_command_.invoked(), *this, &HostServicesPage::on_show_task_dialog);
     on((*task_dialog_).closed(), *this, &HostServicesPage::on_task_dialog_closed);
+    ThreadExceptionReport report =
+        describe_exception(std::make_exception_ptr(std::runtime_error("The evidence index is out of date.")));
+    report.caption = "GUI.Forms Gallery";
+    report.details = "Thrown and caught by this specimen. A C++ exception carries no stack trace, "
+                     "so an application supplies its own details.";
+    exception_dialog_ = std::make_shared<ThreadExceptionDialog>(
+        StableId("gallery.host.exception-dialog.dialog"), std::move(report));
+    on(exception_dialog_command_.invoked(), *this, &HostServicesPage::on_show_exception_dialog);
+    on((*exception_dialog_).closed(), *this, &HostServicesPage::on_exception_dialog_closed);
+}
+
+void HostServicesPage::on_show_exception_dialog() {
+    if (!(*exception_dialog_).show(exception_dialog_button_)) return;
+    (*status_).set_text("ThreadExceptionDialog shown · Continue, Quit or Escape closes it");
+}
+
+void HostServicesPage::on_exception_dialog_closed(DialogResult result) {
+    // The Gallery keeps running on Quit; an application would close itself.
+    const char* const outcome = result == DialogResult::abort ? "Quit · the application would close itself"
+                                                              : "Continue · the error is ignored";
+    (*status_).set_text(std::string("ThreadExceptionDialog closed with ") + outcome);
 }
 
 void HostServicesPage::on_show_task_dialog() {

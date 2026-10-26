@@ -77,6 +77,24 @@ void test_dialogs_and_host_services(gui_forms::Window& window,
                 services.snapshot().dialog_requests == 5U &&
                 services.dialog_trace().find("dialog=open_file") != std::string::npos,
             "the OpenFileDialog specimen publishes its one accepted path");
+    // The button sits below the fold of the test window, so it is clicked
+    // as a keyboard user activates it.
+    const std::shared_ptr<gui_forms::Button> exception_button = std::dynamic_pointer_cast<Button>(
+        window.find("gallery.host.exception-dialog.show"));
+    require(exception_button && (*exception_button).perform_click(), "the exception button is clicked");
+    const std::shared_ptr<gui_forms::TaskDialog> exception_dialog = std::dynamic_pointer_cast<TaskDialog>(
+        window.find("gallery.host.exception-dialog.dialog"));
+    require(exception_dialog && (*exception_dialog).shown() &&
+                (*exception_dialog).page().text == "The evidence index is out of date." &&
+                (*status).text().find("ThreadExceptionDialog shown") != std::string::npos,
+            "the exception button reports the caught exception in a ThreadExceptionDialog");
+    require((*exception_dialog).click("quit") && !(*exception_dialog).shown() &&
+                (*status).text().find("closed with Quit") != std::string::npos,
+            "Quit closes the exception dialog and the Gallery keeps running");
+    require((*exception_button).perform_click(), "the exception button is clicked again");
+    static_cast<void>(window.dispatch_key({KeyAction::down, PhysicalKey::escape}));
+    require(!(*exception_dialog).shown() && (*status).text().find("closed with Continue") != std::string::npos,
+            "Escape continues past the exception");
 }
 
 } // namespace gallery_pages_tests
