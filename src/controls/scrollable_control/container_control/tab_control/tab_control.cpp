@@ -107,7 +107,24 @@ void TabControl::initialize_control_tree() {
     configure_strip();
     invoked_token_ = (*strip_).page_invoked().subscribe(
         *this, Delegate<const PageInvocation&>::bind<TabControl, &TabControl::on_strip_invoked>(*this));
+    draw_item_content_token_ = (*strip_).draw_item_content().subscribe(
+        *this, Delegate<ItemContentPaint&>::bind<TabControl, &TabControl::on_strip_draw_item_content>(*this));
     add_child(strip_);
+}
+
+ItemDrawMode TabControl::draw_mode() const noexcept {
+    const ItemDrawMode mode = strip_ ? (*strip_).draw_mode() : ItemDrawMode::normal;
+    return mode;
+}
+
+void TabControl::set_draw_mode(ItemDrawMode mode) {
+    require_mutable();
+    if (!strip_) throw std::logic_error("TabControl has no tab strip yet");
+    (*strip_).set_draw_mode(mode);
+}
+
+void TabControl::on_strip_draw_item_content(ItemContentPaint& item) {
+    draw_item_content_.emit(item);
 }
 
 TabControl::~TabControl() {

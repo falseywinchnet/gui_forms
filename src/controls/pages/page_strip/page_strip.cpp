@@ -224,6 +224,16 @@ void PageStrip::set_font(FontSpec font) {
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
+void PageStrip::set_draw_mode(ItemDrawMode mode) {
+    require_mutable();
+    if (mode != ItemDrawMode::normal && mode != ItemDrawMode::owner_draw) {
+        throw std::invalid_argument("PageStrip draw mode is invalid");
+    }
+    if (draw_mode_ == mode) return;
+    draw_mode_ = mode;
+    invalidate(Dirty::paint);
+}
+
 void PageStrip::set_image_list(std::shared_ptr<ImageList> image_list) {
     require_mutable();
     if (image_list && !(*image_list).is_alive()) {
@@ -1028,11 +1038,13 @@ void PageStrip::on_paint(Painter& painter, Rect) {
     // The dragged tab of a live reorder is painted last, over the tabs it
     // passes.
     const bool sliding = drag_.phase == DragState::Phase::sliding;
+    // An owner-draw handler that changed the strip ends this paint; the
+    // change has already asked for the next one.
     for (const std::size_t position : placed.visible) {
         if (sliding && position == drag_.origin) continue;
-        paint_tab(painter, part, position, scale);
+        if (!paint_tab(painter, part, position, scale)) return;
     }
-    if (sliding) paint_tab(painter, part, drag_.origin, scale);
+    if (sliding && !paint_tab(painter, part, drag_.origin, scale)) return;
     const Rect mark = insertion_mark_bounds();
     if (!mark.empty()) {
         // The drop role has no recipe of its own until T2: a button plate.
@@ -1081,7 +1093,7 @@ void PageStrip::on_paint(Painter& painter, Rect) {
 // One tab and its parts, in paint order: face, icon, label, the slot's
 // close button, pin or modified dot, seam, focus. `part` carries the font,
 // family, alignment and orientation; its other fields are left reset.
-void PageStrip::paint_tab(Painter& painter, PartPaint& part, std::size_t position, double scale) {
+bool PageStrip::paint_tab(Painter& painter, PartPaint& part, std::size_t position, double scale) {
     const Layout& placed = layout();
     const ItemParts parts = tab_parts(position);
     const AnatomyStateSet states = tab_states(position);
@@ -1089,7 +1101,32 @@ void PageStrip::paint_tab(Painter& painter, PartPaint& part, std::size_t positio
     part.role = PartRole::face;
     part.bounds = parts.tab.bounds;
     paint_part(painter, *this, part);
-    if (parts.tab_icon.present) {
+    bool default_content = true;
+    if (draw_mode_ == ItemDrawMode::owner_draw && (parts.tab_icon.present || parts.tab_label.present)) {
+        Rect content = parts.tab_label.bounds;
+        if (parts.tab_icon.present) {
+            content = parts.tab_label.present ? Rect::united(parts.tab_icon.bounds, parts.tab_label.bounds)
+                                              : parts.tab_icon.bounds;
+        }
+        // The handlers see the page ID through the strip's own copy, valid
+        // for the whole raise even when one of them changes the set.
+        paint_stable_id_ = (*pages_).record_at(PagePosition{position}).id.value;
+        ItemContentPaint request{.painter = painter,
+                                 .index = position,
+                                 .column = 0U,
+                                 .stable_id = paint_stable_id_,
+                                 .content = content,
+                                 .states = states,
+                                 .font = part.font,
+                                 .text = item_content_text(*this, part.family, states)};
+        const LayoutKey key = placed.key;
+        const PageSet* const set = pages_;
+        default_content = raise_item_content_paint(draw_item_content_, request);
+        // `placed` is the strip's cached layout: a handler's change would
+        // replace it, so nothing of it is read again once the key moved.
+        if (!is_alive() || pages_ != set || !(current_key() == key)) return false;
+    }
+    if (default_content && parts.tab_icon.present) {
         const PageRecord& record = (*pages_).record_at(PagePosition{position});
         const ImageVisualState state = states.contains(AnatomyState::selected) ? ImageVisualState::selected
                                                                                 : ImageVisualState::normal;
@@ -1100,7 +1137,7 @@ void PageStrip::paint_tab(Painter& painter, PartPaint& part, std::size_t positio
         paint_part(painter, *this, part);
         part.image = {};
     }
-    if (parts.tab_label.present) {
+    if (default_content && parts.tab_label.present) {
         part.role = PartRole::label;
         part.bounds = parts.tab_label.bounds;
         part.text = placed.tabs[position].label;
@@ -1147,6 +1184,7 @@ void PageStrip::paint_tab(Painter& painter, PartPaint& part, std::size_t positio
     part.role = PartRole::focus;
     part.bounds = parts.tab_focus.bounds;
     paint_part(painter, *this, part);
+    return true;
 }
 
 // -- input ---------------------------------------------------------------------

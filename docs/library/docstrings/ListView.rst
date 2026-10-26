@@ -71,6 +71,10 @@ large_image_list
     The images of the large-icon view.
 font
     The font of item and header text.
+draw_mode : default ``ItemDrawMode::normal``
+    With ``ItemDrawMode::owner_draw`` the application draws the items'
+    content (Windows Forms' `OwnerDraw`): see `draw_item_content`. Throws
+    `std::invalid_argument` for an unknown mode.
 realized_items
     The visible items' parts and states, in paint order.
 realized_sub_items
@@ -80,6 +84,18 @@ realized_columns
 
 Events
 ------
+draw_item_content
+    Raised while the view paints in the owner-draw mode, with an
+    `ItemContentPaint`: once for each painted item's own content (column 0,
+    its icon and text area) and, in the details view, once for each visible
+    sub-item cell (its column), in paint order (Windows Forms' `DrawItem` and
+    `DrawSubItem`). The painter is clipped to the content rectangle; the
+    item's plate, check box and focus cue are already painted by role.
+    `text` and `font` are the default content's. Set `draw_default` to add
+    the default content. Column headers are not owner-drawn. A handler
+    paints only; one that changes the items, their order, the columns or
+    the view, or disposes the view, ends that paint, and the view is painted
+    again.
 selection_changed
     Raised after the set of selected items changes, by the user or the
     program. It carries the selected count and the focused item; read the
@@ -187,7 +203,7 @@ The select action selects an item; press activates it, or toggles a
 check-box item.
 
 Not supported yet: groups, the tile view, label editing, the insertion mark,
-owner drawing, item tooltips, hot-tracking activation, column reordering,
+item tooltips, hot-tracking activation, column reordering,
 type-ahead in virtual mode, and wrapping large-icon labels over two lines.
 
 Examples

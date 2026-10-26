@@ -54,6 +54,10 @@ style
     theme and no longer reads it.
 overflowing
     Whether the tabs do not all fit, so the scroll and list buttons show.
+draw_mode : default ``ItemDrawMode::normal``
+    With ``ItemDrawMode::owner_draw`` the application draws the tabs'
+    content (Windows Forms' `DrawMode.OwnerDrawFixed`): see
+    `draw_item_content`. Throws `std::invalid_argument` for an unknown mode.
 display_bounds
     The area given to the selected page, in the control's coordinates. With
     the default alignment it starts one pixel above the bottom of the tab
@@ -61,6 +65,14 @@ display_bounds
 
 Events
 ------
+draw_item_content
+    Raised while the tabs paint in the owner-draw mode, once per painted
+    tab, with an `ItemContentPaint` whose index is the tab's and whose
+    stable ID is its page's (Windows Forms' `DrawItem`). The painter is
+    clipped to the tab's icon and label area; the tab's plate and focus cue
+    are painted by role. Set `draw_default` to add the default content. A
+    handler paints only; one that changes the tabs ends that paint, and the
+    tabs are painted again.
 selected_index_changed
     Raised after the selection changes, by the user or by a setter, with a
     `TabSelectionChange` holding the old and new index (either may be

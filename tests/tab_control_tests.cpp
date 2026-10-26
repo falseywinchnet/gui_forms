@@ -7,6 +7,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -222,12 +223,87 @@ void test_page_removal_and_disposal_reconciliation() {
 
 } // namespace
 
+bool painted(const RecordingPainter& painter, std::string_view text) {
+    const bool found = std::find(painter.texts.begin(), painter.texts.end(), text) != painter.texts.end();
+    return found;
+}
+
+// Records each owner-draw call and draws a marker into the tab's content.
+class DrawTabContent final {
+public:
+    DrawTabContent(std::vector<std::size_t>& indices, std::vector<std::string>& identities) noexcept
+        : indices_(indices), identities_(identities) {}
+
+    void operator()(ItemContentPaint& item) const {
+        indices_.push_back(item.index);
+        identities_.emplace_back(item.stable_id);
+        item.painter.draw_text_utf8({item.content.x, item.content.y}, "owner tab", item.font, item.text);
+    }
+
+private:
+    std::vector<std::size_t>& indices_;
+    std::vector<std::string>& identities_;
+};
+
+// Changes the strip's settings from inside its paint.
+class ResizeTabsWhilePainting final {
+public:
+    ResizeTabsWhilePainting(TabControl& tabs, std::size_t& calls) noexcept : tabs_(tabs), calls_(calls) {}
+
+    void operator()(ItemContentPaint&) const {
+        ++calls_;
+        tabs_.set_size_mode(TabSizeMode::fixed);
+    }
+
+private:
+    TabControl& tabs_;
+    std::size_t& calls_;
+};
+
+// Content-only owner drawing of the tabs (owner decision W-Q6): the
+// application draws each tab's icon and label; the plate stays by role, and
+// a handler that changes the strip ends that paint.
+void test_owner_draw() {
+    Fixture fixture = make_fixture();
+    Window window(fixture.tabs, {480.0, 260.0});
+    window.perform_layout();
+    require((*fixture.tabs).draw_mode() == ItemDrawMode::normal, "tabs draw their own content by default");
+    std::vector<std::size_t> indices;
+    std::vector<std::string> identities;
+    SubscriptionToken drawing =
+        (*fixture.tabs).draw_item_content().subscribe(DrawTabContent(indices, identities));
+    (*fixture.tabs).set_draw_mode(ItemDrawMode::owner_draw);
+    window.perform_layout();
+    RecordingPainter painter;
+    window.paint(painter, {0.0, 0.0, 480.0, 260.0});
+    require(indices == std::vector<std::size_t>{0U, 1U, 2U} && identities.size() == 3U &&
+                identities[0] == "tabs.first",
+            "each painted tab raises its content once, with its index and page ID");
+    require(!painted(painter, "Overview") && !painted(painter, "Details") && painted(painter, "owner tab") &&
+                painted(painter, "First page action"),
+            "owner-drawn tabs show only what the handler drew; the page content is unaffected");
+    drawing.disconnect();
+
+    std::size_t calls = 0U;
+    SubscriptionToken resizing =
+        (*fixture.tabs).draw_item_content().subscribe(ResizeTabsWhilePainting(*fixture.tabs, calls));
+    (*fixture.tabs).set_draw_mode(ItemDrawMode::normal);
+    (*fixture.tabs).set_draw_mode(ItemDrawMode::owner_draw);
+    window.perform_layout();
+    RecordingPainter interrupted;
+    window.paint(interrupted, {0.0, 0.0, 480.0, 260.0});
+    require(calls == 1U && (*fixture.tabs).size_mode() == TabSizeMode::fixed,
+            "a handler that changes the strip ends that paint at once");
+    resizing.disconnect();
+}
+
 int main() {
     try {
         test_page_ownership_layout_and_visibility();
         test_keyboard_pointer_and_focus_restoration();
         test_alignment_appearance_and_semantics();
         test_page_removal_and_disposal_reconciliation();
+        test_owner_draw();
         std::cout << "gui_forms_tab_control_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

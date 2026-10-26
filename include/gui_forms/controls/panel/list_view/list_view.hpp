@@ -3,6 +3,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/image_list.hpp"
+#include "gui_forms/theme/owner_draw/owner_draw.hpp"
 
 #include <chrono>
 #include <cstddef>
@@ -138,9 +139,10 @@ struct ListViewColumnWidthChange final {
 // Selection, focus and check boxes are kept by index. Replacing the items
 // of an ordinary view carries the selection, the focused item and the anchor
 // over by stable ID; a virtual view keeps them by index, clamped to the new
-// count. Columns are resized by dragging a header's divider. Groups, the
-// tile view, label editing, the insertion mark, owner drawing, tooltips and
-// hot-tracking activation are not supported yet.
+// count. Columns are resized by dragging a header's divider. An
+// application may draw items' content itself (draw_mode). Groups, the tile
+// view, label editing, the insertion mark, tooltips and hot-tracking
+// activation are not supported yet.
 class ListView final : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
@@ -252,6 +254,21 @@ public:
 
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
+
+    // Content-only owner drawing (owner decision W-Q6; Windows Forms'
+    // OwnerDraw with DrawItem and DrawSubItem). In ItemDrawMode::owner_draw
+    // the view raises draw_item_content for each painted item's own content
+    // (column 0: its icon and text) and, in the details view, for each
+    // visible sub-item cell (its column), in paint order; the item's plate,
+    // check box and focus cue stay painted by role, and a handler's
+    // draw_default adds the default content. Column headers are not
+    // owner-drawn. A handler that changes the view's items, order, columns
+    // or view, or disposes it, ends that paint at once; the view is painted
+    // again with the change. Throws std::invalid_argument for an unknown
+    // mode.
+    [[nodiscard]] ItemDrawMode draw_mode() const noexcept { return draw_mode_; }
+    void set_draw_mode(ItemDrawMode mode);
+    [[nodiscard]] Event<ItemContentPaint&>& draw_item_content() noexcept { return draw_item_content_; }
 
     // The item under a point in window coordinates, if any.
     [[nodiscard]] std::optional<std::size_t> item_index_at(Point window_point) const;
@@ -451,7 +468,12 @@ private:
     [[nodiscard]] std::size_t realized_sub_item_count(const Layout& placed) const noexcept;
     [[nodiscard]] std::size_t realized_sub_item_column(const Layout& placed, std::size_t position) const noexcept;
 
-    void paint_item(Painter& painter, const Layout& placed, std::size_t index);
+    // Paints one item; false when an owner-draw handler changed the model
+    // or disposed the view, so that the paint stops.
+    [[nodiscard]] bool paint_item(Painter& painter, const Layout& placed, std::size_t index);
+    // Whether the view is alive and its model is the one `revision` named
+    // before an owner-draw handler ran.
+    [[nodiscard]] bool model_unchanged(std::uint64_t revision) const noexcept;
     void paint_column(Painter& painter, const Layout& placed, std::size_t column);
 
     void set_top_line(std::size_t line);
@@ -508,6 +530,10 @@ private:
     ListViewView view_{ListViewView::details};
     std::optional<std::size_t> sort_column_{};
     ListViewSortOrder sort_order_{ListViewSortOrder::none};
+    ItemDrawMode draw_mode_{ItemDrawMode::normal};
+    // Moves with every change to the items, their order, the columns or the
+    // view, so that a paint can tell an owner-draw handler changed them.
+    std::uint64_t model_revision_{};
     bool check_boxes_{};
     bool multi_select_{true};
     bool full_row_select_{};
@@ -525,6 +551,8 @@ private:
     // Paint scratch, reused for every item of a paint pass.
     ListViewItem paint_item_{};
     std::string paint_text_{};
+    // The painted item's identity while owner-draw handlers run.
+    std::string paint_stable_id_{};
     // Type-ahead.
     std::string type_prefix_{};
     std::chrono::steady_clock::time_point last_type_time_{};
@@ -534,6 +562,7 @@ private:
     Event<const ListViewItemCheck&> item_checked_{};
     Event<const ListViewColumnClick&> column_click_{};
     Event<const ListViewColumnWidthChange&> column_width_changed_{};
+    Event<ItemContentPaint&> draw_item_content_{};
 };
 
 } // namespace gui_forms
