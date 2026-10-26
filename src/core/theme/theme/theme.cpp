@@ -409,9 +409,10 @@ ControlVisualRecipe recipe(Color top, Color bottom, Color border, Color text,
 
 // Fills `result` with one professional role's recipes. It fills the
 // caller's storage rather than returning a value: a ControlRoleRecipes is
-// some 9 KB, and windows_professional_theme_definition makes twelve, so
-// returned temporaries cost its frame 100 KB where stack slots are not
-// reused (sanitizer builds), close to a Windows thread's 1 MB stack.
+// some 9 KB, and windows_professional_theme_definition makes one per
+// family, so returned temporaries cost its frame over 100 KB where stack
+// slots are not reused (sanitizer builds), close to a Windows thread's 1 MB
+// stack.
 void fill_professional_role(ControlRoleRecipes& result, Color top, Color bottom,
                             Color border, Color text, double radius = 3.0) {
     // Every record starts from its default; the high-contrast records stay
@@ -463,6 +464,27 @@ void fill_professional_role(ControlRoleRecipes& result, Color top, Color bottom,
     // The high-contrast records are derived from the ordinary ones when the
     // theme is made (derive_high_contrast_recipes, the forced high-contrast
     // pass of T2 E4), not authored here.
+}
+
+// Fills `result` with a link family's recipes (owner decision W-Q5): a
+// professional role whose plates are all clear, so that a link draws only
+// its text and underline, with `text` in every enabled state (hover and
+// press keep the link's colour, and window deactivation does not dim it)
+// and `disabled_text` when disabled. The built-in theme passes its
+// compatibility style's link colours, which LinkLabel drew before the
+// family existed.
+void fill_link_role(ControlRoleRecipes& result, Color text, Color disabled_text) {
+    const Color clear = Color::rgba(255, 255, 255, 0);
+    fill_professional_role(result, clear, clear, clear, text, 0.0);
+    for (std::size_t index = 0; index < control_surface_state_count; ++index) {
+        const bool disabled = index == static_cast<std::size_t>(ControlSurfaceState::disabled);
+        const Color state_text = disabled ? disabled_text : text;
+        ControlVisualRecipe& ordinary = result.ordinary[index];
+        ordinary.material = surface(clear, clear, clear, 0.0);
+        ordinary.text = state_text;
+        ordinary.glyph = state_text;
+        result.selected[index] = ordinary;
+    }
 }
 
 // GUI.Forms' own high-contrast mode (T2 plan, E4; design language 5.8): a
@@ -532,6 +554,20 @@ bool valid_text_shadow(const std::optional<ControlTextShadow>& shadow) noexcept 
                         std::abs(offset.y) <= maximum_text_shadow_offset;
     const bool blurred = std::isfinite(blur) && blur >= 0.0 && blur <= maximum_text_shadow_blur;
     return placed && blurred;
+}
+
+// A valid request, and at most one base per backdrop, none for `opaque`
+// (the window recipe is its base), each a valid material.
+bool valid_window_backdrop(const ThemeWindowBackdrop& backdrop) noexcept {
+    if (!window_backdrop_request_valid(backdrop.request)) return false;
+    std::array<bool, window_backdrop_count> seen{};
+    for (const ThemeBackdropBase& base : backdrop.bases) {
+        const std::size_t index = static_cast<std::size_t>(base.backdrop);
+        if (index >= window_backdrop_count || base.backdrop == WindowBackdrop::opaque || seen[index]) return false;
+        seen[index] = true;
+        if (!valid_surface_material(base.material)) return false;
+    }
+    return true;
 }
 
 bool valid_recipe(const ControlVisualRecipe& value) noexcept {
@@ -1011,6 +1047,10 @@ std::shared_ptr<const Theme> Theme::create(const ThemeDefinition& definition) {
         throw std::invalid_argument(
             "theme structural tokens must be finite, ordered, and bounded");
     }
+    if (!valid_window_backdrop(definition.window_backdrop)) {
+        throw std::invalid_argument(
+            "theme window backdrop needs a valid request, no opaque base and valid base materials");
+    }
     std::unique_ptr<Theme> theme(new Theme(definition));
     // The forced high-contrast pass: every family's high-contrast records
     // are derived from its ordinary ones, replacing whatever was authored.
@@ -1036,6 +1076,8 @@ std::string_view control_visual_role_name(ControlVisualRole role) noexcept {
     case ControlVisualRole::selection: return "selection";
     case ControlVisualRole::progress: return "progress";
     case ControlVisualRole::tool_tip: return "tool_tip";
+    case ControlVisualRole::link: return "link";
+    case ControlVisualRole::visited_link: return "visited_link";
     case ControlVisualRole::count: return {};
     }
     return {};
@@ -1127,6 +1169,10 @@ ThemeDefinition windows_professional_theme_definition() {
                           Color::rgba(255, 255, 225),
                           Color::rgba(104, 111, 118),
                           Color::rgba(24, 31, 38), 0.0);
+    fill_link_role(result.roles[static_cast<std::size_t>(ControlVisualRole::link)],
+                   result.compatibility.link, result.compatibility.disabled_text);
+    fill_link_role(result.roles[static_cast<std::size_t>(ControlVisualRole::visited_link)],
+                   result.compatibility.visited_link, result.compatibility.disabled_text);
     result.overlay_shadow = provisional_overlay_shadow();
     result.high_contrast_overlay_shadow.clear();
     return result;

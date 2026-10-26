@@ -19,6 +19,12 @@ public:
     void record_dirty_mark(double requested_damage_area) noexcept;
     void record_measure(std::uint64_t nodes_visited,
                         std::uint64_t callbacks) noexcept;
+    void record_measure_cache_hit() noexcept;
+    // `control_pass_misses` is the missing control's miss count in the
+    // current layout pass, this miss included.
+    void record_measure_cache_miss(std::uint64_t control_pass_misses) noexcept;
+    void record_layout_boundary_stop() noexcept;
+    void record_layout_measure_clamp() noexcept;
     void record_arrange(std::uint64_t nodes_visited,
                         std::uint64_t callbacks) noexcept;
     void record_paint(std::uint64_t nodes_visited,
@@ -84,6 +90,7 @@ public:
     // A primitive refused to draw a part (EnginePrimitive::accepts), which
     // the built-in recipe drew instead.
     void record_engine_primitive_refusal() noexcept;
+    void record_engine_material_assembly() noexcept;
     void record_paint_group_refusals(std::uint64_t refusals) noexcept;
     void record_frame_callback_fault() noexcept;
     void record_reentrant_frame_poll() noexcept;

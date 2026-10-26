@@ -40,6 +40,11 @@ std::string MetricsSnapshot::to_json() const {
            << "\"measure_nodes_visited\":" << measure_nodes_visited << ','
            << "\"arrange_nodes_visited\":" << arrange_nodes_visited << ','
            << "\"paint_nodes_visited\":" << paint_nodes_visited << ','
+           << "\"measure_cache_hits\":" << measure_cache_hits << ','
+           << "\"measure_cache_misses\":" << measure_cache_misses << ','
+           << "\"maximum_measures_per_control_pass\":" << maximum_measures_per_control_pass << ','
+           << "\"layout_boundary_stops\":" << layout_boundary_stops << ','
+           << "\"layout_measure_clamps\":" << layout_measure_clamps << ','
            << "\"paint_invalidations_consumed\":" << paint_invalidations_consumed << ','
            << "\"display_chunks_rebuilt\":" << display_chunks_rebuilt << ','
            << "\"display_chunks_reused\":" << display_chunks_reused << ','
@@ -121,6 +126,7 @@ std::string MetricsSnapshot::to_json() const {
            << "\"engine_ambient_frames\":" << engine_ambient_frames << ','
            << "\"engine_ambient_refusals\":" << engine_ambient_refusals << ','
            << "\"engine_primitive_refusals\":" << engine_primitive_refusals << ','
+           << "\"engine_material_assemblies\":" << engine_material_assemblies << ','
            << "\"paint_group_refusals\":" << paint_group_refusals << ','
            << "\"renderer_name\":\"" << escaped_json(renderer_name) << "\","
            << "\"cpu_only\":" << (cpu_only ? "true" : "false")

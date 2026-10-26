@@ -58,6 +58,14 @@ void Metrics::record_measure(std::uint64_t nodes_visited,
     values_.measure_nodes_visited += nodes_visited;
     values_.controls_measured += callbacks;
 }
+void Metrics::record_measure_cache_hit() noexcept { ++values_.measure_cache_hits; }
+void Metrics::record_measure_cache_miss(std::uint64_t control_pass_misses) noexcept {
+    ++values_.measure_cache_misses;
+    values_.maximum_measures_per_control_pass =
+        std::max(values_.maximum_measures_per_control_pass, control_pass_misses);
+}
+void Metrics::record_layout_boundary_stop() noexcept { ++values_.layout_boundary_stops; }
+void Metrics::record_layout_measure_clamp() noexcept { ++values_.layout_measure_clamps; }
 void Metrics::record_arrange(std::uint64_t nodes_visited,
                              std::uint64_t callbacks) noexcept {
     ++values_.arrange_passes;
@@ -213,6 +221,9 @@ void Metrics::record_engine_ambient_refusal() noexcept {
 }
 void Metrics::record_engine_primitive_refusal() noexcept {
     values_.engine_primitive_refusals = values_.engine_primitive_refusals + 1U;
+}
+void Metrics::record_engine_material_assembly() noexcept {
+    values_.engine_material_assemblies = values_.engine_material_assemblies + 1U;
 }
 void Metrics::record_paint_group_refusals(std::uint64_t refusals) noexcept {
     values_.paint_group_refusals = values_.paint_group_refusals + refusals;

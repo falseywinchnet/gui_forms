@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <iterator>
 #include <stdexcept>
@@ -330,13 +331,80 @@ Size Label::measure(const Size available) {
                             std::min(available.height, requested.height)};
         return measured;
     }
-    const std::string text = display_text();
-    const FontSpec font = effective_font((*this).font());
     const double wrap_width = requested.width > 0.0
         ? requested.width : available.width;
+    const Size measured = measure_wrapped_text(std::max(0.0, wrap_width - 4.0), available);
+    return measured;
+}
+
+Size Label::measure_intrinsic(const LayoutConstraint& constraint) {
+    const AvailableExtentKind kind = constraint.width.kind;
+    const bool content_query = kind == AvailableExtentKind::min_content ||
+                               kind == AvailableExtentKind::max_content;
+    if (!content_query || requested_bounds().width > 0.0 ||
+        text_wrapping_ == TextWrapping::no_wrap) {
+        const Size measured = Control::measure_intrinsic(constraint);
+        return measured;
+    }
+    const Size available = measure_available_size(constraint);
+    double content_width_limit = practical_unbounded_extent;
+    if (kind == AvailableExtentKind::min_content) {
+        const std::string text = display_text();
+        content_width_limit = widest_unbreakable_segment(text, effective_font((*this).font()));
+    }
+    Size measured = measure_wrapped_text(content_width_limit, available);
+    // A container that lays the label out at this width hands it back as a
+    // definite width, and measure and paint wrap at that width less the
+    // inset. Adding and then subtracting the inset can round below the
+    // widest word, which would then break inside it; step up by the unit in
+    // the last place until it cannot. One step corrects the rounding of one
+    // addition; four bound the loop.
+    if (kind == AvailableExtentKind::min_content) {
+        for (int step = 0; step < 4 && measured.width - 4.0 < content_width_limit; ++step) {
+            measured.width = std::nextafter(measured.width, practical_unbounded_extent);
+        }
+    }
+    if (constraint.height.kind == AvailableExtentKind::definite) {
+        measured.height = constraint.height.extent.value();
+    }
+    return measured;
+}
+
+double Label::widest_unbreakable_segment(const std::string_view text,
+                                         const FontSpec font) const {
+    // The same segments label_lines wraps between: runs of bytes that are
+    // not ASCII whitespace. A newline is whitespace, so paragraphs need no
+    // separate pass.
+    double widest = 0.0;
+    std::size_t cursor = 0U;
+    while (cursor < text.size()) {
+        while (cursor < text.size() &&
+               std::isspace(static_cast<unsigned char>(text[cursor])) != 0) {
+            ++cursor;
+        }
+        std::size_t word_end = cursor;
+        while (word_end < text.size() &&
+               std::isspace(static_cast<unsigned char>(text[word_end])) == 0) {
+            ++word_end;
+        }
+        if (word_end > cursor) {
+            const ResolvedTextLayout word =
+                resolve_text_layout_utf8(text.substr(cursor, word_end - cursor), font);
+            widest = std::max(widest, word.logical_size.width);
+        }
+        cursor = word_end;
+    }
+    return widest;
+}
+
+Size Label::measure_wrapped_text(const double content_width_limit,
+                                 const Size available) const {
+    const Rect requested = requested_bounds();
+    const std::string text = display_text();
+    const FontSpec font = effective_font((*this).font());
     const TextWidthResolver resolve{LabelWidth{*this, font}};
     std::vector<std::string> lines = label_lines(
-        text, font, std::max(0.0, wrap_width - 4.0), text_wrapping_, resolve, maximum_lines_);
+        text, font, content_width_limit, text_wrapping_, resolve, maximum_lines_);
     double content_width{};
     double line_height{};
     for (const std::string& line : lines) {

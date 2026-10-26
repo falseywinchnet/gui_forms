@@ -1,6 +1,7 @@
 #include "gui_forms/controls/button_base/link_label/link_label.hpp"
 #include "../../basic/basic_control_rendering.hpp"
 #include "gui_forms/text.hpp"
+#include "gui_forms/theme/part_painting/part_painting.hpp"
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
@@ -129,11 +130,20 @@ LinkLabel::States LinkLabel::states() const {
     return record;
 }
 
+// The text and underline take the link family's text colour (owner
+// decision W-Q5): `visited_link` once visited, else `link`, in the state
+// the control's anatomy states select. A compatibility style set on the
+// control (set_style) keeps its own link colours outside high contrast, as
+// a Button's recipe override does.
 void LinkLabel::on_paint(Painter& painter, Rect) {
     const Rect bounds = local_bounds();
-    const BasicControlStyle& colors = style();
-    const Color foreground = enabled()
-        ? (visited_ ? colors.visited_link : colors.link) : colors.disabled_text;
+    const ControlVisualContext context = part_visual_context(*this, anatomy_states());
+    const ControlVisualRole family = visited_ ? ControlVisualRole::visited_link : ControlVisualRole::link;
+    Color foreground = effective_theme().resolve(family, context).text;
+    if (has_style_override() && !context.high_contrast) {
+        const BasicControlStyle& colors = style();
+        foreground = enabled() ? (visited_ ? colors.visited_link : colors.link) : colors.disabled_text;
+    }
     const double baseline = text_baseline();
     const double width = underline_width();
     painter.draw_text_utf8({2.0, baseline}, display_text(), font(), foreground);

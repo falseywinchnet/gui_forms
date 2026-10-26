@@ -98,12 +98,12 @@ MonthCalendar::MonthCalendar(StableId stable_id) : Control(std::move(stable_id))
     set_focusable(true);
     set_cursor(CursorKind::arrow);
     set_paint_plane(PaintPlane::control);
-    today_ = system_date();
-    selection_ = CalendarDateRange{today_, today_};
-    anchor_ = today_;
-    focus_date_ = today_;
-    first_year_ = today_.year;
-    first_month_ = today_.month;
+    system_today_ = system_date();
+    selection_ = CalendarDateRange{system_today_, system_today_};
+    anchor_ = system_today_;
+    focus_date_ = system_today_;
+    first_year_ = system_today_.year;
+    first_month_ = system_today_.month;
 }
 
 // -- model ---------------------------------------------------------------------
@@ -192,8 +192,7 @@ void MonthCalendar::set_range(DateTimeValue minimum, DateTimeValue maximum) {
 void MonthCalendar::set_today_date(DateTimeValue date) {
     require_mutable();
     if (!valid_date_time(date)) throw std::invalid_argument("MonthCalendar today date is invalid");
-    today_ = civil_date(date);
-    today_set_ = true;
+    set_today_ = civil_date(date);
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
@@ -559,7 +558,7 @@ MonthCalendar::DayParts MonthCalendar::day_parts(std::size_t month, std::size_t 
     record.day_text = PartGeometry::from_bounds(cell);
     record.day_focus = PartGeometry::from_bounds(cell);
     // The today marker is a ring around the cell (the perimeter role).
-    if (show_today_circle_ && same_day(date, today_)) {
+    if (show_today_circle_ && same_day(date, today_date())) {
         record.day_marker = PartGeometry::from_bounds(cell);
         record.day_marker.states.insert(AnatomyState::current);
     }
@@ -582,7 +581,7 @@ AnatomyStateSet MonthCalendar::day_states(DateTimeValue date) const {
     if (day >= serial_day(selection_.start) && day <= serial_day(selection_.end)) {
         states.insert(AnatomyState::selected);
     }
-    if (show_today_circle_ && same_day(date, today_)) states.insert(AnatomyState::current);
+    if (show_today_circle_ && same_day(date, today_date())) states.insert(AnatomyState::current);
     if (!in_range(date)) states.insert(AnatomyState::disabled);
     const Window* const host = attached_window();
     if (focused_ && same_day(date, focus_date_) && host != nullptr && (*host).focus_cue_visible()) {
@@ -622,7 +621,7 @@ std::string MonthCalendar::month_title_text(std::size_t month) const {
 
 std::string MonthCalendar::today_text() const {
     const std::string text = "Today: " + date_time_detail::format_date_time(
-                                             today_, provider_.short_date_pattern, provider_);
+                                             today_date(), provider_.short_date_pattern, provider_);
     return text;
 }
 

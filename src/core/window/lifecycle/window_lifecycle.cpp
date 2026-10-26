@@ -51,6 +51,10 @@ Window::Window(Control::Ptr root, Size client_size,
         throw std::logic_error("GUI.Forms window root may not be disposed");
     }
     attach_subtree(root_, {});
+    // The theme's backdrop request (stage T5) until the application makes
+    // its own. Undeclared, the window is granted `opaque` whatever it asks.
+    backdrop_request_ = (*theme_).definition().window_backdrop.request;
+    refresh_backdrop();
     const Rect initial_damage{0.0, 0.0, client_size_.width, client_size_.height};
     add_damage_all_planes(initial_damage);
     metrics_.record_dirty_mark(initial_damage.area());
@@ -99,16 +103,45 @@ void Window::resize(Size client_size) {
         return;
     }
     const Rect old_bounds{0.0, 0.0, client_size_.width, client_size_.height};
+    const bool width_changed = client_size_.width != client_size.width;
+    const bool height_changed = client_size_.height != client_size.height;
     client_size_ = client_size;
     invalidate_cursor_interaction(CursorError::stale_metrics);
     ++surface_epoch_;
     if (surface_epoch_ == 0U) ++surface_epoch_;
     add_damage_all_planes(old_bounds);
-    mark_subtree_dirty(*root_, invalidation::bounds);
+    // Every control is arranged, painted and hit-tested again, as before.
+    // Only the controls whose measure input the client size reaches are
+    // measured again; the others are handed the same available size as
+    // before, so their measure would answer as it did (stage L, L7).
+    mark_subtree_dirty(*root_, without_dirty(invalidation::bounds, Dirty::measure));
+    mark_resized_measure(*root_, width_changed, height_changed);
     for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
         if (const Control::Ptr overlay = (*popup).popup()) {
             mark_subtree_dirty(*overlay, invalidation::bounds);
         }
+    }
+}
+
+// The window's measure pass hands the root the client size, and hands each
+// child its parent's requested extent on each axis, or, where that is zero,
+// what the parent was handed (measure_dirty_recursive). A client-size change
+// therefore changes what a control is handed exactly when it reaches the
+// control: on a changed axis, through ancestors that request no extent on
+// that axis. Those controls, and only those, are marked for measure. The
+// reached set contains each reached control's ancestors, so their subtree
+// flags already cover it.
+void Window::mark_resized_measure(Control& control, bool width_reaches, bool height_reaches) {
+    // add_dirty advances the measure generation, so a reached control's
+    // cached measure answers (measure_for_layout) are not answered again.
+    control.add_dirty(Dirty::measure);
+    control.subtree_dirty_ |= Dirty::measure;
+    const bool child_width_reaches = width_reaches && control.requested_bounds_.width <= 0.0;
+    const bool child_height_reaches = height_reaches && control.requested_bounds_.height <= 0.0;
+    if (!child_width_reaches && !child_height_reaches) return;
+    for (const Control::Ptr& child : control.children_) {
+        if (!child) continue;
+        mark_resized_measure(*child, child_width_reaches, child_height_reaches);
     }
 }
 
@@ -139,6 +172,15 @@ void Window::set_presentation_settings(PresentationSettings settings) {
         throw std::invalid_argument(
             "GUI.Forms text scale must be finite and between 0.5 and 4.0");
     }
+    if (settings.double_click_milliseconds == 0U ||
+        settings.double_click_milliseconds > maximum_double_click_milliseconds) {
+        throw std::invalid_argument(
+            "GUI.Forms double-click interval must be between 1 and 5000 milliseconds");
+    }
+    if (settings.double_click_origin != SettingOrigin::default_value &&
+        settings.double_click_origin != SettingOrigin::host) {
+        throw std::invalid_argument("GUI.Forms double-click origin is not a SettingOrigin");
+    }
     if (presentation_settings_ == settings) {
         return;
     }
@@ -148,6 +190,8 @@ void Window::set_presentation_settings(PresentationSettings settings) {
         settings.reduced_motion && !presentation_settings_.reduced_motion;
     const bool ambient_switched_off =
         !settings.ambient_motion && presentation_settings_.ambient_motion;
+    const bool transparency_switched =
+        settings.reduced_transparency != presentation_settings_.reduced_transparency;
     presentation_settings_ = settings;
     // Transient overlays own geometry resolved for the opening text metrics.
     // A text-scale transition dismisses them deterministically; reopening
@@ -171,7 +215,12 @@ void Window::set_presentation_settings(PresentationSettings settings) {
     // part repaints above, at its pose; one resuming is repainted too, and
     // its paint starts its effect again.
     if (ambient_switched_off) motion_clock_.stop_ambient(false);
+    // Reduced transparency (stage T5, PLAN.md §4.5): glass draws flattened,
+    // so every part that sampled the backplane is baked again.
+    if (transparency_switched) damage_backplane_readers(nullptr);
     presentation_changed_.emit(presentation_settings_);
+    // High contrast and reduced transparency withdraw a backdrop (stage T5).
+    refresh_backdrop();
 }
 
 void Window::set_theme(std::shared_ptr<const Theme> theme) {
@@ -189,6 +238,13 @@ void Window::apply_theme(const std::shared_ptr<const Theme>& theme) {
     engine_parts_.invalidate_rasters();
     // The window's backplane material may differ (E9-B).
     damage_backplane_readers(nullptr);
+    // A window following its theme's backdrop request takes the new
+    // theme's, and its grant is resolved again before theme_changed is
+    // raised, so handlers see the grant the theme brings.
+    if (!application_backdrop_request_) {
+        backdrop_request_ = (*theme_).definition().window_backdrop.request;
+        refresh_backdrop();
+    }
     // Themes include structural spacing/geometry/type tokens as well as paint
     // recipes, so replacement must remeasure and re-hit-test inherited content.
     mark_subtree_dirty(*root_, invalidation::conservative_subtree);

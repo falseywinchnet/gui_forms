@@ -155,6 +155,14 @@ bool valid_drag_event(const DragEvent& event) noexcept {
 // second attach, after close authorization only the close, shutdown or a
 // passive deactivation or occlusion, once closed only shutdown, and nothing
 // after shutdown.
+bool valid_input_settings(const HostInputSettingsEvent& input) noexcept {
+    const bool interval = input.double_click_milliseconds != 0U &&
+                          input.double_click_milliseconds <= maximum_double_click_milliseconds;
+    const bool origin = input.double_click_origin == SettingOrigin::default_value ||
+                        input.double_click_origin == SettingOrigin::host;
+    return interval && origin;
+}
+
 HostDispatchError lifecycle_refusal(HostLifecyclePhase phase, bool attach, bool shutdown,
                                     bool closed, bool passive_terminal) noexcept {
     switch (phase) {
@@ -182,6 +190,8 @@ HostSession::HostSession(Window& window,
                          HostServices* services)
     : window_(&window), services_(services), ui_thread_(std::this_thread::get_id()) {
     snapshot_.capabilities = std::move(capabilities);
+    // The window's non-opaque declaration is fixed from here (stage T5).
+    window.host_session_bound_ = true;
     if (services_ != nullptr) {
         if (window.host_services_ != nullptr && window.host_services_ != services_) {
             throw std::logic_error("GUI.Forms Window already has an active host service seam");
@@ -316,6 +326,17 @@ void HostSession::DispatchVisitor::operator()(
         (*(*session).window_).shutdown_dispatcher();
     } else if constexpr (std::is_same_v<Payload, HostShutdownEvent>) {
         (*session).shutdown();
+    } else if constexpr (std::is_same_v<Payload, HostCompositorEvent>) {
+        const bool host_preferences =
+            (*session).snapshot_.capabilities.supports(HostCapability::presentation_preferences);
+        (*(*session).window_).set_compositor_state(payload.state, host_preferences);
+    } else if constexpr (std::is_same_v<Payload, HostInputSettingsEvent>) {
+        // Only the reported fields change; the application's own settings
+        // stay as they are.
+        PresentationSettings settings = (*(*session).window_).presentation_settings();
+        settings.double_click_milliseconds = payload.double_click_milliseconds;
+        settings.double_click_origin = payload.double_click_origin;
+        (*(*session).window_).set_presentation_settings(settings);
     }
 }
 
@@ -373,8 +394,26 @@ HostDispatchResult HostSession::dispatch(HostEvent event) {
         observed_.emit(event, result);
         return result;
     }
+    // A compositor report is usable only when its opaque backdrop is
+    // supported and it is later than the window's last one (stage T5).
+    if (const HostCompositorEvent* compositor = std::get_if<HostCompositorEvent>(&event.payload);
+        compositor != nullptr &&
+        (!compositor_state_valid((*compositor).state) ||
+         !((*window_).compositor_state().generation < (*compositor).state.generation))) {
+        result.error = HostDispatchError::invalid_payload;
+        ++snapshot_.events_rejected;
+        observed_.emit(event, result);
+        return result;
+    }
     if (const gui_forms::DragEvent* drag = std::get_if<DragEvent>(&event.payload);
         drag != nullptr && !valid_drag_event(*drag)) {
+        result.error = HostDispatchError::invalid_payload;
+        ++snapshot_.events_rejected;
+        observed_.emit(event, result);
+        return result;
+    }
+    if (const HostInputSettingsEvent* input = std::get_if<HostInputSettingsEvent>(&event.payload);
+        input != nullptr && !valid_input_settings(*input)) {
         result.error = HostDispatchError::invalid_payload;
         ++snapshot_.events_rejected;
         observed_.emit(event, result);

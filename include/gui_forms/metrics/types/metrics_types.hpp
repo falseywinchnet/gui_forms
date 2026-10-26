@@ -19,6 +19,19 @@ struct MetricsSnapshot {
     std::uint64_t measure_nodes_visited{};
     std::uint64_t arrange_nodes_visited{};
     std::uint64_t paint_nodes_visited{};
+    // Control::measure_for_layout (stage L): answers from a control's measure
+    // cache, misses that called measure_intrinsic, and the most misses one
+    // control answered within one layout pass (a solver asking more than
+    // once per pass shows here). Measure calls that bypass the entry are
+    // counted only by controls_measured.
+    std::uint64_t measure_cache_hits{};
+    std::uint64_t measure_cache_misses{};
+    std::uint64_t maximum_measures_per_control_pass{};
+    // Measure propagations stopped at a layout boundary
+    // (Control::size_depends_on_content), and measure results with a
+    // negative or non-finite dimension clamped to zero.
+    std::uint64_t layout_boundary_stops{};
+    std::uint64_t layout_measure_clamps{};
     std::uint64_t paint_invalidations_consumed{};
     std::uint64_t display_chunks_rebuilt{};
     std::uint64_t display_chunks_reused{};
@@ -141,6 +154,11 @@ struct MetricsSnapshot {
     // built-in recipe instead. Counted when a keyed part's refusal begins,
     // and at every paint of a part without a key.
     std::uint64_t engine_primitive_refusals{};
+    // Materials assembled from a recipe's material and the material fields
+    // a theme's rules set (T3 EC1): once per distinct assembly for a keyed
+    // part (AssembledPartMaterial), and at every paint of a part without a
+    // key.
+    std::uint64_t engine_material_assemblies{};
     // Paint groups begun deeper than maximum_paint_group_depth, drawn
     // without isolation (Painter::begin_group).
     std::uint64_t paint_group_refusals{};

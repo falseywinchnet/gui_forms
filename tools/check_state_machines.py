@@ -75,7 +75,7 @@ from check_house_style import EXCLUDED, EXTENSIONS, LEXEMES, mask_literal
 
 FIRST_PARTY: tuple[str, ...] = ("include", "src", "demo", "tests", "examples", "tools",
                                 "file_manager_demoboard", "stx_vorbis", "stx_zlib", "stx_png", "stx_conv",
-                                "stx_cng", "fuzz")
+                                "fuzz")
 VOCABULARY_HEADERS: tuple[str, ...] = (
     "include/gui_forms/anatomy/types/anatomy_types.hpp",
     "include/gui_forms/semantics/types/semantic_types.hpp",
@@ -103,7 +103,6 @@ AREAS: tuple[tuple[str, str], ...] = (
     ("stx_zlib/", "stx_zlib"),
     ("stx_png/", "stx_png"),
     ("stx_conv/", "stx_conv"),
-    ("stx_cng/", "stx_cng"),
     ("fuzz/", "fuzz"),
     ("examples/", "examples"),
     ("tools/", "tools"),

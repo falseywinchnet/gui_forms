@@ -123,7 +123,7 @@ struct RunStyle final {
     bool italic = false;
     bool underline = false;
     bool strikethrough = false;
-    bool code = false;                     // inline code; exclusive with the five below
+    bool code = false;                     // inline code; combines with every other attribute
     bool superscript = false;              // exclusive with subscript
     bool subscript = false;
     std::optional<LinkIndex> link;
@@ -144,7 +144,7 @@ struct Block final {
     std::uint8_t level = 0;                // heading 1-6; list nesting 0-7; else 0
     std::uint8_t quote_depth = 0;          // 0-7, any kind may be quoted
     ListMarker marker = ListMarker::bullet;
-    std::uint32_t ordered_start = 1;       // first number of an ordered list
+    std::uint32_t ordinal = 0;             // the number written on an ordered item; 0 otherwise
     Alignment alignment = Alignment::left;
     std::uint32_t first_run = 0;           // index into Document::runs
     std::uint32_t run_count = 0;
@@ -171,15 +171,24 @@ can be compared field by field:
 
 - runs are contiguous and in block order. Every block has at least one text
   run, and no run is empty except a line break;
-- adjacent text runs with equal styles are merged. A line break is never
-  first or last in a block, and two line breaks are never adjacent;
+- adjacent text runs with equal styles are merged. A line break may open a
+  block or follow another (markdown writes each as a backslash line), but
+  never ends a block, and headings have none;
+- a list item at nesting level L > 0 directly follows a list item at the
+  same quote depth whose level is at least L - 1, since markdown writes
+  nesting under a parent;
 - text is valid UTF-8 without paragraph or line separators, without C0
   controls other than tab, and without U+FEFF;
 - blanks (spaces and tabs) are kept wherever they appear, including at the
   start and end of a block. The markdown writer escapes the ones CommonMark
   would strip (section 4), so nothing the user can see is lost;
-- `code` excludes the other run attributes. Code blocks have one unstyled
-  text run per line, separated by line breaks;
+- `code` is an attribute like the others: inline code may be bold,
+  coloured, spanned or linked. A code block is one unstyled text run whose
+  text holds its lines joined by line feeds, so blank lines inside code are
+  kept; no other text contains a line feed;
+- an ordered list item's `ordinal` is the number written on its marker.
+  Readers keep the number they read, so renumbering is the consumer's
+  presentation choice; bullets and other blocks have ordinal 0;
 - `size_step` is 0 in headings, whose level stands for their size.
 
 `Document::clear` keeps capacity, so one `Document` can be reused across
@@ -198,9 +207,9 @@ built. This section fixes its shape.
 |---|---|
 | paragraph | its text; blocks are separated by one blank line |
 | heading level n | `#` × n, a space, then the text |
-| list item | `-` or `n.` then a space; nesting indents by the parent marker's width plus one space (2 for `-`, 3 for `1.`, 4 for `10.`) |
-| quote depth n | `> ` × n before every line of the block |
-| code block | a backtick fence one longer than the longest run of backticks inside, at least three |
+| list item | `-` or the ordinal and `.`, then a space; nesting indents by the parent marker's width plus one space (2 for `-`, 3 for `1.`, 4 for `10.`); continuation lines are indented to the item's content |
+| quote depth n | `> ` × n before every line of the block; the blank line between two quoted blocks is quoted to their shared depth, so the quote continues |
+| code block | a backtick fence one longer than the longest run of backticks inside, at least three; each line of the run's text on its own line |
 | bold, italic | `**text**`, `*text*` |
 | strikethrough | `~~text~~` |
 | inline code | a backtick string one longer than the longest run of backticks inside, padded with one space on each side when the text starts or ends with a backtick or a space and is not all spaces (CommonMark strips exactly that padding) |
@@ -210,10 +219,16 @@ built. This section fixes its shape.
 | alignment other than left | a block attribute line, `{align=center}` or `{align=right}`, on the line directly before the block (inside the quote markers when quoted) |
 
 When a run has both CommonMark emphasis and span attributes, the emphasis
-goes inside the span: `[**text**]{u}`. Within the text, the writer escapes
+goes inside the span: `[**text**]{u}`. A link is written outside the spans
+it contains. CommonMark's flanking rules cannot place `**`, `*` and `~~` at
+every run boundary (bold "foo." before plain "bar" cannot be `**foo.**bar`),
+so the writer reads each block back and, when the runs differ, writes that
+block's bold, italic and strikethrough as the span items `b`, `i` and `s`. Within the text, the writer escapes
 `\`, `` ` ``, `*`, `_`, `[`, `]`, `~`, `<`, `{` and `&` with a backslash
 wherever they appear. At the start of a line it also escapes `#`, `>`, `-`,
-`+`, `=`, `|`, and a digit run followed by `.` or `)`. Blanks that
+`+`, `=`, `|`, and a digit run followed by `.` or `)`; every `#` in a
+heading; and a `!` ending a run that another text run follows, where it
+could meet a link's or span's `[`. Blanks that
 CommonMark would strip, those at the start of a line and at the end of a
 block, are written as numeric character references, `&#32;` for a space and
 `&#9;` for a tab. Numeric character references are CommonMark syntax, not
@@ -253,7 +268,7 @@ pops them.
 |---|---|---|
 | Header | `\rtf1`; `\ansi`, `\ansicpgN`, `\deffN`, `\ucN`, `\uN` | Text must start `{\rtf`; otherwise `malformed` at offset 0. After `\uN`, its `\ucN` fallback characters are skipped |
 | Bytes | `\'hh`, and literal bytes 0x20-0x7E | Code page 1252 only. Another declared code page is accepted until it decodes a byte above 0x7F; that byte stops the read with `unsupported_encoding` (decision 3) |
-| Fonts | `\fonttbl`, `\fN`, family words, font names | A font is monospace when its family is `\fmodern` or its name is in a fixed list (Courier New, Courier, Consolas, Lucida Console, Menlo, Monaco, Cascadia Mono, Cascadia Code, DejaVu Sans Mono, Liberation Mono). Runs in a monospace font become inline code. Other font identity is dropped and counted |
+| Fonts | `\fonttbl`, `\fN`, family words, font names | A font is monospace when its family is `\fmodern` or its name is in a fixed list (Courier New, Courier, Consolas, Lucida Console, Menlo, Monaco, Cascadia Mono, Cascadia Code, DejaVu Sans Mono, Liberation Mono). Runs in a monospace font other than the document's default font (`\deff`) become inline code, so a document typed entirely in Courier is not one code span (coordinator, 2026-10-26). Other font identity is dropped |
 | Colours | `\colortbl`, `\redN\greenN\blueN`, `\cfN`, `\cbN`, `\highlightN` | `colour` and `background`. Index 0 (auto) means none |
 | Characters | `\b`, `\i`, `\ul` and its style variants, `\ulnone`, `\strike`, `\striked1`, `\super`, `\sub`, `\nosupersub`, `\fsN`, `\plain`, each with a `0` parameter to turn off | Run style. Underline styles collapse to one underline (counted). `\fsN` maps to a size step (below) |
 | Paragraphs | `\par`, `\pard`, `\line`, `\tab`, `\page`, `\sect`, `\ql`, `\qc`, `\qr`, `\qj`, `\liN`, `\fiN`, `\sbN`, `\saN` | Blocks and line breaks. `\qj` reads as left (counted). Indents and spacing are dropped (counted), except as list and quote evidence |
@@ -274,11 +289,24 @@ reaches the document.
 **Size steps.** Size steps are relative to the document's body size: step
 0 is body text. A consumer maps step 0 to its own body font, as
 `RichTextBox` maps it to the control's `Font`, and scales the other steps
-with it. RTF sizes are absolute, so the reader converts them against a
-12-point body. Word's 11-point default and TextEdit's 12-point default
-both read as step 0. The half-point value `h` maps as follows: h ≤ 17 is -2; 18-21 is -1; 22-25 is 0;
+with it. The reader finds the body size as the first of: Word's
+`{\*\defchp \fsN}`, the Normal style's `\fs` (style 0), and the size
+covering the most characters; `RtfReader::last_body()` reports which rule
+chose it (coordinator, 2026-10-26). Each absolute size `a` is scaled to a
+12-point body, `h = round(a * 24 / body)`, so Windows Forms' 8.5-point
+RichTextBox text and Word's 11-point text both read as step 0. The scaled
+value `h` maps as follows: h ≤ 17 is -2; 18-21 is -1; 22-25 is 0;
 26-31 is +1; 32-39 is +2; 40-55 is +3; h ≥ 56 is +4. A size that is not one
 of the canonical values written in section 6 is counted as quantised.
+
+**Counting.** An empty paragraph ended by `\par` or `\cell` is spacing the
+model cannot hold, counted as `spacing_dropped`, as are non-zero
+`\sb`/`\sa`. Producer words that change nothing the model holds (`\rsid`,
+`\lang`, page geometry, Cocoa and Word document settings) are not counted;
+unknown words and words that change appearance the model cannot hold
+(`\caps`, `\outl` and the like) are counted as `control_word_ignored`.
+Effort is charged per input byte, per control-word letter, per decoded
+character and per emitted run and block.
 
 ## 6. RTF written
 
@@ -468,6 +496,23 @@ coordinator decided and recorded below.
    12-point body.
 9. **Phase order puts markdown first**, so W can build the run model before
    RTF reading exists.
+
+Refinements found while building RT1, accepted by the coordinator on
+2026-10-26 and sent to W (who replies only to object):
+
+10. **A code block is one text run** holding its lines joined by line
+    feeds, so blank lines inside code survive.
+11. **List items carry `ordinal`**, the number written on the marker,
+    instead of `ordered_start`. Readers keep what they read; adjacent lists
+    with different delimiters would otherwise not round-trip.
+12. **The emphasis fallback**: the span items `b`, `i` and `s`, written only
+    for a block whose delimiters would not read back as the same runs.
+    They fall within the owner's attribute-span spelling (decision 2).
+13. **Inline code combines with other attributes** (bold code, coloured
+    code), where the first draft made it exclusive and lost them.
+14. **Line breaks** may open a block or follow one another; none ends a
+    block or sits in a heading. **A nested list item follows its parent**,
+    so nesting can always be written as indentation.
 
 ## 12. Owner decisions, 2026-10-26
 

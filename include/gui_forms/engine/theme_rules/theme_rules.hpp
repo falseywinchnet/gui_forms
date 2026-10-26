@@ -5,6 +5,7 @@
 #include "gui_forms/engine/motion_value/motion_value.hpp"
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
 #include "gui_forms/engine/types/engine_types.hpp"
+#include "gui_forms/surface_material/types/surface_material_types.hpp"
 #include "gui_forms/types/paint_types/paint_types.hpp"
 
 #include <array>
@@ -299,26 +300,162 @@ struct AmbientEffect final {
     }
 };
 
+// The material fields a rule may set (T3 engine change EC1, owner R2-02).
+// Each cascades on its own, as a parameter does: a part's material is the
+// recipe material its primitive draws (the cascade's floor), with each
+// field the winning matching rule sets in its place. The fields are
+// SurfaceMaterial's, split where CSS's longhands are, so that each
+// cascades as CSS cascades it:
+// - the fills are CSS's background-color, background-image and
+//   background-blend-mode (owner C6, 2026-10-26: they combine across
+//   rules, the colour under the image layers);
+// - the border is its twelve longhands, each edge's style, width and
+//   colour, in that order, the edges in CSS's order (`border` sets all
+//   twelve);
+// - the radii are the four corners, in CSS's order (`border-radius` sets
+//   all four).
+enum class MaterialField : std::uint8_t {
+    background_colour,
+    fills,
+    fill_blend_modes,
+    shadows,
+    glows,
+    border_top_style,
+    border_top_width,
+    border_top_colour,
+    border_right_style,
+    border_right_width,
+    border_right_colour,
+    border_bottom_style,
+    border_bottom_width,
+    border_bottom_colour,
+    border_left_style,
+    border_left_width,
+    border_left_colour,
+    keylines,
+    corner_top_left,
+    corner_top_right,
+    corner_bottom_right,
+    corner_bottom_left,
+    colour_filter,
+    drop_shadow,
+    filter_blur,
+    finish,
+    mask,
+    count,
+};
+
+inline constexpr std::size_t material_field_count = static_cast<std::size_t>(MaterialField::count);
+
+[[nodiscard]] std::string_view material_field_name(MaterialField field) noexcept;
+
+// One material field a rule sets and its value. Only the members `field`
+// names are read; the others stay empty:
+// - background_colour: `colour`, a solid layer under the image layers;
+// - fills: the image layers (gradients, images, patterns), bottom first,
+//   at most SurfaceMaterial::maximum_fill_layers, empty for none;
+// - fill_blend_modes: `blend_modes`, in CSS's order (the top image
+//   layer's first), repeated over the image layers as CSS repeats a short
+//   list; empty for normal;
+// - shadows, glows, keylines: the lists;
+// - an edge's style: `border_style`, empty for none (CSS's `none`); its
+//   width: `number`, 0 for none; its colour: `colour`;
+// - a corner: `number`, its radius in logical units, or, with `relative`,
+//   a fraction of the box's shorter side (CSS's percentage, R2-11),
+//   resolved when the material is assembled for a part;
+// - colour_filter: `colour_filter`; drop_shadow: `drop_shadow`, empty for
+//   none; mask: `mask`, empty for none;
+// - filter_blur and finish: `number`.
+// `initial`, set, is CSS's `initial`: the field keeps the floor's value,
+// and the declaration still wins over those beneath it; its value members
+// are not read.
+struct MaterialDeclaration final {
+    MaterialField field{MaterialField::fills};
+    bool initial{};
+    std::vector<MaterialFillLayer> fills{};
+    std::vector<MaterialBlendMode> blend_modes{};
+    std::vector<MaterialShadow> shadows{};
+    std::vector<MaterialGlow> glows{};
+    std::optional<MaterialBorderStyle> border_style{};
+    Color colour{};
+    std::vector<MaterialKeyline> keylines{};
+    double number{};
+    bool relative{};
+    MaterialColourFilter colour_filter{};
+    std::optional<MaterialDropShadow> drop_shadow{};
+    std::optional<MaterialFillLayer> mask{};
+
+    friend bool operator==(const MaterialDeclaration& left, const MaterialDeclaration& right) noexcept {
+        return left.field == right.field && left.initial == right.initial && left.fills == right.fills &&
+               left.blend_modes == right.blend_modes && left.shadows == right.shadows &&
+               left.glows == right.glows && left.border_style == right.border_style &&
+               left.colour == right.colour && left.keylines == right.keylines &&
+               left.number == right.number && left.relative == right.relative &&
+               left.colour_filter == right.colour_filter && left.drop_shadow == right.drop_shadow &&
+               left.mask == right.mask;
+    }
+};
+
+// Replaces `material` with `floor` and the declarations of `fields` (the
+// winning declaration of each field, by the field's position, null where
+// none) in place: a part's assembled material (EC1); an `initial`
+// declaration keeps the floor's value. The fills are composed when any
+// fill field is declared: the colour layer (the declared colour, else the
+// floor's bottom layer when it is solid) under the image layers (the
+// declared ones, else the floor's others), which take the declared blend
+// modes; a colour of alpha 0 adds no layer, and with no layer at all the
+// fill is one transparent solid. More than
+// SurfaceMaterial::maximum_fill_layers is no material. The corners are
+// composed when any is declared: each is its declaration's, else the
+// floor's (its corner_radii's, else its corner_radius); four equal corners
+// are corner_radius alone, and others corner_radii, with corner_radius the
+// smallest (the built-in path rounds every corner by it). The border's
+// edges are assembled
+// together when any of their fields is declared: each starts as the
+// floor's (its single edge, else its uniform border; an edge the floor
+// lacks has the default MaterialBorder's width and colour and is not
+// drawn), takes its declared style, width and colour, and is drawn unless
+// its style is none or its width 0. Four equal edges are drawn as one
+// uniform border, which keeps a dash and rounded corners, and unequal ones
+// as single edges, which a material admits only with square corners
+// (valid_surface_material). Relative corners are
+// resolved against `shorter_side`, the box's shorter side in logical
+// units.
+void assemble_material(const SurfaceMaterial& floor,
+                       const std::array<const MaterialDeclaration*, material_field_count>& fields,
+                       double shorter_side, SurfaceMaterial& material);
+
 // One rule. `label` names it in diagnostics (T3: its source position).
 // `requires_engine`, when set, is the engine version the rule needs, in
 // place of its sheet's. Its transitions and its ambient effect cascade as
 // declarations do: for each property, the transition of the last matching
 // rule that declares one (for a parameter, among the rules selecting the
 // part's primitive), and the ambient effect of the last matching rule that
-// declares one.
+// declares one. Its material fields (EC1) cascade the same way, each on
+// its own, from every matching rule, whatever primitive it selects: they
+// change a part only where its primitive draws a theme material.
+//
+// `specificity`, when set, is the rule's specificity in place of the one
+// its selector gives (T3 engine change EC2): a rule expanded from CSS's
+// `:is()` takes its most specific argument's. A class or stable-ID rule
+// with a given specificity then needs a class or an ID in it rather than
+// in its selector; an inline style still needs its selector's stable ID.
 struct ThemeRule final {
     std::string label{};
     CascadeLevel level{CascadeLevel::theme_sheet};
     RuleSelector selector{};
+    std::optional<RuleSpecificity> specificity{};
     std::vector<RuleDeclaration> declarations{};
     std::optional<EngineVersion> requires_engine{};
     std::vector<PropertyTransition> transitions{};
     std::optional<AmbientEffect> ambient{};
+    std::vector<MaterialDeclaration> materials{};
 
     friend bool operator==(const ThemeRule& left, const ThemeRule& right) noexcept {
         return left.label == right.label && left.level == right.level && left.selector == right.selector &&
-               left.declarations == right.declarations && left.requires_engine == right.requires_engine &&
-               left.transitions == right.transitions && left.ambient == right.ambient;
+               left.specificity == right.specificity && left.declarations == right.declarations &&
+               left.requires_engine == right.requires_engine && left.transitions == right.transitions &&
+               left.ambient == right.ambient && left.materials == right.materials;
     }
 };
 
@@ -413,6 +550,9 @@ enum class RuleDiagnosticKind : std::uint8_t {
     // than a rule, names it in `property`; its position stays, and reads as
     // not published.
     published_value_invalid,
+    // A material field whose value no material admits
+    // (valid_surface_material), such as a ninth fill or a negative radius.
+    material_field_invalid,
 };
 
 [[nodiscard]] std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept;
@@ -440,7 +580,12 @@ struct RuleDiagnostic final {
 // broken rule cannot take the theme's other rules down with it.
 class CompiledThemeRules final {
 public:
-    CompiledThemeRules() = default;
+    CompiledThemeRules();
+    CompiledThemeRules(const CompiledThemeRules& other);
+    CompiledThemeRules& operator=(const CompiledThemeRules& other);
+    CompiledThemeRules(CompiledThemeRules&& other) noexcept = default;
+    CompiledThemeRules& operator=(CompiledThemeRules&& other) noexcept = default;
+    ~CompiledThemeRules() = default;
 
     // Compiles `sheet` against `registry`, which must outlive the result.
     [[nodiscard]] static CompiledThemeRules compile(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry);
@@ -535,14 +680,28 @@ public:
         const AmbientEffect* ambient{};
         // The part's blend (blend_property): the last matching rule's.
         PartBlend blend{PartBlend::normal};
+        // The winning declaration of each material field (EC1), by the
+        // field's position, or null where no matching rule sets it; they
+        // belong to the compiled rules. `materials_authored` is whether any
+        // is set.
+        std::array<const MaterialDeclaration*, material_field_count> materials{};
+        bool materials_authored{};
     };
 
     // The cascade for one part: the winning primitive declaration, then
     // each of that primitive's parameters from the winning declaration of
     // it among the matching rules that select the same primitive, else its
-    // declared default. Linear in the number of rules; tables are small,
-    // and a theme with no rules returns at once.
+    // declared default; and each material field from its winning
+    // declaration among all the matching rules. Linear in the number of
+    // rules; tables are small, and a theme with no rules returns at once.
     [[nodiscard]] Resolution resolve(const PartFacts& facts) const noexcept;
+
+    // This compilation's serial number, unique among the compilations of
+    // the process: a cache keyed by the addresses of the rules'
+    // declarations (an assembled material, EC1) compares it first. A copy
+    // takes a new one, since its declarations lie elsewhere; a move keeps
+    // it with the declarations.
+    [[nodiscard]] std::uint64_t serial() const noexcept { return serial_; }
 
 private:
     // A checked declaration: the primitive a rule selects (null for
@@ -573,6 +732,8 @@ private:
         std::vector<CompiledTransition> transitions{};
         std::optional<AmbientEffect> ambient{};
         std::optional<PartBlend> blend{};
+        // Checked material fields, at most one per field.
+        std::vector<MaterialDeclaration> materials{};
     };
 
     // Compiles `sheet`'s rules into `result` at their authored levels, or,
@@ -594,6 +755,12 @@ private:
     // diagnostic.
     static void add_blend(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
                           const RuleDeclaration& declaration, CompiledRule& compiled);
+    // A rule's material fields, checked; a defect or a second declaration
+    // of one field drops it with a diagnostic.
+    static void add_materials(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
+                              CompiledRule& compiled);
+    // The winning material fields of the matching rules into `result`.
+    void resolve_materials(const PartFacts& facts, Resolution& result) const noexcept;
 
     [[nodiscard]] static bool matches(const CompiledRule& rule, const PartFacts& facts) noexcept;
 
@@ -603,6 +770,7 @@ private:
     std::vector<RuleDiagnostic> diagnostics_{};
     std::vector<std::string> published_values_{};
     std::size_t built_in_rules_{};
+    std::uint64_t serial_{};
 };
 
 // The engine's built-in rules (E7), compiled below every theme's: the

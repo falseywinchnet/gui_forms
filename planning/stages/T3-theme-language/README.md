@@ -71,7 +71,7 @@ What history teaches:
 - **Resources**: image assets named by resource: tiling backgrounds,
   backplane frescoes and control faces. Image faces are supported: CONV
   prepares each face size ahead of the bake (T2, "CONV, image face
-  variants"). CNG is the native resource format, and PNG is for interop. No
+  variants"). PNG is the only image format. No
   font bytes; a theme selects among bundled typography roles. No executable
   code, filesystem or network access.
 - **Engine version**: a theme declares the engine version it needs.
@@ -409,6 +409,76 @@ Both are decided.
    the newly added piece is at fault, and a program designer's inline rules
    are honoured. Another program without that inline style accepts the
    same theme.
+
+### Phase decisions approved by the owner (2026-10-25)
+
+1. **Number limits (P1).** A number token has at most 19 significant
+   digits, and is either zero or of a magnitude from 1e-40 up to but not
+   including 1e40. Anything else is an error: E108 `number_too_precise` or
+   E109 `number_out_of_range`. The owner approved them as recorded in
+   PLAN.md section 1.2.
+2. **Phases in plan order.** P3 and the later phases go on in plan order,
+   one PR per phase with its gate, each based on main, without stopping
+   between phases. Work stops only at an owner decision or a genuine
+   blocker.
+
+### Confirmations answered by the owner (2026-10-26)
+
+Accepted as built:
+
+- **C1.** The derived limits E510 (at most 32 simple selectors in one
+  expanded selector) and E513 (at most 16 MiB of lowered records).
+- **C2.** A rule expanded from a selector list keeps the specificity
+  `:is()` gives it, and its cascade level follows that specificity.
+- **C3.** The engine's budget refusals keep their own warnings,
+  `primitive_over_budget` W108 and `primitive_cost_unbounded` W109,
+  appended to the W1xx row.
+- **C4.** A sheet that declares a newer engine loads at the running
+  version: what the running engine understands applies, and the rest is
+  dropped with a warning (W301, W302).
+- **C5.** The material primitive's default recipe is the part's own
+  family recipe (`family`; engine 0.3).
+- **C7.** A rule that declares material fields and no `primitive`
+  selects the `material` primitive.
+
+Reversed:
+
+- **C6.** `background-color` and `background-image` declared in
+  different rules combine as CSS combines them, the colour under the
+  image layers. They are separate cascaded fields, composed when the
+  material is assembled; they never cascade as one field.
+
+- **C8, engine versions** (answered 2026-10-26, corrected the same day:
+  "there's no such thing as an upper bound here. lower bounds only").
+  Versions are lower bounds only, since a theme states the features it
+  needs. The manifest's engine field is written `">=0.3"`; a bare number,
+  an upper bound or a range is an error. A running engine older than the
+  bound refuses the theme, with a diagnostic naming the version needed:
+  "this theme needs engine >= X.Y; upgrade to run it". Inside a sheet,
+  `@supports engine(major.minor) { ... }` also means "at least": each rule
+  inside lowers with that `requires_engine`, and on an older engine the
+  whole block is skipped, so a group never applies in part. `@supports
+  not engine(...)` holds the fallback rules, and `engine()` is the only
+  test admitted inside `@supports`. Built in P9/P10. The manifest's
+  bound is a hard requirement (owner, 2026-10-26): C4's load-and-warn
+  applies only inside an accepted theme, to `@supports engine(...)`
+  blocks and per-rule versions.
+
+### Owner decision: compatibility policy (2026-10-26, standing)
+
+- The language and the engine are made right by 1.0. After 1.0 there
+  are only bug fixes and added features, never a breaking change.
+- Versions are lower bounds only. The engine supports every theme
+  targeting 1.0 or later, always.
+- If anything is ever deprecated, a compatibility module restores the old
+  capability transparently. The engine detects an old construct it no
+  longer supports and errors with "please update your theme, or use this
+  compatibility plugin".
+- There are no upper bounds, ranges or migration modes.
+
+P9 and P10 are designed so that nothing assumes a later break: no
+version ranges, no per-version branches in the loader, and room for a
+compatibility module to register the constructs it restores.
 
 ## Read first
 

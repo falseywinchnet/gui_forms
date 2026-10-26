@@ -18,12 +18,12 @@ GUI.Forms documentation
 **Version**: |version|
 
 **Download programs**:
-`Latest release <https://github.com/falseywinchnet/gui_forms/releases/latest>`_
+`Latest release <https://github.com/malkuth-software/gui_forms/releases/latest>`_
 
 **Useful links**:
-`Source Repository <https://github.com/falseywinchnet/gui_forms>`_ |
-`Issue Tracker <https://github.com/falseywinchnet/gui_forms/issues>`_ |
-`Releases <https://github.com/falseywinchnet/gui_forms/releases>`_
+`Source Repository <https://github.com/malkuth-software/gui_forms>`_ |
+`Issue Tracker <https://github.com/malkuth-software/gui_forms/issues>`_ |
+`Releases <https://github.com/malkuth-software/gui_forms/releases>`_
 
 GUI.Forms is a retained, CPU-rendered forms toolkit written in C++20. You
 build a tree of controls once, change it imperatively, and the toolkit tracks

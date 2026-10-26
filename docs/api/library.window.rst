@@ -730,6 +730,18 @@ Related types
 
       The application's motion switch (design language §9.4 item 3, T2 E7): off, the theme engine's ambient effects stop and their parts rest at their static poses. Transitions are not affected; reduced motion, the host's preference, ends them. Default: ``{true}``.
 
+   .. cpp:member:: bool reduced_transparency
+
+      Reduced transparency (stage T5, owner decision T5-Q7): the host's setting where the host reports it (capability presentation_preferences), or the application's. With it, or with high_contrast, a window's backdrop is opaque (WindowBackdropReason).
+
+   .. cpp:member:: std::uint32_t double_click_milliseconds
+
+      The system's double-click interval, a perceptual duration in milliseconds: the longest gap between two clicks that the platform counts as one double-click. A control that tells a slow second click from a double-click (a list's label edit) compares against it. The host reports it at attach and again when the system setting changes (HostInputSettingsEvent); each host's source is listed under "Input settings" in docs/user/hosts-and-capabilities.md. ``double_click_origin`` says whether it is that host value or the stated default. Between 1 and maximum_double_click_milliseconds. Default: ``{default_double_click_milliseconds}``.
+
+   .. cpp:member:: SettingOrigin double_click_origin
+
+      Default: ``{SettingOrigin::default_value}``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PresentedArea final
@@ -859,6 +871,16 @@ Enumerations
 
    .. cpp:enumerator:: overlay
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: SettingOrigin
+
+   ``#include <gui_forms/window/presentation/input_settings.hpp>``
+
+   .. cpp:enumerator:: default_value
+
+   .. cpp:enumerator:: host
+
 Functions, constants and aliases
 --------------------------------
 
@@ -967,6 +989,18 @@ Functions, constants and aliases
 .. cpp:var:: constexpr FrameInterval minimum_ui_timer_interval
 
    Value: ``std::chrono::milliseconds(1)``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/window/presentation/input_settings.hpp>``
+
+.. cpp:var:: constexpr std::uint32_t default_double_click_milliseconds
+
+   The double-click interval GUI.Forms states where the host has none, and the longest one admitted (Windows' own limit). Perceptual durations, in milliseconds. Value: ``400U``.
+
+.. cpp:var:: constexpr std::uint32_t maximum_double_click_milliseconds
+
+   Value: ``5000U``.
 
 .. cpp:namespace:: gui_forms
 

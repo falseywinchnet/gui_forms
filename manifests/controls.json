@@ -232,7 +232,7 @@
       "type": "DataGridView",
       "header": "gui_forms/controls/data_grid_view/data_grid_view.hpp",
       "category": "Selection from a list",
-      "purpose": "Grid of text, check box, combo box and button columns over unbound, virtual or BindingSource rows identified by stable row IDs, with cell or row selection kept by ID, in-place editing and only visible rows realized.",
+      "purpose": "Grid of text, check box, combo box, button and image columns over unbound, virtual or BindingSource rows identified by stable row IDs, with cell or row selection kept by ID, in-place editing and only visible rows realized.",
       "winforms": "DataGridView",
       "status": "provisional",
       "gallery_page": "tree-and-object-views",
@@ -1084,6 +1084,28 @@
       "status": "provisional",
       "gallery_page": "dialogs-and-host-services",
       "doc": "api/generated/gui_forms.NotifyIcon.rst"
+    },
+    {
+      "id": "open_file_dialog",
+      "type": "OpenFileDialog",
+      "header": "gui_forms/components/open_file_dialog/open_file_dialog.hpp",
+      "category": "Components",
+      "purpose": "The host's dialog for choosing existing files, with a Windows Forms filter string, multiple selection and a cancellable file_ok, shown modally through HostServices.",
+      "winforms": "OpenFileDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.OpenFileDialog.rst"
+    },
+    {
+      "id": "save_file_dialog",
+      "type": "SaveFileDialog",
+      "header": "gui_forms/components/save_file_dialog/save_file_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "The host's dialog for choosing where to save a file, with a Windows Forms filter string, a default extension, an overwrite prompt and a cancellable file_ok, shown modally through HostServices.",
+      "winforms": "SaveFileDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.SaveFileDialog.rst"
     },
     {
       "id": "image_list",

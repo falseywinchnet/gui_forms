@@ -47,7 +47,13 @@ struct RetainedDrawCache final {
 //   alphas, multiply gives s × (1 − αd) + d × (1 − αs) + s × d, screen
 //   gives s + d − s × d, and both give alpha αs + αd − αs × αd. A theme
 //   rule's `blend` property (blend_property) draws a part through one.
-enum class PaintGroupComposite : std::uint8_t { source_over, plus, multiply, screen };
+// - copy (stage T5): the group's image replaces what lies beneath it within
+//   the group's clipped bounds, transparent pixels included, as Porter-Duff
+//   "source" does; a partly covered edge pixel keeps the rest of what lay
+//   beneath. A window granted a non-opaque backdrop paints its backplane in
+//   a copy group, so that its frame starts clear. Theme data never selects
+//   it.
+enum class PaintGroupComposite : std::uint8_t { source_over, plus, multiply, screen, copy };
 
 // A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that
 // group layer may be needed for"): commands drawn as one image, then

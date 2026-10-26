@@ -5,7 +5,7 @@ To the Holy One, blessed be He, from whom all good things come. We dedicate this
 A retained, WinForms-shaped native C++20 toolkit that paints on the CPU and
 runs the same control tree on macOS, Windows and Linux.
 
-[![CI](https://github.com/falseywinchnet/gui_forms/actions/workflows/native.yml/badge.svg)](https://github.com/falseywinchnet/gui_forms/actions/workflows/native.yml) [![Docs](https://readthedocs.org/projects/gui-forms/badge/?version=latest)](https://gui-forms.readthedocs.io/) [![Release](https://img.shields.io/github/v/release/falseywinchnet/gui_forms?display_name=tag)](https://github.com/falseywinchnet/gui_forms/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
+[![CI](https://github.com/malkuth-software/gui_forms/actions/workflows/native.yml/badge.svg)](https://github.com/malkuth-software/gui_forms/actions/workflows/native.yml) [![Docs](https://readthedocs.org/projects/gui-forms/badge/?version=latest)](https://gui-forms.readthedocs.io/) [![Release](https://img.shields.io/github/v/release/malkuth-software/gui_forms?display_name=tag)](https://github.com/malkuth-software/gui_forms/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
 
 **Status: early public preview. The API is not yet stable. The macOS and
 Windows hosts are native; the Linux X11 host is opt-in. GUI.Forms is CPU-only
@@ -71,7 +71,7 @@ Three demonstration programs are built from `demo/` and
 
 Every push to `main` that passes the build, the tests and a launch of each
 packaged program is published at
-[releases/latest](https://github.com/falseywinchnet/gui_forms/releases/latest):
+[releases/latest](https://github.com/malkuth-software/gui_forms/releases/latest):
 one archive and one installer per program for macOS arm64, Windows x64, Linux
 x64 and Linux arm64, plus `SHA256SUMS.txt`. The `build-<sha>` pre-releases are
 compiler-cache archives for CI, not downloads.
@@ -100,8 +100,8 @@ See [Download](https://gui-forms.readthedocs.io/en/latest/user/download.html) fo
 - Stable IDs on every control, used by logs, semantics, tests and automation.
 - A C ABI seam (`include/gui_forms/c_api.h`) and an installed CMake SDK
   (`GUIForms::Application`).
-- CNG (native resources) and PNG (interchange) are the only image codecs in
-  the core.
+- PNG, through the owned `stx_png` and `stx_zlib`, is the only image codec
+  in the core.
 - No GPU, no .NET, no browser engine.
 
 ## Controls
@@ -129,7 +129,7 @@ Every stock control, grouped by function; the table is generated from
 | [`ChoiceGroup`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ChoiceGroup.html) |  | Row of retained item buttons that selects exactly one ChoiceItem and exposes the selection as a bindable Value. |
 | [`ComboBox`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ComboBox.html) |  | Choice field, noneditable or with an editor (drop_down style), with placeholder projection, keyboard cycling, a transient ListBox popup, and auto-complete from its items or a custom list. |
 | [`CorrespondenceView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.CorrespondenceView.html) |  | Variable-height virtual list with independent keyboard focus, delayed pointer inspection, and one persistent pinned item. |
-| [`DataGridView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.DataGridView.html) |  | Grid of text, check box, combo box and button columns over unbound, virtual or BindingSource rows identified by stable row IDs, with cell or row selection kept by ID, in-place editing and only visible rows realized. |
+| [`DataGridView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.DataGridView.html) |  | Grid of text, check box, combo box, button and image columns over unbound, virtual or BindingSource rows identified by stable row IDs, with cell or row selection kept by ID, in-place editing and only visible rows realized. |
 | [`ListBox`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ListBox.html) |  | Virtual-row selector with single, multi-simple, and multi-extended selection policies, stable item identities, and scroll-window projection. |
 | [`ListView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ListView.html) |  | Item list with details, list, small-icon and large-icon views, check boxes, column headers that report clicks and resize, and a virtual mode that realizes only visible items. |
 | [`ObjectView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ObjectView.html) |  | Stable-ID virtual object collection with icon and details projections that owns no per-item controls. |
@@ -195,6 +195,7 @@ Every stock control, grouped by function; the table is generated from
 | [`AnchoredPopupLayer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.AnchoredPopupLayer.html) | Dialogs and popups | Full-client overlay that owns one retained popup content subtree, re-resolves anchored bounds on resize, and reports click-away and Escape requests. |
 | [`FontDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.FontDialog.html) |  | In-window owned dialog choosing a bundled face by role, a style the face has, and a size, with a preview and Apply, OK and Cancel; returns a FontSpec. |
 | [`RibbonToolTip`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.RibbonToolTip.html) |  | Nonvisual provider of enhanced tooltips on controls and ToolStrip items: title, description, shortcut, image, a disabled command's reason, and an F1 help topic reported as an event. |
+| [`SaveFileDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.SaveFileDialog.html) |  | The host's dialog for choosing where to save a file, with a Windows Forms filter string, a default extension, an overwrite prompt and a cancellable file_ok, shown modally through HostServices. |
 | [`TaskDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.TaskDialog.html) |  | In-window owned message dialog of TaskDialogPage pages: heading, text, icon, standard and custom buttons, radio buttons, a verification check box, an expander, a footnote and a progress bar, with navigation between pages. |
 | [`ThreadExceptionDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ThreadExceptionDialog.html) |  | The dialog for an exception the application did not handle: a TaskDialog preset with the error icon, the message, details behind an expander, and Continue and Quit, returned as cancel and abort. |
 | [`ToolTip`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ToolTip.html) |  | Nonvisual provider that maps Controls to tooltip text and presents a retained, input-transparent overlay owned by each target. |
@@ -215,6 +216,7 @@ Every stock control, grouped by function; the table is generated from
 | [`HelpProvider`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.HelpProvider.html) |  | Policy-free help provider that retains authored metadata and routes F1 and pointer help requests to the consumer. |
 | [`ImageList`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ImageList.html) |  | Ordered, keyed collection of PNG-sourced Window image resources with density and state variants and atomic mutation. |
 | [`NotifyIcon`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.NotifyIcon.html) |  | Icon in the desktop's notification area (Windows tray, macOS status item, X11 system tray) with a tooltip, clicks, a native context menu and notification text, each refused explicitly where the host lacks the capability. |
+| [`OpenFileDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.OpenFileDialog.html) |  | The host's dialog for choosing existing files, with a Windows Forms filter string, multiple selection and a cancellable file_ok, shown modally through HostServices. |
 | [`SemanticFeedback`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.SemanticFeedback.html) |  | Turns one-shot application transitions into bounded, traceable host cues. |
 | [`Timer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.Timer.html) |  | Timer whose callbacks are serialized with input, layout, and paint on the owning Window's UI thread and whose late ticks are coalesced. |
 <!-- controls:end -->

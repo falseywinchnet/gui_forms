@@ -415,6 +415,12 @@ void content_colors(const Control& control) {
             "a part's geometry record carries its content colour");
 }
 
+// A clear plate: one solid fill with no coverage.
+bool clear_fill(const MaterialFillLayer& fill) noexcept {
+    const bool clear = fill.kind == MaterialFillKind::solid && fill.color.alpha == 0U;
+    return clear;
+}
+
 // Every family has a registered name, and the tooltip family has its own
 // recipe (owner decision RB-38) apart from the card it borrowed before.
 void families() {
@@ -434,6 +440,32 @@ void families() {
                 tool_tip.material.corner_radius == 0.0 && tool_tip.text == Color::rgba(24, 31, 38) &&
                 !(tool_tip.material == card.material),
             "the default theme's tooltip family keeps the plain tooltip's face, edge and text");
+
+    // The link families (owner decision W-Q5): clear plates in every state,
+    // the compatibility style's link colour in every enabled state (hover
+    // keeps it) and its disabled text when disabled.
+    require(control_visual_role_name(ControlVisualRole::link) == "link" &&
+                control_visual_role_name(ControlVisualRole::visited_link) == "visited_link",
+            "the link families are registered as link and visited_link");
+    const BasicControlStyle& compatibility = (*theme).basic_style();
+    const ControlVisualRole links[] = {ControlVisualRole::link, ControlVisualRole::visited_link};
+    for (const ControlVisualRole family : links) {
+        const Color expected = family == ControlVisualRole::link ? compatibility.link : compatibility.visited_link;
+        for (std::size_t index = 0; index < control_surface_state_count; ++index) {
+            const ControlSurfaceState state = static_cast<ControlSurfaceState>(index);
+            const Color text = state == ControlSurfaceState::disabled ? compatibility.disabled_text : expected;
+            for (const bool selected : {false, true}) {
+                ControlVisualContext context;
+                context.surface = state;
+                context.selected = selected;
+                const ControlVisualRecipe& recipe = (*theme).resolve(family, context);
+                const bool clear = std::all_of(recipe.material.fills.begin(), recipe.material.fills.end(),
+                                               &clear_fill) &&
+                                   (!recipe.material.border || (*recipe.material.border).color.alpha == 0U);
+                require(recipe.text == text && clear, "a link family draws only its text, in the link's colour");
+            }
+        }
+    }
 }
 
 } // namespace

@@ -11,6 +11,7 @@
 #include "gui_forms/engine/part_shape/part_shape.hpp"
 #include "gui_forms/surface_material/painting/surface_material_painting.hpp"
 #include "gui_forms/surface_material/presets/material_presets.hpp"
+#include "gui_forms/theme/types/theme_types.hpp"
 
 #include <algorithm>
 #include <array>
@@ -35,9 +36,15 @@ namespace {
 
 // -- the descriptor ----------------------------------------------------------------
 
-constexpr std::array<std::string_view, 12> recipe_names{
-    "window", "panel", "card", "button", "accent_button", "command_button",
-    "choice", "editor", "menu_item", "selection", "progress", "tool_tip"};
+// The recipe roles in ControlVisualRole's order, then `family`: the recipe
+// of the part's own family (PartPaint::family, T3 EC1), so that a theme's
+// material fields on any part keep that part's recipe as their floor.
+constexpr std::array<std::string_view, 15> recipe_names{
+    "window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor",
+    "menu_item", "selection", "progress", "tool_tip", "link", "visited_link", "family"};
+constexpr double family_recipe = 14.0;
+static_assert(recipe_names.size() == static_cast<std::size_t>(ControlVisualRole::count) + 1U,
+              "one choice per recipe role, then the family's");
 
 const PartRole material_roles[] = {PartRole::region, PartRole::face,  PartRole::actuator, PartRole::well,
                                    PartRole::track,  PartRole::thumb, PartRole::chip};
@@ -55,10 +62,11 @@ enum MaterialParameter : std::size_t {
     material_parameter_count,
 };
 
-// The default recipe is the button's (position 3). The shape (E9.6) is the
-// box's outline; a rounded rectangle takes its radii from the material.
+// The default recipe is the part's family's (EC1; the button's, position 3,
+// before engine 0.3). The shape (E9.6) is the box's outline; a rounded
+// rectangle takes its radii from the material.
 const PrimitiveParameterDeclaration material_parameters[] = {
-    {"recipe", PrimitiveParameterKind::choice, 0.0, 0.0, 3.0, {}, false, recipe_names},
+    {"recipe", PrimitiveParameterKind::choice, 0.0, 0.0, family_recipe, {}, false, recipe_names},
     {"shape", PrimitiveParameterKind::choice, 0.0, 0.0, 0.0, {}, false, part_shape_names},
 };
 static_assert(std::size(material_parameters) == material_parameter_count, "one declaration per material parameter");
@@ -1716,9 +1724,10 @@ const PrimitiveDescriptor& MaterialPrimitive::descriptor() const noexcept {
     return material_descriptor;
 }
 
-std::optional<ControlVisualRole> MaterialPrimitive::theme_material(
-    const PrimitiveParameterBlock& parameters) const noexcept {
+std::optional<ControlVisualRole> MaterialPrimitive::theme_material(const PrimitiveParameterBlock& parameters,
+                                                                   ControlVisualRole family) const noexcept {
     const double position = parameters.values[material_recipe].number;
+    if (position == family_recipe) return family;
     const ControlVisualRole role = static_cast<ControlVisualRole>(static_cast<std::uint8_t>(position));
     return role;
 }
