@@ -151,6 +151,8 @@ std::uint64_t composite_backplane_chunk(const DisplayChunk& chunk, Point origin,
                              state.opacity * command.scalar, region, image);
             break;
         default:
+            // The backplane composites part rasters only: any other drawing
+            // (fills, strokes, text, images) is counted as skipped.
             skipped = skipped + 1U;
             break;
         }
