@@ -1691,6 +1691,71 @@ void example() {
 }
 }  // namespace doc_example_GalleryCommand_1
 
+namespace doc_example_GridLayoutPanel_1 {
+void example() {
+    std::shared_ptr<gf::GridLayoutPanel> form =
+        gf::make_control<gf::GridLayoutPanel>(gf::StableId("form"));
+    gf::GridTrackSize fixed{};
+    fixed.minimum.kind = gf::TrackBreadthKind::length_percentage;
+    fixed.minimum.length = gf::LengthPercentage{gf::LogicalLength{80.0}, 0.0};
+    fixed.maximum = fixed.minimum;
+    gf::GridTrackSize flexible{};
+    flexible.maximum.kind = gf::TrackBreadthKind::fraction;
+    flexible.maximum.fraction = gf::FractionFactor{1.0};
+    gf::GridTrackList columns{};
+    columns.tracks = {fixed, flexible};
+    (*form).set_template_columns(columns);
+    (*form).set_column_gap(gf::LengthPercentage{gf::LogicalLength{10.0}, 0.0});
+    (*form).set_row_gap(gf::LengthPercentage{gf::LogicalLength{5.0}, 0.0});
+    std::vector<std::shared_ptr<gf::Button>> buttons;
+    for (int index = 0; index < 4; ++index) {
+        std::shared_ptr<gf::Button> button = gf::make_control<gf::Button>(
+            gf::StableId("form.button" + std::to_string(index)), "Button");
+        (*button).set_requested_bounds({0.0, 0.0, 10.0, 20.0});
+        (*button).set_margin({});
+        (*form).add_child(button);
+        buttons.push_back(button);
+    }
+
+    gf::Window window(form, {200.0, 45.0});
+    window.perform_layout();
+    // buttons 0 and 2 are 80 wide at x 0, buttons 1 and 3 110 wide at x 90;
+    // the rows are 20 high at y 0 and y 25
+}
+}  // namespace doc_example_GridLayoutPanel_1
+
+namespace doc_example_GridLayoutPanel_2 {
+void example() {
+    std::shared_ptr<gf::GridLayoutPanel> cards =
+        gf::make_control<gf::GridLayoutPanel>(gf::StableId("cards"));
+    gf::GridTrackSize card{};
+    card.minimum.kind = gf::TrackBreadthKind::length_percentage;
+    card.minimum.length = gf::LengthPercentage{gf::LogicalLength{100.0}, 0.0};
+    card.maximum.kind = gf::TrackBreadthKind::fraction;
+    card.maximum.fraction = gf::FractionFactor{1.0};
+    gf::GridTrackList columns{};
+    columns.auto_repeat = gf::AutoRepeatKind::auto_fill;
+    columns.auto_repeat_tracks = {card};
+    (*cards).set_template_columns(columns);
+    (*cards).set_column_gap(gf::LengthPercentage{gf::LogicalLength{15.0}, 0.0});
+    (*cards).set_row_gap(gf::LengthPercentage{gf::LogicalLength{10.0}, 0.0});
+    std::vector<std::shared_ptr<gf::Button>> buttons;
+    for (int index = 0; index < 5; ++index) {
+        std::shared_ptr<gf::Button> button = gf::make_control<gf::Button>(
+            gf::StableId("cards.button" + std::to_string(index)), "Card");
+        (*button).set_requested_bounds({0.0, 0.0, 10.0, 20.0});
+        (*button).set_margin({});
+        (*cards).add_child(button);
+        buttons.push_back(button);
+    }
+
+    gf::Window window(cards, {330.0, 50.0});
+    window.perform_layout();
+    // three 100-wide columns at x 0, 115 and 230; buttons 0 to 2 in the
+    // first row at y 0, buttons 3 and 4 in the second at y 30
+}
+}  // namespace doc_example_GridLayoutPanel_2
+
 namespace doc_example_GroupBox_1 {
 void example() {
     std::shared_ptr<gf::GroupBox> mode =
@@ -4106,6 +4171,8 @@ int main() {
     failures += run("FontCommand example 1", &doc_example_FontCommand_1::example);
     failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
     failures += run("GalleryCommand example 1", &doc_example_GalleryCommand_1::example);
+    failures += run("GridLayoutPanel example 1", &doc_example_GridLayoutPanel_1::example);
+    failures += run("GridLayoutPanel example 2", &doc_example_GridLayoutPanel_2::example);
     failures += run("GroupBox example 1", &doc_example_GroupBox_1::example);
     failures += run("GroupBox example 2", &doc_example_GroupBox_2::example);
     failures += run("HScrollBar example 1", &doc_example_HScrollBar_1::example);

@@ -42,10 +42,44 @@ void test_css_layout_panels(gui_forms::Window& window) {
     require(flex_group && (*flex_group).arranged_bounds().y + (*flex_group).arranged_bounds().height <= 660.0,
             "the flex group must fit the page body");
 
+    // The named areas: the head and foot span both columns, the main area
+    // follows the fixed 90 px side column and its gap.
+    const std::shared_ptr<GridLayoutPanel> areas =
+        std::dynamic_pointer_cast<GridLayoutPanel>(window.find("gallery.css-layout.grid.areas"));
+    const Control::Ptr head = window.find("gallery.css-layout.grid.areas.head");
+    const Control::Ptr main = window.find("gallery.css-layout.grid.areas.main");
+    const Control::Ptr foot = window.find("gallery.css-layout.grid.areas.foot");
+    require(areas && head && main && foot, "the page must retain its named-area GridLayoutPanel");
+    const Rect area_bounds = (*areas).arranged_bounds();
+    const Rect foot_bounds = (*foot).arranged_bounds();
+    require(std::abs((*head).arranged_bounds().width - area_bounds.width) < 1.0e-6 &&
+                std::abs(foot_bounds.width - area_bounds.width) < 1.0e-6 &&
+                std::abs((*main).arranged_bounds().x - 96.0) < 1.0e-6 &&
+                std::abs(foot_bounds.y + foot_bounds.height - area_bounds.height) < 1.0e-6,
+            "named areas must span their columns and the fraction row must fill the height");
+
+    // The cards: five minmax(86px, 1fr) columns fit 476 px; the spanning
+    // card covers two of them and the gap between.
+    const std::shared_ptr<GridLayoutPanel> cards =
+        std::dynamic_pointer_cast<GridLayoutPanel>(window.find("gallery.css-layout.grid.cards"));
+    const Control::Ptr first_card = window.find("gallery.css-layout.grid.cards.item.0");
+    const Control::Ptr spanning = window.find("gallery.css-layout.grid.cards.item.1");
+    require(cards && first_card && spanning && (*cards).layout_snapshot().columns().size() == 5U,
+            "five auto-fill card columns must fit the specimen");
+    const double card_width = (*first_card).arranged_bounds().width;
+    require(card_width >= 86.0 && std::abs((*spanning).arranged_bounds().width - (2.0 * card_width + 6.0)) < 1.0e-6,
+            "the spanning card must cover two columns and their gap");
+
+    const Control::Ptr grid_group = window.find("gallery.css-layout.grid.group");
+    require(grid_group && (*grid_group).arranged_bounds().y + (*grid_group).arranged_bounds().height <= 660.0,
+            "the grid group must fit the page body");
+
     const std::string semantics = window.semantic_snapshot().to_json();
     require(semantics.find("Growing flex row") != std::string::npos &&
-                semantics.find("Centred flex column") != std::string::npos,
-            "the flex specimens must publish their named group semantics");
+                semantics.find("Centred flex column") != std::string::npos &&
+                semantics.find("Named grid areas") != std::string::npos &&
+                semantics.find("Auto-fill grid cards") != std::string::npos,
+            "the flex and grid specimens must publish their named group semantics");
 }
 
 } // namespace gallery_pages_tests

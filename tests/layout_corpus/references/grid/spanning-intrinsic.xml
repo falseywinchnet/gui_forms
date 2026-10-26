@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<layout-reference fixture="grid/spanning-intrinsic" chromium="155.0.8059.39" platform="win64">
+  <profile viewport="320x240" scale="1">
+    <node id="root" x="0" y="0" width="320" height="240"/>
+    <node id="one" x="0" y="0" width="100" height="30"/>
+    <node id="one-0" x="0" y="0" width="50" height="20"/>
+    <node id="two" x="100" y="0" width="80" height="30"/>
+    <node id="two-0" x="100" y="0" width="30" height="20"/>
+    <node id="three" x="180" y="0" width="140" height="30"/>
+    <node id="span" x="0" y="30" width="180" height="30"/>
+    <node id="span-0" x="0" y="30" width="100" height="20"/>
+    <node id="span-1" x="100" y="30" width="80" height="20"/>
+  </profile>
+  <profile viewport="800x600" scale="1">
+    <node id="root" x="0" y="0" width="800" height="600"/>
+    <node id="one" x="0" y="0" width="100" height="30"/>
+    <node id="one-0" x="0" y="0" width="50" height="20"/>
+    <node id="two" x="100" y="0" width="80" height="30"/>
+    <node id="two-0" x="100" y="0" width="30" height="20"/>
+    <node id="three" x="180" y="0" width="620" height="30"/>
+    <node id="span" x="0" y="30" width="180" height="30"/>
+    <node id="span-0" x="0" y="30" width="100" height="20"/>
+    <node id="span-1" x="100" y="30" width="80" height="20"/>
+  </profile>
+  <profile viewport="1280x800" scale="1">
+    <node id="root" x="0" y="0" width="1280" height="800"/>
+    <node id="one" x="0" y="0" width="100" height="30"/>
+    <node id="one-0" x="0" y="0" width="50" height="20"/>
+    <node id="two" x="100" y="0" width="80" height="30"/>
+    <node id="two-0" x="100" y="0" width="30" height="20"/>
+    <node id="three" x="180" y="0" width="1100" height="30"/>
+    <node id="span" x="0" y="30" width="180" height="30"/>
+    <node id="span-0" x="0" y="30" width="100" height="20"/>
+    <node id="span-1" x="100" y="30" width="80" height="20"/>
+  </profile>
+  <profile viewport="1440x900" scale="1">
+    <node id="root" x="0" y="0" width="1440" height="900"/>
+    <node id="one" x="0" y="0" width="100" height="30"/>
+    <node id="one-0" x="0" y="0" width="50" height="20"/>
+    <node id="two" x="100" y="0" width="80" height="30"/>
+    <node id="two-0" x="100" y="0" width="30" height="20"/>
+    <node id="three" x="180" y="0" width="1260" height="30"/>
+    <node id="span" x="0" y="30" width="180" height="30"/>
+    <node id="span-0" x="0" y="30" width="100" height="20"/>
+    <node id="span-1" x="100" y="30" width="80" height="20"/>
+  </profile>
+  <profile viewport="320x240" scale="2">
+    <node id="root" x="0" y="0" width="320" height="240"/>
+    <node id="one" x="0" y="0" width="100" height="30"/>
+    <node id="one-0" x="0" y="0" width="50" height="20"/>
+    <node id="two" x="100" y="0" width="80" height="30"/>
+    <node id="two-0" x="100" y="0" width="30" height="20"/>
+    <node id="three" x="180" y="0" width="140" height="30"/>
+    <node id="span" x="0" y="30" width="180" height="30"/>
+    <node id="span-0" x="0" y="30" width="100" height="20"/>
+    <node id="span-1" x="100" y="30" width="80" height="20"/>
+  </profile>
+  <profile viewport="800x600" scale="2">
+    <node id="root" x="0" y="0" width="800" height="600"/>
+    <node id="one" x="0" y="0" width="100" height="30"/>
+    <node id="one-0" x="0" y="0" width="50" height="20"/>
+    <node id="two" x="100" y="0" width="80" height="30"/>
+    <node id="two-0" x="100" y="0" width="30" height="20"/>
+    <node id="three" x="180" y="0" width="620" height="30"/>
+    <node id="span" x="0" y="30" width="180" height="30"/>
+    <node id="span-0" x="0" y="30" width="100" height="20"/>
+    <node id="span-1" x="100" y="30" width="80" height="20"/>
+  </profile>
+  <profile viewport="1280x800" scale="2">
+    <node id="root" x="0" y="0" width="1280" height="800"/>
+    <node id="one" x="0" y="0" width="100" height="30"/>
+    <node id="one-0" x="0" y="0" width="50" height="20"/>
+    <node id="two" x="100" y="0" width="80" height="30"/>
+    <node id="two-0" x="100" y="0" width="30" height="20"/>
+    <node id="three" x="180" y="0" width="1100" height="30"/>
+    <node id="span" x="0" y="30" width="180" height="30"/>
+    <node id="span-0" x="0" y="30" width="100" height="20"/>
+    <node id="span-1" x="100" y="30" width="80" height="20"/>
+  </profile>
+  <profile viewport="1440x900" scale="2">
+    <node id="root" x="0" y="0" width="1440" height="900"/>
+    <node id="one" x="0" y="0" width="100" height="30"/>
+    <node id="one-0" x="0" y="0" width="50" height="20"/>
+    <node id="two" x="100" y="0" width="80" height="30"/>
+    <node id="two-0" x="100" y="0" width="30" height="20"/>
+    <node id="three" x="180" y="0" width="1260" height="30"/>
+    <node id="span" x="0" y="30" width="180" height="30"/>
+    <node id="span-0" x="0" y="30" width="100" height="20"/>
+    <node id="span-1" x="100" y="30" width="80" height="20"/>
+  </profile>
+</layout-reference>

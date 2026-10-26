@@ -1877,6 +1877,32 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `auto_validate_changed` | `AutoValidate` |
 
+## `grid_layout_panel` (GridLayoutPanel, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `viewport` | region |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `scroll` | `ScrollEvent`, by reference |
+| `auto_validate_changed` | `AutoValidate` |
+
 ## `table_layout_panel` (TableLayoutPanel, control)
 
 | Part | Role | Reuses | Own states |

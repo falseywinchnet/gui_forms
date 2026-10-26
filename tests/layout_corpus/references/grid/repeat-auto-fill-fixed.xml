@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<layout-reference fixture="grid/repeat-auto-fill-fixed" chromium="155.0.8059.39" platform="win64">
+  <profile viewport="320x240" scale="1">
+    <node id="root" x="0" y="0" width="320" height="240"/>
+    <node id="item-0" x="0" y="0" width="100" height="24"/>
+    <node id="item-1" x="105" y="0" width="100" height="24"/>
+    <node id="item-2" x="210" y="0" width="100" height="24"/>
+    <node id="item-3" x="0" y="24" width="100" height="24"/>
+    <node id="item-4" x="105" y="24" width="100" height="24"/>
+    <node id="item-5" x="210" y="24" width="100" height="24"/>
+    <node id="item-6" x="0" y="48" width="100" height="24"/>
+  </profile>
+  <profile viewport="800x600" scale="1">
+    <node id="root" x="0" y="0" width="800" height="600"/>
+    <node id="item-0" x="0" y="0" width="100" height="24"/>
+    <node id="item-1" x="105" y="0" width="100" height="24"/>
+    <node id="item-2" x="210" y="0" width="100" height="24"/>
+    <node id="item-3" x="315" y="0" width="100" height="24"/>
+    <node id="item-4" x="420" y="0" width="100" height="24"/>
+    <node id="item-5" x="525" y="0" width="100" height="24"/>
+    <node id="item-6" x="630" y="0" width="100" height="24"/>
+  </profile>
+  <profile viewport="1280x800" scale="1">
+    <node id="root" x="0" y="0" width="1280" height="800"/>
+    <node id="item-0" x="0" y="0" width="100" height="24"/>
+    <node id="item-1" x="105" y="0" width="100" height="24"/>
+    <node id="item-2" x="210" y="0" width="100" height="24"/>
+    <node id="item-3" x="315" y="0" width="100" height="24"/>
+    <node id="item-4" x="420" y="0" width="100" height="24"/>
+    <node id="item-5" x="525" y="0" width="100" height="24"/>
+    <node id="item-6" x="630" y="0" width="100" height="24"/>
+  </profile>
+  <profile viewport="1440x900" scale="1">
+    <node id="root" x="0" y="0" width="1440" height="900"/>
+    <node id="item-0" x="0" y="0" width="100" height="24"/>
+    <node id="item-1" x="105" y="0" width="100" height="24"/>
+    <node id="item-2" x="210" y="0" width="100" height="24"/>
+    <node id="item-3" x="315" y="0" width="100" height="24"/>
+    <node id="item-4" x="420" y="0" width="100" height="24"/>
+    <node id="item-5" x="525" y="0" width="100" height="24"/>
+    <node id="item-6" x="630" y="0" width="100" height="24"/>
+  </profile>
+  <profile viewport="320x240" scale="2">
+    <node id="root" x="0" y="0" width="320" height="240"/>
+    <node id="item-0" x="0" y="0" width="100" height="24"/>
+    <node id="item-1" x="105" y="0" width="100" height="24"/>
+    <node id="item-2" x="210" y="0" width="100" height="24"/>
+    <node id="item-3" x="0" y="24" width="100" height="24"/>
+    <node id="item-4" x="105" y="24" width="100" height="24"/>
+    <node id="item-5" x="210" y="24" width="100" height="24"/>
+    <node id="item-6" x="0" y="48" width="100" height="24"/>
+  </profile>
+  <profile viewport="800x600" scale="2">
+    <node id="root" x="0" y="0" width="800" height="600"/>
+    <node id="item-0" x="0" y="0" width="100" height="24"/>
+    <node id="item-1" x="105" y="0" width="100" height="24"/>
+    <node id="item-2" x="210" y="0" width="100" height="24"/>
+    <node id="item-3" x="315" y="0" width="100" height="24"/>
+    <node id="item-4" x="420" y="0" width="100" height="24"/>
+    <node id="item-5" x="525" y="0" width="100" height="24"/>
+    <node id="item-6" x="630" y="0" width="100" height="24"/>
+  </profile>
+  <profile viewport="1280x800" scale="2">
+    <node id="root" x="0" y="0" width="1280" height="800"/>
+    <node id="item-0" x="0" y="0" width="100" height="24"/>
+    <node id="item-1" x="105" y="0" width="100" height="24"/>
+    <node id="item-2" x="210" y="0" width="100" height="24"/>
+    <node id="item-3" x="315" y="0" width="100" height="24"/>
+    <node id="item-4" x="420" y="0" width="100" height="24"/>
+    <node id="item-5" x="525" y="0" width="100" height="24"/>
+    <node id="item-6" x="630" y="0" width="100" height="24"/>
+  </profile>
+  <profile viewport="1440x900" scale="2">
+    <node id="root" x="0" y="0" width="1440" height="900"/>
+    <node id="item-0" x="0" y="0" width="100" height="24"/>
+    <node id="item-1" x="105" y="0" width="100" height="24"/>
+    <node id="item-2" x="210" y="0" width="100" height="24"/>
+    <node id="item-3" x="315" y="0" width="100" height="24"/>
+    <node id="item-4" x="420" y="0" width="100" height="24"/>
+    <node id="item-5" x="525" y="0" width="100" height="24"/>
+    <node id="item-6" x="630" y="0" width="100" height="24"/>
+  </profile>
+</layout-reference>

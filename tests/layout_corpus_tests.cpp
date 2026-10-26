@@ -17,10 +17,11 @@
 //
 // The flow and table fixtures go through a deliberately small style reader
 // that admits only the declarations the Windows Forms containers can
-// express. Flex fixtures (phase L3) are read whole by the layout value
-// reader of phase L2: a container's declarations become FlexLayoutPanel
-// properties, an item's its FlexItemLayout, and every other declaration is
-// refused by name.
+// express. Flex and grid fixtures (phases L3 and L4) are read whole by the
+// layout value reader of phase L2: a container's declarations become
+// FlexLayoutPanel or GridLayoutPanel properties, an item's its
+// FlexItemLayout or GridItemLayout, and every other declaration is refused
+// by name.
 
 #include "../src/core/layout/style_reader/layout_style_reader.hpp"
 
@@ -319,6 +320,7 @@ enum class FixtureKind : std::uint8_t {
     flow_layout_panel,
     table_layout_panel,
     flex_layout_panel,
+    grid_layout_panel,
 };
 
 FixtureKind parse_kind(const std::string& kind, const std::string& where) {
@@ -326,6 +328,7 @@ FixtureKind parse_kind(const std::string& kind, const std::string& where) {
     if (kind == "flow-layout-panel") return FixtureKind::flow_layout_panel;
     if (kind == "table-layout-panel") return FixtureKind::table_layout_panel;
     if (kind == "flex-layout-panel") return FixtureKind::flex_layout_panel;
+    if (kind == "grid-layout-panel") return FixtureKind::grid_layout_panel;
     fault(where, "data-gf-kind \"" + kind + "\" is not built by the corpus harness yet");
 }
 
@@ -427,7 +430,22 @@ struct ChildLayout final {
     bool explicit_height{};
     // Flex children: the whole item record.
     FlexItemLayout flex_item;
+    // Grid children: the whole item record.
+    GridItemLayout grid_item;
 };
+
+// What the layout value reader may set on one element: the container and
+// item properties of its own kind and its parent's.
+struct ReaderRoles final {
+    bool flex_container{};
+    bool grid_container{};
+    bool flex_item{};
+    bool grid_item{};
+};
+
+bool reader_kind(FixtureKind kind) {
+    return kind == FixtureKind::flex_layout_panel || kind == FixtureKind::grid_layout_panel;
+}
 
 struct ContainerDefaults final {
     CellAlignment justify_items{CellAlignment::stretch};
@@ -503,14 +521,13 @@ private:
         identities_.push_back(BuiltIdentity{*identity, built.control});
 
         const std::string* style_text = attribute(element, "style");
-        const bool flex_context = kind == FixtureKind::flex_layout_panel ||
-                                  parent_kind == FixtureKind::flex_layout_panel;
-        if (flex_context) {
-            apply_flex_style(control, kind, parent_kind, style_text, built.layout, where);
+        const bool reader_context = reader_kind(kind) || (parent_kind && reader_kind(*parent_kind));
+        if (reader_context) {
+            apply_reader_style(control, kind, parent_kind, style_text, built.layout, where);
         }
         const std::vector<StyleDeclaration> declarations =
-            style_text == nullptr || flex_context ? std::vector<StyleDeclaration>{}
-                                                  : read_style(*style_text, where);
+            style_text == nullptr || reader_context ? std::vector<StyleDeclaration>{}
+                                                    : read_style(*style_text, where);
         ContainerDefaults defaults;
         std::vector<TableLayoutStyle> columns;
         std::vector<TableLayoutStyle> rows;
@@ -557,15 +574,23 @@ private:
                 static_cast<FlexLayoutPanel&>(control).set_item_layout(*child.control,
                                                                        child.layout.flex_item);
             }
+            if (kind == FixtureKind::grid_layout_panel) {
+                try {
+                    static_cast<GridLayoutPanel&>(control).set_item_layout(*child.control,
+                                                                           child.layout.grid_item);
+                } catch (const std::invalid_argument& error) {
+                    fault(where, std::string("GridLayoutPanel refused an item layout: ") + error.what());
+                }
+            }
         }
         return built;
     }
 
-    // A flex container's or flex item's whole inline style, through the
-    // layout value reader. On a fault the fixture is abandoned, so the
-    // partly configured control is never laid out.
-    void apply_flex_style(Control& control, FixtureKind kind, std::optional<FixtureKind> parent_kind,
-                          const std::string* style_text, ChildLayout& child, const std::string& where) {
+    // A flex or grid container's, or a flex or grid item's, whole inline
+    // style through the layout value reader. On a fault the fixture is
+    // abandoned, so the partly configured control is never laid out.
+    void apply_reader_style(Control& control, FixtureKind kind, std::optional<FixtureKind> parent_kind,
+                            const std::string* style_text, ChildLayout& child, const std::string& where) {
         LayoutStyle base{};
         base.display = DisplayKind::block;
         LayoutStyle style = base;
@@ -588,19 +613,24 @@ private:
                 fault(where, "the layout value reader reported" + reported);
             }
         }
-        const bool container = kind == FixtureKind::flex_layout_panel;
-        const bool item = parent_kind == FixtureKind::flex_layout_panel;
-        refuse_unbuilt_flex_values(style, base, container, item, where);
+        ReaderRoles roles{};
+        roles.flex_container = kind == FixtureKind::flex_layout_panel;
+        roles.grid_container = kind == FixtureKind::grid_layout_panel;
+        roles.flex_item = parent_kind == FixtureKind::flex_layout_panel;
+        roles.grid_item = parent_kind == FixtureKind::grid_layout_panel;
+        refuse_unbuilt_values(style, base, roles, where);
 
-        // Margins: a length, or `auto` on a flex item's side.
+        // Margins: a length, or `auto` on an item's side.
         const BoxSides<AutoLengthPercentage>& margin = style.margin;
-        child.flex_item.auto_margin = BoxSides<bool>{margin.top.automatic, margin.right.automatic,
-                                                     margin.bottom.automatic, margin.left.automatic};
+        const BoxSides<bool> automatic{margin.top.automatic, margin.right.automatic, margin.bottom.automatic,
+                                       margin.left.automatic};
+        child.flex_item.auto_margin = automatic;
+        child.grid_item.auto_margin = automatic;
         Insets margins{};
-        margins.left = flex_margin_length(margin.left, where);
-        margins.top = flex_margin_length(margin.top, where);
-        margins.right = flex_margin_length(margin.right, where);
-        margins.bottom = flex_margin_length(margin.bottom, where);
+        margins.left = margin_length(margin.left, where);
+        margins.top = margin_length(margin.top, where);
+        margins.right = margin_length(margin.right, where);
+        margins.bottom = margin_length(margin.bottom, where);
         control.set_margin(margins);
         const BoxSides<LengthPercentage>& padding = style.padding;
         if (padding.top.percent != 0.0 || padding.right.percent != 0.0 || padding.bottom.percent != 0.0 ||
@@ -614,7 +644,7 @@ private:
         paddings.bottom = padding.bottom.length.value();
         control.set_padding(paddings);
 
-        if (container) {
+        if (roles.flex_container) {
             FlexLayoutPanel& panel = static_cast<FlexLayoutPanel&>(control);
             panel.set_flex_direction(style.flex.direction);
             panel.set_flex_wrap(style.flex.wrap);
@@ -624,7 +654,10 @@ private:
             panel.set_row_gap(style.row_gap);
             panel.set_column_gap(style.column_gap);
         }
-        if (item) {
+        if (roles.grid_container) {
+            configure_grid(static_cast<GridLayoutPanel&>(control), style, where);
+        }
+        if (roles.flex_item) {
             FlexItemLayout& layout = child.flex_item;
             layout.flex = style.flex_item;
             layout.align_self = style.alignment.align_self;
@@ -635,55 +668,102 @@ private:
             layout.max_width = style.max_width;
             layout.max_height = style.max_height;
         }
+        if (roles.grid_item) {
+            GridItemLayout& layout = child.grid_item;
+            layout.placement = style.grid_item;
+            layout.justify_self = style.alignment.justify_self;
+            layout.align_self = style.alignment.align_self;
+            layout.width = style.width;
+            layout.height = style.height;
+            layout.min_width = style.min_width;
+            layout.min_height = style.min_height;
+            layout.max_width = style.max_width;
+            layout.max_height = style.max_height;
+        }
     }
 
-    static double flex_margin_length(const AutoLengthPercentage& side, const std::string& where) {
+    // A grid container's properties; a value the panel refuses abandons
+    // the fixture.
+    static void configure_grid(GridLayoutPanel& panel, const LayoutStyle& style, const std::string& where) {
+        try {
+            panel.set_template_columns(style.grid.template_columns);
+            panel.set_template_rows(style.grid.template_rows);
+            panel.set_template_areas(style.grid.template_areas);
+            panel.set_auto_flow(style.grid.auto_flow);
+            panel.set_auto_columns(style.grid.auto_columns);
+            panel.set_auto_rows(style.grid.auto_rows);
+            panel.set_justify_content(style.alignment.justify_content);
+            panel.set_align_content(style.alignment.align_content);
+            panel.set_justify_items(style.alignment.justify_items);
+            panel.set_align_items(style.alignment.align_items);
+            panel.set_row_gap(style.row_gap);
+            panel.set_column_gap(style.column_gap);
+        } catch (const std::invalid_argument& error) {
+            fault(where, std::string("GridLayoutPanel refused a container value: ") + error.what());
+        }
+    }
+
+    static double margin_length(const AutoLengthPercentage& side, const std::string& where) {
         if (side.automatic) return 0.0;
         if (side.value.percent != 0.0) fault(where, "a percentage margin is not built by the corpus harness yet");
         return side.value.length.value();
     }
 
-    // The values a flex fixture may not use: those of another layout, and
-    // item or container values on an element that is not one.
-    static void refuse_unbuilt_flex_values(const LayoutStyle& style, const LayoutStyle& base, bool container,
-                                           bool item, const std::string& where) {
+    // The values a flex or grid fixture may not use: those of a layout not
+    // built yet, and container or item values on an element that is not
+    // one.
+    static void refuse_unbuilt_values(const LayoutStyle& style, const LayoutStyle& base, const ReaderRoles& roles,
+                                      const std::string& where) {
         if (style.position != base.position || !(style.inset == base.inset)) {
             fault(where, "positioning belongs to phase L5");
-        }
-        if (!(style.grid == base.grid) || !(style.grid_item == base.grid_item) ||
-            style.alignment.justify_items != base.alignment.justify_items ||
-            style.alignment.justify_self != base.alignment.justify_self) {
-            fault(where, "grid values belong to phase L4");
         }
         if (style.text_align != base.text_align || style.vertical_align != base.vertical_align) {
             fault(where, "inline values belong to phase L5");
         }
-        if (container && style.display != DisplayKind::flex) {
+        const bool container = roles.flex_container || roles.grid_container;
+        const bool item = roles.flex_item || roles.grid_item;
+        if (roles.flex_container && style.display != DisplayKind::flex) {
             fault(where, "a flex-layout-panel is display: flex");
         }
-        if (!container && style.display != DisplayKind::block) {
-            fault(where, "only a flex-layout-panel changes display");
+        if (roles.grid_container && style.display != DisplayKind::grid) {
+            fault(where, "a grid-layout-panel is display: grid");
         }
-        const bool container_values = !(style.flex == base.flex) || !(style.row_gap == base.row_gap) ||
-                                      !(style.column_gap == base.column_gap) ||
+        if (!container && style.display != DisplayKind::block) {
+            fault(where, "only a flex-layout-panel or a grid-layout-panel changes display");
+        }
+        if (!roles.flex_container && !(style.flex == base.flex)) {
+            fault(where, "flex container values on an element that is not one");
+        }
+        const bool grid_values = !(style.grid == base.grid) ||
+                                 style.alignment.justify_items != base.alignment.justify_items;
+        if (!roles.grid_container && grid_values) {
+            fault(where, "grid container values on an element that is not one");
+        }
+        const bool container_values = !(style.row_gap == base.row_gap) || !(style.column_gap == base.column_gap) ||
                                       style.alignment.justify_content != base.alignment.justify_content ||
                                       style.alignment.align_content != base.alignment.align_content ||
                                       style.alignment.align_items != base.alignment.align_items;
         if (!container && container_values) {
-            fault(where, "flex container values on an element that is not one");
+            fault(where, "container values on an element that is not a container");
         }
         const bool sized = !(style.width == base.width) || !(style.height == base.height) ||
                            !(style.min_width == base.min_width) || !(style.min_height == base.min_height) ||
                            !(style.max_width == base.max_width) || !(style.max_height == base.max_height);
-        const bool item_values = sized || !(style.flex_item == base.flex_item) ||
-                                 style.alignment.align_self != base.alignment.align_self;
-        if (!item && item_values) {
-            fault(where, "flex item values on an element that is not one (the root fills the window)");
+        if (!item && (sized || style.alignment.align_self != base.alignment.align_self)) {
+            fault(where, "item values on an element that is not an item (the root fills the window)");
+        }
+        if (!roles.flex_item && !(style.flex_item == base.flex_item)) {
+            fault(where, "flex item values on an element that is not one");
+        }
+        const bool grid_item_values = !(style.grid_item == base.grid_item) ||
+                                      style.alignment.justify_self != base.alignment.justify_self;
+        if (!roles.grid_item && grid_item_values) {
+            fault(where, "grid item values on an element that is not one");
         }
         const BoxSides<AutoLengthPercentage>& margin = style.margin;
         const bool automatic_margin =
             margin.top.automatic || margin.right.automatic || margin.bottom.automatic || margin.left.automatic;
-        if (!item && automatic_margin) fault(where, "an auto margin outside a flex container");
+        if (!item && automatic_margin) fault(where, "an auto margin outside a flex or grid container");
     }
 
     static Control::Ptr make_kind(FixtureKind kind, const std::string& identity) {
@@ -696,6 +776,8 @@ private:
             return make_control<TableLayoutPanel>(StableId(identity));
         case FixtureKind::flex_layout_panel:
             return make_control<FlexLayoutPanel>(StableId(identity));
+        case FixtureKind::grid_layout_panel:
+            return make_control<GridLayoutPanel>(StableId(identity));
         }
         throw std::logic_error("unknown fixture kind");
     }
@@ -936,7 +1018,7 @@ private:
 
     std::string fixture_name_;
     std::vector<BuiltIdentity> identities_;
-    // Reused for every flex element of the fixture.
+    // Reused for every flex and grid element of the fixture.
     gui_forms::layout_style::LayoutStyleReader style_reader_;
     gui_forms::theme_language::ThemeDiagnosticList diagnostics_;
 };

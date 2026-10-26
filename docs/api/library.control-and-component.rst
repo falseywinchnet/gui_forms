@@ -86,16 +86,38 @@ Related types
      - One margin as the solver reads it: a resolved length, or ``auto``.
    * - :cpp:class:`FractionFactor <gui_forms::FractionFactor>`
      -  
+   * - :cpp:class:`GridAvailableExtent <gui_forms::GridAvailableExtent>`
+     -  
+   * - :cpp:class:`GridContainerInput <gui_forms::GridContainerInput>`
+     -  
    * - :cpp:class:`GridContainerStyle <gui_forms::GridContainerStyle>`
+     -  
+   * - :cpp:class:`GridItemArea <gui_forms::GridItemArea>`
+     - One item's area in the implicit grid: zero-based, half-open track ranges.
+   * - :cpp:class:`GridItemContribution <gui_forms::GridItemContribution>`
+     - One item's contributions to the tracks of one axis, outer sizes (margins included).
+   * - :cpp:class:`GridItemInput <gui_forms::GridItemInput>`
+     - One item's inputs to every call.
+   * - :cpp:class:`GridItemResult <gui_forms::GridItemResult>`
      -  
    * - :cpp:class:`GridItemStyle <gui_forms::GridItemStyle>`
      -  
+   * - :cpp:class:`GridLayoutWorkspace <gui_forms::GridLayoutWorkspace>`
+     - Caller-owned storage the four calls fill, reused from layout to layout (house style section 5): ``items`` has one record per input item, in input order; ``columns`` and ``rows`` the tracks of the implicit grid in line order.
+   * - :cpp:class:`GridLayoutWorkspace::AxisPlacement <gui_forms::GridLayoutWorkspace::AxisPlacement>`
+     - One item's placement on one axis during auto-placement: its start line (zero for the explicit grid's first line, negative before it), its span, and whether its lines fixed it.
+   * - :cpp:class:`GridLayoutWorkspace::TrackFunction <gui_forms::GridLayoutWorkspace::TrackFunction>`
+     -  
    * - :cpp:class:`GridLine <gui_forms::GridLine>`
      -  
+   * - :cpp:class:`GridMargin <gui_forms::GridMargin>`
+     - One margin as the solver reads it: a resolved length, or ``auto``.
    * - :cpp:class:`GridNamedArea <gui_forms::GridNamedArea>`
      - One named area of grid-template-areas, as zero-based half-open line ranges of the template's cells.
    * - :cpp:class:`GridTemplateAreas <gui_forms::GridTemplateAreas>`
      - grid-template-areas: its dimensions in cells and its areas in the order their first cells are written.
+   * - :cpp:class:`GridTrack <gui_forms::GridTrack>`
+     - One track of the implicit grid, in line order.
    * - :cpp:class:`GridTrackList <gui_forms::GridTrackList>`
      - A grid-template-columns or -rows value.
    * - :cpp:class:`GridTrackSize <gui_forms::GridTrackSize>`
@@ -697,6 +719,54 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: GridAvailableExtent final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:member:: double extent
+
+   .. cpp:member:: GridSizingKind kind
+
+      Default: ``{GridSizingKind::max_content}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridContainerInput final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:member:: LayoutAlignment justify_content
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment align_content
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment justify_items
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment align_items
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: double column_gap
+
+      Resolved gaps: column_gap between columns, row_gap between rows.
+
+   .. cpp:member:: double row_gap
+
+   .. cpp:member:: GridAvailableExtent width
+
+   .. cpp:member:: GridAvailableExtent height
+
+   .. cpp:member:: LayoutDirection layout_direction
+
+      left_to_right or right_to_left (an ``inherit`` is resolved by the caller): mirrors the columns at output (PLAN section 4). Default: ``{LayoutDirection::left_to_right}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: GridContainerStyle final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -721,6 +791,98 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: GridItemArea final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One item's area in the implicit grid: zero-based, half-open track ranges.
+
+   .. cpp:member:: std::uint32_t column_start
+
+   .. cpp:member:: std::uint32_t column_end
+
+   .. cpp:member:: std::uint32_t row_start
+
+   .. cpp:member:: std::uint32_t row_end
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridItemContribution final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One item's contributions to the tracks of one axis, outer sizes (margins included). ``minimum`` is the item's minimum contribution (CSS Grid 12.3): its min-content contribution when its width or height is definite; the outer min-width or min-height when that is a length; otherwise ``automatic_minimum`` is set and ``minimum`` is the content-based minimum (CSS Grid 6.6), which the solver applies only where 6.6 does: when the item spans a track whose minimum is ``auto`` and, if it spans several, no flexible one.
+
+   .. cpp:member:: double minimum
+
+   .. cpp:member:: bool automatic_minimum
+
+   .. cpp:member:: double min_content
+
+   .. cpp:member:: double max_content
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridItemInput final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One item's inputs to every call.
+
+   .. cpp:member:: const GridItemStyle* placement
+
+      The item's placement properties, borrowed for each call: the caller keeps the record alive and unchanged from the first call to the last.
+
+   .. cpp:member:: LayoutAlignment justify_self
+
+      ``auto`` takes the container's justify-items or align-items. Default: ``{LayoutAlignment::automatic}``.
+
+   .. cpp:member:: LayoutAlignment align_self
+
+      Default: ``{LayoutAlignment::automatic}``.
+
+   .. cpp:member:: BoxSides<GridMargin> margin
+
+      Physical sides.
+
+   .. cpp:member:: SizeValue width
+
+      The item's sizes; a percentage is of its grid area, resolved when the item is placed in it.
+
+   .. cpp:member:: SizeValue height
+
+   .. cpp:member:: SizeValue min_width
+
+   .. cpp:member:: SizeValue min_height
+
+   .. cpp:member:: SizeValue max_width
+
+      Default: ``{SizeKind::none, {}}``.
+
+   .. cpp:member:: SizeValue max_height
+
+      Default: ``{SizeKind::none, {}}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridItemResult final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:member:: GridItemArea area
+
+   .. cpp:member:: bool column_definite
+
+      Whether placement found the area from the item's lines (not by auto-placement), for inspection.
+
+   .. cpp:member:: bool row_definite
+
+   .. cpp:member:: Rect bounds
+
+      The item's border box in the container's content box.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: GridItemStyle final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -735,6 +897,82 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: GridLayoutWorkspace final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   Caller-owned storage the four calls fill, reused from layout to layout (house style section 5): :cpp:func:`items <gui_forms::GridLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`columns <gui_forms::GridLayoutWorkspace::columns>` and :cpp:func:`rows <gui_forms::GridLayoutWorkspace::rows>` the tracks of the implicit grid in line order. Its storage grows only when the item or track count does.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const GridItemResult> items() const& noexcept
+
+   .. cpp:function:: std::span<const GridTrack> columns() const& noexcept
+
+   .. cpp:function:: std::span<const GridTrack> rows() const& noexcept
+
+   .. cpp:function:: std::uint32_t leading_implicit_columns() const noexcept
+
+      How many implicit tracks precede the explicit grid on each axis (from negative or out-of-range lines).
+
+   .. cpp:function:: std::uint32_t leading_implicit_rows() const noexcept
+
+   .. cpp:function:: double content_width() const noexcept
+
+      The sized grid's extent on each axis: the tracks and their gaps.
+
+   .. cpp:function:: double content_height() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: double area_extent(std::size_t index, GridAxis axis) const noexcept
+
+      The extent of item ``index``'s area on ``axis``: its tracks' sizes and the gaps between them, once that axis is sized; zero before.
+
+   .. cpp:function:: void reserve(std::size_t count)
+
+      Reserves storage for ``count`` items, so a later layout of at most that many items (and as many tracks) allocates nothing.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridLayoutWorkspace::AxisPlacement final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One item's placement on one axis during auto-placement: its start line (zero for the explicit grid's first line, negative before it), its span, and whether its lines fixed it. Internal to the solver.
+
+   .. cpp:member:: std::int64_t start
+
+   .. cpp:member:: std::uint32_t span
+
+      Default: ``{1U}``.
+
+   .. cpp:member:: bool definite
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridLayoutWorkspace::TrackFunction final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:member:: Breadth minimum
+
+      Default: ``{Breadth::automatic}``.
+
+   .. cpp:member:: double minimum_value
+
+   .. cpp:member:: Breadth maximum
+
+      Default: ``{Breadth::automatic}``.
+
+   .. cpp:member:: double maximum_value
+
+      The fixed maximum, the fraction, or the fit-content() limit.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: GridLine final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -746,6 +984,18 @@ Related types
    .. cpp:member:: std::int32_t number
 
    .. cpp:member:: std::string area
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridMargin final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One margin as the solver reads it: a resolved length, or ``auto``.
+
+   .. cpp:member:: double length
+
+   .. cpp:member:: bool automatic
 
 .. cpp:namespace:: gui_forms
 
@@ -778,6 +1028,38 @@ Related types
    .. cpp:member:: std::uint32_t columns
 
    .. cpp:member:: std::vector<GridNamedArea> areas
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridTrack final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One track of the implicit grid, in line order.
+
+   .. cpp:member:: GridTrackSize sizing
+
+      The sizing function it was given (from the template, ``repeat()``, or grid-auto-columns / -rows for an implicit track).
+
+   .. cpp:member:: double base
+
+      The track sizing algorithm's base size and growth limit (infinity while unbounded); ``size`` is the final base size.
+
+   .. cpp:member:: double growth_limit
+
+      Default: ``{std::numeric_limits<double>::infinity()}``.
+
+   .. cpp:member:: double size
+
+   .. cpp:member:: double position
+
+      Its start edge in the content box, after track alignment (columns flow-relative: before right-to-left mirroring).
+
+   .. cpp:member:: bool implicit
+
+   .. cpp:member:: bool collapsed
+
+      An empty ``auto-fit`` repetition: size zero, and its gaps collapse.
 
 .. cpp:namespace:: gui_forms
 
@@ -1620,6 +1902,34 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: GridAxis
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:enumerator:: columns
+
+   .. cpp:enumerator:: rows
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: GridLayoutWorkspace::Breadth
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:enumerator:: fixed
+
+   .. cpp:enumerator:: min_content
+
+   .. cpp:enumerator:: max_content
+
+   .. cpp:enumerator:: automatic
+
+   .. cpp:enumerator:: fraction
+
+   .. cpp:enumerator:: fit_content
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: GridLineKind
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -1631,6 +1941,32 @@ Enumerations
    .. cpp:enumerator:: span
 
    .. cpp:enumerator:: area
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: GridSizingKind
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:enumerator:: definite
+
+   .. cpp:enumerator:: min_content
+
+   .. cpp:enumerator:: max_content
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: GridSolveOutcome
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:enumerator:: solved
+
+   .. cpp:enumerator:: refused_too_many_items
+
+   .. cpp:enumerator:: refused_too_many_cells
+
+   .. cpp:enumerator:: refused_mismatched_input
 
 .. cpp:namespace:: gui_forms
 
@@ -2016,6 +2352,46 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_flex_items
 
    The most items one container lays out (PLAN section 5). Value: ``65'536U``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+.. cpp:function:: GridSolveOutcome place_grid_items(const GridContainerStyle& style, const GridContainerInput& container, std::span<const GridItemInput> items, GridLayoutWorkspace& workspace)
+
+   The first call. Fills the tracks (sizing functions, implicit and collapsed flags) and each item's area; ``style`` and ``items`` are borrowed for the call. Refuses more than maximum_grid_items items, and an implicit grid of more than maximum_grid_cells cells.
+
+.. cpp:function:: GridSolveOutcome size_grid_tracks(GridAxis axis, const GridContainerInput& container, std::span<const GridItemInput> items, std::span<const GridItemContribution> contributions, GridLayoutWorkspace& workspace)
+
+   The second and third calls: sizes the tracks of ``axis``, columns first, from one contribution per item on that axis. Fills each track's base, growth_limit and size, and the content extent.
+
+.. cpp:function:: double grid_item_column_size(const GridContainerInput& container, const GridItemInput& item, const GridItemContribution& column_contribution, const GridLayoutWorkspace& workspace, std::size_t index)
+
+   The border-box width item ``index`` takes in its column area, once the columns are sized: what arrange_grid_items will give it. The caller measures the item's height at this width for its row contributions.
+
+.. cpp:function:: GridSolveOutcome arrange_grid_items(const GridContainerInput& container, std::span<const GridItemInput> items, std::span<const GridItemContribution> column_contributions, std::span<const GridItemContribution> row_contributions, GridLayoutWorkspace& workspace)
+
+   The fourth call, with the contributions the sizing calls were given. Fills the tracks' positions and each item's bounds.
+
+.. cpp:var:: constexpr std::size_t maximum_grid_items
+
+   The most items one container lays out (PLAN section 5). Value: ``65'536U``.
+
+.. cpp:var:: constexpr std::size_t maximum_grid_cells
+
+   The most cells auto-placement's occupancy may cover, rows times columns of the implicit grid (PLAN section 5); above it nothing is laid out. Value: ``1'048'576U``.
+
+.. cpp:var:: constexpr std::size_t maximum_grid_repetitions
+
+   The most repetitions one ``repeat(auto-fill | auto-fit, ...)`` generates. Value: ``10'000U``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/style/layout_style.hpp>``
+
+.. cpp:var:: constexpr std::size_t maximum_grid_tracks
+
+   The most tracks one grid-template-columns or -rows value may expand to, ``repeat()`` counted, and the most sizes one grid-auto-columns or -rows value may list (PLAN section 5). Value: ``10'000U``.
 
 .. cpp:namespace:: gui_forms
 

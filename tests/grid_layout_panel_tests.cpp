@@ -1,0 +1,477 @@
+// Stage L, phase L4: GridLayoutPanel over child controls. Track lists,
+// areas and item records and their validation and reconciliation, the
+// solver's results published as child slots, nested intrinsic sizes, the
+// cell limit's refusal, and the counts of PLAN section 5 at 10,000
+// children: changing one item's text costs one item measure callback,
+// resizing costs none, and arranging allocates nothing.
+
+#include "gui_forms/basic_controls.hpp"
+#include "gui_forms/container_controls.hpp"
+#include "gui_forms/window.hpp"
+
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <new>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
+// Counts global allocations while armed, so the arrange loop can be shown
+// to allocate nothing (PLAN section 5).
+namespace {
+bool counting_allocations = false;
+std::uint64_t counted_allocations = 0U;
+} // namespace
+
+void* operator new(std::size_t size) {
+    if (counting_allocations) ++counted_allocations;
+    void* allocation = std::malloc(size == 0U ? 1U : size);
+    if (allocation == nullptr) throw std::bad_alloc();
+    return allocation;
+}
+
+void* operator new[](std::size_t size) {
+    if (counting_allocations) ++counted_allocations;
+    void* allocation = std::malloc(size == 0U ? 1U : size);
+    if (allocation == nullptr) throw std::bad_alloc();
+    return allocation;
+}
+
+void operator delete(void* allocation) noexcept {
+    std::free(allocation);
+}
+
+void operator delete[](void* allocation) noexcept {
+    std::free(allocation);
+}
+
+void operator delete(void* allocation, std::size_t) noexcept {
+    std::free(allocation);
+}
+
+void operator delete[](void* allocation, std::size_t) noexcept {
+    std::free(allocation);
+}
+
+namespace {
+
+using namespace gui_forms;
+
+void require(bool condition, const std::string& message) {
+    if (!condition) throw std::runtime_error(message);
+}
+
+bool near(double left, double right) {
+    return std::abs(left - right) <= 1.0e-9;
+}
+
+std::string describe(Rect rect) {
+    return "{" + std::to_string(rect.x) + ", " + std::to_string(rect.y) + ", " + std::to_string(rect.width) + ", " +
+           std::to_string(rect.height) + "}";
+}
+
+void require_bounds(const Control& control, double x, double y, double width, double height,
+                    const std::string& what) {
+    const Rect bounds = control.arranged_bounds();
+    const bool same =
+        near(bounds.x, x) && near(bounds.y, y) && near(bounds.width, width) && near(bounds.height, height);
+    require(same, what + ": got " + describe(bounds));
+}
+
+std::shared_ptr<Panel> box(const std::string& id, double width, double height) {
+    std::shared_ptr<Panel> made = make_control<Panel>(StableId(id));
+    (*made).set_bounds({0.0, 0.0, width, height});
+    (*made).set_margin({0.0, 0.0, 0.0, 0.0});
+    return made;
+}
+
+LengthPercentage px(double value) {
+    const LengthPercentage length{LogicalLength{value}, 0.0};
+    return length;
+}
+
+GridTrackSize fixed(double value) {
+    GridTrackSize size{};
+    size.minimum = TrackBreadth{TrackBreadthKind::length_percentage, px(value), FractionFactor{}};
+    size.maximum = size.minimum;
+    return size;
+}
+
+GridTrackSize fraction(double value) {
+    GridTrackSize size{};
+    size.minimum = TrackBreadth{};
+    size.maximum = TrackBreadth{TrackBreadthKind::fraction, {}, FractionFactor{value}};
+    return size;
+}
+
+GridTrackSize automatic() {
+    const GridTrackSize size{};
+    return size;
+}
+
+GridTrackList tracks(std::vector<GridTrackSize> sizes) {
+    GridTrackList list{};
+    list.tracks = std::move(sizes);
+    return list;
+}
+
+GridLine line(std::int32_t number) {
+    GridLine made{};
+    made.kind = GridLineKind::line;
+    made.number = number;
+    return made;
+}
+
+GridLine span(std::int32_t count) {
+    GridLine made{};
+    made.kind = GridLineKind::span;
+    made.number = count;
+    return made;
+}
+
+GridLine area_line(const std::string& name) {
+    GridLine made{};
+    made.kind = GridLineKind::area;
+    made.area = name;
+    return made;
+}
+
+GridItemLayout in_area(const std::string& name) {
+    GridItemLayout layout{};
+    layout.placement.column_start = area_line(name);
+    layout.placement.column_end = area_line(name);
+    layout.placement.row_start = area_line(name);
+    layout.placement.row_end = area_line(name);
+    return layout;
+}
+
+bool refuses_item(GridLayoutPanel& panel, const Control& child, const GridItemLayout& layout) {
+    try {
+        panel.set_item_layout(child, layout);
+    } catch (const std::invalid_argument&) {
+        return true;
+    }
+    return false;
+}
+
+bool refuses_columns(GridLayoutPanel& panel, const GridTrackList& list) {
+    try {
+        panel.set_template_columns(list);
+    } catch (const std::invalid_argument&) {
+        return true;
+    }
+    return false;
+}
+
+// A label that counts its measure callbacks.
+class CountingLabel final : public Label {
+public:
+    explicit CountingLabel(StableId id) : Label(std::move(id)) {}
+
+    std::uint64_t callbacks{};
+
+protected:
+    Size measure_intrinsic(const LayoutConstraint& constraint) override {
+        ++callbacks;
+        const Size measured = Label::measure_intrinsic(constraint);
+        return measured;
+    }
+};
+
+void test_tracks_gaps_and_stretch() {
+    std::shared_ptr<GridLayoutPanel> panel = make_control<GridLayoutPanel>(StableId("grid.tracks"));
+    (*panel).set_padding({10.0, 10.0, 10.0, 10.0});
+    (*panel).set_template_columns(tracks({fixed(100.0), fraction(1.0)}));
+    (*panel).set_column_gap(px(10.0));
+    (*panel).set_row_gap(px(5.0));
+    std::vector<std::shared_ptr<Panel>> boxes;
+    for (int index = 0; index < 3; ++index) {
+        boxes.push_back(box("grid.tracks." + std::to_string(index), 50.0, 20.0));
+        (*panel).add_child(boxes.back());
+    }
+    const std::unique_ptr<Window> held = std::make_unique<Window>(panel, Size{320.0, 100.0});
+    Window& window = *held;
+    window.perform_layout();
+    // 300 by 80 of content: columns 100 and 190; two auto rows of 20
+    // stretched by half of the 35 px left each.
+    require_bounds(*boxes[0], 10.0, 10.0, 100.0, 37.5, "the first item fills its cell");
+    require_bounds(*boxes[1], 120.0, 10.0, 190.0, 37.5, "the second takes the fraction column");
+    require_bounds(*boxes[2], 10.0, 52.5, 100.0, 37.5, "the third wraps to the next row");
+    const GridLayoutWorkspace& snapshot = (*panel).layout_snapshot();
+    require(snapshot.columns().size() == 2U && snapshot.rows().size() == 2U, "the snapshot has the tracks");
+    require(snapshot.rows()[1].implicit, "the rows are implicit");
+    require((*panel).laid_out_children()[2] == (*boxes[2]).runtime_id(), "the snapshot names its children");
+    require((*panel).layout_outcome() == GridSolveOutcome::solved, "the layout solved");
+
+    // Start alignment sizes the items from their content instead.
+    (*panel).set_justify_items(LayoutAlignment::start);
+    (*panel).set_align_items(LayoutAlignment::end);
+    window.perform_layout();
+    require_bounds(*boxes[1], 120.0, 27.5, 50.0, 20.0, "a start-justified, end-aligned item");
+}
+
+void test_records_validate_and_reconcile() {
+    std::shared_ptr<GridLayoutPanel> panel = make_control<GridLayoutPanel>(StableId("grid.records"));
+    std::shared_ptr<Panel> child = box("grid.records.child", 10.0, 10.0);
+    std::shared_ptr<Panel> stranger = box("grid.records.stranger", 10.0, 10.0);
+    (*panel).add_child(child);
+    GridItemLayout spanning{};
+    spanning.placement.column_start = span(2);
+    require(refuses_item(*panel, *stranger, spanning), "a record needs a direct child");
+    GridItemLayout zero_line{};
+    zero_line.placement.row_start = line(0);
+    require(refuses_item(*panel, *child, zero_line), "line 0 is refused");
+    GridItemLayout zero_span{};
+    zero_span.placement.row_end = span(0);
+    require(refuses_item(*panel, *child, zero_span), "span 0 is refused");
+    GridItemLayout content_width{};
+    content_width.width = SizeValue{SizeKind::min_content, {}};
+    require(refuses_item(*panel, *child, content_width), "a content keyword width is refused");
+
+    GridTrackSize fraction_minimum = fraction(1.0);
+    fraction_minimum.minimum = fraction_minimum.maximum;
+    require(refuses_columns(*panel, tracks({fraction_minimum})), "a fraction minimum is refused");
+    GridTrackList intrinsic_repeat{};
+    intrinsic_repeat.auto_repeat = AutoRepeatKind::auto_fill;
+    intrinsic_repeat.auto_repeat_tracks = {automatic()};
+    require(refuses_columns(*panel, intrinsic_repeat), "an automatic repeat of an auto track is refused");
+    GridTrackList too_many{};
+    too_many.tracks.assign(maximum_grid_tracks + 1U, fixed(1.0));
+    require(refuses_columns(*panel, too_many), "more than 10000 tracks are refused");
+    GridTemplateAreas overlapping{};
+    overlapping.rows = 1U;
+    overlapping.columns = 2U;
+    overlapping.areas = {GridNamedArea{"a", 0U, 1U, 0U, 1U}, GridNamedArea{"a", 0U, 1U, 1U, 2U}};
+    bool refused = false;
+    try {
+        (*panel).set_template_areas(overlapping);
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused, "a name used twice is refused");
+    std::vector<GridTrackSize> none{};
+    refused = false;
+    try {
+        (*panel).set_auto_rows(none);
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused, "grid-auto-rows needs a size");
+
+    (*panel).set_item_layout(*child, spanning);
+    require((*panel).item_layout(*child) == spanning, "the record is kept");
+    const std::unique_ptr<Window> held = std::make_unique<Window>(panel, Size{100.0, 40.0});
+    Window& window = *held;
+    window.perform_layout();
+    static_cast<void>((*panel).remove_child((*child).runtime_id()));
+    window.perform_layout();
+    (*panel).add_child(child);
+    require((*panel).item_layout(*child) == GridItemLayout{}, "a departed child's record is dropped");
+}
+
+void test_named_areas() {
+    std::shared_ptr<GridLayoutPanel> panel = make_control<GridLayoutPanel>(StableId("grid.areas"));
+    (*panel).set_template_columns(tracks({fixed(80.0), fraction(1.0)}));
+    (*panel).set_template_rows(tracks({fixed(30.0), fraction(1.0)}));
+    GridTemplateAreas areas{};
+    areas.rows = 2U;
+    areas.columns = 2U;
+    areas.areas = {GridNamedArea{"head", 0U, 1U, 0U, 2U}, GridNamedArea{"side", 1U, 2U, 0U, 1U},
+                   GridNamedArea{"main", 1U, 2U, 1U, 2U}};
+    (*panel).set_template_areas(areas);
+    std::shared_ptr<Panel> main = box("grid.areas.main", 10.0, 10.0);
+    std::shared_ptr<Panel> head = box("grid.areas.head", 10.0, 10.0);
+    std::shared_ptr<Panel> side = box("grid.areas.side", 10.0, 10.0);
+    (*panel).add_child(main);
+    (*panel).add_child(head);
+    (*panel).add_child(side);
+    (*panel).set_item_layout(*main, in_area("main"));
+    (*panel).set_item_layout(*head, in_area("head"));
+    (*panel).set_item_layout(*side, in_area("side"));
+    const std::unique_ptr<Window> held = std::make_unique<Window>(panel, Size{300.0, 200.0});
+    (*held).perform_layout();
+    require_bounds(*head, 0.0, 0.0, 300.0, 30.0, "the head spans both columns");
+    require_bounds(*side, 0.0, 30.0, 80.0, 170.0, "the side");
+    require_bounds(*main, 80.0, 30.0, 220.0, 170.0, "the main area");
+}
+
+void test_nested_intrinsic_columns() {
+    std::shared_ptr<GridLayoutPanel> outer = make_control<GridLayoutPanel>(StableId("grid.outer"));
+    (*outer).set_template_columns(tracks({automatic(), fraction(1.0)}));
+    std::shared_ptr<GridLayoutPanel> inner = make_control<GridLayoutPanel>(StableId("grid.outer.inner"));
+    (*inner).set_template_columns(tracks({fixed(30.0), fixed(40.0)}));
+    (*inner).set_column_gap(px(5.0));
+    (*inner).set_margin({0.0, 0.0, 0.0, 0.0});
+    std::shared_ptr<Panel> first = box("grid.outer.inner.a", 10.0, 20.0);
+    std::shared_ptr<Panel> second = box("grid.outer.inner.b", 10.0, 12.0);
+    (*inner).add_child(first);
+    (*inner).add_child(second);
+    std::shared_ptr<Panel> after = box("grid.outer.after", 10.0, 10.0);
+    (*outer).add_child(inner);
+    (*outer).add_child(after);
+    const std::unique_ptr<Window> held = std::make_unique<Window>(outer, Size{300.0, 100.0});
+    (*held).perform_layout();
+    require_bounds(*inner, 0.0, 0.0, 75.0, 100.0, "the inner grid's column is its max-content width");
+    require_bounds(*after, 75.0, 0.0, 225.0, 100.0, "the fraction takes the rest");
+    require_bounds(*second, 35.0, 0.0, 40.0, 100.0, "the inner items stretch over its row");
+}
+
+void test_cell_limit_refuses() {
+    std::shared_ptr<GridLayoutPanel> panel = make_control<GridLayoutPanel>(StableId("grid.limit"));
+    std::shared_ptr<Panel> far = box("grid.limit.far", 10.0, 10.0);
+    std::shared_ptr<Panel> placed = box("grid.limit.placed", 10.0, 10.0);
+    (*panel).add_child(far);
+    (*panel).add_child(placed);
+    GridItemLayout distant{};
+    distant.placement.column_start = line(2'000);
+    distant.placement.row_start = line(2'000);
+    (*panel).set_item_layout(*far, distant);
+    const std::unique_ptr<Window> held = std::make_unique<Window>(panel, Size{100.0, 100.0});
+    (*held).perform_layout();
+    require((*panel).layout_outcome() == GridSolveOutcome::refused_too_many_cells,
+            "a grid of four million cells is refused");
+    require((*panel).laid_out_children().empty(), "a refused layout publishes no children");
+    (*panel).set_item_layout(*far, GridItemLayout{});
+    (*held).perform_layout();
+    require((*panel).layout_outcome() == GridSolveOutcome::solved, "the layout solves again");
+    require((*panel).laid_out_children().size() == 2U, "and publishes both children");
+}
+
+std::shared_ptr<Button> sized_button(const std::string& id) {
+    std::shared_ptr<Button> made = make_control<Button>(StableId(id), "Button");
+    (*made).set_requested_bounds({0.0, 0.0, 10.0, 20.0});
+    (*made).set_margin({});
+    return made;
+}
+
+// The docstring's two examples, with the results their comments state.
+void test_documented_examples() {
+    std::shared_ptr<GridLayoutPanel> form = make_control<GridLayoutPanel>(StableId("doc.form"));
+    (*form).set_template_columns(tracks({fixed(80.0), fraction(1.0)}));
+    (*form).set_column_gap(px(10.0));
+    (*form).set_row_gap(px(5.0));
+    std::vector<std::shared_ptr<Button>> buttons;
+    for (int index = 0; index < 4; ++index) {
+        buttons.push_back(sized_button("doc.form.button" + std::to_string(index)));
+        (*form).add_child(buttons.back());
+    }
+    const std::unique_ptr<Window> form_window = std::make_unique<Window>(form, Size{200.0, 45.0});
+    (*form_window).perform_layout();
+    require_bounds(*buttons[0], 0.0, 0.0, 80.0, 20.0, "the first form button");
+    require_bounds(*buttons[1], 90.0, 0.0, 110.0, 20.0, "the second form button");
+    require_bounds(*buttons[2], 0.0, 25.0, 80.0, 20.0, "the third form button");
+    require_bounds(*buttons[3], 90.0, 25.0, 110.0, 20.0, "the fourth form button");
+
+    std::shared_ptr<GridLayoutPanel> cards = make_control<GridLayoutPanel>(StableId("doc.cards"));
+    GridTrackSize card = fraction(1.0);
+    card.minimum = TrackBreadth{TrackBreadthKind::length_percentage, px(100.0), FractionFactor{}};
+    GridTrackList columns{};
+    columns.auto_repeat = AutoRepeatKind::auto_fill;
+    columns.auto_repeat_tracks = {card};
+    (*cards).set_template_columns(columns);
+    (*cards).set_column_gap(px(15.0));
+    (*cards).set_row_gap(px(10.0));
+    std::vector<std::shared_ptr<Button>> card_buttons;
+    for (int index = 0; index < 5; ++index) {
+        card_buttons.push_back(sized_button("doc.cards.button" + std::to_string(index)));
+        (*cards).add_child(card_buttons.back());
+    }
+    const std::unique_ptr<Window> cards_window = std::make_unique<Window>(cards, Size{330.0, 50.0});
+    (*cards_window).perform_layout();
+    require((*cards).layout_snapshot().columns().size() == 3U, "three card columns fit");
+    require_bounds(*card_buttons[0], 0.0, 0.0, 100.0, 20.0, "the first card");
+    require_bounds(*card_buttons[1], 115.0, 0.0, 100.0, 20.0, "the second card");
+    require_bounds(*card_buttons[2], 230.0, 0.0, 100.0, 20.0, "the third card");
+    require_bounds(*card_buttons[3], 0.0, 30.0, 100.0, 20.0, "the fourth card");
+    require_bounds(*card_buttons[4], 115.0, 30.0, 100.0, 20.0, "the fifth card");
+}
+
+void test_ten_thousand_children_counts() {
+    constexpr std::size_t count = 10'000U;
+    std::shared_ptr<GridLayoutPanel> panel = make_control<GridLayoutPanel>(StableId("grid.many"));
+    GridTrackList columns{};
+    columns.auto_repeat = AutoRepeatKind::auto_fill;
+    columns.auto_repeat_tracks = {fixed(120.0)};
+    (*panel).set_template_columns(columns);
+    (*panel).set_align_items(LayoutAlignment::start);
+    std::vector<std::shared_ptr<CountingLabel>> labels;
+    labels.reserve(count);
+    for (std::size_t index = 0U; index < count; ++index) {
+        std::shared_ptr<CountingLabel> label =
+            make_control<CountingLabel>(StableId("grid.many." + std::to_string(index)));
+        (*label).set_text("Item " + std::to_string(index));
+        (*panel).add_child(label);
+        labels.push_back(std::move(label));
+    }
+    // The panel sits in a plain root, so resizing the container (not the
+    // window) is a bounds change on the panel alone.
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("grid.many.root"));
+    (*panel).set_bounds({0.0, 0.0, 1200.0, 800.0});
+    (*root).add_child(panel);
+    const std::unique_ptr<Window> held = std::make_unique<Window>(root, Size{1200.0, 800.0});
+    Window& window = *held;
+    window.perform_layout();
+    require((*panel).layout_snapshot().columns().size() == 10U, "ten 120 px columns fit 1200 px");
+    for (const std::shared_ptr<CountingLabel>& label : labels) (*label).callbacks = 0U;
+    window.reset_activity_metrics();
+
+    // One item's text: the items stretch over fixed columns, so each is
+    // asked only its height at its column's width. The changed item's
+    // query misses, and so do the panel's own measure and the plain root's
+    // above it; every other item answers from its cache.
+    (*labels[4'321]).set_text("A rather longer item text");
+    window.perform_layout();
+    std::uint64_t callbacks = 0U;
+    for (const std::shared_ptr<CountingLabel>& label : labels) callbacks += (*label).callbacks;
+    require(callbacks == 1U, "changing one item's text costs one item measure callback, got " +
+                                 std::to_string(callbacks));
+    require((*labels[4'321]).callbacks == 1U, "the callback is the changed item's");
+    const MetricsSnapshot changed = window.metrics_snapshot();
+    require(changed.measure_cache_misses == 3U, "the item, the panel and the root miss, got " +
+                                                    std::to_string(changed.measure_cache_misses));
+
+    // Resizing the panel changes no item's constraint: the columns stay
+    // 120 px wide, though there are fewer of them.
+    for (const std::shared_ptr<CountingLabel>& label : labels) (*label).callbacks = 0U;
+    (*panel).set_bounds({0.0, 0.0, 900.0, 700.0});
+    window.perform_layout();
+    callbacks = 0U;
+    for (const std::shared_ptr<CountingLabel>& label : labels) callbacks += (*label).callbacks;
+    require(callbacks == 0U, "resizing costs no item measure callback, got " + std::to_string(callbacks));
+    require((*panel).layout_snapshot().columns().size() == 7U, "seven columns fit 900 px");
+
+    // Arranging again at the same size allocates nothing.
+    const Rect bounds = (*panel).arranged_bounds();
+    (*panel).arrange(bounds);
+    counted_allocations = 0U;
+    counting_allocations = true;
+    (*panel).arrange(bounds);
+    counting_allocations = false;
+    require(counted_allocations == 0U, "arranging 10000 children allocated " + std::to_string(counted_allocations) +
+                                           " times");
+    std::cout << "grid-layout-panel-tests: 10000 children: 1 callback on a text change, 0 on a resize, "
+                 "0 allocations per arrange\n";
+}
+
+} // namespace
+
+int main() {
+    try {
+        test_tracks_gaps_and_stretch();
+        test_records_validate_and_reconcile();
+        test_named_areas();
+        test_nested_intrinsic_columns();
+        test_cell_limit_refuses();
+        test_documented_examples();
+        test_ten_thousand_children_counts();
+        std::cout << "grid-layout-panel-tests: pass\n";
+        return EXIT_SUCCESS;
+    } catch (const std::exception& error) {
+        std::cerr << "grid-layout-panel-tests: fail: " << error.what() << '\n';
+        return EXIT_FAILURE;
+    }
+}

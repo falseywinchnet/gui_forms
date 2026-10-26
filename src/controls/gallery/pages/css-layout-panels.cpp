@@ -5,8 +5,8 @@
 namespace gui_forms::gallery::pages {
 
 // Owner of the CSS Layout Panels page: the containers of stage L that lay
-// their children out by CSS rules, each as one group of specimens. Phase
-// L3 adds the FlexLayoutPanel group; later phases add theirs below it.
+// their children out by CSS rules, each as one group of specimens: the
+// FlexLayoutPanel group (phase L3), then the GridLayoutPanel group (L4).
 class CssLayoutPanelsPage final : public gui_forms::Component {
 public:
     CssLayoutPanelsPage(const std::shared_ptr<Surface>& page,
@@ -20,6 +20,7 @@ public:
                              12.0, 400, muted),
                        {26.0, 52.0, 920.0, 24.0});
         build_flex(page);
+        build_grid(page);
     }
 
 private:
@@ -82,6 +83,97 @@ private:
             (*item).set_margin({0.0, 0.0, 0.0, 0.0});
             (*column).add_child(item);
         }
+    }
+
+    // Named areas with a fixed side column and a flexible main area; and
+    // cards repeated as often as minmax(86px, 1fr) columns fit, one of them
+    // spanning two columns.
+    void build_grid(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> grid_group = group(
+            "gallery.css-layout.grid.group",
+            "GridLayoutPanel · named areas · fr tracks · auto-fill minmax cards · span",
+            {930.0, 210.0});
+        (*page).add_at(grid_group, {24.0, 312.0, 930.0, 210.0});
+
+        std::shared_ptr<GridLayoutPanel> areas = make_control<GridLayoutPanel>(
+            StableId("gallery.css-layout.grid.areas"));
+        (*areas).set_accessible_name("Named grid areas");
+        GridTrackList columns{};
+        columns.tracks = {fixed_track(90.0), fraction_track(1.0)};
+        (*areas).set_template_columns(columns);
+        GridTrackList rows{};
+        rows.tracks = {fixed_track(28.0), fraction_track(1.0), fixed_track(24.0)};
+        (*areas).set_template_rows(rows);
+        GridTemplateAreas names{};
+        names.rows = 3U;
+        names.columns = 2U;
+        names.areas = {GridNamedArea{"head", 0U, 1U, 0U, 2U}, GridNamedArea{"nav", 1U, 2U, 0U, 1U},
+                       GridNamedArea{"main", 1U, 2U, 1U, 2U}, GridNamedArea{"foot", 2U, 3U, 0U, 2U}};
+        (*areas).set_template_areas(names);
+        (*areas).set_column_gap(LengthPercentage{LogicalLength{6.0}, 0.0});
+        (*areas).set_row_gap(LengthPercentage{LogicalLength{6.0}, 0.0});
+        (*grid_group).add_at(areas, {18.0, 38.0, 400.0, 152.0});
+        constexpr std::array<const char*, 4> area_names{"head", "nav", "main", "foot"};
+        for (const char* name : area_names) {
+            std::shared_ptr<Button> item = make_control<Button>(
+                StableId(std::string("gallery.css-layout.grid.areas.") + name), name);
+            (*item).set_visual_style(ButtonVisualStyle::command);
+            (*item).set_margin({0.0, 0.0, 0.0, 0.0});
+            (*areas).add_child(item);
+            GridLine line{};
+            line.kind = GridLineKind::area;
+            line.area = name;
+            GridItemLayout layout{};
+            layout.placement = GridItemStyle{line, line, line, line};
+            (*areas).set_item_layout(*item, layout);
+        }
+
+        std::shared_ptr<GridLayoutPanel> cards = make_control<GridLayoutPanel>(
+            StableId("gallery.css-layout.grid.cards"));
+        (*cards).set_accessible_name("Auto-fill grid cards");
+        GridTrackSize card{};
+        card.minimum = TrackBreadth{TrackBreadthKind::length_percentage, LengthPercentage{LogicalLength{86.0}, 0.0},
+                                    FractionFactor{}};
+        card.maximum = TrackBreadth{TrackBreadthKind::fraction, LengthPercentage{}, FractionFactor{1.0}};
+        GridTrackList card_columns{};
+        card_columns.auto_repeat = AutoRepeatKind::auto_fill;
+        card_columns.auto_repeat_tracks = {card};
+        (*cards).set_template_columns(card_columns);
+        const std::array<GridTrackSize, 1> card_rows{fixed_track(28.0)};
+        (*cards).set_auto_rows(card_rows);
+        (*cards).set_column_gap(LengthPercentage{LogicalLength{6.0}, 0.0});
+        (*cards).set_row_gap(LengthPercentage{LogicalLength{6.0}, 0.0});
+        (*cards).set_align_content(LayoutAlignment::start);
+        (*grid_group).add_at(cards, {436.0, 38.0, 476.0, 152.0});
+        for (std::size_t index = 0U; index < 8U; ++index) {
+            const bool spans = index == 1U;
+            const std::string caption = spans ? std::string("Span 2") : "Card " + std::to_string(index + 1U);
+            std::shared_ptr<Button> item = make_control<Button>(
+                StableId("gallery.css-layout.grid.cards.item." + std::to_string(index)), caption);
+            (*item).set_visual_style(spans ? ButtonVisualStyle::accent : ButtonVisualStyle::standard);
+            (*item).set_margin({0.0, 0.0, 0.0, 0.0});
+            (*cards).add_child(item);
+            if (spans) {
+                GridItemLayout spanning{};
+                spanning.placement.column_start.kind = GridLineKind::span;
+                spanning.placement.column_start.number = 2;
+                (*cards).set_item_layout(*item, spanning);
+            }
+        }
+    }
+
+    static GridTrackSize fixed_track(double length) {
+        GridTrackSize size{};
+        size.minimum = TrackBreadth{TrackBreadthKind::length_percentage, LengthPercentage{LogicalLength{length}, 0.0},
+                                    FractionFactor{}};
+        size.maximum = size.minimum;
+        return size;
+    }
+
+    static GridTrackSize fraction_track(double fraction) {
+        GridTrackSize size{};
+        size.maximum = TrackBreadth{TrackBreadthKind::fraction, LengthPercentage{}, FractionFactor{fraction}};
+        return size;
     }
 };
 

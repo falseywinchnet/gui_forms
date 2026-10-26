@@ -95,7 +95,7 @@ inline constexpr std::array<GalleryPageSpec, 30> gallery_pages {{
      "FlowLayoutPanel and TableLayoutPanel with retained cell policy.",
      false, "Layout"},
     {"css-layout-panels", "CSS layout panels",
-     "FlexLayoutPanel: CSS flex containers over retained children.",
+     "FlexLayoutPanel and GridLayoutPanel: CSS flex and grid containers over retained children.",
      false, "Layout"},
     {"dock-and-anchor", "Dock and anchor",
      "Dock and Anchor layout policy on public Panel and Button instances.",

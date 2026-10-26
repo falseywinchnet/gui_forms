@@ -591,6 +591,17 @@
       "doc": "api/generated/gui_forms.FlexLayoutPanel.rst"
     },
     {
+      "id": "grid_layout_panel",
+      "type": "GridLayoutPanel",
+      "header": "gui_forms/controls/scrollable_control/container_control/grid_layout_panel/grid_layout_panel.hpp",
+      "category": "Layout",
+      "purpose": "CSS Grid container: explicit and implicit tracks, line-based and automatic placement with dense packing, named areas, intrinsic, fixed and flexible track sizing, auto-fill and auto-fit repeats, gaps, box alignment with baselines, and right-to-left mirroring.",
+      "winforms": "GUI.Forms-only",
+      "status": "stable",
+      "gallery_page": "css-layout-panels",
+      "doc": "api/generated/gui_forms.GridLayoutPanel.rst"
+    },
+    {
       "id": "table_layout_panel",
       "type": "TableLayoutPanel",
       "header": "gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp",

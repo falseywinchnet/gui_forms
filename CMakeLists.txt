@@ -192,6 +192,7 @@ add_library(gui_forms_core STATIC
     src/core/layout/types/layout_types.cpp
     src/core/layout/style_reader/layout_style_reader.cpp
     src/core/layout/flex_solver/flex_solver.cpp
+    src/core/layout/grid_solver/grid_solver.cpp
     src/core/metrics/metrics/metrics.cpp
     src/core/metrics/snapshot/metrics_snapshot.cpp
     src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp
@@ -645,6 +646,7 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/group_box/scaled_group_box/scaled_group_box.cpp
     src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp
     src/controls/scrollable_control/container_control/flex_layout_panel/flex_layout_panel.cpp
+    src/controls/scrollable_control/container_control/grid_layout_panel/grid_layout_panel.cpp
     src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp
     src/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.cpp
     src/controls/scrollable_control/container_control/command_overflow_panel/command_overflow_panel.cpp
@@ -2953,6 +2955,22 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_layout_style_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_layout_style_tests
              COMMAND gui_forms_layout_style_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/layout_corpus)
+
+    # Stage L, phase L4: the grid solver headless, and GridLayoutPanel with
+    # the 10,000-child counts.
+    add_executable(gui_forms_grid_solver_tests
+        tests/grid_solver_tests.cpp
+    )
+    target_link_libraries(gui_forms_grid_solver_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_grid_solver_tests
+             COMMAND gui_forms_grid_solver_tests)
+
+    add_executable(gui_forms_grid_layout_panel_tests
+        tests/grid_layout_panel_tests.cpp
+    )
+    target_link_libraries(gui_forms_grid_layout_panel_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_grid_layout_panel_tests
+             COMMAND gui_forms_grid_layout_panel_tests)
 
     # Stage L, phase L3: the flex solver headless, and FlexLayoutPanel with
     # the 10,000-child counts.

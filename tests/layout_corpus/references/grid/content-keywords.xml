@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<layout-reference fixture="grid/content-keywords" chromium="155.0.8059.39" platform="win64">
+  <profile viewport="320x240" scale="1">
+    <node id="root" x="0" y="0" width="320" height="240"/>
+    <node id="narrow" x="0" y="0" width="60" height="50"/>
+    <node id="narrow-0" x="0" y="0" width="40" height="20"/>
+    <node id="narrow-1" x="0" y="20" width="60" height="20"/>
+    <node id="narrow-2" x="0" y="40" width="30" height="20"/>
+    <node id="wide" x="60" y="0" width="130" height="50"/>
+    <node id="wide-0" x="60" y="0" width="40" height="20"/>
+    <node id="wide-1" x="100" y="0" width="60" height="20"/>
+    <node id="wide-2" x="160" y="0" width="30" height="20"/>
+    <node id="rest" x="190" y="0" width="130" height="50"/>
+  </profile>
+  <profile viewport="800x600" scale="1">
+    <node id="root" x="0" y="0" width="800" height="600"/>
+    <node id="narrow" x="0" y="0" width="60" height="50"/>
+    <node id="narrow-0" x="0" y="0" width="40" height="20"/>
+    <node id="narrow-1" x="0" y="20" width="60" height="20"/>
+    <node id="narrow-2" x="0" y="40" width="30" height="20"/>
+    <node id="wide" x="60" y="0" width="130" height="50"/>
+    <node id="wide-0" x="60" y="0" width="40" height="20"/>
+    <node id="wide-1" x="100" y="0" width="60" height="20"/>
+    <node id="wide-2" x="160" y="0" width="30" height="20"/>
+    <node id="rest" x="190" y="0" width="610" height="50"/>
+  </profile>
+  <profile viewport="1280x800" scale="1">
+    <node id="root" x="0" y="0" width="1280" height="800"/>
+    <node id="narrow" x="0" y="0" width="60" height="50"/>
+    <node id="narrow-0" x="0" y="0" width="40" height="20"/>
+    <node id="narrow-1" x="0" y="20" width="60" height="20"/>
+    <node id="narrow-2" x="0" y="40" width="30" height="20"/>
+    <node id="wide" x="60" y="0" width="130" height="50"/>
+    <node id="wide-0" x="60" y="0" width="40" height="20"/>
+    <node id="wide-1" x="100" y="0" width="60" height="20"/>
+    <node id="wide-2" x="160" y="0" width="30" height="20"/>
+    <node id="rest" x="190" y="0" width="1090" height="50"/>
+  </profile>
+  <profile viewport="1440x900" scale="1">
+    <node id="root" x="0" y="0" width="1440" height="900"/>
+    <node id="narrow" x="0" y="0" width="60" height="50"/>
+    <node id="narrow-0" x="0" y="0" width="40" height="20"/>
+    <node id="narrow-1" x="0" y="20" width="60" height="20"/>
+    <node id="narrow-2" x="0" y="40" width="30" height="20"/>
+    <node id="wide" x="60" y="0" width="130" height="50"/>
+    <node id="wide-0" x="60" y="0" width="40" height="20"/>
+    <node id="wide-1" x="100" y="0" width="60" height="20"/>
+    <node id="wide-2" x="160" y="0" width="30" height="20"/>
+    <node id="rest" x="190" y="0" width="1250" height="50"/>
+  </profile>
+  <profile viewport="320x240" scale="2">
+    <node id="root" x="0" y="0" width="320" height="240"/>
+    <node id="narrow" x="0" y="0" width="60" height="50"/>
+    <node id="narrow-0" x="0" y="0" width="40" height="20"/>
+    <node id="narrow-1" x="0" y="20" width="60" height="20"/>
+    <node id="narrow-2" x="0" y="40" width="30" height="20"/>
+    <node id="wide" x="60" y="0" width="130" height="50"/>
+    <node id="wide-0" x="60" y="0" width="40" height="20"/>
+    <node id="wide-1" x="100" y="0" width="60" height="20"/>
+    <node id="wide-2" x="160" y="0" width="30" height="20"/>
+    <node id="rest" x="190" y="0" width="130" height="50"/>
+  </profile>
+  <profile viewport="800x600" scale="2">
+    <node id="root" x="0" y="0" width="800" height="600"/>
+    <node id="narrow" x="0" y="0" width="60" height="50"/>
+    <node id="narrow-0" x="0" y="0" width="40" height="20"/>
+    <node id="narrow-1" x="0" y="20" width="60" height="20"/>
+    <node id="narrow-2" x="0" y="40" width="30" height="20"/>
+    <node id="wide" x="60" y="0" width="130" height="50"/>
+    <node id="wide-0" x="60" y="0" width="40" height="20"/>
+    <node id="wide-1" x="100" y="0" width="60" height="20"/>
+    <node id="wide-2" x="160" y="0" width="30" height="20"/>
+    <node id="rest" x="190" y="0" width="610" height="50"/>
+  </profile>
+  <profile viewport="1280x800" scale="2">
+    <node id="root" x="0" y="0" width="1280" height="800"/>
+    <node id="narrow" x="0" y="0" width="60" height="50"/>
+    <node id="narrow-0" x="0" y="0" width="40" height="20"/>
+    <node id="narrow-1" x="0" y="20" width="60" height="20"/>
+    <node id="narrow-2" x="0" y="40" width="30" height="20"/>
+    <node id="wide" x="60" y="0" width="130" height="50"/>
+    <node id="wide-0" x="60" y="0" width="40" height="20"/>
+    <node id="wide-1" x="100" y="0" width="60" height="20"/>
+    <node id="wide-2" x="160" y="0" width="30" height="20"/>
+    <node id="rest" x="190" y="0" width="1090" height="50"/>
+  </profile>
+  <profile viewport="1440x900" scale="2">
+    <node id="root" x="0" y="0" width="1440" height="900"/>
+    <node id="narrow" x="0" y="0" width="60" height="50"/>
+    <node id="narrow-0" x="0" y="0" width="40" height="20"/>
+    <node id="narrow-1" x="0" y="20" width="60" height="20"/>
+    <node id="narrow-2" x="0" y="40" width="30" height="20"/>
+    <node id="wide" x="60" y="0" width="130" height="50"/>
+    <node id="wide-0" x="60" y="0" width="40" height="20"/>
+    <node id="wide-1" x="100" y="0" width="60" height="20"/>
+    <node id="wide-2" x="160" y="0" width="30" height="20"/>
+    <node id="rest" x="190" y="0" width="1250" height="50"/>
+  </profile>
+</layout-reference>

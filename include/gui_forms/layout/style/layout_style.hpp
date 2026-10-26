@@ -2,6 +2,7 @@
 
 #include "gui_forms/layout/types/layout_types.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -202,6 +203,11 @@ struct GridTrackSize final {
 };
 
 enum class AutoRepeatKind : std::uint8_t { none, auto_fill, auto_fit };
+
+// The most tracks one grid-template-columns or -rows value may expand to,
+// `repeat()` counted, and the most sizes one grid-auto-columns or -rows
+// value may list (PLAN section 5).
+inline constexpr std::size_t maximum_grid_tracks = 10'000U;
 
 // A grid-template-columns or -rows value. `repeat(<n>, ...)` is expanded
 // into `tracks` when read; the one `repeat(auto-fill | auto-fit, ...)` a list
