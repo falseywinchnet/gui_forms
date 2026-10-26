@@ -269,7 +269,6 @@ jobs:
       - name: Fetch pinned text sources and build the CPU renderer
         run: |
           sh gui_forms/third_party/fetch_text_stack.sh
-          sh gui_forms/stx_cng/tools/fetch_zstd.sh
           if [ "$RUNNER_OS" != Windows ]; then
             if [ "$RUNNER_OS" = Linux ]; then export GUI_FORMS_SYSTEM_BUILD_TOOLS=1; fi
             sh gui_forms/third_party/fetch_skia_cpu.sh

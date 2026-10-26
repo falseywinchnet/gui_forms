@@ -1,5 +1,9 @@
 # Intake measurement — 2026-10-22 (provisional)
 
+> Moved here from `stx_cng/results/2026-10-22-intake/` when CNG was removed
+> from GUI.Forms (2026-10-26). The package, including the
+> `docs/HARDENING.md` cited below, remains in git history.
+
 **Provisional:** the machine's CPU load was 97 to 100 % for the whole run
 (other builds were running). Ratios between codecs measured in interleaved
 rounds share that load; absolute times do not mean much. Re-measure on an idle
