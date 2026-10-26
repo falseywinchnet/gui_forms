@@ -1055,21 +1055,30 @@ namespace doc_example_DateTimePicker_2 {
 struct Reminder final : gf::Component {
     std::shared_ptr<gf::DateTimePicker> when =
         gf::make_control<gf::DateTimePicker>(gf::StableId("reminder.when"));
-    bool has_date = true;
-    gf::DateTimeValue date{};
+    // Empty while the box is unchecked.
+    std::optional<gf::DateTimeValue> date{};
 
     Reminder() {
         (*when).set_show_check_box(true);
+        date = (*when).value();
         gf::on((*when).checked_changed(), *this, &Reminder::on_checked);
         gf::on((*when).value_changed(), *this, &Reminder::on_date);
     }
-    void on_checked(bool checked) { has_date = checked; }
-    void on_date(gf::DateTimeValue value) { date = value; }
+    void on_checked(bool checked) {
+        if (checked) {
+            date = (*when).value();
+        } else {
+            date.reset();
+        }
+    }
+    void on_date(gf::DateTimeValue value) {
+        if ((*when).checked()) date = value;
+    }
 };
 
 void example() {
     Reminder reminder;
-    (*reminder.when).set_checked(false);   // has_date is false
+    (*reminder.when).set_checked(false);   // date is empty
     std::shared_ptr<gf::Panel> root =
         gf::make_control<gf::Panel>(gf::StableId("reminder.root"));
     (*reminder.when).set_requested_bounds({10.0, 10.0, 240.0, 29.0});
@@ -1078,7 +1087,7 @@ void example() {
     window.perform_layout();
     window.request_focus(reminder.when);
     window.dispatch_key({gf::KeyAction::down, gf::PhysicalKey::up});
-    // has_date is true again and date is January 2, 2000
+    // date is January 2, 2000
 }
 }  // namespace doc_example_DateTimePicker_2
 
@@ -2241,6 +2250,25 @@ void example() {
 }
 }  // namespace doc_example_ObjectView_2
 
+namespace doc_example_OpenFileDialog_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    gf::OpenFileDialog dialog;
+    dialog.set_title("Open recordings");
+    dialog.set_filter("Recordings|*.wav;*.flac|All files|*.*");
+    dialog.set_multiselect(true);
+    const gf::DialogResult result = dialog.show_dialog(window);
+    if (result == gf::DialogResult::ok) {
+        for (const std::string& path : dialog.file_names()) {
+            static_cast<void>(path);
+        }
+    } else if (result == gf::DialogResult::none) {
+        // Without a host, dialog.status().error is gf::HostServiceError::unsupported.
+    }
+}
+}  // namespace doc_example_OpenFileDialog_1
+
 namespace doc_example_PageSet_1 {
 void example() {
     gf::PageSet pages;
@@ -3293,6 +3321,24 @@ void example() {
 }
 }  // namespace doc_example_TextBox_3
 
+namespace doc_example_ThreadExceptionDialog_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {640.0, 480.0});
+    gf::ThreadExceptionReport report;
+    try {
+        throw std::runtime_error("The index is out of date.");
+    } catch (...) {
+        report = gf::describe_exception(std::current_exception());
+    }
+    report.details = "Raised while rebuilding the index.";
+    gf::ThreadExceptionDialog dialog(gf::StableId("doc.error"), std::move(report));
+    const bool shown = dialog.show(root);
+    static_cast<void>(shown);
+    dialog.close(gf::DialogResult::cancel);
+}
+}  // namespace doc_example_ThreadExceptionDialog_1
+
 namespace doc_example_Timer_1 {
 struct Clock final : gf::Component {
     int ticks = 0;
@@ -4011,6 +4057,7 @@ int main() {
     failures += run("NumericUpDown example 2", &doc_example_NumericUpDown_2::example);
     failures += run("ObjectView example 1", &doc_example_ObjectView_1::example);
     failures += run("ObjectView example 2", &doc_example_ObjectView_2::example);
+    failures += run("OpenFileDialog example 1", &doc_example_OpenFileDialog_1::example);
     failures += run("PageSet example 1", &doc_example_PageSet_1::example);
     failures += run("PageSet example 2", &doc_example_PageSet_2::example);
     failures += run("PageStrip example 1", &doc_example_PageStrip_1::example);
@@ -4063,6 +4110,7 @@ int main() {
     failures += run("TextBox example 1", &doc_example_TextBox_1::example);
     failures += run("TextBox example 2", &doc_example_TextBox_2::example);
     failures += run("TextBox example 3", &doc_example_TextBox_3::example);
+    failures += run("ThreadExceptionDialog example 1", &doc_example_ThreadExceptionDialog_1::example);
     failures += run("Timer example 1", &doc_example_Timer_1::example);
     failures += run("Timer example 2", &doc_example_Timer_2::example);
     failures += run("TokenBox example 1", &doc_example_TokenBox_1::example);

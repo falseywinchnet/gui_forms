@@ -11,6 +11,7 @@
 #include "gui_forms/engine/part_shape/part_shape.hpp"
 #include "gui_forms/surface_material/painting/surface_material_painting.hpp"
 #include "gui_forms/surface_material/presets/material_presets.hpp"
+#include "gui_forms/theme/types/theme_types.hpp"
 
 #include <algorithm>
 #include <array>
@@ -35,9 +36,12 @@ namespace {
 
 // -- the descriptor ----------------------------------------------------------------
 
-constexpr std::array<std::string_view, 12> recipe_names{
+constexpr std::array<std::string_view, 14> recipe_names{
     "window", "panel", "card", "button", "accent_button", "command_button",
-    "choice", "editor", "menu_item", "selection", "progress", "tool_tip"};
+    "choice", "editor", "menu_item", "selection", "progress", "tool_tip",
+    "link", "visited_link"};
+static_assert(recipe_names.size() == static_cast<std::size_t>(ControlVisualRole::count),
+              "one choice per recipe role");
 
 const PartRole material_roles[] = {PartRole::region, PartRole::face,  PartRole::actuator, PartRole::well,
                                    PartRole::track,  PartRole::thumb, PartRole::chip};
@@ -441,6 +445,8 @@ void add_keyline(MaterialLook& look, const MaterialKeyline& keyline, double scal
         add_band(look, Rect{box.x + inset, box.y + inset, width, box.height - inset * 2.0}, keyline.color, clipped);
         return;
     }
+    // An edge outside the enumeration draws no keyline.
+    return;
 }
 
 // A dashed or dotted border's path in `box`, `width` device pixels wide; a

@@ -83,10 +83,11 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
           ("window", "scheduler", "dispatcher", "display", "dirty", "metrics")),
     Group("control-and-component", "Control and component",
           "The base classes every control and nonvisual component derives from, "
-          "with layout, docking, anchoring and validation vocabularies, and the "
+          "with layout, docking, anchoring and validation vocabularies (layout "
+          "constraints, intrinsic sizes and layout direction among them), and the "
           "anatomy each control publishes: named parts, part roles and states, "
           "and the interactions each type raises.",
-          ("control", "component", "anatomy", "schema")),
+          ("control", "component", "anatomy", "schema", "layout")),
     Group("events-values-and-commands", "Events, values and commands",
           "Retained events and owned handlers, application-owned `Value` state, "
           "command bindings and semantic feedback records.",
@@ -148,6 +149,7 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
 # library page: property inspection with PropertyGrid, instrument records with
 # InstrumentRack, metrics and visual inspection with the diagnostic views.
 AREA_TO_CATEGORY: dict[str, str] = {
+    "components": "Components",
     "inspection": "Value setting",
     "instrument": "Value setting",
     "metrics": "Diagnostics",
@@ -172,7 +174,7 @@ CATEGORY_DESCRIPTIONS: dict[str, str] = {
     "Drawing": "Owner-drawn, live and raster surfaces.",
     "Diagnostics": "Metrics, easing, typography and visual-inspection views.",
     "Components": "Nonvisual components: bindings, providers, image lists, "
-                  "timers and semantic feedback.",
+                  "timers, semantic feedback and the host's file dialogs.",
 }
 
 
