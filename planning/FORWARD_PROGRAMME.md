@@ -196,8 +196,9 @@ to the built-in recipe; reduced motion disables motion primitives.
 
 A parser for the CSS-syntax subset: selectors by control type, stable ID,
 class, `::part()` and `:state()`; no combinators; inheritance only for text and
-colour roles; no layout properties. Diagnostics name the file, line and rule;
-an invalid rule is dropped, not fatal. Theme documents are data only.
+colour roles; no layout properties. Diagnostics name the file, line and rule.
+Themes are compiled: an error refuses the whole theme, a warning drops one
+declaration (owner, 2026-10-25; T3 README, B2). Theme documents are data only.
 
 Gate: conformance fixtures for every selector and property form; malformed
 and hostile input tests; a byte-preserving round trip of an untouched document.

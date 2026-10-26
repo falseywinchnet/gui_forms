@@ -433,7 +433,9 @@ jobs:
             .ci/*.json
             .ci/engine-gate-*.tsv
       - name: Publish this passing platform immediately
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        # Only a push to main publishes. The daily schedule rebuilds a commit
+        # main already published, and publish_cache.py refuses different bytes.
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
