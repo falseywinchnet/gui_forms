@@ -3,7 +3,8 @@
 Release: 0.4 Flexible. Depends on: T1. Unblocks FD, D and H. Status
 2026-10-26: phases L0 to L7 built; the box gate is recorded
 (`results/2026-10-26-l-layout-gate`), with the text-scale dimension not yet
-exercised; L8, the text fixtures, next (owner, 2026-10-26). Plan accepted
+exercised. L8a (the `TextBlock` leaf, the baseline contract and the strut
+from the font) built; L8b, the text corpus, next. Plan accepted
 2026-10-25 ([`PLAN.md`](PLAN.md)); interview round 001 answered (below). T1's gate is recorded
 (`results/2026-10-13-t1-anatomy-gate`). Authority: `planning/FORWARD_PROGRAMME.md` §4 L.
 
@@ -239,11 +240,26 @@ to right changes nothing.
 
   It must meet L-Q9's tolerances: 0.51 px per edge and 1.0 px on the
   baseline.
-- The leaf is provisionally named `TextBlock`, by the panels' rule of a
-  name that cannot be confused with a CSS property. The coordinator is
-  confirming the name with the owner. The control is not added before
-  then.
+- The leaf is named `TextBlock`, by the panels' rule of a name that
+  cannot be confused with a CSS property. The owner confirmed the name on
+  2026-10-26 ("textblock seems fine"). It is registered like any control:
+  the registry, schema, docs and the CSS layout panels Gallery page.
 - `Label` stays as it is.
+
+**Wrapping and the strut** (coordinator and owner, 2026-10-26):
+- The leaf wraps at the text engine's existing UAX #14 breaker, the
+  pinned libunibreak 8.0. No second breaker is written.
+- It reaches the breaker through `TextMetricsProvider`: a non-pure
+  virtual, `fill_line_break_opportunities_utf8`, whose default breaks at
+  white space and reports `estimated`. `HarfBuzzFontEngine` answers it
+  with libunibreak and reports `exact`.
+- libunibreak's admission widens from the text-mask profile to the text
+  engine (owner: "libunibreak is fine, can admit it"). It is fetched
+  wherever the HarfBuzz/FreeType sources are, and its conformance test
+  runs in the default text build
+  (`third_party/LIBUNIBREAK_INTAKE_2026-10-01.md`).
+- A `BlockPanel` with no strut set takes it from its font, scaled with
+  the text scale (option (a)).
 
 `PLAN.md` section 12 is L8's plan.
 

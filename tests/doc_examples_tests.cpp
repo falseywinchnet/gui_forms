@@ -287,6 +287,7 @@ void example() {
     std::shared_ptr<gf::BlockPanel> row =
         gf::make_control<gf::BlockPanel>(gf::StableId("row"));
     (*row).set_text_align(gf::TextAlignment::center);
+    (*row).set_line_strut(gf::LineStrut{});   // lines as tall as their items
     gf::BlockFlowItemLayout atomic{};
     atomic.level = gf::BlockFlowLevel::inline_level;
     atomic.width = gf::SizeValue{gf::SizeKind::length_percentage,
@@ -3457,6 +3458,45 @@ void example() {
 }
 }  // namespace doc_example_TaskDialog_1
 
+namespace doc_example_TextBlock_1 {
+void example() {
+    std::shared_ptr<gf::FlexPanel> column =
+        gf::make_control<gf::FlexPanel>(gf::StableId("article"));
+    (*column).set_flex_direction(gf::FlexDirection::column);
+    std::shared_ptr<gf::TextBlock> heading = gf::make_control<gf::TextBlock>(
+        gf::StableId("article.heading"), "Export settings");
+    (*heading).set_font(gf::FontSpec{gf::FontRole::content, 19.5, 700, false, 0.0});
+    std::shared_ptr<gf::TextBlock> body = gf::make_control<gf::TextBlock>(
+        gf::StableId("article.body"),
+        "Exported files keep their names; existing files are never overwritten.");
+    (*column).add_child(heading);
+    (*column).add_child(body);
+
+    gf::Window window(column, {240.0, 120.0});
+    window.perform_layout();
+    // the paragraph wraps to the column's 240 px width
+}
+}  // namespace doc_example_TextBlock_1
+
+namespace doc_example_TextBlock_2 {
+void example() {
+    std::shared_ptr<gf::FlexPanel> row =
+        gf::make_control<gf::FlexPanel>(gf::StableId("rate"));
+    (*row).set_align_items(gf::LayoutAlignment::baseline);
+    std::shared_ptr<gf::TextBlock> caption =
+        gf::make_control<gf::TextBlock>(gf::StableId("rate.caption"), "Rate");
+    std::shared_ptr<gf::TextBlock> value =
+        gf::make_control<gf::TextBlock>(gf::StableId("rate.value"), "42 MB/s");
+    (*value).set_font(gf::FontSpec{gf::FontRole::content, 26.0, 400, false, 0.0});
+    (*row).add_child(caption);
+    (*row).add_child(value);
+
+    gf::Window window(row, {240.0, 60.0});
+    window.perform_layout();
+    // the caption's first line sits on the value's baseline
+}
+}  // namespace doc_example_TextBlock_2
+
 namespace doc_example_TextBox_1 {
 struct Search final : gf::Component {
     std::shared_ptr<gf::TextBox> field =
@@ -4304,6 +4344,8 @@ int main() {
     failures += run("TableLayoutPanelCompat example 1", &doc_example_TableLayoutPanelCompat_1::example);
     failures += run("TableLayoutPanelCompat example 2", &doc_example_TableLayoutPanelCompat_2::example);
     failures += run("TaskDialog example 1", &doc_example_TaskDialog_1::example);
+    failures += run("TextBlock example 1", &doc_example_TextBlock_1::example);
+    failures += run("TextBlock example 2", &doc_example_TextBlock_2::example);
     failures += run("TextBox example 1", &doc_example_TextBox_1::example);
     failures += run("TextBox example 2", &doc_example_TextBox_2::example);
     failures += run("TextBox example 3", &doc_example_TextBox_3::example);

@@ -297,6 +297,21 @@ Properties beyond every control's: `font` (font), `fore_color` (color), `maximum
 |---|---|
 | `text_changed` | `std::string` |
 
+## `text_block` (TextBlock, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `text` | label |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: `font` (font), `fore_color` (color), `line_height` (number), `text` (text), `text_align` (enumeration).
+
+| Interaction | Payload |
+|---|---|
+| `text_changed` | `std::string` |
+
 ## `picture_box` (PictureBox, control)
 
 | Part | Role | Reuses | Own states |

@@ -292,6 +292,8 @@ gui_forms::Window
         - Removes a snapshot's image; false when it is not there.
       * - :cpp:func:`resolve_text_layout_utf8 <gui_forms::Window::resolve_text_layout_utf8>`
         -  
+      * - :cpp:func:`fill_line_break_opportunities_utf8 <gui_forms::Window::fill_line_break_opportunities_utf8>`
+        - The installed provider's line-break opportunities (TextMetricsProvider::fill_line_break_opportunities_utf8), or the estimate without one.
       * - :cpp:func:`shares_resources_with <gui_forms::Window::shares_resources_with>`
         -  
       * - :cpp:func:`declare_non_opaque <gui_forms::Window::declare_non_opaque>`
@@ -933,6 +935,10 @@ gui_forms::Window
       Removes a snapshot's image; false when it is not there.
 
    .. cpp:function:: ResolvedTextLayout resolve_text_layout_utf8(std::string_view utf8, FontSpec effective_font) const
+
+   .. cpp:function:: TextResolutionStatus fill_line_break_opportunities_utf8(std::string_view utf8, std::span<LineBreakOpportunity> opportunities) const
+
+      The installed provider's line-break opportunities (TextMetricsProvider::fill_line_break_opportunities_utf8), or the estimate without one.
 
    .. cpp:function:: bool shares_resources_with(const Window& other) const noexcept
 

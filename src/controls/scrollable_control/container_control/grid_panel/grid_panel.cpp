@@ -567,15 +567,20 @@ void GridPanel::measure_row_contributions(const GridContainerInput& container,
                                                     child.minimum_size().height, child.maximum_size().height);
         double height = 0.0;
         const bool definite_height = plain_length(layout.height);
+        const double width =
+            grid_item_column_size(container, inputs_[index], column_contributions_[index], workspace, index);
         if (definite_height) {
             height = plain_length_value(layout.height);
         } else {
-            const double width =
-                grid_item_column_size(container, inputs_[index], column_contributions_[index], workspace, index);
             const LayoutConstraint constraint{query_extent(width), max_content_extent()};
             height = child.measure_for_layout(constraint).height;
             if (!is_alive()) return;
         }
+        // Its first baseline at its column size, for baseline alignment in
+        // its row.
+        const std::optional<double> baseline = child.first_baseline(width);
+        if (!is_alive()) return;
+        if (baseline) contribution.baseline = *baseline;
         const double outer = clamp_content(height, bounds) + margins;
         contribution.min_content = outer;
         contribution.max_content = outer;

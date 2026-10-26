@@ -442,6 +442,11 @@ public:
     // second time.
     [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
         std::string_view utf8, FontSpec effective) const;
+    // The attached window's line-break opportunities
+    // (Window::fill_line_break_opportunities_utf8), or the estimate while
+    // detached.
+    [[nodiscard]] TextResolutionStatus fill_line_break_opportunities_utf8(
+        std::string_view utf8, std::span<LineBreakOpportunity> opportunities) const;
     [[nodiscard]] double snap_text_baseline(double logical_baseline) const noexcept;
     [[nodiscard]] const Theme& effective_theme() const noexcept;
     // The attached window's key map (Window::key_map), or the PC
@@ -685,6 +690,16 @@ public:
     // thread only. The window's own measure pass calls this too, so a
     // container's later query under the same constraint is a hit.
     [[nodiscard]] Size measure_for_layout(const LayoutConstraint& constraint);
+    // The baselines a layout container aligns this control by (stage L,
+    // PLAN.md section 12.3): its first and last line boxes' baselines, as
+    // offsets from the top of its border box when laid out at `width`. None
+    // means it has no line box; the container then synthesizes one from the
+    // border box, as CSS does. The defaults answer none. Text that lays out
+    // in lines (TextBlock) and the CSS containers override them. Flex and
+    // grid alignment use the first baseline; an inline item in BlockPanel
+    // uses the last, as an inline-block does.
+    [[nodiscard]] virtual std::optional<double> first_baseline(double width);
+    [[nodiscard]] virtual std::optional<double> last_baseline(double width);
     // Advances whenever this control becomes measure-dirty; a cache entry
     // stored under an earlier generation is never answered.
     [[nodiscard]] std::uint64_t measure_generation() const noexcept {

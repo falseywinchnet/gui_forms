@@ -344,7 +344,7 @@ struct PageDigest final {
 // and, where the phase had recorded every page, the two main pages too.
 //
 // typography-and-inspection's entry is the trace with the RuntimeId the
-// specimen has when this test runs first (#1311 since L6 on main); the digest
+// specimen has when this test runs first (#1317 since L8a on main); the digest
 // changes whenever a page made before it makes a control more or less.
 constexpr std::array<PageDigest, 30> expected_digests{{
     {"basics", 0x8ad3bd64955e6995ULL},
@@ -355,7 +355,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"ranges-and-progress", 0x2a06ace770e13138ULL},
     {"containers-and-focus", 0x4bd8a3f439f8078cULL},
     {"animation-laboratory", 0xd22492f193fdb022ULL},
-    {"states-and-diagnostics", 0xe08e3a5ddce44856ULL},
+    {"states-and-diagnostics", 0x1223886a1399df43ULL},
     {"text-and-input", 0x6cea6c153578579dULL},
     {"collections-and-popups", 0x5b75d7735fed6b79ULL},
     {"values-and-spinners", 0x53974a1f042eaa19ULL},
@@ -365,7 +365,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"timing-and-tooltips", 0x99f306d142ff03deULL},
     {"dates-and-calendar", 0x6f1eb88a51fed7cfULL},
     {"dialogs-and-host-services", 0x5b7235ff76025a51ULL},
-    {"css-layout-panels", 0xcdbcfbcf6e561d16ULL},
+    {"css-layout-panels", 0x13ab5d90ddefe752ULL},
     {"retained-layout-panels", 0x9468a4553545fddeULL},
     {"dock-and-anchor", 0x8f0e6fa2ea1031b2ULL},
     {"commands-and-menus", 0xeefd420533055ee2ULL},
@@ -375,7 +375,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"responsive-layouts", 0x3f60bc621cdf06c9ULL},
     {"anchored-popups", 0x898b0bfbbfdcc181ULL},
     {"live-surfaces", 0xf100f9eb79b7356eULL},
-    {"typography-and-inspection", 0xa7920cdbbd5db32bULL},
+    {"typography-and-inspection", 0x20f818876c5de4cfULL},
     {"semantic-feedback", 0x52902fede7280d09ULL},
 }};
 

@@ -1,4 +1,4 @@
-# Source-only Unicode 17 line breaking. No headers or target are exported.
+# Source-only Unicode 17 line breaking for the text engine. No headers or target are exported.
 set(GUI_FORMS_LINEBREAK_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/libunibreak/src")
 if(NOT EXISTS "${GUI_FORMS_LINEBREAK_SOURCE}/linebreak.c")
     message(FATAL_ERROR "Fetch the pinned line-break dependency with third_party/fetch_linebreak.sh")

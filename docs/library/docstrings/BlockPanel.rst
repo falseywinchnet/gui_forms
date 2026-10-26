@@ -35,12 +35,19 @@ text_align : default ``TextAlignment::start``
     How each line box's items sit along it: `start`, `end`, `left`,
     `right` or `center`. A line wider than the panel starts at its start
     edge whatever the alignment.
-line_strut : default zero
+line_strut : default none
     The `LineStrut` every line box starts with: the ascent and descent the
     panel's font and line height give a line above and below its
-    baseline, and the x-height `middle` aligns to. With the default zero
-    strut a line is as tall as its items. Its values must be finite and
-    nonnegative.
+    baseline, and the x-height `middle` aligns to. When none is set the
+    panel uses its font's: the `line-height: normal` line box of `font`
+    at the window's text scale, as CSS's strut is. With a zero strut a
+    line is as tall as its items. Its values must be finite and
+    nonnegative; `clear_line_strut` returns to the font's.
+font
+    The font the panel's inline content is set in, for its strut: the one
+    given to `set_font`, or else the theme's field typography. An invalid
+    specification throws `std::invalid_argument`; `clear_font` returns to
+    the theme's font.
 layout_snapshot : read-only
     The last arrange's resolution: for each laid-out child its bounds and
     its line, and the line boxes with their tops, heights, baselines and
@@ -152,6 +159,7 @@ Centre a row of 80-wide inline buttons, wrapping the third:
    std::shared_ptr<gf::BlockPanel> row =
        gf::make_control<gf::BlockPanel>(gf::StableId("row"));
    (*row).set_text_align(gf::TextAlignment::center);
+   (*row).set_line_strut(gf::LineStrut{});   // lines as tall as their items
    gf::BlockFlowItemLayout atomic{};
    atomic.level = gf::BlockFlowLevel::inline_level;
    atomic.width = gf::SizeValue{gf::SizeKind::length_percentage,

@@ -48,9 +48,28 @@ dependency choice, not a new public API, installed SDK promise or global ADR.
 Keep it out of normal OFF builds. First-party fetch/build/adapter code receives
 house-style review; upstream code and data retain their original licenses.
 
+**OBSERVED owner decision, 2026-10-26:** the admission widens from the
+development text-mask profile to the text engine ("libunibreak is fine, can
+admit it"). Stage L's `TextBlock` wraps at UAX #14 opportunities through the
+text engine's `TextMetricsProvider`, and a control cannot otherwise reach the
+breaker (`planning/stages/L-layout/PLAN.md`, section 12.9). From that date:
+
+- `gui_forms_linebreak` is built wherever `GUI_FORMS_ENABLE_HARFBUZZ_TEXT` is
+  on (`cmake/LineBreak.cmake`, formerly `cmake/TextMaskLineBreak.cmake`), and
+  `gui_forms_text_engine` links it privately;
+- `fetch_linebreak.sh` runs wherever `fetch_text_stack.sh` runs: by
+  `tools/ci_build.py` on every host, and by the release workflow;
+- `gui_forms_linebreak_conformance` runs in the default text build;
+- the pin, the licence and the attribution are unchanged, and builds without
+  HarfBuzz text still have no line-break dependency.
+
+The sentence above, "Keep it out of normal OFF builds", now reads as builds
+without HarfBuzz text. The text-mask profile keeps its own adapter.
+
 `fetch_linebreak.sh` fetches the exact commit and refuses an unexpected origin,
-modified checkout or non-repository destination. Unlike the general text-stack
-fetch, it is explicitly requested only for the development mask build. Initial
+modified checkout or non-repository destination. Until 2026-10-26 it was
+requested only for the development mask build; it now runs with the
+general text-stack fetch. Initial
 manual invocation with an incomplete MSYS PATH exposed a nested `dirname`
 failure: the script incorrectly resolved to the working directory. The script
 now resolves its parent in a separate checked assignment. The newly fetched

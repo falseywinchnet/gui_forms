@@ -9,6 +9,7 @@
 #include "gui_forms/layout/block_flow_solver/block_flow_solver.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace gui_forms {
 
@@ -129,6 +130,15 @@ struct LineMetrics final {
     double descent{};
 };
 
+// How far a baseline-aligned item's margin box reaches above its baseline:
+// its top margin and its own baseline, or its whole margin box when it has
+// none.
+double item_ascent(const BlockFlowItemInput& item) noexcept {
+    if (std::isnan(item.baseline)) return outer_height(item);
+    const double ascent = item.margin.top + item.baseline;
+    return ascent;
+}
+
 LineMetrics line_metrics(const LineStrut& strut, std::span<const BlockFlowItemInput> line) noexcept {
     LineMetrics metrics{strut.ascent, strut.descent};
     double tallest = 0.0;
@@ -137,9 +147,12 @@ LineMetrics line_metrics(const LineStrut& strut, std::span<const BlockFlowItemIn
     for (const BlockFlowItemInput& item : line) {
         const double height = outer_height(item);
         switch (item.vertical_align) {
-        case InlineVerticalAlignment::baseline:
-            metrics.ascent = std::max(metrics.ascent, height);
+        case InlineVerticalAlignment::baseline: {
+            const double ascent = item_ascent(item);
+            metrics.ascent = std::max(metrics.ascent, ascent);
+            metrics.descent = std::max(metrics.descent, height - ascent);
             break;
+        }
         case InlineVerticalAlignment::middle: {
             const double half = height / 2.0;
             metrics.ascent = std::max(metrics.ascent, half + strut.x_height / 2.0);
@@ -172,7 +185,7 @@ double inline_item_top(const BlockFlowItemInput& item, const LineMetrics& metric
     double margin_top = 0.0;
     switch (item.vertical_align) {
     case InlineVerticalAlignment::baseline:
-        margin_top = metrics.ascent - height;
+        margin_top = metrics.ascent - item_ascent(item);
         break;
     case InlineVerticalAlignment::middle:
         margin_top = metrics.ascent - x_height / 2.0 - height / 2.0;

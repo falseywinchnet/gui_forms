@@ -10,6 +10,7 @@
 
 #include "../../scrollable_anatomy.hpp"
 #include "../out_of_flow.hpp"
+#include "gui_forms/window.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -132,9 +133,45 @@ void BlockPanel::set_line_strut(LineStrut strut) {
     if (!admitted_strut(strut)) {
         throw std::invalid_argument("BlockPanel line strut values must be finite and nonnegative");
     }
-    if (line_strut_ == strut) return;
+    if (line_strut_ && *line_strut_ == strut) return;
     line_strut_ = strut;
     invalidate(invalidation::bounds);
+}
+
+void BlockPanel::clear_line_strut() {
+    require_mutable();
+    if (!line_strut_) return;
+    line_strut_.reset();
+    invalidate(invalidation::bounds);
+}
+
+LineStrut BlockPanel::used_line_strut() const {
+    if (line_strut_) return *line_strut_;
+    const FontSpec used = effective_font((*this).font());
+    const ResolvedTextLayout primary = resolve_text_layout_utf8(" ", used);
+    const LineBoxMetrics line = line_box_metrics(primary, std::nullopt);
+    const LineStrut strut{line.baseline, std::max(0.0, line.height - line.baseline), line.x_height};
+    return strut;
+}
+
+FontSpec BlockPanel::font() const noexcept {
+    if (font_override_) return *font_override_;
+    return effective_theme().structure().typography.field;
+}
+
+void BlockPanel::set_font(FontSpec font) {
+    require_mutable();
+    if (!valid_font_spec(font)) throw std::invalid_argument("BlockPanel font is invalid");
+    if (font_override_ && *font_override_ == font) return;
+    font_override_ = font;
+    if (!line_strut_) invalidate(invalidation::bounds);
+}
+
+void BlockPanel::clear_font() {
+    require_mutable();
+    if (!font_override_) return;
+    font_override_.reset();
+    if (!line_strut_) invalidate(invalidation::bounds);
 }
 
 void BlockPanel::set_item_layout(const Control& child, const BlockFlowItemLayout& layout) {
@@ -285,7 +322,14 @@ void BlockPanel::resolve_item_inputs(const SolveRequest& request) {
         }
         const double height = std::max(0.0, clamp_size(content_height, heights));
         input.height = height;
-        if (!block) continue;
+        if (!block) {
+            // An inline item sits on the line by its last line box's
+            // baseline, as an inline-block does.
+            const std::optional<double> baseline = child.last_baseline(width);
+            if (!is_alive()) return;
+            if (baseline) input.baseline = *baseline;
+            continue;
+        }
 
         BlockPanel* const nested = dynamic_cast<BlockPanel*>(&child);
         if (nested != nullptr) {
@@ -329,7 +373,7 @@ BlockPanel::SolveResult BlockPanel::solve(const SolveRequest& request, BlockFlow
     BlockFlowContainerInput container{};
     container.width = request.width;
     container.text_align = text_align_;
-    container.strut = line_strut_;
+    container.strut = used_line_strut();
     container.shares_leading_margin = shares && inset.top == 0.0;
     const LayoutDirection direction = effective_layout_direction();
     container.layout_direction = direction == LayoutDirection::right_to_left ? LayoutDirection::right_to_left

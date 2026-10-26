@@ -23,4 +23,14 @@ ResolvedTextLayout Window::resolve_text_layout_utf8(
         : estimate_text_layout_utf8(utf8, effective_font);
 }
 
+TextResolutionStatus Window::fill_line_break_opportunities_utf8(
+    std::string_view utf8, std::span<LineBreakOpportunity> opportunities) const {
+    if (text_metrics_provider_ == nullptr) {
+        return estimate_line_break_opportunities_utf8(utf8, opportunities);
+    }
+    const TextResolutionStatus status =
+        (*text_metrics_provider_).fill_line_break_opportunities_utf8(utf8, opportunities);
+    return status;
+}
+
 } // namespace gui_forms

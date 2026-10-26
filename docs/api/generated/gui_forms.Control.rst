@@ -417,6 +417,8 @@ gui_forms::Control
         - Scales an authored font's size and letter spacing by :cpp:func:`effective_text_scale <gui_forms::Control::effective_text_scale>`.
       * - :cpp:func:`resolve_text_layout_utf8 <gui_forms::Control::resolve_text_layout_utf8>`
         - Resolves an already-effective FontSpec (normally from effective_font) through the attached terminal provider without applying text scale a second time.
+      * - :cpp:func:`fill_line_break_opportunities_utf8 <gui_forms::Control::fill_line_break_opportunities_utf8>`
+        - The attached window's line-break opportunities (Window::fill_line_break_opportunities_utf8), or the estimate while detached.
       * - :cpp:func:`snap_text_baseline <gui_forms::Control::snap_text_baseline>`
         -  
       * - :cpp:func:`clear_theme_override <gui_forms::Control::clear_theme_override>`
@@ -1231,6 +1233,10 @@ gui_forms::Control
 
       Resolves an already-effective FontSpec (normally from effective_font) through the attached terminal provider without applying text scale a second time.
 
+   .. cpp:function:: TextResolutionStatus fill_line_break_opportunities_utf8(std::string_view utf8, std::span<LineBreakOpportunity> opportunities) const
+
+      The attached window's line-break opportunities (Window::fill_line_break_opportunities_utf8), or the estimate while detached.
+
    .. cpp:function:: double snap_text_baseline(double logical_baseline) const noexcept
 
    .. cpp:function:: void clear_theme_override()
@@ -1425,6 +1431,12 @@ gui_forms::Control
       the final bounds and lays out children by :cpp:func:`dock <gui_forms::Control::dock>` and :cpp:func:`anchor <gui_forms::Control::anchor>`. A layout
       container that places its own children calls ``arrange_self`` and
       ``set_child_layout`` instead.
+
+   .. cpp:function:: virtual std::optional<double> first_baseline(double width)
+
+      The baselines a layout container aligns this control by (stage L, PLAN.md section 12.3): its first and last line boxes' baselines, as offsets from the top of its border box when laid out at :cpp:func:`width <gui_forms::Control::width>`. None means it has no line box; the container then synthesizes one from the border box, as CSS does. The defaults answer none. Text that lays out in lines (TextBlock) and the CSS containers override them. Flex and grid alignment use the first baseline; an inline item in BlockPanel uses the last, as an inline-block does.
+
+   .. cpp:function:: virtual std::optional<double> last_baseline(double width)
 
    .. cpp:function:: virtual bool size_depends_on_content() const noexcept
 

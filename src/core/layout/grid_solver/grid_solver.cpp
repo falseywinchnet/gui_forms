@@ -668,6 +668,20 @@ SelfPacking self_packing(LayoutAlignment self, LayoutAlignment items, bool defin
     }
 }
 
+// How far a baseline-aligned item's margin box reaches above its baseline
+// in its row: its top margin and its own baseline, or its outer height less
+// its bottom margin (the border box's bottom) when it has none.
+double baseline_ascent(const GridItemInput& item, const GridItemContribution& contribution) noexcept {
+    if (std::isnan(contribution.baseline)) {
+        const GridMargin& bottom = item.margin.bottom;
+        const double synthesized = contribution.max_content - (bottom.automatic ? 0.0 : bottom.length);
+        return synthesized;
+    }
+    const GridMargin& top = item.margin.top;
+    const double ascent = (top.automatic ? 0.0 : top.length) + contribution.baseline;
+    return ascent;
+}
+
 bool baseline_aligned(const GridContainerInput& container, const GridItemInput& item) noexcept {
     const LayoutAlignment used = item.align_self == LayoutAlignment::automatic ? container.align_items : item.align_self;
     return used == LayoutAlignment::baseline;
@@ -1258,8 +1272,9 @@ GridSolveOutcome size_grid_tracks(GridAxis axis, const GridContainerInput& conta
     const bool mirrored = right_to_left(container);
 
     // Row contributions carry each baseline-aligned item's shim: the space
-    // above it that lines its baseline (synthesized from its border box's
-    // bottom) up with its row's other baseline-aligned items (12.5 step 1).
+    // above it that lines its baseline (its own, or synthesized from its
+    // border box's bottom) up with its row's other baseline-aligned items
+    // (12.5 step 1).
     std::span<const GridItemContribution> used = contributions;
     if (axis == GridAxis::rows) {
         workspace.adjusted_.assign(contributions.begin(), contributions.end());
@@ -1267,15 +1282,13 @@ GridSolveOutcome size_grid_tracks(GridAxis axis, const GridContainerInput& conta
         workspace.group_ascents_.assign(track_count, 0.0);
         for (std::size_t index = 0U; index < count; ++index) {
             if (!baseline_aligned(container, items[index])) continue;
-            const GridMargin& bottom = items[index].margin.bottom;
-            const double ascent = contributions[index].max_content - (bottom.automatic ? 0.0 : bottom.length);
+            const double ascent = baseline_ascent(items[index], contributions[index]);
             double& group = workspace.group_ascents_[workspace.items_[index].area.row_start];
             group = std::max(group, ascent);
         }
         for (std::size_t index = 0U; index < count; ++index) {
             if (!baseline_aligned(container, items[index])) continue;
-            const GridMargin& bottom = items[index].margin.bottom;
-            const double ascent = contributions[index].max_content - (bottom.automatic ? 0.0 : bottom.length);
+            const double ascent = baseline_ascent(items[index], contributions[index]);
             const double shim = workspace.group_ascents_[workspace.items_[index].area.row_start] - ascent;
             workspace.baseline_shims_[index] = shim;
             GridItemContribution& adjusted = workspace.adjusted_[index];

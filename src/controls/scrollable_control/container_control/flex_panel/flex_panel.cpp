@@ -436,6 +436,14 @@ void FlexPanel::measure_item_crosses(const SolveRequest& request, const FlexLayo
         const SizeValue& cross_size = horizontal ? layout.height : layout.width;
         FlexItemCross& cross = crosses_[index];
         cross = FlexItemCross{};
+        if (horizontal) {
+            // A row aligns its items by their first baselines at their main
+            // sizes (9.4 step 8); a column's baseline alignment falls back
+            // to start, so it needs none.
+            const std::optional<double> baseline = child.first_baseline(results[index].main_size);
+            if (!is_alive()) return;
+            if (baseline) cross.baseline = *baseline;
+        }
         if (inputs_[index].definite_cross) {
             cross.hypothetical_cross = definite_size_value(cross_size, cross_basis);
             continue;

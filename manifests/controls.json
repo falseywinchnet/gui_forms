@@ -107,6 +107,17 @@
       "doc": "api/generated/gui_forms.Label.rst"
     },
     {
+      "id": "text_block",
+      "type": "TextBlock",
+      "header": "gui_forms/controls/text_block/text_block.hpp",
+      "category": "Information display",
+      "purpose": "CSS text leaf for the layout panels: white space collapsing, UAX #14 line breaking, line-height: normal or a set line height, text-align in both directions, no inset, and first and last baselines for flex, grid and block alignment.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "css-layout-panels",
+      "doc": "api/generated/gui_forms.TextBlock.rst"
+    },
+    {
       "id": "picture_box",
       "type": "PictureBox",
       "header": "gui_forms/controls/panel/picture_box/picture_box.hpp",

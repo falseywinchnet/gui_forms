@@ -104,13 +104,36 @@ void test_css_layout_panels(gui_forms::Window& window) {
     require(block_group && (*block_group).arranged_bounds().y + (*block_group).arranged_bounds().height <= 660.0,
             "the block group must fit the page body");
 
+    // The text row: the caption and the larger value share a baseline; the
+    // paragraph wraps within its 476 px.
+    const std::shared_ptr<TextBlock> caption =
+        std::dynamic_pointer_cast<TextBlock>(window.find("gallery.css-layout.text.rate.caption"));
+    const std::shared_ptr<TextBlock> value =
+        std::dynamic_pointer_cast<TextBlock>(window.find("gallery.css-layout.text.rate.value"));
+    const std::shared_ptr<TextBlock> paragraph =
+        std::dynamic_pointer_cast<TextBlock>(window.find("gallery.css-layout.text.paragraph"));
+    require(caption && value && paragraph, "the page must retain its TextBlock specimens");
+    const Rect caption_bounds = (*caption).arranged_bounds();
+    const Rect value_bounds = (*value).arranged_bounds();
+    const double caption_baseline = caption_bounds.y + (*caption).first_baseline(caption_bounds.width).value();
+    const double value_baseline = value_bounds.y + (*value).first_baseline(value_bounds.width).value();
+    require(std::abs(caption_baseline - value_baseline) < 1.0e-6 && caption_bounds.y > value_bounds.y,
+            "the caption must drop to the larger value's baseline");
+    require((*paragraph).last_baseline(476.0).value() > (*paragraph).first_baseline(476.0).value(),
+            "the paragraph must wrap to more than one line");
+    const Control::Ptr text_group = window.find("gallery.css-layout.text.group");
+    require(text_group && (*text_group).arranged_bounds().y + (*text_group).arranged_bounds().height <= 660.0,
+            "the text group must fit the page body");
+
     const std::string semantics = window.semantic_snapshot().to_json();
     require(semantics.find("Growing flex row") != std::string::npos &&
                 semantics.find("Centred flex column") != std::string::npos &&
                 semantics.find("Named grid areas") != std::string::npos &&
                 semantics.find("Stacked blocks") != std::string::npos &&
                 semantics.find("Centred inline line") != std::string::npos &&
-                semantics.find("Auto-fill grid cards") != std::string::npos,
+                semantics.find("Auto-fill grid cards") != std::string::npos &&
+                semantics.find("Baseline-aligned text") != std::string::npos &&
+                semantics.find("Wrapped paragraph") != std::string::npos,
             "the flex and grid specimens must publish their named group semantics");
 }
 

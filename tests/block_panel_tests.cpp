@@ -222,6 +222,9 @@ void test_lines_and_shrink_to_fit() {
     std::shared_ptr<BlockPanel> root = flow("block.lines");
     std::shared_ptr<BlockPanel> line = flow("block.lines.w");
     (*line).set_text_align(TextAlignment::center);
+    // A zero strut, so a line is as tall as its items (unset, the strut
+    // would come from the panel's font).
+    (*line).set_line_strut(LineStrut{});
     (*root).add_child(line);
     BlockFlowItemLayout narrow{};
     narrow.width = px(100.0);
@@ -244,6 +247,7 @@ void test_lines_and_shrink_to_fit() {
     BlockFlowItemLayout atomic{};
     atomic.level = BlockFlowLevel::inline_level;
     (*root).set_item_layout(*fitted, atomic);
+    (*root).set_line_strut(LineStrut{});
 
     const std::unique_ptr<Window> held = std::make_unique<Window>(root, Size{800.0, 600.0});
     (*held).perform_layout();
@@ -338,6 +342,7 @@ void test_documented_examples() {
 
     std::shared_ptr<BlockPanel> row = make_control<BlockPanel>(StableId("doc.row"));
     (*row).set_text_align(TextAlignment::center);
+    (*row).set_line_strut(LineStrut{});
     const BlockFlowItemLayout atomic = inline_item(80.0, 20.0);
     std::vector<std::shared_ptr<Button>> row_buttons;
     for (int index = 0; index < 3; ++index) {

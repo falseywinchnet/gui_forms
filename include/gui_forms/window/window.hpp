@@ -335,6 +335,11 @@ public:
     }
     [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
         std::string_view utf8, FontSpec effective_font) const;
+    // The installed provider's line-break opportunities
+    // (TextMetricsProvider::fill_line_break_opportunities_utf8), or the
+    // estimate without one.
+    [[nodiscard]] TextResolutionStatus fill_line_break_opportunities_utf8(
+        std::string_view utf8, std::span<LineBreakOpportunity> opportunities) const;
     [[nodiscard]] Event<const PresentationSettings&>& presentation_changed() noexcept {
         return presentation_changed_;
     }

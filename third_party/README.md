@@ -7,10 +7,14 @@ vector, GPU, subset and utility targets remain disabled. The upgrade and
 compiler-warning investigation are recorded in
 [`HARFBUZZ_14_6_INTAKE_2026-10-06.md`](HARFBUZZ_14_6_INTAKE_2026-10-06.md).
 
-The source-only logical text-mask profile uses libunibreak 8.0, pinned to
+The text engine uses libunibreak 8.0, pinned to
 `28a2756b864c343f438cd22537d49d394d4666a5` by `fetch_linebreak.sh`. Its private
-line-break subset implements Unicode 17 UAX #14. It is excluded from normal OFF
-builds and SDK exports. See
+line-break subset implements Unicode 17 UAX #14. It was admitted for the
+logical text-mask profile only (2026-10-01). The owner widened the admission
+to the text engine on 2026-10-26 ("libunibreak is fine, can admit it"), so it
+is built wherever HarfBuzz text is (`GUI_FORMS_ENABLE_HARFBUZZ_TEXT`) and
+fetched wherever `fetch_text_stack.sh` runs. It is still excluded from builds
+without HarfBuzz text and from SDK exports. See
 [`LIBUNIBREAK_INTAKE_2026-10-01.md`](LIBUNIBREAK_INTAKE_2026-10-01.md) for the
 local conformance reproduction, caller-buffer boundary and license requirements.
 

@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <span>
 #include <vector>
 
@@ -21,8 +22,9 @@ namespace gui_forms {
 // items, each an atomic inline box, is broken into line boxes (9.4.2) at
 // the boundaries between items, aligned by `text-align`, and aligned on the
 // block axis by `vertical-align` (10.8): every line box starts with the
-// container's strut. An item's baseline is the bottom edge of its margin
-// box, CSS's baseline of an inline-block without line boxes.
+// container's strut. An inline item's baseline is the one it gives (its
+// last line box's), or else the bottom edge of its margin box, CSS's
+// baseline of an inline-block without line boxes.
 //
 // The caller resolves what needs style or content knowledge: each item's
 // used border-box width and height (the filled or given width of a block
@@ -96,6 +98,11 @@ struct BlockFlowItemInput final {
     // content's margins and trailing_inner is empty.
     bool collapses_through{};
     InlineVerticalAlignment vertical_align{InlineVerticalAlignment::baseline};
+    // An inline item's baseline from the top of its border box (its last
+    // line box's, Control::last_baseline); NaN for none, in which case the
+    // solver synthesizes the bottom of its margin box. Block items ignore
+    // it.
+    double baseline{std::numeric_limits<double>::quiet_NaN()};
 };
 
 struct BlockFlowContainerInput final {

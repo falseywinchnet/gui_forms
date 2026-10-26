@@ -51,12 +51,25 @@ gui_forms::BlockPanel
          ``right`` or ``center``. A line wider than the panel starts at its start
          edge whatever the alignment.
 
-      **line_strut** : ``LineStrut``, default zero
+      **line_strut** : ``std::optional<LineStrut>``, default none
          The :cpp:class:`LineStrut <gui_forms::LineStrut>` every line box starts with: the ascent and descent the
          panel's font and line height give a line above and below its
-         baseline, and the x-height ``middle`` aligns to. With the default zero
-         strut a line is as tall as its items. Its values must be finite and
-         nonnegative.
+         baseline, and the x-height ``middle`` aligns to. When none is set the
+         panel uses its font's: the ``line-height: normal`` line box of :cpp:func:`font <gui_forms::BlockPanel::font>`
+         at the window's text scale, as CSS's strut is. With a zero strut a
+         line is as tall as its items. Its values must be finite and
+         nonnegative; :cpp:func:`clear_line_strut <gui_forms::BlockPanel::clear_line_strut>` returns to the font's.
+
+      **used_line_strut** : ``LineStrut``, read-only
+         The strut the line boxes use: the set one, or the font's.
+
+      **font** : ``FontSpec``
+         The font the panel's inline content is set in, for its strut: the one
+         given to :cpp:func:`set_font <gui_forms::BlockPanel::set_font>`, or else the theme's field typography. An invalid
+         specification throws ``std::invalid_argument``; :cpp:func:`clear_font <gui_forms::BlockPanel::clear_font>` returns to
+         the theme's font.
+
+      **has_font_override** : ``bool``, read-only
 
       **layout_snapshot** : ``BlockFlowLayoutWorkspace``, read-only, read-only
          The last arrange's resolution: for each laid-out child its bounds and
@@ -88,6 +101,10 @@ gui_forms::BlockPanel
       :class: autosummary longtable
       :widths: 35 65
 
+      * - :cpp:func:`clear_line_strut <gui_forms::BlockPanel::clear_line_strut>`
+        -  
+      * - :cpp:func:`clear_font <gui_forms::BlockPanel::clear_font>`
+        -  
       * - :cpp:func:`item_layout <gui_forms::BlockPanel::item_layout>`
         - The child's item layout, or the default one for a child without its own record or a control that is not a direct child.
       * - :cpp:func:`item_positioning <gui_forms::BlockPanel::item_positioning>`
@@ -180,6 +197,7 @@ gui_forms::BlockPanel
       std::shared_ptr<gf::BlockPanel> row =
           gf::make_control<gf::BlockPanel>(gf::StableId("row"));
       (*row).set_text_align(gf::TextAlignment::center);
+      (*row).set_line_strut(gf::LineStrut{});   // lines as tall as their items
       gf::BlockFlowItemLayout atomic{};
       atomic.level = gf::BlockFlowLevel::inline_level;
       atomic.width = gf::SizeValue{gf::SizeKind::length_percentage,
@@ -219,17 +237,36 @@ gui_forms::BlockPanel
 
       Sets :cpp:func:`text_align <gui_forms::BlockPanel::text_align>`; see the property's description above.
 
-   .. cpp:function:: LineStrut line_strut() const noexcept
+   .. cpp:function:: std::optional<LineStrut> line_strut() const noexcept
 
       The :cpp:class:`LineStrut <gui_forms::LineStrut>` every line box starts with: the ascent and descent the
       panel's font and line height give a line above and below its
-      baseline, and the x-height ``middle`` aligns to. With the default zero
-      strut a line is as tall as its items. Its values must be finite and
-      nonnegative.
+      baseline, and the x-height ``middle`` aligns to. When none is set the
+      panel uses its font's: the ``line-height: normal`` line box of :cpp:func:`font <gui_forms::BlockPanel::font>`
+      at the window's text scale, as CSS's strut is. With a zero strut a
+      line is as tall as its items. Its values must be finite and
+      nonnegative; :cpp:func:`clear_line_strut <gui_forms::BlockPanel::clear_line_strut>` returns to the font's.
 
    .. cpp:function:: void set_line_strut(LineStrut strut)
 
       Sets :cpp:func:`line_strut <gui_forms::BlockPanel::line_strut>`; see the property's description above.
+
+   .. cpp:function:: LineStrut used_line_strut() const
+
+      The strut the line boxes use: the set one, or the font's.
+
+   .. cpp:function:: FontSpec font() const noexcept
+
+      The font the panel's inline content is set in, for its strut: the one
+      given to :cpp:func:`set_font <gui_forms::BlockPanel::set_font>`, or else the theme's field typography. An invalid
+      specification throws ``std::invalid_argument``; :cpp:func:`clear_font <gui_forms::BlockPanel::clear_font>` returns to
+      the theme's font.
+
+   .. cpp:function:: void set_font(FontSpec font)
+
+      Sets :cpp:func:`font <gui_forms::BlockPanel::font>`; see the property's description above.
+
+   .. cpp:function:: bool has_font_override() const noexcept
 
    .. cpp:function:: const BlockFlowLayoutWorkspace& layout_snapshot() const& noexcept
 
@@ -252,6 +289,10 @@ gui_forms::BlockPanel
 
 
    .. rubric:: Methods
+
+   .. cpp:function:: void clear_line_strut()
+
+   .. cpp:function:: void clear_font()
 
    .. cpp:function:: BlockFlowItemLayout item_layout(const Control& child) const
 

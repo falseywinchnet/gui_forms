@@ -122,6 +122,13 @@ public:
         BoundedShapeWorkspace& workspace);
     [[nodiscard]] ResolvedTextLayout resolve(std::string_view utf8,
                                              FontSpec font);
+    // UAX #14 line-break opportunities (libunibreak 8.0, Unicode 17, the
+    // locale-independent "-strict" tailoring), one per input byte, under
+    // TextMetricsProvider::fill_line_break_opportunities_utf8's contract.
+    // Returns exact, or invalid_request with `opportunities` unchanged. It
+    // reads no face and allocates nothing.
+    [[nodiscard]] static TextResolutionStatus fill_line_break_opportunities_utf8(
+        std::string_view utf8, std::span<LineBreakOpportunity> opportunities) noexcept;
     [[nodiscard]] std::size_t face_count() const noexcept;
     // Nullopt for an unknown ID. Registered faces are never removed, so the
     // span stays valid while the returned owner is held.

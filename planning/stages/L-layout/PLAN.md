@@ -785,10 +785,9 @@ The owner's decision of 2026-10-26 (coordinator's option list, L7):
 - L8 adds the text fixtures, with a new CSS-style text leaf;
 - `Label` stays as it is.
 
-The leaf is provisionally named `TextBlock`, after the owner's rule for
-panels: a name that cannot be confused with a CSS property. The
-coordinator is confirming the name with the owner. The control is not
-added until the name is confirmed.
+The leaf is named `TextBlock`, after the owner's rule for panels: a name
+that cannot be confused with a CSS property. The owner confirmed it on
+2026-10-26 ("textblock seems fine").
 
 ### 12.1 Why a new leaf
 
@@ -831,8 +830,10 @@ A leaf control that shows text as a CSS block of text does:
   12.9 records what the leaf and the harness need in order to reach it.
 - **Alignment.** `text_align` (`start`, `end`, `left`, `right`,
   `center`), which follows the effective `LayoutDirection` as CSS does.
-  Inside a `BlockPanel` the leaf takes the panel's `text_align` unless it
-  sets its own.
+  The leaf does not read its parent's: CSS's inheritance of `text-align`
+  is resolved by whoever builds the tree (the corpus harness, a form
+  importer), as the direction is. (Built in L8a: an inherited property
+  on one control type would be the only one of its kind.)
 - **Measure.** `measure_intrinsic` answers with:
   - min-content: the widest unbreakable segment;
   - max-content: the widest paragraph;
@@ -858,9 +859,15 @@ baseline. `TextBlock` answers with its first line's baseline. A nested
 `FlexPanel`, `GridPanel` or `BlockPanel` answers with its first item's
 baseline, as CSS's first-baseline sets do.
 
-The answer is cached with the measure answer for the same width. It is
-invalidated by the same measure generation, so it never outlives the
-text or the font it was computed from.
+There are two virtuals, `first_baseline(width)` and
+`last_baseline(width)`: flex and grid align by the first, and an inline
+item in `BlockPanel` sits on its line by its last, as an inline-block
+does. As built in L8a they are computed on demand rather than cached:
+`TextBlock`'s first baseline needs no line breaking (only the font's
+metrics), so a cache would save little and could outlive a change that
+does not advance the measure generation. The nested containers'
+answers (a `FlexPanel` answering its first item's baseline) are left to
+L8b, and are built only if a fixture needs them.
 
 `BlockPanel`'s `line_strut` stays a property. A `BlockPanel` whose strut
 is not set takes it from its content font's metrics (coordinator,
@@ -914,6 +921,21 @@ A measured rounding rule that cannot be matched within tolerance at both
 scales goes to the owner with its numbers. It is not recorded as a
 difference.
 
+**Measured** (Chrome 155 headless, probe pages not checked in, device
+scales 1 and 2 alike):
+- `line-height: normal` is round(ascent) + round(descent) + round(gap)
+  from the face's design metrics (hhea, which for the bundled faces
+  agrees with OS/2's typographic or Windows values): Carlito 12, 13, 14
+  and 19.5 px give 14, 15, 17 and 24; Portsmouth Rapids 12, 13 and 19.5
+  px give 15, 16 and 25. The baseline is at the rounded ascent.
+- The engine's FreeType size metrics round the ascender up and the
+  descender down (Carlito 13 px: 13 + 4 = 17), so `ResolvedTextLayout`
+  gains the unrounded design metrics (`design_metrics`), filled by the
+  engine, and `line_box_metrics` applies Chromium's rule to them.
+- A set line height's leading goes half above, rounded down: Carlito 13
+  px at 20, 20.5, 21, 12 and 13 px puts the baseline at 14, 14, 15, 10
+  and 11.
+
 ### 12.6 Fixtures
 
 About 30, each marked bidirectional where its boxes depend on direction:
@@ -944,8 +966,7 @@ About 30, each marked bidirectional where its boxes depend on direction:
 
 ### 12.8 Questions put to the coordinator
 
-1. **The name.** `TextBlock` is provisional, and the owner is confirming
-   it. The control is not added before then.
+1. **The name.** Answered (owner, 2026-10-26): `TextBlock`.
 2. **Wrapping.** Answered (coordinator, 2026-10-26): neither proposed
    option. The leaf uses the text engine's existing line breaker (12.2).
 3. **The strut without a declared font.** Answered (coordinator,
@@ -953,6 +974,14 @@ About 30, each marked bidirectional where its boxes depend on direction:
    scales with the text scale, as in CSS.
 
 ### 12.9 Reaching the line breaker
+
+Resolved (owner, 2026-10-26: "libunibreak is fine, can admit it"). Items
+1 to 3 below are built in L8a: the query is
+`TextMetricsProvider::fill_line_break_opportunities_utf8`, non-pure, with
+the white-space estimate as its default; `HarfBuzzFontEngine` answers it
+with libunibreak, linked into `gui_forms_text_engine`; the Skia raster
+and the Win32 host's painter forward to it. The record as written
+before the decision follows.
 
 What is there today:
 - libunibreak is linked only into the development text-mask service

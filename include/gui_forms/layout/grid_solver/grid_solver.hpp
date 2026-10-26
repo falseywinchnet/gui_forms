@@ -121,6 +121,11 @@ struct GridItemContribution final {
     bool automatic_minimum{};
     double min_content{};
     double max_content{};
+    // A row contribution's first baseline, from the top of the item's
+    // border box at its column size; NaN for none, in which case the solver
+    // synthesizes the border box's bottom (12.5 step 1). Column
+    // contributions ignore it.
+    double baseline{std::numeric_limits<double>::quiet_NaN()};
 };
 
 // One track of the implicit grid, in line order.

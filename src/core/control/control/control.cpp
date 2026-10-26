@@ -671,6 +671,14 @@ ResolvedTextLayout Control::resolve_text_layout_utf8(
         : estimate_text_layout_utf8(utf8, effective);
 }
 
+TextResolutionStatus Control::fill_line_break_opportunities_utf8(
+    std::string_view utf8, std::span<LineBreakOpportunity> opportunities) const {
+    if (window_ == nullptr) return estimate_line_break_opportunities_utf8(utf8, opportunities);
+    const TextResolutionStatus status =
+        (*window_).fill_line_break_opportunities_utf8(utf8, opportunities);
+    return status;
+}
+
 double Control::snap_text_baseline(double logical_baseline) const noexcept {
     return gui_forms::snap_text_baseline(
         logical_baseline, window_ != nullptr ? (*window_).scale() : 1.0);
@@ -2406,6 +2414,16 @@ Size Control::measure_for_layout(const LayoutConstraint& constraint) {
     }
     measure_cache_[slot] = MeasureCacheEntry{constraint, measured, generation};
     return measured;
+}
+
+std::optional<double> Control::first_baseline(double width) {
+    static_cast<void>(width);
+    return std::nullopt;
+}
+
+std::optional<double> Control::last_baseline(double width) {
+    static_cast<void>(width);
+    return std::nullopt;
 }
 
 Size Control::measure_intrinsic(const LayoutConstraint& constraint) {

@@ -6,6 +6,7 @@
 #include "gui_forms/layout/style/layout_style.hpp"
 
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <unordered_map>
 #include <vector>
@@ -84,12 +85,25 @@ public:
     // admitted.
     [[nodiscard]] TextAlignment text_align() const noexcept { return text_align_; }
     void set_text_align(TextAlignment alignment);
-    // The strut every line box starts with, from the font and line height
-    // the panel's inline content is set in (a form importer resolves a
-    // source's). Zero by default: a point on the baseline, so a line is as
-    // tall as its items. Its values must be finite and nonnegative.
-    [[nodiscard]] LineStrut line_strut() const noexcept { return line_strut_; }
+    // The strut every line box starts with (CSS 2.1 section 10.8.1). A set
+    // strut is used as given (a form importer resolves a source's font and
+    // line height to one; a zero strut is a point on the baseline, CSS's
+    // strut of a zero-size font). Unset, the default, it comes from the
+    // panel's font: that font's `line-height: normal` line box
+    // (line_box_metrics) at the effective text scale (coordinator,
+    // 2026-10-26, option (a)). Its values must be finite and nonnegative.
+    [[nodiscard]] std::optional<LineStrut> line_strut() const noexcept { return line_strut_; }
     void set_line_strut(LineStrut strut);
+    void clear_line_strut();
+    // The strut the line boxes use: the set one, or the font's.
+    [[nodiscard]] LineStrut used_line_strut() const;
+    // The font the panel's inline content is set in, for the strut: the
+    // authored font, or the theme's field typography when none is set.
+    // set_font throws std::invalid_argument for an invalid FontSpec.
+    [[nodiscard]] FontSpec font() const noexcept;
+    [[nodiscard]] bool has_font_override() const noexcept { return font_override_.has_value(); }
+    void set_font(FontSpec font);
+    void clear_font();
 
     // A live direct child's record; throws std::invalid_argument for any
     // other child or for a value the panel does not admit (content keywords,
@@ -181,7 +195,8 @@ private:
 
     ItemMap items_{};
     TextAlignment text_align_{TextAlignment::start};
-    LineStrut line_strut_{};
+    std::optional<LineStrut> line_strut_;
+    std::optional<FontSpec> font_override_;
 
     std::uint64_t pass_{};
     std::vector<Control::Ptr> children_{};

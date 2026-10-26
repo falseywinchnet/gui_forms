@@ -361,6 +361,9 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     target_include_directories(gui_forms_bidi PUBLIC third_party/sheenbidi/Headers)
     target_compile_definitions(gui_forms_bidi PRIVATE SB_CONFIG_UNITY)
     set_target_properties(gui_forms_bidi PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    # UAX #14 line breaking (libunibreak 8.0), admitted to the text engine by
+    # the owner on 2026-10-26 (third_party/LIBUNIBREAK_INTAKE_2026-10-01.md).
+    include(cmake/LineBreak.cmake)
     add_library(gui_forms_text_engine STATIC
         src/render/text/harfbuzz/harfbuzz_font_engine.cpp
         src/render/text/harfbuzz/bounded_shape_workspace.cpp
@@ -371,7 +374,7 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     )
     target_link_libraries(gui_forms_text_engine
         PUBLIC gui_forms_core
-        PRIVATE freetype harfbuzz gui_forms_bidi
+        PRIVATE freetype harfbuzz gui_forms_bidi gui_forms_linebreak
     )
     target_compile_features(gui_forms_text_engine PUBLIC cxx_std_20)
     if(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
@@ -441,7 +444,6 @@ if(GUI_FORMS_BUILD_TEXT_MASKS)
         message(FATAL_ERROR "GUI_FORMS_BUILD_TEXT_MASKS requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT")
     endif()
     find_package(Threads REQUIRED)
-    include(cmake/TextMaskLineBreak.cmake)
     add_library(gui_forms_text_masks_impl STATIC
         src/core/text/text_mask/text_mask_budget.cpp
         src/core/text/text_mask/text_mask_storage.cpp
@@ -579,6 +581,7 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/group_box/group_box.cpp
     src/controls/panel/picture_box/picture_box.cpp
     src/controls/label/label.cpp
+    src/controls/text_block/text_block.cpp
     src/controls/button_base/button_base.cpp
     src/controls/button_base/button/button.cpp
     src/controls/button_base/button/drop_down_button/drop_down_button.cpp
@@ -2976,6 +2979,23 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_block_panel_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_block_panel_tests
              COMMAND gui_forms_block_panel_tests)
+
+    # Stage L, phase L8a: TextBlock, the CSS text leaf, and the baselines
+    # the containers align it by.
+    add_executable(gui_forms_text_block_tests
+        tests/text_block_tests.cpp
+    )
+    target_link_libraries(gui_forms_text_block_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_text_block_tests
+             COMMAND gui_forms_text_block_tests)
+    if(TARGET gui_forms_text_engine)
+        add_executable(gui_forms_text_block_engine_tests
+            tests/text_block_engine_tests.cpp
+        )
+        target_link_libraries(gui_forms_text_block_engine_tests PRIVATE gui_forms_controls gui_forms_text_engine)
+        add_test(NAME gui_forms_text_block_engine_tests
+                 COMMAND gui_forms_text_block_engine_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+    endif()
 
     # Stage L, phase L5: absolute and relative positioning in the three CSS
     # containers, layout diagnostics and the containing-block dependency.

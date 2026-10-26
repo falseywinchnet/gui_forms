@@ -407,6 +407,10 @@ Related types
 
       Default: ``{InlineVerticalAlignment::baseline}``.
 
+   .. cpp:member:: double baseline
+
+      An inline item's baseline from the top of its border box (its last line box's, Control::last_baseline); NaN for none, in which case the solver synthesizes the bottom of its margin box. Block items ignore it. Default: ``{std::numeric_limits<double>::quiet_NaN()}``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: BlockFlowItemResult final
@@ -1086,6 +1090,10 @@ Related types
    .. cpp:member:: double min_content
 
    .. cpp:member:: double max_content
+
+   .. cpp:member:: double baseline
+
+      A row contribution's first baseline, from the top of the item's border box at its column size; NaN for none, in which case the solver synthesizes the border box's bottom (12.5 step 1). Column contributions ignore it. Default: ``{std::numeric_limits<double>::quiet_NaN()}``.
 
 .. cpp:namespace:: gui_forms
 
