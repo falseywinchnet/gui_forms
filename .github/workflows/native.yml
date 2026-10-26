@@ -48,6 +48,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_ci_sanitizer_seed.py
           python3 -B -m unittest discover -s tools -p test_publish_cache.py
           python3 -B -m unittest discover -s tools -p test_windows_toolchain.py
+          python3 -B -m unittest discover -s tools -p test_skia_archive.py
           python3 -B -m unittest discover -s tools -p test_stack_frames.py
           python3 -B -m unittest discover -s tools -p test_control_registry.py
           python3 tools/control_registry.py check

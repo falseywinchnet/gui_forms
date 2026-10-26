@@ -286,6 +286,34 @@ jobs:
           else
             python gui_forms/tools/ci_build.py --jobs 4
           fi
+      # Stage SK1: the Windows CPU Skia archive, built natively with the pinned
+      # CLANG64 toolchain (BGRA, the profile's spelled-out order), packed, then
+      # compiled against and run from a fresh extraction (tools/skia_archive.py).
+      # The link-map audit below reads its two libraries. A push to main
+      # publishes the archive (the last step); tools/skia_archive_release.json
+      # then pins it. GUI.Forms itself does not yet build with it on Windows.
+      - name: Build, pack and probe the Windows CPU Skia archive
+        id: skia-archive
+        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Windows' && steps.reuse.outputs.reused != 'true')
+        env:
+          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
+        run: |
+          toolchain_python=$(cygpath -u "$TOOLCHAIN_PYTHON")
+          skia_out=.build/native-${{ inputs.platform }}/skia
+          sh gui_forms/third_party/fetch_skia_cpu.sh
+          sh gui_forms/third_party/build_skia_cpu_windows_mingw.sh "$skia_out"
+          "$toolchain_python" gui_forms/tools/skia_archive.py pack --platform "${{ inputs.platform }}" --skia-out "$skia_out"
+          "$toolchain_python" gui_forms/tools/skia_archive.py probe --platform "${{ inputs.platform }}"
+      - uses: actions/upload-artifact@v4
+        if: steps.skia-archive.outcome == 'success'
+        with:
+          name: ${{ steps.skia-archive.outputs.artifact-name }}
+          overwrite: true
+          path: |
+            gui-forms-skia-${{ inputs.platform }}.tar.zst
+            gui-forms-skia-${{ inputs.platform }}.json
+          compression-level: 0
+          retention-days: 30
       - name: Prove one compression and PNG implementation in the link map
         if: steps.promotion.outputs.reused != 'true' && (steps.reuse.outputs.reused != 'true')
         run: |
@@ -440,3 +468,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python gui_forms/tools/publish_cache.py --platform "${{ inputs.platform }}"
+      # Until tools/skia_archive_release.json pins the current identity, every
+      # push to main publishes the archive this job packed, or the validating
+      # run's artifact, in the revision's build release.
+      - name: Publish the Windows CPU Skia archive until it is pinned
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && runner.os == 'Windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
+        run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/skia_archive.py publish --platform "${{ inputs.platform }}"'
