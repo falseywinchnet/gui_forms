@@ -358,8 +358,8 @@ the member rows is deliverable 3. "Rows" is the type's own admitted rows.
 | `ColorDialog` | 21 | `HostColorDialogRequest` | partial: as `OpenFileDialog` |
 | `FontDialog` | 40 | `FontDialog` | done (in the window, bundled faces only) |
 | `TaskDialog` | 9 | `TaskDialog` (provisional) | done (in the window) |
-| `MessageBox` | 22 | `TaskDialog`, `HostMessageDialogRequest` | partial: no `show` facade |
-| `ThreadExceptionDialog` | 5 | none | missing |
+| `MessageBox` | 22 | `show_message_box` (the host's message dialog) | done (host-drawn) |
+| `ThreadExceptionDialog` | 5 | `ThreadExceptionDialog` (a `TaskDialog` preset) | done (in the window) |
 
 ### Excluded
 

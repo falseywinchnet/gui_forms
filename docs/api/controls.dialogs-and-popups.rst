@@ -58,6 +58,10 @@ Related types
      - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`FontDialogResult <gui_forms::FontDialogResult>`
      - How a FontDialog closed, and the font it holds then.
+   * - :cpp:class:`MessageBoxRequest <gui_forms::MessageBoxRequest>`
+     - The arguments of Windows Forms' MessageBox.Show: the message, the caption in the title bar, the buttons, the icon and the default button.
+   * - :cpp:class:`MessageBoxResult <gui_forms::MessageBoxResult>`
+     - What show_message_box returns: the button the user chose, as Windows Forms' DialogResult, and the host's answer.
    * - :cpp:class:`RibbonToolTipContent <gui_forms::RibbonToolTipContent>`
      - What an enhanced tooltip shows (owner decision RB-13, E3-2): a title, a description, the shortcut, an image, the reason a disabled command is unavailable, and a help topic F1 opens while the tooltip shows.
    * - :cpp:class:`RibbonToolTipEvent <gui_forms::RibbonToolTipEvent>`
@@ -200,6 +204,44 @@ Related types
       Default: ``{DialogResult::none}``.
 
    .. cpp:member:: FontSpec font
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MessageBoxRequest final
+
+   ``#include <gui_forms/components/message_box/message_box.hpp>``
+
+   The arguments of Windows Forms' MessageBox.Show: the message, the caption in the title bar, the buttons, the icon and the default button.
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: std::string caption
+
+   .. cpp:member:: HostMessageButtons buttons
+
+      Default: ``{HostMessageButtons::ok}``.
+
+   .. cpp:member:: HostMessageIcon icon
+
+      Default: ``{HostMessageIcon::none}``.
+
+   .. cpp:member:: MessageBoxDefaultButton default_button
+
+      Default: ``{MessageBoxDefaultButton::button1}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MessageBoxResult final
+
+   ``#include <gui_forms/components/message_box/message_box.hpp>``
+
+   What show_message_box returns: the button the user chose, as Windows Forms' DialogResult, and the host's answer. ``result`` is none when the box could not be shown, with ``status`` saying why.
+
+   .. cpp:member:: DialogResult result
+
+      Default: ``{DialogResult::none}``.
+
+   .. cpp:member:: HostServiceStatus status
 
 .. cpp:namespace:: gui_forms
 
@@ -520,6 +562,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: MessageBoxDefaultButton
+
+   ``#include <gui_forms/components/message_box/message_box.hpp>``
+
+   .. cpp:enumerator:: button1
+
+   .. cpp:enumerator:: button2
+
+   .. cpp:enumerator:: button3
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PopupDismissReason
 
    ``#include <gui_forms/controls/panel/anchored_popup_layer/anchored_popup_layer.hpp>``
@@ -614,6 +668,14 @@ Functions, constants and aliases
 .. cpp:function:: std::string file_dialog_name_part(std::string_view path)
 
    The last component of a host path: the file's name without its directory, by the path rules of the platform the program runs on (Windows accepts ``\`` and ``/``, the others ``/`` only). Empty for a path that ends in a separator.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/components/message_box/message_box.hpp>``
+
+.. cpp:function:: MessageBoxResult show_message_box(Window& owner, const MessageBoxRequest& request)
+
+   Shows a message box over ``owner``, modally, and returns when it closes (Windows Forms' MessageBox.Show). The host draws the box (owner decision W-Q3): MessageBoxW on Windows, NSAlert on macOS, and a dialog of GUI.Forms controls on X11, through the window's HostServices (capability ``dialogs``). TaskDialog stays the themed, richer dialog drawn in the window. The result is the chosen button. A box the user closes without choosing (Escape or the title bar's close button) returns cancel, or ok for a box whose only button is OK, as in Windows Forms; a Yes/No box the host closes without a choice returns none. Without a host or without ``dialogs`` the result is none and ``status`` is unsupported. Throws std::invalid_argument for text or a caption that is not valid UTF-8, contains NUL or is longer than HostServices::maximum_dialog_text_bytes, and for an unknown button set, icon or default button; throws std::logic_error off the window's UI thread.
 
 .. cpp:namespace:: gui_forms
 

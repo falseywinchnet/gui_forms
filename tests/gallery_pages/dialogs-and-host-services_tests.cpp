@@ -21,7 +21,7 @@ void test_dialogs_and_host_services(gui_forms::Window& window,
     }
 
     click(window, window.find("gallery.host.message.2"));
-    require((*status).text().find("accepted · yes") != std::string::npos,
+    require((*status).text().find("Accepted · MessageBox Yes") != std::string::npos,
             "message dialog must publish its typed accepted choice");
     click(window, window.find("gallery.host.dialog.1"));
     require((*status).text().find("2 paths · /tmp/alpha.txt") != std::string::npos,
