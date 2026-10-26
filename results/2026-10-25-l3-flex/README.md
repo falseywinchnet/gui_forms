@@ -30,7 +30,10 @@ corpus (about 40 fixtures) within tolerance at every profile, and the
 - Registration: `manifests/controls.json` and `control-schema.json`, the
   generated control indexes and schema page, the README table, a docstring
   with two examples (both asserted in `flex_layout_panel_tests`), and two
-  specimens on the Gallery's Retained Layout Panels page with their test.
+  specimens on a new Gallery page, CSS layout panels (`css-layout-panels`,
+  in the Layout group), with its test. The page will also hold the grid
+  (L4) and block-flow (L5) specimens; the Retained Layout Panels page has
+  no room left within its 660 px body.
 - The corpus harness reads flex fixtures whole with the L2 reader
   (`data-gf-kind="flex-layout-panel"`), and 51 fixtures under
   `tests/layout_corpus/fixtures/flex/` with Chromium 155.0.8059.39
@@ -89,10 +92,33 @@ row of labels in a plain root:
 - Right-to-left is covered by the solver tests only; the corpus harness has
   no `dir` attribute yet.
 
+## Gallery display trace: digests re-recorded
+
+The new page adds a navigation entry, so every page's display trace
+changed, and `gui_forms_gallery_display_trace_tests` (T2 E2) was
+re-recorded under the coordinator's rule: only when page-by-page trace
+diffs show intended changes alone. The diffs, against a run of the same
+tree with FlexLayoutPanel demonstrated on no page (which reproduces every
+committed digest, both live-surfaces ones included):
+
+- css-layout-panels: the new page.
+- Every page: the navigation sidebar only, meaning its new entry, its
+  taller paper and its scroll offset and thumb.
+- states-and-diagnostics, beyond the sidebar: the live control count
+  (1226 to 1243) and the paint chunks reused (297 to 296).
+- typography-and-inspection, beyond the sidebar: the inspected specimen's
+  RuntimeId (#1251 to #1268), its generation (972 to 993) and the control
+  count.
+
+Nothing else changed. The non-Windows live-surfaces digest is the Windows
+trace with `BGRA` replaced by `RGBA`, hashed as the test hashes it; the
+same computation reproduces both previous digests.
+
 ## Commands
 
 ```text
 cmake --build .build/native-windows-x64/gui-forms --target gui_forms_flex_solver_tests gui_forms_flex_layout_panel_tests gui_forms_layout_corpus_tests gui_forms_gallery_pages_tests gui_forms_doc_examples_tests
+gui_forms_gallery_pages_tests --display-trace
 gui_forms_layout_corpus_tests tests/layout_corpus
 python -B tools/layout_oracle/capture.py --chromium <chrome-headless-shell 155.0.8059.39 win64> --corpus tests/layout_corpus --output <empty directory> --platform win64 --fixture flex/<name> ...
 ```

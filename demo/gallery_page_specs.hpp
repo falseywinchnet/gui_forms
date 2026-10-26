@@ -36,7 +36,7 @@ inline constexpr std::string_view body_id_prefix = "gallery.body.";
 
 // Compiled-DML pages first (their content is declared in gallery.dml), then the
 // pages migrated from the retired Complete Showcase in their former order.
-inline constexpr std::array<GalleryPageSpec, 29> gallery_pages {{
+inline constexpr std::array<GalleryPageSpec, 30> gallery_pages {{
     {"basics", "Basic controls",
      "Compiled-DML form grid over public Button, CheckBox, RadioButton, LinkLabel and Label instances plus a composed UserControl lifecycle card.",
      false, "Information display"},
@@ -93,6 +93,9 @@ inline constexpr std::array<GalleryPageSpec, 29> gallery_pages {{
      false, "Dialogs and popups"},
     {"retained-layout-panels", "Retained layout panels",
      "FlowLayoutPanel and TableLayoutPanel with retained cell policy.",
+     false, "Layout"},
+    {"css-layout-panels", "CSS layout panels",
+     "FlexLayoutPanel: CSS flex containers over retained children.",
      false, "Layout"},
     {"dock-and-anchor", "Dock and anchor",
      "Dock and Anchor layout policy on public Panel and Button instances.",

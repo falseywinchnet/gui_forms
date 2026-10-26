@@ -587,7 +587,7 @@
       "purpose": "CSS Flexbox container: rows or columns, wrapping lines, grow and shrink with frozen minimums and maximums, justify and align, auto margins, order and right-to-left mirroring.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": "retained-layout-panels",
+      "gallery_page": "css-layout-panels",
       "doc": "api/generated/gui_forms.FlexLayoutPanel.rst"
     },
     {
