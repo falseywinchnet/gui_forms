@@ -5,12 +5,12 @@
 // edge share a device edge, with no seam and no overlap. Every CPU painter
 // paints this scene, and the same check reads its pixels.
 //
-// The scene is 40 x 24 logical units under a fractional translation. Two
+// The scene is 40 x 34 logical units under a fractional translation. Two
 // translucent boxes share a fractional vertical edge, two share a fractional
-// horizontal edge, and a stroked rectangle and a flat gradient sit at
-// fractional positions. Translucent colours make a seam (both boxes covering
-// an edge pixel partly) and an overlap (both covering it fully) visible as a
-// colour that is neither box's.
+// horizontal edge, and a stroked rectangle, a flat gradient and a rounded
+// fill with a rounded border on it sit at fractional positions. Translucent
+// colours make a seam (both boxes covering an edge pixel partly) and an
+// overlap (both covering it fully) visible as a colour that is neither box's.
 
 #include "gui_forms/types.hpp"
 
@@ -23,7 +23,7 @@
 
 namespace edge_snapping {
 
-constexpr gui_forms::Size scene_size{40.0, 24.0};
+constexpr gui_forms::Size scene_size{40.0, 34.0};
 constexpr gui_forms::Point translation{0.3, 0.45};
 constexpr gui_forms::Rect left_box{2.2, 2.1, 10.37 - 2.2, 8.0};
 constexpr gui_forms::Rect right_box{10.37, 2.1, 20.08 - 10.37, 8.0};
@@ -32,6 +32,8 @@ constexpr gui_forms::Rect bottom_box{24.15, 6.43, 11.6, 10.11 - 6.43};
 constexpr gui_forms::Rect stroked{3.3, 13.6, 14.45, 7.2};
 constexpr double stroke_width = 1.3;
 constexpr gui_forms::Rect gradient_box{24.15, 13.6, 11.6, 7.2};
+constexpr gui_forms::Rect rounded_box{6.35, 24.2, 27.4, 6.6};
+constexpr double rounded_radius = 2.2;
 
 inline void paint_scene(gui_forms::Painter& painter) {
     painter.fill_rect({0.0, 0.0, scene_size.width, scene_size.height}, gui_forms::Color::rgba(250, 250, 250));
@@ -48,6 +50,9 @@ inline void paint_scene(gui_forms::Painter& painter) {
     const std::array<gui_forms::GradientStop, 2> stops{{{0.0, flat}, {1.0, flat}}};
     painter.fill_linear_gradient(gradient_box, {gradient_box.x, gradient_box.y},
                                  {gradient_box.right(), gradient_box.y}, stops);
+    // A control's face: a rounded fill with its border on the same box.
+    painter.fill_rounded_rect(rounded_box, rounded_radius, gui_forms::Color::rgba(200, 220, 240));
+    painter.stroke_rounded_rect(rounded_box, rounded_radius, gui_forms::Color::rgba(40, 60, 90), stroke_width);
     painter.restore();
 }
 
@@ -140,6 +145,52 @@ inline bool whole_pixels(const PixelImage& image, const double scale, const gui_
     return true;
 }
 
+// Across a rounded fill with its border, along one row (horizontal) or
+// column from `from` to `to`: background, border, fill, border, background,
+// each pixel exactly one of the three. The border's outer edges are whole
+// device pixels at the box's edges, rounded, either centred on them (a
+// stroke half outside) or inside them (a painter that strokes inside).
+inline bool border_on_fill(const PixelImage& image, const double scale, const bool horizontal, const int line,
+                           const double first_edge, const double last_edge, const double offset,
+                           const int from, const int to, const std::uint32_t background) {
+    std::array<int, 2> position{0, 0};
+    const std::size_t along = horizontal ? 0U : 1U;
+    position[1U - along] = line;
+    int stage = 0; // 0 before, 1 first border, 2 fill, 3 last border, 4 after
+    std::uint32_t border = background;
+    std::uint32_t fill = background;
+    int border_start = 0;
+    int border_end = 0;
+    for (int step = from; step < to; ++step) {
+        position[along] = step;
+        const std::uint32_t value = pixel_at(image, position[0], position[1]);
+        if (stage == 0 && value != background) {
+            stage = 1;
+            border = value;
+            border_start = step;
+        } else if (stage == 1 && value != border) {
+            stage = 2;
+            fill = value;
+        } else if (stage == 2 && value != fill) {
+            stage = 3;
+        } else if (stage == 3 && value != border) {
+            stage = 4;
+            border_end = step;
+        }
+        const bool expected = (stage == 0 && value == background) || ((stage == 1 || stage == 3) && value == border) ||
+            (stage == 2 && value == fill) || (stage == 4 && value == background);
+        if (!expected) return fail("the border and its fill do not meet on whole pixels", scale, position[0], position[1]);
+    }
+    if (stage != 4) return fail("the border and fill did not both appear", scale, position[0], position[1]);
+    const double half = stroke_width * 0.5;
+    const bool start_snapped = border_start == device_edge(first_edge - half, offset, scale) ||
+        border_start == device_edge(first_edge, offset, scale);
+    const bool end_snapped = border_end == device_edge(last_edge + half, offset, scale) ||
+        border_end == device_edge(last_edge, offset, scale);
+    if (!start_snapped || !end_snapped) return fail("the border's outer edge is not the rounded box edge", scale, border_start, border_end);
+    return true;
+}
+
 inline bool check_scene(const PixelImage& image, const double scale) {
     const std::uint32_t background = pixel_at(image, 0, 0);
     const int row = device_edge(6.0, translation.y, scale);
@@ -156,7 +207,15 @@ inline bool check_scene(const PixelImage& image, const double scale) {
     const gui_forms::Rect gradient_area{gradient_box.x - 1.0, gradient_box.y - 1.0,
                                         gradient_box.width + 2.0, gradient_box.height + 2.0};
     const bool gradient = whole_pixels(image, scale, gradient_area, background);
-    const bool passed = across && down && stroke && gradient;
+    const int rounded_row = device_edge(27.5, translation.y, scale);
+    const bool rounded_across = border_on_fill(image, scale, true, rounded_row, rounded_box.x, rounded_box.right(),
+        translation.x, device_edge(rounded_box.x - 2.0, translation.x, scale),
+        device_edge(rounded_box.right() + 2.0, translation.x, scale), background);
+    const int rounded_column = device_edge(20.0, translation.x, scale);
+    const bool rounded_down = border_on_fill(image, scale, false, rounded_column, rounded_box.y, rounded_box.bottom(),
+        translation.y, device_edge(rounded_box.y - 2.0, translation.y, scale),
+        device_edge(rounded_box.bottom() + 2.0, translation.y, scale), background);
+    const bool passed = across && down && stroke && gradient && rounded_across && rounded_down;
     return passed;
 }
 

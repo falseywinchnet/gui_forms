@@ -61,8 +61,9 @@ replaced without touching one.
 
 Layout gives controls unsnapped logical boxes, identical at every display
 scale. The painters snap at paint time: a filled rectangle, a stroked
-rectangle, a gradient fill and the bounds of a rounded rectangle have each
-edge rounded to the nearest device pixel, halves upward. The extent is not
+rectangle, a gradient fill and the bounds of a rounded rectangle, filled or
+stroked, have each edge rounded to the nearest device pixel, halves upward,
+so a rounded border sits exactly on its fill. The extent is not
 rounded. Two boxes that share a logical edge therefore share a device edge,
 with no seam between them and no pixel covered twice, at 1.25 or 1.5 as
 at 1 or 2. Rounded corners, paths, lines, text and images keep their

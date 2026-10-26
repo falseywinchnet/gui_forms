@@ -571,6 +571,36 @@ void CoreGraphicsRaster::stroke_rect(Rect rect, Color color, double width) {
 void CoreGraphicsRaster::stroke_rounded_rect(Rect rect, double radius,
                                              Color color, double width) {
     if ((*impl_).context == nullptr) return;
+    // The stroke is centred on the edges. Snapped, it is the ring between its
+    // snapped outer and inner bounds, as a rounded fill snaps its bounds; the
+    // corners keep their antialiasing.
+    const double half = width * 0.5;
+    CGRect outer = CGRectNull;
+    CGRect inner = CGRectNull;
+    const bool snapped = std::isfinite(half) && half > 0.0 &&
+        snapped_user_rect((*impl_).context, outset_rect(rect, half), outer) &&
+        snapped_user_rect((*impl_).context, outset_rect(rect, -half), inner);
+    if (snapped) {
+        const double bounded = std::clamp(radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5));
+        const Rect outer_rect{static_cast<double>(outer.origin.x), static_cast<double>(outer.origin.y),
+                              static_cast<double>(outer.size.width), static_cast<double>(outer.size.height)};
+        CGPathRef outer_path = rounded_path(outer_rect, bounded + half);
+        if (outer_path == nullptr) return;
+        set_color((*impl_).context, color);
+        CGContextAddPath((*impl_).context, outer_path);
+        CGPathRelease(outer_path);
+        if (!CGRectIsEmpty(inner)) {
+            const Rect inner_rect{static_cast<double>(inner.origin.x), static_cast<double>(inner.origin.y),
+                                  static_cast<double>(inner.size.width), static_cast<double>(inner.size.height)};
+            CGPathRef inner_path = rounded_path(inner_rect, std::max(0.0, bounded - half));
+            if (inner_path != nullptr) {
+                CGContextAddPath((*impl_).context, inner_path);
+                CGPathRelease(inner_path);
+            }
+        }
+        CGContextEOFillPath((*impl_).context);
+        return;
+    }
     CGPathRef path = rounded_path(rect, radius);
     if (path == nullptr) return;
     set_color((*impl_).context, color);

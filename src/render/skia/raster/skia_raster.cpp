@@ -850,6 +850,30 @@ void SkiaRaster::stroke_rounded_rect(Rect rect, double radius, Color color,
                                     double width) {
     if (SkCanvas* canvas = (*impl_).canvas()) {
         SkPaint paint = make_paint(color);
+        // The stroke is centred on the edges. Snapped, it is the ring between
+        // its snapped outer and inner bounds, as a rounded fill snaps its
+        // bounds; the corners keep their antialiasing.
+        const double half = width * 0.5;
+        SkRect outer{};
+        SkRect inner{};
+        const bool snapped = std::isfinite(half) && half > 0.0 &&
+            snapped_local_rect(*canvas, outset_rect(rect, half), outer) &&
+            snapped_local_rect(*canvas, outset_rect(rect, -half), inner);
+        if (snapped) {
+            const double bounded = std::clamp(radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5));
+            const SkScalar outer_radius = static_cast<SkScalar>(std::min(bounded + half,
+                static_cast<double>(std::min(outer.width(), outer.height())) * 0.5));
+            const SkRRect outer_shape = SkRRect::MakeRectXY(outer, outer_radius, outer_radius);
+            if (inner.isEmpty()) {
+                (*canvas).drawRRect(outer_shape, paint);
+                return;
+            }
+            const SkScalar inner_radius = static_cast<SkScalar>(std::clamp(bounded - half, 0.0,
+                static_cast<double>(std::min(inner.width(), inner.height())) * 0.5));
+            const SkRRect inner_shape = SkRRect::MakeRectXY(inner, inner_radius, inner_radius);
+            (*canvas).drawDRRect(outer_shape, inner_shape, paint);
+            return;
+        }
         paint.setStyle(SkPaint::kStroke_Style);
         paint.setStrokeWidth(static_cast<SkScalar>(width));
         (*canvas).drawRRect(to_sk_rrect(rect, radius), paint);
