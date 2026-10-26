@@ -67,8 +67,16 @@ static void shape_scanline_equivalence() {
                         for (int y = 0; y < height; ++y) {
                             for (int x = 0; x < width; ++x) {
                                 const Point sample{(x + 0.5) / scale, (y + 0.5) / scale};
-                                bool covered = x >= std::floor(bounds.x * scale) && x < std::ceil(bounds.right() * scale) &&
-                                    y >= std::floor(bounds.y * scale) && y < std::ceil(bounds.bottom() * scale) && clipping.contains(sample);
+                                // Rounded shapes cover the pixels whose centres they hold. Boxes
+                                // (fills and gradients) round each edge to the nearest device pixel
+                                // (owner decision L-Q8); the clip keeps pixel centres.
+                                const bool box = kind == 0 || kind >= 3;
+                                const bool inside_box = x >= std::floor(absolute.x * scale + 0.5) &&
+                                    x < std::floor(absolute.right() * scale + 0.5) &&
+                                    y >= std::floor(absolute.y * scale + 0.5) && y < std::floor(absolute.bottom() * scale + 0.5);
+                                const bool inside_bounds = x >= std::floor(bounds.x * scale) && x < std::ceil(bounds.right() * scale) &&
+                                    y >= std::floor(bounds.y * scale) && y < std::ceil(bounds.bottom() * scale);
+                                bool covered = (box ? inside_box : inside_bounds) && clipping.contains(sample);
                                 if (rounded) covered = covered && reference_inside(sample, rounded_clip, 7.3);
                                 if (kind == 1 || kind == 2) covered = covered && reference_inside(sample, absolute, 8.2);
                                 if (kind == 2) covered = covered && !reference_inside(sample,

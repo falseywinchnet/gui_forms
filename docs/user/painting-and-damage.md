@@ -59,6 +59,16 @@ Skia-based CPU adapter on macOS and Linux and by the DIB compositor on
 Windows. No Skia type is visible to a control, and the renderer can be
 replaced without touching one.
 
+Layout gives controls unsnapped logical boxes, identical at every display
+scale. The painters snap at paint time: a filled rectangle, a stroked
+rectangle, a gradient fill and the bounds of a rounded rectangle have each
+edge rounded to the nearest device pixel, halves upward. The extent is not
+rounded. Two boxes that share a logical edge therefore share a device edge,
+with no seam between them and no pixel covered twice, at 1.25 or 1.5 as
+at 1 or 2. Rounded corners, paths, lines, text and images keep their
+antialiasing. Under a rotated or skewed transform nothing snaps. A box
+narrower than a device pixel can round to nothing.
+
 PNG is the supported encoded image format. The resource registry validates
 the PNG structure and retains its encoded bytes; the renderer decodes and
 caches the pixels. Controls refer to resources by `ImageId`. The registry

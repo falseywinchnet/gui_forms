@@ -175,10 +175,36 @@ void clipboard_files() {
     require(DestroyWindow(owner));
 }
 #include "support/windows_shape_reference.hpp"
+#include "support/edge_snapping_scene.hpp"
+
+// Owner decision L-Q8 on the DIB painter: each box edge rounds to the
+// nearest device pixel, so neighbours share an edge (support/edge_snapping_scene.hpp).
+void edge_snapping_scene() {
+    for (const double scale : edge_snapping::scales) {
+        host::DibPainter painter;
+        require(painter.resize(edge_snapping::scene_size, scale));
+        painter.begin_frame();
+        edge_snapping::paint_scene(painter);
+        require(painter.save_bmp(L"edge-snapping.bmp"));
+        std::ifstream file("edge-snapping.bmp", std::ios::binary);
+        const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(file)), {});
+        file.close();
+        std::remove("edge-snapping.bmp");
+        edge_snapping::PixelImage image{};
+        image.width = static_cast<int>(std::ceil(edge_snapping::scene_size.width * scale));
+        image.height = static_cast<int>(std::ceil(edge_snapping::scene_size.height * scale));
+        image.row_bytes = static_cast<std::size_t>(image.width) * 4U;
+        // A top-down 32-bit BMP: the pixels follow the 54-byte headers.
+        require(bytes.size() >= 54U + image.row_bytes * static_cast<std::size_t>(image.height));
+        image.bytes = bytes.data() + 54U;
+        require(edge_snapping::check_scene(image, scale));
+    }
+}
 
 int main() {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     shape_scanline_equivalence();
+    edge_snapping_scene();
     clipboard_files();
     disclosure_render();
     for (ImageSampling sampling : {ImageSampling::nearest, ImageSampling::linear})

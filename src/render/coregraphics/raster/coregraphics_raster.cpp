@@ -22,6 +22,28 @@ CGRect to_cg_rect(Rect rect) noexcept {
     return CGRectMake(rect.x, rect.y, rect.width, rect.height);
 }
 
+// Edge snapping (owner decision L-Q8, detail::snap_device_edge): the
+// user-space rectangle whose device edges are `rect`'s, each rounded to a
+// whole device pixel. Only an axis-aligned transform snaps; under any other,
+// false, and the caller keeps antialiased geometry.
+bool snapped_user_rect(CGContextRef context, const Rect rect, CGRect& snapped) {
+    const CGAffineTransform transform = CGContextGetCTM(context);
+    if (transform.b != 0.0 || transform.c != 0.0 || !rect.finite()) return false;
+    const CGRect device = CGContextConvertRectToDeviceSpace(context, to_cg_rect(rect));
+    const double left = gui_forms::detail::snap_device_edge(static_cast<double>(CGRectGetMinX(device)));
+    const double top = gui_forms::detail::snap_device_edge(static_cast<double>(CGRectGetMinY(device)));
+    const double right = gui_forms::detail::snap_device_edge(static_cast<double>(CGRectGetMaxX(device)));
+    const double bottom = gui_forms::detail::snap_device_edge(static_cast<double>(CGRectGetMaxY(device)));
+    const CGRect rounded = CGRectMake(left, top, right - left, bottom - top);
+    snapped = CGContextConvertRectToUserSpace(context, rounded);
+    return true;
+}
+
+Rect outset_rect(const Rect rect, const double amount) noexcept {
+    const Rect result{rect.x - amount, rect.y - amount, rect.width + amount * 2.0, rect.height + amount * 2.0};
+    return result;
+}
+
 CGPathRef rounded_path(Rect rect, double radius) noexcept {
     const CGFloat bounded = std::clamp(
         radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5));
@@ -496,12 +518,23 @@ void CoreGraphicsRaster::clip_rounded_rect(Rect rect, double radius) {
 void CoreGraphicsRaster::fill_rect(Rect rect, Color color) {
     if ((*impl_).context != nullptr) {
         set_color((*impl_).context, color);
-        CGContextFillRect((*impl_).context, to_cg_rect(rect));
+        CGRect box = to_cg_rect(rect);
+        const bool snapped = snapped_user_rect((*impl_).context, rect, box);
+        CGContextSaveGState((*impl_).context);
+        if (snapped) CGContextSetShouldAntialias((*impl_).context, false);
+        CGContextFillRect((*impl_).context, box);
+        CGContextRestoreGState((*impl_).context);
     }
 }
 
 void CoreGraphicsRaster::fill_rounded_rect(Rect rect, double radius, Color color) {
     if ((*impl_).context == nullptr) return;
+    // The bounds snap; the corners keep their antialiasing.
+    CGRect bounds = to_cg_rect(rect);
+    if (snapped_user_rect((*impl_).context, rect, bounds)) {
+        rect = Rect{static_cast<double>(bounds.origin.x), static_cast<double>(bounds.origin.y),
+                    static_cast<double>(bounds.size.width), static_cast<double>(bounds.size.height)};
+    }
     CGPathRef path = rounded_path(rect, radius);
     if (path == nullptr) return;
     set_color((*impl_).context, color);
@@ -513,6 +546,23 @@ void CoreGraphicsRaster::fill_rounded_rect(Rect rect, double radius, Color color
 void CoreGraphicsRaster::stroke_rect(Rect rect, Color color, double width) {
     if ((*impl_).context != nullptr) {
         set_color((*impl_).context, color);
+        // The stroke is centred on the edges. Snapped, it is the ring between
+        // its snapped outer and inner edges, filled without antialiasing.
+        const double half = width * 0.5;
+        CGRect outer = CGRectNull;
+        CGRect inner = CGRectNull;
+        const bool snapped = std::isfinite(half) && half > 0.0 &&
+            snapped_user_rect((*impl_).context, outset_rect(rect, half), outer) &&
+            snapped_user_rect((*impl_).context, outset_rect(rect, -half), inner);
+        if (snapped) {
+            CGContextSaveGState((*impl_).context);
+            CGContextSetShouldAntialias((*impl_).context, false);
+            CGContextAddRect((*impl_).context, outer);
+            if (!CGRectIsEmpty(inner)) CGContextAddRect((*impl_).context, inner);
+            CGContextEOFillPath((*impl_).context);
+            CGContextRestoreGState((*impl_).context);
+            return;
+        }
         CGContextSetLineWidth((*impl_).context, width);
         CGContextStrokeRect((*impl_).context, to_cg_rect(rect));
     }
@@ -536,8 +586,10 @@ void CoreGraphicsRaster::fill_linear_gradient(
     if ((*impl_).context == nullptr || rect.empty()) return;
     CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
+    CGRect box = to_cg_rect(rect);
+    static_cast<void>(snapped_user_rect((*impl_).context, rect, box));
     CGContextSaveGState((*impl_).context);
-    CGContextClipToRect((*impl_).context, to_cg_rect(rect));
+    CGContextClipToRect((*impl_).context, box);
     CGContextDrawLinearGradient(
         (*impl_).context, gradient, CGPointMake(start.x, start.y),
         CGPointMake(end.x, end.y),
@@ -600,8 +652,10 @@ void CoreGraphicsRaster::fill_linear_gradient_spread(
             (corner.y - start.y) * perpendicular.y) + 1.0);
     }
 
+    CGRect box = to_cg_rect(rect);
+    static_cast<void>(snapped_user_rect((*impl_).context, rect, box));
     CGContextSaveGState((*impl_).context);
-    CGContextClipToRect((*impl_).context, to_cg_rect(rect));
+    CGContextClipToRect((*impl_).context, box);
     for (double period = first_period; period < final_period; period += 1.0) {
         const Point band_start{start.x + dx * period,
                                start.y + dy * period};
@@ -646,8 +700,10 @@ void CoreGraphicsRaster::fill_radial_gradient(
     }
     CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
+    CGRect box = to_cg_rect(rect);
+    static_cast<void>(snapped_user_rect((*impl_).context, rect, box));
     CGContextSaveGState((*impl_).context);
-    CGContextClipToRect((*impl_).context, to_cg_rect(rect));
+    CGContextClipToRect((*impl_).context, box);
     CGContextTranslateCTM((*impl_).context, center.x, center.y);
     CGContextScaleCTM((*impl_).context, radii.width, radii.height);
     CGContextDrawRadialGradient(
