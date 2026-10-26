@@ -119,7 +119,7 @@ Related types
    * - :cpp:class:`TabControl::Item <gui_forms::TabControl::Item>`
      -  
    * - :cpp:class:`TabControl::ItemParts <gui_forms::TabControl::ItemParts>`
-     - A tab's parts, in the control's coordinates: the strip's tab, label, focus and seam parts of the same names (the strip paints them).
+     - A tab's parts, in the control's coordinates: the strip's tab, label, focus, seam and icon parts of the same names (the strip paints them).
    * - :cpp:class:`TabControl::ItemStates <gui_forms::TabControl::ItemStates>`
      -  
    * - :cpp:class:`TabControl::Parts <gui_forms::TabControl::Parts>`
@@ -673,7 +673,7 @@ Related types
 
    ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
 
-   A tab's parts, in the control's coordinates: the strip's tab, label, focus and seam parts of the same names (the strip paints them).
+   A tab's parts, in the control's coordinates: the strip's tab, label, focus, seam and icon parts of the same names (the strip paints them).
 
    .. cpp:member:: PartGeometry tab
 
@@ -682,6 +682,8 @@ Related types
    .. cpp:member:: PartGeometry tab_focus
 
    .. cpp:member:: PartGeometry tab_seam
+
+   .. cpp:member:: PartGeometry tab_icon
 
 .. cpp:namespace:: gui_forms
 
