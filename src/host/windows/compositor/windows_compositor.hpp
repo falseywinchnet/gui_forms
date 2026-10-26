@@ -19,8 +19,9 @@
 // dwmapi.dll is loaded at run time, as elsewhere in the host. UI thread only.
 namespace gui_forms::host::detail {
 
-// The live state for `window`: composition from DwmIsCompositionEnabled,
-// support for each backdrop, the transparency-effects setting
+// The live state for `window`: composition present from Windows 8 on
+// (DWM cannot be off there), else from DwmIsCompositionEnabled; support
+// for each backdrop, the transparency-effects setting
 // (EnableTransparency, which also stands for reduced transparency on
 // Windows) and high contrast (SPI_GETHIGHCONTRAST). `generation` is the
 // caller's. Without dwmapi.dll only opaque is supported.

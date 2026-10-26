@@ -20,7 +20,11 @@
 //
 // The test window and the backdrop are topmost while the test runs, so that
 // another test's windows on the same desktop cannot cover them. Each
-// reading is printed as a JSON line for the C2 record.
+// reading is printed as a JSON line for the C2 record. The state line also
+// carries the raw settings it came from, read independently of the host
+// (the registry value, WinRT's UISettings, SPI_GETHIGHCONTRAST and
+// DwmIsCompositionEnabled), so that a run explains itself; a failure is
+// printed as a JSON line too.
 #include "gui_forms/application.hpp"
 #include "gui_forms/control.hpp"
 #include "gui_forms/theme/theme/theme.hpp"
@@ -30,12 +34,17 @@
 
 #include <windows.h>
 #include <dwmapi.h>
+#include <inspectable.h>
+#include <roapi.h>
+#include <winstring.h>
+#include <windows.ui.viewmanagement.h>
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cwchar>
 #include <memory>
 #include <string>
 
@@ -152,11 +161,100 @@ void fail(GateContext& gate, const char* message) {
     if (gate.failure == nullptr) gate.failure = message;
 }
 
+// The raw settings behind the host's state, read here independently of it.
+// `enable_transparency` is the registry value (1 on, 0 off, -1 absent) and
+// `enable_transparency_status` the LSTATUS of reading it;
+// `advanced_effects` is UISettings.AdvancedEffectsEnabled (-1 unavailable);
+// `high_contrast_flags` is HIGHCONTRASTW::dwFlags (HCF_HIGHCONTRASTON is
+// 1), 0 when unread; `composition` is what DwmIsCompositionEnabled answers
+// (-1 when it fails).
+struct SettingSources final {
+    unsigned long build{};
+    int enable_transparency{};
+    long enable_transparency_status{};
+    int advanced_effects{};
+    bool high_contrast_read{};
+    unsigned long high_contrast_flags{};
+    int composition{};
+    bool remote_session{};
+};
+
+// HKLM\...\Windows NT\CurrentVersion CurrentBuildNumber, for the record
+// (GetVersionExW reports 9200 without a compatibility manifest); 0 unread.
+unsigned long operating_system_build() {
+    std::array<wchar_t, 16> text{};
+    DWORD size = static_cast<DWORD>(text.size() * sizeof(wchar_t));
+    const LSTATUS status = RegGetValueW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                                        L"CurrentBuildNumber", RRF_RT_REG_SZ, nullptr, text.data(), &size);
+    if (status != ERROR_SUCCESS) return 0UL;
+    const unsigned long build = std::wcstoul(text.data(), nullptr, 10);
+    return build;
+}
+
+// The interface identifier windows.ui.viewmanagement.h declares for
+// IUISettings4 (Windows 10 1803).
+constexpr GUID ui_settings4_interface{0x52bb3002, 0x919b, 0x4d6b, {0x9b, 0x78, 0x8d, 0xd6, 0x6f, 0xf4, 0xb9, 0x3b}};
+
+int advanced_effects_setting() {
+    const HRESULT initialized = RoInitialize(RO_INIT_SINGLETHREADED);
+    const bool uninitialize = SUCCEEDED(initialized);
+    int setting = -1;
+    HSTRING_HEADER header{};
+    HSTRING class_name = nullptr;
+    const wchar_t* const name = RuntimeClass_Windows_UI_ViewManagement_UISettings;
+    if (SUCCEEDED(WindowsCreateStringReference(name, static_cast<UINT32>(std::wcslen(name)), &header, &class_name))) {
+        IInspectable* instance = nullptr;
+        if (SUCCEEDED(RoActivateInstance(class_name, &instance)) && instance != nullptr) {
+            void* queried = nullptr;
+            if (SUCCEEDED((*instance).QueryInterface(ui_settings4_interface, &queried)) && queried != nullptr) {
+                ABI::Windows::UI::ViewManagement::IUISettings4* const settings =
+                    static_cast<ABI::Windows::UI::ViewManagement::IUISettings4*>(queried);
+                boolean enabled = 0;
+                if (SUCCEEDED((*settings).get_AdvancedEffectsEnabled(&enabled))) setting = enabled != 0 ? 1 : 0;
+                (*settings).Release();
+            }
+            (*instance).Release();
+        }
+    }
+    if (uninitialize) RoUninitialize();
+    return setting;
+}
+
+SettingSources read_setting_sources() {
+    SettingSources sources{};
+    sources.build = operating_system_build();
+    DWORD value = 0U;
+    DWORD size = sizeof(value);
+    const LSTATUS status =
+        RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                     L"EnableTransparency", RRF_RT_REG_DWORD, nullptr, &value, &size);
+    sources.enable_transparency_status = static_cast<long>(status);
+    sources.enable_transparency = -1;
+    if (status == ERROR_SUCCESS) sources.enable_transparency = value != 0U ? 1 : 0;
+    sources.advanced_effects = advanced_effects_setting();
+    HIGHCONTRASTW contrast{};
+    contrast.cbSize = sizeof(contrast);
+    sources.high_contrast_read = SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0) != FALSE;
+    if (sources.high_contrast_read) sources.high_contrast_flags = static_cast<unsigned long>(contrast.dwFlags);
+    BOOL composition = FALSE;
+    sources.composition = -1;
+    if (SUCCEEDED(DwmIsCompositionEnabled(&composition))) sources.composition = composition != FALSE ? 1 : 0;
+    sources.remote_session = GetSystemMetrics(SM_REMOTESESSION) != 0;
+    return sources;
+}
+
 // What the window's compositor state must be on this machine: present,
 // transparent supported, both materials supported or os_version together.
 void check_state(GateContext& gate) {
     const CompositorState& state = (*gate.model).compositor_state();
-    std::printf("{\"gate\":\"windows_compositor\",\"state\":%s}\n", state.to_json().c_str());
+    const SettingSources sources = read_setting_sources();
+    std::printf("{\"gate\":\"windows_compositor\",\"state\":%s,\"sources\":{\"build\":%lu,"
+                "\"enable_transparency\":%d,\"enable_transparency_status\":%ld,\"advanced_effects\":%d,"
+                "\"high_contrast_read\":%s,\"high_contrast_flags\":%lu,\"composition\":%d,\"remote_session\":%s}}\n",
+                state.to_json().c_str(), sources.build, sources.enable_transparency,
+                sources.enable_transparency_status, sources.advanced_effects,
+                sources.high_contrast_read ? "true" : "false", sources.high_contrast_flags, sources.composition,
+                sources.remote_session ? "true" : "false");
     if (state.generation.value == 0U) fail(gate, "the host reports its compositor state after attach");
     if (state.compositing != CompositorPresence::present) fail(gate, "DWM composes on every supported Windows");
     if (state.support_of(WindowBackdrop::transparent) != WindowBackdropSupport::supported) {
@@ -209,6 +307,15 @@ void read_step(GateContext& gate) {
     if (withdrawn) {
         if (grant.granted != WindowBackdrop::opaque) fail(gate, "the user's settings withdraw every backdrop");
         if (green) fail(gate, "a withdrawn backdrop shows nothing behind the window");
+        // The setting that withdrew it is the reason: high contrast first
+        // (owner decision T5-Q7), then reduced transparency, which Windows'
+        // transparency-effects switch also sets.
+        WindowBackdropReason expected = WindowBackdropReason::transparency_disabled;
+        if (settings.reduced_transparency) expected = WindowBackdropReason::reduced_transparency;
+        if (settings.high_contrast) expected = WindowBackdropReason::high_contrast;
+        if (gate.step != GateStep::opaque && grant.reason != expected) {
+            fail(gate, "a withdrawn backdrop gives the user's setting as its reason");
+        }
         return;
     }
     switch (grant.granted) {
@@ -349,6 +456,7 @@ int main() {
         return 1;
     }
     if (gate.failure != nullptr) {
+        std::printf("{\"gate\":\"windows_compositor\",\"failed\":\"%s\"}\n", gate.failure);
         std::fprintf(stderr, "%s\n", gate.failure);
         return 1;
     }

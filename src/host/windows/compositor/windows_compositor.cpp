@@ -1,6 +1,7 @@
 #include "windows_compositor.hpp"
 
 #include <dwmapi.h>
+#include <versionhelpers.h>
 
 #include <cstring>
 #include <cwchar>
@@ -112,10 +113,19 @@ CompositorState read_windows_compositor_state(HWND window, CompositorGeneration 
     CompositorState state{};
     state.generation = generation;
     const DwmFunctions& functions = dwm();
-    BOOL composing = FALSE;
-    const bool known = functions.composition_enabled != nullptr && SUCCEEDED(functions.composition_enabled(&composing));
+    // DWM composes every desktop from Windows 8 on and cannot be turned
+    // off; DwmIsCompositionEnabled answers FALSE under a contrast theme
+    // there all the same (the owner's run, MEASUREMENTS.md C2), so it is
+    // asked only on an older system.
     state.compositing = CompositorPresence::unknown;
-    if (known) state.compositing = composing != FALSE ? CompositorPresence::present : CompositorPresence::absent;
+    if (IsWindows8OrGreater()) {
+        state.compositing = CompositorPresence::present;
+    } else {
+        BOOL composing = FALSE;
+        const bool known =
+            functions.composition_enabled != nullptr && SUCCEEDED(functions.composition_enabled(&composing));
+        if (known) state.compositing = composing != FALSE ? CompositorPresence::present : CompositorPresence::absent;
+    }
     const bool alpha_available = functions.enable_blur_behind != nullptr;
     const bool materials_available = functions.set_attribute != nullptr && backdrop_attribute_readable(window);
     const WindowBackdropSupport transparent_support =
