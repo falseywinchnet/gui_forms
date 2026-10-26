@@ -96,6 +96,9 @@ add_subdirectory(stx_conv)
 # CNG, the native resource image codec (PNG stays for interchange); its
 # pinned Zstandard 1.5.7 comes from stx_cng/tools/fetch_zstd.sh.
 add_subdirectory(stx_cng)
+# The rich-text library: one document model, the markdown-like dialect and
+# RTF (planning/stages/RT-rich-text/PLAN.md).
+add_subdirectory(stx_rtf2md)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -3891,13 +3894,15 @@ include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
-# stx_zlib, stx_png, stx_conv and stx_cng install their own licences and provenance under
+# stx_zlib, stx_png, stx_conv, stx_cng and stx_rtf2md install their own licences and provenance under
 # share/licenses/<package>; the SDK also carries them beside GUI.Forms' others.
 install(FILES stx_zlib/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE.txt)
 install(FILES stx_zlib/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-puff.txt)
 install(FILES stx_zlib/LICENSE-zlib.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-zlib.txt)
 install(FILES stx_zlib/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-PROVENANCE.md)
 install(FILES stx_png/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-LICENSE.txt)
+install(FILES stx_rtf2md/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_rtf2md-LICENSE.txt)
+install(FILES stx_rtf2md/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_rtf2md-PROVENANCE.md)
 install(FILES stx_png/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-PROVENANCE.md)
 install(FILES stx_conv/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_conv-LICENSE.txt)
 install(FILES stx_conv/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_conv-PROVENANCE.md)

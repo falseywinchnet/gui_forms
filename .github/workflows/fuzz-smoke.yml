@@ -11,6 +11,7 @@ on:
       - 'stx_png/**'
       - 'stx_conv/**'
       - 'stx_cng/**'
+      - 'stx_rtf2md/**'
       - 'src/core/image/**'
       - 'include/gui_forms/compression/**'
       - 'fuzz/**'
@@ -33,7 +34,7 @@ jobs:
       fail-fast: false
       matrix:
         architecture: [x64, arm64]
-        target: [inflate, inflate_oracle_ordinary, inflate_oracle_strict, inflate_protocol, deflate, png_decode, conv, cng]
+        target: [inflate, inflate_oracle_ordinary, inflate_oracle_strict, inflate_protocol, deflate, png_decode, conv, cng, rtf2md_markdown]
         include:
           - architecture: x64
             runner: ubuntu-24.04
@@ -100,6 +101,9 @@ jobs:
               clang++ $flags -Ioracle -DGUI_FORMS_INFLATE_ORACLE=1 fuzz/inflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp $objects -o smoke ;;
             inflate_protocol) clang++ $flags fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp -o smoke ;;
             deflate) clang++ $flags fuzz/deflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp stx_zlib/src/deflate.cpp -o smoke ;;
+            rtf2md_markdown) clang++ $flags -Istx_rtf2md/include -Istx_rtf2md/src stx_rtf2md/fuzz/markdown_round_trip_fuzz.cpp \
+                   stx_rtf2md/src/document.cpp stx_rtf2md/src/limits.cpp stx_rtf2md/src/text_scan.cpp \
+                   stx_rtf2md/src/markdown_inline.cpp stx_rtf2md/src/markdown_reader.cpp stx_rtf2md/src/markdown_writer.cpp -o smoke ;;
             conv) clang++ $flags -Istx_conv/include stx_conv/fuzz/conv_fuzz.cpp stx_conv/src/plan.cpp stx_conv/src/profile.cpp stx_conv/src/image.cpp -o smoke ;;
             cng) clang++ $flags -Istx_cng/include stx_cng/fuzz/cng_fuzz.cpp .build/cng-fuzz/libstx_cng.a \
                    .build/cng-fuzz/libstx_cng_zstd.a .build/cng-fuzz-zlib/libstx_zlib.a -o smoke ;;
