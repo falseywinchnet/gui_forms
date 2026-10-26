@@ -323,6 +323,16 @@ void host_region_helpers() {
     detail::append_uncovered_live_damage({0.0, 0.0, 100.0, 100.0}, 1.0, scattered, uncovered);
     require(uncovered.size() == 1U && uncovered[0] == Rect(0.0, 0.0, 100.0, 100.0),
             "fragment overflow falls back to the whole dirty rectangle");
+    // AppKit's one coalesced rectangle over two distant changes: on a reusable
+    // raster only the parts beneath live surfaces stay retained damage.
+    const std::array<Rect, 1> coalesced{{{10.0, 10.0, 370.0, 270.0}}};
+    std::vector<Rect> kept;
+    detail::append_within_live_destinations(coalesced, {}, kept);
+    require(kept.empty(), "without live surfaces AppKit's request is a copy only");
+    const std::array<Rect, 2> destinations{{{0.0, 0.0, 100.0, 80.0}, {500.0, 500.0, 10.0, 10.0}}};
+    detail::append_within_live_destinations(coalesced, destinations, kept);
+    require(kept.size() == 1U && kept[0] == Rect(10.0, 10.0, 90.0, 70.0),
+            "the request is kept only beneath a live surface");
 }
 } // namespace
 
