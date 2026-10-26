@@ -99,9 +99,10 @@ struct ThemeValue final {
 [[nodiscard]] std::optional<Color> named_colour(std::string_view name) noexcept;
 
 // What a value may read besides constants, all borrowed for the read:
-// - `parameters`: the registered names of the primitive's number
-//   parameters, in declaration order, for `param()` (empty outside a
-//   primitive's parameters);
+// - `parameters`: the registered names of all the primitive's parameters,
+//   in declaration order, for `param()`, which reads one by its position
+//   (empty outside a primitive's parameters; the lowering refuses a
+//   `param()` of a colour or a choice);
 // - `published_values`: how many values the theme's manifest publishes, so
 //   inputs are addressed up to engine_input_count + published_values;
 // - `resources`: the resource names the manifest lists, for `url()`.

@@ -24,6 +24,27 @@ inline constexpr std::size_t maximum_is_arguments = 32U;
 // of expanding a selector to a constant per expanded rule.
 inline constexpr std::size_t maximum_simple_selectors = 32U;
 
+// The lowered sheet's size (a derived limit, PLAN.md P5): at most
+// maximum_lowered_bytes, counted as an estimate of the records' bytes, so
+// that a selector list expanding into many rules, each copying its rule's
+// names and declarations, builds a bounded amount. Each record counts
+// lowered_record_bytes and its strings their bytes (lowered_selector_bytes
+// for a selector).
+inline constexpr std::size_t maximum_lowered_bytes = 16U * maximum_sheet_bytes;
+inline constexpr std::size_t lowered_record_bytes = 64U;
+
+// What the lowering of one sheet may still build: `rules` expanded rules,
+// at most maximum_rules, and `bytes` lowered bytes, at most
+// maximum_lowered_bytes.
+struct LoweringBudget final {
+    std::size_t rules{maximum_rules};
+    std::size_t bytes{maximum_lowered_bytes};
+};
+
+// The lowered bytes one selector counts: a record, its names' bytes and one
+// byte per state.
+[[nodiscard]] std::size_t lowered_selector_bytes(const RuleSelector& selector) noexcept;
+
 // One selector of a rule, expanded: the engine's selector, the specificity
 // CSS gives it (with `:is()`, its most specific argument's, EC2), and the
 // cascade level that specificity puts a theme-sheet rule at (a stable ID
@@ -127,12 +148,15 @@ struct SelectorWorkspace final {
 class SelectorLowering final {
 public:
     // Appends the rule's selectors to `output` and subtracts their count
-    // from `rule_budget`. A list that would expand past `rule_budget` is
-    // refused with too_many_rules (the rules of a sheet, expanded, are at
-    // most maximum_rules). Its diagnostics are appended to `diagnostics`.
-    // On `dropped` or `refused`, `output` and `rule_budget` are unchanged.
+    // and their lowered bytes from `budget`. A list that would expand past
+    // `budget.rules` is refused with too_many_rules (the rules of a sheet,
+    // expanded, are at most maximum_rules), and one whose selectors would
+    // count more than `budget.bytes` with lowered_sheet_too_large. A
+    // dropped rule's selectors count, since each is built. Its diagnostics
+    // are appended to `diagnostics`. On `dropped` or `refused`, `output` and
+    // `budget` are unchanged.
     [[nodiscard]] SelectorOutcome lower(const SelectorInput& input, const SelectorVocabulary& vocabulary,
-                                        std::size_t& rule_budget, std::vector<LoweredSelector>& output,
+                                        LoweringBudget& budget, std::vector<LoweredSelector>& output,
                                         ThemeDiagnosticList& diagnostics);
 
 private:
