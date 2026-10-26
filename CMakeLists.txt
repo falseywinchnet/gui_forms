@@ -1174,6 +1174,8 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     add_library(gui_forms_host_linux STATIC
         src/host/linux/application/linux_host.cpp
         src/host/linux/application/x11_windowing.cpp
+        src/host/linux/settings/xsettings_parse.cpp
+        src/host/linux/settings/xsettings_watch.cpp
         src/host/linux/accessibility/linux_accessibility.cpp
         src/host/linux/services/linux_services.cpp
         src/host/linux/services/x11_tray_icons.cpp
@@ -2409,6 +2411,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_material_tests tests/engine_material_tests.cpp)
     target_link_libraries(gui_forms_engine_material_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_material_tests COMMAND gui_forms_engine_material_tests)
+    add_executable(gui_forms_engine_authored_material_tests tests/engine_authored_material_tests.cpp)
+    target_link_libraries(gui_forms_engine_authored_material_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_authored_material_tests COMMAND gui_forms_engine_authored_material_tests)
     add_executable(gui_forms_engine_procedural_tests tests/engine_procedural_tests.cpp)
     target_link_libraries(gui_forms_engine_procedural_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_procedural_tests COMMAND gui_forms_engine_procedural_tests)
@@ -2790,6 +2795,11 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_key_commands_tests tests/key_commands_tests.cpp)
     target_link_libraries(gui_forms_key_commands_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_key_commands_tests COMMAND gui_forms_key_commands_tests)
+    # The X11 host's XSETTINGS parser takes plain bytes and no Xlib, so it is
+    # tested on every platform.
+    add_executable(gui_forms_xsettings_parse_tests
+        tests/xsettings_parse_tests.cpp src/host/linux/settings/xsettings_parse.cpp)
+    add_test(NAME gui_forms_xsettings_parse_tests COMMAND gui_forms_xsettings_parse_tests)
     add_executable(gui_forms_page_view_document_tests tests/page_view_document_tests.cpp)
     target_link_libraries(gui_forms_page_view_document_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_page_view_document_tests COMMAND gui_forms_page_view_document_tests)
@@ -4068,6 +4078,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
 endif()
 
 if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
+    add_executable(gui_forms_windows_input_settings_tests tests/windows_input_settings_tests.cpp)
+    target_link_libraries(gui_forms_windows_input_settings_tests PRIVATE GUIForms::Application)
+    add_test(NAME gui_forms_windows_input_settings_tests COMMAND gui_forms_windows_input_settings_tests)
+    set_tests_properties(gui_forms_windows_input_settings_tests PROPERTIES TIMEOUT 60)
     add_executable(gui_forms_windows_accessibility_tests tests/windows_accessibility_tests.cpp)
     target_link_libraries(gui_forms_windows_accessibility_tests PRIVATE GUIForms::Application oleacc uiautomationcore oleaut32 uuid)
     add_test(NAME gui_forms_windows_accessibility_tests COMMAND gui_forms_windows_accessibility_tests)

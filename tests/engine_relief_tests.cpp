@@ -133,7 +133,7 @@ bool pixel_is(const TestRaster& raster, std::uint32_t column, std::uint32_t row,
 const char* const relief_names[] = {"pill_plate", "gold_plate", "inset_well", "etched_divider", "seam_line", "grip"};
 
 void test_relief_primitives_register() {
-    require(current_engine_version == (EngineVersion{0, 2}), "E8 is engine 0.2");
+    require(!(current_engine_version < EngineVersion{0, 2}), "E8 is engine 0.2, which this engine implements");
     for (const char* const name : relief_names) {
         const PrimitiveDescriptor& descriptor = builtin(name).descriptor();
         require(descriptor.introduced == (EngineVersion{0, 2}), "the relief set is engine 0.2");

@@ -168,6 +168,15 @@ void Window::set_presentation_settings(PresentationSettings settings) {
         throw std::invalid_argument(
             "GUI.Forms text scale must be finite and between 0.5 and 4.0");
     }
+    if (settings.double_click_milliseconds == 0U ||
+        settings.double_click_milliseconds > maximum_double_click_milliseconds) {
+        throw std::invalid_argument(
+            "GUI.Forms double-click interval must be between 1 and 5000 milliseconds");
+    }
+    if (settings.double_click_origin != SettingOrigin::default_value &&
+        settings.double_click_origin != SettingOrigin::host) {
+        throw std::invalid_argument("GUI.Forms double-click origin is not a SettingOrigin");
+    }
     if (presentation_settings_ == settings) {
         return;
     }

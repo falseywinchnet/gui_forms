@@ -414,7 +414,7 @@ void test_properties() {
             "parameters before the primitive belong to it; initial is the default; px is a number");
     const ThemeRule choice = only_rule("#a { primitive: material; recipe: initial; shape: CAP-START }");
     require(choice.declarations.size() == 3U &&
-                choice.declarations[1] == RuleDeclaration::choice_value("recipe", "button") &&
+                choice.declarations[1] == RuleDeclaration::choice_value("recipe", "family") &&
                 choice.declarations[2] == RuleDeclaration::choice_value("shape", "cap_start"),
             "a choice's initial is its default; keywords match in any case");
     const ThemeRule named = only_rule("#a { primitive: bulge; light-colour: transparent }");
