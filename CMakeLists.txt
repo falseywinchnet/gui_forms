@@ -2106,13 +2106,13 @@ if(GUI_FORMS_BUILD_TESTS)
         endif()
         # Stage T5, C4's measurement: what the X server and a compositing
         # manager do with premultiplied alpha, the 32-bit visual and the
-        # _NET_WM_CM_Sn selection (XWayland included). Xlib and XFixes only;
+        # _NET_WM_CM_Sn selection (XWayland included). Xlib, XFixes and XInput;
         # prints JSON lines (kept in CI's LastTest.log evidence) and fails
         # only when it cannot open the display. Serial: it reads the screen
         # and may start xcompmgr.
-        if(TARGET X11::Xfixes)
+        if(TARGET X11::Xfixes AND TARGET X11::Xi)
             add_executable(gui_forms_x11_compositor_probe tests/x11_compositor_probe.cpp)
-            target_link_libraries(gui_forms_x11_compositor_probe PRIVATE X11::Xfixes X11::X11)
+            target_link_libraries(gui_forms_x11_compositor_probe PRIVATE X11::Xfixes X11::Xi X11::X11)
             add_test(NAME gui_forms_x11_compositor_probe COMMAND gui_forms_x11_compositor_probe)
             set_tests_properties(gui_forms_x11_compositor_probe PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE)
             # The same probe under a headless Weston's Xwayland; it reports

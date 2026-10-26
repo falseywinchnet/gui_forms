@@ -27,7 +27,7 @@ archives=$2
 # Wayland compositor and its X server, for the same probe under XWayland
 # (owner, 2026-10-25; Linux CI only).
 toolkit_packages="cmake ninja-build ccache clang-22 generate-ninja pkg-config \
-libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev \
+libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libatk1.0-dev libatk-bridge2.0-dev \
 xvfb xauth xcompmgr weston xwayland xdg-utils dbus at-spi2-core python3-gi gir1.2-atspi-2.0"
 case "$profile" in
   toolkit) packages=$toolkit_packages ;;

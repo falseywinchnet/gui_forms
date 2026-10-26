@@ -25,6 +25,14 @@
 // read the server refuses (Xwayland's rootless root window has no image to
 // get) is recorded as an unread pixel, not a crash.
 //
+// The top-level under the clear column is read by warping the pointer
+// there. Xwayland 23.2.6 under a headless Weston 13, whose seat has no
+// pointer, segfaults on that warp (CI, every Linux job: address 0xa0,
+// straight after the warp request). Under Xwayland the probe therefore warps
+// only when Xwayland has made its pointer device ("xwayland-pointer:N"
+// in the XInput device list), and otherwise records that reading as not
+// exercised, with the device's absence in the settings line.
+//
 // It prints one JSON line per case. It measures and never judges: it fails
 // only when it cannot open the display or make its windows. Verdicts
 // ("per_pixel_alpha") are its reading of the colours, within a tolerance of
@@ -32,6 +40,7 @@
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/extensions/XInput.h>
 #include <X11/extensions/Xfixes.h>
 
 #include <signal.h>
@@ -212,6 +221,9 @@ struct Probe final {
     // GUI_FORMS_X11_PROBE_STEPS set: each request group is named on stderr
     // before it is sent, so a server that dies mid-case shows where.
     bool trace_steps{};
+    // The server is Xwayland, and whether its seat has a pointer device.
+    bool xwayland{};
+    bool xwayland_pointer_device{};
 };
 
 void note_step(const Probe& probe, const char* step) {
@@ -280,6 +292,28 @@ void put_columns(const Probe& probe, Window window, Visual* visual, int depth, b
     XSync(probe.display, False);
 }
 
+// The top-level the server finds at (x, y) on the root: the pointer is
+// warped there and queried.
+const char* top_level_at(const Probe& probe, Window window, int x, int y) {
+    note_step(probe, "warp the pointer");
+    XWarpPointer(probe.display, None, probe.root, 0, 0, 0U, 0U, x, y);
+    XSync(probe.display, False);
+    Window root_return = None;
+    Window child = None;
+    int root_x = 0;
+    int root_y = 0;
+    int window_x = 0;
+    int window_y = 0;
+    unsigned buttons = 0U;
+    note_step(probe, "query the pointer");
+    const Bool queried = XQueryPointer(probe.display, probe.root, &root_return, &child, &root_x, &root_y,
+                                       &window_x, &window_y, &buttons);
+    if (queried == False) return "none";
+    if (child == window) return "probe";
+    if (child == probe.backdrop) return "backdrop";
+    return "none";
+}
+
 CaseReading run_case(const Probe& probe, ProbeVisual kind, SelectionTrace& trace) {
     CaseReading reading{};
     Visual* visual = DefaultVisual(probe.display, probe.screen);
@@ -330,22 +364,12 @@ CaseReading run_case(const Probe& probe, ProbeVisual kind, SelectionTrace& trace
     note_step(probe, "window attributes");
     XWindowAttributes actual{};
     if (XGetWindowAttributes(probe.display, window, &actual) != 0) reading.depth = actual.depth;
-    // The server's own choice of the top-level under the clear column.
-    note_step(probe, "warp the pointer");
-    XWarpPointer(probe.display, None, probe.root, 0, 0, 0U, 0U, probe_x + clear_x, probe_y + middle);
-    XSync(probe.display, False);
-    Window root_return = None;
-    Window child = None;
-    int root_x = 0;
-    int root_y = 0;
-    int window_x = 0;
-    int window_y = 0;
-    unsigned buttons = 0U;
-    note_step(probe, "query the pointer");
-    if (XQueryPointer(probe.display, probe.root, &root_return, &child, &root_x, &root_y, &window_x, &window_y,
-                      &buttons) != 0) {
-        if (child == window) reading.window_at_clear = "probe";
-        if (child == probe.backdrop) reading.window_at_clear = "backdrop";
+    // The server's own choice of the top-level under the clear column,
+    // read only where warping the pointer is safe (see the top of the file).
+    if (probe.xwayland && !probe.xwayland_pointer_device) {
+        reading.window_at_clear = "not exercised: the Xwayland seat has no pointer";
+    } else {
+        reading.window_at_clear = top_level_at(probe, window, probe_x + clear_x, probe_y + middle);
     }
     note_step(probe, "destroy the window");
     XDestroyWindow(probe.display, window);
@@ -426,13 +450,32 @@ bool has_extension(Display* display, const char* name) {
     return present;
 }
 
+// Whether Xwayland has made the pointer device for its seat's pointer:
+// a slave pointer named "xwayland-pointer:<seat>". The relative-pointer
+// and gesture devices have other names.
+bool has_xwayland_pointer_device(Display* display) {
+    if (!has_extension(display, "XInputExtension")) return false;
+    int count = 0;
+    XDeviceInfo* const devices = XListInputDevices(display, &count);
+    if (devices == nullptr) return false;
+    const char* const prefix = "xwayland-pointer:";
+    const std::size_t prefix_length = std::strlen(prefix);
+    bool found = false;
+    for (int index = 0; index < count; ++index) {
+        const char* const name = devices[index].name;
+        if (name != nullptr && std::strncmp(name, prefix, prefix_length) == 0) found = true;
+    }
+    XFreeDeviceList(devices);
+    return found;
+}
+
 void print_settings(const Probe& probe, const char* found_compositor, bool xcompmgr_available) {
     const char* const session = std::getenv("XDG_SESSION_TYPE");
     const char* const wayland = std::getenv("WAYLAND_DISPLAY");
     const char* const vendor = ServerVendor(probe.display);
     std::printf("{\"probe\":\"x11_compositor\",\"settings\":true,\"vendor\":\"%s\",\"release\":%d,"
                 "\"default_depth\":%d,\"argb32_visual\":%s,\"argb32_alpha_mask\":\"0x%08lx\","
-                "\"composite\":%s,\"xfixes\":%s,\"render\":%s,\"damage\":%s,\"shape\":%s,\"xwayland\":%s,"
+                "\"composite\":%s,\"xfixes\":%s,\"render\":%s,\"damage\":%s,\"shape\":%s,\"xwayland\":%s,\"xwayland_pointer_device\":%s,"
                 "\"found_compositor\":\"%s\",\"xcompmgr_available\":%s,\"xdg_session_type\":\"%s\","
                 "\"wayland_display\":%s,\"x_errors\":%u,\"last_error_request\":%d,\"last_error_code\":%d}\n",
                 vendor != nullptr ? vendor : "", VendorRelease(probe.display),
@@ -442,7 +485,8 @@ void print_settings(const Probe& probe, const char* found_compositor, bool xcomp
                 has_extension(probe.display, "RENDER") ? "true" : "false",
                 has_extension(probe.display, "DAMAGE") ? "true" : "false",
                 has_extension(probe.display, "SHAPE") ? "true" : "false",
-                has_extension(probe.display, "XWAYLAND") ? "true" : "false", found_compositor,
+                probe.xwayland ? "true" : "false", probe.xwayland_pointer_device ? "true" : "false",
+                found_compositor,
                 xcompmgr_available ? "true" : "false", session != nullptr ? session : "",
                 wayland != nullptr ? "true" : "false", probe_errors.count, probe_errors.last_request,
                 probe_errors.last_code);
@@ -463,6 +507,8 @@ int main() {
     probe.root = RootWindow(probe.display, probe.screen);
     probe.argb = find_argb_visual(probe.display, probe.screen);
     probe.trace_steps = std::getenv("GUI_FORMS_X11_PROBE_STEPS") != nullptr;
+    probe.xwayland = has_extension(probe.display, "XWAYLAND");
+    probe.xwayland_pointer_device = probe.xwayland && has_xwayland_pointer_device(probe.display);
     SelectionTrace trace{};
     int error_base = 0;
     if (XFixesQueryExtension(probe.display, &trace.event_base, &error_base) == 0) trace.event_base = 0;
