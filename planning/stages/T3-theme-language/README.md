@@ -480,6 +480,23 @@ P9 and P10 are designed so that nothing assumes a later break: no
 version ranges, no per-version branches in the loader, and room for a
 compatibility module to register the constructs it restores.
 
+### Coordinator decisions on the rest of P6 (2026-10-26)
+
+- **D1, the recipe's own fields** (`color`, `outline` and
+  `outline-offset`, `text-shadow`). The engine resolves them per control,
+  from the rules that match that control, cached on its part record, with
+  `Theme::resolve` as the floor (EC1). T3 builds the engine side first.
+  In a second PR, T3 also moves the control call sites in
+  `src/controls` (about 40), and has permission for that PR only. That
+  diff is mechanical: with no rule matching, the behaviour is the same and
+  the goldens do not move.
+- **D2, `backdrop-filter`** (and the sheen's pointer gradient) is
+  deferred. Until then authors write `primitive: glass; blur: ...;
+  tint: ...`, and the sheen waits for P12.
+  - Stage H (the HTML import) will need `backdrop-filter`.
+  - Kept in view: once the glass takes a matrix parameter, its colour
+    functions compose into one matrix, as `filter`'s do.
+
 ## Read first
 
 - `planning/DESIGN_LANGUAGE_SPECIFICATION.md` §1.2, §8.2, §9.6, §12.1 item 1,

@@ -947,10 +947,10 @@ one bake per distinct assembly. 3 PRs.
   same C++ material; plus the lowering of the styles and of a
   percentage-sliced border image, and seven more refusals.
 
-*Still to build in P6:* `backdrop-filter` to the glass primitive, the
-sheen's pointer gradient, and §14's `color`, `outline` and
-`text-shadow`, which need a carrier for the recipe's own fields (owner
-decision pending, T3 track).
+*Still to build in P6:* §14's `color`, `outline` and `text-shadow`,
+which the engine resolves per control from the rules matching it (P6f,
+coordinator D1). `backdrop-filter` and the sheen's pointer gradient are
+deferred (coordinator D2, T3 README).
 
 **P7. Motion.** `transition`, the timing functions, delays, `@keyframes`,
 `animation`, ambient loops, and the state-machine grouping. Gate: a fixture
