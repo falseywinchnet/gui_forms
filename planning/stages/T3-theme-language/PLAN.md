@@ -989,6 +989,49 @@ from a sheet with the same frames as the C++ rules in
 `gui_forms_engine_motion_curve_tests`; zero bakes while a transition runs
 (E7r's counter). 2 PRs.
 
+*P7a, transitions and the grouping, done:*
+- **The lowering** (`src/core/theme_language/motion/`) reads
+  `transition` and its four longhands into the rule's lists, as CSS keeps
+  them: a later declaration replaces the lists it sets, and a short list
+  repeats. When the rule is emitted each named property takes its curve.
+  A property with a static value in the rule (`opacity`, `scale`,
+  `translate`) puts the curve on that value's machine; one without
+  becomes a machine of its own, whose states the grouping supplies.
+- **Targets:** `opacity`, `scale`, `face` (the cross-fade) and
+  `translate` (both translations), or an animated number parameter of
+  the rule's primitive (a parameter that is not animated is E402, an
+  unknown one E405). `all`, and a transition with no
+  `transition-property`, are E405 (the engine's machines each move one
+  property); `none` declares nothing.
+- **Timing functions:** `linear` and `ease` are the engine's; `ease-in-out`
+  is its smoothstep; `ease-in` and `ease-out` are CSS's exact
+  `cubic-bezier()` (R2-17). `step-start`, `step-end`, `cubic-bezier()`
+  (x within [0, 1], else E403) and `steps()` (1 to 32 levels;
+  `jump-none` and `jump-both` are E405) are CSS's. `follow(t)`, `decay(t)`
+  and `spring(t, ζ)` are the engine's physical curves (C2). A spring's ζ
+  is its damping ratio, from about 0.627 (8 % overshoot) to 1 (owner
+  decision, README). A physical curve keeps its own time, so a duration
+  with it is E405. A negative duration is E403; a negative delay is E405.
+  Every time is clamped to the 400 ms ceiling.
+- **The grouping** (R2-18), once every rule is lowered: each transition
+  absorbs the static values of the rules that refine its own (same level,
+  same selector but for more states). Its states are ordered most
+  precedent first: the higher specificity, then the later rule, then its
+  own value last. For a parameter, the values are number declarations in
+  rules selecting the same primitive. Absorbed machines and declarations
+  leave their rules, and a rule left with nothing is dropped. A
+  transition with no value to move (other than a face cross-fade) is
+  dropped. More than 8 states is E407. This first version groups only
+  exact refinements: a rule of intermediate specificity that does not
+  refine the transition's own may now win where an absorbed refinement
+  used to.
+- Gate: `gui_forms_theme_motion_css_tests`. The pop of
+  `gui_forms_engine_pop_tests` written as a sheet gives the C++ pop's
+  records, and on a hand-driven clock the same frames, pixel for pixel,
+  with the same bakes, none while it moves. The test also has a fixture
+  per timing function, the longhands, translate, a parameter, the grouping
+  order and 24 refusals.
+
 **P8. Colour roles, em, text roles and `@media` (engine changes EC3, EC4,
 EC5).** Colour roles as vocabulary atoms and the theme's `:root` palette
 (R2-03); colour values that remember their role; the high-contrast

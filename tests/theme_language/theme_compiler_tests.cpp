@@ -470,7 +470,7 @@ void test_refusals() {
         {"@keyframes k { from { opacity: 0 } }", DiagnosticCode::not_yet_built, "@keyframes"},
         {"#a { backdrop-filter: blur(2px) }", DiagnosticCode::not_yet_built, "backdrop-filter"},
         {"#a { border-image-slice: 1 }", DiagnosticCode::not_yet_built, "border"},
-        {"#a { transition: opacity 1s }", DiagnosticCode::not_yet_built, "transition"},
+        {"#a { animation: fade 1s }", DiagnosticCode::not_yet_built, "animation"},
         {"#a { color: inherit }", DiagnosticCode::not_yet_built, "inherit"},
         {"#a { font: ui }", DiagnosticCode::not_yet_built, "font"},
         {"#a { opacity: inherit }", DiagnosticCode::value_wrong_kind, "inherit"},

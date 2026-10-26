@@ -497,6 +497,15 @@ compatibility module to register the constructs it restores.
   - Kept in view: once the glass takes a matrix parameter, its colour
     functions compose into one matrix, as `filter`'s do.
 
+### Owner decision on `spring()` (2026-10-26)
+
+- **E1, `spring(<response>, <damping>)`.** The second argument is a
+  damping ratio ζ, as in SwiftUI's damping fraction. It converts to the
+  engine's overshoot as e^(−πζ/√(1−ζ²)); ζ = 1 is critically damped
+  (no overshoot). It is admitted from about 0.627 (an 8 % overshoot, the
+  engine's limit) to 1; anything outside is E403. `response` is the
+  engine's response time, 1/ω, written as a time.
+
 ## Read first
 
 - `planning/DESIGN_LANGUAGE_SPECIFICATION.md` §1.2, §8.2, §9.6, §12.1 item 1,

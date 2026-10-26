@@ -12,6 +12,7 @@
 #include "../custom_properties/theme_custom_properties.hpp"
 #include "../diagnostics/theme_diagnostics.hpp"
 #include "../material/theme_material_lowering.hpp"
+#include "../motion/theme_motion_lowering.hpp"
 #include "../selector/theme_selector.hpp"
 #include "../source_text/theme_source_text.hpp"
 #include "../syntax_tree/theme_syntax_tree.hpp"
@@ -80,6 +81,18 @@ struct LoweredDeclaration final {
     std::size_t transition_count{};
 };
 
+// The transitions' storage (P7a): a rule's written lists and declared
+// curves, and the origin of every machine of the sheet, for the grouping
+// once every rule is lowered.
+struct TransitionStorage final {
+    WrittenTransitions written{};
+    std::vector<DeclaredTransition> declared{};
+    std::vector<MachineOrigin> origins{};
+    // The machines of the rule being emitted, `rule` unset.
+    std::vector<MachineOrigin> rule_machines{};
+    MotionLoweringProblem problem{};
+};
+
 // Compiles theme sheets. It keeps every stage's storage from sheet to
 // sheet; one instance serves one compilation at a time.
 class ThemeCompiler final {
@@ -112,6 +125,7 @@ private:
     MaterialLowering material_lowering_{};
     std::vector<MaterialField> material_fields_{};
     std::vector<RecipeDeclaration> recipe_fields_{};
+    TransitionStorage transitions_{};
     std::string folded_{};
 };
 
