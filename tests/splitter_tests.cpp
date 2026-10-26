@@ -135,6 +135,8 @@ void left_drag() {
             "the splitter publishes a valid anatomy");
 
     const Point start = centre(splitter);
+    pointer(window, PointerAction::move, start);
+    require(splitter.states().hot, "a splitter with a target is hot under the pointer");
     pointer(window, PointerAction::down, start);
     require(splitter.states().pressed && splitter.states().captured, "a press on the bar starts a drag");
     pointer(window, PointerAction::move, {start.x + 50.0, start.y});
@@ -215,6 +217,8 @@ void without_a_target() {
     splitter.set_split_position(150.0);
     (*fixture.window).perform_layout();
     require(near((*fixture.pane).committed_arranged_bounds().width, 100.0), "a splitter without a target moves nothing");
+    pointer(*fixture.window, PointerAction::move, centre(splitter));
+    require(!splitter.states().hot, "a splitter without a target is not hot under the pointer");
     pointer(*fixture.window, PointerAction::down, centre(splitter));
     require(!splitter.states().pressed, "a press without a target starts no drag");
     pointer(*fixture.window, PointerAction::up, centre(splitter));

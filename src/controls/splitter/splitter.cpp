@@ -154,7 +154,9 @@ Size Splitter::measure(Size) {
 void Splitter::on_pointer(PointerEvent& event) {
     if (event.action == PointerAction::enter || event.action == PointerAction::move ||
         event.action == PointerAction::leave) {
-        const bool hot = event.action != PointerAction::leave;
+        // A splitter with nothing to resize ignores the pointer: no resize
+        // cursor and no hot face.
+        const bool hot = event.action != PointerAction::leave && enabled() && target() != nullptr;
         if (hot) set_cursor(horizontal_axis() ? CursorKind::resize_horizontal : CursorKind::resize_vertical);
         if (hot_ != hot) {
             hot_ = hot;
