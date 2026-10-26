@@ -834,6 +834,13 @@ parent-owned overlap; a scroll arrow is a button (CONTROL_DNA §3.6, §4.1–4.2
    does not restate.
 3. Leading, middle, trailing and sole roles come from the parent's ordered
    membership, never coordinates (REGIONS §4 rule 3).
+4. Owner drawing is content-only (owner decision W-Q6, 2026-10-26). A
+   control with items may let the application draw an item's content
+   (`ItemDrawMode::owner_draw`, the `ItemContentPaint` event, in
+   `gui_forms/theme/owner_draw`): the application draws with GUI.Forms'
+   painter, clipped to the item's content rectangle, and the item's plate,
+   selection and focus cue stay painted by role, so a theme still styles
+   every owner-drawn item's chrome.
 
 ### 8.3 Participation
 
