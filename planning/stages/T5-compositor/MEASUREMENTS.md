@@ -280,3 +280,41 @@ after which the run fails with "not exercised: window inactive". The
 effect views still follow the window's active state, as the adapter's
 do: the rerun confirms the materials in an active window, not a forced
 state. The rerun is the owner's, from the fresh bench sheet.
+
+## C6. The backplane replay
+
+### Cost per repaint, Shadow Windows (x64, Release), 2026-10-26
+
+Workload: the scene in `tests/backplane_replay_scene.hpp`, which is
+- a 240×100 logical window;
+- a backplane page with a dark band and two Carlito text runs;
+- one glass pane at (10, 10, 220, 80) with blur 1.
+
+Each repaint follows damage to the backplane. It replays the whole
+backplane through the DIB painter's framebuffer, bakes the glass again
+and paints the window. The figures are means over 64 repaints, from
+`gui_forms_windows_backplane_replay_tests`:
+
+| Scale | Window pixels | Per repaint |
+|---|---|---|
+| 1.0 | 24,000 | 1.62 ms |
+| 1.5 | 54,000 | 3.80 ms |
+| 2.0 | 96,000 | 9.11 ms |
+
+These are a record, not a gate. They are taken on one machine, from one
+build, and include the window paint.
+
+### Identity
+
+The glass raster's FNV-1a hashes through the DIB painter (Windows x64) are:
+
+| Scale | Hash |
+|---|---|
+| 1.0 | `0x14e91c188a71dda6` |
+| 1.5 | `0xe31497238996ea16` |
+| 2.0 | `0xfd9daabeb75fa8ee` |
+
+`gui_forms_backplane_replay_identity_tests` holds Skia to the same table
+(ADR-004: text renders identically). Skia is first checked on CI. If it
+differs there, that is a divergence in text drawn through the replay, and
+it is reported, not re-baselined.
