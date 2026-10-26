@@ -5,6 +5,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "macos_host.hpp"
+#include "front_reuse.hpp"
 #include "live_surface_damage.hpp"
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text/types/text_types.hpp"
@@ -854,6 +855,9 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     // A presentation region was taken but its pixels never reached a
     // presented raster. The next pass copies complete clips.
     BOOL _liveRegionLost;
+    // The surface epoch of the receipt the raster's front presents; 0 before
+    // the first presented frame.
+    std::uint64_t _frontSurfaceEpoch;
     NSPanel* _tooltipPanel;
     NSTimer* _tooltipTimer;
     std::uint64_t _lastSemanticGeneration;
@@ -2721,14 +2725,23 @@ void post_perform_close(NSWindow* window) {
 #endif
     const GFRect nativeDamage{dirtyRect.origin.x, dirtyRect.origin.y,
                               dirtyRect.size.width, dirtyRect.size.height};
-    const bool modelClean = (*_model).paint_lease_snapshot().state ==
-        gui_forms::PaintLeaseState::clean;
-    // The raster still holds the last presentation, at this size and scale.
-    bool frontHeld = _rasterHasContent == YES && modelClean;
+    const gui_forms::PaintLeaseSnapshot drawLease = (*_model).paint_lease_snapshot();
+    gui_forms::detail::FrontReuse reuse{};
+    reuse.raster_has_content = _rasterHasContent == YES;
 #if defined(GUI_FORMS_PREPARED_TEXT)
-    frontHeld = frontHeld && _raster.prepared_front_matches(logicalSize, scale);
+    reuse.front_matches_extent = _raster.prepared_front_matches(logicalSize, scale);
     const PaintReceipt previousReceipt = _raster.prepared_front_receipt();
+#else
+    // The ordinary raster was resized to the view above (and lost its content).
+    reuse.front_matches_extent = true;
 #endif
+    reuse.front_surface_epoch = _frontSurfaceEpoch;
+    reuse.surface_epoch = drawLease.surface_epoch;
+    reuse.lease_clean = drawLease.state == gui_forms::PaintLeaseState::clean;
+    reuse.live_region_lost = _liveRegionLost == YES;
+    // The raster still holds the last presentation, at this size and scale,
+    // in the model's current surface epoch.
+    const bool frontHeld = gui_forms::detail::front_held(reuse);
     const bool reusableRaster = frontHeld && _hostOccluded == NO;
     // While hidden the model declines to paint. AppKit's rectangles then ask
     // for a copy (an exposure or a snapshot); kept as retained damage, they
@@ -2808,12 +2821,12 @@ void post_perform_close(NSWindow* window) {
     }
     if (drawnCount == 0 && !occludedCopy) _uncoveredDamage.push_back(nativeDamage);
     // Nothing owed and no live frame: AppKit's request is a copy of the raster
-    // as it stands, and this draw prepares and paints nothing.
-    bool copyOnly = occludedCopy && _pendingDamage.empty();
-    if (reusableRaster && _pendingDamage.empty() && _pendingLivePresentations.empty()) {
-        copyOnly = true;
-        _uncoveredDamage.clear();
-    }
+    // as it stands, and this draw prepares and paints nothing. A resize, a
+    // scale change, a reallocated backing or a discarded candidate fails the
+    // predicate and repaints.
+    const bool copyOnly = gui_forms::detail::copy_only_draw(
+        reuse, !_pendingDamage.empty(), !_pendingLivePresentations.empty());
+    if (copyOnly) _uncoveredDamage.clear();
     if (reusableRaster && !copyOnly) {
         // Paint the gathered set, not AppKit's coalesced request: outside the
         // model's damage (already in _pendingDamage) and the live surfaces,
@@ -2956,7 +2969,10 @@ void post_perform_close(NSWindow* window) {
         std::chrono::steady_clock::now();
     _rasterFinishPhase.record(finishStarted, finishEnded);
 
-    if (receipt) _rasterHasContent = YES;
+    if (receipt) {
+        _rasterHasContent = YES;
+        _frontSurfaceEpoch = (*receipt).surface_epoch;
+    }
     GFSize presentationSize = logicalSize;
 #if defined(GUI_FORMS_PREPARED_TEXT)
     _rasterHasContent = _raster.prepared_front_receipt() ? YES : NO;

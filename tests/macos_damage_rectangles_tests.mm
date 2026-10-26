@@ -34,6 +34,11 @@ extern char** environ;
 // Then becoming visible again: after a change made while hidden, the first
 // visible frame repaints that change only, and with nothing changed it
 // repaints nothing (AppKit's whole-view request is a copy of the raster).
+// After a resize while hidden the reveal repaints the whole view. Last, the
+// window is miniaturized and restored for real, with and without a change
+// while hidden, and the screen after the restore must equal the screen
+// before it apart from the changed block: a restored window must never come
+// back blank or white (the draw that copies the raster must always copy).
 
 // Existing private native diagnostics and occlusion hooks, not a public API addition.
 @interface NSView (DamageRectanglesProbe)
@@ -74,7 +79,10 @@ struct Capture final {
     std::vector<std::uint8_t> rgba{};
 };
 
-enum class Stage { first_frame, drain, settle, changed, shown, hidden, revealed, bare_reveal };
+enum class Stage {
+    first_frame, drain, settle, changed, shown, hidden, revealed, bare_reveal,
+    resize_hidden, resized, minimize, minimized, restored
+};
 
 struct State final {
     std::shared_ptr<ColorBlock> root{};
@@ -95,6 +103,10 @@ struct State final {
     Capture raster_before{};
     Capture screen_before{};
     double scale{1.0};
+    // The miniaturize passes: the second one changes a block while hidden.
+    bool change_while_minimized{false};
+    double draws_before{0.0};
+    Capture screen_before_minimize{};
     bool finished{false};
     bool host_closed{false};
     std::string failure{};
@@ -133,6 +145,11 @@ const char* stage_name(const Stage stage) {
     case Stage::hidden: return "hidden";
     case Stage::revealed: return "revealed";
     case Stage::bare_reveal: return "bare_reveal";
+    case Stage::resize_hidden: return "resize_hidden";
+    case Stage::resized: return "resized";
+    case Stage::minimize: return "minimize";
+    case Stage::minimized: return "minimized";
+    case Stage::restored: return "restored";
     }
     return "unknown";
 }
@@ -444,18 +461,99 @@ void advance(State& state) {
         set_stage(state, Stage::bare_reveal);
         return;
     }
-    // Let the whole-view display request of the reveal be drawn.
+    if (state.stage == Stage::bare_reveal) {
+        // Let the whole-view display request of the reveal be drawn.
+        ++state.settle_steps;
+        if (state.settle_steps < 4U) return;
+        const MetricsSnapshot after = (*state.model).metrics_snapshot();
+        const double painted = after.painted_damage_area - state.before_metrics.painted_damage_area;
+        const std::uint64_t passes = after.paint_passes - state.before_metrics.paint_passes;
+        const double native_dirty = host_number(view, "last_native_dirty_area");
+        std::cout << "dp-reveal|unchanged|painted_area=" << painted << "|paint_passes=" << passes
+                  << "|native_dirty_area=" << native_dirty << '\n';
+        require(painted == 0.0 && passes == 0U, "becoming visible with nothing changed repainted");
+        set_stage(state, Stage::resize_hidden);
+        return;
+    }
+    if (state.stage == Stage::resize_hidden) {
+        // A new backing size while hidden: the front no longer matches.
+        [view notifyOcclusion:YES];
+        state.before_metrics = (*state.model).metrics_snapshot();
+        state.previous_presented = (*state.model).paint_lease_snapshot().presented_revision;
+        [window setContentSize:NSMakeSize(420.0, 300.0)];
+        [view notifyOcclusion:NO];
+        set_stage(state, Stage::resized);
+        return;
+    }
+    if (state.stage == Stage::resized) {
+        const PaintLeaseSnapshot lease = (*state.model).paint_lease_snapshot();
+        if (lease.presented_revision <= state.previous_presented) return;
+        const MetricsSnapshot after = (*state.model).metrics_snapshot();
+        const double painted = after.painted_damage_area - state.before_metrics.painted_damage_area;
+        const double extent = static_cast<double>(view.bounds.size.width * view.bounds.size.height);
+        std::cout << "dp-reveal|resized_while_hidden|painted_area=" << painted << "|view_area=" << extent << '\n';
+        require(extent > 400.0 * 300.0, "the window did not take the new size");
+        require(painted >= extent - 1.0e-6, "a reveal after a resize while hidden did not repaint the whole view");
+        state.settle_steps = 0;
+        set_stage(state, Stage::minimize);
+        return;
+    }
+    if (state.stage == Stage::minimize) {
+        // Let the window server show the last frame before the baseline.
+        ++state.settle_steps;
+        if (state.settle_steps < 4U) return;
+        state.screen_before_minimize = capture_screen(window, view, "before_minimize");
+        [window miniaturize:nil];
+        set_stage(state, Stage::minimized);
+        return;
+    }
+    if (state.stage == Stage::minimized) {
+        if (!window.isMiniaturized) return;
+        if (state.change_while_minimized) {
+            (*state.top_left).set_color(Color::rgba(200, 160, 40));
+            [view collectDamage];
+        }
+        state.before_metrics = (*state.model).metrics_snapshot();
+        state.draws_before = host_number(view, "native_draw_count");
+        [window deminiaturize:nil];
+        state.settle_steps = 0;
+        set_stage(state, Stage::restored);
+        return;
+    }
+    const bool shown_again = !window.isMiniaturized && window.isVisible &&
+        (window.occlusionState & NSWindowOcclusionStateVisible) != 0;
+    if (!shown_again) return;
+    // Let the restore animation finish. The old fault (a restored window left
+    // blank until mouse input) persists, so a settled capture still sees it.
     ++state.settle_steps;
-    if (state.settle_steps < 4U) return;
+    if (state.settle_steps < 10U) return;
+    const Capture restored = capture_screen(window, view, state.change_while_minimized ? "restored_changed" : "restored");
     const MetricsSnapshot after = (*state.model).metrics_snapshot();
     const double painted = after.painted_damage_area - state.before_metrics.painted_damage_area;
     const std::uint64_t passes = after.paint_passes - state.before_metrics.paint_passes;
-    const double native_dirty = host_number(view, "last_native_dirty_area");
-    std::cout << "dp-reveal|unchanged|painted_area=" << painted << "|paint_passes=" << passes
-              << "|native_dirty_area=" << native_dirty << '\n';
-    require(painted == 0.0 && passes == 0U, "becoming visible with nothing changed repainted");
-    state.finished = true;
-    close_fixture(state);
+    const double draws = host_number(view, "native_draw_count") - state.draws_before;
+    const std::array<gui_forms::Rect, 1> changed_block{state.blocks[0]};
+    const ChangedPixels changed = changed_pixels(state.screen_before_minimize, restored, state.scale, changed_block);
+    const std::uint8_t root_red = red_at(restored, state.scale, 200.0, 150.0);
+    std::cout << "dp-reveal|miniaturize|change_while_hidden=" << (state.change_while_minimized ? 1 : 0)
+              << "|native_draws=" << draws << "|painted_area=" << painted << "|paint_passes=" << passes
+              << "|screen_changed_inside=" << changed.inside << "|screen_changed_outside=" << changed.outside
+              << "|root_red=" << static_cast<unsigned>(root_red) << '\n';
+    require(root_red != 255U, "the restored window came back white");
+    require(changed.outside == 0U, "the restored window differs from the window before it was hidden");
+    const double device_pixels_per_unit = state.scale * state.scale;
+    const std::size_t block_pixels =
+        static_cast<std::size_t>(std::llround(state.blocks[0].area() * device_pixels_per_unit));
+    if (state.change_while_minimized) {
+        require(changed.inside == block_pixels, "the change made while hidden is not on the screen after the restore");
+        state.finished = true;
+        close_fixture(state);
+        return;
+    }
+    require(changed.inside == 0U, "the restored window changed although nothing changed while hidden");
+    state.change_while_minimized = true;
+    state.settle_steps = 0;
+    set_stage(state, Stage::minimize);
 }
 void run_step(void* const context) {
     const std::unique_ptr<DeferredStep> owner(static_cast<DeferredStep*>(context));
