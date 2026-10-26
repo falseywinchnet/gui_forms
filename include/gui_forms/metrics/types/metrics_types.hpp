@@ -141,6 +141,11 @@ struct MetricsSnapshot {
     // built-in recipe instead. Counted when a keyed part's refusal begins,
     // and at every paint of a part without a key.
     std::uint64_t engine_primitive_refusals{};
+    // Materials assembled from a recipe's material and the material fields
+    // a theme's rules set (T3 EC1): once per distinct assembly for a keyed
+    // part (AssembledPartMaterial), and at every paint of a part without a
+    // key.
+    std::uint64_t engine_material_assemblies{};
     // Paint groups begun deeper than maximum_paint_group_depth, drawn
     // without isolation (Painter::begin_group).
     std::uint64_t paint_group_refusals{};

@@ -74,8 +74,8 @@ inline constexpr double material_outset = 8.0;
 class MaterialPrimitive final : public EnginePrimitive {
 public:
     [[nodiscard]] const PrimitiveDescriptor& descriptor() const noexcept override;
-    [[nodiscard]] std::optional<ControlVisualRole> theme_material(
-        const PrimitiveParameterBlock& parameters) const noexcept override;
+    [[nodiscard]] std::optional<ControlVisualRole> theme_material(const PrimitiveParameterBlock& parameters,
+                                                                  ControlVisualRole family) const noexcept override;
     [[nodiscard]] PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept override;
     [[nodiscard]] bool accepts(const PrimitiveParameterBlock& parameters,
                                const PrimitiveTarget& target) const noexcept override;

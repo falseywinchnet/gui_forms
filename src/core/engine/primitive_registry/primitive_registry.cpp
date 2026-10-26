@@ -249,7 +249,8 @@ bool EnginePrimitive::blank(const PrimitiveParameterBlock&) const noexcept {
     return false;
 }
 
-std::optional<ControlVisualRole> EnginePrimitive::theme_material(const PrimitiveParameterBlock&) const noexcept {
+std::optional<ControlVisualRole> EnginePrimitive::theme_material(const PrimitiveParameterBlock&,
+                                                                 ControlVisualRole) const noexcept {
     return std::nullopt;
 }
 

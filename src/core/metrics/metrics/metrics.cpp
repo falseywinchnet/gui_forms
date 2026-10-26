@@ -214,6 +214,9 @@ void Metrics::record_engine_ambient_refusal() noexcept {
 void Metrics::record_engine_primitive_refusal() noexcept {
     values_.engine_primitive_refusals = values_.engine_primitive_refusals + 1U;
 }
+void Metrics::record_engine_material_assembly() noexcept {
+    values_.engine_material_assemblies = values_.engine_material_assemblies + 1U;
+}
 void Metrics::record_paint_group_refusals(std::uint64_t refusals) noexcept {
     values_.paint_group_refusals = values_.paint_group_refusals + refusals;
 }

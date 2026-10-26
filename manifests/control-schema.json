@@ -18,7 +18,7 @@
     "semantic_fields": ["position_in_set", "set_size", "has_popup", "controlled_panel", "orientation", "level", "modal", "row_index", "column_index", "row_count", "column_count", "access_key", "small_step", "large_step", "text_selection", "multiline"]
   },
   "engine": {
-    "version": "0.2",
+    "version": "0.3",
     "cascade_levels": ["built_in", "theme_sheet", "class_rule", "stable_id_rule", "inline_style", "forced_high_contrast"],
     "budgets": {"operations_per_device_pixel": 512, "animated_operations_per_frame": 4000000},
     "primitives": [
@@ -197,7 +197,7 @@
         "cost": {"per_device_pixel": 512, "fixed": 64, "preparation_per_device_pixel": 0},
         "outsets": [8, 8, 8, 8],
         "parameters": [
-          {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"], "default": "button", "animated": false},
+          {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip", "family"], "default": "family", "animated": false},
           {"name": "shape", "kind": "choice", "choices": ["rounded_rectangle", "pill", "circle", "cap_start", "cap_end"], "default": "rounded_rectangle", "animated": false}
         ]
       },

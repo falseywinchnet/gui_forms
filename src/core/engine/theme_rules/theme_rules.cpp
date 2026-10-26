@@ -3,7 +3,10 @@
 
 #include "gui_forms/engine/theme_rules/theme_rules.hpp"
 
+#include "gui_forms/surface_material/painting/surface_material_painting.hpp"
+
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <utility>
 
@@ -195,8 +198,112 @@ std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept {
     case RuleDiagnosticKind::ambient_invalid: return "ambient_invalid";
     case RuleDiagnosticKind::blend_invalid: return "blend_invalid";
     case RuleDiagnosticKind::published_value_invalid: return "published_value_invalid";
+    case RuleDiagnosticKind::material_field_invalid: return "material_field_invalid";
     }
     return {};
+}
+
+// -- material fields (EC1) ----------------------------------------------------------
+
+namespace {
+
+constexpr std::array<std::string_view, material_field_count> material_field_names{
+    "fills",    "shadows", "glows",         "border_top",  "border_right", "border_bottom", "border_left",
+    "keylines", "corners", "colour_filter", "drop_shadow", "filter_blur",  "finish",        "mask"};
+
+// Draws the serial number of a new compilation; the first is 1.
+std::uint64_t next_rules_serial() noexcept {
+    static std::atomic<std::uint64_t> drawn{0U};
+    const std::uint64_t serial = drawn.fetch_add(1U, std::memory_order_relaxed) + 1U;
+    return serial;
+}
+
+} // namespace
+
+std::string_view material_field_name(MaterialField field) noexcept {
+    const std::size_t position = static_cast<std::size_t>(field);
+    if (position >= material_field_names.size()) return {};
+    return material_field_names[position];
+}
+
+namespace {
+
+// Writes `declaration`'s field into `material`, replacing what was there;
+// an edge is written as a single edge.
+void apply_material_declaration(const MaterialDeclaration& declaration, SurfaceMaterial& material) {
+    switch (declaration.field) {
+    case MaterialField::fills: material.fills = declaration.fills; return;
+    case MaterialField::shadows: material.shadows = declaration.shadows; return;
+    case MaterialField::glows: material.glows = declaration.glows; return;
+    case MaterialField::border_top: material.border_edges.top = declaration.border; return;
+    case MaterialField::border_right: material.border_edges.right = declaration.border; return;
+    case MaterialField::border_bottom: material.border_edges.bottom = declaration.border; return;
+    case MaterialField::border_left: material.border_edges.left = declaration.border; return;
+    case MaterialField::keylines: material.keylines = declaration.keylines; return;
+    case MaterialField::corners:
+        material.corner_radius = declaration.number;
+        material.corner_radii = declaration.corner_radii;
+        return;
+    case MaterialField::colour_filter: material.colour_filter = declaration.colour_filter; return;
+    case MaterialField::drop_shadow: material.drop_shadow = declaration.drop_shadow; return;
+    case MaterialField::filter_blur: material.filter_blur = declaration.number; return;
+    case MaterialField::finish: material.finish = declaration.number; return;
+    case MaterialField::mask: material.mask = declaration.mask; return;
+    case MaterialField::count: return;
+    }
+}
+
+bool edge_field(MaterialField field) noexcept {
+    const bool edge = field == MaterialField::border_top || field == MaterialField::border_right ||
+                      field == MaterialField::border_bottom || field == MaterialField::border_left;
+    return edge;
+}
+
+// One edge as assembled: its declaration's, else the floor's single edge,
+// else the floor's uniform border.
+std::optional<MaterialBorder> assembled_edge(const SurfaceMaterial& floor,
+                                             const std::optional<MaterialBorder>& floor_edge,
+                                             const MaterialDeclaration* declaration) {
+    if (declaration != nullptr) return (*declaration).border;
+    if (!floor.border_edges.empty()) return floor_edge;
+    return floor.border;
+}
+
+} // namespace
+
+void assemble_material(const SurfaceMaterial& floor,
+                       const std::array<const MaterialDeclaration*, material_field_count>& fields,
+                       SurfaceMaterial& material) {
+    material = floor;
+    bool edges = false;
+    for (const MaterialDeclaration* const declaration : fields) {
+        if (declaration == nullptr) continue;
+        if (edge_field((*declaration).field)) {
+            edges = true;
+            continue;
+        }
+        apply_material_declaration(*declaration, material);
+    }
+    if (!edges) return;
+    const std::optional<MaterialBorder> top = assembled_edge(
+        floor, floor.border_edges.top, fields[static_cast<std::size_t>(MaterialField::border_top)]);
+    const std::optional<MaterialBorder> right = assembled_edge(
+        floor, floor.border_edges.right, fields[static_cast<std::size_t>(MaterialField::border_right)]);
+    const std::optional<MaterialBorder> bottom = assembled_edge(
+        floor, floor.border_edges.bottom, fields[static_cast<std::size_t>(MaterialField::border_bottom)]);
+    const std::optional<MaterialBorder> left = assembled_edge(
+        floor, floor.border_edges.left, fields[static_cast<std::size_t>(MaterialField::border_left)]);
+    const bool uniform = top == right && top == bottom && top == left;
+    if (uniform) {
+        material.border = top;
+        material.border_edges = MaterialBorderEdges{};
+        return;
+    }
+    material.border.reset();
+    material.border_edges.top = top;
+    material.border_edges.right = right;
+    material.border_edges.bottom = bottom;
+    material.border_edges.left = left;
 }
 
 RuleDeclaration RuleDeclaration::primitive(std::string_view primitive_name) {
@@ -398,8 +505,10 @@ void CompiledThemeRules::add_rules(CompiledThemeRules& result, const ThemeRuleSh
         }
         add_transitions(result.diagnostics_, index, rule, compiled);
         add_ambient(result.diagnostics_, index, rule, compiled);
+        add_materials(result.diagnostics_, index, rule, compiled);
         const bool declares = compiled.selects || !compiled.parameters.empty() || !compiled.transitions.empty() ||
-                              compiled.ambient.has_value() || compiled.blend.has_value();
+                              compiled.ambient.has_value() || compiled.blend.has_value() ||
+                              !compiled.materials.empty();
         if (!declares) {
             result.diagnostics_.push_back(diagnostic(RuleDiagnosticKind::rule_empty, index, rule, {}));
             continue;
@@ -432,6 +541,37 @@ void CompiledThemeRules::add_blend(std::vector<RuleDiagnostic>& diagnostics, std
         return;
     }
     diagnostics.push_back(diagnostic(RuleDiagnosticKind::blend_invalid, index, rule, declaration.property));
+}
+
+// A field is checked alone, written into the default material: what it
+// sets must be what some material admits. The default material has one
+// solid fill, so a finish is checked against a fill that takes one; the
+// assembled material is checked again when a part draws it
+// (MaterialPrimitive::accepts), and one no material admits is drawn by the
+// built-in recipe instead.
+void CompiledThemeRules::add_materials(std::vector<RuleDiagnostic>& diagnostics, std::size_t index,
+                                       const ThemeRule& rule, CompiledRule& compiled) {
+    std::array<bool, material_field_count> declared{};
+    for (const MaterialDeclaration& declaration : rule.materials) {
+        const std::size_t position = static_cast<std::size_t>(declaration.field);
+        const std::string_view name = material_field_name(declaration.field);
+        if (position >= material_field_count) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::material_field_invalid, index, rule, {}));
+            continue;
+        }
+        if (declared[position]) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::duplicate_declaration, index, rule, name));
+            continue;
+        }
+        SurfaceMaterial checked{};
+        apply_material_declaration(declaration, checked);
+        if (!valid_surface_material(checked)) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::material_field_invalid, index, rule, name));
+            continue;
+        }
+        declared[position] = true;
+        compiled.materials.push_back(declaration);
+    }
 }
 
 // -- transitions and ambient effects (E7) ------------------------------------------
@@ -567,6 +707,25 @@ void CompiledThemeRules::add_ambient(std::vector<RuleDiagnostic>& diagnostics, s
     compiled.ambient = ambient;
 }
 
+CompiledThemeRules::CompiledThemeRules() : serial_(next_rules_serial()) {}
+
+CompiledThemeRules::CompiledThemeRules(const CompiledThemeRules& other)
+    : rules_(other.rules_),
+      diagnostics_(other.diagnostics_),
+      published_values_(other.published_values_),
+      built_in_rules_(other.built_in_rules_),
+      serial_(next_rules_serial()) {}
+
+CompiledThemeRules& CompiledThemeRules::operator=(const CompiledThemeRules& other) {
+    if (this == &other) return *this;
+    rules_ = other.rules_;
+    diagnostics_ = other.diagnostics_;
+    published_values_ = other.published_values_;
+    built_in_rules_ = other.built_in_rules_;
+    serial_ = next_rules_serial();
+    return *this;
+}
+
 CompiledThemeRules CompiledThemeRules::compile(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry) {
     CompiledThemeRules result{};
     // The published values first: expressions are checked against their
@@ -642,7 +801,20 @@ CompiledThemeRules::Resolution CompiledThemeRules::resolve(const PartFacts& fact
     }
     if (winner != rules_.size()) resolve_primitive(facts, rules_[winner], result);
     resolve_transitions(facts, result);
+    resolve_materials(facts, result);
     return result;
+}
+
+void CompiledThemeRules::resolve_materials(const PartFacts& facts, Resolution& result) const noexcept {
+    // The last matching declaration of each field wins, rules being in
+    // ascending precedence; a rule declares each field at most once.
+    for (const CompiledRule& rule : rules_) {
+        if (rule.materials.empty() || !matches(rule, facts)) continue;
+        for (const MaterialDeclaration& declaration : rule.materials) {
+            result.materials[static_cast<std::size_t>(declaration.field)] = &declaration;
+        }
+        result.materials_authored = true;
+    }
 }
 
 void CompiledThemeRules::resolve_primitive(const PartFacts& facts, const CompiledRule& chosen,

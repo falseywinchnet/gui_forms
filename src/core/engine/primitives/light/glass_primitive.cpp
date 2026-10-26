@@ -103,8 +103,9 @@ PartShape GlassPrimitive::shape(const PrimitiveParameterBlock& parameters) const
     return rounded;
 }
 
-std::optional<ControlVisualRole> GlassPrimitive::theme_material(
-    const PrimitiveParameterBlock& parameters) const noexcept {
+// Glass names its recipe or none; it never reads the part's family.
+std::optional<ControlVisualRole> GlassPrimitive::theme_material(const PrimitiveParameterBlock& parameters,
+                                                                ControlVisualRole) const noexcept {
     const double position = parameters.values[glass_recipe].number;
     if (!(position >= 1.0)) return std::nullopt;
     const ControlVisualRole role = static_cast<ControlVisualRole>(static_cast<std::uint8_t>(position - 1.0));
