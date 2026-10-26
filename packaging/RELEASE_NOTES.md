@@ -21,8 +21,9 @@ mail mockup.
   `SOVERSION 0`, and as in 0.1 there is no binary promise between releases:
   rebuild against each new SDK.
 - **Images are admitted by format, not only as PNG.**
-  `ImageRegistry::load_image` and `replace_image` take a CNG or PNG file and
-  choose the decoder by its signature. Image resources and their views
+  `ImageRegistry::load_image` and `replace_image` take an encoded file and
+  choose the decoder by its signature; PNG is the only format admitted (CNG,
+  admitted in 0.2.0, was removed afterwards). Image resources and their views
   report `ImageMetadata` (width, height, alpha and decoded byte count) in
   place of `PngMetadata`, which only `validate_png` reports now.
   `load_png` and `replace_png` remain, for PNG only.
@@ -95,8 +96,8 @@ mail mockup.
   bundled gzip or libpng.
 - Windows no longer decodes images through WIC, and windowscodecs is no
   longer linked.
-- CNG is the native resource format and PNG stays for interchange. The
-  clipboard and GUI.Drawing still use PNG.
+- PNG is the only image format, for resources, the clipboard and
+  GUI.Drawing alike.
 - stx_conv's CONV interpolation prepares the sized variants of image faces:
   enlargements use the CONV interpolant, and reductions use pixel-area
   averaging.

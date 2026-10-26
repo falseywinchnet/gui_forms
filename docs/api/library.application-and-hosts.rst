@@ -43,6 +43,10 @@ Related types
      -  
    * - :cpp:class:`ApplicationWindowOpenResult <gui_forms::ApplicationWindowOpenResult>`
      -  
+   * - :cpp:class:`CompositorGeneration <gui_forms::CompositorGeneration>`
+     - The order of compositor state reports within one host run.
+   * - :cpp:class:`CompositorState <gui_forms::CompositorState>`
+     - The host's live compositor and preference state (PLAN.md §2.1).
    * - :cpp:class:`CursorCapabilities <gui_forms::CursorCapabilities>`
      -  
    * - :cpp:class:`CursorHiddenLease <gui_forms::CursorHiddenLease>`
@@ -83,6 +87,8 @@ Related types
      - HostColorDialogRequest declares title, initial RGBA, and alpha-edit policy.
    * - :cpp:class:`HostColorDialogResult <gui_forms::HostColorDialogResult>`
      - HostColorDialogResult carries accepted/cancelled outcome and portable RGBA.
+   * - :cpp:class:`HostCompositorEvent <gui_forms::HostCompositorEvent>`
+     - The host's compositor and preference state (stage T5): reported once after attach and again whenever it changes (capability compositor_notifications).
    * - :cpp:class:`HostDialogRequest <gui_forms::HostDialogRequest>`
      - HostDialogRequest binds a unique request ID and portable owner stable ID to one typed dialog variant.
    * - :cpp:class:`HostDialogResult <gui_forms::HostDialogResult>`
@@ -191,6 +197,12 @@ Related types
      - MacHostOptions declares initial native window title, geometry, display scale, and run policy.
    * - :cpp:class:`MacHostServiceOptions <gui_forms::host::MacHostServiceOptions>`
      - MacHostServiceOptions injects bounded dialog, tooltip, clipboard, and semantic-sound services into an AppKit session.
+   * - :cpp:class:`WindowBackdropConditions <gui_forms::WindowBackdropConditions>`
+     - The window-side conditions a grant depends on besides the host's state.
+   * - :cpp:class:`WindowBackdropGrant <gui_forms::WindowBackdropGrant>`
+     - What a window was given: the first entry of its request the host can honour now, or ``opaque``.
+   * - :cpp:class:`WindowBackdropRequest <gui_forms::WindowBackdropRequest>`
+     - A window's backdrop request (owner decisions T5-Q3 and T5-Q5): the preferred backdrop, then up to two fallbacks, tried in order; ``opaque`` always follows them.
    * - :cpp:class:`WindowChromeHit <gui_forms::WindowChromeHit>`
      -  
    * - :cpp:class:`WindowChromeRegionValidation <gui_forms::WindowChromeRegionValidation>`
@@ -280,6 +292,52 @@ Related types
    .. cpp:member:: ApplicationWindowHandle window
 
       Active once the window is ready; inactive when the open was refused.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CompositorGeneration final
+
+   ``#include <gui_forms/host/compositor/window_backdrop.hpp>``
+
+   The order of compositor state reports within one host run. Its own type, never mixed with a window's backplane damage generation. The first report a host makes has generation 1; 0 is the state before any report.
+
+   .. cpp:member:: std::uint64_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CompositorState final
+
+   ``#include <gui_forms/host/compositor/window_backdrop.hpp>``
+
+   The host's live compositor and preference state (PLAN.md §2.1). Hosts report it after attach and whenever it changes, as HostCompositorEvent; the window resolves its backdrop grant from it. ``support`` is indexed by WindowBackdrop; ``opaque`` is always supported, and a report saying otherwise is refused.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::string to_json() const
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: WindowBackdropSupport support_of(WindowBackdrop backdrop) const noexcept
+
+   .. cpp:member:: CompositorGeneration generation
+
+   .. cpp:member:: CompositorPresence compositing
+
+      Default: ``{CompositorPresence::unknown}``.
+
+   .. cpp:member:: std::array<WindowBackdropSupport, window_backdrop_count> support
+
+   .. cpp:member:: bool transparency_enabled
+
+      The user's transparency-effects setting (Windows); true where the host has no such setting. Default: ``{true}``.
+
+   .. cpp:member:: bool reduced_transparency
+
+      The host's reduced-transparency and high-contrast settings, as the host reports them. A window's own PresentationSettings say what is in force; the host's changes reach them (capability presentation_preferences).
+
+   .. cpp:member:: bool high_contrast
 
 .. cpp:namespace:: gui_forms
 
@@ -473,7 +531,7 @@ Related types
 
    .. cpp:member:: constexpr std::uint32_t current_protocol_version
 
-      8: the host's keyboard-command defaults (``key_map``). Default: ``8``.
+      8: the host's keyboard-command defaults (``key_map``). 9: the compositor state report (HostCompositorEvent, stage T5). Default: ``9``.
 
    .. cpp:member:: std::uint32_t protocol_version
 
@@ -594,6 +652,16 @@ Related types
       Default: ``{HostDialogOutcome::cancelled}``.
 
    .. cpp:member:: std::uint32_t rgba
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostCompositorEvent final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   The host's compositor and preference state (stage T5): reported once after attach and again whenever it changes (capability compositor_notifications). Each report's generation is later than the last; a report whose opaque backdrop is not supported is refused as invalid_payload.
+
+   .. cpp:member:: CompositorState state
 
 .. cpp:namespace:: gui_forms
 
@@ -1045,6 +1113,10 @@ Related types
 
    .. cpp:function:: bool tray_icon_live(HostTrayIconId icon_id) const noexcept
 
+   .. cpp:function:: HostServiceStatus apply_window_backdrop(WindowBackdrop backdrop)
+
+      Applies a window's backdrop grant to the native window (stage T5). The window calls it only when its granted backdrop changes. ``opaque`` needs no capability, and an adapter must not fail it; ``transparent`` needs transparent_windows, and the two materials window_backdrops. A refused or failed request leaves the native window as it was.
+
    .. cpp:function:: void shutdown() noexcept
 
       Idempotently enters terminal state on the UI thread and invokes concrete adapter cleanup.
@@ -1175,6 +1247,12 @@ Related types
    .. cpp:function:: virtual HostTrayMenuResult show_tray_menu_impl(HostTrayIconId icon_id, const HostTrayMenuRequest& request)
 
       *Protected.*
+
+   .. cpp:function:: virtual HostServiceStatus apply_window_backdrop_impl(WindowBackdrop backdrop)
+
+      *Protected.*
+
+      Called with a backdrop whose capability the host advertises. The default accepts ``opaque``, which needs nothing native, and refuses the rest as unsupported.
 
    .. cpp:function:: void publish_tray_icon_event(const HostTrayIconEvent& event)
 
@@ -2145,6 +2223,78 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: WindowBackdropConditions final
+
+   ``#include <gui_forms/host/compositor/window_backdrop.hpp>``
+
+   The window-side conditions a grant depends on besides the host's state. ``high_contrast`` and ``reduced_transparency`` are the ones in force (the window's PresentationSettings), which the host's reports feed and the application may also set.
+
+   .. cpp:member:: bool declared
+
+   .. cpp:member:: bool high_contrast
+
+   .. cpp:member:: bool reduced_transparency
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: WindowBackdropGrant final
+
+   ``#include <gui_forms/host/compositor/window_backdrop.hpp>``
+
+   What a window was given: the first entry of its request the host can honour now, or ``opaque``. ``reason`` explains the preferred entry; it is ``granted`` only when the preferred entry was granted.
+
+   .. cpp:member:: WindowBackdrop requested
+
+      Default: ``{WindowBackdrop::opaque}``.
+
+   .. cpp:member:: WindowBackdrop granted
+
+      Default: ``{WindowBackdrop::opaque}``.
+
+   .. cpp:member:: WindowBackdropReason reason
+
+      Default: ``{WindowBackdropReason::granted}``.
+
+   .. cpp:member:: CompositorGeneration generation
+
+      The compositor state it was decided at.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: WindowBackdropRequest final
+
+   ``#include <gui_forms/host/compositor/window_backdrop.hpp>``
+
+   A window's backdrop request (owner decisions T5-Q3 and T5-Q5): the preferred backdrop, then up to two fallbacks, tried in order; ``opaque`` always follows them. Built with the factories; a request is valid when it has one to three entries, none repeated, and ``opaque`` only as the last.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: WindowBackdrop preferred() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static WindowBackdropRequest preferring(WindowBackdrop preferred) noexcept
+
+   .. cpp:function:: static WindowBackdropRequest with_fallback(WindowBackdrop preferred, WindowBackdrop fallback) noexcept
+
+   .. cpp:function:: static WindowBackdropRequest with_fallbacks(WindowBackdrop preferred, WindowBackdrop first, WindowBackdrop second) noexcept
+
+   .. cpp:member:: constexpr std::size_t maximum_entries
+
+      Default: ``3U``.
+
+   .. cpp:member:: std::array<WindowBackdrop, maximum_entries> entries
+
+      Value-initialized: every entry ``opaque``, the enumeration's first.
+
+   .. cpp:member:: std::size_t length
+
+      Default: ``{1U}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: WindowChromeHit final
 
    ``#include <gui_forms/host/types/host_types.hpp>``
@@ -2505,6 +2655,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: CompositorPresence
+
+   ``#include <gui_forms/host/compositor/window_backdrop.hpp>``
+
+   .. cpp:enumerator:: unknown
+
+   .. cpp:enumerator:: present
+
+   .. cpp:enumerator:: absent
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: CursorError
 
    ``#include <gui_forms/host/cursor_interaction/cursor_interaction.hpp>``
@@ -2626,6 +2788,14 @@ Enumerations
    .. cpp:enumerator:: window_at_point
 
    .. cpp:enumerator:: window_ordering
+
+   .. cpp:enumerator:: transparent_windows
+
+   .. cpp:enumerator:: window_backdrops
+
+   .. cpp:enumerator:: compositor_notifications
+
+   .. cpp:enumerator:: presentation_preferences
 
 .. cpp:namespace:: gui_forms
 
@@ -2867,6 +3037,58 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: WindowBackdrop
+
+   ``#include <gui_forms/host/compositor/window_backdrop.hpp>``
+
+   .. cpp:enumerator:: opaque
+
+   .. cpp:enumerator:: transparent
+
+   .. cpp:enumerator:: window_material
+
+   .. cpp:enumerator:: transient_material
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: WindowBackdropReason
+
+   ``#include <gui_forms/host/compositor/window_backdrop.hpp>``
+
+   .. cpp:enumerator:: granted
+
+   .. cpp:enumerator:: not_declared
+
+   .. cpp:enumerator:: host_unsupported
+
+   .. cpp:enumerator:: os_version
+
+   .. cpp:enumerator:: no_compositor
+
+   .. cpp:enumerator:: high_contrast
+
+   .. cpp:enumerator:: reduced_transparency
+
+   .. cpp:enumerator:: transparency_disabled
+
+   .. cpp:enumerator:: backend_failure
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: WindowBackdropSupport
+
+   ``#include <gui_forms/host/compositor/window_backdrop.hpp>``
+
+   .. cpp:enumerator:: supported
+
+   .. cpp:enumerator:: host_unsupported
+
+   .. cpp:enumerator:: os_version
+
+   .. cpp:enumerator:: no_compositor
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: WindowChromeHitRole
 
    ``#include <gui_forms/host/types/host_types.hpp>``
@@ -2907,6 +3129,36 @@ Functions, constants and aliases
 ``#include <gui_forms/application/window_frame_drag/window_frame_drag.hpp>``
 
 .. cpp:function:: const char* window_frame_drag_mode_name(WindowFrameDragMode mode) noexcept
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/host/compositor/window_backdrop.hpp>``
+
+.. cpp:function:: const char* window_backdrop_name(WindowBackdrop backdrop) noexcept
+
+.. cpp:function:: const char* window_backdrop_support_name(WindowBackdropSupport support) noexcept
+
+.. cpp:function:: const char* compositor_presence_name(CompositorPresence presence) noexcept
+
+.. cpp:function:: bool compositor_state_valid(const CompositorState& state) noexcept
+
+   Whether a host report can be used: ``opaque`` supported, and each support value and the presence within their enumerations.
+
+.. cpp:function:: bool window_backdrop_request_valid(const WindowBackdropRequest& request) noexcept
+
+.. cpp:function:: const char* window_backdrop_reason_name(WindowBackdropReason reason) noexcept
+
+.. cpp:function:: WindowBackdropReason window_backdrop_refusal(WindowBackdrop backdrop, const CompositorState& state, const WindowBackdropConditions& conditions) noexcept
+
+   Why ``backdrop`` cannot be given now, or ``granted``. The one decision point (PLAN.md §2.3): adapters report state and apply grants, never decide. ``opaque`` is always granted. For any other backdrop the refusals are checked in this order: not declared; high contrast; the host's support for it; no compositor running; reduced transparency; transparency effects off.
+
+.. cpp:function:: WindowBackdropGrant resolve_window_backdrop(const WindowBackdropRequest& request, const CompositorState& state, const WindowBackdropConditions& conditions) noexcept
+
+   The grant for a valid ``request``: its first entry that is granted, else ``opaque``, with the preferred entry's reason and the state's generation.
+
+.. cpp:var:: constexpr std::size_t window_backdrop_count
+
+   Value: ``4U``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2960,7 +3212,7 @@ Functions, constants and aliases
 
 .. cpp:type:: HostDialogResultPayload = std::variant< HostMessageDialogResult, HostPathDialogResult, HostColorDialogResult>
 
-.. cpp:type:: HostEventPayload = std::variant< HostAttachEvent, HostResizeEvent, HostScaleEvent, HostActivationEvent, HostOcclusionEvent, HostDisplayEvent, DragEvent, PointerEvent, KeyEvent, TextInputEvent, HostCloseRequest, HostClosedEvent, HostShutdownEvent>
+.. cpp:type:: HostEventPayload = std::variant< HostAttachEvent, HostResizeEvent, HostScaleEvent, HostActivationEvent, HostOcclusionEvent, HostDisplayEvent, DragEvent, PointerEvent, KeyEvent, TextInputEvent, HostCloseRequest, HostClosedEvent, HostShutdownEvent, HostCompositorEvent>
 
 .. cpp:namespace:: gui_forms
 

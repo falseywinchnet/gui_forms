@@ -1,0 +1,142 @@
+#pragma once
+
+#include "../diagnostics/theme_diagnostics.hpp"
+#include "../source_text/theme_source_text.hpp"
+#include "../syntax_tree/theme_syntax_tree.hpp"
+#include "../tokenizer/theme_tokenizer.hpp"
+
+#include "gui_forms/anatomy/types/anatomy_types.hpp"
+#include "gui_forms/engine/theme_rules/theme_rules.hpp"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <string_view>
+#include <vector>
+
+namespace gui_forms::theme_language {
+
+// The derived selector limits (PLAN.md section 6; R2-14 starting values).
+inline constexpr std::size_t maximum_is_arguments = 32U;
+// Simple selectors in one expanded selector: its type, ID, classes, states,
+// part and role, as written, `:is()` arguments included. It bounds the work
+// of expanding a selector to a constant per expanded rule.
+inline constexpr std::size_t maximum_simple_selectors = 32U;
+
+// One selector of a rule, expanded: the engine's selector, the specificity
+// CSS gives it (with `:is()`, its most specific argument's, EC2), and the
+// cascade level that specificity puts a theme-sheet rule at (a stable ID
+// at stable_id_rule, else a class at class_rule, else theme_sheet).
+struct LoweredSelector final {
+    RuleSelector selector{};
+    RuleSpecificity specificity{};
+    CascadeLevel level{CascadeLevel::theme_sheet};
+
+    friend bool operator==(const LoweredSelector& left, const LoweredSelector& right) noexcept {
+        return left.selector == right.selector && left.specificity == right.specificity &&
+               left.level == right.level;
+    }
+};
+
+// The names a selector may use: the anatomy of each control type a theme
+// may name (manifests/control-schema.json lists the stock ones). A part
+// named with a control type must be declared by that type, among its own
+// parts or its item systems'; a part named without one by some type.
+// Borrowed for the lowering.
+struct SelectorVocabulary final {
+    std::span<const ControlAnatomy> controls{};
+};
+
+// What one lowering reads, all borrowed for the call: the sheet, its
+// tokens, the selector list's tokens (a style rule's content), the label
+// diagnostics give the rule, and the cursor that locates diagnostics. The
+// cursor is the caller's, so that lowering every rule of a sheet locates
+// in one pass.
+struct SelectorInput final {
+    const ThemeSource& source;
+    const ThemeTokenBuffer& tokens;
+    TokenRange selectors{};
+    std::string_view rule_label{};
+    SourcePositionCursor& cursor;
+};
+
+enum class SelectorOutcome : std::uint8_t {
+    // The selectors were appended to the output.
+    lowered,
+    // A name the vocabulary does not know: one warning, and the rule is
+    // dropped (B3, R2-08). Nothing was appended.
+    dropped,
+    // An error: the theme is refused (B2). Nothing was appended.
+    refused,
+};
+
+namespace selector_detail {
+
+// One choice of every `:is()` argument in a compound: the simple
+// selectors it is made of, as positions in the lowering's simple
+// selector table. At most maximum_simple_selectors.
+struct Alternative final {
+    std::array<std::uint32_t, maximum_simple_selectors> simples{};
+    std::uint32_t count{};
+};
+
+// A simple selector read from the list.
+enum class SimpleKind : std::uint8_t { control_type, stable_id, style_class, state, part, role };
+struct Simple final {
+    SimpleKind kind{SimpleKind::control_type};
+    // The token that wrote it, for diagnostics.
+    std::uint32_t token{};
+    // The written name: the control type, ID, class or part (in its
+    // written kebab-case for a type or part).
+    std::string_view name{};
+    AnatomyState state{AnatomyState::normal};
+    PartRole role{PartRole::region};
+};
+
+// One compound selector being read, and, for an `:is()`, the union of
+// its finished arguments.
+struct Frame final {
+    std::vector<Alternative> compound{};
+    RuleSpecificity compound_specificity{};
+    // Whether the compound has a simple selector or `*` yet, and whether
+    // whitespace followed it (a descendant combinator if another simple
+    // selector follows).
+    bool compound_started{};
+    bool space_pending{};
+    std::vector<Alternative> arguments{};
+    RuleSpecificity arguments_specificity{};
+    std::size_t argument_count{};
+};
+
+// The storage one lowering works in, kept from rule to rule: the simple
+// selectors read, one frame per open `:is()` (and the list itself), and
+// the scratch product of an `:is()` with its compound.
+struct SelectorWorkspace final {
+    std::vector<Simple> simples{};
+    std::array<Frame, maximum_nesting_depth + 1U> frames{};
+    std::vector<Alternative> product{};
+};
+
+} // namespace selector_detail
+
+// Lowers selector lists (PLAN.md section 1.4): each compound selector of
+// the list, with each `:is()` expanded into one selector per argument, is
+// appended to the output in written order. The lowering keeps its working
+// storage from rule to rule; one instance serves one compilation at a time.
+class SelectorLowering final {
+public:
+    // Appends the rule's selectors to `output` and subtracts their count
+    // from `rule_budget`. A list that would expand past `rule_budget` is
+    // refused with too_many_rules (the rules of a sheet, expanded, are at
+    // most maximum_rules). Its diagnostics are appended to `diagnostics`.
+    // On `dropped` or `refused`, `output` and `rule_budget` are unchanged.
+    [[nodiscard]] SelectorOutcome lower(const SelectorInput& input, const SelectorVocabulary& vocabulary,
+                                        std::size_t& rule_budget, std::vector<LoweredSelector>& output,
+                                        ThemeDiagnosticList& diagnostics);
+
+private:
+    selector_detail::SelectorWorkspace workspace_{};
+};
+
+} // namespace gui_forms::theme_language

@@ -669,8 +669,9 @@ void observe_effects(StockControlFixture& fixture) {
 }
 
 void omit_components(FixtureBuilder& builder) {
-    const std::array<const char*, 13> components{
-        "timer", "background_worker", "notify_icon", "image_list", "error_provider", "help_provider",
+    const std::array<const char*, 14> components{
+        "timer", "background_worker", "notify_icon", "thread_exception_dialog",
+        "image_list", "error_provider", "help_provider",
         "semantic_feedback", "binding", "binding_source", "binding_context", "open_file_dialog",
         "save_file_dialog", "folder_browser_dialog"};
     for (const char* identifier : components) {

@@ -5,6 +5,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "macos_host.hpp"
+#include "front_reuse.hpp"
 #include "live_surface_damage.hpp"
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text/types/text_types.hpp"
@@ -847,9 +848,16 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     std::vector<std::size_t> _liveFrameSources;
     std::vector<GFRect> _liveRegions;
     std::vector<GFRect> _uncoveredDamage;
+    // Per drawRect: on a reusable raster, the pending live presentations'
+    // destinations and the parts of the uncovered damage inside them.
+    std::vector<GFRect> _liveDestinations;
+    std::vector<GFRect> _liveExposure;
     // A presentation region was taken but its pixels never reached a
     // presented raster. The next pass copies complete clips.
     BOOL _liveRegionLost;
+    // The surface epoch of the receipt the raster's front presents; 0 before
+    // the first presented frame.
+    std::uint64_t _frontSurfaceEpoch;
     NSPanel* _tooltipPanel;
     NSTimer* _tooltipTimer;
     std::uint64_t _lastSemanticGeneration;
@@ -2027,10 +2035,13 @@ void post_perform_close(NSWindow* window) {
         [self stopDisplayLink];
         [self armWakeTimer];
     } else {
-        _pendingDamage.add(GFRect{0.0, 0.0, self.bounds.size.width, self.bounds.size.height});
+        // What changed while hidden is in _pendingDamage (an occluded draw
+        // keeps it, since the model declines to paint) or still in the model.
+        // The raster holds the last presentation everywhere else.
         [self collectDamage];
         // AppKit may consume a display request while our model is still hidden.
-        // Rearm native presentation even when no new model damage was produced.
+        // Rearm native presentation even when no new model damage was produced;
+        // with nothing owed, that draw copies the raster and paints nothing.
         [self setNeedsDisplay:YES];
         [self startDisplayLinkIfNeeded];
     }
@@ -2714,13 +2725,29 @@ void post_perform_close(NSWindow* window) {
 #endif
     const GFRect nativeDamage{dirtyRect.origin.x, dirtyRect.origin.y,
                               dirtyRect.size.width, dirtyRect.size.height};
-    const bool modelClean = (*_model).paint_lease_snapshot().state ==
-        gui_forms::PaintLeaseState::clean;
-    bool reusableRaster = _rasterHasContent == YES && _hostOccluded == NO && modelClean;
+    const gui_forms::PaintLeaseSnapshot drawLease = (*_model).paint_lease_snapshot();
+    gui_forms::detail::FrontReuse reuse{};
+    reuse.raster_has_content = _rasterHasContent == YES;
 #if defined(GUI_FORMS_PREPARED_TEXT)
-    reusableRaster = reusableRaster && _raster.prepared_front_matches(logicalSize, scale);
+    reuse.front_matches_extent = _raster.prepared_front_matches(logicalSize, scale);
     const PaintReceipt previousReceipt = _raster.prepared_front_receipt();
+#else
+    // The ordinary raster was resized to the view above (and lost its content).
+    reuse.front_matches_extent = true;
 #endif
+    reuse.front_surface_epoch = _frontSurfaceEpoch;
+    reuse.surface_epoch = drawLease.surface_epoch;
+    reuse.lease_clean = drawLease.state == gui_forms::PaintLeaseState::clean;
+    reuse.live_region_lost = _liveRegionLost == YES;
+    // The raster still holds the last presentation, at this size and scale,
+    // in the model's current surface epoch.
+    const bool frontHeld = gui_forms::detail::front_held(reuse);
+    const bool reusableRaster = frontHeld && _hostOccluded == NO;
+    // While hidden the model declines to paint. AppKit's rectangles then ask
+    // for a copy (an exposure or a snapshot); kept as retained damage, they
+    // would be repainted by the first visible frame. Live frames still
+    // compose while hidden, so a pending one keeps the ordinary path.
+    const bool occludedCopy = frontHeld && _hostOccluded == YES && _pendingLivePresentations.empty();
     // Copying only a presentation region needs a raster that still holds the
     // previous presentation of that placement.
     const bool regionsUsable = reusableRaster && _liveRegionLost == NO;
@@ -2783,7 +2810,7 @@ void post_perform_close(NSWindow* window) {
     NSInteger drawnCount = 0;
     [self getRectsBeingDrawn:&drawnRects count:&drawnCount];
     _uncoveredDamage.clear();
-    for (NSInteger index = 0; index < drawnCount; ++index) {
+    for (NSInteger index = 0; index < drawnCount && !occludedCopy; ++index) {
         const NSRect rect = drawnRects[index];
         const GFRect dirty{rect.origin.x, rect.origin.y, rect.size.width, rect.size.height};
         if (reusableRaster) {
@@ -2792,7 +2819,35 @@ void post_perform_close(NSWindow* window) {
             _uncoveredDamage.push_back(dirty);
         }
     }
-    if (drawnCount == 0) _uncoveredDamage.push_back(nativeDamage);
+    if (drawnCount == 0 && !occludedCopy) _uncoveredDamage.push_back(nativeDamage);
+    // Nothing owed and no live frame: AppKit's request is a copy of the raster
+    // as it stands, and this draw prepares and paints nothing. A resize, a
+    // scale change, a reallocated backing or a discarded candidate fails the
+    // predicate and repaints.
+    const bool copyOnly = gui_forms::detail::copy_only_draw(
+        reuse, !_pendingDamage.empty(), !_pendingLivePresentations.empty());
+    if (copyOnly) _uncoveredDamage.clear();
+    if (reusableRaster && !copyOnly) {
+        // Paint the gathered set, not AppKit's coalesced request: outside the
+        // model's damage (already in _pendingDamage) and the live surfaces,
+        // the raster holds this frame's pixels, which AppKit copies unchanged.
+        _liveDestinations.clear();
+        for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
+            _liveDestinations.push_back(update.destination);
+        }
+        _liveExposure.clear();
+        gui_forms::detail::append_within_live_destinations(_uncoveredDamage, _liveDestinations, _liveExposure);
+        bool livePending{false};
+        for (const GFRect region : _liveRegions) {
+            if (!region.empty()) livePending = true;
+        }
+        // Live frames narrowed to nothing leave nothing to paint, and empty
+        // frame damage would mean the whole raster (a prepared frame clears its
+        // candidate). Keep AppKit's rectangles then, as the host did before.
+        if (!_pendingDamage.empty() || !_liveExposure.empty() || livePending) {
+            _uncoveredDamage.swap(_liveExposure);
+        }
+    }
     for (const GFRect rectangle : _uncoveredDamage) _pendingDamage.add(rectangle);
     bool liveOnly = _pendingDamage.empty();
     if (narrowedAny && !liveOnly) {
@@ -2820,12 +2875,17 @@ void post_perform_close(NSWindow* window) {
         }
         narrowedAny = false;
     }
-    bool frameReady{true};
+    // A copy-only draw begins no frame: the front is presented as it stands,
+    // with no candidate, receipt or acknowledgement.
+    bool frameReady{!copyOnly};
 #if defined(GUI_FORMS_PREPARED_TEXT)
-    const gui_forms::PreparedTextStatus admission = imagesReady
-        ? _raster.begin_prepared_frame(logicalSize, scale, frameDamage)
-        : gui_forms::PreparedTextStatus::resource_failure;
-    frameReady = admission == gui_forms::PreparedTextStatus::success;
+    gui_forms::PreparedTextStatus admission = gui_forms::PreparedTextStatus::success;
+    if (frameReady) {
+        admission = imagesReady
+            ? _raster.begin_prepared_frame(logicalSize, scale, frameDamage)
+            : gui_forms::PreparedTextStatus::resource_failure;
+    }
+    frameReady = frameReady && admission == gui_forms::PreparedTextStatus::success;
     if (frameReady) {
         // Admission clears the candidate instead of copying the presented
         // front when damage spans the raster (resize, revocation, full live
@@ -2849,7 +2909,7 @@ void post_perform_close(NSWindow* window) {
         }
     }
 #else
-    _raster.begin_frame(frameDamage);
+    if (frameReady) _raster.begin_frame(frameDamage);
 #endif
     _lastFrameDamageBoundsArea = frameDamage.bounds().area();
     const std::chrono::steady_clock::time_point preparedAt =
@@ -2909,7 +2969,10 @@ void post_perform_close(NSWindow* window) {
         std::chrono::steady_clock::now();
     _rasterFinishPhase.record(finishStarted, finishEnded);
 
-    if (receipt) _rasterHasContent = YES;
+    if (receipt) {
+        _rasterHasContent = YES;
+        _frontSurfaceEpoch = (*receipt).surface_epoch;
+    }
     GFSize presentationSize = logicalSize;
 #if defined(GUI_FORMS_PREPARED_TEXT)
     _rasterHasContent = _raster.prepared_front_receipt() ? YES : NO;

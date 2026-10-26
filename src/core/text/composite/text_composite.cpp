@@ -303,10 +303,37 @@ std::uint32_t separable_pixel(const std::uint32_t previous, const std::array<uns
     return joined_pixel;
 }
 
+// A target pixel replaced by the premultiplied source at `weight` (copy):
+// each channel s × w + d × (unit − w), rounded once each and clamped, so
+// that full weight writes the source exactly, transparent included, and a
+// partly covered edge pixel keeps the rest of the target.
+std::uint32_t copied_pixel(const std::uint32_t previous, const std::array<std::uint64_t, 4>& rgba,
+                           const std::uint64_t weight, const ChannelShifts shifts, const bool opaque) noexcept {
+    const std::uint64_t kept = 65280U - weight;
+    const unsigned out_red =
+        std::min(255U, weighted_channel(rgba[0], weight) + weighted_channel((previous >> shifts.red) & 255U, kept));
+    const unsigned out_green = std::min(
+        255U, weighted_channel(rgba[1], weight) + weighted_channel((previous >> shifts.green) & 255U, kept));
+    const unsigned out_blue =
+        std::min(255U, weighted_channel(rgba[2], weight) + weighted_channel((previous >> shifts.blue) & 255U, kept));
+    unsigned out_alpha = 255U;
+    if (!opaque) {
+        out_alpha = std::min(
+            255U, weighted_channel(rgba[3], weight) + weighted_channel((previous >> shifts.alpha) & 255U, kept));
+    }
+    const std::uint32_t copied = (out_red << shifts.red) | (out_green << shifts.green) | (out_blue << shifts.blue) |
+                                 (out_alpha << shifts.alpha);
+    return copied;
+}
+
 // One premultiplied source pixel blended over a target pixel at `weight`
 // (opacity 0..255 times clip coverage 0..256): see composite_part_raster.
 void blend_part_pixel(std::uint32_t& pixel, const std::array<std::uint64_t, 4>& rgba, const std::uint64_t weight,
                       const ChannelShifts shifts, const bool opaque, const PartCompositeBlend blend) noexcept {
+    if (blend == PartCompositeBlend::copy) {
+        pixel = copied_pixel(pixel, rgba, weight, shifts, opaque);
+        return;
+    }
     const unsigned alpha = weighted_channel(rgba[3], weight);
     if (alpha == 0) return;
     const unsigned red = weighted_channel(rgba[0], weight);
@@ -414,6 +441,9 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
     const std::size_t blue_byte = source.order == TextPixelOrder::rgba ? 2U : 0U;
     const std::array<std::size_t, 4> bytes{red_byte, 1U, blue_byte, 3U};
     const std::uint64_t opacity_weight = opacity;
+    // Every other blend leaves the target as it is under a transparent
+    // source pixel; copy writes it.
+    const bool skip_transparent = source.blend != PartCompositeBlend::copy;
     if (!scaled) {
         for (std::int64_t y = top; y < bottom; ++y) {
             const std::size_t source_row = static_cast<std::size_t>(y - source.top) * source.row_bytes;
@@ -421,7 +451,7 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
             for (std::int64_t x = left; x < right; ++x) {
                 const std::size_t offset = source_row + static_cast<std::size_t>(x - source.left) * 4U;
                 const std::uint64_t source_alpha = source.pixels[offset + 3U];
-                if (source_alpha == 0) continue;
+                if (skip_transparent && source_alpha == 0) continue;
                 const std::uint64_t clipped = static_cast<std::uint64_t>(prepared_clip_coverage(prepared, x, y));
                 if (clipped == 0) continue;
                 // One weight for opacity x clip (unit = 256), applied to
@@ -457,7 +487,7 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
                                             texel_channel(source, texel_x + 1, texel_y + 1, byte) * after;
                 rgba[channel] = (upper * above + lower * below + 32768U) >> 16U;
             }
-            if (rgba[3] == 0U) continue;
+            if (skip_transparent && rgba[3] == 0U) continue;
             blend_part_pixel(target.pixels[target_row + static_cast<std::size_t>(x)], rgba, opacity_weight * clipped,
                              shifts, target.opaque, source.blend);
         }
@@ -471,6 +501,7 @@ PartCompositeBlend part_composite_blend(const PaintGroupComposite composite) noe
     case PaintGroupComposite::plus: return PartCompositeBlend::plus;
     case PaintGroupComposite::multiply: return PartCompositeBlend::multiply;
     case PaintGroupComposite::screen: return PartCompositeBlend::screen;
+    case PaintGroupComposite::copy: return PartCompositeBlend::copy;
     }
     return PartCompositeBlend::source_over;
 }

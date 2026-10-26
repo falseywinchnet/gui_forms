@@ -71,7 +71,7 @@ What history teaches:
 - **Resources**: image assets named by resource: tiling backgrounds,
   backplane frescoes and control faces. Image faces are supported: CONV
   prepares each face size ahead of the bake (T2, "CONV, image face
-  variants"). CNG is the native resource format, and PNG is for interop. No
+  variants"). PNG is the only image format. No
   font bytes; a theme selects among bundled typography roles. No executable
   code, filesystem or network access.
 - **Engine version**: a theme declares the engine version it needs.
@@ -409,6 +409,18 @@ Both are decided.
    the newly added piece is at fault, and a program designer's inline rules
    are honoured. Another program without that inline style accepts the
    same theme.
+
+### Phase decisions approved by the owner (2026-10-25)
+
+1. **Number limits (P1).** A number token has at most 19 significant
+   digits, and is either zero or of a magnitude from 1e-40 up to but not
+   including 1e40. Anything else is an error: E108 `number_too_precise` or
+   E109 `number_out_of_range`. The owner approved them as recorded in
+   PLAN.md section 1.2.
+2. **Phases in plan order.** P3 and the later phases go on in plan order,
+   one PR per phase with its gate, each based on main, without stopping
+   between phases. Work stops only at an owner decision or a genuine
+   blocker.
 
 ## Read first
 

@@ -1,6 +1,5 @@
 #include "gui_forms/resources.hpp"
 
-#include "../../image/cng_pixels.hpp"
 #include "stx_zlib/checksum.hpp"
 
 #include <algorithm>
@@ -133,8 +132,6 @@ std::string_view image_resource_error_name(ImageResourceError error) noexcept {
         return "registry_decoded_limit_exceeded";
     case ImageResourceError::stale_image_id: return "stale_image_id";
     case ImageResourceError::allocation_failed: return "allocation_failed";
-    case ImageResourceError::invalid_image_header: return "invalid_image_header";
-    case ImageResourceError::invalid_image_data: return "invalid_image_data";
     }
     return "unknown";
 }
@@ -446,26 +443,9 @@ ImageRegistry::EncodedImage ImageRegistry::validate_encoded(
         return result;
     }
     // Not a PNG file (validate_png checked emptiness and the encoded size
-    // first): a CNG file, or neither (invalid_signature).
-    const image::CngFraming cng = image::validate_cng_framing(encoded);
-    if (cng.error != ImageResourceError::none) {
-        result.error = cng.error;
-        return result;
-    }
-    const std::uint64_t pixel_count = static_cast<std::uint64_t>(cng.width) * cng.height;
-    const std::uint64_t decoded_bytes = pixel_count * 4U;
-    if (cng.width > limits_.maximum_width || cng.height > limits_.maximum_height ||
-        pixel_count > limits_.maximum_pixels ||
-        decoded_bytes > limits_.maximum_decoded_bytes_per_image) {
-        result.error = ImageResourceError::dimension_limit_exceeded;
-        return result;
-    }
-    const std::uint64_t channels = cng.alpha ? 4U : 3U;
-    result.error = ImageResourceError::none;
-    result.encoding = ImageResourceEncoding::cng;
-    result.metadata = ImageMetadata{cng.width, cng.height,
-                                   cng.alpha ? ImageAlpha::straight : ImageAlpha::opaque, decoded_bytes};
-    result.row_bytes = static_cast<std::uint64_t>(cng.width) * channels;
+    // first). PNG is the only admitted format; another format's admission,
+    // chosen by its signature, would be tried here.
+    result.error = ImageResourceError::invalid_signature;
     return result;
 }
 
