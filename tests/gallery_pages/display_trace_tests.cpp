@@ -309,7 +309,7 @@ struct PageDigest final {
 
 // Recorded on main at 13d1c7e0, before the theme engine's entry point.
 // typography-and-inspection's entry is main's trace with the RuntimeId the
-// specimen has when this test runs first (#1252 rather than #19747); the
+// specimen has when this test runs first (#1262 rather than #19747); the
 // two traces differ in that number alone. ThreadExceptionDialog's registry
 // line on dialogs-and-host-services added one control, which
 // states-and-diagnostics counts (1227 controls) and which moved that
@@ -323,7 +323,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"ranges-and-progress", 0x76a87838f40755cbULL},
     {"containers-and-focus", 0x74609a23b162e4bfULL},
     {"animation-laboratory", 0x2b0eba60f2b03985ULL},
-    {"states-and-diagnostics", 0xac334554cf8040c8ULL},
+    {"states-and-diagnostics", 0x424443a3222ab0c1ULL},
     {"text-and-input", 0xf5ae22834f148beeULL},
     {"collections-and-popups", 0xdcfb5edee24a4d9eULL},
     {"values-and-spinners", 0xc6d61a2832ad4bdbULL},
@@ -342,7 +342,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"responsive-layouts", 0xa5fe70ebb0d4051eULL},
     {"anchored-popups", 0x53eef5309813b41aULL},
     {"live-surfaces", 0x5d366debbc32b5ffULL},
-    {"typography-and-inspection", 0xd4bcfd68817043d2ULL},
+    {"typography-and-inspection", 0x1f63ef79c50899a0ULL},
     {"semantic-feedback", 0x819d5ed9aa229adaULL},
 }};
 

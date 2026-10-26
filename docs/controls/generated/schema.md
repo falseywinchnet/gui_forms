@@ -608,6 +608,7 @@ Properties beyond every control's: none.
 | `horizontal_scroll_bar` | track | `h_scroll_bar` |  |
 | `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
+| `insertion_mark` | drop |  | drop_accepted |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 

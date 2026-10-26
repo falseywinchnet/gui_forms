@@ -180,6 +180,8 @@ Related types
      - A click on a column header.
    * - :cpp:class:`ListViewColumnWidthChange <gui_forms::ListViewColumnWidthChange>`
      - A column's new width in logical units, after a divider drag ends or set_column_width() changes it.
+   * - :cpp:class:`ListViewInsertionMark <gui_forms::ListViewInsertionMark>`
+     - Where a ListView's insertion mark stands (Windows Forms' ListViewInsertionMark Index and AppearsAfterItem): beside the item at model index ``index``, before it or, with ``after``, after it.
    * - :cpp:class:`ListViewItem <gui_forms::ListViewItem>`
      - One item.
    * - :cpp:class:`ListViewItemActivation <gui_forms::ListViewItemActivation>`
@@ -1374,6 +1376,10 @@ Related types
 
    .. cpp:member:: PartGeometry focus
 
+   .. cpp:member:: PartGeometry insertion_mark
+
+      The bar of the insertion mark; absent without a shown mark.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: ListView::SubItem final
@@ -1459,6 +1465,18 @@ Related types
    .. cpp:member:: std::size_t column
 
    .. cpp:member:: double width
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListViewInsertionMark final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   Where a ListView's insertion mark stands (Windows Forms' ListViewInsertionMark Index and AppearsAfterItem): beside the item at model index ``index``, before it or, with ``after``, after it.
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: bool after
 
 .. cpp:namespace:: gui_forms
 
