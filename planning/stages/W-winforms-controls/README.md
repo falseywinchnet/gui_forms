@@ -156,6 +156,34 @@ from it. Record under `results/`.
    picker's direct-paint bridge is replaced by it. Admitted to the design
    language and schema vocabulary with the field.
 
+## Owner decisions, 2026-10-25
+
+The owner answered the W interview (round 1) on 2026-10-25, through the
+coordinator.
+
+1. **`RichTextBox` (W-Q1): an inline markdown-like rich text field, not
+   Windows Forms' RTF-native design.** Its text is an inline run model
+   (paragraphs of styled runs) that reads and writes a markdown-like
+   dialect. RTF goes through a standalone first-party parser library inside
+   `gui_forms/`, built the way `stx_zlib` is: no GUI.Forms dependency, its own
+   tests, fuzz target and provenance. SwiftEdit consumes and dogfoods the
+   library, and a SwiftEdit worker builds it under house style. The
+   [rich text brief](RICH_TEXT_BRIEF.md) states the library's scope and
+   the seam `RichTextBox` needs; W builds the run model and the control once
+   that seam exists, not before.
+2. **`Splitter` (W-Q2): a thin migration facade.** A `Splitter` docked
+   between dock children resizes its neighbour, built on GUI.Forms' dock
+   layout. New code uses `SplitContainer`.
+3. **`MessageBox.show` (W-Q3): the host's message dialog**, the same rule
+   as the file and colour dialogs (`HostMessageDialogRequest` through
+   `HostServices`). `TaskDialog` stays the themed, richer in-window dialog.
+4. **A link role in the paint vocabulary (W-Q4)**, with normal, hover,
+   visited and disabled states. `LinkLabel` moves onto it with its goldens
+   unchanged, then `DataGridViewLinkColumn` is built on it. The role is a
+   vocabulary addition after the T2 seal, so it lands in its own PR, which
+   records the vocabulary's new version and digest and the built-in themes'
+   recipes for the role.
+
 ## Advanced candidates, 2026-10-14
 
 The owner listed common advanced controls from other frameworks and
