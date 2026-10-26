@@ -1,12 +1,20 @@
 {
   "notes": [
     "Compiler-cache pre-releases (tag build-<sha>) whose source revision appears here are never pruned by tools/prune_cache_releases.py.",
-    "Add one entry per downstream consumer pin. File Manager pins per its dependency lock; add its locked GUI.Forms revision here when the lock is read."
+    "Add one entry per downstream consumer pin, with where the consumer records it. A pin protects a release that exists; a revision whose release was already pruned stays uncached until the consumer's pin moves to a revision that has one."
   ],
   "pinned": [
     {
       "sha": "5bb7a8ba74ccb358f11d1b9056831e0130bdd8d0",
       "consumer": "PlaySuite (playsuite-games .github/workflows/applications.yml, tools/package_common.py TOOLKIT_REVISION); also tools/windows_toolchain_release.json (the published Windows LLVM 22.1.8 toolchain)"
+    },
+    {
+      "sha": "4e126d6eb3ab837f1a44c0e9c9eb7901d50f80bb",
+      "consumer": "SwiftEdit (malkuth-software/swiftedit ci/dependencies.json, revision with cache_sha256 per platform); build-4e126d6 was pruned before this pin, so SwiftEdit compiles uncached until its pin moves"
+    },
+    {
+      "sha": "c90eacf36652e2c30a94201e6621f91b2026a865",
+      "consumer": "File Manager (malkuth-software/file_manager dependencies.lock.json gui_forms.revision and release, sha256 per platform; also its gui_forms submodule); build-c90eacf3 was pruned before this pin"
     }
   ]
 }
