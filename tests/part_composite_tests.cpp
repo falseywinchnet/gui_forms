@@ -482,6 +482,60 @@ void test_command_is_recorded_replayed_and_inspected() {
 
 } // namespace
 
+// Copy (stage T5): the weighted source replaces the target, transparent
+// source pixels included; full weight writes it exactly, and a partly
+// covered pixel keeps the rest of the target.
+void test_copy_blend() {
+    const std::uint32_t beneath = pack(TextPixelOrder::rgba, 200U, 10U, 5U, 200U);
+    const std::vector<std::uint8_t> half{100U, 50U, 0U, 128U};
+    PartRasterSource copied = source_of(half, 1U, 1U, 0, 0);
+    copied.blend = detail::PartCompositeBlend::copy;
+    TestTarget replaced = make_target(1U, 1U, beneath, TextPixelOrder::rgba, false);
+    require(detail::composite_part_raster(copied, replaced.target, whole(1U, 1U), 255U) ==
+                detail::TextCompositeStatus::success,
+            "a copy source composites");
+    require(replaced.pixels[0] == pack(TextPixelOrder::rgba, 100U, 50U, 0U, 128U), "copy writes the source exactly");
+
+    const std::vector<std::uint8_t> clear{0U, 0U, 0U, 0U};
+    PartRasterSource cleared = source_of(clear, 1U, 1U, 0, 0);
+    cleared.blend = detail::PartCompositeBlend::copy;
+    TestTarget emptied = make_target(1U, 1U, beneath, TextPixelOrder::rgba, false);
+    static_cast<void>(detail::composite_part_raster(cleared, emptied.target, whole(1U, 1U), 255U));
+    require(emptied.pixels[0] == 0U, "copying a transparent pixel clears the target");
+    TestTarget scaled_target = make_target(4U, 4U, beneath, TextPixelOrder::bgra, false);
+    const std::vector<std::uint8_t> scaled_bytes = solid_source(2U, 2U, {0U, 0U, 0U, 0U});
+    PartRasterSource scaled_clear = source_of(scaled_bytes, 2U, 2U, 0, 0);
+    scaled_clear.shown_width = 4U;
+    scaled_clear.shown_height = 4U;
+    scaled_clear.blend = detail::PartCompositeBlend::copy;
+    static_cast<void>(detail::composite_part_raster(scaled_clear, scaled_target.target, whole(4U, 4U), 255U));
+    require(scaled_target.pixels[0] == 0U && scaled_target.pixels[15] == 0U,
+            "a scaled transparent copy clears the target");
+
+    // Half weight (opacity 255, clip coverage 128): each channel half the
+    // source plus half the target, rounded once each.
+    TestTarget edge = make_target(1U, 1U, beneath, TextPixelOrder::rgba, false);
+    TextCompositeClip half_column{};
+    half_column.rect = {0.0, 0.0, 0.5, 1.0};
+    static_cast<void>(detail::composite_part_raster(copied, edge.target, half_column, 255U));
+    require(edge.pixels[0] == pack(TextPixelOrder::rgba, 150U, 30U, 3U, 164U), "a partly covered pixel keeps the rest");
+
+    // An opaque target stays opaque; outside the clip nothing is written.
+    TestTarget opaque = make_target(2U, 1U, pack(TextPixelOrder::bgra, 9U, 9U, 9U, 255U), TextPixelOrder::bgra, true);
+    const std::vector<std::uint8_t> wide_bytes = solid_source(2U, 1U, {0U, 0U, 0U, 0U});
+    PartRasterSource wide = source_of(wide_bytes, 2U, 1U, 0, 0);
+    wide.blend = detail::PartCompositeBlend::copy;
+    TextCompositeClip first_column{};
+    first_column.rect = {0.0, 0.0, 1.0, 1.0};
+    static_cast<void>(detail::composite_part_raster(wide, opaque.target, first_column, 255U));
+    require(opaque.pixels[0] == pack(TextPixelOrder::bgra, 0U, 0U, 0U, 255U) &&
+                opaque.pixels[1] == pack(TextPixelOrder::bgra, 9U, 9U, 9U, 255U),
+            "copy onto an opaque target writes alpha 255 within the clip only");
+
+    require(detail::part_composite_blend(PaintGroupComposite::copy) == detail::PartCompositeBlend::copy,
+            "the copy group composite has the copy blend");
+}
+
 int main() {
     test_opacity_quantization();
     test_blend_arithmetic();
@@ -492,6 +546,7 @@ int main() {
     test_scaled_sampling();
     test_plus_blend();
     test_separable_blends();
+    test_copy_blend();
     test_part_raster();
     test_command_is_recorded_replayed_and_inspected();
     std::cout << "part composite tests passed\n";

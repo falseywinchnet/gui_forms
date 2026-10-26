@@ -19,6 +19,8 @@ Nonvisual components: bindings, providers, image lists, timers and semantic feed
      - Runs work on a worker thread and reports progress and completion on the UI thread.
    * - :cpp:class:`NotifyIcon <gui_forms::NotifyIcon>`
      - An icon in the desktop's notification area, with clicks, a menu and notification text.
+   * - :cpp:class:`OpenFileDialog <gui_forms::OpenFileDialog>`
+     - The host's dialog for choosing one or more existing files.
    * - :cpp:class:`ImageList <gui_forms::ImageList>`
      - A keyed collection of images that buttons, trees and object views share.
    * - :cpp:class:`ErrorProvider <gui_forms::ErrorProvider>`
@@ -41,6 +43,7 @@ Nonvisual components: bindings, providers, image lists, timers and semantic feed
    generated/gui_forms.Timer
    generated/gui_forms.BackgroundWorker
    generated/gui_forms.NotifyIcon
+   generated/gui_forms.OpenFileDialog
    generated/gui_forms.ImageList
    generated/gui_forms.ErrorProvider
    generated/gui_forms.HelpProvider

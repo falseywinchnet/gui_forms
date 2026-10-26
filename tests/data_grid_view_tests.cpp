@@ -1,6 +1,6 @@
 // DataGridView (stage W): columns and unbound rows, layout and published
 // parts, selection and keyboard navigation, text editing in the hosted
-// editor, check box, button and combo box cells, virtual rows on stable row
+// editor, check box, button, combo box and image cells, virtual rows on stable row
 // IDs with a provider asked by ID, row identity kept across inserts, removals
 // and sorts in every row source, sorting, header clicks and column resizing,
 // BindingSource rows, scrolling and semantics.
@@ -941,6 +941,155 @@ void scrolling() {
     require((*grid).first_displayed_row() == row_at(20U), "moving the bar scrolls the rows");
 }
 
+// Records the images drawn and the clip each was drawn under; the grid draws
+// an image cell's image whole and cuts it with a clip at the cell's edges.
+class ImagePainter final : public Painter {
+public:
+    struct Drawn final {
+        ImageId image{};
+        Rect bounds{};
+        Rect clip{};
+    };
+
+    void save() override { saved_.push_back(clip_); }
+    void restore() override {
+        if (saved_.empty()) return;
+        clip_ = saved_.back();
+        saved_.pop_back();
+    }
+    void translate(Point) override {}
+    void clip_rect(Rect rect) override { clip_ = rect; }
+    void fill_rect(Rect, Color) override {}
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point, Point, Color, double) override {}
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId image, Rect bounds, double) override { drawn.push_back({image, bounds, clip_}); }
+
+    std::vector<Drawn> drawn;
+
+private:
+    Rect clip_{};
+    std::vector<Rect> saved_;
+};
+
+// A solid image of one size, held by the window.
+ImageId load_solid_image(Window& window, std::uint32_t width, std::uint32_t height) {
+    const std::vector<std::byte> pixels(static_cast<std::size_t>(width) * height * 4U, std::byte{0xFF});
+    const ImageLoadResult loaded = window.load_bgra32_premultiplied(width, height, std::uint64_t{width} * 4U, pixels);
+    require(static_cast<bool>(loaded), "the test image loads");
+    return loaded.image;
+}
+
+struct SetBadLayout final {
+    DataGridView* grid{};
+    void operator()() const {
+        (*grid).add_column({.name = "bad", .kind = DataGridViewColumnKind::image,
+                            .image_layout = static_cast<DataGridViewImageLayout>(9)});
+    }
+};
+
+bool near(double left, double right) {
+    const bool result = left - right < 0.001 && right - left < 0.001;
+    return result;
+}
+
+void image_cells() {
+    std::shared_ptr<DataGridView> grid = make_control<DataGridView>(StableId("grid.images"));
+    (*grid).set_columns({
+        {.name = "name", .header_text = "Name", .width = 80.0},
+        {.name = "badge", .header_text = "Badge", .kind = DataGridViewColumnKind::image, .width = 60.0,
+         .image_description = "Validated"},
+        {.name = "thumb", .header_text = "Thumb", .kind = DataGridViewColumnKind::image, .width = 60.0,
+         .image_layout = DataGridViewImageLayout::zoom},
+        {.name = "fill", .header_text = "Fill", .kind = DataGridViewColumnKind::image, .width = 60.0,
+         .image_layout = DataGridViewImageLayout::stretch},
+        {.name = "strip", .header_text = "Strip", .kind = DataGridViewColumnKind::image, .width = 30.0,
+         .minimum_width = 20.0},
+    });
+    Window window(grid, {400.0, 160.0});
+    const ImageId badge = load_solid_image(window, 16U, 8U);
+    const ImageId wide = load_solid_image(window, 80U, 10U);
+    (*grid).add_row({.stable_id = {"alpha"},
+                     .cells = {BindingValue{std::string("Alpha")}, BindingValue{badge}, BindingValue{badge},
+                               BindingValue{badge}, BindingValue{wide}}});
+    (*grid).add_row({.stable_id = {"bravo"}, .cells = {BindingValue{std::string("Bravo")}}});
+    (*grid).add_row({.stable_id = {"charlie"},
+                     .cells = {BindingValue{std::string("Charlie")}, BindingValue{ImageId{0x7FFFFFFFU}},
+                               BindingValue{std::string("not an image")}}});
+    window.perform_layout();
+    require(throws<std::invalid_argument>(SetBadLayout{grid.get()}) && (*grid).columns().size() == 5U,
+            "an image layout outside the enumeration is refused");
+
+    const std::vector<DataGridView::Cell> cells = (*grid).realized_cells();
+    const DataGridView::Cell* normal = find_cell(cells, 0U, 1U);
+    const Rect normal_inside = (*normal).parts.cell_selection.bounds;
+    const Rect normal_image = (*normal).parts.cell_image.bounds;
+    require((*normal).parts.cell_image.present && !(*normal).parts.cell_content.present &&
+                near(normal_image.width, 16.0) && near(normal_image.height, 8.0) &&
+                near(normal_image.x + 8.0, normal_inside.x + normal_inside.width * 0.5) &&
+                near(normal_image.y + 4.0, normal_inside.y + normal_inside.height * 0.5),
+            "a normal image cell shows its image at its own size, centred");
+    const DataGridView::Cell* zoomed = find_cell(cells, 0U, 2U);
+    const Rect zoom_inside = (*zoomed).parts.cell_selection.bounds;
+    const Rect zoom_image = (*zoomed).parts.cell_image.bounds;
+    require((*zoomed).parts.cell_image.present && near(zoom_image.width, zoom_image.height * 2.0) &&
+                (near(zoom_image.width, zoom_inside.width) || near(zoom_image.height, zoom_inside.height)) &&
+                zoom_image.width <= zoom_inside.width + 0.001 && zoom_image.height <= zoom_inside.height + 0.001,
+            "a zoomed image is as large as fits, its shape kept");
+    const DataGridView::Cell* stretched = find_cell(cells, 0U, 3U);
+    const Rect fill_inside = (*stretched).parts.cell_selection.bounds;
+    const Rect fill_image = (*stretched).parts.cell_image.bounds;
+    require((*stretched).parts.cell_image.present && near(fill_image.x, fill_inside.x) &&
+                near(fill_image.width, fill_inside.width) && near(fill_image.height, fill_inside.height),
+            "a stretched image fills its cell");
+    const DataGridView::Cell* strip = find_cell(cells, 0U, 4U);
+    const Rect strip_inside = (*strip).parts.cell_selection.bounds;
+    require((*strip).parts.cell_image.present && near((*strip).parts.cell_image.bounds.width, strip_inside.width) &&
+                near((*strip).parts.cell_image.bounds.x, strip_inside.x),
+            "an image wider than its cell is published as it is seen, cut at the cell's edges");
+    require(!(*find_cell(cells, 1U, 1U)).parts.cell_image.present &&
+                !(*find_cell(cells, 2U, 1U)).parts.cell_image.present &&
+                !(*find_cell(cells, 2U, 2U)).parts.cell_image.present,
+            "an empty cell, an image the window does not hold and a value that is no image show nothing");
+    require((*grid).cell_text(row_at(0U), 1U) == "Validated" && (*grid).cell_text(row_at(1U), 1U).empty() &&
+                (*grid).cell_text(row_at(0U), 2U).empty(),
+            "an image cell's text is its column's description while it holds an image");
+
+    ImagePainter painter;
+    (*grid).on_paint(painter, (*grid).client_rectangle());
+    require(painter.drawn.size() == 4U, "each held image is drawn once, and nothing for the cells without one");
+    bool strip_drawn_whole = false;
+    for (const ImagePainter::Drawn& drawn : painter.drawn) {
+        if (drawn.image == wide && near(drawn.bounds.width, 80.0) && near(drawn.clip.width, strip_inside.width) &&
+            near(drawn.clip.x, strip_inside.x)) {
+            strip_drawn_whole = true;
+        }
+    }
+    require(strip_drawn_whole, "the wide image is drawn whole under a clip at its cell's edges");
+
+    std::vector<DataGridViewCellEvent> clicked;
+    SubscriptionToken click_token = (*grid).cell_content_click().subscribe(RecordCell{&clicked});
+    require(window.request_focus(grid), "the grid takes focus");
+    click(window, centre(*grid, normal_image));
+    require(clicked.size() == 1U && clicked[0].row_id == id("alpha") && clicked[0].column == 1U,
+            "clicking an image raises cell_content_click");
+    click(window, centre(*grid, (*find_cell(cells, 1U, 1U)).parts.cell.bounds));
+    require(clicked.size() == 1U && (*grid).current_cell() == cell_at(1U, 1U),
+            "clicking an image cell without an image only makes it current");
+    static_cast<void>(key(window, PhysicalKey::f2));
+    require(!(*grid).is_current_cell_in_edit_mode(), "an image cell does not edit");
+
+    const std::vector<SemanticNode> nodes = (*grid).semantic_virtual_children();
+    const SemanticNode& row = nodes[5];
+    require(row.stable_id == "alpha" && row.children[2].name == "Badge" && row.children[2].value == "Validated" &&
+                !has_action(row.children[2], SemanticAction::set_value) &&
+                !has_action(row.children[2], SemanticAction::press),
+            "an image cell is named by its column, valued by its description, and offers no set_value");
+    require(!(*grid).on_semantic_child_action("alpha.badge", SemanticAction::set_value, "Other") &&
+                (*grid).cell_value(row_at(0U), 1U) == BindingValue{badge},
+            "set_value on an image cell is refused");
+}
+
 void semantics() {
     std::shared_ptr<DataGridView> grid = make_grid("grid.semantics");
     (*grid).set_accessible_name("Stations");
@@ -1024,7 +1173,8 @@ int main() {
     bound_rows();
     scrolling();
     semantics();
+    image_cells();
     std::cout << "DataGridView: columns, rows, parts, selection, keys, editing, cell kinds, virtual rows, "
-                 "row identity, sorting, resizing, binding, scrolling and semantics passed\n";
+                 "row identity, sorting, resizing, binding, scrolling, semantics and image cells passed\n";
     return 0;
 }

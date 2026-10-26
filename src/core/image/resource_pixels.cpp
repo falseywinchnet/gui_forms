@@ -16,17 +16,6 @@ ResourcePixelError png_error(PngPixelError error) noexcept {
     return ResourcePixelError::decode_failed;
 }
 
-ResourcePixelError cng_error(CngPixelError error) noexcept {
-    switch (error) {
-    case CngPixelError::none: return ResourcePixelError::none;
-    case CngPixelError::invalid_argument: return ResourcePixelError::invalid_argument;
-    case CngPixelError::decode_failed: return ResourcePixelError::decode_failed;
-    case CngPixelError::insufficient_storage: return ResourcePixelError::insufficient_storage;
-    case CngPixelError::allocation_failed: return ResourcePixelError::allocation_failed;
-    }
-    return ResourcePixelError::decode_failed;
-}
-
 } // namespace
 
 ResourcePixelDecoder::ResourcePixelDecoder() {}
@@ -35,7 +24,6 @@ ResourcePixelDecoder::~ResourcePixelDecoder() {}
 
 void ResourcePixelDecoder::release() noexcept {
     png_.release();
-    cng_.release();
 }
 
 ResourcePixelResult ResourcePixelDecoder::decode(const ImageResourceView& resource, PixelTarget target,
@@ -49,11 +37,6 @@ ResourcePixelResult ResourcePixelDecoder::decode(const ImageResourceView& resour
         request.purpose = PngPixelPurpose::resource;
         PngPixelResult decoded = png_.decode(resource.encoded, request, pixels, row_bytes);
         result.error = png_error(decoded.error);
-        result.width = decoded.width;
-        result.height = decoded.height;
-    } else if (resource.encoding == ImageResourceEncoding::cng) {
-        CngPixelResult decoded = cng_.decode(resource.encoded, target, pixels, row_bytes);
-        result.error = cng_error(decoded.error);
         result.width = decoded.width;
         result.height = decoded.height;
     } else {

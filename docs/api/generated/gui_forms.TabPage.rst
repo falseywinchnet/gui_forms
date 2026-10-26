@@ -35,6 +35,18 @@ gui_forms::TabPage
          The caption on the page's tab, drawn exactly as written, and the page's
          accessible name unless you set one. Setting it repaints the tab strip.
 
+      **image_key** : ``std::string``, default empty
+         The key of the tab's image in the tab control's ``image_list``. Setting it
+         clears :cpp:func:`image_index <gui_forms::TabPage::image_index>`. An empty key, or one the list does not have, shows
+         no image. Throws ``std::invalid_argument`` for a key that is not valid
+         UTF-8 or is longer than 256 bytes.
+
+      **image_index** : ``int``, default ``-1``
+         The index of the tab's image in the tab control's ``image_list``, used
+         while :cpp:func:`image_key <gui_forms::TabPage::image_key>` is empty; setting it clears :cpp:func:`image_key <gui_forms::TabPage::image_key>`. ``-1``, or an
+         index past the list's end, shows no image. Throws ``std::out_of_range``
+         below ``-1``.
+
    :Inherited:
 
       From :cpp:class:`Panel <gui_forms::Panel>`: properties :cpp:func:`border_style <gui_forms::Panel::border_style>`, :cpp:func:`background <gui_forms::Panel::background>`, :cpp:func:`has_background_override <gui_forms::Panel::has_background_override>`, :cpp:func:`style <gui_forms::Panel::style>`, :cpp:func:`has_style_override <gui_forms::Panel::has_style_override>`, :cpp:func:`visual_role <gui_forms::Panel::visual_role>`, :cpp:func:`parts <gui_forms::Panel::parts>`; methods :cpp:func:`clear_background <gui_forms::Panel::clear_background>`, :cpp:func:`clear_style <gui_forms::Panel::clear_style>`.
@@ -102,6 +114,28 @@ gui_forms::TabPage
    .. cpp:function:: void set_text(std::string text)
 
       Sets :cpp:func:`text <gui_forms::TabPage::text>`; see the property's description above.
+
+   .. cpp:function:: const std::string& image_key() const noexcept
+
+      The key of the tab's image in the tab control's ``image_list``. Setting it
+      clears :cpp:func:`image_index <gui_forms::TabPage::image_index>`. An empty key, or one the list does not have, shows
+      no image. Throws ``std::invalid_argument`` for a key that is not valid
+      UTF-8 or is longer than 256 bytes.
+
+   .. cpp:function:: void set_image_key(std::string image_key)
+
+      Sets :cpp:func:`image_key <gui_forms::TabPage::image_key>`; see the property's description above.
+
+   .. cpp:function:: int image_index() const noexcept
+
+      The index of the tab's image in the tab control's ``image_list``, used
+      while :cpp:func:`image_key <gui_forms::TabPage::image_key>` is empty; setting it clears :cpp:func:`image_key <gui_forms::TabPage::image_key>`. ``-1``, or an
+      index past the list's end, shows no image. Throws ``std::out_of_range``
+      below ``-1``.
+
+   .. cpp:function:: void set_image_index(int image_index)
+
+      Sets :cpp:func:`image_index <gui_forms::TabPage::image_index>`; see the property's description above.
 
 
    .. rubric:: Extension points

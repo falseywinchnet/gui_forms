@@ -37,10 +37,11 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | sealed 2026-10-23 (`results/2026-10-23-t2-engine-gate/SEALED.md`; gate run 40027309396: 4 hosts, 144 images, 308 sample images, 77 features, 0 differences, 0 busy idle counters): E1 to E11 plus E7r, E9.6 and E10; bake costs measured on a quiet machine (#293) |
 | T3 | [Theme language front end](T3-theme-language/README.md) | 0.3 Themeable | T1, T2 | rounds 001 and 002 answered; plan awaits last review |
 | T4 | [Default theme and Windows-familiar themes](T4-default-theme/README.md) | 0.3 Themeable | T1, T2, T3 | design decided, build not started |
-| T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | plan proposed ([PLAN.md](T5-compositor/PLAN.md)), awaiting the owner's answers; reflection and full-fidelity glass moved here from T2 (owner decision 2026-10-23) |
-| L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | not started; ready (T1 gate recorded) |
+| T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | plan accepted ([PLAN.md](T5-compositor/PLAN.md)), decisions T5-Q1 to T5-Q16 (2026-10-25), C0 next; reflection and full-fidelity glass moved here from T2 (owner decision 2026-10-23) |
+| L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | plan accepted 2026-10-25 (`L-layout/PLAN.md`, interview round 001 in the brief); L0 next |
 | FD | [Form documents](FD-form-documents/README.md) | 0.4 Flexible | T1, T3 | not started; format decided |
-| DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | in progress: rectangle sets painted and presented on every host, paint contract version 2 (#59 to #78); X11 direct live frames in #80; Windows gate recorded (`results/2026-10-13-dp-gate-windows`), macOS and X11 records pending PlaySuite's runs against #80 |
+| DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | complete 2026-10-25 (#320): rectangle sets painted on every host, paint contract version 2 (#59 to #78), X11 direct live frames (#80); gate records `results/2026-10-13-dp-gate-windows`, `results/2026-10-25-dp-gate-x11` and `results/2026-10-25-dp-gate-macos`; the owner accepted macOS's copy (AppKit's union over unchanged pixels) as recorded |
+| SK | [Universal Skia: one painter, one pixel format](SK-universal-skia/README.md) | 0.3 Themeable | none | owner decision 2026-10-26: Skia mandatory on every platform, DibPainter and CoreGraphicsRaster removed, BGRA8 premultiplied sRGB everywhere (corrected from RGBA the same day); brief written, SK1 (the build) next |
 | W | [Windows Forms control coverage (.NET 8+ only)](W-winforms-controls/README.md) | 0.4 Flexible to 0.6 Bindings | T4, or the by-role paint path (ruling 2026-10-14) | started 2026-10-14: catalogue regenerated from the official surface; by-role paint path in place |
 | R | [SDRSharp reflection](R-sdrsharp-reflection/README.md) | not on the public site | T4, F | last run 2026-08-10 |
 | C | [Stable installed C ABI](C-c-abi/README.md) | 0.5 ABI candidate | T1, T2 | experimental ABI 0.26, not installed |
@@ -48,6 +49,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | RB | [Ribbon framework: study, interview, decisions, plan](RB-ribbon/README.md) | to be placed by its plan | none to start | complete 2026-10-14: study, interview round 001, 27 decisions and the plan, accepted by the owner; the ribbon is built in W (`RB-ribbon/PLAN.md`), phase 0 first |
 | DK | [Docking and windowing: study, interview, decisions, plan](DK-docking/README.md) | to be placed by its plan | none to start | started 2026-10-14 (admitted by the owner, matrix row 43): complete 2026-10-17: studies, interview round 001 (43 decisions, look studies published) and the plan, accepted by the owner; built in a DK window-layer stage (W0) and in W (`DK-docking/PLAN.md`) |
 | DG | [Diagram control: study, interview, decisions, plan](DG-diagram/README.md) | to be placed by its plan | none to start | started 2026-10-19 (matrix row 55): study written; the interview waits for the owner |
+| RT | [`stx_rtf2md`: the RTF and rich-markdown library](RT-rich-text/PLAN.md) | to be placed by its plan | none to start; W's `RichTextBox` depends on its RT1 | plan accepted 2026-10-26 (owner decisions in PLAN.md section 12; built by the SwiftEdit worker under W-Q1); RT1 (model and markdown) in review; RT2 (reading RTF) next |
 | Z | [Owned zlib replacement: study and threat model](Z-zlib/README.md) | 0.2 Verified (done; owner decision 2026-10-23) | none for study; owner acceptance before code | complete: stx_zlib and stx_png in production on every host, WIC decoding removed, FreeType built without zlib (GA record #240, `Z-zlib/GA_RECORD.md`); then stx_conv (CONV interpolation, the face-variant generator) and CNG (the native resource format, PNG kept for interchange; #270, #276) |
 | D | [Interface builder](D-interface-builder/README.md) | 0.7 Designers | T3, L, FD | not started |
 | H | [HTML import and layout designer](H-html-import/README.md) | 0.7 Designers | L, T3 | earlier attempt discarded |
@@ -67,8 +69,7 @@ complete. The next spine stage is
 **T3, the theme language front end**, now unblocked by T2; **T5** and **C**
 are also unblocked (T5 now carries reflection and full-fidelity glass), and
 **L** has been ready since T1. **W** continues under the by-role paint path
-(ruling 2026-10-14), and **DP** is open only for its macOS and X11 gate
-records. Read `planning/stages/T2-engine-core/README.md` and its gate record
+(ruling 2026-10-14), and **DP** is complete (2026-10-25). Read `planning/stages/T2-engine-core/README.md` and its gate record
 before starting T3, T4, T5 or C, and `planning/stages/T1-anatomy/README.md`
 "Hand-off" before T3, L, FD or C.
 
