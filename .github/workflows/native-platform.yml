@@ -52,7 +52,11 @@ jobs:
       # One tree per job: a pull_request run takes its workflow files from the
       # test merge commit (refs/pull/N/merge), so the job checks out that same
       # commit (the default ref), never the head alone, whose older tree may
-      # lack tools main's workflow calls. A push checks out the pushed commit.
+      # lack tools main's workflow calls. A push or a merge group checks out
+      # its own commit. A merge group's branch is temporary: it never promotes
+      # (main only) and saves no Actions cache, and it reuses a pull request's
+      # validation of the same tree (tools/ci_reuse.py), as main then reuses
+      # the merge group's.
       - uses: actions/checkout@v4
         with:
           path: gui_forms
@@ -127,7 +131,7 @@ jobs:
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux')
         run: sh gui_forms/tools/install_linux_ci_packages.sh toolkit "$RUNNER_TEMP/apt-archives"
       - uses: actions/cache/save@v4
-        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux') && github.event_name != 'pull_request' && steps.linux-packages.outputs.cache-hit != 'true'
+        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux') && github.event_name != 'pull_request' && github.event_name != 'merge_group' && steps.linux-packages.outputs.cache-hit != 'true'
         with:
           path: ${{ runner.temp }}/apt-archives
           key: ${{ steps.linux-packages.outputs.cache-primary-key }}
@@ -383,11 +387,11 @@ jobs:
       - name: Keep only the compiler cache entries this build used
         if: success() && steps.promotion.outputs.reused != 'true' && steps.reuse.outputs.reused != 'true'
         run: python gui_forms/tools/ci_cache.py evict --since "$GUI_FORMS_JOB_START"
-      # Only main saves object caches: pull requests seed from validated
-      # archives (ci_promote.py seed), and their per-tree entries evicted the
-      # dependency caches from the repository's 10 GB.
+      # Only main saves object caches: pull requests and merge groups seed
+      # from validated archives (ci_promote.py seed), and their per-tree
+      # entries evicted the dependency caches from the repository's 10 GB.
       - uses: actions/cache/save@v4
-        if: steps.promotion.outputs.reused != 'true' && github.event_name != 'pull_request' && (always() && (steps.reuse.outputs.reused == 'true' || (steps.objects.outputs.cache-primary-key != '' && steps.objects.outputs.cache-hit != 'true')))
+        if: steps.promotion.outputs.reused != 'true' && github.event_name != 'pull_request' && github.event_name != 'merge_group' && (always() && (steps.reuse.outputs.reused == 'true' || (steps.objects.outputs.cache-primary-key != '' && steps.objects.outputs.cache-hit != 'true')))
         with:
           path: .ccache
           key: gui-objects-v2-${{ inputs.platform }}-${{ steps.compiler.outputs.identity }}-${{ steps.inputs.outputs.tree }}

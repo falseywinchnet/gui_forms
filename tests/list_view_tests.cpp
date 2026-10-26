@@ -6,9 +6,12 @@
 #include "gui_forms/gui_forms.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -28,7 +31,9 @@ public:
     void restore() override {}
     void translate(Point) override {}
     void clip_rect(Rect) override {}
-    void fill_rect(Rect, Color) override {}
+    void fill_rect(Rect, Color) override { ++fills; }
+    void fill_rounded_rect(Rect, double, Color) override { ++fills; }
+    void fill_linear_gradient(Rect, Point, Point, std::span<const GradientStop>) override { ++fills; }
     void stroke_rect(Rect, Color, double) override {}
     void draw_line(Point, Point, Color, double) override {}
     void draw_text_utf8(Point, std::string_view text, FontSpec, Color) override { texts.emplace_back(text); }
@@ -36,6 +41,7 @@ public:
 
     std::vector<std::string> texts;
     std::uint64_t images{};
+    std::uint64_t fills{};
 };
 
 bool painted(const RecordingPainter& painter, std::string_view text) {
@@ -390,6 +396,70 @@ void views_lay_out_items() {
             "the large-icon label sits under the icon's place");
 }
 
+// The insertion mark (Windows Forms' InsertionMark): a drop-role bar in the
+// gap beside an item, across rows in the details and list views and
+// between cells in the icon views, cleared by any change to the items or
+// their order.
+void insertion_mark() {
+    std::shared_ptr<ListView> view = details_view(6U);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    require(!(*view).insertion_mark().has_value() && !(*view).parts().insertion_mark.present,
+            "a view starts without an insertion mark");
+    RecordingPainter plain;
+    static_cast<void>(window.paint(plain, {0.0, 0.0, 400.0, 240.0}));
+
+    require((*view).show_insertion_mark({.index = 2U, .after = false}), "a mark beside an item is shown");
+    window.perform_layout();
+    std::vector<ListView::Item> items = (*view).realized_items();
+    ListView::Parts parts = (*view).parts();
+    const Rect row = items[2].parts.cell.bounds;
+    require(parts.insertion_mark.present && parts.insertion_mark.states.contains(AnatomyState::drop_accepted) &&
+                std::abs(parts.insertion_mark.bounds.y + parts.insertion_mark.bounds.height * 0.5 - row.y) < 0.001 &&
+                parts.insertion_mark.bounds.height == 2.0,
+            "a details view's mark lies across the top of its row, drop-accepted");
+    RecordingPainter marked;
+    static_cast<void>(window.paint(marked, {0.0, 0.0, 400.0, 240.0}));
+    require(marked.fills > plain.fills, "the mark is painted");
+
+    require((*view).show_insertion_mark({.index = 2U, .after = true}), "a mark after an item is shown");
+    window.perform_layout();
+    parts = (*view).parts();
+    require(std::abs(parts.insertion_mark.bounds.y + parts.insertion_mark.bounds.height * 0.5 -
+                     (row.y + row.height)) < 0.001,
+            "a mark after the item lies across its bottom");
+
+    const Point lower_half{row.x + 20.0, row.y + row.height * 0.75};
+    const std::optional<ListViewInsertionMark> nearest = (*view).insertion_mark_at(to_window(*view, lower_half));
+    require(nearest && (*nearest).index == 2U && (*nearest).after, "a point past an item's middle names the gap after it");
+    const Point far_below{row.x + 20.0, 1000.0};
+    const std::optional<ListViewInsertionMark> last = (*view).insertion_mark_at(to_window(*view, far_below));
+    require(last && (*last).index == 5U && (*last).after, "a point past the last item names the gap after it");
+
+    require(!(*view).show_insertion_mark({.index = 6U, .after = false}) && !(*view).insertion_mark().has_value(),
+            "an index past the items is refused and clears the mark");
+    require((*view).show_insertion_mark({.index = 1U, .after = false}), "the mark is shown again");
+    (*view).sort_items(0U, ListViewSortOrder::ascending);
+    require(!(*view).insertion_mark().has_value(), "sorting clears the mark");
+    require((*view).show_insertion_mark({.index = 1U, .after = false}), "the mark is shown once more");
+    (*view).set_items(sample_items(4U));
+    require(!(*view).insertion_mark().has_value(), "replacing the items clears the mark");
+
+    (*view).set_view(ListViewView::large_icon);
+    window.perform_layout();
+    require((*view).show_insertion_mark({.index = 1U, .after = true}), "an icon view shows a mark");
+    window.perform_layout();
+    items = (*view).realized_items();
+    parts = (*view).parts();
+    const Rect cell = items[1].parts.cell.bounds;
+    require(parts.insertion_mark.present && parts.insertion_mark.bounds.width == 2.0 &&
+                std::abs(parts.insertion_mark.bounds.x + 1.0 - (cell.x + cell.width)) < 0.001,
+            "an icon view's mark stands down the cell's right side when after it");
+    (*view).clear_insertion_mark();
+    require(!(*view).insertion_mark().has_value() && !(*view).parts().insertion_mark.present,
+            "clear_insertion_mark removes the mark");
+}
+
 void scrolling() {
     std::shared_ptr<ListView> view = details_view(200U);
     std::vector<ListViewColumn> wide = sample_columns();
@@ -560,11 +630,13 @@ int main() {
     check_boxes();
     columns_click_sort_and_resize();
     views_lay_out_items();
+    insertion_mark();
     scrolling();
     virtual_mode();
     semantics();
     refusals();
-    std::cout << "ListView: parts, views, selection, keys, checks, columns, sorting, resizing, virtual mode, "
+    std::cout << "ListView: parts, views, selection, keys, checks, columns, sorting, resizing, insertion mark, "
+                 "virtual mode, "
                  "scrolling, semantics and refusals passed\n";
     return 0;
 }

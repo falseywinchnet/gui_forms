@@ -107,7 +107,7 @@ html_theme_options = {
         "image_light": "_static/gui_forms_mark.svg",
         "image_dark": "_static/gui_forms_mark_dark.svg",
     },
-    "github_url": "https://github.com/falseywinchnet/gui_forms",
+    "github_url": "https://github.com/malkuth-software/gui_forms",
     "collapse_navigation": True,
     "header_links_before_dropdown": 6,
     "navbar_end": [

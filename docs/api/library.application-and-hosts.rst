@@ -107,6 +107,8 @@ Related types
      - An owned host-service image.
    * - :cpp:class:`HostImageView <gui_forms::HostImageView>`
      - A borrowed, top-to-bottom, straight-alpha RGBA8 sRGB image.
+   * - :cpp:class:`HostInputSettingsEvent <gui_forms::HostInputSettingsEvent>`
+     - The platform's input settings that controls read (stage W, ListView label editing): reported after attach and again whenever the system setting changes.
    * - :cpp:class:`HostMessageDialogRequest <gui_forms::HostMessageDialogRequest>`
      - HostMessageDialogRequest declares portable title/message, button set, semantic icon, and valid default choice.
    * - :cpp:class:`HostMessageDialogResult <gui_forms::HostMessageDialogResult>`
@@ -123,6 +125,8 @@ Related types
      - HostOpenFileDialogRequest declares bounded portable title/location/name/filter state and multiple-selection policy.
    * - :cpp:class:`HostPathDialogResult <gui_forms::HostPathDialogResult>`
      - HostPathDialogResult carries accepted/cancelled outcome and a bounded UTF-8 path collection constrained by request multiplicity.
+   * - :cpp:class:`HostProtocolRevision <gui_forms::HostProtocolRevision>`
+     - One host protocol version and the feature it added.
    * - :cpp:class:`HostResizeEvent <gui_forms::HostResizeEvent>`
      - HostResizeEvent carries a validated logical client extent for an attached session.
    * - :cpp:class:`HostSaveFileDialogRequest <gui_forms::HostSaveFileDialogRequest>`
@@ -531,7 +535,7 @@ Related types
 
    .. cpp:member:: constexpr std::uint32_t current_protocol_version
 
-      8: the host's keyboard-command defaults (``key_map``). 9: the compositor state report (HostCompositorEvent, stage T5). Default: ``9``.
+      The last row of host_protocol_revisions. Default: ``host_protocol_revisions[host_protocol_revisions.size() - 1U].version``.
 
    .. cpp:member:: std::uint32_t protocol_version
 
@@ -821,6 +825,22 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: HostInputSettingsEvent final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   The platform's input settings that controls read (stage W, ListView label editing): reported after attach and again whenever the system setting changes. The session copies them into the window's PresentationSettings (double_click_milliseconds and double_click_origin), leaving every other field as it is. An interval of 0 or above maximum_double_click_milliseconds is refused as invalid_payload.
+
+   .. cpp:member:: std::uint32_t double_click_milliseconds
+
+      Default: ``{default_double_click_milliseconds}``.
+
+   .. cpp:member:: SettingOrigin double_click_origin
+
+      Default: ``{SettingOrigin::host}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: HostMessageDialogRequest final
 
    ``#include <gui_forms/host/types/host_types.hpp>``
@@ -946,6 +966,18 @@ Related types
       Default: ``{HostDialogOutcome::cancelled}``.
 
    .. cpp:member:: std::vector<std::string> paths
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostProtocolRevision final
+
+   ``#include <gui_forms/host/types/host_capabilities/host_capabilities.hpp>``
+
+   One host protocol version and the feature it added.
+
+   .. cpp:member:: std::uint32_t version
+
+   .. cpp:member:: const char* feature
 
 .. cpp:namespace:: gui_forms
 
@@ -3170,6 +3202,18 @@ Functions, constants and aliases
 
 .. cpp:namespace:: gui_forms
 
+``#include <gui_forms/host/types/host_capabilities/host_capabilities.hpp>``
+
+.. cpp:function:: constexpr bool host_protocol_revisions_consecutive() noexcept
+
+   Whether the rows run consecutively from 8, each with a feature.
+
+.. cpp:var:: constexpr std::array<HostProtocolRevision, 3> host_protocol_revisions
+
+   The host protocol's versions, one row each, from version 8 (earlier versions are not recorded). The current version is the last row's. A change to the protocol adds a row at the end, so two changes that claim the same version both add the same line and conflict when merged, and the checks below refuse a skipped or repeated version.
+
+.. cpp:namespace:: gui_forms
+
 ``#include <gui_forms/host/types/host_capability/host_capability.hpp>``
 
 .. cpp:function:: constexpr bool has_capability(HostCapability available, HostCapability requested) noexcept
@@ -3212,7 +3256,7 @@ Functions, constants and aliases
 
 .. cpp:type:: HostDialogResultPayload = std::variant< HostMessageDialogResult, HostPathDialogResult, HostColorDialogResult>
 
-.. cpp:type:: HostEventPayload = std::variant< HostAttachEvent, HostResizeEvent, HostScaleEvent, HostActivationEvent, HostOcclusionEvent, HostDisplayEvent, DragEvent, PointerEvent, KeyEvent, TextInputEvent, HostCloseRequest, HostClosedEvent, HostShutdownEvent, HostCompositorEvent>
+.. cpp:type:: HostEventPayload = std::variant< HostAttachEvent, HostResizeEvent, HostScaleEvent, HostActivationEvent, HostOcclusionEvent, HostDisplayEvent, DragEvent, PointerEvent, KeyEvent, TextInputEvent, HostCloseRequest, HostClosedEvent, HostShutdownEvent, HostCompositorEvent, HostInputSettingsEvent>
 
 .. cpp:namespace:: gui_forms
 

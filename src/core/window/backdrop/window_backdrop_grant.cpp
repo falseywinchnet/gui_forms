@@ -55,6 +55,7 @@ WindowBackdropGrant Window::request_backdrop(const WindowBackdropRequest& reques
             "GUI.Forms backdrop request needs one to three distinct entries with opaque only last");
     }
     backdrop_request_ = request;
+    application_backdrop_request_ = true;
     refresh_backdrop();
     const WindowBackdropGrant grant = backdrop_grant_;
     return grant;
@@ -95,6 +96,14 @@ void Window::refresh_backdrop() {
     // backdrop_grant_ while later handlers of this emission still run.
     const WindowBackdropGrant emitted = backdrop_grant_;
     backdrop_changed_.emit(emitted);
+}
+
+const SurfaceMaterial& Window::backplane_base(const ControlVisualContext& context) const noexcept {
+    const ThemeWindowBackdrop& themed = (*theme_).definition().window_backdrop;
+    const SurfaceMaterial* const base = themed.base_for(backdrop_grant_.granted);
+    if (backdrop_grant_.granted != WindowBackdrop::opaque && base != nullptr) return *base;
+    const SurfaceMaterial& recipe = (*theme_).resolve(ControlVisualRole::window, context).material;
+    return recipe;
 }
 
 } // namespace gui_forms

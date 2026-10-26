@@ -91,6 +91,14 @@ class LookupTests(unittest.TestCase):
     def test_takes_an_older_trusted_run_that_passed_this_tree(self) -> None:
         self.assertEqual(found(FakeGitHub()), 10)
 
+    def test_takes_a_merge_group_run_but_no_other_event(self) -> None:
+        queued: FakeGitHub = FakeGitHub()
+        queued.run_record['event'] = 'merge_group'
+        self.assertEqual(found(queued), 10)
+        other: FakeGitHub = FakeGitHub()
+        other.run_record['event'] = 'pull_request_target'
+        self.assertIsNone(found(other))
+
     def test_never_takes_this_run_or_a_newer_one(self) -> None:
         github: FakeGitHub = FakeGitHub()
         github.producer = 20

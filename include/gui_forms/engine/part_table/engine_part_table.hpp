@@ -116,6 +116,24 @@ struct CachedPartRaster final {
     std::uint64_t raster_table_generation{};
 };
 
+// A part's assembled material (T3 EC1): its recipe's material, the floor,
+// with the winning material fields of the theme's rules in place, and what
+// it was assembled from. It is assembled again only when that changes:
+// - `rules_serial` and `fields`: the compiled rules' serial
+//   (CompiledThemeRules::serial) and the winning declaration of each field,
+//   by address within those rules (null for none);
+// - `floor`: a copy of the recipe material, compared by value, since the
+//   theme's recipe may be replaced and another may occupy its address;
+// - `box`: the part's box size, for fields that read it
+//   (material_fields_read_box), else empty.
+struct AssembledPartMaterial final {
+    std::uint64_t rules_serial{};
+    std::array<const MaterialDeclaration*, material_field_count> fields{};
+    Size box{};
+    SurfaceMaterial floor{};
+    SurfaceMaterial material{};
+};
+
 class Window;
 
 // One property's transition on a part (E7): an engine property or the
@@ -225,6 +243,9 @@ struct EnginePartRecord final {
     // The cached raster and what drew it, made the first time a primitive
     // draws the part, so that a record no primitive draws stays small.
     std::unique_ptr<CachedPartRaster> cached{};
+    // The part's assembled material, made the first time a material
+    // primitive draws the part with a material field a rule sets (EC1).
+    std::unique_ptr<AssembledPartMaterial> assembled_material{};
     // The record's current raster generation; invalidate_raster advances it.
     std::uint64_t generation{1U};
 };
@@ -235,7 +256,9 @@ struct EnginePartRecord final {
 // lookup text and its index entry it takes about 1 KB, so the cap costs at
 // most about 4 MB per window. A part a primitive draws also has its
 // CachedPartRaster (about 600 bytes, and a copy of its material when a
-// material primitive draws it) and its raster, which the raster
+// material primitive draws it), two more copies of the material when the
+// theme's rules set its fields (AssembledPartMaterial), and its raster,
+// which the raster
 // cache's budget bounds. The cap covers far more item parts than a window
 // shows at once: a record evicted while its part is still on screen is only
 // made again on the next paint. Each eviction is O(1).
