@@ -53,6 +53,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_ci_promote.py
           python3 -B -m unittest discover -s tools -p test_ci_sanitizer_seed.py
           python3 -B -m unittest discover -s tools -p test_publish_cache.py
+          python3 -B -m unittest discover -s tools -p test_readthedocs_build.py
           python3 -B -m unittest discover -s tools -p test_windows_toolchain.py
           python3 -B -m unittest discover -s tools -p test_skia_archive.py
           python3 -B -m unittest discover -s tools -p test_stack_frames.py
