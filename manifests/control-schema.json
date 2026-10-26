@@ -1718,6 +1718,7 @@
             {"name": "cell", "role": "region", "composed_from": null, "states": []},
             {"name": "cell_selection", "role": "selection", "composed_from": null, "states": []},
             {"name": "cell_content", "role": "content", "composed_from": null, "states": []},
+            {"name": "cell_image", "role": "image", "composed_from": null, "states": []},
             {"name": "cell_check_well", "role": "well", "composed_from": "check_box", "states": []},
             {"name": "cell_check_indicator", "role": "indicator", "composed_from": null, "states": []},
             {"name": "cell_button_face", "role": "face", "composed_from": "button", "states": []},

@@ -799,6 +799,7 @@ Item system `cell`:
 | `cell` | region |  |  |
 | `cell_selection` | selection |  |  |
 | `cell_content` | content |  |  |
+| `cell_image` | image |  |  |
 | `cell_check_well` | well | `check_box` |  |
 | `cell_check_indicator` | indicator |  |  |
 | `cell_button_face` | face | `button` |  |
