@@ -64,12 +64,18 @@ void MetricsView::on_paint(Painter& painter, Rect) {
     painter.draw_text_utf8({16.0 * s, 24.0 * s}, title_,
                            effective_font({FontRole::control, 12.0, 700, false}),
                            style_.face_light);
-    const std::string metrics = metrics_text();
-    const std::size_t split = metrics.find(" · ", metrics.size() / 2U);
+    std::string metrics = metrics_text();
+    if (metrics != painted_metrics_) {
+        painted_metrics_ = std::move(metrics);
+        // Semantics only: the generation advances, no repaint is owed.
+        invalidate(Dirty::semantics);
+    }
+    const std::string& painted = painted_metrics_;
+    const std::size_t split = painted.find(" · ", painted.size() / 2U);
     const std::string first = split == std::string::npos
-        ? metrics : metrics.substr(0U, split);
+        ? painted : painted.substr(0U, split);
     const std::string second = split == std::string::npos
-        ? std::string{} : metrics.substr(split + 3U);
+        ? std::string{} : painted.substr(split + 3U);
     painter.draw_text_utf8({16.0 * s, 48.0 * s}, first,
                            effective_font({FontRole::content, 11.0, 400, false}),
                            style_.face);
@@ -86,7 +92,7 @@ SemanticDescriptor MetricsView::semantic_descriptor() const {
     SemanticDescriptor descriptor;
     descriptor.role = SemanticRole::group;
     descriptor.name = title_;
-    descriptor.value = metrics_text();
+    descriptor.value = painted_metrics_;
     descriptor.exposed = true;
     return descriptor;
 }
