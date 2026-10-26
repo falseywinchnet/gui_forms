@@ -3397,13 +3397,24 @@ if(GUI_FORMS_BUILD_TESTS)
 
         # Stage T5, C3's measurement: what the window server composes from a
         # non-opaque window and a behind-window effect view, AppKit only.
-        # Prints JSON lines (kept in CI's LastTest.log evidence); fails only
-        # when it cannot make its windows. Serial: it reads the screen.
-        add_executable(gui_forms_macos_compositor_probe tests/macos_compositor_probe.mm)
+        # An application bundle launched through LaunchServices, so that its
+        # windows are active as a real application's are; the script prints
+        # its JSON lines (kept in CI's LastTest.log evidence) and fails when
+        # a material case was read in an inactive window. Serial: it reads
+        # the screen.
+        add_executable(gui_forms_macos_compositor_probe MACOSX_BUNDLE tests/macos_compositor_probe.mm)
         target_compile_options(gui_forms_macos_compositor_probe PRIVATE -fobjc-arc)
         target_link_libraries(gui_forms_macos_compositor_probe PRIVATE
             "-framework AppKit" "-framework ApplicationServices")
-        add_test(NAME gui_forms_macos_compositor_probe COMMAND gui_forms_macos_compositor_probe)
+        set_target_properties(gui_forms_macos_compositor_probe PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "T5 Compositor Probe"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.t5-compositor-probe"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.3"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1")
+        add_test(NAME gui_forms_macos_compositor_probe
+            COMMAND /bin/sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/support/run_macos_probe_bundle.sh
+                $<TARGET_BUNDLE_DIR:gui_forms_macos_compositor_probe>
+                ${CMAKE_CURRENT_BINARY_DIR}/macos_compositor_probe.jsonl)
         set_tests_properties(gui_forms_macos_compositor_probe PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
 
         add_executable(gui_forms_macos_exposure_tests tests/macos_exposure_tests.mm)
