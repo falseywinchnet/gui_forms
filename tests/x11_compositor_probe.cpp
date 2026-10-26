@@ -21,7 +21,9 @@
 // takes and drops the selection, as a compositor starting and stopping
 // does (by xcompmgr, or by the probe itself standing in for one). A
 // settings line records the server, its extensions, the 32-bit visual,
-// and whether the server is XWayland.
+// and whether the server is XWayland, with the X errors the probe met: a
+// read the server refuses (Xwayland's rootless root window has no image to
+// get) is recorded as an unread pixel, not a crash.
 //
 // It prints one JSON line per case. It measures and never judges: it fails
 // only when it cannot open the display or make its windows. Verdicts
@@ -71,6 +73,27 @@ enum class ProbeVisual {
     default_visual,
     argb32,
 };
+
+// The X errors the probe met. Xlib's default handler ends the process on
+// the first one; the probe's handler records it, and the failed request's
+// result (a null image) reads as an unread pixel.
+struct ErrorRecord final {
+    unsigned count{};
+    int last_request{};
+    int last_code{};
+};
+
+// Written only by record_x_error, on the probe's one thread, while Xlib
+// processes a reply; read by print_settings.
+ErrorRecord probe_errors{};
+
+int record_x_error(Display* display, XErrorEvent* error) {
+    static_cast<void>(display);
+    probe_errors.count = probe_errors.count + 1U;
+    probe_errors.last_request = static_cast<int>((*error).request_code);
+    probe_errors.last_code = static_cast<int>((*error).error_code);
+    return 0;
+}
 
 const char* visual_name(ProbeVisual visual) noexcept {
     switch (visual) {
@@ -394,7 +417,7 @@ void print_settings(const Probe& probe, const char* found_compositor, bool xcomp
                 "\"default_depth\":%d,\"argb32_visual\":%s,\"argb32_alpha_mask\":\"0x%08lx\","
                 "\"composite\":%s,\"xfixes\":%s,\"render\":%s,\"damage\":%s,\"shape\":%s,\"xwayland\":%s,"
                 "\"found_compositor\":\"%s\",\"xcompmgr_available\":%s,\"xdg_session_type\":\"%s\","
-                "\"wayland_display\":%s}\n",
+                "\"wayland_display\":%s,\"x_errors\":%u,\"last_error_request\":%d,\"last_error_code\":%d}\n",
                 vendor != nullptr ? vendor : "", VendorRelease(probe.display),
                 DefaultDepth(probe.display, probe.screen), probe.argb.found ? "true" : "false",
                 probe.argb.alpha_mask, has_extension(probe.display, "Composite") ? "true" : "false",
@@ -404,7 +427,8 @@ void print_settings(const Probe& probe, const char* found_compositor, bool xcomp
                 has_extension(probe.display, "SHAPE") ? "true" : "false",
                 has_extension(probe.display, "XWAYLAND") ? "true" : "false", found_compositor,
                 xcompmgr_available ? "true" : "false", session != nullptr ? session : "",
-                wayland != nullptr ? "true" : "false");
+                wayland != nullptr ? "true" : "false", probe_errors.count, probe_errors.last_request,
+                probe_errors.last_code);
     std::fflush(stdout);
 }
 
@@ -417,6 +441,7 @@ int main() {
         std::fprintf(stderr, "the probe opens the display\n");
         return 1;
     }
+    static_cast<void>(XSetErrorHandler(&record_x_error));
     probe.screen = DefaultScreen(probe.display);
     probe.root = RootWindow(probe.display, probe.screen);
     probe.argb = find_argb_visual(probe.display, probe.screen);
