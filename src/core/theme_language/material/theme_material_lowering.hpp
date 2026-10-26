@@ -1,7 +1,7 @@
 #pragma once
 
 // The material properties' lowering (stage T3, PLAN.md P6b): CSS's
-// background, border and box-shadow families, read from a declaration's
+// background, border, border-radius and box-shadow families, read from a declaration's
 // value, become the engine's material fields (EC1), each CSS longhand one
 // field, so that each cascades as CSS cascades it. The compiler reads the
 // value and handles the CSS-wide keywords; this lowers what is left into
@@ -22,12 +22,42 @@
 
 namespace gui_forms::theme_language {
 
-// The CSS properties lowered onto material fields, the shorthands first.
+// The CSS properties lowered onto material fields: each family's
+// shorthands, then its longhands. The edges' and the corners' come in
+// CSS's order (top, right, bottom, left; top-left, top-right,
+// bottom-right, bottom-left), each edge's in the order of its fields
+// (style, width, colour).
 enum class MaterialProperty : std::uint8_t {
     background,
     background_color,
     background_image,
     background_blend_mode,
+    border,
+    border_top,
+    border_right,
+    border_bottom,
+    border_left,
+    border_style,
+    border_width,
+    border_color,
+    border_top_style,
+    border_top_width,
+    border_top_color,
+    border_right_style,
+    border_right_width,
+    border_right_color,
+    border_bottom_style,
+    border_bottom_width,
+    border_bottom_color,
+    border_left_style,
+    border_left_width,
+    border_left_color,
+    border_radius,
+    border_top_left_radius,
+    border_top_right_radius,
+    border_bottom_right_radius,
+    border_bottom_left_radius,
+    box_shadow,
 };
 
 // The property `name` (lower case) names, or none for another property.

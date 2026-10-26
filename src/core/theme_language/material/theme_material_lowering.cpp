@@ -26,11 +26,38 @@ struct NamedMaterialProperty final {
     MaterialProperty property{MaterialProperty::background};
 };
 
-constexpr std::array<NamedMaterialProperty, 4> material_properties{{
+// Sorted by name.
+constexpr std::array<NamedMaterialProperty, 30> material_properties{{
     {.name = "background", .property = MaterialProperty::background},
     {.name = "background-blend-mode", .property = MaterialProperty::background_blend_mode},
     {.name = "background-color", .property = MaterialProperty::background_color},
     {.name = "background-image", .property = MaterialProperty::background_image},
+    {.name = "border", .property = MaterialProperty::border},
+    {.name = "border-bottom", .property = MaterialProperty::border_bottom},
+    {.name = "border-bottom-color", .property = MaterialProperty::border_bottom_color},
+    {.name = "border-bottom-left-radius", .property = MaterialProperty::border_bottom_left_radius},
+    {.name = "border-bottom-right-radius", .property = MaterialProperty::border_bottom_right_radius},
+    {.name = "border-bottom-style", .property = MaterialProperty::border_bottom_style},
+    {.name = "border-bottom-width", .property = MaterialProperty::border_bottom_width},
+    {.name = "border-color", .property = MaterialProperty::border_color},
+    {.name = "border-left", .property = MaterialProperty::border_left},
+    {.name = "border-left-color", .property = MaterialProperty::border_left_color},
+    {.name = "border-left-style", .property = MaterialProperty::border_left_style},
+    {.name = "border-left-width", .property = MaterialProperty::border_left_width},
+    {.name = "border-radius", .property = MaterialProperty::border_radius},
+    {.name = "border-right", .property = MaterialProperty::border_right},
+    {.name = "border-right-color", .property = MaterialProperty::border_right_color},
+    {.name = "border-right-style", .property = MaterialProperty::border_right_style},
+    {.name = "border-right-width", .property = MaterialProperty::border_right_width},
+    {.name = "border-style", .property = MaterialProperty::border_style},
+    {.name = "border-top", .property = MaterialProperty::border_top},
+    {.name = "border-top-color", .property = MaterialProperty::border_top_color},
+    {.name = "border-top-left-radius", .property = MaterialProperty::border_top_left_radius},
+    {.name = "border-top-right-radius", .property = MaterialProperty::border_top_right_radius},
+    {.name = "border-top-style", .property = MaterialProperty::border_top_style},
+    {.name = "border-top-width", .property = MaterialProperty::border_top_width},
+    {.name = "border-width", .property = MaterialProperty::border_width},
+    {.name = "box-shadow", .property = MaterialProperty::box_shadow},
 }};
 
 // CSS blend modes the engine does not composite (CSS_COVERAGE section 7).
@@ -89,6 +116,42 @@ enum class PositionWord : std::uint8_t { none, left, center, right, top, bottom 
     return BoxLength{0.5, 0.0};
 }
 
+// The first of an edge's three fields, its style; its width and colour
+// follow.
+[[nodiscard]] MaterialField edge_style_field(std::size_t edge) noexcept {
+    const std::size_t first = static_cast<std::size_t>(MaterialField::border_top_style) + edge * 3U;
+    return static_cast<MaterialField>(first);
+}
+
+[[nodiscard]] MaterialField edge_field(std::size_t edge, std::size_t part) noexcept {
+    const std::size_t field = static_cast<std::size_t>(edge_style_field(edge)) + part;
+    return static_cast<MaterialField>(field);
+}
+
+[[nodiscard]] MaterialField corner_field(std::size_t corner) noexcept {
+    const std::size_t field = static_cast<std::size_t>(MaterialField::corner_top_left) + corner;
+    return static_cast<MaterialField>(field);
+}
+
+// A field that keeps the floor's value: what a shorthand sets for a part it
+// omits (the language's `initial`, the built-in recipe's value).
+[[nodiscard]] MaterialDeclaration initial_field(MaterialField field) {
+    MaterialDeclaration declaration{};
+    declaration.field = field;
+    declaration.initial = true;
+    return declaration;
+}
+
+// The edges or corners CSS's one to four values set, in CSS's order: one
+// value sets all four; two, the first and third and then the second and
+// fourth; three, the first, the second and fourth, and the third.
+constexpr std::array<std::array<std::size_t, 4>, 4> four_sides{{
+    {0U, 0U, 0U, 0U},
+    {0U, 1U, 0U, 1U},
+    {0U, 1U, 2U, 1U},
+    {0U, 1U, 2U, 3U},
+}};
+
 // Components [first, end) of a value, at one nesting level.
 struct ComponentRange final {
     std::size_t first{};
@@ -126,11 +189,23 @@ private:
     bool read_gradient(std::size_t index, AuthoredGradient& gradient);
     bool read_image(std::size_t index, AuthoredGradient& gradient);
     bool push_fills(std::span<const AuthoredGradient> written);
+    bool read_style(std::size_t index, std::optional<MaterialBorderStyle>& style);
+    bool read_width(std::size_t index, double& width);
+    bool read_radius(std::size_t index, MaterialDeclaration& corner);
+    bool read_shadow(ComponentRange range, MaterialShadow& shadow);
+    [[nodiscard]] bool style_word(std::size_t index) const noexcept;
+    [[nodiscard]] bool width_word(std::size_t index) const noexcept;
 
     bool lower_background_colour();
     bool lower_background_image();
     bool lower_blend_modes();
     bool lower_background();
+    bool lower_edges(std::size_t first_edge, std::size_t edge_count);
+    bool lower_sides(std::size_t part);
+    bool lower_edge_field(std::size_t edge, std::size_t part);
+    bool lower_radii();
+    bool lower_corner(std::size_t corner);
+    bool lower_shadows();
 
     const ThemeValue& value_;
     std::uint32_t start_{};
@@ -555,6 +630,276 @@ bool MaterialReader::push_fills(std::span<const AuthoredGradient> written) {
     return true;
 }
 
+// -- borders, radii and shadows --------------------------------------------------
+
+bool MaterialReader::style_word(std::size_t index) const noexcept {
+    constexpr std::array<std::string_view, 10> styles{"none",   "hidden", "solid", "dashed", "dotted",
+                                                      "double", "groove", "ridge", "inset",  "outset"};
+    for (const std::string_view style : styles) {
+        if (keyword(index, style)) return true;
+    }
+    return false;
+}
+
+bool MaterialReader::width_word(std::size_t index) const noexcept {
+    const bool word = keyword(index, "thin") || keyword(index, "medium") || keyword(index, "thick");
+    return word;
+}
+
+// A <line-style>: empty for none (CSS's `none` and `hidden`).
+bool MaterialReader::read_style(std::size_t index, std::optional<MaterialBorderStyle>& style) {
+    const ValueComponent& component = value_.components[index];
+    if (component.kind != ValueComponentKind::keyword) {
+        return fail(DiagnosticCode::value_wrong_kind, component.token, "a border style");
+    }
+    if (keyword(index, "none") || keyword(index, "hidden")) {
+        style.reset();
+        return true;
+    }
+    if (keyword(index, "solid")) {
+        style = MaterialBorderStyle::solid;
+        return true;
+    }
+    if (keyword(index, "dashed")) {
+        style = MaterialBorderStyle::dashed;
+        return true;
+    }
+    if (keyword(index, "dotted")) {
+        style = MaterialBorderStyle::dotted;
+        return true;
+    }
+    // P6c lowers the three to keyline pairs.
+    if (keyword(index, "double") || keyword(index, "groove") || keyword(index, "ridge")) {
+        return fail(DiagnosticCode::not_yet_built, component.token, clipped_theme_detail(component.text));
+    }
+    if (keyword(index, "inset") || keyword(index, "outset")) {
+        return fail(DiagnosticCode::value_form_not_admitted, component.token, clipped_theme_detail(component.text));
+    }
+    return fail(DiagnosticCode::keyword_unknown, component.token, clipped_theme_detail(component.text));
+}
+
+// A <line-width>: a length, or CSS's thin (1px), medium (3px) or thick
+// (5px).
+bool MaterialReader::read_width(std::size_t index, double& width) {
+    if (keyword(index, "thin")) {
+        width = 1.0;
+        return true;
+    }
+    if (keyword(index, "medium")) {
+        width = 3.0;
+        return true;
+    }
+    if (keyword(index, "thick")) {
+        width = 5.0;
+        return true;
+    }
+    BoxLength length{};
+    if (!read_length(index, false, false, length)) return false;
+    width = length.units;
+    return true;
+}
+
+// One corner's radius: a length, or a percentage, a fraction of the box's
+// shorter side (R2-11).
+bool MaterialReader::read_radius(std::size_t index, MaterialDeclaration& corner) {
+    BoxLength length{};
+    if (!read_length(index, true, false, length)) return false;
+    corner.relative = length.units == 0.0 && length.fraction != 0.0;
+    corner.number = corner.relative ? length.fraction : length.units;
+    return true;
+}
+
+// `border` and an edge's shorthand: `<line-width> || <line-style> ||
+// <color>` for edges [first_edge, first_edge + edge_count); an omitted
+// part keeps the floor's (the language's `initial`).
+bool MaterialReader::lower_edges(std::size_t first_edge, std::size_t edge_count) {
+    std::optional<std::size_t> style_at{};
+    std::optional<std::size_t> width_at{};
+    std::optional<std::size_t> colour_at{};
+    for (std::size_t index = 0U; index < value_.components.size(); index = next(index)) {
+        const ValueComponent& component = value_.components[index];
+        const bool width = width_word(index) || component.kind == ValueComponentKind::number;
+        std::optional<std::size_t>& slot = width ? width_at : (style_word(index) ? style_at : colour_at);
+        if (slot) return fail(DiagnosticCode::value_syntax, component.token, "one width, one style and one colour");
+        slot = index;
+    }
+    std::optional<MaterialBorderStyle> style{};
+    double width = 0.0;
+    Color colour{};
+    if (style_at && !read_style(*style_at, style)) return false;
+    if (width_at && !read_width(*width_at, width)) return false;
+    if (colour_at && !read_colour(*colour_at, colour)) return false;
+    for (std::size_t edge = first_edge; edge < first_edge + edge_count; ++edge) {
+        MaterialDeclaration styled = initial_field(edge_field(edge, 0U));
+        MaterialDeclaration wide = initial_field(edge_field(edge, 1U));
+        MaterialDeclaration coloured = initial_field(edge_field(edge, 2U));
+        if (style_at) {
+            styled.initial = false;
+            styled.border_style = style;
+        }
+        if (width_at) {
+            wide.initial = false;
+            wide.number = width;
+        }
+        if (colour_at) {
+            coloured.initial = false;
+            coloured.colour = colour;
+        }
+        lowering_.declarations.push_back(std::move(styled));
+        lowering_.declarations.push_back(std::move(wide));
+        lowering_.declarations.push_back(std::move(coloured));
+    }
+    return true;
+}
+
+// `border-style`, `border-width` or `border-color` (`part` 0, 1 or 2): one
+// to four values, CSS's order.
+bool MaterialReader::lower_sides(std::size_t part) {
+    const std::size_t values = count(ComponentRange{0U, value_.components.size()});
+    if (values > 4U) {
+        return fail(DiagnosticCode::value_syntax, value_.components.back().token, "one to four values");
+    }
+    std::array<MaterialDeclaration, 4> read{};
+    std::size_t index = 0U;
+    for (std::size_t value = 0U; value < values; ++value) {
+        MaterialDeclaration& declaration = read[value];
+        if (part == 0U && !read_style(index, declaration.border_style)) return false;
+        if (part == 1U && !read_width(index, declaration.number)) return false;
+        if (part == 2U && !read_colour(index, declaration.colour)) return false;
+        index = next(index);
+    }
+    const std::array<std::size_t, 4>& sides = four_sides[values - 1U];
+    for (std::size_t edge = 0U; edge < 4U; ++edge) {
+        MaterialDeclaration declaration = read[sides[edge]];
+        declaration.field = edge_field(edge, part);
+        lowering_.declarations.push_back(std::move(declaration));
+    }
+    return true;
+}
+
+bool MaterialReader::lower_edge_field(std::size_t edge, std::size_t part) {
+    if (value_.components.size() != 1U) {
+        return fail(DiagnosticCode::value_syntax, value_.components[next(0U)].token, "one value");
+    }
+    MaterialDeclaration declaration{};
+    declaration.field = edge_field(edge, part);
+    if (part == 0U && !read_style(0U, declaration.border_style)) return false;
+    if (part == 1U && !read_width(0U, declaration.number)) return false;
+    if (part == 2U && !read_colour(0U, declaration.colour)) return false;
+    lowering_.declarations.push_back(std::move(declaration));
+    return true;
+}
+
+// `border-radius`: one to four radii, CSS's order; elliptical radii (`/`)
+// are not admitted (CSS_COVERAGE section 2).
+bool MaterialReader::lower_radii() {
+    for (const ValueComponent& component : value_.components) {
+        if (component.kind == ValueComponentKind::slash) {
+            return fail(DiagnosticCode::value_form_not_admitted, component.token, "elliptical radii");
+        }
+    }
+    const std::size_t values = count(ComponentRange{0U, value_.components.size()});
+    if (values > 4U) {
+        return fail(DiagnosticCode::value_syntax, value_.components.back().token, "one to four radii");
+    }
+    std::array<MaterialDeclaration, 4> read{};
+    std::size_t index = 0U;
+    for (std::size_t value = 0U; value < values; ++value) {
+        if (!read_radius(index, read[value])) return false;
+        index = next(index);
+    }
+    const std::array<std::size_t, 4>& sides = four_sides[values - 1U];
+    for (std::size_t corner = 0U; corner < 4U; ++corner) {
+        MaterialDeclaration declaration = read[sides[corner]];
+        declaration.field = corner_field(corner);
+        lowering_.declarations.push_back(std::move(declaration));
+    }
+    return true;
+}
+
+bool MaterialReader::lower_corner(std::size_t corner) {
+    if (value_.components.size() != 1U) {
+        return fail(DiagnosticCode::value_form_not_admitted, value_.components[next(0U)].token, "elliptical radii");
+    }
+    MaterialDeclaration declaration{};
+    declaration.field = corner_field(corner);
+    if (!read_radius(0U, declaration)) return false;
+    lowering_.declarations.push_back(std::move(declaration));
+    return true;
+}
+
+// One shadow: `inset? && <length>{2,4} && <color>`. CSS's default colour,
+// currentcolor, arrives with the colour roles (P8).
+bool MaterialReader::read_shadow(ComponentRange range, MaterialShadow& shadow) {
+    shadow = MaterialShadow{};
+    shadow.offset = Point{};
+    shadow.blur_radius = 0.0;
+    bool inset = false;
+    bool coloured = false;
+    std::array<double, 4> lengths{};
+    std::size_t length_count = 0U;
+    bool lengths_done = false;
+    for (std::size_t index = range.first; index < range.end; index = next(index)) {
+        const ValueComponent& component = value_.components[index];
+        if (keyword(index, "inset")) {
+            if (inset) return fail(DiagnosticCode::value_syntax, component.token, "one inset");
+            inset = true;
+            lengths_done = length_count > 0U;
+            continue;
+        }
+        if (component.kind == ValueComponentKind::number) {
+            if (lengths_done || length_count == lengths.size()) {
+                return fail(DiagnosticCode::value_syntax, component.token, "two to four adjacent lengths");
+            }
+            BoxLength length{};
+            const bool negatives = length_count != 2U;
+            if (!read_length(index, false, negatives, length)) return false;
+            lengths[length_count] = length.units;
+            length_count = length_count + 1U;
+            continue;
+        }
+        if (coloured) return fail(DiagnosticCode::value_syntax, component.token, "one colour");
+        coloured = true;
+        lengths_done = length_count > 0U;
+        if (!read_colour(index, shadow.color)) return false;
+    }
+    const std::uint32_t token = range.first < range.end ? value_.components[range.first].token : start_;
+    if (length_count < 2U) return fail(DiagnosticCode::value_syntax, token, "two to four lengths");
+    if (!coloured) return fail(DiagnosticCode::not_yet_built, token, "a shadow without a colour (currentcolor)");
+    shadow.offset = Point{lengths[0], lengths[1]};
+    shadow.blur_radius = lengths[2];
+    shadow.spread = lengths[3];
+    shadow.inset = inset;
+    return true;
+}
+
+// `box-shadow`: none, or up to SurfaceMaterial::maximum_shadows shadows,
+// CSS's first on top (the material draws its list bottom first).
+bool MaterialReader::lower_shadows() {
+    MaterialDeclaration declaration{};
+    declaration.field = MaterialField::shadows;
+    const ComponentRange whole{0U, value_.components.size()};
+    if (count(whole) == 1U && keyword(0U, "none")) {
+        lowering_.declarations.push_back(std::move(declaration));
+        return true;
+    }
+    std::vector<ComponentRange> shadows{};
+    split(whole, shadows);
+    if (shadows.size() > SurfaceMaterial::maximum_shadows) {
+        return fail(DiagnosticCode::too_many_layers, start_,
+                    std::to_string(SurfaceMaterial::maximum_shadows) + " shadows");
+    }
+    declaration.shadows.resize(shadows.size());
+    for (std::size_t shadow = 0U; shadow < shadows.size(); ++shadow) {
+        if (!read_shadow(shadows[shadow], declaration.shadows[shadows.size() - 1U - shadow])) return false;
+    }
+    SurfaceMaterial checked{};
+    checked.shadows = declaration.shadows;
+    if (!valid_surface_material(checked)) return fail(DiagnosticCode::value_out_of_range, start_, "a shadow");
+    lowering_.declarations.push_back(std::move(declaration));
+    return true;
+}
+
 // -- the properties ---------------------------------------------------------------
 
 bool MaterialReader::lower_background_colour() {
@@ -688,6 +1033,32 @@ void MaterialReader::lower(MaterialProperty property) {
     case MaterialProperty::background_color: static_cast<void>(lower_background_colour()); return;
     case MaterialProperty::background_image: static_cast<void>(lower_background_image()); return;
     case MaterialProperty::background_blend_mode: static_cast<void>(lower_blend_modes()); return;
+    case MaterialProperty::border: static_cast<void>(lower_edges(0U, 4U)); return;
+    case MaterialProperty::border_top: static_cast<void>(lower_edges(0U, 1U)); return;
+    case MaterialProperty::border_right: static_cast<void>(lower_edges(1U, 1U)); return;
+    case MaterialProperty::border_bottom: static_cast<void>(lower_edges(2U, 1U)); return;
+    case MaterialProperty::border_left: static_cast<void>(lower_edges(3U, 1U)); return;
+    case MaterialProperty::border_style: static_cast<void>(lower_sides(0U)); return;
+    case MaterialProperty::border_width: static_cast<void>(lower_sides(1U)); return;
+    case MaterialProperty::border_color: static_cast<void>(lower_sides(2U)); return;
+    case MaterialProperty::border_top_style: static_cast<void>(lower_edge_field(0U, 0U)); return;
+    case MaterialProperty::border_top_width: static_cast<void>(lower_edge_field(0U, 1U)); return;
+    case MaterialProperty::border_top_color: static_cast<void>(lower_edge_field(0U, 2U)); return;
+    case MaterialProperty::border_right_style: static_cast<void>(lower_edge_field(1U, 0U)); return;
+    case MaterialProperty::border_right_width: static_cast<void>(lower_edge_field(1U, 1U)); return;
+    case MaterialProperty::border_right_color: static_cast<void>(lower_edge_field(1U, 2U)); return;
+    case MaterialProperty::border_bottom_style: static_cast<void>(lower_edge_field(2U, 0U)); return;
+    case MaterialProperty::border_bottom_width: static_cast<void>(lower_edge_field(2U, 1U)); return;
+    case MaterialProperty::border_bottom_color: static_cast<void>(lower_edge_field(2U, 2U)); return;
+    case MaterialProperty::border_left_style: static_cast<void>(lower_edge_field(3U, 0U)); return;
+    case MaterialProperty::border_left_width: static_cast<void>(lower_edge_field(3U, 1U)); return;
+    case MaterialProperty::border_left_color: static_cast<void>(lower_edge_field(3U, 2U)); return;
+    case MaterialProperty::border_radius: static_cast<void>(lower_radii()); return;
+    case MaterialProperty::border_top_left_radius: static_cast<void>(lower_corner(0U)); return;
+    case MaterialProperty::border_top_right_radius: static_cast<void>(lower_corner(1U)); return;
+    case MaterialProperty::border_bottom_right_radius: static_cast<void>(lower_corner(2U)); return;
+    case MaterialProperty::border_bottom_left_radius: static_cast<void>(lower_corner(3U)); return;
+    case MaterialProperty::box_shadow: static_cast<void>(lower_shadows()); return;
     }
 }
 
@@ -720,6 +1091,52 @@ void material_property_fields(MaterialProperty property, std::vector<MaterialFie
     case MaterialProperty::background_color: fields.push_back(MaterialField::background_colour); return;
     case MaterialProperty::background_image: fields.push_back(MaterialField::fills); return;
     case MaterialProperty::background_blend_mode: fields.push_back(MaterialField::fill_blend_modes); return;
+    case MaterialProperty::border:
+        for (std::size_t edge = 0U; edge < 4U; ++edge) {
+            for (std::size_t part = 0U; part < 3U; ++part) fields.push_back(edge_field(edge, part));
+        }
+        return;
+    case MaterialProperty::border_top:
+        for (std::size_t part = 0U; part < 3U; ++part) fields.push_back(edge_field(0U, part));
+        return;
+    case MaterialProperty::border_right:
+        for (std::size_t part = 0U; part < 3U; ++part) fields.push_back(edge_field(1U, part));
+        return;
+    case MaterialProperty::border_bottom:
+        for (std::size_t part = 0U; part < 3U; ++part) fields.push_back(edge_field(2U, part));
+        return;
+    case MaterialProperty::border_left:
+        for (std::size_t part = 0U; part < 3U; ++part) fields.push_back(edge_field(3U, part));
+        return;
+    case MaterialProperty::border_style:
+        for (std::size_t edge = 0U; edge < 4U; ++edge) fields.push_back(edge_field(edge, 0U));
+        return;
+    case MaterialProperty::border_width:
+        for (std::size_t edge = 0U; edge < 4U; ++edge) fields.push_back(edge_field(edge, 1U));
+        return;
+    case MaterialProperty::border_color:
+        for (std::size_t edge = 0U; edge < 4U; ++edge) fields.push_back(edge_field(edge, 2U));
+        return;
+    case MaterialProperty::border_top_style: fields.push_back(edge_field(0U, 0U)); return;
+    case MaterialProperty::border_top_width: fields.push_back(edge_field(0U, 1U)); return;
+    case MaterialProperty::border_top_color: fields.push_back(edge_field(0U, 2U)); return;
+    case MaterialProperty::border_right_style: fields.push_back(edge_field(1U, 0U)); return;
+    case MaterialProperty::border_right_width: fields.push_back(edge_field(1U, 1U)); return;
+    case MaterialProperty::border_right_color: fields.push_back(edge_field(1U, 2U)); return;
+    case MaterialProperty::border_bottom_style: fields.push_back(edge_field(2U, 0U)); return;
+    case MaterialProperty::border_bottom_width: fields.push_back(edge_field(2U, 1U)); return;
+    case MaterialProperty::border_bottom_color: fields.push_back(edge_field(2U, 2U)); return;
+    case MaterialProperty::border_left_style: fields.push_back(edge_field(3U, 0U)); return;
+    case MaterialProperty::border_left_width: fields.push_back(edge_field(3U, 1U)); return;
+    case MaterialProperty::border_left_color: fields.push_back(edge_field(3U, 2U)); return;
+    case MaterialProperty::border_radius:
+        for (std::size_t corner = 0U; corner < 4U; ++corner) fields.push_back(corner_field(corner));
+        return;
+    case MaterialProperty::border_top_left_radius: fields.push_back(corner_field(0U)); return;
+    case MaterialProperty::border_top_right_radius: fields.push_back(corner_field(1U)); return;
+    case MaterialProperty::border_bottom_right_radius: fields.push_back(corner_field(2U)); return;
+    case MaterialProperty::border_bottom_left_radius: fields.push_back(corner_field(3U)); return;
+    case MaterialProperty::box_shadow: fields.push_back(MaterialField::shadows); return;
     }
 }
 

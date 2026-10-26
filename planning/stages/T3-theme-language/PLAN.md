@@ -774,7 +774,7 @@ one bake per distinct assembly. 3 PRs.
   floor, not the button's (owner C5, 2026-10-26).
   `EnginePrimitive::theme_material` takes the part's family for it. The
   engine version is 0.3.
-- **Implicit material** (owner C7, 2026-10-26; P6b builds it): a rule
+- **Implicit material** (owner C7, 2026-10-26; built in P6b): a rule
   that declares material fields and no `primitive` selects `material`.
 - Gate: `gui_forms_engine_authored_material_tests`. A part with fields
   from two rules bakes the same pixels as the same material written into
@@ -784,6 +784,65 @@ one bake per distinct assembly. 3 PRs.
   nothing; a state change assembles and bakes once. The checks, the
   per-field cascade, the edge assembly, the serials, the family default and
   the refused assembly are tested too.
+
+*P6b, the CSS of fills, borders, radii and shadows, done:*
+- **The lowering** (`src/core/theme_language/material/`) reads a material
+  property's value into a result record (`MaterialLowering`): the fields
+  it sets, or the problem the compiler reports. Each CSS longhand is one
+  field, so a shorthand sets several, and within a rule the later
+  declaration of a field wins, whichever property set it. A shorthand's
+  omitted part is `initial` (the floor's value), the language's reading of
+  CSS's initial value. `initial` on any of them resets each field it sets.
+- **Fills** (§1, §7): `background-color`; `background-image` with
+  `linear-`, `radial-` and `conic-gradient()` and their `repeating-`
+  forms, up to 8 layers (E407 `too_many_layers` past them), CSS's first
+  layer on top; `background` with a colour (transparent when it names
+  none) and images; `background-blend-mode`. A layer's position, size,
+  repeat, attachment, origin and clip, and image resources, are P6c's
+  (E999). A colour hint, a `none` among other layers, a three- or
+  four-value position and CSS's blend modes the engine lacks are E405;
+  `currentcolor` and `em` wait for P8 (E999).
+- **Authored gradients** (`AuthoredGradient`, engine): a gradient as
+  written, resolved as CSS places it for the part's box: the stops placed
+  by CSS's fixup and clipped to the drawn range, sides and corners, the
+  four radial extents for circles and ellipses, positions and radii as a
+  fraction of the box plus logical units, repeating periods (a radial
+  one rotated to begin at its centre), CSS's average colour for a period
+  of no length. Coincident stops (CSS's hard stops) are 2^-20 apart, which
+  the engine's stops require: under a tenth of a device pixel on a
+  gradient shorter than 100,000 device pixels. A gradient the same for
+  every box is resolved when the sheet compiles, in normalized
+  coordinates or a CSS angle, exactly the layer C++ writes; the others
+  (a corner, a circle, a length) when the material is assembled, in
+  logical units. The assembly keys on the box only where a field reads
+  it (`material_fields_read_box`), so a resize assembles nothing new
+  otherwise.
+- **Borders** (§2): `border`, the four edges' shorthands, `border-style`,
+  `border-width` and `border-color` (one to four values) and the twelve
+  longhands; `thin`, `medium` and `thick` are 1, 3 and 5 px; `none` and
+  `hidden` draw no line. `double`, `groove` and `ridge` are P6c's keyline
+  pairs (E999); `inset` and `outset` are E405.
+- **Radii** (§2): `border-radius` (one to four) and the four corners'
+  longhands; a percentage is a fraction of the shorter side (R2-11);
+  elliptical radii are E405.
+- **Shadows** (§3): `box-shadow`, `none` or up to 4, `inset` admitted,
+  CSS's first on top; a shadow without a colour waits for `currentcolor`
+  (E999).
+- **Implicit material** (owner C7): a rule with material fields and no
+  `primitive` selects `material`.
+- Gate: `gui_forms_theme_material_css_tests`. Each row (the fill forms,
+  the blend mode, a uniform, a dashed and rounded, single-edge and
+  four-value border, per-corner and percentage radii, outer and inset
+  shadows) compiles from a sheet and bakes the pixels of the same
+  material written in C++, which differ from the floor's. The gradient
+  resolution, the lowering of each property and 28 refusals are tested
+  too.
+
+*P6c, still to build:* §5 filters, §8 finish, §9 glow, §10 image layers
+(the manifest's resources bound to the engine's images, with
+`background-size`, `-repeat` and `-position`), §11 masks, `border-image`,
+`double`, `groove` and `ridge` as keyline pairs, and §14's `color`,
+`outline` and `text-shadow`, which need an engine carrier.
 
 **P7. Motion.** `transition`, the timing functions, delays, `@keyframes`,
 `animation`, ambient loops, and the state-machine grouping. Gate: a fixture

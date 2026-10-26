@@ -1,8 +1,8 @@
 // CSS's material properties (stage T3, phase P6b): background-color,
 // background-image with the six gradient functions, the `background`
-// shorthand and background-blend-mode lower onto the engine's material
-// fields, and a rule of fields alone selects the material primitive (owner
-// C7). The authored gradients resolve as CSS places them: stop fixup, sides
+// shorthand, background-blend-mode, the border family, border-radius and
+// box-shadow lower onto the engine's material fields, and a rule of fields
+// alone selects the material primitive (owner C7). The authored gradients resolve as CSS places them: stop fixup, sides
 // and corners, the radial extents, repeating periods, lengths along the
 // gradient. Gate: for each form, a sheet and the same material written in
 // C++ bake identical pixels.
@@ -343,13 +343,79 @@ void test_lowering() {
             "initial resets each field the shorthand sets");
 }
 
+void test_border_lowering() {
+    const std::string_view border_sheet = "#pad::part(face) { border: 2px solid red }";
+    const Compilation border = compile(border_sheet);
+    const ThemeRule& bordered = only_rule(border, border_sheet);
+    require(bordered.materials.size() == 12U, "border sets the twelve longhands");
+    const MaterialDeclaration* const left_colour = field_of(bordered, MaterialField::border_left_colour);
+    const MaterialDeclaration* const top_width = field_of(bordered, MaterialField::border_top_width);
+    require(left_colour != nullptr && (*left_colour).colour == red && top_width != nullptr &&
+                (*top_width).number == 2.0,
+            "each edge takes the width and the colour");
+
+    const std::string_view style_sheet = "#pad::part(face) { border: dashed }";
+    const Compilation style = compile(style_sheet);
+    const MaterialDeclaration* const omitted = field_of(only_rule(style, style_sheet), MaterialField::border_top_width);
+    const MaterialDeclaration* const dash =
+        field_of(only_rule(style, style_sheet), MaterialField::border_bottom_style);
+    require(omitted != nullptr && (*omitted).initial && dash != nullptr &&
+                (*dash).border_style == MaterialBorderStyle::dashed,
+            "a part the shorthand omits keeps the floor's");
+
+    const std::string_view colour_sheet = "#pad::part(face) { border-color: red green blue }";
+    const Compilation colours = compile(colour_sheet);
+    const ThemeRule& coloured = only_rule(colours, colour_sheet);
+    const MaterialDeclaration* const right = field_of(coloured, MaterialField::border_right_colour);
+    const MaterialDeclaration* const left = field_of(coloured, MaterialField::border_left_colour);
+    const MaterialDeclaration* const bottom = field_of(coloured, MaterialField::border_bottom_colour);
+    require(right != nullptr && left != nullptr && bottom != nullptr && (*right).colour == green &&
+                (*left).colour == green && (*bottom).colour == blue,
+            "three values: top, the sides, bottom");
+
+    const std::string_view none_sheet = "#pad::part(face) { border-left-style: none; border-right-width: thick }";
+    const Compilation none = compile(none_sheet);
+    const MaterialDeclaration* const no_line = field_of(only_rule(none, none_sheet), MaterialField::border_left_style);
+    const MaterialDeclaration* const thick = field_of(only_rule(none, none_sheet), MaterialField::border_right_width);
+    require(no_line != nullptr && !(*no_line).border_style && thick != nullptr && (*thick).number == 5.0,
+            "none is no line; thick is 5px");
+
+    const std::string_view radius_sheet = "#pad::part(face) { border-radius: 4px 50%; border-top-left-radius: 3px }";
+    const Compilation radius = compile(radius_sheet);
+    const ThemeRule& rounded = only_rule(radius, radius_sheet);
+    const MaterialDeclaration* const top_left = field_of(rounded, MaterialField::corner_top_left);
+    const MaterialDeclaration* const top_right = field_of(rounded, MaterialField::corner_top_right);
+    const MaterialDeclaration* const bottom_right = field_of(rounded, MaterialField::corner_bottom_right);
+    require(top_left != nullptr && (*top_left).number == 3.0 && !(*top_left).relative && top_right != nullptr &&
+                (*top_right).relative && (*top_right).number == 0.5 && bottom_right != nullptr &&
+                (*bottom_right).number == 4.0,
+            "border-radius sets the corners, a percentage relative, and a later corner replaces its own");
+
+    const std::string_view shadow_sheet = "#pad::part(face) { box-shadow: 0 2px 4px red, inset 1px 1px blue }";
+    const Compilation shadow = compile(shadow_sheet);
+    const MaterialDeclaration* const shadows = field_of(only_rule(shadow, shadow_sheet), MaterialField::shadows);
+    require(shadows != nullptr && (*shadows).shadows.size() == 2U, "two shadows");
+    if (shadows != nullptr && (*shadows).shadows.size() == 2U) {
+        require((*shadows).shadows[0].inset && (*shadows).shadows[0].color == blue &&
+                    (*shadows).shadows[1].blur_radius == 4.0 && (*shadows).shadows[1].offset == (Point{0.0, 2.0}),
+                "CSS's first shadow is on top: the list is bottom first");
+    }
+
+    const std::string_view reset_sheet = "#pad::part(face) { border: initial }";
+    const Compilation reset = compile(reset_sheet);
+    const ThemeRule& reset_rule = only_rule(reset, reset_sheet);
+    bool all_initial = reset_rule.materials.size() == 12U;
+    for (const MaterialDeclaration& declaration : reset_rule.materials) all_initial = all_initial && declaration.initial;
+    require(all_initial, "border: initial resets the twelve longhands");
+}
+
 struct Refusal final {
     std::string_view sheet{};
     DiagnosticCode code{};
 };
 
 void test_refusals() {
-    const std::array<Refusal, 16> refusals{{
+    const std::array<Refusal, 28> refusals{{
         {"#a { background-image: "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
@@ -371,6 +437,19 @@ void test_refusals() {
         {"#a { background-image: radial-gradient(at left 10px top, red, blue) }",
          DiagnosticCode::value_form_not_admitted},
         {"#a { background-image: linear-gradient(red 1em, blue) }", DiagnosticCode::not_yet_built},
+        {"#a { border-style: double }", DiagnosticCode::not_yet_built},
+        {"#a { border-style: inset }", DiagnosticCode::value_form_not_admitted},
+        {"#a { border-style: wavy }", DiagnosticCode::keyword_unknown},
+        {"#a { border-radius: 4px / 2px }", DiagnosticCode::value_form_not_admitted},
+        {"#a { border-top-left-radius: 4px 2px }", DiagnosticCode::value_form_not_admitted},
+        {"#a { border-width: -1px }", DiagnosticCode::value_out_of_range},
+        {"#a { border-width: 1px 1px 1px 1px 1px }", DiagnosticCode::value_syntax},
+        {"#a { border: 1px 2px }", DiagnosticCode::value_syntax},
+        {"#a { box-shadow: 1px }", DiagnosticCode::value_syntax},
+        {"#a { box-shadow: 1px 1px }", DiagnosticCode::not_yet_built},
+        {"#a { box-shadow: 1px 1px -2px red }", DiagnosticCode::value_out_of_range},
+        {"#a { box-shadow: 1px 1px red, 1px 1px red, 1px 1px red, 1px 1px red, 1px 1px red }",
+         DiagnosticCode::too_many_layers},
     }};
     for (const Refusal& refusal : refusals) {
         const Compilation compiled = compile(refusal.sheet);
@@ -417,9 +496,10 @@ public:
     }
 };
 
-// The face's pixels, drawn with `rules` and, when set, `fills` in place of
-// the button recipes' fills (the C++ form of the same material).
-std::uint64_t face_pixels(const ThemeRuleSheet& rules, const std::optional<std::vector<MaterialFillLayer>>& fills) {
+// The face's pixels, drawn with `rules` over the button recipes' material
+// replaced by `recipe`: for a sheet the floor its fields assemble over, for
+// C++ the material the fields stand for.
+std::uint64_t face_pixels(const ThemeRuleSheet& rules, const SurfaceMaterial& recipe) {
     std::shared_ptr<Panel> root = make_control<Panel>(StableId("root"));
     std::shared_ptr<Pad> pad = make_control<Pad>(StableId("pad"));
     (*pad).set_requested_bounds(Rect{0.0, 0.0, 100.0, 84.0});
@@ -429,10 +509,8 @@ std::uint64_t face_pixels(const ThemeRuleSheet& rules, const std::optional<std::
     ThemeDefinition& definition = *held;
     definition.id = "theme-material-css-gate";
     ControlRoleRecipes& button = definition.roles[static_cast<std::size_t>(ControlVisualRole::button)];
-    if (fills) {
-        for (ControlVisualRecipe& recipe : button.ordinary) recipe.material.fills = *fills;
-        for (ControlVisualRecipe& recipe : button.selected) recipe.material.fills = *fills;
-    }
+    for (ControlVisualRecipe& written : button.ordinary) written.material = recipe;
+    for (ControlVisualRecipe& written : button.selected) written.material = recipe;
     definition.rules = rules;
     window.set_theme(Theme::create(definition));
     require(window.theme().engine().rules().diagnostics().empty(), "the gate theme compiles cleanly");
@@ -463,49 +541,120 @@ ThemeRuleSheet written_rules() {
 
 struct GateRow final {
     std::string_view declarations{};
-    std::vector<MaterialFillLayer> fills{};
+    SurfaceMaterial material{};
 };
 
-void test_gate() {
+MaterialBorder border_of(Color colour, double width, MaterialBorderStyle style) {
+    MaterialBorder border{};
+    border.color = colour;
+    border.width = width;
+    border.style = style;
+    return border;
+}
+
+MaterialShadow shadow_of(Point offset, double blur, double spread, Color colour, bool inset) {
+    MaterialShadow shadow{};
+    shadow.offset = offset;
+    shadow.blur_radius = blur;
+    shadow.spread = spread;
+    shadow.color = colour;
+    shadow.inset = inset;
+    return shadow;
+}
+
+// A row whose C++ material is the plain floor with `fills`.
+GateRow filled(std::string_view declarations, std::vector<MaterialFillLayer> fills) {
+    GateRow row{};
+    row.declarations = declarations;
+    row.material.fills = std::move(fills);
+    return row;
+}
+
+std::vector<GateRow> gate_rows() {
     const std::vector<GradientStop> red_blue = stops_of({{0.0, red}, {1.0, blue}});
     const double diagonal = engine_arctangent2(24.0, 40.0) * (180.0 / pi);
-    std::vector<GateRow> rows{};
-    rows.push_back(GateRow{"background: green", {MaterialFillLayer::solid(green)}});
-    rows.push_back(GateRow{"background: linear-gradient(135deg, red, blue)",
-                           {MaterialFillLayer::linear_css_angle(135.0, red_blue)}});
-    rows.push_back(GateRow{"background: linear-gradient(to top right, red, blue)",
-                           {MaterialFillLayer::linear_css_angle(diagonal, red_blue)}});
-    rows.push_back(GateRow{"background: linear-gradient(red 25%, green, blue 75%)",
-                           {MaterialFillLayer::linear_css_angle(
-                               180.0, stops_of({{0.0, red}, {0.25, red}, {0.5, green}, {0.75, blue}, {1.0, blue}}))}});
-    rows.push_back(GateRow{"background: repeating-linear-gradient(0deg, red 0px, blue 6px)",
-                           {MaterialFillLayer::repeating_linear(Point{20.0, 24.0}, Point{20.0, 18.0}, red_blue,
-                                                                MaterialCoordinateSpace::logical)}});
     const double corner = 0.5 * 1.41421356237309504880168872420969808;
-    rows.push_back(GateRow{"background: radial-gradient(red, blue)",
-                           {MaterialFillLayer::radial(Point{0.5, 0.5}, Size{corner, corner}, red_blue)}});
-    rows.push_back(GateRow{"background: radial-gradient(circle closest-side at 25% 50%, red, blue)",
-                           {MaterialFillLayer::radial(Point{10.0, 12.0}, Size{10.0, 10.0}, red_blue,
-                                                      MaterialCoordinateSpace::logical)}});
-    rows.push_back(GateRow{"background: repeating-radial-gradient(closest-side, red, blue 50%)",
-                           {MaterialFillLayer::repeating_radial(Point{0.5, 0.5}, Size{0.25, 0.25}, red_blue)}});
-    rows.push_back(GateRow{"background: conic-gradient(from 90deg, red, blue)",
-                           {MaterialFillLayer::conic(Point{0.5, 0.5}, 90.0, red_blue)}});
-    rows.push_back(GateRow{"background: repeating-conic-gradient(red 0deg, blue 90deg)",
-                           {MaterialFillLayer::repeating_conic(Point{0.5, 0.5}, 0.0, 90.0, red_blue)}});
-    rows.push_back(GateRow{"background: linear-gradient(red, blue) green",
-                           {MaterialFillLayer::solid(green), MaterialFillLayer::linear_css_angle(180.0, red_blue)}});
+    std::vector<GateRow> rows{};
+    rows.push_back(filled("background: green", {MaterialFillLayer::solid(green)}));
+    rows.push_back(filled("background: linear-gradient(135deg, red, blue)",
+                          {MaterialFillLayer::linear_css_angle(135.0, red_blue)}));
+    rows.push_back(filled("background: linear-gradient(to top right, red, blue)",
+                          {MaterialFillLayer::linear_css_angle(diagonal, red_blue)}));
+    rows.push_back(filled("background: linear-gradient(red 25%, green, blue 75%)",
+                          {MaterialFillLayer::linear_css_angle(
+                              180.0, stops_of({{0.0, red}, {0.25, red}, {0.5, green}, {0.75, blue}, {1.0, blue}}))}));
+    rows.push_back(filled("background: repeating-linear-gradient(0deg, red 0px, blue 6px)",
+                          {MaterialFillLayer::repeating_linear(Point{20.0, 24.0}, Point{20.0, 18.0}, red_blue,
+                                                               MaterialCoordinateSpace::logical)}));
+    rows.push_back(filled("background: radial-gradient(red, blue)",
+                          {MaterialFillLayer::radial(Point{0.5, 0.5}, Size{corner, corner}, red_blue)}));
+    rows.push_back(filled("background: radial-gradient(circle closest-side at 25% 50%, red, blue)",
+                          {MaterialFillLayer::radial(Point{10.0, 12.0}, Size{10.0, 10.0}, red_blue,
+                                                     MaterialCoordinateSpace::logical)}));
+    rows.push_back(filled("background: repeating-radial-gradient(closest-side, red, blue 50%)",
+                          {MaterialFillLayer::repeating_radial(Point{0.5, 0.5}, Size{0.25, 0.25}, red_blue)}));
+    rows.push_back(filled("background: conic-gradient(from 90deg, red, blue)",
+                          {MaterialFillLayer::conic(Point{0.5, 0.5}, 90.0, red_blue)}));
+    rows.push_back(filled("background: repeating-conic-gradient(red 0deg, blue 90deg)",
+                          {MaterialFillLayer::repeating_conic(Point{0.5, 0.5}, 0.0, 90.0, red_blue)}));
+    rows.push_back(filled("background: linear-gradient(red, blue) green",
+                          {MaterialFillLayer::solid(green), MaterialFillLayer::linear_css_angle(180.0, red_blue)}));
     MaterialFillLayer multiplied = MaterialFillLayer::linear_css_angle(90.0, red_blue);
     multiplied.blend = MaterialBlendMode::multiply;
-    rows.push_back(GateRow{"background: linear-gradient(90deg, red, blue) green; background-blend-mode: multiply",
-                           {MaterialFillLayer::solid(green), multiplied}});
+    rows.push_back(filled("background: linear-gradient(90deg, red, blue) green; background-blend-mode: multiply",
+                          {MaterialFillLayer::solid(green), multiplied}));
+
+    GateRow border{};
+    border.declarations = "border: 2px solid red";
+    border.material.border = border_of(red, 2.0, MaterialBorderStyle::solid);
+    rows.push_back(border);
+    GateRow dashed{};
+    dashed.declarations = "border: 2px dashed red; border-radius: 6px";
+    dashed.material.border = border_of(red, 2.0, MaterialBorderStyle::dashed);
+    dashed.material.corner_radius = 6.0;
+    rows.push_back(dashed);
+    GateRow edges{};
+    edges.declarations = "border-top: 3px solid blue; border-bottom: 1px solid red";
+    edges.material.border_edges.top = border_of(blue, 3.0, MaterialBorderStyle::solid);
+    edges.material.border_edges.bottom = border_of(red, 1.0, MaterialBorderStyle::solid);
+    rows.push_back(edges);
+    GateRow sides{};
+    sides.declarations = "border-style: solid; border-width: 1px 2px; border-color: red blue";
+    sides.material.border_edges.top = border_of(red, 1.0, MaterialBorderStyle::solid);
+    sides.material.border_edges.right = border_of(blue, 2.0, MaterialBorderStyle::solid);
+    sides.material.border_edges.bottom = border_of(red, 1.0, MaterialBorderStyle::solid);
+    sides.material.border_edges.left = border_of(blue, 2.0, MaterialBorderStyle::solid);
+    rows.push_back(sides);
+    GateRow radii{};
+    radii.declarations = "border-radius: 4px 8px";
+    radii.material.corner_radius = 4.0;
+    radii.material.corner_radii = MaterialCornerRadii{4.0, 8.0, 4.0, 8.0};
+    rows.push_back(radii);
+    GateRow relative{};
+    relative.declarations = "border-radius: 50%";
+    relative.material.corner_radius = 12.0;
+    rows.push_back(relative);
+    GateRow shadows{};
+    shadows.declarations = "box-shadow: 0 2px 4px rgb(0 0 0 / 40%), inset 0 1px 0 white";
+    shadows.material.shadows = {shadow_of(Point{0.0, 1.0}, 0.0, 0.0, Color::rgba(255, 255, 255), true),
+                                shadow_of(Point{0.0, 2.0}, 4.0, 0.0, Color::rgba(0, 0, 0, 102), false)};
+    rows.push_back(shadows);
+    return rows;
+}
+
+void test_gate() {
+    const SurfaceMaterial plain{};
+    const std::uint64_t floor_pixels = face_pixels(written_rules(), plain);
+    const std::vector<GateRow> rows = gate_rows();
     for (const GateRow& row : rows) {
         const std::string sheet = "#pad::part(face) { " + std::string(row.declarations) + " }";
         const Compilation compiled = compile(sheet);
         require(compiled.outcome == CompileOutcome::compiled, "the row compiles: " + sheet);
-        const std::uint64_t from_sheet = face_pixels(compiled.sheet, std::nullopt);
-        const std::uint64_t from_cpp = face_pixels(written_rules(), row.fills);
+        require(valid_surface_material(row.material), "the C++ material is valid: " + sheet);
+        const std::uint64_t from_sheet = face_pixels(compiled.sheet, plain);
+        const std::uint64_t from_cpp = face_pixels(written_rules(), row.material);
         require(from_sheet == from_cpp, "the sheet bakes the pixels of the C++ material: " + sheet);
+        require(from_cpp != floor_pixels, "and the row changes the face: " + sheet);
     }
 }
 
@@ -517,6 +666,7 @@ int main() {
     test_radial_geometry();
     test_conic_geometry();
     test_lowering();
+    test_border_lowering();
     test_refusals();
     test_gate();
     if (failures != 0) {
