@@ -3,6 +3,7 @@
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
+#include <array>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
@@ -10,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <poll.h>
+#include <span>
 #include <stdexcept>
 #include <sys/wait.h>
 #include <thread>
@@ -470,6 +472,140 @@ void live_frame_sequence(Runtime &runtime) {
   (*window).close(HostCloseReason::application, true);
   runtime.step(0);
 }
+// Stage DP gate on X11: two distant damaged rectangles paint their sum, not
+// their bounding box; the host copies exactly that rectangle set to the
+// window; and no pixel outside them changes, in the raster or on the X
+// server. The record is results/2026-10-25-dp-gate-x11.
+class ColorBlock final : public Control {
+public:
+  ColorBlock(StableId id, const Color color) : Control(std::move(id)), color_(color) {}
+  void on_paint(Painter &painter, Rect) override { painter.fill_rect(client_rectangle(), color_); }
+  void set_color(const Color color) {
+    color_ = color;
+    invalidate(Dirty::paint);
+  }
+
+private:
+  Color color_{};
+};
+// Pixels that differ between two copies of a window, counted by whether the
+// pixel's centre lies in one of the damaged rectangles.
+struct ChangedPixels {
+  std::size_t inside{};
+  std::size_t outside{};
+};
+bool centre_inside(const std::size_t x, const std::size_t y, const std::span<const Rect> rectangles) {
+  const Point centre{static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5};
+  for (std::size_t index = 0; index < rectangles.size(); ++index) {
+    if (rectangles[index].contains(centre)) return true;
+  }
+  return false;
+}
+// `before` and `after` hold `width` x `height` pixels, row by row.
+template <typename Pixel>
+ChangedPixels changed_pixels(const std::vector<Pixel> &before, const std::vector<Pixel> &after,
+                             const std::size_t width, const std::size_t height,
+                             const std::span<const Rect> rectangles) {
+  require(before.size() == width * height && after.size() == width * height, "Pixel copies differ in size");
+  ChangedPixels changed{};
+  for (std::size_t y = 0; y < height; ++y) {
+    for (std::size_t x = 0; x < width; ++x) {
+      const std::size_t index = y * width + x;
+      if (before[index] == after[index]) continue;
+      if (centre_inside(x, y, rectangles)) {
+        ++changed.inside;
+      } else {
+        ++changed.outside;
+      }
+    }
+  }
+  return changed;
+}
+// The raster's first `width` x `height` pixels, each RGBA pixel in one word.
+std::vector<std::uint32_t> raster_copy(const NativeWindow &window, const std::size_t width, const std::size_t height) {
+  require(window.raster.pixel_width() >= width && window.raster.pixel_height() >= height,
+          "Raster smaller than the window");
+  std::vector<std::uint32_t> pixels(width * height);
+  const unsigned char *const base = static_cast<const unsigned char *>(window.raster.pixels());
+  for (std::size_t y = 0; y < height; ++y) {
+    const unsigned char *const row = base + y * window.raster.row_bytes();
+    std::memcpy(pixels.data() + y * width, row, width * 4U);
+  }
+  return pixels;
+}
+// The window's pixels as the X server holds them: what the screen shows.
+std::vector<unsigned long> screen_copy(const NativeWindow &window, const std::size_t width, const std::size_t height) {
+  Display *const display = window.runtime.display;
+  XSync(display, False);
+  XImage *const image = XGetImage(display, window.xid, 0, 0, static_cast<unsigned>(width),
+                                  static_cast<unsigned>(height), AllPlanes, ZPixmap);
+  require(image != nullptr, "XGetImage refused the window");
+  std::vector<unsigned long> pixels(width * height);
+  for (std::size_t y = 0; y < height; ++y) {
+    for (std::size_t x = 0; x < width; ++x) {
+      pixels[y * width + x] = XGetPixel(image, static_cast<int>(x), static_cast<int>(y));
+    }
+  }
+  XDestroyImage(image);
+  return pixels;
+}
+void damage_rectangles_gate(Runtime &runtime) {
+  const Color rest = Color::rgba(90, 90, 90);
+  const std::shared_ptr<ColorBlock> root = make_control<ColorBlock>(StableId("dp.root"), Color::rgba(230, 230, 230));
+  const std::shared_ptr<ColorBlock> top_left = make_control<ColorBlock>(StableId("dp.top-left"), rest);
+  const std::shared_ptr<ColorBlock> bottom_right = make_control<ColorBlock>(StableId("dp.bottom-right"), rest);
+  const std::array<Rect, 2> blocks{Rect{10.0, 10.0, 40.0, 30.0}, Rect{340.0, 250.0, 40.0, 30.0}};
+  (*top_left).set_requested_bounds(blocks[0]);
+  (*bottom_right).set_requested_bounds(blocks[1]);
+  (*root).add_child(top_left);
+  (*root).add_child(bottom_right);
+  host::LinuxApplicationWindow entry;
+  entry.stable_id = "dp";
+  entry.options.title = "GUI.Forms X11 damage rectangles check";
+  entry.options.initial_size = {400, 300};
+  entry.model = std::make_unique<gui_forms::Window>(root, entry.options.initial_size);
+  const std::shared_ptr<NativeWindow> window = runtime.add(std::move(entry));
+  (*window).ready();
+  gui_forms::Window &model = *(*window).entry.model;
+  for (int tick = 0; tick < 8; ++tick) runtime.step(10);
+  require((*window).visible, "Damage rectangles window is not shown");
+  const std::size_t width = 400U;
+  const std::size_t height = 300U;
+  const std::vector<std::uint32_t> raster_before = raster_copy(*window, width, height);
+  const std::vector<unsigned long> screen_before = screen_copy(*window, width, height);
+
+  const MetricsSnapshot before = model.metrics_snapshot();
+  (*top_left).set_color(Color::rgba(200, 40, 40));
+  (*bottom_right).set_color(Color::rgba(40, 40, 200));
+  for (int tick = 0; tick < 4; ++tick) runtime.step(10);
+  const MetricsSnapshot after = model.metrics_snapshot();
+  const std::vector<std::uint32_t> raster_after = raster_copy(*window, width, height);
+  const std::vector<unsigned long> screen_after = screen_copy(*window, width, height);
+
+  const double sum = blocks[0].area() + blocks[1].area();
+  const double painted = after.painted_damage_area - before.painted_damage_area;
+  const double bounding = after.paint_bounding_area - before.paint_bounding_area;
+  const std::uint64_t presents = after.frames_presented - before.frames_presented;
+  const std::uint64_t rectangles = after.retained_rectangles_presented - before.retained_rectangles_presented;
+  const std::uint64_t pixels = after.retained_pixels_presented - before.retained_pixels_presented;
+  const ChangedPixels raster = changed_pixels(raster_before, raster_after, width, height, blocks);
+  const ChangedPixels screen = changed_pixels(screen_before, screen_after, width, height, blocks);
+  std::cout << "dp-gate|host=x11|sum_area=" << sum << "|painted_area=" << painted << "|bounding_area=" << bounding
+            << "|presents=" << presents << "|rectangles_presented=" << rectangles << "|pixels_presented=" << pixels
+            << "|raster_changed_inside=" << raster.inside << "|raster_changed_outside=" << raster.outside
+            << "|screen_changed_inside=" << screen.inside << "|screen_changed_outside=" << screen.outside << '\n';
+  require(presents == 1U, "Two distant changes did not present one frame");
+  const double difference = painted - sum;
+  require(difference < 1.0e-6 && difference > -1.0e-6, "Painted area differs from the rectangles' sum");
+  require(bounding > painted * 10.0, "The rectangles are not distant: the test cannot tell a sum from a box");
+  require(rectangles == 2U, "The host did not copy the two-rectangle set");
+  require(pixels == static_cast<std::uint64_t>(sum), "The host copied more than the two rectangles");
+  require(raster.outside == 0U && screen.outside == 0U, "A pixel outside the damaged rectangles changed");
+  require(raster.inside == static_cast<std::size_t>(sum) && screen.inside == static_cast<std::size_t>(sum),
+          "The damaged rectangles did not change in the raster and on the screen");
+  (*window).close(HostCloseReason::application, true);
+  runtime.step(0);
+}
 struct KeepClientSize final {
   std::function<HostServiceStatus(Size)> *retained{};
   void operator()(std::function<HostServiceStatus(Size)> request) const { *retained = std::move(request); }
@@ -657,6 +793,7 @@ int main() {
     dialog(runtime, *window, directory, true);
     std::filesystem::remove_all(directory);
     live_frame_sequence(runtime);
+    damage_rectangles_gate(runtime);
     client_size_request(runtime);
     (*window).close(HostCloseReason::application, true);
     std::cout << "X11 services: cross-process text and PNG INCR, preserved "
