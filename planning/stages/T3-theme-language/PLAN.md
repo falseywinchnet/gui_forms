@@ -710,6 +710,81 @@ shorthands. Gate: a fixture per row; for each, a sheet and the equivalent
 C++ material bake to identical pixels; the material cache's counters show
 one bake per distinct assembly. 3 PRs.
 
+*P6a, the engine (EC1), done:*
+- **Fields.** A `ThemeRule` carries `materials`, a list of
+  `MaterialDeclaration`s, each one `MaterialField` and its value:
+  `background_colour`, `fills` (the image layers), `fill_blend_modes`,
+  `shadows`, `glows`, the border's twelve longhands (each edge's style,
+  width and colour), `keylines`, the four corners (`corner_top_left` to
+  `corner_bottom_left`, in CSS's order), `colour_filter`, `drop_shadow`,
+  `filter_blur`, `finish` and `mask`. The fields are CSS's longhands, so
+  each cascades as CSS cascades it. The border cascades by CSS longhand, so that `border-color` in one rule and `border-width`
+  in another combine as CSS has them: the compiler (P6b) lowers `border`
+  and its shorthands to the longhands. The fills are two fields (owner
+  C6, 2026-10-26), CSS's `background-color` and `background-image`,
+  which combine across rules as CSS combines them: the colour layer
+  under the image layers, composed at assembly. The floor's bottom layer,
+  when solid, is its colour and its other layers its image layers; a
+  colour of alpha 0 adds no layer, and with no layer at all the fill is
+  one transparent solid. `fill_blend_modes` is `background-blend-mode`:
+  the modes in CSS's order (the top image layer's first), repeated over
+  the image layers; the colour layer keeps normal.
+- **Corners.** Each corner cascades on its own, as `border-top-left-radius`
+  does; the compiler lowers `border-radius` to the four. At assembly each
+  corner is its declaration's, else the floor's. Four equal corners are
+  `corner_radius` alone; unequal ones are `corner_radii`, with
+  `corner_radius` the smallest, which the built-in path rounds every
+  corner by.
+- **`initial`** (`MaterialDeclaration::initial`) keeps the floor's value
+  and still wins over the rules beneath it.
+- **Percentage radii** (R2-11): a corner marked `relative` is a
+  fraction of the box's shorter side, resolved when the material is
+  assembled for a part.
+- **Checking.** Each field is checked alone, written into the default
+  material, by `valid_surface_material`; one no material admits is the new
+  engine diagnostic `material_field_invalid`, and a second declaration of
+  a field in one rule is `duplicate_declaration`. Fields count as
+  declarations, so a rule of fields alone is not empty.
+- **Cascade.** Each field cascades on its own over every matching rule,
+  whatever primitive the rule selects (`Resolution::materials`, the
+  winning declaration of each field). Fields change a part only where its
+  primitive draws a theme material.
+- **Assembly.** The floor is the material of the recipe the primitive
+  names, for the part's state. `assemble_material` writes the winning
+  fields over it. The edges assemble together: four equal edges are one
+  uniform border, which keeps a dash and rounded corners; unequal ones are
+  single edges, which a material admits only with square corners. Each
+  edge starts as the floor's (an edge the floor lacks has the default
+  border's width and colour and is not drawn), takes its declared style,
+  width and colour, and is drawn unless its style is none or its width 0.
+  An
+  assembly no material admits (eight keylines and a finish, say) is
+  refused by the primitive and drawn by the built-in recipe, the refusal
+  counted, as any refusal is.
+- **Cache.** A keyed part keeps its assembly on its record
+  (`AssembledPartMaterial`), assembled again only when its identity
+  changes: the compiled rules' serial and the winning declarations'
+  addresses, the floor by value (a recipe may be replaced and another
+  occupy its address), and the box's shorter side. A copy of compiled rules takes a new serial; a move
+  keeps it. A part without a key assembles at each paint.
+  `engine_material_assemblies` counts assemblies.
+- **The family recipe.** The material primitive's `recipe` gains a last
+  choice, `family`, the part's own recipe family, and it is the default:
+  a material rule naming no recipe now keeps its part's own recipe as its
+  floor, not the button's (owner C5, 2026-10-26).
+  `EnginePrimitive::theme_material` takes the part's family for it. The
+  engine version is 0.3.
+- **Implicit material** (owner C7, 2026-10-26; P6b builds it): a rule
+  that declares material fields and no `primitive` selects `material`.
+- Gate: `gui_forms_engine_authored_material_tests`. A part with fields
+  from two rules bakes the same pixels as the same material written into
+  the theme's recipe in C++, in two states; a colour and image layers
+  set in different rules, with the colour's rule the less and then the
+  more specific, bake as the same layers written in C++. A repaint assembles and bakes
+  nothing; a state change assembles and bakes once. The checks, the
+  per-field cascade, the edge assembly, the serials, the family default and
+  the refused assembly are tested too.
+
 **P7. Motion.** `transition`, the timing functions, delays, `@keyframes`,
 `animation`, ambient loops, and the state-machine grouping. Gate: a fixture
 per timing function and keyframe form; the pop scenario of the README runs

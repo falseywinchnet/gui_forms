@@ -543,6 +543,8 @@ ApplicationWindowOpenResult HeadlessApplication::open(ApplicationWindow&& source
     if (compositor_state_.generation.value != 0U) {
         static_cast<void>((*window.host).dispatch(HostCompositorEvent{compositor_state_}, next_timestamp()));
     }
+    const HostInputSettingsEvent input{headless_double_click_milliseconds, SettingOrigin::host};
+    static_cast<void>((*window.host).dispatch(input, next_timestamp()));
     const Rect content = default_placement(kind, owner, window.options.initial_size);
     if (!owner.valid() && kind != HostWindowKind::primary) ++placements_;
     windowing_.create_native(window.id, window.stable_id, content, window.options.minimum_size);

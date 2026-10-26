@@ -1077,6 +1077,91 @@ void test_sequence_geometry_and_shutdown_guards() {
             "events after shutdown must be rejected deterministically");
 }
 
+// Counts the presentation_changed notifications a window raises.
+struct PresentationChangeCounter final {
+    unsigned* count{};
+    void operator()(const PresentationSettings&) const { *count = *count + 1U; }
+};
+
+void test_input_settings_report_and_validation() {
+    require(host_protocol_revisions.size() == 3U && host_protocol_revisions[1].version == 9U &&
+                host_protocol_revisions[2].version == 10U && HostCapabilities::current_protocol_version == 10U,
+            "the compositor report is version 9 and the input settings version 10");
+    const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
+    Fixture& fixture = *held_fixture;
+    const PresentationSettings initial = fixture.window.presentation_settings();
+    require(initial.double_click_milliseconds == default_double_click_milliseconds &&
+                initial.double_click_milliseconds == 400U &&
+                initial.double_click_origin == SettingOrigin::default_value,
+            "before any report the window holds the stated default, as a default");
+    HostEvent early{1, 1, HostInputSettingsEvent{650U, SettingOrigin::host}};
+    require(fixture.host.session().dispatch(std::move(early)).error == HostDispatchError::invalid_lifecycle,
+            "input settings before attach are a lifecycle error");
+    HostEvent attach{2, 2, HostAttachEvent{{320.0, 180.0}, 1.0}};
+    require(fixture.host.session().dispatch(std::move(attach)).accepted(), "attach accepted");
+
+    // The application's own settings, set before the host reports.
+    PresentationSettings own = fixture.window.presentation_settings();
+    own.text_scale = 1.5;
+    own.sound_enabled = false;
+    fixture.window.set_presentation_settings(own);
+    unsigned changes = 0U;
+    const std::shared_ptr<Component> owner = std::make_shared<Component>();
+    const SubscriptionToken token =
+        fixture.window.presentation_changed().subscribe(*owner, PresentationChangeCounter{&changes});
+
+    HostEvent reported{3, 3, HostInputSettingsEvent{650U, SettingOrigin::host}};
+    require(fixture.host.session().dispatch(std::move(reported)).accepted(), "a valid report is accepted");
+    const PresentationSettings& after = fixture.window.presentation_settings();
+    require(after.double_click_milliseconds == 650U && after.double_click_origin == SettingOrigin::host,
+            "the report reaches the window's presentation settings");
+    require(after.text_scale == 1.5 && !after.sound_enabled, "the report leaves the application's settings");
+    require(changes == 1U, "one report raises presentation_changed once");
+
+    HostEvent same{4, 4, HostInputSettingsEvent{650U, SettingOrigin::host}};
+    require(fixture.host.session().dispatch(std::move(same)).accepted() && changes == 1U,
+            "an unchanged report raises nothing");
+
+    HostEvent zero{5, 5, HostInputSettingsEvent{0U, SettingOrigin::host}};
+    require(fixture.host.session().dispatch(std::move(zero)).error == HostDispatchError::invalid_payload,
+            "a zero interval is refused");
+    HostEvent too_long{6, 6, HostInputSettingsEvent{maximum_double_click_milliseconds + 1U, SettingOrigin::host}};
+    require(fixture.host.session().dispatch(std::move(too_long)).error == HostDispatchError::invalid_payload,
+            "an interval above the maximum is refused");
+    HostEvent bad_origin{7, 7, HostInputSettingsEvent{650U, static_cast<SettingOrigin>(7U)}};
+    require(fixture.host.session().dispatch(std::move(bad_origin)).error == HostDispatchError::invalid_payload,
+            "an origin outside the enumeration is refused");
+    require(fixture.window.presentation_settings().double_click_milliseconds == 650U && changes == 1U,
+            "a refused report changes nothing");
+
+    HostEvent longest{8, 8, HostInputSettingsEvent{maximum_double_click_milliseconds, SettingOrigin::host}};
+    require(fixture.host.session().dispatch(std::move(longest)).accepted() &&
+                fixture.window.presentation_settings().double_click_milliseconds == 5000U,
+            "the maximum itself is accepted");
+    HostEvent fallback{9, 9, HostInputSettingsEvent{default_double_click_milliseconds, SettingOrigin::default_value}};
+    require(fixture.host.session().dispatch(std::move(fallback)).accepted() &&
+                fixture.window.presentation_settings().double_click_origin == SettingOrigin::default_value,
+            "a host without the setting reports the default as a default");
+
+    // The application's later changes keep the host's report.
+    fixture.window.set_text_scale(1.25);
+    require(fixture.window.presentation_settings().double_click_origin == SettingOrigin::default_value &&
+                fixture.window.presentation_settings().double_click_milliseconds == 400U,
+            "a text scale change keeps the reported interval");
+    PresentationSettings invalid = fixture.window.presentation_settings();
+    invalid.double_click_milliseconds = 0U;
+    bool threw = false;
+    try {
+        fixture.window.set_presentation_settings(invalid);
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    require(threw && fixture.window.presentation_settings().double_click_milliseconds == 400U,
+            "an application's zero interval throws and changes nothing");
+    require(host_event_name(HostEventPayload{HostInputSettingsEvent{}}) == std::string("input_settings"),
+            "the event is named input_settings");
+}
+
 void test_lifecycle_transition_guards() {
     const std::unique_ptr<Fixture> held_fixture = std::make_unique<Fixture>();
     Fixture& fixture = *held_fixture;
@@ -1278,6 +1363,7 @@ int main() {
         test_display_capture_and_occlusion_synchronization();
         test_environment_services_are_bounded_and_deterministic();
         test_sequence_geometry_and_shutdown_guards();
+        test_input_settings_report_and_validation();
         test_lifecycle_transition_guards();
         test_close_cancellation_and_closed_cleanup();
         test_headless_trace_is_byte_deterministic();

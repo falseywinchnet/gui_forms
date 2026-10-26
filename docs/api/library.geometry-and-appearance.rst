@@ -16,6 +16,8 @@ Types
 
    * - :cpp:class:`AmbientEffect <gui_forms::AmbientEffect>`
      - An ambient effect (E7): its part repaints as time passes, at most ``frames_per_second``, and reads time_in_state within one ``period`` (it wraps), so that the effect cycles.
+   * - :cpp:class:`AssembledPartMaterial <gui_forms::AssembledPartMaterial>`
+     - A part's assembled material (T3 EC1): its recipe's material, the floor, with the winning material fields of the theme's rules in place, and what it was assembled from.
    * - :cpp:class:`BackplaneRegion <gui_forms::BackplaneRegion>`
      - One backplane image's region (E9-B): ``extent`` device pixels at ``scale``, its top-left pixel at ``origin`` in the window's device pixels (the window's logical origin times the scale; possibly fractional).
    * - :cpp:class:`BasicControlStyle <gui_forms::BasicControlStyle>`
@@ -116,6 +118,8 @@ Types
      - A colour filter (E9.6; CSS ``filter`` and ``backdrop-filter`` colour functions): a 4 × 5 matrix on straight (not premultiplied) colour with each channel in [0, 1].
    * - :cpp:class:`MaterialCornerRadii <gui_forms::MaterialCornerRadii>`
      - A material's four corner radii (E9.6, CSS ``border-*-radius``), in logical units: top-left, top-right, bottom-right and bottom-left.
+   * - :cpp:class:`MaterialDeclaration <gui_forms::MaterialDeclaration>`
+     - One material field a rule sets and its value.
    * - :cpp:class:`MaterialDropShadow <gui_forms::MaterialDropShadow>`
      - A drop shadow of the part's own drawn alpha (E9.6, CSS ``filter: drop-shadow()``): the baked raster's alpha, blurred by ``blur_radius`` (σ = blur / 2, as a shadow's), moved by ``offset``, in ``color``, drawn beneath the raster.
    * - :cpp:class:`MaterialFillLayer <gui_forms::MaterialFillLayer>`
@@ -265,6 +269,24 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: AssembledPartMaterial final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   A part's assembled material (T3 EC1): its recipe's material, the floor, with the winning material fields of the theme's rules in place, and what it was assembled from. It is assembled again only when that changes: - ``rules_serial`` and ``fields``: the compiled rules' serial (CompiledThemeRules::serial) and the winning declaration of each field, by address within those rules (null for none); - ``floor``: a copy of the recipe material, compared by value, since the theme's recipe may be replaced and another may occupy its address; - ``shorter_side``: the box's shorter side, which relative corners read.
+
+   .. cpp:member:: std::uint64_t rules_serial
+
+   .. cpp:member:: std::array<const MaterialDeclaration*, material_field_count> fields
+
+   .. cpp:member:: double shorter_side
+
+   .. cpp:member:: SurfaceMaterial floor
+
+   .. cpp:member:: SurfaceMaterial material
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: BackplaneRegion final
 
    ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
@@ -403,7 +425,11 @@ Types
 
    .. rubric:: Construction
 
-   .. cpp:function:: CompiledThemeRules() = default
+   .. cpp:function:: CompiledThemeRules()
+
+   .. cpp:function:: CompiledThemeRules(const CompiledThemeRules& other)
+
+   .. cpp:function:: CompiledThemeRules(CompiledThemeRules&& other) noexcept = default
 
 
    .. rubric:: Properties
@@ -426,6 +452,10 @@ Types
 
       How many inputs the sheet's expressions are evaluated with: the engine inputs and the sheet's published values.
 
+   .. cpp:function:: std::uint64_t serial() const noexcept
+
+      This compilation's serial number, unique among the compilations of the process: a cache keyed by the addresses of the rules' declarations (an assembled material, EC1) compares it first. A copy takes a new one, since its declarations lie elsewhere; a move keeps it with the declarations.
+
 
    .. rubric:: Methods
 
@@ -443,7 +473,7 @@ Types
 
    .. cpp:function:: Resolution resolve(const PartFacts& facts) const noexcept
 
-      The cascade for one part: the winning primitive declaration, then each of that primitive's parameters from the winning declaration of it among the matching rules that select the same primitive, else its declared default. Linear in the number of rules; tables are small, and a theme with no rules returns at once.
+      The cascade for one part: the winning primitive declaration, then each of that primitive's parameters from the winning declaration of it among the matching rules that select the same primitive, else its declared default; and each material field from its winning declaration among all the matching rules. Linear in the number of rules; tables are small, and a theme with no rules returns at once.
 
 .. cpp:namespace:: gui_forms
 
@@ -542,6 +572,12 @@ Types
    .. cpp:member:: PartBlend blend
 
       The part's blend (blend_property): the last matching rule's. Default: ``{PartBlend::normal}``.
+
+   .. cpp:member:: std::array<const MaterialDeclaration*, material_field_count> materials
+
+      The winning declaration of each material field (EC1), by the field's position, or null where no matching rule sets it; they belong to the compiled rules. ``materials_authored`` is whether any is set.
+
+   .. cpp:member:: bool materials_authored
 
 .. cpp:namespace:: gui_forms
 
@@ -968,6 +1004,10 @@ Types
 
       The cached raster and what drew it, made the first time a primitive draws the part, so that a record no primitive draws stays small.
 
+   .. cpp:member:: std::unique_ptr<AssembledPartMaterial> assembled_material
+
+      The part's assembled material, made the first time a material primitive draws the part with a material field a rule sets (EC1).
+
    .. cpp:member:: std::uint64_t generation
 
       The record's current raster generation; invalidate_raster advances it. Default: ``{1U}``.
@@ -1121,9 +1161,9 @@ Types
 
       How far inside a part of ``logical`` size, at display ``scale`` and the window's ``text_scale``, its text may begin (E8, T1's hand-off: text is published as a layout slot, ThemeEngine::text_slot). In logical units; the slot inside them lies within the shape the primitive draws. None unless the primitive says otherwise. ``parameters`` match the declarations; ``logical`` and ``scale`` are positive and finite.
 
-   .. cpp:function:: virtual std::optional<ControlVisualRole> theme_material(const PrimitiveParameterBlock& parameters) const noexcept
+   .. cpp:function:: virtual std::optional<ControlVisualRole> theme_material(const PrimitiveParameterBlock& parameters, ControlVisualRole family) const noexcept
 
-      The recipe role (ControlVisualRole) whose theme material the primitive draws with ``parameters`` (E8-1): the engine then resolves the role's recipe for the part's state and lends its material in the target. None unless the primitive says otherwise. ``parameters`` match the declarations.
+      The recipe role (ControlVisualRole) whose theme material the primitive draws with ``parameters`` (E8-1) on a part of recipe family ``family``: the engine then resolves the role's recipe for the part's state and lends its material in the target, with the material fields the theme's rules set in place of the recipe's (EC1). None unless the primitive says otherwise. ``parameters`` match the declarations.
 
    .. cpp:function:: virtual bool lends_overlay_shadow() const noexcept
 
@@ -1594,6 +1634,44 @@ Types
    .. cpp:member:: double bottom_right
 
    .. cpp:member:: double bottom_left
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaterialDeclaration final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   One material field a rule sets and its value. Only the members ``field`` names are read; the others stay empty: - background_colour: ``colour``, a solid layer under the image layers; - fills: the image layers (gradients, images, patterns), bottom first, at most SurfaceMaterial::maximum_fill_layers, empty for none; - fill_blend_modes: ``blend_modes``, in CSS's order (the top image layer's first), repeated over the image layers as CSS repeats a short list; empty for normal; - shadows, glows, keylines: the lists; - an edge's style: ``border_style``, empty for none (CSS's ``none``); its width: ``number``, 0 for none; its colour: ``colour``; - a corner: ``number``, its radius in logical units, or, with ``relative``, a fraction of the box's shorter side (CSS's percentage, R2-11), resolved when the material is assembled for a part; - colour_filter: ``colour_filter``; drop_shadow: ``drop_shadow``, empty for none; mask: ``mask``, empty for none; - filter_blur and finish: ``number``. ``initial``, set, is CSS's ``initial``: the field keeps the floor's value, and the declaration still wins over those beneath it; its value members are not read.
+
+   .. cpp:member:: MaterialField field
+
+      Default: ``{MaterialField::fills}``.
+
+   .. cpp:member:: bool initial
+
+   .. cpp:member:: std::vector<MaterialFillLayer> fills
+
+   .. cpp:member:: std::vector<MaterialBlendMode> blend_modes
+
+   .. cpp:member:: std::vector<MaterialShadow> shadows
+
+   .. cpp:member:: std::vector<MaterialGlow> glows
+
+   .. cpp:member:: std::optional<MaterialBorderStyle> border_style
+
+   .. cpp:member:: Color colour
+
+   .. cpp:member:: std::vector<MaterialKeyline> keylines
+
+   .. cpp:member:: double number
+
+   .. cpp:member:: bool relative
+
+   .. cpp:member:: MaterialColourFilter colour_filter
+
+   .. cpp:member:: std::optional<MaterialDropShadow> drop_shadow
+
+   .. cpp:member:: std::optional<MaterialFillLayer> mask
 
 .. cpp:namespace:: gui_forms
 
@@ -3404,7 +3482,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one. ``specificity``, when set, is the rule's specificity in place of the one its selector gives (T3 engine change EC2): a rule expanded from CSS's ``:is()`` takes its most specific argument's. A class or stable-ID rule with a given specificity then needs a class or an ID in it rather than in its selector; an inline style still needs its selector's stable ID.
+   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one. Its material fields (EC1) cascade the same way, each on its own, from every matching rule, whatever primitive it selects: they change a part only where its primitive draws a theme material. ``specificity``, when set, is the rule's specificity in place of the one its selector gives (T3 engine change EC2): a rule expanded from CSS's ``:is()`` takes its most specific argument's. A class or stable-ID rule with a given specificity then needs a class or an ID in it rather than in its selector; an inline style still needs its selector's stable ID.
 
    .. cpp:member:: std::string label
 
@@ -3423,6 +3501,8 @@ Types
    .. cpp:member:: std::vector<PropertyTransition> transitions
 
    .. cpp:member:: std::optional<AmbientEffect> ambient
+
+   .. cpp:member:: std::vector<MaterialDeclaration> materials
 
 .. cpp:namespace:: gui_forms
 
@@ -3918,6 +3998,68 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: MaterialField
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: background_colour
+
+   .. cpp:enumerator:: fills
+
+   .. cpp:enumerator:: fill_blend_modes
+
+   .. cpp:enumerator:: shadows
+
+   .. cpp:enumerator:: glows
+
+   .. cpp:enumerator:: border_top_style
+
+   .. cpp:enumerator:: border_top_width
+
+   .. cpp:enumerator:: border_top_colour
+
+   .. cpp:enumerator:: border_right_style
+
+   .. cpp:enumerator:: border_right_width
+
+   .. cpp:enumerator:: border_right_colour
+
+   .. cpp:enumerator:: border_bottom_style
+
+   .. cpp:enumerator:: border_bottom_width
+
+   .. cpp:enumerator:: border_bottom_colour
+
+   .. cpp:enumerator:: border_left_style
+
+   .. cpp:enumerator:: border_left_width
+
+   .. cpp:enumerator:: border_left_colour
+
+   .. cpp:enumerator:: keylines
+
+   .. cpp:enumerator:: corner_top_left
+
+   .. cpp:enumerator:: corner_top_right
+
+   .. cpp:enumerator:: corner_bottom_right
+
+   .. cpp:enumerator:: corner_bottom_left
+
+   .. cpp:enumerator:: colour_filter
+
+   .. cpp:enumerator:: drop_shadow
+
+   .. cpp:enumerator:: filter_blur
+
+   .. cpp:enumerator:: finish
+
+   .. cpp:enumerator:: mask
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: MaterialFillKind
 
    ``#include <gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp>``
@@ -4394,6 +4536,8 @@ Enumerations
 
    .. cpp:enumerator:: published_value_invalid
 
+   .. cpp:enumerator:: material_field_invalid
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: RuleValueKind
@@ -4653,7 +4797,7 @@ Functions, constants and aliases
 
 .. cpp:var:: constexpr std::size_t maximum_item_part_records
 
-   The most item-part records one window keeps before it evicts the least recently painted (see EnginePartTable). A record is about 800 bytes on 64-bit hosts (its preparation is about half of that); with its slot, its lookup text and its index entry it takes about 1 KB, so the cap costs at most about 4 MB per window. A part a primitive draws also has its CachedPartRaster (about 600 bytes, and a copy of its material when a material primitive draws it) and its raster, which the raster cache's budget bounds. The cap covers far more item parts than a window shows at once: a record evicted while its part is still on screen is only made again on the next paint. Each eviction is O(1). Value: ``4096``.
+   The most item-part records one window keeps before it evicts the least recently painted (see EnginePartTable). A record is about 800 bytes on 64-bit hosts (its preparation is about half of that); with its slot, its lookup text and its index entry it takes about 1 KB, so the cap costs at most about 4 MB per window. A part a primitive draws also has its CachedPartRaster (about 600 bytes, and a copy of its material when a material primitive draws it), two more copies of the material when the theme's rules set its fields (AssembledPartMaterial), and its raster, which the raster cache's budget bounds. The cap covers far more item parts than a window shows at once: a record evicted while its part is still on screen is only made again on the next paint. Each eviction is O(1). Value: ``4096``.
 
 .. cpp:var:: constexpr std::size_t raster_cache_budget_bytes
 
@@ -4737,6 +4881,12 @@ Functions, constants and aliases
 
 .. cpp:function:: RuleSpecificity rule_specificity(const RuleSelector& selector) noexcept
 
+.. cpp:function:: std::string_view material_field_name(MaterialField field) noexcept
+
+.. cpp:function:: void assemble_material(const SurfaceMaterial& floor, const std::array<const MaterialDeclaration*, material_field_count>& fields, double shorter_side, SurfaceMaterial& material)
+
+   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value. The fills are composed when any fill field is declared: the colour layer (the declared colour, else the floor's bottom layer when it is solid) under the image layers (the declared ones, else the floor's others), which take the declared blend modes; a colour of alpha 0 adds no layer, and with no layer at all the fill is one transparent solid. More than SurfaceMaterial::maximum_fill_layers is no material. The corners are composed when any is declared: each is its declaration's, else the floor's (its corner_radii's, else its corner_radius); four equal corners are corner_radius alone, and others corner_radii, with corner_radius the smallest (the built-in path rounds every corner by it). The border's edges are assembled together when any of their fields is declared: each starts as the floor's (its single edge, else its uniform border; an edge the floor lacks has the default MaterialBorder's width and colour and is not drawn), takes its declared style, width and colour, and is drawn unless its style is none or its width 0. Four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material). Relative corners are resolved against ``shorter_side``, the box's shorter side in logical units.
+
 .. cpp:function:: std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept
 
 .. cpp:function:: const ThemeRuleSheet& built_in_theme_rules()
@@ -4803,6 +4953,10 @@ Functions, constants and aliases
 
    Value: ``0.10``.
 
+.. cpp:var:: constexpr std::size_t material_field_count
+
+   Value: ``static_cast<std::size_t>(MaterialField::count)``.
+
 .. cpp:var:: constexpr std::uint32_t maximum_operations_per_device_pixel
 
    Budgets (GIVEN F1-1): a part's primitive costs at most 512 declared operations per device pixel, and an animated part (one whose primitive has an animated parameter) at most 4 million per frame. A part beyond either keeps the built-in recipe; a primitive declaring no per-pixel cost cannot be bounded and is refused too. Value: ``512U``.
@@ -4837,7 +4991,7 @@ Functions, constants and aliases
 
 .. cpp:var:: constexpr EngineVersion current_engine_version
 
-   The version this build of the engine implements. E1 (the kernels, the registry and the bulge pair) is 0.1; E8 (the relief primitives, shapes and choice parameters) is 0.2. Value: ``{0, 2}``.
+   The version this build of the engine implements. E1 (the kernels, the registry and the bulge pair) is 0.1; E8 (the relief primitives, shapes and choice parameters) is 0.2; T3's EC1 (authored material fields and the material primitive's ``family`` recipe) is 0.3. Value: ``{0, 3}``.
 
 .. cpp:var:: constexpr double minimum_device_scale
 

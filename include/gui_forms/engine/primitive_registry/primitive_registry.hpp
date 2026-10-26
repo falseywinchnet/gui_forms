@@ -418,12 +418,13 @@ public:
                                                 DeviceScale scale, double text_scale) const noexcept;
 
     // The recipe role (ControlVisualRole) whose theme material the
-    // primitive draws with `parameters` (E8-1): the engine then resolves
-    // the role's recipe for the part's state and lends its material in the
-    // target. None unless the primitive says otherwise. `parameters` match
-    // the declarations.
-    [[nodiscard]] virtual std::optional<ControlVisualRole> theme_material(
-        const PrimitiveParameterBlock& parameters) const noexcept;
+    // primitive draws with `parameters` (E8-1) on a part of recipe family
+    // `family`: the engine then resolves the role's recipe for the part's
+    // state and lends its material in the target, with the material fields
+    // the theme's rules set in place of the recipe's (EC1). None unless the
+    // primitive says otherwise. `parameters` match the declarations.
+    [[nodiscard]] virtual std::optional<ControlVisualRole> theme_material(const PrimitiveParameterBlock& parameters,
+                                                                          ControlVisualRole family) const noexcept;
 
     // Whether the primitive draws the theme's overlay shadow (E9, GIVEN
     // E1-1): the engine then lends the theme's overlay shadow layers for the
