@@ -2,13 +2,29 @@
 
 Release: 0.3 Themeable (a renderer change under every later stage; it
 lands before T4's theme images are recorded). Depends on: nothing; it can
-start now. Status: **brief written 2026-10-26**; SK1 next.
+start now. Status: **brief written 2026-10-26**, corrected the same day to BGRA (see
+Why); SK1 next.
 
 ## Why
 
 Owner decision, 2026-10-26, in the owner's words: "skia is mandatory on all
 platforms, and we should go universal. DibPainter and CoreGraphicsRaster go
 away. one pixel format everywhere, RGBA. no coregraphics, no dibpainter."
+
+Owner correction, the same day: "one pixel format everywhere, BGRA8
+premultiplied sRGB". It replaces RGBA, because every screen GUI.Forms copies
+to wants BGRA in memory:
+- GDI and the DIB do.
+- The usual 32-bit X11 visual does, so today's `convert_native_pixels32_bytes`
+  reorders every pixel at present.
+- Quartz prefers premultiplied-first little-endian, which is BGRA in memory.
+  Today `macos_host.mm` (the `CGImageCreate` near line 2999) hands it RGBA,
+  premultiplied-last big-endian.
+- Skia renders BGRA natively on little-endian.
+
+PlaySuite (`falseywinchnet/games`) needs no change: its images go through
+`load/replace/patch_bgra32_premultiplied`, and its live surfaces follow
+`native_live_surface_pixel_format()`.
 
 GUI.Forms has three CPU painters today: `SkiaRaster` (macOS and X11), the
 first-party `DibPainter` inside the Windows host, and `CoreGraphicsRaster`
@@ -23,8 +39,8 @@ The owner's reference rule ("our engine is the reference") means a single
 painter whose output is identical on every host. Two pixel orders (BGRA on
 Windows and MinGW Skia, RGBA elsewhere) double every compositing kernel,
 every image path and every golden. Universal Skia means one painter and one
-pixel format, RGBA8 premultiplied sRGB. The byte order differs only at a
-host's final copy to the screen, in one measured kernel.
+pixel format, BGRA8 premultiplied sRGB, on every surface, resource and
+raster. Every present is then a plain copy: no host reorders bytes.
 
 ## Read first
 
@@ -55,7 +71,9 @@ host's final copy to the screen, in one measured kernel.
 - A MinGW profile exists (`build_skia_cpu_windows_mingw.sh`,
   `skia_cpu_windows_mingw_args.gn`, `skia_windows_mingw.patch`). It is a
   cross-compile from a macOS Homebrew toolchain (its compiler and include paths
-  are `/opt/homebrew/...`), and its archive is BGRA. No CI job builds it.
+  are `/opt/homebrew/...`), and its archive is BGRA, by Skia's Windows default.
+  No CI job builds it. The macOS and Linux archives are RGBA, Skia's default
+  there.
 
 **Painters.**
 - `SkiaRaster` (`src/render/skia/raster/`): the macOS and X11 hosts. It already
@@ -80,14 +98,22 @@ host's final copy to the screen, in one measured kernel.
   T2 engine's feature samples and material images, CNG pixels and the Windows
   notify icons.
 
-`grep -rni bgra include src` lists them. SK2 starts from that inventory.
+RGBA appears beside it: `PixelFormat::rgba32_premultiplied`,
+`LiveSurfacePixelFormat::rgba32_premultiplied_srgb` (the non-Windows answer
+of `native_live_surface_pixel_format()`), `GD_PIXEL_RGBA32_PREMULTIPLIED`,
+`FramebufferChannelOrder::rgba`, `HostImage` (straight-alpha RGBA8), and the
+engine's part rasters and primitive registry (premultiplied RGBA8).
+`grep -rni 'bgra\|rgba' include src` lists both. SK2 starts from that
+inventory.
 
 **Screen copies.**
-- X11 already converts at present time, per presented rectangle, into the
-  visual's layout (`src/host/linux/application/linux_host.cpp`,
+- X11 converts at present time, per presented rectangle, into the visual's
+  layout (`src/host/linux/application/linux_host.cpp`,
   `convert_native_pixels32_bytes` and its two fallbacks), and times the copy.
-- macOS copies RGBA through CoreGraphics (`CGContextDrawImage`). That stays:
-  it is the host's screen copy, not a painter.
+  For the usual 32-bit visual that is a reorder of every pixel.
+- macOS copies RGBA through CoreGraphics (`CGContextDrawImage`), described as
+  premultiplied-last big-endian. The copy stays (it is the host's screen
+  copy, not a painter); its format becomes premultiplied-first little-endian.
 - Windows paints BGRA directly into its DIB.
 
 ## The phases
@@ -104,7 +130,10 @@ its description. Stacks stay at most two deep.
   platforms. It uses the MinGW/CLANG64 profile, made a native MSYS2 CLANG64
   build on the runner: no Homebrew paths, the repository's LLVM 22
   toolchain, and the same GPU, codec and font switches as `skia_cpu_args.gn`.
-- The profile's colour type becomes RGBA.
+- The profile's colour type is BGRA, spelled out (`SK_B32_SHIFT=0`,
+  `SK_G32_SHIFT=8`, `SK_R32_SHIFT=16`, `SK_A32_SHIFT=24`) rather than left to
+  Skia's platform default. SK2 gives the macOS and Linux profiles the same
+  four definitions.
 - The Windows host links Skia but keeps `DibPainter` until SK3.
 - Every Windows `OFF` above becomes `ON`: `ci_build.py`, `release.yml`,
   `state-machines.yml`, `prove_compiler_cache.py`, and the local build
@@ -121,34 +150,45 @@ its description. Stacks stay at most two deep.
 
 ### SK2: one pixel format
 
-- Every surface and resource is RGBA8 premultiplied sRGB, on every
+- Every surface, resource and raster is BGRA8 premultiplied sRGB, on every
   platform, MinGW included: rasters, part rasters, live surfaces, image
   resources, text compositing, engine samples and materials, CNG.
-- Where a host's screen copy needs another order (GDI `BitBlt` and
-  `SetDIBitsToDevice`, typical X11 visuals), the host converts at present
-  time. The conversion is one named kernel per host, applied per presented
-  damage rectangle, and validated over the whole rectangle set before any
-  pixel is written.
-- X11's existing conversion is that kernel; the Windows host gets its own in
-  SK3.
-- Every other byte-order branch is removed: the `kBGRA_8888` paths in
-  `src/render/skia/`, the `bgra` text composite order, and the BGRA cases in
+- Skia is configured BGRA on all four platforms with the same four shift
+  definitions, in each profile's GN arguments and in every GUI.Forms
+  translation unit that includes Skia's headers. A static assertion in the
+  Skia adapter checks `kN32_SkColorType == kBGRA_8888_SkColorType`.
+- Every present becomes a plain copy:
+  - X11: the reorder path for the usual 32-bit visual (`convert_native_pixels32_bytes`)
+    goes. A visual whose masks are not BGRA keeps a named fallback kernel,
+    applied per presented damage rectangle and validated over the whole
+    rectangle set before any pixel is written.
+  - macOS: the `CGImage` is described as premultiplied-first little-endian
+    (`kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little`).
+  - Windows: unchanged in SK2 (DibPainter paints BGRA); SK3 copies the Skia
+    raster into the DIB without conversion.
+- `native_live_surface_pixel_format()` returns `bgra32_premultiplied_srgb`
+  everywhere.
+- RGBA appears only as an input, converted once at entry in one named
+  kernel (SK-Q1, settled below): PNG decode, which already decodes once into
+  a cached resource, and the RGBA submissions that stay accepted.
+- Every other byte-order branch is removed: the `kRGBA_8888` paths in
+  `src/render/skia/`, the `rgba` text composite order, and the RGBA cases in
   image, live-surface and engine code.
-- The public BGRA spellings depend on SK-Q1.
-- **Measurement:** the conversion's time and pixels per presented frame,
-  queryable as counters beside the existing copy timer. Record them for the
-  Gallery idle and the DP gate's workloads on Windows and X11.
+- **Measurement:** present time per frame, before and after, on all three
+  hosts (Windows, macOS, X11): the existing copy timer, plus pixels per
+  presented frame, queryable as counters. Record them for the Gallery idle
+  and the DP gate's workloads. This is the evidence for the change.
 - **Gate:**
-  - `grep -rni bgra src include` finds only the hosts' conversion kernels and
-    whatever SK-Q1 keeps at the public boundary;
+  - `grep -rni rgba src include` finds only colour values, the input-only
+    spellings listed under SK-Q1 and their entry kernels;
   - every touched test passes plain and under the sanitizer;
-  - the reference images don't move except where a test read BGRA bytes
+  - the reference images don't move except where a test read RGBA bytes
     directly. Those moves are listed one by one, with their reason.
 
 ### SK3: the Windows host draws with Skia
 
-- The Windows host paints with `SkiaRaster` into its own RGBA raster and
-  presents through SK2's conversion into its DIB.
+- The Windows host paints with `SkiaRaster` into its own BGRA raster and
+  presents it into its DIB with a plain copy, no conversion.
 - `DibPainter` is deleted with its private helpers. The transactional DIB
   frame store keeps its all-or-nothing commit of the rectangle set over the
   new raster: a frame that fails converts nothing.
@@ -194,7 +234,7 @@ The owner is building `stx_skia`, a pruned Skia, in their own thread.
 - This stage uses nothing outside the "Required" list in
   `D:/gui_forms_workers/stx_skia/REQUIREMENTS.md`.
 - It does not touch image filters, Skia's fonts or text, or extra codecs.
-- After SK2, the list's "RGBA8 and BGRA8" surfaces become RGBA8 and A8 only.
+- After SK2, the list's "RGBA8 and BGRA8" surfaces become BGRA8 and A8 only.
   Tell the coordinator, so the requirements file can say so.
 
 ## Measurements to record
@@ -203,7 +243,7 @@ The owner is building `stx_skia`, a pruned Skia, in their own thread.
 |---|---|---|
 | SK1 | Windows CI job time, cold and steady-state, before and after | the SK1 PR, from the workflow's job timings |
 | SK1 | Windows Skia archive size and link-map audit | the SK1 PR |
-| SK2 | Present-time conversion: nanoseconds and pixels per frame, Gallery idle and DP gate workloads, Windows and X11 | counters beside the copy timer; the SK2 PR |
+| SK2 | Present time per frame, before and after, and pixels per frame; Gallery idle and DP gate workloads; Windows, macOS and X11 | the copy timer and counters beside it; the SK2 PR |
 | SK3 | DP gate on Windows, re-run | `results/` record named in the SK3 PR |
 | SK5 | Per-test reference image changes, and cross-host digest equality | the SK5 PR |
 
@@ -212,20 +252,37 @@ one.
 
 ## Open decisions (for the owner, through the coordinator)
 
-**SK-Q1. The public BGRA spellings.** BGRA is part of the public C++ types
-and the C ABI (experimental 0.26, not frozen).
-1. Remove BGRA from every public type and the C ABI. Callers convert before
-   they hand pixels in.
-2. Keep BGRA only as an input interchange format at the boundary. A caller's
-   BGRA pixels are converted to RGBA once, in one named kernel, as they
-   enter, and are never stored or rendered as BGRA.
-3. As 2, but only for the Windows compatibility paint endpoint
-   (`gf_windows_paint_endpoint_submit_bgra_v1`), where GDI's own BGRA is the
-   foreign interface; everything else is RGBA only.
+**SK-Q1. The public pixel-format spellings: settled by the owner's
+correction (2026-10-26).** BGRA8 premultiplied sRGB is the format. RGBA
+appears only as an input, converted once at entry, and is never stored or
+rendered.
 
-Recommendation: 3. It is the owner's "one pixel format everywhere" inside
-GUI.Forms, and keeps the one boundary where the operating system's format
-is the contract.
+Kept, as input only (each converted in one named kernel as it enters):
+- PNG decode (stx_png), which already decodes once into a cached resource;
+- `gui_drawing::PixelFormat::rgba32_premultiplied` and
+  `GD_PIXEL_RGBA32_PREMULTIPLIED`: accepted image submissions to the drawing
+  facade and its C ABI;
+- `LiveSurfacePixelFormat::rgba32_premultiplied_srgb`: an accepted
+  live-surface submission. It stops being any platform's native format.
+
+Removed:
+- `FramebufferChannelOrder` and `PaintFramebuffer::channel_order()`: there is
+  one order, so nothing is left to report;
+- the RGBA8 storage of the engine (`engine_types.hpp`, `part_raster.hpp`,
+  `primitive_registry.hpp`): part rasters, samples and materials are stored
+  BGRA8 premultiplied;
+- every RGBA case inside `src/` other than the entry kernels above.
+
+Unchanged, because it is not a surface: `HostImage`, the straight-alpha RGBA8
+interchange of clipboard images and notify icons. A clipboard read returns
+it, so it is an output too; a caller who draws one hands it to the drawing
+facade, which converts it once at entry. If the owner wants it BGRA as well,
+that is a separate change to the host-services contract.
+
+BGRA keeps its existing spellings: `PixelFormat::bgra32_premultiplied`,
+`LiveSurfacePixelFormat::bgra32_premultiplied_srgb`,
+`GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED`, `GD_PIXEL_BGRA32_PREMULTIPLIED` and
+`gf_windows_paint_endpoint_submit_bgra_v1`.
 
 **SK-Q2. Skia in local Windows worker trees.** After SK1, a tree cannot
 configure without Skia, so the D: worker trees need it.
@@ -258,3 +315,6 @@ in CI, and local verification of every later phase stops.
 
 - 2026-10-26: brief written (this file); the owner's decision recorded
   above. SK1 next.
+- 2026-10-26: the owner's correction: BGRA8 premultiplied sRGB everywhere,
+  not RGBA. Why, What exists today, SK1, SK2, SK3, Swap-ready and the
+  measurements follow it; SK-Q1 is settled by it.
