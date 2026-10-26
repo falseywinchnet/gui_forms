@@ -2114,6 +2114,12 @@ if(GUI_FORMS_BUILD_TESTS)
             target_link_libraries(gui_forms_x11_compositor_probe PRIVATE X11::Xfixes X11::X11)
             add_test(NAME gui_forms_x11_compositor_probe COMMAND gui_forms_x11_compositor_probe)
             set_tests_properties(gui_forms_x11_compositor_probe PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE)
+            # The same probe under a headless Weston's Xwayland; it reports
+            # the case not exercised where Weston is missing.
+            add_test(NAME gui_forms_xwayland_compositor_probe
+                COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/xwayland_compositor_probe.sh
+                    $<TARGET_FILE:gui_forms_x11_compositor_probe>)
+            set_tests_properties(gui_forms_xwayland_compositor_probe PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
         endif()
     endif()
     add_executable(gui_forms_cursor_image_tests tests/cursor_image_tests.cpp)
