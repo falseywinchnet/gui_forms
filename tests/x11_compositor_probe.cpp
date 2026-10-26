@@ -209,7 +209,16 @@ struct Probe final {
     Window root{};
     Window backdrop{};
     ArgbVisual argb{};
+    // GUI_FORMS_X11_PROBE_STEPS set: each request group is named on stderr
+    // before it is sent, so a server that dies mid-case shows where.
+    bool trace_steps{};
 };
+
+void note_step(const Probe& probe, const char* step) {
+    if (!probe.trace_steps) return;
+    std::fprintf(stderr, "{\"probe\":\"x11_compositor\",\"step\":\"%s\"}\n", step);
+    std::fflush(stderr);
+}
 
 Window make_backdrop(const Probe& probe) {
     const unsigned long green = (static_cast<unsigned long>(backdrop_rgb[1]) << 8U);
@@ -290,6 +299,7 @@ CaseReading run_case(const Probe& probe, ProbeVisual kind, SelectionTrace& trace
         attributes.background_pixel = 0UL;
         mask = mask | CWColormap | CWBorderPixel | CWBackPixel;
     }
+    note_step(probe, kind == ProbeVisual::argb32 ? "argb32 window" : "default window");
     const Window window = XCreateWindow(probe.display, probe.root, probe_x, probe_y, probe_width, probe_height, 0U,
                                         depth, InputOutput, visual, mask, &attributes);
     if (window == None) return reading;
@@ -299,6 +309,7 @@ CaseReading run_case(const Probe& probe, ProbeVisual kind, SelectionTrace& trace
     drain(probe.display, trace);
     wait_for(std::chrono::milliseconds(200));
     const bool with_alpha = kind == ProbeVisual::argb32;
+    note_step(probe, "put columns");
     put_columns(probe, window, visual, depth, with_alpha);
     // A compositor repaints after damage; give it time to.
     wait_for(std::chrono::milliseconds(400));
@@ -307,16 +318,20 @@ CaseReading run_case(const Probe& probe, ProbeVisual kind, SelectionTrace& trace
     const int clear_x = static_cast<int>(column_width / 2U);
     const int half_x = static_cast<int>(column_width + column_width / 2U);
     const int opaque_x = static_cast<int>(column_width * 2U + column_width / 2U);
+    note_step(probe, "read the root");
     reading.clear = read_pixel(probe.display, probe.root, probe_x + clear_x, probe_y + middle, 0UL);
     reading.half = read_pixel(probe.display, probe.root, probe_x + half_x, probe_y + middle, 0UL);
     reading.opaque = read_pixel(probe.display, probe.root, probe_x + opaque_x, probe_y + middle, 0UL);
     const unsigned long alpha_mask = with_alpha ? probe.argb.alpha_mask : 0UL;
+    note_step(probe, "read the window");
     reading.own_clear = read_pixel(probe.display, window, clear_x, middle, alpha_mask);
     reading.own_half = read_pixel(probe.display, window, half_x, middle, alpha_mask);
     reading.own_opaque = read_pixel(probe.display, window, opaque_x, middle, alpha_mask);
+    note_step(probe, "window attributes");
     XWindowAttributes actual{};
     if (XGetWindowAttributes(probe.display, window, &actual) != 0) reading.depth = actual.depth;
     // The server's own choice of the top-level under the clear column.
+    note_step(probe, "warp the pointer");
     XWarpPointer(probe.display, None, probe.root, 0, 0, 0U, 0U, probe_x + clear_x, probe_y + middle);
     XSync(probe.display, False);
     Window root_return = None;
@@ -326,11 +341,13 @@ CaseReading run_case(const Probe& probe, ProbeVisual kind, SelectionTrace& trace
     int window_x = 0;
     int window_y = 0;
     unsigned buttons = 0U;
+    note_step(probe, "query the pointer");
     if (XQueryPointer(probe.display, probe.root, &root_return, &child, &root_x, &root_y, &window_x, &window_y,
                       &buttons) != 0) {
         if (child == window) reading.window_at_clear = "probe";
         if (child == probe.backdrop) reading.window_at_clear = "backdrop";
     }
+    note_step(probe, "destroy the window");
     XDestroyWindow(probe.display, window);
     if (colormap != None) XFreeColormap(probe.display, colormap);
     XSync(probe.display, False);
@@ -445,6 +462,7 @@ int main() {
     probe.screen = DefaultScreen(probe.display);
     probe.root = RootWindow(probe.display, probe.screen);
     probe.argb = find_argb_visual(probe.display, probe.screen);
+    probe.trace_steps = std::getenv("GUI_FORMS_X11_PROBE_STEPS") != nullptr;
     SelectionTrace trace{};
     int error_base = 0;
     if (XFixesQueryExtension(probe.display, &trace.event_base, &error_base) == 0) trace.event_base = 0;
@@ -455,6 +473,7 @@ int main() {
                                    XFixesSetSelectionOwnerNotifyMask | XFixesSelectionWindowDestroyNotifyMask |
                                        XFixesSelectionClientCloseNotifyMask);
     }
+    note_step(probe, "backdrop window");
     probe.backdrop = make_backdrop(probe);
     if (probe.backdrop == None) {
         std::fprintf(stderr, "the probe's backdrop window is made\n");

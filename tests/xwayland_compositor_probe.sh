@@ -53,9 +53,13 @@ if [ -z "$display" ]; then
     not_exercised "weston did not report an Xwayland display"
 else
     printf '{"probe":"x11_compositor","xwayland_case":"exercised","display":"%s"}\n' "$display"
+    # The versions, so a server crash can be matched against upstream.
+    printf '{"probe":"x11_compositor","weston":"%s","xwayland":"%s"}\n' \
+        "$(weston --version 2>&1 | head -n 1)" "$(Xwayland -version 2>&1 | grep -i version | head -n 1)"
     DISPLAY="$display" WAYLAND_DISPLAY=t5-wayland XDG_RUNTIME_DIR="$runtime" XDG_SESSION_TYPE=wayland \
-        timeout 45 "$probe"
+        GUI_FORMS_X11_PROBE_STEPS=1 timeout 45 "$probe"
     status=$?
+    if [ $status -ne 0 ]; then tail -n 30 "$log"; fi
 fi
 
 kill "$weston_pid" 2> /dev/null
