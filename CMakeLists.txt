@@ -641,6 +641,7 @@ add_library(gui_forms_controls STATIC
     src/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.cpp
     src/controls/scrollable_control/container_control/split_container/splitter_grip.cpp
     src/controls/scrollable_control/container_control/split_container/split_container.cpp
+    src/controls/splitter/splitter.cpp
     src/controls/panel/date_time_picker/date_time_utilities.cpp
     src/controls/panel/date_time_picker/calendar_grid/calendar_grid.cpp
     src/controls/panel/date_time_picker/date_time_value/date_time_value.cpp
@@ -2876,6 +2877,9 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_split_container_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_split_container_tests
              COMMAND gui_forms_split_container_tests)
+    add_executable(gui_forms_splitter_tests tests/splitter_tests.cpp)
+    target_link_libraries(gui_forms_splitter_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_splitter_tests COMMAND gui_forms_splitter_tests)
 
     add_executable(gui_forms_layout_panel_tests
         tests/layout_panel_tests.cpp

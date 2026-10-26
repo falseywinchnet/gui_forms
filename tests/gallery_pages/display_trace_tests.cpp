@@ -309,7 +309,7 @@ struct PageDigest final {
 
 // Recorded on main at 13d1c7e0, before the theme engine's entry point.
 // typography-and-inspection's entry is main's trace with the RuntimeId the
-// specimen has when this test runs first (#1251 rather than #19747); the
+// specimen has when this test runs first (#1259 rather than #19747); the
 // two traces differ in that number alone.
 constexpr std::array<PageDigest, 29> expected_digests{{
     {"basics", 0x6d537a7173ffd432ULL},
@@ -320,7 +320,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"ranges-and-progress", 0x76a87838f40755cbULL},
     {"containers-and-focus", 0x74609a23b162e4bfULL},
     {"animation-laboratory", 0x2b0eba60f2b03985ULL},
-    {"states-and-diagnostics", 0xb94e6c2789d13bb2ULL},
+    {"states-and-diagnostics", 0x515a595b9c0221a3ULL},
     {"text-and-input", 0xf5ae22834f148beeULL},
     {"collections-and-popups", 0xdcfb5edee24a4d9eULL},
     {"values-and-spinners", 0xc6d61a2832ad4bdbULL},
@@ -331,7 +331,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"dates-and-calendar", 0xc5c53d69a0faf9b8ULL},
     {"dialogs-and-host-services", 0x9f4777496aff0402ULL},
     {"retained-layout-panels", 0x61d01430a35f8421ULL},
-    {"dock-and-anchor", 0x8de690ba5f4749d3ULL},
+    {"dock-and-anchor", 0xdc273117963d8adeULL},
     {"commands-and-menus", 0x4dcd03ef20ba7517ULL},
     {"tree-and-object-views", 0x29921b544adcdd83ULL},
     {"choices-and-sections", 0x611f380c46897bf9ULL},
@@ -339,7 +339,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"responsive-layouts", 0xa5fe70ebb0d4051eULL},
     {"anchored-popups", 0x53eef5309813b41aULL},
     {"live-surfaces", 0x5d366debbc32b5ffULL},
-    {"typography-and-inspection", 0x27adf74d8cf4ec14ULL},
+    {"typography-and-inspection", 0x61eebbd257210d08ULL},
     {"semantic-feedback", 0x819d5ed9aa229adaULL},
 }};
 
