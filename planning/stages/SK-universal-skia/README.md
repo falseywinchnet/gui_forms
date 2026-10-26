@@ -168,6 +168,20 @@ its description. Stacks stay at most two deep.
     raster into the DIB without conversion.
 - `native_live_surface_pixel_format()` returns `bgra32_premultiplied_srgb`
   everywhere.
+- `HostImage` and `HostImageView` become BGRA8 premultiplied sRGB, like
+  everything else (owner, 2026-10-26). Each host converts to the operating
+  system's own clipboard or icon format only when it hands an image over
+  (Windows' clipboard bitmap; PNG on macOS and Linux), and converts back on
+  read: once per copy, paste or icon change, in one named kernel per
+  direction. The straight-alpha wording of `host_image.hpp`, and its promise
+  of colour under zero alpha, go: a premultiplied pixel of alpha 0 is
+  0, 0, 0, 0. Notify icons take the same type.
+- Clipboard images get a round-trip test on each host (Windows, macOS, X11,
+  and headless): write, read back, and compare premultiplied values exactly,
+  including transparent and half-transparent pixels. Unpremultiplying for the
+  operating system and premultiplying back is exact for every value: with
+  `s = round(255 c / a)`, `round(s a / 255)` is `c` again for every alpha of
+  1 to 255.
 - RGBA appears only as an input, converted once at entry in one named
   kernel (SK-Q1, settled below): PNG decode, which already decodes once into
   a cached resource, and the RGBA submissions that stay accepted.
@@ -271,13 +285,10 @@ Removed:
 - the RGBA8 storage of the engine (`engine_types.hpp`, `part_raster.hpp`,
   `primitive_registry.hpp`): part rasters, samples and materials are stored
   BGRA8 premultiplied;
-- every RGBA case inside `src/` other than the entry kernels above.
-
-Unchanged, because it is not a surface: `HostImage`, the straight-alpha RGBA8
-interchange of clipboard images and notify icons. A clipboard read returns
-it, so it is an output too; a caller who draws one hands it to the drawing
-facade, which converts it once at entry. If the owner wants it BGRA as well,
-that is a separate change to the host-services contract.
+- every RGBA case inside `src/` other than the entry kernels above;
+- the straight-alpha RGBA8 `HostImage` (owner, 2026-10-26): clipboard
+  images and notify icons are BGRA8 premultiplied sRGB, and each host
+  converts to and from the operating system's format at the hand-over (SK2).
 
 BGRA keeps its existing spellings: `PixelFormat::bgra32_premultiplied`,
 `LiveSurfacePixelFormat::bgra32_premultiplied_srgb`,
