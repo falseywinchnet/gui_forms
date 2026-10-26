@@ -2,3 +2,9 @@
 *.sh text eol=lf
 # The Zstandard licence copy must stay byte-identical to the release tarball's.
 LICENSE-zstd.txt text eol=lf
+# The conformance vectors are byte-identical to upstream's (PROVENANCE.md):
+# never convert line endings, in the samples or in the lists.
+tests/vectors/*.cng binary
+tests/vectors/*.raw binary
+tests/vectors/LIST -text
+tests/vectors/manifest.json -text

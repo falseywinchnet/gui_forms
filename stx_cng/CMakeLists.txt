@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    project(stx_cng VERSION 0.2.0 LANGUAGES C CXX)
+    project(stx_cng VERSION 1.0.0 LANGUAGES C CXX)
     set(CMAKE_CXX_STANDARD 20)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CMAKE_CXX_EXTENSIONS OFF)
@@ -20,6 +20,8 @@ option(STX_CNG_SANITIZE "Instrument library and tests" OFF)
 if(NOT TARGET stx_zlib::stx_zlib)
     find_package(stx_zlib 0.1 CONFIG REQUIRED)
 endif()
+# Encoding and decoding with more than one thread start std::thread workers.
+find_package(Threads REQUIRED)
 
 # Zstandard 1.5.7, built from its official release tarball, pinned by SHA-256.
 # tools/fetch_zstd.sh downloads and verifies it; configuration verifies the
@@ -48,7 +50,8 @@ if(NOT stx_cng_zstd_licence STREQUAL stx_cng_zstd_licence_copy)
 endif()
 include(cmake/zstd.cmake)
 
-add_library(stx_cng STATIC src/codec.cpp src/sequences.cpp src/literals.cpp src/restore.cpp)
+add_library(stx_cng STATIC src/codec.cpp src/container.cpp src/tables.cpp src/decoder.cpp src/encoder.cpp
+    src/collection.cpp)
 add_library(stx_cng::stx_cng ALIAS stx_cng)
 target_compile_features(stx_cng PUBLIC cxx_std_20)
 set_target_properties(stx_cng PROPERTIES CXX_EXTENSIONS OFF POSITION_INDEPENDENT_CODE ON)
@@ -57,11 +60,14 @@ target_include_directories(stx_cng PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 # Zstandard stays private: no zstd type or header reaches the public API. The
 # installed archive still needs it at link time, which the export records.
-target_link_libraries(stx_cng PUBLIC stx_zlib::stx_zlib PRIVATE stx_cng_zstd)
+target_link_libraries(stx_cng PUBLIC stx_zlib::stx_zlib Threads::Threads PRIVATE stx_cng_zstd)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    target_compile_options(stx_cng PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+    # The encoder prices its parse in doubles in a fixed order of operations;
+    # contracting a multiply and an add into one rounding would change its
+    # decisions on hosts with fused multiply-add (docs/FORMAT.md section 11).
+    target_compile_options(stx_cng PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow -ffp-contract=off)
 elseif(MSVC)
-    target_compile_options(stx_cng PRIVATE /W4)
+    target_compile_options(stx_cng PRIVATE /W4 /fp:precise)
 endif()
 if(STX_CNG_SANITIZE)
     if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
@@ -77,7 +83,7 @@ endif()
 
 if(STX_CNG_TESTS)
     enable_testing()
-    foreach(test core malformed limits)
+    foreach(test core malformed limits collection)
         add_executable(stx_cng_${test} tests/${test}.cpp)
         target_link_libraries(stx_cng_${test} PRIVATE stx_cng::stx_cng)
         if(STX_CNG_SANITIZE)
@@ -87,6 +93,14 @@ if(STX_CNG_TESTS)
     endforeach()
     # The malformed-input test builds Zstandard frames of its own.
     target_link_libraries(stx_cng_malformed PRIVATE stx_cng_zstd)
+    # The format's conformance vectors (tests/vectors): every file decodes to
+    # its samples, and re-encodes byte for byte with Zstandard 1.5.7.
+    add_executable(stx_cng_conformance tests/conformance.cpp)
+    target_link_libraries(stx_cng_conformance PRIVATE stx_cng::stx_cng stx_cng_zstd)
+    if(STX_CNG_SANITIZE)
+        target_compile_options(stx_cng_conformance PRIVATE ${stx_cng_sanitize})
+    endif()
+    add_test(NAME stx_cng_conformance COMMAND stx_cng_conformance "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors")
     add_executable(stx_cng_fuzz_harness fuzz/cng_fuzz.cpp)
     target_link_libraries(stx_cng_fuzz_harness PRIVATE stx_cng::stx_cng)
     target_compile_definitions(stx_cng_fuzz_harness PRIVATE STX_CNG_FUZZ_STANDALONE=1)
@@ -102,7 +116,7 @@ install(EXPORT stx_cngTargets NAMESPACE stx_cng:: DESTINATION ${CMAKE_INSTALL_LI
 configure_package_config_file(cmake/stx_cngConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/stx_cngConfig.cmake
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/stx_cng)
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/stx_cngConfigVersion.cmake
-    VERSION 0.2.0 COMPATIBILITY SameMajorVersion)
+    VERSION 1.0.0 COMPATIBILITY SameMajorVersion)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stx_cngConfig.cmake ${CMAKE_CURRENT_BINARY_DIR}/stx_cngConfigVersion.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/stx_cng)
 install(FILES LICENSE PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/stx_cng)

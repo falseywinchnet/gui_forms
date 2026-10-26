@@ -61,7 +61,7 @@ enum class ImageResourceError : std::uint8_t {
     missing_idat, missing_iend, trailing_data, unknown_critical_chunk,
     resource_count_exceeded, registry_encoded_limit_exceeded,
     registry_decoded_limit_exceeded, stale_image_id, allocation_failed,
-    // A CNG file's header or band framing (cng_pixels).
+    // A CNG file's header fields or its contents (cng_pixels).
     invalid_image_header, invalid_image_data,
 };
 

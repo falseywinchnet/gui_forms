@@ -1,8 +1,9 @@
 # Private Zstandard 1.5.7 archive for stx_cng: library sources only (no
 # programs, dictionary builder, deprecated or legacy formats), single
-# threaded. The format uses one-shot level-3 compression, so the unused
-# block-compressor strategies are compiled out; the bytes written are
-# unchanged. Built with Zstandard's own conventions, not the house warnings.
+# threaded. The format compresses one tables frame at level 19, which selects
+# the btultra2 strategy for every tables body (at most 21,850 bytes), so the
+# strategies it never uses are compiled out; the bytes written are unchanged.
+# Built with Zstandard's own conventions, not the house warnings.
 set(stx_cng_zstd_lib "${STX_CNG_ZSTD_ROOT}/lib")
 set(stx_cng_zstd_sources
     ${stx_cng_zstd_lib}/common/debug.c
@@ -37,8 +38,7 @@ set(stx_cng_zstd_definitions
     ZSTD_EXCLUDE_LAZY_BLOCK_COMPRESSOR
     ZSTD_EXCLUDE_LAZY2_BLOCK_COMPRESSOR
     ZSTD_EXCLUDE_BTLAZY2_BLOCK_COMPRESSOR
-    ZSTD_EXCLUDE_BTOPT_BLOCK_COMPRESSOR
-    ZSTD_EXCLUDE_BTULTRA_BLOCK_COMPRESSOR)
+    ZSTD_EXCLUDE_BTOPT_BLOCK_COMPRESSOR)
 # Zstandard's x86-64 Huffman decoder is preprocessed assembly for
 # GNU-compatible compilers (its own macros disable it elsewhere). Without it
 # the portable C decoder runs.

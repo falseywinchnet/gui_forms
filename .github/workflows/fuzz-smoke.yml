@@ -102,7 +102,7 @@ jobs:
             deflate) clang++ $flags fuzz/deflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp stx_zlib/src/deflate.cpp -o smoke ;;
             conv) clang++ $flags -Istx_conv/include stx_conv/fuzz/conv_fuzz.cpp stx_conv/src/plan.cpp stx_conv/src/profile.cpp stx_conv/src/image.cpp -o smoke ;;
             cng) clang++ $flags -Istx_cng/include stx_cng/fuzz/cng_fuzz.cpp .build/cng-fuzz/libstx_cng.a \
-                   .build/cng-fuzz/libstx_cng_zstd.a .build/cng-fuzz-zlib/libstx_zlib.a -o smoke ;;
+                   .build/cng-fuzz/libstx_cng_zstd.a .build/cng-fuzz-zlib/libstx_zlib.a -pthread -o smoke ;;
             png_decode) clang++ $flags -Istx_png/include fuzz/png_decode_fuzz.cpp stx_png/src/decoder.cpp stx_png/src/encoder.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp stx_zlib/src/deflate.cpp -o smoke ;;
           esac
       - name: Run the smoke

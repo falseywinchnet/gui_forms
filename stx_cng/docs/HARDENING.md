@@ -1,23 +1,32 @@
-# Hardening record — 2026-10-22
+# Hardening record — 2026-10-26
 
-Intake of the owner's CNG codec (`falseywinchnet/stx_cng` 0.1.0-rc1) into
-GUI.Forms, to the standard `stx_zlib`, `stx_png` and `stx_conv` were taken in
-at: a design safe by construction, an audit of every function that reads
-caller input, deterministic sweeps, sanitizer runs, and a short libFuzzer
-smoke per change on CI only. There is no sustained fuzz campaign (owner
-decision, 2026-10-20). Owner decisions D1 to D5 of 2026-10-22 set the scope:
-standalone images only, the D2 extent, strict decoding, reusable owners.
+Intake of the owner's CNG 1.0 codec (`falseywinchnet/stx_cng` at
+`9fde861451367796fa11da8686e47d164b6c8042`, `PROVENANCE.md`) into GUI.Forms,
+to the standard `stx_zlib`, `stx_png`, `stx_conv` and the 2026-10-22 intake of
+CNG 0.1 were held to: a design safe by construction, an audit of every
+function that reads caller input, deterministic sweeps, sanitizer runs, and a
+short libFuzzer smoke per change on CI only. There is no sustained fuzz
+campaign (owner decision, 2026-10-20).
+
+CNG 1.0 replaces the 0.1 format (`\x89CSP` v2, banded LZ77 with Zstandard
+literals) with a new one: 128 x 32 segments coded by a context-modelled range
+coder, a 16 x 16-cell mosaic, one Zstandard frame of frequency tables, and a
+second copy of every redundant part (`FORMAT.md`). The 0.1 record's audit
+does not carry over; this one replaces it. The owner decisions of 2026-10-22
+still in force are D3 (collections through caller-owned spans and a budget)
+and D4 (reusable owners); D1 (the 0.1 signature) and D2 (the 0.1 extent) are
+superseded by the 1.0 format, which fixes its own signature and extent.
 
 ## Rules applied
 
 | Rule | Meaning here |
 |---|---|
-| R1 bounded loops | Every loop's bound is computed before it from validated counts: bands from the header, records from `N`, literals from `L`, descriptors from the packed size. |
-| R2 no allocation once grown | An owner grows to the largest band it has seen; a call that fits allocates nothing. Zstandard contexts are static (`ZSTD_initStaticCCtx`, `ZSTD_initStaticDCtx`) inside owner storage. |
+| R1 bounded loops | Every loop's bound is computed before it from validated counts: segments from the header, stream lengths from the payload, pixels from the tile, table entries from the bounded tables body, collection members from the checked header. The range decoder's renormalisation stops at the end of its stream. |
+| R2 no allocation once grown | An owner grows to the largest segment, mosaic and table storage it has needed; a call that fits allocates nothing. Zstandard contexts are static (`ZSTD_initStaticCCtx`, `ZSTD_initStaticDCtx`) in owner storage. Worker threads are started per call and joined before it returns; their storage is the owner's. |
 | R3 no recursion | |
-| R4 every result checked | Every `CngError`, `bool` and Zstandard return is tested where it is produced. |
-| R5 every parameter validated | Extent, channels, stride, sample and destination sizes, overlap, and every length, count and frame read from input are checked before the data they govern is written. |
-| R6 impossible states | One validator owns the sequence grammar; restore kernels take only validated records. Every unexpected input in every state goes to one named `CngError`. |
+| R4 every result checked | Every `CngError`, `bool` and Zstandard return is tested where it is produced; every worker's result is collected after the join. |
+| R5 every parameter validated | Extent, channels, thread count, stride, sample and destination extents and overlap are checked before any write; every length, checksum, count, code and distance read from input is checked before the data it governs is used. |
+| R6 impossible states | The container is read into one validated `Container` before any payload is touched; a tile decoder that meets an invalid code, a distance outside the produced pixels, a length past the tile or an exhausted stream sets one failure flag and stops at the row's end. Every unexpected input reaches one named `CngError`. |
 
 Results are **pass**, **fixed** (changed in this intake) or **finding**
 (recorded with its remedy).
@@ -26,125 +35,145 @@ Results are **pass**, **fixed** (changed in this intake) or **finding**
 
 | Owner | States | Transitions |
 |---|---|---|
-| `CngDecoder` | empty, grown(size) | Construction: empty (`noexcept`, no allocation). A decode whose largest band exceeds the storage grows it (exact reservations); on allocation failure the storage keeps its previous size and the call returns `allocation_failed`. `release()`: empty. Copy and move are deleted. |
-| `CngEncoder` | empty, grown(size, strided) | As the decoder. The band copy for strided input is grown only when a strided input arrives. |
+| `CngDecoder` | empty, grown(tables, tiles, salvage) | Construction: empty (`noexcept`, no allocation). A call that needs more storage grows it (exact reservations); on allocation failure the storage keeps what it had and the call returns `allocation_failed`. `release()`: empty. Copy and move are deleted. |
+| `CngEncoder` | empty, grown(tiles, streams, payloads, context) | As the decoder. The per-tile streams and payloads grow with the image's segment count (see Storage). |
+| `CngCollectionEncoder`, `CngCollectionDecoder` | empty, grown | Each owns one image owner and, for the composite form, the canvas; transitions as above. |
 
-The format itself is a straight-line grammar: the header fixes the number of
-bands, so there is no hidden parser state machine. Each call's response:
+The format is a straight-line grammar: the header fixes the segment count,
+the directory every payload's length, the payload its streams' lengths, and
+the tile its pixel count, so there is no hidden parser state machine. Each
+call's response:
 
-| Operation | Bad signature or header | Extent or channels | Wrong storage | Overlap | Bad band | After `CEND` |
+| Operation | Signature or fields | Directory, tables | Wrong storage | Overlap | Bad payload | Damaged copy |
 |---|---|---|---|---|---|---|
-| `inspect_cng` | `invalid_signature`, `truncated`, `invalid_chunk`, `crc_mismatch`, `invalid_header` | `unsupported_dimensions` | — | — | not examined | not examined |
-| `validate_cng_framing` | as `inspect_cng` | as `inspect_cng` | — | — | framing only: `truncated`, `invalid_chunk`, `crc_mismatch`, `invalid_band` (shorter than its fields) | `trailing_data` |
-| `decode` | as `inspect_cng`; samples untouched | as `inspect_cng` | `insufficient_storage` (size other than `cng_sample_bytes`); untouched | `overlap`; untouched | `invalid_band`, `entropy_failure`, `invalid_sequences`, `invalid_literals`, `truncated`, `invalid_chunk`, `crc_mismatch`; earlier bands written | `trailing_data` |
-| `encode` | — | `unsupported_dimensions` | stride below a row or overflowing, short samples: `invalid_argument`; destination below the bound: `insufficient_storage` | `overlap` | — | — |
+| `inspect_cng` | `invalid_signature` (empty input included); `invalid_header` (short prefix, no intact field block, shape outside the extent); `unsupported_version` | `invalid_directory`, `invalid_tables` | — | — | not examined | the other copy is used |
+| `validate_cng_framing` | `invalid_signature`; `truncated`; `crc_mismatch` (front block); as `inspect_cng` for the fields | `crc_mismatch` (front directory, tables or mosaic); `invalid_tables` (not one Zstandard frame) | — | — | `crc_mismatch` (framing only; not decoded) | `truncated`, `trailing_data`, `copy_mismatch` |
+| `decode` | as `inspect_cng`; samples untouched | as `inspect_cng`, and `invalid_tables` for a body outside the format; untouched | `insufficient_storage`, `invalid_argument` (stride, threads); untouched | `overlap`; untouched | `invalid_segment`; other segments written, the image to be discarded | the other copy is used |
+| `decode_mosaic` | as `decode` | as `decode` | as `decode` | as `decode` | `invalid_segment` | `mosaic_unavailable` when both copies fail |
+| `decode_salvage` | as `decode` | as `decode` | as `decode`, and a short `segment_intact` | as `decode` | the segment is filled from the mosaic (or 128) and reported lost | the other copy is used |
+| `encode` | — | — | shape, threads, stride or short samples: `invalid_argument`; destination below what this file needs: `insufficient_storage` with `required_bytes` | `overlap` | — | — |
 
-Refusals before storage is touched leave the owner unchanged. A band
-refusal leaves the owner grown and reusable (`tests/malformed.cpp`,
-"decoder reusable after refusals").
+Refusals before storage is touched leave the owner unchanged. A payload
+refusal leaves the owner grown and reusable (`tests/malformed.cpp` reuses one
+decoder across every damaged and crafted file).
 
 ## Audit
 
 | Function | R1 | R2 | R5 | R6 | Result |
 |---|---|---|---|---|---|
-| `admitted`, `cng_sample_bytes` | — | — | sides in [1, 16384], area at most 2^26, channels 3 or 4; products in 64 bits | — | **fixed** (D2; finding F5) |
-| `cng_encoded_bound` | — | — | every term in `uint64_t`, refused above `SIZE_MAX` | — | pass |
-| `band_shape` | — | — | admitted image only; rows >= 15 | — | pass |
-| `read_chunk` | — | — | 12 framing bytes present; length within the remaining input (subtraction, no addition overflow); type; CRC | — | pass |
-| `declared_frame` | — | — | non-skippable; one frame spanning the payload exactly; content size declared and within the limit | — | **fixed** (F6) |
-| `inspect_cng` | — | — | signature, header length 16, version, channels, flags, reserved, budget, extent | — | **fixed** (F3: header probe) |
-| `validate_cng_framing` | bands from the header | none | as `inspect_cng`, then each band chunk's framing and minimum length, the empty `CEND`, end of input | the image is reported only when the whole file passes | added for registry admission |
-| `decode_band` | records `N`, literals `L` | none | `1 <= N <= P/4 + 1`, `L <= P`, `S` within the payload, sequence frame exactly `12N`; coding 0 payload exactly `L*C`; coding 1 needs `L > 0` and payload below `L*C` | all checks precede the band's first write | **fixed** (F6) |
-| `valid_sequences` | `N` | none | literals within the band and within `L`; runs >= 4 and within the band; distance <= produced and <= 262,144; exact totals | the single grammar validator | **fixed** (F7: was three copies) |
-| `restore_runs` | descriptors until the packed count | none | five groups at most, no redundant zero group, runs >= 4, cursors meet | — | pass |
-| `unpack_literals` | `L` | none | padding nibbles of odd counts zero | — | **fixed** (F6) |
-| `restore_band` / `restore<C>` | records, then pixels | none | (validated records only) | copies read only produced pixels; overlapping copies double from the prefix | **fixed** (F7: one kernel per channel count) |
-| `CngDecoder::decode` | bands from the header | grows once | probe; storage size exact; overlap; `CEND` empty and last | previous row is the zero row or the output row above | **fixed** (F2, F3, F4) |
-| `find_sequences` / `search<C>` | pixels of the band | none (index in owner) | (owned band) | bands under four pixels give one literal record | pass |
-| `separate_runs` | packed bytes | none | (owned) | descriptors never overtake the literal region (proved in the source) | pass |
-| `CngEncoder::encode` | bands | grows once | extent; stride at least a row and `stride * height` within `size_t`; sample span covers `stride*(H-1) + row`; destination at least the bound; overlap | compressed literals kept only when smaller than stored | **fixed** (F2, F4) |
-| Owners' copy and move | — | — | — | deleted | **fixed** |
+| `admitted_shape`, `cng_sample_bytes`, `check_extent` | — | — | sides at least 1, at most 2^31 samples, channels 3 or 4; products in 64 bits; `(height - 1) * row_bytes` formed only after a division shows it fits | — | pass |
+| `cng_encoded_bound` | — | — | every term in `uint64_t`, zero above `SIZE_MAX` | — | pass |
+| `parse_fields` | — | — | version 1, segment 128 x 32, shape admitted; lengths are 32-bit | — | pass |
+| `read_container` | segments from the fields | none | length at least the minimum; front field block, else the back one; file at least the fixed bytes the fields imply; a directory copy whose CRC holds; a tables copy whose CRC holds; the payload lengths summing exactly to the payload region (sums in 64 bits of at most 2^26 entries of 32 bits) | every later read is within `[payload_begin, payload_end)` | pass |
+| `validate_framing` | segments | none | front copies only; implied length exact; every CRC; every second copy byte-identical; the tables part exactly one frame | the image is reported only when the whole file passes | pass |
+| `single_frame`, `read_tables` | contexts, then entries | static DCtx in owner storage | one non-skippable frame spanning the part; decompressed size at most the format's tables body; per context a count of at most `green_symbols` entries, each q at most 25; the body consumed exactly | an all-zero context is marked unused; a symbol read from it is a stream failure | **fixed** (upstream accepted trailing frames and skippable frames; `FORMAT.md` 1.0 requires exactly one) |
+| `build_table` / `normalize` | entries | owner workspace | (validated q values) | normalised to exactly 4,096; the difference repaid from entries above 1 in a fixed order | pass |
+| `split_streams`, `read_leb128` | channels - 1 lengths | none | at most five LEB128 bytes each; listed lengths at most what remains | the last stream takes the rest | pass |
+| `start_range`, `renormalize`, `decode_symbol`, `decode_bits` | bytes of the stream | none | a stream under four bytes fails; renormalisation stops at the stream's end; raw bit counts at most 12 | failure is sticky and checked at every row's end and at the tile's end | pass |
+| `TileState::match` | — | none | length code and distance code below 30; distance at least 1 and at most the pixels produced; length within the tile | a failed match writes nothing further | pass |
+| `decode_row`, `decode_tile` | pixels of the tile | caller's workspace, grown by `reserve_tile` | (validated container and tables) | rows are written in order; matches and the activity read only pixels already written | pass |
+| `run_segments`, `CngDecoder::decode` | segments, split into contiguous ranges | grows once per worker | threads 1 to 64; destination extent and overlap before any write; each payload's CRC before it is decoded | workers write disjoint rectangles; the first failure in segment order is reported | **fixed** (byte spans, caller row stride, owners and threads replace upstream's per-call vectors) |
+| `decode_mosaic`, `decode_salvage` | mosaic cells; segments | as `decode` | as `decode`; `segment_intact` at least the segment count | salvage writes every pixel: intact segments exactly, the rest from the mosaic or 128 | **fixed** (salvage reports intact segments explicitly) |
+| `CngEncoder::encode` and its passes | tiles; ops per stream bounded by three per sample | grows per image | shape, threads, stride, sample extent, overlap; destination checked against the exact size before the first byte is written | output identical at every thread count; workers' counts summed in job order | **fixed** (allocation failure is a result, not an exception) |
+| `inspect_cng_collection` | members (at most 4,096) | none | signature; header chunk and its CRC; version, form, count, canvas; directory chunk; each member within the bounds, ids unique, chunks contiguous and inside the file, composite members stacked without gaps and sharing one chunk; the end chunk last; every image chunk's CRC and its file's inspected shape equal to the entry's | `entries` filled only up to the first refusal and meaningful only on success | **fixed** (D3: spans, caller entries; upstream used the filesystem) |
+| `cng_collection_bound`, `CngCollectionEncoder` | members | grows per collection | member checks first; the bound in 64 bits, zero above `SIZE_MAX`; the budget's remaining room checked before each chunk, so nothing is written outside it | the canvas is the encoder's own storage; on failure the budget's contents are unspecified | **fixed** (D3 budget) |
+| `copy_cng_collection_member` | rows of the member | none | canvas extent; the entry inside the canvas; destination extent and overlap | a BGR member of a BGRA canvas drops the added alpha | pass |
+| Owners' copy and move | — | — | — | deleted | pass |
 
-## Storage maxima
+## Storage
 
-`tools/storage_bound.py` enumerates the owners' array reservations for every
-admitted width and both channel counts, at the largest band height:
+Measured by `results/2026-10-26-cng-1.0-intake/storage_probe.cpp` on a
+1,024 x 256 image (64 full segments), owners fresh for each call:
 
-| Owner | Arrays at most | At | Context (Zstandard 1.5.7) |
-|---|---:|---|---|
-| Encoder, tight input | 6,601,073 B | width 15,887, RGB | level-3 CCtx, about 1.30 MB |
-| Encoder, strided input | 7,649,615 B | width 15,887, RGB | as above |
-| Decoder | 6,338,929 B | width 15,887, RGB | DCtx, about 96 KB |
+| Owner | Image | Bytes |
+|---|---|---:|
+| Decoder, 1 thread | any | 552,488 |
+| Decoder, 4 threads | any | 614,144 |
+| Decoder, 64 threads | any | 1,847,264 |
+| Encoder | BGR noise | 6,059,696 (7.71 per sample) |
+| Encoder | BGRA noise | 7,115,870 (6.79 per sample) |
+| Encoder | BGR flat | 1,841,824 (2.34 per sample) |
 
-`tests/limits.cpp` round-trips the maximal shape and checks the measured
-`workspace_bytes()` against these array maxima plus context ceilings
-(4 MiB + 8 for the CCtx, guarding another Zstandard build; 256 KiB for the
-DCtx). Upstream's per-call contexts and arrays (finding F4) are gone, and the
-decoder's context is no longer unbounded.
+Over the intake corpus the decoder stayed at 614,144 bytes at four threads
+and the encoder reached 209,770,188 bytes for a 3,840 x 2,400 BGR image (7.6
+bytes per sample). The decoder's fixed part is its tables (38 contexts of
+4,096 slots) and the static Zstandard context; each thread adds one segment's
+residuals, energy rows and column sums.
+
+The decoder's storage is fixed by the segment size and the thread count, not
+the image: `tests/limits.cpp` requires the storage after a 128 x 32 file and
+after a 1,536 x 1,000 file to be equal at one thread. Its Zstandard context is
+static and bounded by the tables part's size. The encoder keeps every tile's
+operations (at most three four-byte codes per sample) and payloads until the
+container is written, so its storage grows with the image (finding F3 below).
 
 ## Sweeps
 
-`tests/malformed.cpp`, on four shapes (5 x 3 RGB, 31 x 17 RGBA, 300 x 1100
-RGBA with five bands, 700 x 520 RGB with four) and three patterns (ramp,
-noise, sparse noise: stored and compressed literals), at every byte offset,
-or at 256 evenly spaced offsets for files above 4 KB:
+`tests/malformed.cpp`, on five files (1 x 1 BGR noise and 13 x 9 BGRA alpha
+steps exhaustively; 129 x 33 BGR tiles, 140 x 70 BGRA patches and 300 x 64
+BGR noise at about 400 sampled offsets), through `validate_cng_framing`,
+`inspect_cng`, `decode` at one and four threads, `decode_mosaic` and
+`decode_salvage`:
 
-- every proper prefix is refused, by decode and by `validate_cng_framing`;
-- every byte flipped by 0x01, 0x80 and 0xFF is refused, by both; with the chunk CRC
-  then repaired, the decoder runs to a defined result without a checksum
-  error (under the sanitizer, with no memory or UB finding);
-- one trailing byte is refused as `trailing_data`;
-- hand-built cases for each header field, each band count, each strict-frame
-  rule (skippable, concatenated, unsized, garbage, missing and mismatched
-  frames), each grammar rule, each literal-coding rule, the padding nibble and
-  the chunk order.
+- every prefix and every single-bit flip; 60 random bursts of up to 600 bytes;
+- 300 crafted files per case with every checksum repaired: random payloads,
+  scrambled streams under valid stream lengths, random table bodies in valid
+  Zstandard frames (truncated, oversized and zero contexts), random mosaics,
+  and random dimensions with matching directories;
+- every q value from 26 to 255, two frames, and a skippable frame.
 
-All fixtures are built in memory; no test writes a file (finding F11).
+A decode that reports success must reproduce the original samples, and a
+salvage must reproduce every segment it reports intact. `tests/core.cpp`
+damages each first and each second copy separately and checks that decoding
+uses the other one and that strict framing refuses the file
+(`crc_mismatch`, `copy_mismatch`); `tests/collection.cpp` sweeps 400 damaged
+files per collection form. All fixtures are built in memory; no test writes a
+file.
 
 ## Sanitizer and fuzzing
 
 - `-DSTX_CNG_SANITIZE=ON`: AddressSanitizer and UndefinedBehaviorSanitizer
   with `-fno-sanitize-recover=undefined` over the library, Zstandard and every
-  test. Windows (pinned LLVM 22, MinGW): all four tests pass; leak detection
-  is not available there and is covered on Linux CI.
-- `fuzz/cng_fuzz.cpp`: the first byte selects decoding an arbitrary file (an
-  accepted file must re-encode and decode exactly, and agree with the probe)
-  or encoding a generated image with stride padding (exact round trip, and a
-  truncated copy refused). One encoder and one decoder serve every input, so
-  storage reuse across shapes is exercised. Built standalone it replays 400
-  generated images with 24 single-bit edits each (half CRC-repaired) and
-  requires both outcomes. CI runs the libFuzzer build for 150 s per change on
-  Linux x64 and arm64.
+  test; GUI.Forms' sanitizer tree (`tools/ci_build.py --sanitize`) runs the
+  same tests and `resource_pixels`. Windows (pinned LLVM 22, MinGW): all pass;
+  leak detection is not available there and is covered on Linux CI.
+- `fuzz/cng_fuzz.cpp`: the first byte selects one of five modes: an arbitrary
+  file through every reading call (salvage must agree with a successful
+  decode, and a decoded image of at most 1 MiB must re-encode and decode
+  exactly); a generated image's round trip with stride padding at a chosen
+  thread count; a crafted file with valid checksums over the fuzzer's
+  payloads and mosaic; an arbitrary collection; and a generated collection's
+  round trip. Built standalone it replays 300 generated inputs. CI runs the
+  libFuzzer build for 150 s per change on Linux x64 and arm64.
 
-## Findings from the intake review and their disposition
+The sanitizer runs found one defect in this intake's own fuzz replay (the
+standalone input generator read past a one-byte input; fixed) and none in the
+library.
 
-1. F1, collections have no output budget. **Recorded**: collections are not
-   taken in; the follow-up adds a caller-supplied budget and byte-span members
-   (D3).
-2. F2, exceptions as the failure channel. **Fixed**: `noexcept` entry points
-   and `CngError` results.
-3. F3, iostream-only API with no header probe. **Fixed**: byte spans and
-   `inspect_cng`.
-4. F4, allocation per call. **Fixed**: reusable owners, static contexts (D4).
-5. F5, padded 4,194,304-pixel extent. **Fixed**: D2 extent.
-6. F6, non-canonical framing accepted. **Fixed**: strict decoding
-   (`docs/FORMAT.md`, section 3). Whole files are still not canonical; the
-   encoder's choices and Zstandard's bits remain free.
-7. F7, triplicated validation and restore. **Fixed**.
-8. F8, magic numbers and dead code. **Fixed**: `src/format.hpp` names every
-   format constant.
-9. F9, filesystem access in the collection encoder. **Recorded** with F1.
-10. F10, invariant-free decoded aggregate. **Fixed**: decoding fills caller
-    storage; no decoded aggregate remains.
-11. F11, no malformed-input tests; fixtures left behind. **Fixed**.
-12. F12, development signature. **Closed** by D1: `\x89CSP` v2 is kept.
-13. F13, timing in codec paths. **Fixed**: removed; callers time calls.
+## Findings and their disposition
+
+1. F1, the 0.1 record's findings. **Closed** by replacement: the 0.1 format,
+   its sources and its tests are gone. Its fixes that still apply (no
+   exceptions at the interface, byte spans, reusable owners, no filesystem
+   access, no timing in codec paths, no fixtures written to disk) are kept in
+   the 1.0 port.
+2. F2, upstream's tables reader accepted bytes after the first Zstandard
+   frame, and skippable frames. **Fixed**: exactly one frame (`FORMAT.md`
+   1.0, section 5), in decoding and in strict framing.
+3. F3, the encoder's storage grows with the image. **Recorded**: at most
+   three four-byte operations per sample for the streams plus the payloads,
+   all kept until the container is written. A streaming container writer
+   would bound it by the segment and thread count, as the decoder is; not
+   done, since GUI.Forms encodes only images it already holds in memory.
+4. F4, the decoder's failure contract. **Recorded**: a refusal while decoding
+   segments leaves the other segments written; the caller discards the image
+   (README, GUI.Forms' `cng_pixels`). Upstream left it unstated.
 
 Open:
 
 - **Zstandard symbols are global.** A consumer that links another Zstandard
   gets duplicate symbols (`PROVENANCE.md`). Prefixing them would need a
   modified Zstandard and is not done.
-- **Decoded pixels are not authenticated.** CRC-32 per chunk detects
-  accidental damage only; a CRC-repaired edit decodes to other pixels by
+- **Decoded pixels are not authenticated.** CRC-32 per part detects
+  accidental damage only; a checksum-repaired edit decodes to other pixels by
   design (as in PNG).

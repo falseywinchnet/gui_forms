@@ -9,6 +9,7 @@
 #include "stx_cng/codec.hpp"
 #include "stx_png/encoder.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -17,6 +18,7 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -63,12 +65,19 @@ Bytes rgb_of(const Bytes& rgba) {
     return rgb;
 }
 
+// A CNG file of RGB(A) samples: CNG stores blue, green, red(, alpha), so
+// red and blue are exchanged first.
 Bytes cng_file(const Bytes& samples, stx_cng::CngChannels channels) {
     stx_cng::CngImage image{width, height, channels};
+    std::size_t step = static_cast<std::size_t>(channels);
+    Bytes stored = samples;
+    for (std::size_t at = 0; at + 2U < stored.size(); at += step) {
+        std::swap(stored[at], stored[at + 2U]);
+    }
     std::unique_ptr<stx_cng::CngEncoder> encoder = std::make_unique<stx_cng::CngEncoder>();
     Bytes file(stx_cng::cng_encoded_bound(image));
-    std::uint64_t row_bytes = static_cast<std::uint64_t>(width) * static_cast<std::size_t>(channels);
-    stx_cng::CngEncodeResult encoded = (*encoder).encode(stx_cng::CngEncodeInput{image, row_bytes, samples}, file);
+    std::uint64_t row_bytes = static_cast<std::uint64_t>(width) * step;
+    stx_cng::CngEncodeResult encoded = (*encoder).encode(stx_cng::CngEncodeInput{image, row_bytes, stored, 1}, file);
     require(encoded.error == stx_cng::CngError::none, "fixture: CNG encode");
     file.resize(encoded.encoded_bytes);
     return file;
@@ -108,6 +117,27 @@ Bytes reference(const Bytes& rgba, image::PixelTarget target) {
     return pixels;
 }
 
+// Decodes into rows `padding` bytes longer than the pixels, prefilled with
+// a sentinel; returns the tight pixels after checking the padding is intact.
+Bytes decode_padded(image::ResourcePixelDecoder& decoder, const ImageResourceView& view, image::PixelTarget target,
+                    std::size_t padding) {
+    std::size_t row = static_cast<std::size_t>(width) * 4U;
+    std::size_t stride = row + padding;
+    Bytes pixels(stride * (height - 1U) + row, std::byte{0xC3});
+    image::ResourcePixelResult decoded = decoder.decode(view, target, pixels, stride);
+    require(decoded.error == image::ResourcePixelError::none, "resource decodes into padded rows");
+    Bytes tight(row * height);
+    bool padding_intact = true;
+    for (std::size_t y = 0; y < height; ++y) {
+        std::copy_n(pixels.begin() + static_cast<std::ptrdiff_t>(y * stride), row, tight.begin() + static_cast<std::ptrdiff_t>(y * row));
+        for (std::size_t at = y * stride + row; y + 1U < height && at < (y + 1U) * stride; ++at) {
+            padding_intact = padding_intact && pixels[at] == std::byte{0xC3};
+        }
+    }
+    require(padding_intact, "bytes between rows are left alone");
+    return tight;
+}
+
 Bytes decode(image::ResourcePixelDecoder& decoder, const ImageResourceView& view, image::PixelTarget target) {
     Bytes pixels(static_cast<std::size_t>(width) * height * 4U);
     image::ResourcePixelResult decoded = decoder.decode(view, target, pixels, static_cast<std::size_t>(width) * 4U);
@@ -124,8 +154,8 @@ ImageResourceView found(const ImageRegistry& registry, ImageLoadResult loaded) {
 }
 
 void test_admission(const Bytes& rgba) {
-    Bytes cng = cng_file(rgba, stx_cng::CngChannels::rgba);
-    Bytes cng_rgb = cng_file(rgb_of(rgba), stx_cng::CngChannels::rgb);
+    Bytes cng = cng_file(rgba, stx_cng::CngChannels::bgra);
+    Bytes cng_rgb = cng_file(rgb_of(rgba), stx_cng::CngChannels::bgr);
     Bytes png = png_file(rgba, stx_png::PngSourceAlpha::straight);
     ImageRegistry registry;
 
@@ -154,11 +184,15 @@ void test_admission(const Bytes& rgba) {
     trailing.push_back(std::byte{0});
     require(registry.load_image(trailing).error == ImageResourceError::trailing_data, "trailing byte refused");
     Bytes damaged = cng;
-    damaged[60] ^= std::byte{0x10};
-    require(registry.load_image(damaged).error == ImageResourceError::crc_mismatch, "damaged band refused");
+    damaged[60] ^= std::byte{0x10};   // inside the tables
+    require(registry.load_image(damaged).error == ImageResourceError::crc_mismatch, "damaged tables refused");
     Bytes header = cng;
-    header[16] ^= std::byte{1};
+    header[16] ^= std::byte{1};   // the front header's channel count
     require(registry.load_image(header).error == ImageResourceError::crc_mismatch, "damaged header refused");
+    // The decoder would read the back copy; admission compares both.
+    Bytes back = cng;
+    back[back.size() - 20U] ^= std::byte{1};
+    require(registry.load_image(back).error == ImageResourceError::crc_mismatch, "differing header copies refused");
 
     ImageRegistryLimits narrow{};
     narrow.maximum_width = width - 1U;
@@ -180,19 +214,21 @@ void test_admission(const Bytes& rgba) {
 
 void test_decoding(const Bytes& rgba) {
     ImageRegistry registry;
-    ImageResourceView native = found(registry, registry.load_image(cng_file(rgba, stx_cng::CngChannels::rgba)));
+    ImageResourceView native = found(registry, registry.load_image(cng_file(rgba, stx_cng::CngChannels::bgra)));
     ImageResourceView interchange = found(registry, registry.load_image(png_file(rgba, stx_png::PngSourceAlpha::straight)));
     Bytes opaque_rgba = rgba;
     for (std::size_t pixel = 0; pixel < opaque_rgba.size() / 4U; ++pixel) {
         opaque_rgba[pixel * 4U + 3U] = std::byte{255};
     }
-    ImageResourceView opaque = found(registry, registry.load_image(cng_file(rgb_of(rgba), stx_cng::CngChannels::rgb)));
+    ImageResourceView opaque = found(registry, registry.load_image(cng_file(rgb_of(rgba), stx_cng::CngChannels::bgr)));
     std::unique_ptr<image::ResourcePixelDecoder> decoder = std::make_unique<image::ResourcePixelDecoder>();
     for (const image::PixelTarget& target : targets) {
         Bytes expected = reference(rgba, target);
         require(decode(*decoder, native, target) == expected, "CNG decode matches the reference");
         require(decode(*decoder, interchange, target) == expected, "PNG decode matches the reference");
         require(decode(*decoder, opaque, target) == reference(opaque_rgba, target), "RGB CNG decodes opaque");
+        require(decode_padded(*decoder, native, target, 12U) == expected, "CNG decodes into padded rows");
+        require(decode_padded(*decoder, opaque, target, 5U) == reference(opaque_rgba, target), "RGB CNG widens padded rows");
     }
     (*decoder).release();
     require(decode(*decoder, native, targets[1]) == reference(rgba, targets[1]), "decoder works after release");
@@ -209,7 +245,7 @@ void test_decoding(const Bytes& rgba) {
             "BGRA resources are not decoded");
 
     // The CNG decoder refuses an overlapping destination before writing.
-    Bytes file = cng_file(rgba, stx_cng::CngChannels::rgba);
+    Bytes file = cng_file(rgba, stx_cng::CngChannels::bgra);
     file.resize(static_cast<std::size_t>(width) * height * 4U + file.size());
     std::span<const std::byte> encoded(file.data(), file.size() - static_cast<std::size_t>(width) * height * 4U);
     std::span<std::byte> overlapping(file.data(), static_cast<std::size_t>(width) * height * 4U);

@@ -4,19 +4,13 @@
 
 #include <cstdint>
 #include <functional>
-#include <limits>
 #include <new>
-#include <stdexcept>
-#include <vector>
 
 namespace gui_forms::image {
 
 class CngPixelStorage final {
 public:
     stx_cng::CngDecoder decoder;
-    // Tightly packed 8-bit samples of the last image decoded; capacity is the
-    // largest image's width * height * channels.
-    std::vector<std::byte> samples;
 };
 
 namespace {
@@ -37,20 +31,22 @@ ImageResourceError framing_error(stx_cng::CngError error) noexcept {
     case stx_cng::CngError::none: return ImageResourceError::none;
     case stx_cng::CngError::invalid_signature: return ImageResourceError::invalid_signature;
     case stx_cng::CngError::truncated: return ImageResourceError::truncated_chunk;
-    case stx_cng::CngError::invalid_chunk: return ImageResourceError::invalid_chunk_type;
-    case stx_cng::CngError::crc_mismatch: return ImageResourceError::crc_mismatch;
     case stx_cng::CngError::trailing_data: return ImageResourceError::trailing_data;
-    case stx_cng::CngError::unsupported_dimensions: return ImageResourceError::dimension_limit_exceeded;
-    case stx_cng::CngError::invalid_header: return ImageResourceError::invalid_image_header;
-    // Contract errors framing validation does not raise, and band contents:
-    // the image's data is not what the format allows.
+    // A checksum, or a redundant copy that differs from the one it repeats.
+    case stx_cng::CngError::crc_mismatch:
+    case stx_cng::CngError::copy_mismatch: return ImageResourceError::crc_mismatch;
+    case stx_cng::CngError::invalid_header:
+    case stx_cng::CngError::unsupported_version: return ImageResourceError::invalid_image_header;
+    // Contract errors framing validation does not raise, and the parts'
+    // contents: the image's data is not what the format allows.
     case stx_cng::CngError::invalid_argument:
     case stx_cng::CngError::insufficient_storage:
     case stx_cng::CngError::overlap:
-    case stx_cng::CngError::invalid_band:
-    case stx_cng::CngError::invalid_sequences:
-    case stx_cng::CngError::invalid_literals:
-    case stx_cng::CngError::entropy_failure: return ImageResourceError::invalid_image_data;
+    case stx_cng::CngError::invalid_directory:
+    case stx_cng::CngError::invalid_tables:
+    case stx_cng::CngError::invalid_segment:
+    case stx_cng::CngError::mosaic_unavailable:
+    case stx_cng::CngError::invalid_collection: return ImageResourceError::invalid_image_data;
     case stx_cng::CngError::allocation_failed: return ImageResourceError::allocation_failed;
     }
     // A code outside the enumeration is reported as invalid data.
@@ -65,72 +61,77 @@ std::uint8_t premultiply(std::uint8_t colour, std::uint8_t alpha) noexcept {
     return result;
 }
 
-// Tight samples of `channels` bytes per pixel to four-byte pixels of the
-// given order and alpha, row by row; bytes between destination rows are
-// left as they were.
-template<std::size_t channels, PixelOrder order, PixelAlpha alpha>
-void convert_rows(const std::byte* samples, std::uint32_t width, std::uint32_t height, std::byte* pixels,
-                  std::size_t row_bytes) noexcept {
+// Decoded BGRA rows, in place, to the target: alpha premultiplied, then red
+// and blue exchanged for RGBA. Not called for the BGRA straight target,
+// which the decode already is.
+template<PixelOrder order, PixelAlpha alpha>
+void finish_rows(std::byte* pixels, std::uint32_t width, std::uint32_t height, std::size_t row_bytes) noexcept {
     constexpr std::size_t red_slot = order == PixelOrder::rgba ? 0U : 2U;
     constexpr std::size_t blue_slot = 2U - red_slot;
-    std::size_t source_row_bytes = static_cast<std::size_t>(width) * channels;
     for (std::size_t y = 0; y < height; ++y) {
-        const std::byte* source = samples + y * source_row_bytes;
-        std::byte* destination = pixels + y * row_bytes;
+        std::byte* pixel = pixels + y * row_bytes;
         for (std::size_t x = 0; x < width; ++x) {
-            std::uint8_t red = std::to_integer<std::uint8_t>(source[0]);
-            std::uint8_t green = std::to_integer<std::uint8_t>(source[1]);
-            std::uint8_t blue = std::to_integer<std::uint8_t>(source[2]);
-            std::uint8_t coverage = 255U;
-            if constexpr (channels == 4U) {
-                coverage = std::to_integer<std::uint8_t>(source[3]);
-                if constexpr (alpha == PixelAlpha::premultiplied) {
-                    red = premultiply(red, coverage);
-                    green = premultiply(green, coverage);
-                    blue = premultiply(blue, coverage);
-                }
+            std::uint8_t blue = std::to_integer<std::uint8_t>(pixel[0]);
+            std::uint8_t green = std::to_integer<std::uint8_t>(pixel[1]);
+            std::uint8_t red = std::to_integer<std::uint8_t>(pixel[2]);
+            if constexpr (alpha == PixelAlpha::premultiplied) {
+                std::uint8_t coverage = std::to_integer<std::uint8_t>(pixel[3]);
+                blue = premultiply(blue, coverage);
+                green = premultiply(green, coverage);
+                red = premultiply(red, coverage);
             }
-            destination[red_slot] = static_cast<std::byte>(red);
-            destination[1] = static_cast<std::byte>(green);
-            destination[blue_slot] = static_cast<std::byte>(blue);
-            destination[3] = static_cast<std::byte>(coverage);
-            source += channels;
-            destination += 4;
+            pixel[red_slot] = static_cast<std::byte>(red);
+            pixel[1] = static_cast<std::byte>(green);
+            pixel[blue_slot] = static_cast<std::byte>(blue);
+            pixel += 4;
         }
     }
 }
 
-template<std::size_t channels>
-void convert_samples(const std::byte* samples, std::uint32_t width, std::uint32_t height, PixelTarget target,
-                     std::byte* pixels, std::size_t row_bytes) noexcept {
-    bool rgba = target.order == PixelOrder::rgba;
-    bool premultiplied = target.alpha == PixelAlpha::premultiplied;
-    if (rgba && premultiplied) {
-        convert_rows<channels, PixelOrder::rgba, PixelAlpha::premultiplied>(samples, width, height, pixels, row_bytes);
-    } else if (rgba) {
-        convert_rows<channels, PixelOrder::rgba, PixelAlpha::straight>(samples, width, height, pixels, row_bytes);
-    } else if (premultiplied) {
-        convert_rows<channels, PixelOrder::bgra, PixelAlpha::premultiplied>(samples, width, height, pixels, row_bytes);
-    } else {
-        convert_rows<channels, PixelOrder::bgra, PixelAlpha::straight>(samples, width, height, pixels, row_bytes);
+// Decoded BGR rows, each in the first width * 3 bytes of its row, widened in
+// place to four bytes per pixel with alpha 255 (opaque: premultiplication
+// changes nothing). Each row runs from its last pixel back: pixel x is read
+// from bytes [3x, 3x + 3) before [4x, 4x + 4) is written, and every pixel
+// still to come lies below 3x, so nothing is overwritten before it is read.
+template<PixelOrder order>
+void widen_rows(std::byte* pixels, std::uint32_t width, std::uint32_t height, std::size_t row_bytes) noexcept {
+    constexpr std::size_t red_slot = order == PixelOrder::rgba ? 0U : 2U;
+    constexpr std::size_t blue_slot = 2U - red_slot;
+    for (std::size_t y = 0; y < height; ++y) {
+        std::byte* row = pixels + y * row_bytes;
+        for (std::size_t remaining = width; remaining > 0; --remaining) {
+            std::size_t x = remaining - 1;
+            std::byte blue = row[3 * x];
+            std::byte green = row[3 * x + 1];
+            std::byte red = row[3 * x + 2];
+            std::byte* pixel = row + 4 * x;
+            pixel[red_slot] = red;
+            pixel[1] = green;
+            pixel[blue_slot] = blue;
+            pixel[3] = std::byte{255};
+        }
     }
 }
 
-// Grows `samples` to `count` bytes, reserving exactly that capacity; false
-// when allocation fails, leaving it as it was.
-bool grow_samples(std::vector<std::byte>& samples, std::size_t count) noexcept {
-    if (samples.size() >= count) {
-        return true;
+// The pass after decoding, chosen once for the file's channels and the
+// target.
+void finish_pixels(stx_cng::CngChannels channels, PixelTarget target, std::byte* pixels, std::uint32_t width,
+                   std::uint32_t height, std::size_t row_bytes) noexcept {
+    bool rgba = target.order == PixelOrder::rgba;
+    bool premultiplied = target.alpha == PixelAlpha::premultiplied;
+    if (channels == stx_cng::CngChannels::bgr) {
+        if (rgba) {
+            widen_rows<PixelOrder::rgba>(pixels, width, height, row_bytes);
+        } else {
+            widen_rows<PixelOrder::bgra>(pixels, width, height, row_bytes);
+        }
+    } else if (rgba && premultiplied) {
+        finish_rows<PixelOrder::rgba, PixelAlpha::premultiplied>(pixels, width, height, row_bytes);
+    } else if (rgba) {
+        finish_rows<PixelOrder::rgba, PixelAlpha::straight>(pixels, width, height, row_bytes);
+    } else if (premultiplied) {
+        finish_rows<PixelOrder::bgra, PixelAlpha::premultiplied>(pixels, width, height, row_bytes);
     }
-    try {
-        samples.reserve(count);
-        samples.resize(count);
-    } catch (const std::bad_alloc&) {
-        return false;
-    } catch (const std::length_error&) {
-        return false;
-    }
-    return true;
 }
 
 } // namespace
@@ -142,7 +143,7 @@ CngFraming validate_cng_framing(std::span<const std::byte> encoded) noexcept {
     if (framing.error == ImageResourceError::none) {
         framing.width = validated.image.width;
         framing.height = validated.image.height;
-        framing.alpha = validated.image.channels == stx_cng::CngChannels::rgba;
+        framing.alpha = validated.image.channels == stx_cng::CngChannels::bgra;
     }
     return framing;
 }
@@ -181,15 +182,9 @@ CngPixelResult CngPixelDecoder::decode(std::span<const std::byte> encoded, Pixel
             return result;
         }
     }
-    CngPixelStorage& storage = *storage_;
-    // Admitted CNG extents (at most 2^26 pixels of four bytes) fit size_t.
-    std::size_t sample_bytes = stx_cng::cng_sample_bytes(inspected.image);
-    if (!grow_samples(storage.samples, sample_bytes)) {
-        result.error = CngPixelError::allocation_failed;
-        return result;
-    }
-    std::span<std::byte> samples(storage.samples.data(), sample_bytes);
-    stx_cng::CngDecodeResult decoded = storage.decoder.decode(encoded, samples);
+    // Four bytes per destination pixel hold the file's three or four, so the
+    // codec writes the destination rows directly.
+    stx_cng::CngDecodeResult decoded = (*storage_).decoder.decode(encoded, pixels, row_bytes, 1);
     if (decoded.error == stx_cng::CngError::allocation_failed) {
         result.error = CngPixelError::allocation_failed;
         return result;
@@ -198,11 +193,7 @@ CngPixelResult CngPixelDecoder::decode(std::span<const std::byte> encoded, Pixel
         result.error = CngPixelError::decode_failed;
         return result;
     }
-    if (inspected.image.channels == stx_cng::CngChannels::rgba) {
-        convert_samples<4U>(samples.data(), result.width, result.height, target, pixels.data(), row_bytes);
-    } else {
-        convert_samples<3U>(samples.data(), result.width, result.height, target, pixels.data(), row_bytes);
-    }
+    finish_pixels(inspected.image.channels, target, pixels.data(), result.width, result.height, row_bytes);
     result.error = CngPixelError::none;
     return result;
 }
