@@ -1,6 +1,9 @@
 #include "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp"
 #include "../../../../panel/panel_anatomy.hpp"
 
+#include "gui_forms/text.hpp"
+
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -16,6 +19,30 @@ void TabPage::set_text(std::string text) {
     require_mutable();
     if (text_ == text) return;
     text_ = std::move(text);
+    invalidate_tab();
+}
+
+void TabPage::set_image_key(std::string image_key) {
+    require_mutable();
+    if (image_key.size() > 256U) throw std::invalid_argument("TabPage image key exceeds 256 bytes");
+    if (!validate_utf8(image_key).valid()) throw std::invalid_argument("TabPage image key must be valid UTF-8");
+    if (image_key_ == image_key && image_index_ == -1) return;
+    image_key_ = std::move(image_key);
+    image_index_ = -1;
+    invalidate_tab();
+}
+
+void TabPage::set_image_index(int image_index) {
+    require_mutable();
+    if (image_index < -1) throw std::out_of_range("TabPage image index must be -1 or nonnegative");
+    if (image_index_ == image_index && image_key_.empty()) return;
+    image_index_ = image_index;
+    image_key_.clear();
+    invalidate_tab();
+}
+
+// The tab is the owning TabControl's: it lays out and paints the tab again.
+void TabPage::invalidate_tab() {
     invalidate(Dirty::paint | Dirty::semantics | Dirty::measure);
     if (const Control::Ptr owner = parent()) {
         (*owner).invalidate(Dirty::paint | Dirty::semantics | Dirty::measure);

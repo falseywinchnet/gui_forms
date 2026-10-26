@@ -1,8 +1,8 @@
 # Stage T5 plan: compositor cooperation
 
-Status 2026-10-25: proposed, for the owner's review. No T5 code exists
-yet, and none is written until the open questions in section 8 are
-answered. The brief is [`README.md`](README.md); the authority is
+Status 2026-10-25: accepted. The owner took the recommendation (option 1)
+on every question in section 8; the decisions are recorded in the
+README as T5-Q1 to T5-Q16, with the owner's open concern about Wayland. The brief is [`README.md`](README.md); the authority is
 `planning/FORWARD_PROGRAMME.md` §4 T5. Where this plan and a recorded owner
 decision disagree, the decision governs.
 
@@ -75,7 +75,7 @@ user's settings.
 
 | Facility | Interface | Minimum | Notes |
 |---|---|---|---|
-| Per-pixel alpha in the client area, native frame kept | `DwmExtendFrameIntoClientArea` (margins −1), or `DwmEnableBlurBehindWindow` with an empty blur region | Windows Vista (both documented); Windows 10 for GUI.Forms | Keeps `WM_PAINT` and today's 32-bit top-down DIB presentation; DWM reads the DIB's alpha as premultiplied. From Windows 8 blur-behind no longer blurs; it only makes the client alpha visible. Which of the two routes gives clean per-pixel alpha with the native caption on Windows 10 and 11 is measured in C2. |
+| Per-pixel alpha in the client area, native frame kept | `DwmExtendFrameIntoClientArea` (margins −1), or `DwmEnableBlurBehindWindow` with an empty blur region | Windows Vista (both documented); Windows 10 for GUI.Forms | Keeps `WM_PAINT` and today's 32-bit top-down DIB presentation; DWM reads the DIB's alpha as premultiplied. From Windows 8 blur-behind no longer blurs; it only makes the client alpha visible. Which of the two routes gives clean per-pixel alpha with the native caption on Windows 10 and 11 is measured in C2. Measured on Windows 11 build 26200 (MEASUREMENTS.md): only blur behind shows what lies behind; an extended frame shows the frame's solid colour. |
 | Per-pixel alpha for a borderless window | `WS_EX_LAYERED` with `UpdateLayeredWindowIndirect` (`ULW_ALPHA`, `prcDirty`) | Windows Vista for the dirty rectangle | The whole window is the bitmap: no system frame, no `WM_PAINT`. Fits popups and drag images, not top-level windows with a native caption. Fully clear pixels pass input through natively (section 2.5). |
 | Mica (the window material) | `DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE = 38, DWMSBT_MAINWINDOW = 2)` | Windows 11 22H2, build 22621 | Needs the frame extended into the client area, so the client's clear pixels show it. DWM itself shows a solid colour while the window is inactive, under energy saver and with transparency effects off. |
 | Mica Alt | `DWMSBT_TABBEDWINDOW = 4` | build 22621 | A stronger wallpaper tint, for tabbed title areas. |
@@ -207,23 +207,27 @@ WindowBackdropGrant    granted backdrop
                        reason: granted | not_declared | host_unsupported |
                                os_version | no_compositor |
                                transparency_disabled | reduced_transparency |
-                               high_contrast | after_shutdown
+                               high_contrast | backend_failure
                        compositor generation it was decided at
 ```
 
 - Resolving a grant is a pure function of the request and the
   `CompositorState`, in the core, tested headless. Adapters report state
   and apply grants; they do not decide.
-- `ApplicationWindowHandle::request_backdrop` returns the grant
-  synchronously, as an explicit result. An undeclared window gets
-  `opaque` with `not_declared`; a call after close gets `after_shutdown`.
+- `Window::request_backdrop` returns the grant synchronously, as an
+  explicit result (the application holds its `Window` in the ready
+  callback, and in C5 the theme asks through the same window). An
+  undeclared window gets `opaque` with `not_declared`. A malformed request
+  (no entries, a repeat, `opaque` before the end) is a programmer error and
+  throws, changing nothing.
 - An `opaque` grant is drawn by GUI.Forms, with the theme's opaque window
   material, rather than left to the compositor's own fallback colour
   (Mica's inactive solid, X11's black): the window always looks like the
   theme, and the pixels are what the frame capture records.
-- Native state is validated before it is changed: if the host call that
-  applies a material fails, the window keeps its previous grant and the
-  failure is reported in the grant's reason.
+- Native state is validated before it is changed: a host call that fails
+  to apply a backdrop leaves the native window as it was; the window then
+  falls back to `opaque` (which an adapter never fails) and the grant's
+  reason says `backend_failure`.
 
 ### 2.4 Changes at run time
 
@@ -241,11 +245,12 @@ WindowBackdropGrant    granted backdrop
   replaced and its generation advanced; then each window's grant is
   resolved again, in window-open order; each window whose grant changed
   raises `backdrop_changed`, advances its backplane generation and damages
-  the whole backplane plane; the next flush paints and presents once. A
-  change that arrives inside an update scope waits for the scope's flush
-  boundary. Handlers that call `request_backdrop` during
-  `backdrop_changed` get a grant against the new state; the event is not
-  raised again for the same generation.
+  the whole backplane plane; the next flush paints and presents once.
+  Host events are dispatched between update scopes, so the repaint joins
+  the next flush. A report that changes only the generation raises
+  nothing. A handler that calls `request_backdrop` during
+  `backdrop_changed` raises its own event within the first; later
+  handlers of the first emission still see its grant.
 - **No error.** A compositor stopping is not a failure: the window turns
   opaque at the next frame and its grant says why.
 
@@ -414,7 +419,12 @@ packing, `_NET_WM_CM_Sn` presence and the XFixes notifications. Gate:
 `gui_forms_linux_compositor_tests` under Xvfb with no compositor (grant
 `opaque`, `no_compositor`, alpha 255), with `xcompmgr` running (grant
 `transparent`), and across `xcompmgr` stopping and starting (two
-`backdrop_changed` events in order), recorded. 2 PRs.
+`backdrop_changed` events in order), recorded. The XWayland case is
+measured too (owner concern beside T5-Q9): whether `_NET_WM_CM_S0` is
+owned, whether the depth-32 visual is offered, and the grant that
+follows, under a headless Weston running Xwayland in CI if the
+coordinator admits that package, and otherwise on a desktop machine.
+2 PRs.
 
 **C5. The engine join.** The backdrop base of 4.1, glass over a clear
 backplane (4.2), `reduced_transparency` and the high-contrast and
@@ -472,7 +482,8 @@ transparency effects off, then high contrast on); macOS on `macos-15`
 (every backdrop, and reduced transparency where the runner allows setting
 it; otherwise on the bench with the owner's agreement); X11 under Xvfb
 without a compositor, with `xcompmgr`, and across it stopping and
-starting. Every state must end in a rendered window and no error.
+starting; and X11 under XWayland, with its compositor detection and
+depth-32 visual recorded per desktop measured. Every state must end in a rendered window and no error.
 
 ## 7. House-style points
 
@@ -513,9 +524,10 @@ starting. Every state must end in a rendered window and no error.
 - **Docs agree with the build.** The capability table changes in the PR
   that changes what a host advertises.
 
-## 8. Open questions for the owner
+## 8. Questions for the owner (answered 2026-10-25)
 
-Each is a numbered option list with a recommendation (marked **R**).
+Each is a numbered option list with a recommendation (marked **R**). The
+owner chose **R**, option 1, on all sixteen (README, T5-Q1 to T5-Q16).
 
 **Q1. The backdrop vocabulary.**
 1. Portable purposes, a closed set: `opaque`, `transparent`,

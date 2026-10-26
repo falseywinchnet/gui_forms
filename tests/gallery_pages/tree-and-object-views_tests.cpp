@@ -123,6 +123,23 @@ void test_tree_and_object_views(gui_forms::Window& window) {
                 (*status).text().find("TreeListView siblings sorted by Name ascending") == 0U,
             "pressing a TreeListView header must sort the siblings and report it");
 
+    // DataGridView's image column: the Gallery's fixtures install the test
+    // card as the preview of the one PNG file; the other files have none.
+    const std::shared_ptr<DataGridView> grid =
+        std::dynamic_pointer_cast<DataGridView>(window.find("gallery.tree.grid"));
+    require(grid != nullptr, "the page must hold the project grid");
+    const std::optional<std::size_t> preview = (*grid).column_index("preview");
+    const std::optional<DataGridViewRowPosition> logo = (*grid).row_position(DataGridViewRowId{"logo.png"});
+    const std::optional<DataGridViewRowPosition> source = (*grid).row_position(DataGridViewRowId{"button.cpp"});
+    require(preview && logo && source && (*grid).columns()[*preview].kind == DataGridViewColumnKind::image,
+            "the grid must have an image column and the fixture's files");
+    const BindingValue logo_value = (*grid).cell_value(*logo, *preview);
+    const ImageId* const logo_image = std::get_if<ImageId>(&logo_value);
+    require(logo_image != nullptr && (*logo_image).value != 0U &&
+                (*grid).cell_text(*logo, *preview) == "Image preview" &&
+                (*grid).cell_text(*source, *preview).empty(),
+            "the PNG file's preview cell must hold the installed image, and a source file's none");
+
     const std::string semantics = window.semantic_snapshot().to_json();
     require(semantics.find("gallery.tree.folders") != std::string::npos &&
                 semantics.find("\"role\":\"list_item\"") != std::string::npos &&

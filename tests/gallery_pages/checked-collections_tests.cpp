@@ -45,6 +45,20 @@ void test_checked_collections(gui_forms::Window& window) {
     click(window, window.find("gallery.checked.command.item.3"));
     require((*checked).item_check_state(3U) == CheckState::indeterminate,
             "Set mixed must restore the indeterminate row");
+
+    // The toggle sits below the fold, so it is pressed through its public
+    // activation rather than a hit-tested click.
+    std::shared_ptr<gui_forms::ListView> list_view =
+        std::dynamic_pointer_cast<ListView>(window.find("gallery.checked.list-view.list"));
+    std::shared_ptr<gui_forms::Button> mark =
+        std::dynamic_pointer_cast<Button>(window.find("gallery.checked.list-view.mark"));
+    require(list_view && mark && !(*list_view).insertion_mark().has_value(),
+            "the gallery ListView starts without an insertion mark");
+    (*mark).perform_click();
+    require((*list_view).insertion_mark() == std::optional<ListViewInsertionMark>(ListViewInsertionMark{2U, false}),
+            "the gallery toggle shows the insertion mark before the third row");
+    (*mark).perform_click();
+    require(!(*list_view).insertion_mark().has_value(), "the gallery toggle clears the insertion mark");
 }
 
 } // namespace gallery_pages_tests

@@ -147,6 +147,25 @@ private:
         (*note).set_text_wrapping(TextWrapping::word);
         (*note).set_vertical_alignment(VerticalAlignment::near);
         (*list_group).add_at(note, {686.0, 36.0, 220.0, 120.0});
+        mark_toggle_ = make_control<Button>(StableId("gallery.checked.list-view.mark"), "Show insertion mark");
+        (*mark_toggle_).set_style(page_style());
+        (*list_group).add_at(mark_toggle_, {686.0, 166.0, 200.0, 30.0});
+        on((*mark_toggle_).clicked(), *this, &CheckedCollectionsPage::on_mark_toggled);
+    }
+
+    // The insertion mark an application shows while an item is dragged:
+    // here before the third row, until the toggle clears it.
+    void on_mark_toggled(ButtonBase&) {
+        if ((*list_view_).insertion_mark().has_value()) {
+            (*list_view_).clear_insertion_mark();
+            (*mark_toggle_).set_text("Show insertion mark");
+            (*status_).set_text("ListView insertion mark cleared");
+            return;
+        }
+        const bool shown = (*list_view_).show_insertion_mark({.index = 2U, .after = false});
+        (*mark_toggle_).set_text(shown ? "Clear insertion mark" : "Show insertion mark");
+        (*status_).set_text(shown ? "ListView insertion mark before the third row · drop role"
+                                  : "ListView has no third row to mark");
     }
 
     void on_column_click(const ListViewColumnClick& click) {
@@ -186,6 +205,7 @@ private:
 
     std::shared_ptr<CheckedListBox> immediate_;
     std::shared_ptr<ListView> list_view_;
+    std::shared_ptr<Button> mark_toggle_;
     std::shared_ptr<Label> status_;
 };
 

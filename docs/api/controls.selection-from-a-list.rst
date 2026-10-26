@@ -180,6 +180,8 @@ Related types
      - A click on a column header.
    * - :cpp:class:`ListViewColumnWidthChange <gui_forms::ListViewColumnWidthChange>`
      - A column's new width in logical units, after a divider drag ends or set_column_width() changes it.
+   * - :cpp:class:`ListViewInsertionMark <gui_forms::ListViewInsertionMark>`
+     - Where a ListView's insertion mark stands (Windows Forms' ListViewInsertionMark Index and AppearsAfterItem): beside the item at model index ``index``, before it or, with ``after``, after it.
    * - :cpp:class:`ListViewItem <gui_forms::ListViewItem>`
      - One item.
    * - :cpp:class:`ListViewItemActivation <gui_forms::ListViewItemActivation>`
@@ -619,6 +621,8 @@ Related types
 
    .. cpp:member:: PartGeometry cell_content
 
+   .. cpp:member:: PartGeometry cell_image
+
    .. cpp:member:: PartGeometry cell_check_well
 
    .. cpp:member:: PartGeometry cell_check_indicator
@@ -884,7 +888,7 @@ Related types
 
    ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
 
-   One column. ``name`` is the column's identity: unique within the grid, not empty, and without '.', since a cell's stable ID is its row's ID, '.' and the column's name. ``width`` and ``minimum_width`` are logical units at text scale 1. ``value_kind`` is the kind a committed text edit converts to (text by default; a number column takes signed_integer or number). ``items`` are a combo box column's choices and must be empty for other kinds. ``button_text`` is shown on a button cell whose value is empty. ``data_property_name`` names the BindingSource field a bound column shows.
+   One column. ``name`` is the column's identity: unique within the grid, not empty, and without '.', since a cell's stable ID is its row's ID, '.' and the column's name. ``width`` and ``minimum_width`` are logical units at text scale 1. ``value_kind`` is the kind a committed text edit converts to (text by default; a number column takes signed_integer or number). ``items`` are a combo box column's choices and must be empty for other kinds. ``button_text`` is shown on a button cell whose value is empty. An image column's cells hold ImageId values, images of the grid's window, placed by ``image_layout``; ``image_description`` is the text an image cell gives in place of its image (Windows Forms' Description), as its cell text and its semantic name. ``data_property_name`` names the BindingSource field a bound column shows.
 
    .. cpp:member:: std::string name
 
@@ -915,6 +919,12 @@ Related types
    .. cpp:member:: std::vector<std::string> items
 
    .. cpp:member:: std::string button_text
+
+   .. cpp:member:: DataGridViewImageLayout image_layout
+
+      Default: ``{DataGridViewImageLayout::normal}``.
+
+   .. cpp:member:: std::string image_description
 
    .. cpp:member:: std::string data_property_name
 
@@ -1374,6 +1384,10 @@ Related types
 
    .. cpp:member:: PartGeometry focus
 
+   .. cpp:member:: PartGeometry insertion_mark
+
+      The bar of the insertion mark; absent without a shown mark.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: ListView::SubItem final
@@ -1459,6 +1473,18 @@ Related types
    .. cpp:member:: std::size_t column
 
    .. cpp:member:: double width
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListViewInsertionMark final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   Where a ListView's insertion mark stands (Windows Forms' ListViewInsertionMark Index and AppearsAfterItem): beside the item at model index ``index``, before it or, with ``after``, after it.
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: bool after
 
 .. cpp:namespace:: gui_forms
 
@@ -2265,6 +2291,20 @@ Enumerations
    .. cpp:enumerator:: combo_box
 
    .. cpp:enumerator:: button
+
+   .. cpp:enumerator:: image
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewImageLayout
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:enumerator:: normal
+
+   .. cpp:enumerator:: stretch
+
+   .. cpp:enumerator:: zoom
 
 .. cpp:namespace:: gui_forms
 

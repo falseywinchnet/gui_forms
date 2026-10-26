@@ -41,7 +41,7 @@ details are under [Done and tested](#done-and-tested).
   with states and public geometry, described by one schema that the C++ API,
   form documents, themes and the visual tools share.
 - **Owned compression and image codecs on every host**: one zlib, an
-  owned PNG codec, CNG native resources and CONV interpolation, all GPL-free.
+  owned PNG codec and CONV interpolation, all GPL-free.
 
 ## 0.3 Themeable
 
@@ -140,7 +140,7 @@ gates as their own rows. "Done" means the deliverable exists and a test in
 | Coherent latest-state presentation | Separate content, rendered and presented revisions; one paint lease, one coalesced wake and one deferred follow-up per window; exact presentation receipts; owner-callback failure restores the previous chunks | done |
 | Pressure, input and stall conformance | Under 100 mutations per frame, nested paints, resize during replay, occlusion, backend faults and owner retirement: one queued drain, latest-state rendering and a return to idle; input deferred outside the paint lease with a fixed bound | in progress: the deterministic gates pass; a native wall-clock soak remains |
 | Atomic candidate raster | Replay into a private candidate raster and publish it only after every backend command succeeds, keeping the last presented raster across allocation, renderer and upload faults | in progress: an opt-in Windows transactional frame store exists; default hosts replay into the live raster |
-| Damage-preserving painting | Painting and presenting each damage rectangle instead of their bounding box | in progress: every host paints and presents the rectangle set (paint contract version 2), and live frames follow one frame sequence; the gate is recorded on Windows, macOS and X11 records remain |
+| Damage-preserving painting | Painting and presenting each damage rectangle instead of their bounding box | done: every host paints the rectangle set (paint contract version 2), and live frames follow one frame sequence; the gate is recorded on Windows, X11 and macOS (`results/2026-10-25-dp-gate-macos`), where AppKit copies the union of the set over unchanged pixels, accepted by the owner |
 | Presentation availability record | Publishing the mandatory paint-contract version and optional host extensions (partial present, zero-copy import, presentation fences) | done: `Window::presentation_availability()` reports contract version 2 (partial present is now part of the contract), the extensions and the live paint lease; no host offers zero-copy import or fences yet |
 | API stability (1.0) | The conditions listed under "Before 1.0" below | planned |
 
@@ -155,8 +155,9 @@ gates as their own rows. "Done" means the deliverable exists and a test in
   sRGB blending) with identical output on macOS, Windows and Linux, enforced
   by a hash-compared identity test. Skia is built without any font backend.
 - Owned compression and image codecs on every host: one zlib (`stx_zlib`),
-  an owned PNG codec (`stx_png`), CNG as the native resource format with PNG
-  kept for interchange (`stx_cng`), and CONV interpolation (`stx_conv`). WIC
+  an owned PNG codec (`stx_png`), the only image codec, and CONV
+  interpolation (`stx_conv`). CNG (`stx_cng`), taken in for 0.2, was removed
+  on 2026-10-26 (the owner's decision: our own PNG and zlib suffice). WIC
   decoding is removed and FreeType is built without zlib.
 - The theme engine: a cascade of rules over named parts, layered materials,
   effect primitives with declared cost bounds, transitions and settling

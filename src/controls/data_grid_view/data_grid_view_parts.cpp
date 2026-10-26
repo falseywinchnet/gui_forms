@@ -50,6 +50,12 @@ PartGeometry visible_part(Rect bounds, Rect clip) noexcept {
     return geometry;
 }
 
+// A cell's own area, which stops short of its right and bottom grid lines.
+Rect cell_inside(Rect cell) noexcept {
+    const Rect result{cell.x, cell.y, std::max(0.0, cell.width - 1.0), std::max(0.0, cell.height - 1.0)};
+    return result;
+}
+
 PartTextAlignment text_alignment(DataGridViewCellAlignment alignment) noexcept {
     if (alignment == DataGridViewCellAlignment::center) return PartTextAlignment::center;
     if (alignment == DataGridViewCellAlignment::end) return PartTextAlignment::end;
@@ -252,8 +258,7 @@ DataGridView::CellParts DataGridView::cell_parts(DataGridViewRowPosition row, st
     const Rect clip = layout.data;
     const Rect cell = cell_bounds(row, column, layout);
     const double scale = layout.scale;
-    // The cell's own area stops short of its right and bottom grid lines.
-    const Rect inside{cell.x, cell.y, std::max(0.0, cell.width - 1.0), std::max(0.0, cell.height - 1.0)};
+    const Rect inside = cell_inside(cell);
     record.cell = visible_part(cell, clip);
     record.cell_selection = visible_part(inside, clip);
     record.cell_focus = record.cell_selection;
@@ -267,6 +272,10 @@ DataGridView::CellParts DataGridView::cell_parts(DataGridViewRowPosition row, st
         const Rect face = inset_rect(inside, button_inset * scale);
         record.cell_button_face = visible_part(face, clip);
         record.cell_button_label = visible_part(inset_rect(face, padding * 0.5), clip);
+    } else if (kind == DataGridViewColumnKind::image) {
+        // The part is the image as it is seen: cut at the cell's edges.
+        const std::optional<CellImage> image = cell_image(row, column, inside);
+        if (image) record.cell_image = visible_part((*image).bounds, Rect::intersection(inside, clip));
     } else {
         double reserved = 0.0;
         if (kind == DataGridViewColumnKind::combo_box) {
@@ -285,6 +294,39 @@ DataGridView::CellParts DataGridView::cell_parts(DataGridViewRowPosition row, st
     record.cell_vertical_rule = visible_part(vertical_rule, clip);
     record.cell_horizontal_rule = visible_part(horizontal_rule, clip);
     return record;
+}
+
+std::optional<DataGridView::CellImage> DataGridView::cell_image(DataGridViewRowPosition row, std::size_t column,
+                                                                Rect inside) const {
+    const DataGridViewColumn& definition = columns_[column];
+    if (definition.kind != DataGridViewColumnKind::image) return std::nullopt;
+    const BindingValue value = stored_value(row, column);
+    const ImageId* const image = std::get_if<ImageId>(&value);
+    const Window* const host = attached_window();
+    if (image == nullptr || (*image).value == 0U || host == nullptr || inside.empty()) return std::nullopt;
+    const std::optional<ImageResourceView> resource = (*host).image_resources().find(*image);
+    if (!resource) return std::nullopt;
+    // An image's pixels are logical units, as in PictureBox; the grid's text
+    // scale does not apply to them.
+    const double width = static_cast<double>((*resource).metadata.width);
+    const double height = static_cast<double>((*resource).metadata.height);
+    if (width <= 0.0 || height <= 0.0) return std::nullopt;
+    CellImage result;
+    result.image = *image;
+    if (definition.image_layout == DataGridViewImageLayout::stretch) {
+        result.bounds = inside;
+        return result;
+    }
+    double placed_width = width;
+    double placed_height = height;
+    if (definition.image_layout == DataGridViewImageLayout::zoom) {
+        const double fit = std::min(inside.width / width, inside.height / height);
+        placed_width = width * fit;
+        placed_height = height * fit;
+    }
+    result.bounds = {inside.x + (inside.width - placed_width) * 0.5, inside.y + (inside.height - placed_height) * 0.5,
+                     placed_width, placed_height};
+    return result;
 }
 
 DataGridView::ColumnParts DataGridView::column_parts(std::size_t column, const GridLayout& layout) const {
@@ -345,8 +387,8 @@ AnatomyStateSet DataGridView::cell_states(DataGridViewRowPosition row, std::size
         binding_value_to_bool(stored_value(row, column)).value_or(false)) {
         states.insert(AnatomyState::checked);
     }
-    const bool pressed = pressed_button_ && (*pressed_button_).column == column &&
-                         (*pressed_button_).row_id == row_id_text(row);
+    const bool pressed = pressed_content_ && (*pressed_content_).column == column &&
+                         (*pressed_content_).row_id == row_id_text(row);
     if (pressed) states.insert(AnatomyState::pressed);
     if (current && edit_kind_ == EditKind::choice) states.insert(AnatomyState::open);
     const Window* const host = attached_window();
@@ -487,6 +529,22 @@ void DataGridView::paint_cell(Painter& painter, DataGridViewRowPosition row, std
         paint_part(painter, *this, part);
         part.text = {};
         part.alignment = PartTextAlignment::start;
+    }
+    if (parts.cell_image.present) {
+        // Drawn whole and cut at the cell's edges, so that an image wider
+        // than its cell, or one partly scrolled away, keeps its shape.
+        const Rect inside = cell_inside(cell_bounds(row, column, layout));
+        const std::optional<CellImage> image = cell_image(row, column, inside);
+        if (image) {
+            painter.save();
+            painter.clip_rect(Rect::intersection(inside, layout.data));
+            part.role = PartRole::image;
+            part.bounds = (*image).bounds;
+            part.image = (*image).image;
+            paint_part(painter, *this, part);
+            part.image = {};
+            painter.restore();
+        }
     }
     if (parts.cell_check_well.present) {
         part.family = ControlVisualRole::choice;
@@ -682,13 +740,15 @@ constexpr std::array<StateField<DataGridView::RowStates>, 3> row_state_fields{{
     {.state = AnatomyState::read_only, .member = &DataGridView::RowStates::read_only},
 }};
 
-constexpr std::array<PartField<DataGridView::CellParts>, 12> cell_part_fields{{
+constexpr std::array<PartField<DataGridView::CellParts>, 13> cell_part_fields{{
     {.declaration = {.name = "cell", .role = PartRole::region, .composed_from = {}},
      .member = &DataGridView::CellParts::cell},
     {.declaration = {.name = "cell_selection", .role = PartRole::selection, .composed_from = {}},
      .member = &DataGridView::CellParts::cell_selection},
     {.declaration = {.name = "cell_content", .role = PartRole::content, .composed_from = {}},
      .member = &DataGridView::CellParts::cell_content},
+    {.declaration = {.name = "cell_image", .role = PartRole::image, .composed_from = {}},
+     .member = &DataGridView::CellParts::cell_image},
     {.declaration = {.name = "cell_check_well", .role = PartRole::well, .composed_from = "check_box"},
      .member = &DataGridView::CellParts::cell_check_well},
     {.declaration = {.name = "cell_check_indicator", .role = PartRole::indicator, .composed_from = {}},
@@ -748,7 +808,7 @@ constexpr std::array<PartDeclaration, 11> grid_parts_declared = part_declaration
 constexpr std::array<AnatomyState, 6> grid_states_declared = state_declarations(grid_state_fields);
 constexpr std::array<PartDeclaration, 4> row_parts_declared = part_declarations(row_part_fields);
 constexpr std::array<AnatomyState, 3> row_states_declared = state_declarations(row_state_fields);
-constexpr std::array<PartDeclaration, 12> cell_parts_declared = part_declarations(cell_part_fields);
+constexpr std::array<PartDeclaration, 13> cell_parts_declared = part_declarations(cell_part_fields);
 constexpr std::array<AnatomyState, 8> cell_states_declared = state_declarations(cell_state_fields);
 constexpr std::array<PartDeclaration, 5> column_parts_declared = part_declarations(column_part_fields);
 constexpr std::array<AnatomyState, 3> column_states_declared = state_declarations(column_state_fields);

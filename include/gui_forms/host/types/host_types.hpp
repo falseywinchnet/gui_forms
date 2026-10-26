@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/event.hpp"
+#include "gui_forms/host/compositor/window_backdrop.hpp"
 #include "gui_forms/host/image/host_image.hpp"
 #include "gui_forms/events.hpp"
 #include "gui_forms/host/types/host_capabilities/host_capabilities.hpp"
@@ -8,6 +9,7 @@
 #include "gui_forms/host/types/host_services_snapshot/host_services_snapshot.hpp"
 #include "gui_forms/host/types/host_session_snapshot/host_session_snapshot.hpp"
 #include "gui_forms/types.hpp"
+#include "gui_forms/window/presentation/input_settings.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -440,6 +442,25 @@ struct HostClosedEvent final {
 
 struct HostShutdownEvent final {};
 
+// The host's compositor and preference state (stage T5): reported once after
+// attach and again whenever it changes (capability compositor_notifications).
+// Each report's generation is later than the last; a report whose opaque
+// backdrop is not supported is refused as invalid_payload.
+struct HostCompositorEvent final {
+    CompositorState state{};
+};
+
+// The platform's input settings that controls read (stage W, ListView label
+// editing): reported after attach and again whenever the system setting
+// changes. The session copies them into the window's PresentationSettings
+// (double_click_milliseconds and double_click_origin), leaving every other
+// field as it is. An interval of 0 or above
+// maximum_double_click_milliseconds is refused as invalid_payload.
+struct HostInputSettingsEvent final {
+    std::uint32_t double_click_milliseconds{default_double_click_milliseconds};
+    SettingOrigin double_click_origin{SettingOrigin::host};
+};
+
 using HostEventPayload = std::variant<
     HostAttachEvent,
     HostResizeEvent,
@@ -453,7 +474,9 @@ using HostEventPayload = std::variant<
     TextInputEvent,
     HostCloseRequest,
     HostClosedEvent,
-    HostShutdownEvent>;
+    HostShutdownEvent,
+    HostCompositorEvent,
+    HostInputSettingsEvent>;
 
 struct HostEvent final {
     std::uint64_t sequence{};

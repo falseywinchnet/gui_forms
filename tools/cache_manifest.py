@@ -27,7 +27,7 @@ def main() -> None:
     if match is None:
         raise RuntimeError('The cache requires LLVM 22.1.x')
     manifest: dict[str, object] = {
-        'schema': 2, 'repository': 'falseywinchnet/gui_forms',
+        'schema': 2, 'repository': 'malkuth-software/gui_forms',
         'revision': revision, 'platform': sys.argv[1], 'compiler': sys.argv[2],
         'compiler_version': match.group(1), 'compiler_version_text': compiler_text,
         'compiler_sha256': hashlib.sha256(Path(compiler_path).read_bytes()).hexdigest(),

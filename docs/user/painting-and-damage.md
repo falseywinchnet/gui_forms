@@ -59,6 +59,17 @@ Skia-based CPU adapter on macOS and Linux and by the DIB compositor on
 Windows. No Skia type is visible to a control, and the renderer can be
 replaced without touching one.
 
+Layout gives controls unsnapped logical boxes, identical at every display
+scale. The painters snap at paint time: a filled rectangle, a stroked
+rectangle, a gradient fill and the bounds of a rounded rectangle, filled or
+stroked, have each edge rounded to the nearest device pixel, halves upward,
+so a rounded border sits exactly on its fill. The extent is not
+rounded. Two boxes that share a logical edge therefore share a device edge,
+with no seam between them and no pixel covered twice, at 1.25 or 1.5 as
+at 1 or 2. Rounded corners, paths, lines, text and images keep their
+antialiasing. Under a rotated or skewed transform nothing snaps. A box
+narrower than a device pixel can round to nothing.
+
 PNG is the supported encoded image format. The resource registry validates
 the PNG structure and retains its encoded bytes; the renderer decodes and
 caches the pixels. Controls refer to resources by `ImageId`. The registry
@@ -156,7 +167,13 @@ bounding box shows them equal. Both Windows profiles copy each damage
 rectangle (the transactional one still swaps its whole candidate only after
 every rectangle is copied); the X11 host copies each damage rectangle; the
 macOS host copies the rectangles AppKit draws, with live frames counted inside
-the same copy. Every host composes a new opaque live frame the same way: the
+the same copy. AppKit merges the macOS host's display requests into their
+union, so its count shows one rectangle where the host painted several; the
+pixels outside the painted set are copied unchanged. A macOS draw with
+nothing to paint and no live frame (a window shown again, activated or
+restored, or an exposure while hidden) copies the raster as it stands and
+reports nothing: it adds no present, no pixels and no
+`screen_copy_nanoseconds`. Every host composes a new opaque live frame the same way: the
 frame's changed region is drawn straight into the raster, and retained
 painting covers only real damage, such as the share of an overlay above the
 change, in the same frame. On X11 a frame that is not opaque is composed by

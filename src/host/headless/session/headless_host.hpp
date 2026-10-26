@@ -9,6 +9,12 @@
 
 namespace gui_forms::host {
 
+// The headless application's double-click interval: a fixed test value,
+// reported as a host value (HostInputSettingsEvent) after each window's
+// attach. It differs from default_double_click_milliseconds, so a test can
+// tell a host report from none.
+inline constexpr std::uint32_t headless_double_click_milliseconds = 500U;
+
 // Deterministic reference adapter for host-event conformance tests. It owns no
 // clock and performs no background work; the caller supplies every timestamp.
 class HeadlessHost final {
@@ -35,6 +41,9 @@ public:
     [[nodiscard]] const HostSession& session() const noexcept { return session_; }
     [[nodiscard]] HostServices& services() noexcept { return services_; }
     [[nodiscard]] const HostServices& services() const noexcept { return services_; }
+    // The reference services themselves, for tests that drive or read their
+    // simulated native state (the backdrop, stage T5).
+    [[nodiscard]] HeadlessHostServices& headless_services() noexcept { return services_; }
     [[nodiscard]] const std::string& trace() const noexcept { return trace_; }
 
 private:

@@ -5,6 +5,7 @@
 #include "../services/windows_clipboard_open.hpp"
 #include "../services/windows_cursor.hpp"
 #include "../services/windows_notify_icons.hpp"
+#include "../compositor/windows_compositor.hpp"
 #include "../input/windows_key_translation.hpp"
 #include "../input/windows_message_queue.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
@@ -799,7 +800,7 @@ public:
         // A frame starts on the DIB, with no paint group open.
         row_origin_ = 0;
         row_end_ = height_;
-        maintain_alpha_ = false;
+        maintain_alpha_ = frame_alpha_;
         group_depth_ = 0U;
         refused_open_ = 0U;
         SetBkMode(memory_dc_, TRANSPARENT);
@@ -1029,6 +1030,12 @@ public:
     // Encodes the presented front pixels as an opaque PNG through the
     // renderer-neutral core writer. The DIB is 32-bit BGRX whose alpha byte
     // GDI leaves undefined, so the alpha channel is deliberately dropped.
+    // Whether the frames begun after this keep premultiplied alpha on the
+    // DIB itself, as inside a paint group: true while the window's backdrop
+    // grant is not opaque (stage T5, C2), so that DWM composes the client's
+    // alpha. Otherwise every frame pixel is presented opaque, as before.
+    void set_frame_alpha(bool kept) noexcept { frame_alpha_ = kept; }
+
     [[nodiscard]] bool encode_png(std::vector<std::byte>& output) const {
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
         const detail::DibFrontView front = frames_.front();
@@ -1050,7 +1057,9 @@ public:
             reinterpret_cast<const std::byte*>(saved_pixels),
             static_cast<std::size_t>(saved_width) * static_cast<std::size_t>(saved_height) * 4U);
         input.order = gui_forms::image::PngChannelOrder::bgra;
-        input.alpha = gui_forms::image::PngSourceAlpha::opaque;
+        // A frame that keeps alpha is captured with it (stage T5, PLAN.md §3).
+        input.alpha = frame_alpha_ ? gui_forms::image::PngSourceAlpha::premultiplied
+                                   : gui_forms::image::PngSourceAlpha::opaque;
         return gui_forms::image::encode_png(input, output);
     }
 
@@ -1076,14 +1085,7 @@ public:
 
     void fill_rect(Rect rect, Color color) override {
         const PaintTimer timer(timings_[0]);
-        const PixelRect area = pixel_rect(rect);
-        if (area.empty()) return;
-        const unsigned alpha = color.alpha;
-        for (int y = area.top; y < area.bottom; ++y) {
-            std::uint32_t* row = row_at(y);
-            const PixelSpan span = clipped_row_span(area, y);
-            fill_span(row, span, color, alpha);
-        }
+        fill_area(edge_rect(rect), color);
     }
 
     void fill_rounded_rect(Rect rect, double radius, Color color) override {
@@ -1100,12 +1102,31 @@ public:
         }
     }
 
+    // The stroke lies inside the rectangle. Its four bands tile the ring
+    // between device edges computed once: the top and bottom bands span the
+    // width and the sides fill between them, so a translucent stroke covers
+    // no pixel twice.
     void stroke_rect(Rect rect, Color color, double width) override {
+        const PaintTimer timer(timings_[0]);
         const double line = std::max(width, 1.0 / scale_);
-        fill_rect({rect.x, rect.y, rect.width, line}, color);
-        fill_rect({rect.x, rect.y + rect.height - line, rect.width, line}, color);
-        fill_rect({rect.x, rect.y, line, rect.height}, color);
-        fill_rect({rect.x + rect.width - line, rect.y, line, rect.height}, color);
+        const double x = rect.x + state().tx;
+        const double y = rect.y + state().ty;
+        const double outer_left = gui_forms::detail::snap_device_edge(x * scale_);
+        const double inner_left = gui_forms::detail::snap_device_edge((x + line) * scale_);
+        const double inner_right = gui_forms::detail::snap_device_edge((x + rect.width - line) * scale_);
+        const double outer_right = gui_forms::detail::snap_device_edge((x + rect.width) * scale_);
+        const double outer_top = gui_forms::detail::snap_device_edge(y * scale_);
+        const double inner_top = gui_forms::detail::snap_device_edge((y + line) * scale_);
+        const double inner_bottom = gui_forms::detail::snap_device_edge((y + rect.height - line) * scale_);
+        const double outer_bottom = gui_forms::detail::snap_device_edge((y + rect.height) * scale_);
+        if (!(inner_left < inner_right) || !(inner_top < inner_bottom)) {
+            fill_area(device_area(outer_left, outer_top, outer_right, outer_bottom), color);
+            return;
+        }
+        fill_area(device_area(outer_left, outer_top, outer_right, inner_top), color);
+        fill_area(device_area(outer_left, inner_bottom, outer_right, outer_bottom), color);
+        fill_area(device_area(outer_left, inner_top, inner_left, inner_bottom), color);
+        fill_area(device_area(inner_right, inner_top, outer_right, inner_bottom), color);
     }
 
     void stroke_rounded_rect(Rect rect, double radius, Color color,
@@ -1145,7 +1166,7 @@ public:
         std::span<const GradientStop> stops,
         GradientSpreadMode spread) override {
         const PaintTimer timer(timings_[1]);
-        const PixelRect area = pixel_rect(rect);
+        const PixelRect area = edge_rect(rect);
         if (area.empty() || !valid_gradient_stops(stops) ||
             (spread != GradientSpreadMode::pad &&
              spread != GradientSpreadMode::repeat &&
@@ -1205,7 +1226,7 @@ public:
         Rect rect, Point center, Size radii,
         std::span<const GradientStop> stops) override {
         const PaintTimer timer(timings_[2]);
-        const PixelRect area = pixel_rect(rect);
+        const PixelRect area = edge_rect(rect);
         if (area.empty() || radii.width <= 0.0 || radii.height <= 0.0 ||
             !valid_gradient_stops(stops)) {
             return;
@@ -2140,6 +2161,8 @@ private:
     int logical_y(double value) const noexcept {
         return static_cast<int>(std::lround((value + state().ty) * scale_));
     }
+    // Every device pixel the box touches, under the clip's bounds: for
+    // coverage that is decided per pixel (rounded shapes, shadows, images).
     PixelRect pixel_rect(Rect rect) const noexcept {
         rect.x += state().tx;
         rect.y += state().ty;
@@ -2148,6 +2171,48 @@ private:
                 std::clamp(static_cast<int>(std::floor(rect.y * scale_)), row_origin_, row_end_),
                 std::clamp(static_cast<int>(std::ceil((rect.x + rect.width) * scale_)), 0, width_),
                 std::clamp(static_cast<int>(std::ceil((rect.y + rect.height) * scale_)), row_origin_, row_end_)};
+    }
+    // The device pixels a filled box covers: each edge rounded to the nearest
+    // device-pixel boundary (owner decision L-Q8, detail::snap_device_edge),
+    // so boxes sharing a logical edge share a device edge. The clip, whose
+    // row spans test pixel centres, applies to the result as to any fill.
+    PixelRect edge_rect(Rect rect) const noexcept {
+        rect.x += state().tx;
+        rect.y += state().ty;
+        const double left = gui_forms::detail::snap_device_edge(rect.x * scale_);
+        const double top = gui_forms::detail::snap_device_edge(rect.y * scale_);
+        const double right = gui_forms::detail::snap_device_edge((rect.x + rect.width) * scale_);
+        const double bottom = gui_forms::detail::snap_device_edge((rect.y + rect.height) * scale_);
+        const PixelRect result = device_area(left, top, right, bottom);
+        return result;
+    }
+    // Device pixels between whole-pixel edges, bounded by the clip's pixel
+    // bounds and the target; empty when they do not overlap.
+    PixelRect device_area(const double left, const double top, const double right,
+                          const double bottom) const noexcept {
+        const Rect clip = state().clip;
+        const double clip_left = std::floor(clip.x * scale_);
+        const double clip_top = std::floor(clip.y * scale_);
+        const double clip_right = std::ceil((clip.x + clip.width) * scale_);
+        const double clip_bottom = std::ceil((clip.y + clip.height) * scale_);
+        const double low_x = std::max({left, clip_left, 0.0});
+        const double low_y = std::max({top, clip_top, static_cast<double>(row_origin_)});
+        const double high_x = std::min({right, clip_right, static_cast<double>(width_)});
+        const double high_y = std::min({bottom, clip_bottom, static_cast<double>(row_end_)});
+        if (!(low_x < high_x) || !(low_y < high_y)) return {};
+        const PixelRect result{static_cast<int>(low_x), static_cast<int>(low_y),
+                               static_cast<int>(high_x), static_cast<int>(high_y)};
+        return result;
+    }
+    // Fills `area` under the clip, whose row spans test pixel centres.
+    void fill_area(const PixelRect area, const Color color) {
+        if (area.empty()) return;
+        const unsigned alpha = color.alpha;
+        for (int y = area.top; y < area.bottom; ++y) {
+            std::uint32_t* row = row_at(y);
+            const PixelSpan span = clipped_row_span(area, y);
+            fill_span(row, span, color, alpha);
+        }
     }
     // Rasterizes a shaped run at the device scale and blends it into the
     // DIB under the current clip. A memo keeps the coverage for its scale
@@ -2372,13 +2437,15 @@ public:
     [[nodiscard]] std::uint64_t group_refusals() const noexcept { return group_refusals_; }
 
 private:
+    // GDI's clip takes the pixels the painter's own clip keeps: each edge
+    // rounded to the nearest device pixel, as the row spans' centre test does.
     void apply_gdi_clip() const {
         const Rect clip = state().clip;
         IntersectClipRect(memory_dc_,
-            static_cast<int>(std::floor(clip.x * scale_)),
-            static_cast<int>(std::floor(clip.y * scale_)),
-            static_cast<int>(std::ceil((clip.x + clip.width) * scale_)),
-            static_cast<int>(std::ceil((clip.y + clip.height) * scale_)));
+            static_cast<int>(gui_forms::detail::snap_device_edge(clip.x * scale_)),
+            static_cast<int>(gui_forms::detail::snap_device_edge(clip.y * scale_)),
+            static_cast<int>(gui_forms::detail::snap_device_edge((clip.x + clip.width) * scale_)),
+            static_cast<int>(gui_forms::detail::snap_device_edge((clip.y + clip.height) * scale_)));
     }
     void reset_bitmap() noexcept {
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
@@ -2400,7 +2467,7 @@ private:
         glyph_runs_.reset();
     }
 
-    // The shared owned CNG or PNG decode (src/core/image/resource_pixels), as
+    // The shared owned resource decode (src/core/image/resource_pixels), as
     // on every host: premultiplied BGRA, the DIB's native order.
     static bool decode_resource(gui_forms::image::ResourcePixelDecoder& decoder,
                                 const ImageResourceView& resource,
@@ -2439,10 +2506,13 @@ private:
     int width_{};
     int height_{};
     // The current target's rows: [0, height_) on the DIB, a paint group's
-    // rows inside one. maintain_alpha_ is true inside a group.
+    // rows inside one. maintain_alpha_ is true inside a group, and on the
+    // DIB itself while frame_alpha_ holds.
     int row_origin_{};
     int row_end_{};
     bool maintain_alpha_{};
+    // Whether frames keep premultiplied alpha (set_frame_alpha).
+    bool frame_alpha_{};
     // One level per open paint group: its scratch rows (reused, never
     // shrunk; released with the painter), what it covers, and the target it
     // will composite into.
@@ -2649,6 +2719,8 @@ public:
         const HostDispatchResult attached = dispatch(HostAttachEvent{logical, scale_});
         if (!attached.accepted()) return false;
         native_phase_ = NativePhase::attached;
+        report_compositor_state();
+        report_input_settings();
         accessibility_.attach(hwnd_, *model_, scale_);
         (*model_).set_dispatch_wake_handler(
             gui_forms::detail::BoundMemberFunction<
@@ -2708,6 +2780,27 @@ public:
         native_phase_ = NativePhase::ready;
         collect_damage();
         return true;
+    }
+
+    // Reports DWM's state to the window (stage T5, C2): after attach, and
+    // whenever a message may have changed a setting it reads. A reading
+    // that differs from the window's last report only by its generation is
+    // not sent.
+    void report_compositor_state() {
+        const CompositorGeneration next{compositor_generation_.value + 1U};
+        const CompositorState state = detail::read_windows_compositor_state(hwnd_, next);
+        CompositorState unchanged = state;
+        unchanged.generation = (*model_).compositor_state().generation;
+        if (compositor_generation_.value != 0U && unchanged == (*model_).compositor_state()) return;
+        compositor_generation_ = next;
+        static_cast<void>(dispatch(HostCompositorEvent{state}));
+        collect_damage();
+    }
+
+    // The next frame keeps alpha while the window's backdrop is not opaque.
+    void prepare_frame_alpha() noexcept {
+        const bool kept = (*model_).backdrop_grant().granted != WindowBackdrop::opaque;
+        raster_.set_frame_alpha(kept);
     }
 
     bool will_show() noexcept {
@@ -2798,6 +2891,17 @@ public:
             }
         }
         switch (message) {
+        case WM_SETTINGCHANGE:
+            // Broadcast to top-level windows for any system setting; the
+            // double-click interval is read again and reported if it moved,
+            // and the compositor state when the setting is one it reads.
+            report_input_settings();
+            if (detail::windows_compositor_message(message, wparam, lparam)) report_compositor_state();
+            break;
+        case WM_THEMECHANGED:
+        case WM_DWMCOMPOSITIONCHANGED:
+            if (detail::windows_compositor_message(message, wparam, lparam)) report_compositor_state();
+            break;
         case WM_ACTIVATEAPP:
             // Sent to every top-level window of the thread; the windowing
             // ignores repeated reports of the same state.
@@ -3247,6 +3351,19 @@ private:
         return true;
     }
 
+    // The system's double-click interval (GetDoubleClickTime, which Windows
+    // keeps between 1 and 5000 milliseconds), reported after attach and on
+    // WM_SETTINGCHANGE whenever it differs from the last report.
+    void report_input_settings() {
+        const UINT read = GetDoubleClickTime();
+        std::uint32_t interval = static_cast<std::uint32_t>(read);
+        if (interval == 0U) interval = 1U;
+        if (interval > maximum_double_click_milliseconds) interval = maximum_double_click_milliseconds;
+        if (interval == reported_double_click_milliseconds_) return;
+        const HostDispatchResult reported = dispatch(HostInputSettingsEvent{interval, SettingOrigin::host});
+        if (reported.accepted()) reported_double_click_milliseconds_ = interval;
+    }
+
     void resize() {
         RECT client{};
         GetClientRect(hwnd_, &client);
@@ -3431,6 +3548,7 @@ private:
         // Where the placement is unchanged and the frame opaque, only the
         // changed region is drawn and copied: outside it the raster already
         // holds this frame's pixels (as on macOS).
+        prepare_frame_alpha();
         raster_.begin_frame();
         static_cast<void>(raster_.synchronize_images((*model_).image_resources()));
         const bool regions_usable = !live_region_lost_;
@@ -3659,6 +3777,7 @@ private:
         bool presented = false;
         std::uint64_t transactional_copy_nanoseconds = 0U;
         try {
+            prepare_frame_alpha();
             const bool begun = raster_.begin_frame();
             if (begun) {
                 const bool images_ready = raster_.synchronize_images((*model_).image_resources());
@@ -3730,6 +3849,7 @@ private:
         for (std::size_t index = 0; index < painted_rectangles.size(); ++index) {
             present_rectangles.push_back(device_rect(painted_rectangles[index]));
         }
+        prepare_frame_alpha();
         raster_.begin_frame();
         static_cast<void>(raster_.synchronize_images((*model_).image_resources()));
         const std::optional<PaintReceipt> receipt =
@@ -4211,11 +4331,15 @@ private:
     // A taken presentation region that was never presented: the next tick
     // copies whole clips.
     bool live_region_lost_{};
+    // The last compositor state report's generation; 0 before the first.
+    CompositorGeneration compositor_generation_{};
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
     bool recovery_expose_pending_{};
 #endif
     double scale_{1.0};
     std::uint64_t next_sequence_{1};
+    // The double-click interval last reported; 0 before the first report.
+    std::uint32_t reported_double_click_milliseconds_{};
     std::uint64_t native_callback_faults_{};
     wchar_t pending_high_surrogate_{};
     bool render_dispatch_pending_{};
@@ -4339,7 +4463,11 @@ HostCapabilities windows_capabilities() {
                 HostCapability::window_frames |
                 HostCapability::screen_pointer |
                 HostCapability::window_at_point |
-                HostCapability::window_ordering,
+                HostCapability::window_ordering |
+                HostCapability::transparent_windows |
+                HostCapability::window_backdrops |
+                HostCapability::compositor_notifications |
+                HostCapability::presentation_preferences,
             // Windows follows the PC keyboard convention (Ctrl+F4 closes a
             // document).
             pc_key_map()};
