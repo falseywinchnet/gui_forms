@@ -388,7 +388,7 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
         }
 
         // Premultiplied RGBA source rows: swizzled from a BGRA resource, or
-        // decoded by the shared owned CNG or PNG path (as on every host).
+        // decoded by the shared owned resource path (as on every host).
         CGImageRef source_image = nullptr;
         const std::size_t tight_row_bytes =
             static_cast<std::size_t>((*resource).metadata.width) * 4U;

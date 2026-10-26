@@ -2458,7 +2458,7 @@ private:
         glyph_runs_.reset();
     }
 
-    // The shared owned CNG or PNG decode (src/core/image/resource_pixels), as
+    // The shared owned resource decode (src/core/image/resource_pixels), as
     // on every host: premultiplied BGRA, the DIB's native order.
     static bool decode_resource(gui_forms::image::ResourcePixelDecoder& decoder,
                                 const ImageResourceView& resource,
