@@ -2720,6 +2720,7 @@ public:
         if (!attached.accepted()) return false;
         native_phase_ = NativePhase::attached;
         report_compositor_state();
+        report_input_settings();
         accessibility_.attach(hwnd_, *model_, scale_);
         (*model_).set_dispatch_wake_handler(
             gui_forms::detail::BoundMemberFunction<
@@ -2891,6 +2892,12 @@ public:
         }
         switch (message) {
         case WM_SETTINGCHANGE:
+            // Broadcast to top-level windows for any system setting; the
+            // double-click interval is read again and reported if it moved,
+            // and the compositor state when the setting is one it reads.
+            report_input_settings();
+            if (detail::windows_compositor_message(message, wparam, lparam)) report_compositor_state();
+            break;
         case WM_THEMECHANGED:
         case WM_DWMCOMPOSITIONCHANGED:
             if (detail::windows_compositor_message(message, wparam, lparam)) report_compositor_state();
@@ -3342,6 +3349,19 @@ private:
                         static_cast<std::size_t>(tooltip_.width) * 4U);
         }
         return true;
+    }
+
+    // The system's double-click interval (GetDoubleClickTime, which Windows
+    // keeps between 1 and 5000 milliseconds), reported after attach and on
+    // WM_SETTINGCHANGE whenever it differs from the last report.
+    void report_input_settings() {
+        const UINT read = GetDoubleClickTime();
+        std::uint32_t interval = static_cast<std::uint32_t>(read);
+        if (interval == 0U) interval = 1U;
+        if (interval > maximum_double_click_milliseconds) interval = maximum_double_click_milliseconds;
+        if (interval == reported_double_click_milliseconds_) return;
+        const HostDispatchResult reported = dispatch(HostInputSettingsEvent{interval, SettingOrigin::host});
+        if (reported.accepted()) reported_double_click_milliseconds_ = interval;
     }
 
     void resize() {
@@ -4318,6 +4338,8 @@ private:
 #endif
     double scale_{1.0};
     std::uint64_t next_sequence_{1};
+    // The double-click interval last reported; 0 before the first report.
+    std::uint32_t reported_double_click_milliseconds_{};
     std::uint64_t native_callback_faults_{};
     wchar_t pending_high_surrogate_{};
     bool render_dispatch_pending_{};

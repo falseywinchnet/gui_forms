@@ -155,6 +155,14 @@ bool valid_drag_event(const DragEvent& event) noexcept {
 // second attach, after close authorization only the close, shutdown or a
 // passive deactivation or occlusion, once closed only shutdown, and nothing
 // after shutdown.
+bool valid_input_settings(const HostInputSettingsEvent& input) noexcept {
+    const bool interval = input.double_click_milliseconds != 0U &&
+                          input.double_click_milliseconds <= maximum_double_click_milliseconds;
+    const bool origin = input.double_click_origin == SettingOrigin::default_value ||
+                        input.double_click_origin == SettingOrigin::host;
+    return interval && origin;
+}
+
 HostDispatchError lifecycle_refusal(HostLifecyclePhase phase, bool attach, bool shutdown,
                                     bool closed, bool passive_terminal) noexcept {
     switch (phase) {
@@ -322,6 +330,13 @@ void HostSession::DispatchVisitor::operator()(
         const bool host_preferences =
             (*session).snapshot_.capabilities.supports(HostCapability::presentation_preferences);
         (*(*session).window_).set_compositor_state(payload.state, host_preferences);
+    } else if constexpr (std::is_same_v<Payload, HostInputSettingsEvent>) {
+        // Only the reported fields change; the application's own settings
+        // stay as they are.
+        PresentationSettings settings = (*(*session).window_).presentation_settings();
+        settings.double_click_milliseconds = payload.double_click_milliseconds;
+        settings.double_click_origin = payload.double_click_origin;
+        (*(*session).window_).set_presentation_settings(settings);
     }
 }
 
@@ -392,6 +407,13 @@ HostDispatchResult HostSession::dispatch(HostEvent event) {
     }
     if (const gui_forms::DragEvent* drag = std::get_if<DragEvent>(&event.payload);
         drag != nullptr && !valid_drag_event(*drag)) {
+        result.error = HostDispatchError::invalid_payload;
+        ++snapshot_.events_rejected;
+        observed_.emit(event, result);
+        return result;
+    }
+    if (const HostInputSettingsEvent* input = std::get_if<HostInputSettingsEvent>(&event.payload);
+        input != nullptr && !valid_input_settings(*input)) {
         result.error = HostDispatchError::invalid_payload;
         ++snapshot_.events_rejected;
         observed_.emit(event, result);
