@@ -140,6 +140,37 @@ The two builds agree on everything the adapter uses. CI's Windows runner
 can therefore run the C2 gate's `transparent` step for real, and its
 material step exercises the `os_version` fallback to `transparent`.
 
+### The owner's gate runs, Shadow Windows, 2026-10-25
+
+The C2 gate (`gui_forms_windows_compositor_tests`, built from
+`claude/t5-c2-windows` 58d61a18), run by the owner in three states. Two
+found defects on our side; neither run is evidence of the setting itself.
+
+1. **High contrast on.** The state line read `"compositing":"absent"`
+   with `"high_contrast":true`, and `material` and `transparent` were
+   granted `opaque` with the reason `no_compositor`. The gate failed on
+   "DWM composes on every supported Windows". Two defects:
+   - `DwmIsCompositionEnabled` answers FALSE under a contrast theme on
+     build 26200, although DWM cannot be off from Windows 8 on. The
+     adapter now reports compositing present on Windows 8 and later and
+     asks `DwmIsCompositionEnabled` only on an older system.
+   - High contrast was checked after the host's refusals, so a misread
+     compositor hid the user's setting. It is now checked right after
+     `not_declared` (C0, `window_backdrop_refusal`), and the gate checks
+     that a withdrawn backdrop gives the user's setting as its reason.
+2. **Transparency effects off.** The state line read
+   `"transparency_enabled":true,"reduced_transparency":false`, and every
+   step was granted as at normal settings. Either the setting had not
+   taken effect when the program read it, or the reader is wrong; the run
+   cannot say which. The gate's state line now carries the raw sources,
+   read independently of the host: `EnableTransparency` and its read
+   status, `UISettings.AdvancedEffectsEnabled`, `SPI_GETHIGHCONTRAST`'s
+   flags, `DwmIsCompositionEnabled` and the build. The run scripts show
+   the registry value before the run starts.
+3. **Restored (normal settings)** passed, as at the first gate run.
+
+The rerun of 1 and 2 with the fixed program is the owner's.
+
 ## C3. macOS (the window server)
 
 **How.** `gui_forms_macos_compositor_probe` (`tests/macos_compositor_probe.mm`,
@@ -227,3 +258,25 @@ the raster view, inside a container made with the window, because moving
 the raster view out of its window stops its display link; reduce
 transparency comes from `NSWorkspace` and its change notification;
 `ignoresMouseEvents` is set to NO on every non-opaque grant.
+
+### The bench Mac run (owner), 2026-10-25
+
+The probe's windows were never active, so its material readings are not
+evidence. On macOS 14 and later `[NSApp activate]` is granted only when
+the active application yields, and Terminal, which started the probe,
+does not. `lsappinfo` reported the probe frontmost, but the screenshots
+show grey traffic lights and Terminal's menu bar. Every effect view
+(`followsWindowActiveState`) therefore drew its inactive solid colour:
+all 12 materials failed criterion 4 in Light and Dark, and no case
+received its posted click. Criteria 1 to 3 passed.
+
+The probe is now an application bundle launched through LaunchServices
+(`open`, `tests/support/run_macos_probe_bundle.sh`), which activates it
+as an ordinary application, with `activateIgnoringOtherApps:` only as a
+fallback; its settings line records which one worked. Each case records
+the window's `isKeyWindow` and `NSApp.isActive`, and a material case read
+while either is false prints only `"not_exercised":"window inactive"`,
+after which the run fails with "not exercised: window inactive". The
+effect views still follow the window's active state, as the adapter's
+do: the rerun confirms the materials in an active window, not a forced
+state. The rerun is the owner's, from the fresh bench sheet.
