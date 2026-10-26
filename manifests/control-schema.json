@@ -1496,6 +1496,7 @@
         {"name": "focus_observed", "payload": "bool", "mutable_payload": false},
         {"name": "arranged_bounds_changed", "payload": "Rect", "mutable_payload": false},
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
+        {"name": "draw_item_content", "payload": "ItemContentPaint", "mutable_payload": true},
         {"name": "selection_changed", "payload": "ListViewSelectionChange", "mutable_payload": false},
         {"name": "item_activated", "payload": "ListViewItemActivation", "mutable_payload": false},
         {"name": "item_checking", "payload": "ListViewItemCheck", "mutable_payload": true},
@@ -3399,6 +3400,7 @@
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
         {"name": "scroll", "payload": "ScrollEvent", "mutable_payload": true},
         {"name": "auto_validate_changed", "payload": "AutoValidate", "mutable_payload": false},
+        {"name": "draw_item_content", "payload": "ItemContentPaint", "mutable_payload": true},
         {"name": "selected_index_changed", "payload": "TabSelectionChange", "mutable_payload": false}
       ]
     },
@@ -3476,6 +3478,7 @@
         {"name": "focus_observed", "payload": "bool", "mutable_payload": false},
         {"name": "arranged_bounds_changed", "payload": "Rect", "mutable_payload": false},
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
+        {"name": "draw_item_content", "payload": "ItemContentPaint", "mutable_payload": true},
         {"name": "page_invoked", "payload": "PageInvocation", "mutable_payload": false},
         {"name": "page_close_requested", "payload": "PageCloseRequest", "mutable_payload": true},
         {"name": "page_pin_requested", "payload": "PagePinRequest", "mutable_payload": true},

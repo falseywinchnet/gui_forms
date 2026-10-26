@@ -172,6 +172,7 @@ void ListView::set_view(ListViewView view) {
     if (view_ == view) return;
     view_ = view;
     hot_index_.reset();
+    ++model_revision_;
     hot_column_.reset();
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
@@ -197,6 +198,7 @@ void ListView::set_columns(std::vector<ListViewColumn> columns) {
     pressed_column_.reset();
     hot_column_.reset();
     columns_ = std::move(columns);
+    ++model_revision_;
     if (sort_column_ && *sort_column_ >= columns_.size()) {
         sort_column_.reset();
         sort_order_ = ListViewSortOrder::none;
@@ -273,6 +275,7 @@ void ListView::set_items(std::vector<ListViewItem> items) {
     focused_index_ = next_focus;
     anchor_index_ = next_anchor;
     hot_index_.reset();
+    ++model_revision_;
     insertion_mark_.reset();
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
     if (selection_changed) publish_selection();
@@ -289,6 +292,7 @@ void ListView::reset_after_model_change(std::size_t count) {
     if (focused_index_ && *focused_index_ >= count) focused_index_.reset();
     if (anchor_index_ && *anchor_index_ >= count) anchor_index_.reset();
     hot_index_.reset();
+    ++model_revision_;
     insertion_mark_.reset();
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
     if (selection_changed) publish_selection();
@@ -721,6 +725,7 @@ void ListView::sort_items(std::size_t column, ListViewSortOrder order) {
     if (focused_index_) focused_index_ = position_of[*focused_index_];
     if (anchor_index_) anchor_index_ = position_of[*anchor_index_];
     hot_index_.reset();
+    ++model_revision_;
     insertion_mark_.reset();
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
     if (moved) publish_selection();
@@ -765,6 +770,16 @@ void ListView::on_attached_to_window() {
         (large_images_ && !(*large_images_).belongs_to(*window()))) {
         throw std::logic_error("ListView cannot attach to a Window other than its ImageLists'");
     }
+}
+
+void ListView::set_draw_mode(ItemDrawMode mode) {
+    require_mutable();
+    if (mode != ItemDrawMode::normal && mode != ItemDrawMode::owner_draw) {
+        throw std::invalid_argument("ListView draw mode is invalid");
+    }
+    if (draw_mode_ == mode) return;
+    draw_mode_ = mode;
+    invalidate(Dirty::paint);
 }
 
 void ListView::set_font(FontSpec font) {
@@ -1140,7 +1155,15 @@ void ListView::paint_column(Painter& painter, const Layout& placed, std::size_t 
     // sign; painting the grip role would draw grip dots at every divider.
 }
 
-void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t index) {
+bool ListView::model_unchanged(std::uint64_t revision) const noexcept {
+    const bool unchanged = is_alive() && model_revision_ == revision;
+    return unchanged;
+}
+
+// The plate, the check box and the focus cue are painted by role in every
+// mode; the content (icon, text and sub-item text) is the application's in
+// the owner-draw mode, after the plate and before the focus cue.
+bool ListView::paint_item(Painter& painter, const Layout& placed, std::size_t index) {
     const ListViewItem& item = item_at(index, paint_item_);
     const Rect cell = item_bounds(placed, index);
     const ItemParts parts = item_parts(placed, index, cell);
@@ -1168,7 +1191,28 @@ void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
         }
         part.family = ControlVisualRole::selection;
     }
-    if (parts.icon.present && !item.image_key.empty()) {
+    const bool owner_drawn = draw_mode_ == ItemDrawMode::owner_draw;
+    bool default_content = true;
+    if (owner_drawn) {
+        // The handlers see the identity through the view's own copy, which
+        // stays valid for the whole raise even when one of them replaces
+        // the items.
+        paint_stable_id_ = item.stable_id;
+        const Rect content = parts.icon.present ? Rect::united(parts.icon.bounds, parts.text.bounds)
+                                                : parts.text.bounds;
+        ItemContentPaint request{.painter = painter,
+                                 .index = index,
+                                 .column = 0U,
+                                 .stable_id = paint_stable_id_,
+                                 .content = content,
+                                 .states = states,
+                                 .font = part.font,
+                                 .text = item_content_text(*this, ControlVisualRole::selection, states)};
+        const std::uint64_t revision = model_revision_;
+        default_content = raise_item_content_paint(draw_item_content_, request);
+        if (!model_unchanged(revision)) return false;
+    }
+    if (default_content && parts.icon.present && !item.image_key.empty()) {
         const std::shared_ptr<ImageList>& images =
             view_ == ListViewView::large_icon ? large_images_ : small_images_;
         const Window* const host = attached_window();
@@ -1185,10 +1229,12 @@ void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
     part.role = PartRole::content;
     part.bounds = parts.text.bounds;
     part.alignment = view_ == ListViewView::large_icon ? PartTextAlignment::center : PartTextAlignment::start;
-    details_detail::elide_to_width(painter, item.text, part.font, part.bounds.width, paint_text_);
-    part.text = paint_text_;
-    paint_part(painter, *this, part);
-    part.text = {};
+    if (default_content) {
+        details_detail::elide_to_width(painter, item.text, part.font, part.bounds.width, paint_text_);
+        part.text = paint_text_;
+        paint_part(painter, *this, part);
+        part.text = {};
+    }
     if (view_ == ListViewView::details) {
         AnatomyStateSet sub_states;
         if (states.contains(AnatomyState::selected)) sub_states.insert(AnatomyState::selected);
@@ -1199,6 +1245,20 @@ void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
             const Rect header = column_cell(placed, column);
             const Rect sub_cell{header.x, cell.y, header.width, cell.height};
             const SubItemParts sub = sub_item_parts(placed, index, column, sub_cell);
+            if (owner_drawn) {
+                ItemContentPaint request{.painter = painter,
+                                         .index = index,
+                                         .column = column,
+                                         .stable_id = paint_stable_id_,
+                                         .content = sub.sub_item_text.bounds,
+                                         .states = sub_states,
+                                         .font = part.font,
+                                         .text = item_content_text(*this, ControlVisualRole::selection, sub_states)};
+                const std::uint64_t revision = model_revision_;
+                const bool sub_default = raise_item_content_paint(draw_item_content_, request);
+                if (!model_unchanged(revision)) return false;
+                if (!sub_default) continue;
+            }
             part.bounds = sub.sub_item_text.bounds;
             part.alignment = text_alignment(columns_[column].alignment);
             details_detail::elide_to_width(painter, column_text(item, column), part.font, part.bounds.width,
@@ -1213,6 +1273,7 @@ void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
     part.role = PartRole::focus;
     part.bounds = parts.cell_focus.bounds;
     paint_part(painter, *this, part);
+    return true;
 }
 
 void ListView::on_paint(Painter& painter, Rect) {
@@ -1245,7 +1306,12 @@ void ListView::on_paint(Painter& painter, Rect) {
         painter.clip_rect(placed.viewport);
         const std::size_t end = end_realized(placed);
         for (std::size_t index = first_realized(placed); index < end; ++index) {
-            paint_item(painter, placed, index);
+            // An owner-draw handler that changed the model ends this paint;
+            // the change has already asked for the next one.
+            if (!paint_item(painter, placed, index)) {
+                painter.restore();
+                return;
+            }
         }
         const Rect mark = insertion_mark_bounds(placed);
         if (!mark.empty()) {
@@ -2152,7 +2218,8 @@ std::vector<ListView::Column> ListView::realized_columns() const {
 namespace {
 
 // The events ListView adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 6> list_view_interactions{{
+constexpr std::array<InteractionDeclaration, 7> list_view_interactions{{
+    {.name = "draw_item_content", .payload = "ItemContentPaint", .mutable_payload = true},
     {.name = "selection_changed", .payload = "ListViewSelectionChange", .mutable_payload = false},
     {.name = "item_activated", .payload = "ListViewItemActivation", .mutable_payload = false},
     {.name = "item_checking", .payload = "ListViewItemCheck", .mutable_payload = true},
