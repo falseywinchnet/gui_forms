@@ -184,6 +184,25 @@ coordinator.
    records the vocabulary's new version and digest and the built-in themes'
    recipes for the role.
 
+## Owner decisions, 2026-10-26
+
+The owner answered W-Q5 and W-Q6 on 2026-10-26, through the coordinator,
+both as recommended.
+
+5. **The link role (W-Q5) is two families, `link` and `visited_link`**,
+   chosen by the link's visited flag. Hover keeps the normal link colour.
+   This refines decision 4's state list. The vocabulary PR comes first, with
+   `LinkLabel`'s goldens unchanged, then `DataGridViewLinkColumn` on top of
+   it.
+6. **Owner drawing (W-Q6) is content-only.** A per-item draw event receives
+   GUI.Forms' `Painter` and the item's content rectangle; the plate,
+   selection and focus stay painted by role. It lands as one cross-control
+   seam PR first, then `ListView` and `TabControl` adopt it, and later the
+   `ListBox` family.
+
+The rich text library is named `stx_rtf2md` (RT-Q1); the
+[rich text brief](RICH_TEXT_BRIEF.md) records it and the other answers.
+
 ## Advanced candidates, 2026-10-14
 
 The owner listed common advanced controls from other frameworks and

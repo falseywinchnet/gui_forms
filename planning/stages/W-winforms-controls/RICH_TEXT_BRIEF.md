@@ -19,10 +19,11 @@ and the control once the library's seam (below) exists.
 
 ### Name
 
-Proposed: **`stx_rtf`**, beside `stx_zlib`, `stx_png` and `stx_vorbis`
-(`gui_forms/stx_rtf/`, target `stx_rtf::stx_rtf`). Alternative, if the
-owner wants the name to say both formats: `stx_richtext`. The name is the
-owner's call; the rest of this brief uses `stx_rtf`.
+**`stx_rtf2md`** (owner, RT-Q1, 2026-10-26), beside `stx_zlib`, `stx_png`
+and `stx_vorbis` (`gui_forms/stx_rtf2md/`, target `stx_rtf2md::stx_rtf2md`).
+The library is the RT stage; its plan,
+`planning/stages/RT-rich-text/PLAN.md`, is authoritative where it and this
+brief differ.
 
 ### Shape
 
@@ -135,12 +136,12 @@ Bounded in effort units, never wall-clock (the zlib stage's rule):
 
 ## Part 2: RichTextBox's run model (W, after the seam exists)
 
-W's to build once `stx_rtf`'s `Document` seam has landed and the
+W's to build once `stx_rtf2md`'s `Document` seam has landed and the
 coordinator confirms:
 
 - **The run model** (`RichTextModel`, private to the control or a public
   `gui_forms/text/rich_text` type if a second control needs it): paragraphs
-  of styled runs, seeded from and saved to `stx_rtf::Document`, with run
+  of styled runs, seeded from and saved to `stx_rtf2md::Document`, with run
   splitting and merging on edits, selection by scalar position, and style
   queries and changes over a selection (Windows Forms' `SelectionFont`,
   `SelectionColor`, `SelectionBullet`, `SelectionAlignment` and the rest,
@@ -154,12 +155,10 @@ coordinator confirms:
   and Windows Forms' RTF-specific members that have no meaning over the run
   model (they are classified in the catalogue as declined, with the reason).
 
-## Open questions for the owner
+## Owner answers, 2026-10-26
 
-1. The library's name: `stx_rtf` (recommended) or `stx_richtext`.
-2. The extension spelling for underline, colour and size: the attribute
-   span `[text]{u}` (recommended; one rule for every attribute, and it reads
-   as plain text elsewhere) or HTML-like tags (`<u>`), which the dialect
-   otherwise excludes.
-3. Code pages beyond 1252 in the first version: none (recommended; Word,
-   WordPad and TextEdit write `\u` for non-Latin text) or a stated list.
+1. The library's name is `stx_rtf2md` (RT-Q1).
+2. The extension spelling is the attribute span, `[text]{u}`, as
+   recommended; the RT plan's span also carries superscript, subscript,
+   colour, background colour and size, all accepted.
+3. The first version reads code page 1252 only, as recommended.
