@@ -28,6 +28,15 @@ gui_forms::GridLayoutPanel
    :cpp:class:`FlexLayoutPanel <gui_forms::FlexLayoutPanel>` for one-dimensional rows or columns, and a
    :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>` for the Windows Forms table.
 
+   A child's record can also position it, as CSS's ``position`` does. A
+   relative child is offset by its insets after layout without moving its
+   neighbours. An absolute child leaves the flow and is placed by its insets,
+   size and margins in the padding box of its nearest positioned box: this
+   panel when its own parent positions it, otherwise a positioned ancestor,
+   or the window's client area. When that box is not this panel, the window
+   records a ``containing_block_not_parent`` warning in
+   ``Window::layout_diagnostics()``, once for each change of the box.
+
    *Status:* stable.
 
    :Parameters:
@@ -134,6 +143,8 @@ gui_forms::GridLayoutPanel
 
       * - :cpp:func:`item_layout <gui_forms::GridLayoutPanel::item_layout>`
         - The child's item layout, or the default one for a child without its own record or a control that is not a direct child.
+      * - :cpp:func:`item_positioning <gui_forms::GridLayoutPanel::item_positioning>`
+        - The child's ``position`` and insets, without copying its whole record; static for a control that is not a live direct child.
       * - :cpp:func:`set_item_layout <gui_forms::GridLayoutPanel::set_item_layout>`
         - ``set_item_layout(child, layout)`` sets a direct child's :cpp:class:`GridItemLayout <gui_forms::GridItemLayout>`: its ``placement`` (:cpp:class:`GridItemStyle <gui_forms::GridItemStyle>`'s four :cpp:class:`GridLine <gui_forms::GridLine>` values: ``automatic``, a line number other than zero, negative from the end, ``span`` of at least one, or a named area's edge); ``justify_self`` and ``align_self``; its ``width``, ``height``, minimums and maximums; and which margins are ``auto``.
 
@@ -407,6 +418,10 @@ gui_forms::GridLayoutPanel
 
       The child's item layout, or the default one for a child without its
       own record or a control that is not a direct child.
+
+   .. cpp:function:: ItemPositioning item_positioning(const Control& child) const noexcept
+
+      The child's ``position`` and insets, without copying its whole record; static for a control that is not a live direct child.
 
    .. cpp:function:: void set_item_layout(const Control& child, const GridItemLayout& layout)
 

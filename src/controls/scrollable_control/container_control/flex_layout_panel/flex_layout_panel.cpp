@@ -8,6 +8,7 @@
 #include "gui_forms/controls/scrollable_control/container_control/flex_layout_panel/flex_layout_panel.hpp"
 
 #include "../../scrollable_anatomy.hpp"
+#include "../out_of_flow.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -145,7 +146,8 @@ bool admitted_item_layout(const FlexItemLayout& layout) noexcept {
     }
     return admitted_size(layout.width, false) && admitted_size(layout.height, false) &&
            admitted_size(layout.min_width, false) && admitted_size(layout.min_height, false) &&
-           admitted_size(layout.max_width, true) && admitted_size(layout.max_height, true);
+           admitted_size(layout.max_width, true) && admitted_size(layout.max_height, true) &&
+           out_of_flow::admitted_positioning(layout.positioning);
 }
 
 const FlexItemLayout default_item_layout{};
@@ -239,8 +241,13 @@ void FlexLayoutPanel::set_item_layout(const Control& child, const FlexItemLayout
     const ItemMap::iterator found = items_.find(id);
     if (found != items_.end() && (*found).second.layout == layout) return;
     if (found == items_.end() && layout == default_item_layout) return;
+    const bool was_positioned = record_for(child).positioning.position != PositionKind::static_position;
     items_[id].layout = layout;
     invalidate(invalidation::bounds);
+    // A child that becomes, or stops being, a positioned box changes the
+    // containing block of absolute children below it.
+    const bool positioned = layout.positioning.position != PositionKind::static_position;
+    if (positioned != was_positioned) notify_positioning_changed(child);
 }
 
 FlexItemLayout FlexLayoutPanel::item_layout(const Control& child) const {
@@ -280,8 +287,13 @@ void FlexLayoutPanel::gather_children() {
     const std::span<const Control::Ptr> all = children();
     children_.clear();
     children_.reserve(all.size());
+    absolute_children_.clear();
     for (const Control::Ptr& child : all) {
         if (!child || !is_current_layout_child(child) || !(*child).visible()) continue;
+        if (record_for(*child).positioning.position == PositionKind::absolute) {
+            absolute_children_.push_back(child);
+            continue;
+        }
         children_.push_back(child);
     }
 }
@@ -458,7 +470,8 @@ void FlexLayoutPanel::measure_item_crosses(const SolveRequest& request, const Fl
     }
 }
 
-void FlexLayoutPanel::publish_slots(const FlexLayoutWorkspace& workspace) {
+void FlexLayoutPanel::publish_slots(const FlexLayoutWorkspace& workspace, Size content_box) {
+    const LayoutDirection direction = effective_layout_direction();
     const std::span<const FlexItemResult> results = workspace.items();
     const Insets inset = padding();
     const Point offset = scroll_position();
@@ -469,8 +482,9 @@ void FlexLayoutPanel::publish_slots(const FlexLayoutWorkspace& workspace) {
         arranged_ids_.push_back((*child).runtime_id());
         if (index >= results.size() || !is_current_layout_child(child)) continue;
         const Rect bounds = results[index].bounds;
-        const Rect slot{inset.left + bounds.x - offset.x, inset.top + bounds.y - offset.y, bounds.width,
-                        bounds.height};
+        const Point shift = relative_position_offset(record_for(*child).positioning, content_box, direction);
+        const Rect slot{inset.left + bounds.x - offset.x + shift.x, inset.top + bounds.y - offset.y + shift.y,
+                        bounds.width, bounds.height};
         set_child_layout(child, slot);
     }
 }
@@ -492,7 +506,7 @@ Size FlexLayoutPanel::solve(const SolveRequest& request, FlexLayoutWorkspace& wo
     measure_item_crosses(request, workspace);
     if (!is_alive()) return {};
     static_cast<void>(place_flex_items(container, inputs_, crosses_, workspace));
-    if (request.assign) publish_slots(workspace);
+    if (request.assign) publish_slots(workspace, Size{request.width.extent, request.height.extent});
     const bool horizontal = horizontal_main(direction_);
     const FlexAvailableExtent& main_space = horizontal ? request.width : request.height;
     const FlexAvailableExtent& cross_space = horizontal ? request.height : request.width;
@@ -640,6 +654,42 @@ void FlexLayoutPanel::arrange(Rect final_bounds) {
     request.height = FlexAvailableExtent{std::max(0.0, available.height - inset.top - inset.bottom), true};
     request.assign = true;
     static_cast<void>(solve(request, arranged_));
+    if (!is_alive()) return;
+    place_absolute_children(client);
+}
+
+void FlexLayoutPanel::place_absolute_children(Size client) {
+    if (absolute_children_.empty()) {
+        if (registered_dependencies_) set_containing_block_dependencies({});
+        registered_dependencies_ = false;
+        return;
+    }
+    const out_of_flow::ContainingBlock block = out_of_flow::resolve_containing_block(*this);
+    out_of_flow::fill_dependency_path(*this, block, dependency_path_);
+    set_containing_block_dependencies(dependency_path_);
+    registered_dependencies_ = true;
+    out_of_flow::AbsoluteContainer container{};
+    container.padding = padding();
+    container.size = client;
+    container.scroll = scroll_position();
+    container.direction = effective_layout_direction();
+    for (const Control::Ptr& child : absolute_children_) {
+        if (!is_current_layout_child(child)) continue;
+        // The block holds its ancestor, so a measure callback that changes
+        // the tree leaves it readable; such a change is laid out by the
+        // next pass.
+        note_containing_block(*child, *block.ancestor);
+        const out_of_flow::AbsoluteItem item = out_of_flow::absolute_item(record_for(*child));
+        const Rect slot = out_of_flow::place_absolute_child(*child, item, block, container);
+        if (!is_alive()) return;
+        if (!is_current_layout_child(child)) continue;
+        set_child_layout(child, slot);
+    }
+}
+
+ItemPositioning FlexLayoutPanel::item_positioning(const Control& child) const noexcept {
+    if (child.parent().get() != this) return ItemPositioning{};
+    return record_for(child).positioning;
 }
 
 bool FlexLayoutPanel::measures_children_in_arrange() const noexcept {

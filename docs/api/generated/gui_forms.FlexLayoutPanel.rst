@@ -24,6 +24,15 @@ gui_forms::FlexLayoutPanel
    Windows Forms flow, and a :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>` when items must line up in
    columns.
 
+   A child's record can also position it, as CSS's ``position`` does. A
+   relative child is offset by its insets after layout without moving its
+   neighbours. An absolute child leaves the flow and is placed by its insets,
+   size and margins in the padding box of its nearest positioned box: this
+   panel when its own parent positions it, otherwise a positioned ancestor,
+   or the window's client area. When that box is not this panel, the window
+   records a ``containing_block_not_parent`` warning in
+   ``Window::layout_diagnostics()``, once for each change of the box.
+
    *Status:* stable.
 
    :Parameters:
@@ -97,6 +106,8 @@ gui_forms::FlexLayoutPanel
 
       * - :cpp:func:`item_layout <gui_forms::FlexLayoutPanel::item_layout>`
         - The child's item layout, or the default one for a child without its own record or a control that is not a direct child.
+      * - :cpp:func:`item_positioning <gui_forms::FlexLayoutPanel::item_positioning>`
+        - The child's ``position`` and insets, without copying its whole record; static for a control that is not a live direct child.
       * - :cpp:func:`set_item_layout <gui_forms::FlexLayoutPanel::set_item_layout>`
         - ``set_item_layout(child, layout)`` sets a direct child's :cpp:class:`FlexItemLayout <gui_forms::FlexItemLayout>`: its ``flex`` grow and shrink factors, basis and order; ``align_self``; its ``width``, ``height``, minimums and maximums; and which margins are ``auto``.
 
@@ -302,6 +313,10 @@ gui_forms::FlexLayoutPanel
 
       The child's item layout, or the default one for a child without its
       own record or a control that is not a direct child.
+
+   .. cpp:function:: ItemPositioning item_positioning(const Control& child) const noexcept
+
+      The child's ``position`` and insets, without copying its whole record; static for a control that is not a live direct child.
 
    .. cpp:function:: void set_item_layout(const Control& child, const FlexItemLayout& layout)
 

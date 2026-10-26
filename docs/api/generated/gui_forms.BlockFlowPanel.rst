@@ -28,6 +28,15 @@ gui_forms::BlockFlowPanel
    for rows or columns that grow and shrink, and a :cpp:class:`GridLayoutPanel <gui_forms::GridLayoutPanel>` for
    items that line up on both axes.
 
+   A child's record can also position it, as CSS's ``position`` does. A
+   relative child is offset by its insets after layout without moving its
+   neighbours. An absolute child leaves the flow and is placed by its insets,
+   size and margins in the padding box of its nearest positioned box: this
+   panel when its own parent positions it, otherwise a positioned ancestor,
+   or the window's client area. When that box is not this panel, the window
+   records a ``containing_block_not_parent`` warning in
+   ``Window::layout_diagnostics()``, once for each change of the box.
+
    *Status:* stable.
 
    :Parameters:
@@ -81,6 +90,8 @@ gui_forms::BlockFlowPanel
 
       * - :cpp:func:`item_layout <gui_forms::BlockFlowPanel::item_layout>`
         - The child's item layout, or the default one for a child without its own record or a control that is not a direct child.
+      * - :cpp:func:`item_positioning <gui_forms::BlockFlowPanel::item_positioning>`
+        - The child's ``position`` and insets, without copying its whole record; static for a control that is not a live direct child.
       * - :cpp:func:`shared_margins <gui_forms::BlockFlowPanel::shared_margins>`
         - ``shared_margins(width)`` reports the margins this panel's content collapses through its top and bottom edges when it is laid out at that border-box width as a block item of another block flow panel, which reads them; for any other panel it reports none.
       * - :cpp:func:`set_item_layout <gui_forms::BlockFlowPanel::set_item_layout>`
@@ -246,6 +257,10 @@ gui_forms::BlockFlowPanel
 
       The child's item layout, or the default one for a child without its
       own record or a control that is not a direct child.
+
+   .. cpp:function:: ItemPositioning item_positioning(const Control& child) const noexcept
+
+      The child's ``position`` and insets, without copying its whole record; static for a control that is not a live direct child.
 
    .. cpp:function:: BlockFlowSharedMargins shared_margins(double width)
 

@@ -9,6 +9,7 @@
 #include "gui_forms/controls/scrollable_control/container_control/block_flow_panel/block_flow_panel.hpp"
 
 #include "../../scrollable_anatomy.hpp"
+#include "../out_of_flow.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -66,7 +67,8 @@ bool admitted_item_layout(const BlockFlowItemLayout& layout) noexcept {
     if (layout.vertical_align > InlineVerticalAlignment::bottom) return false;
     return admitted_size(layout.width, false) && admitted_size(layout.height, false) &&
            admitted_size(layout.min_width, false) && admitted_size(layout.min_height, false) &&
-           admitted_size(layout.max_width, true) && admitted_size(layout.max_height, true);
+           admitted_size(layout.max_width, true) && admitted_size(layout.max_height, true) &&
+           out_of_flow::admitted_positioning(layout.positioning);
 }
 
 bool admitted_strut(const LineStrut& strut) noexcept {
@@ -147,8 +149,13 @@ void BlockFlowPanel::set_item_layout(const Control& child, const BlockFlowItemLa
     const ItemMap::iterator found = items_.find(id);
     if (found != items_.end() && (*found).second.layout == layout) return;
     if (found == items_.end() && layout == default_item_layout) return;
+    const bool was_positioned = record_for(child).positioning.position != PositionKind::static_position;
     items_[id].layout = layout;
     invalidate(invalidation::bounds);
+    // A child that becomes, or stops being, a positioned box changes the
+    // containing block of absolute children below it.
+    const bool positioned = layout.positioning.position != PositionKind::static_position;
+    if (positioned != was_positioned) notify_positioning_changed(child);
     // A nested panel's own layout reads its record here (whether it shares
     // this panel's margins, whether its height is definite), so its
     // measures are stale too.
@@ -196,7 +203,8 @@ bool BlockFlowPanel::shares_parent_flow() const noexcept {
     const Control::Ptr held = parent();
     const BlockFlowPanel* const flow = dynamic_cast<const BlockFlowPanel*>(held.get());
     if (flow == nullptr) return false;
-    return (*flow).record_for(*this).level == BlockFlowLevel::block;
+    const BlockFlowItemLayout& record = (*flow).record_for(*this);
+    return record.level == BlockFlowLevel::block && record.positioning.position != PositionKind::absolute;
 }
 
 bool BlockFlowPanel::percentage_heights_definite() const noexcept {
@@ -210,8 +218,13 @@ void BlockFlowPanel::gather_children() {
     const std::span<const Control::Ptr> all = children();
     children_.clear();
     children_.reserve(all.size());
+    absolute_children_.clear();
     for (const Control::Ptr& child : all) {
         if (!child || !is_current_layout_child(child) || !(*child).visible()) continue;
+        if (record_for(*child).positioning.position == PositionKind::absolute) {
+            absolute_children_.push_back(child);
+            continue;
+        }
         children_.push_back(child);
     }
 }
@@ -289,7 +302,8 @@ void BlockFlowPanel::resolve_item_inputs(const SolveRequest& request) {
     }
 }
 
-void BlockFlowPanel::publish_slots(const BlockFlowLayoutWorkspace& workspace) {
+void BlockFlowPanel::publish_slots(const BlockFlowLayoutWorkspace& workspace, Size content_box) {
+    const LayoutDirection direction = effective_layout_direction();
     const std::span<const BlockFlowItemResult> results = workspace.items();
     const Insets inset = padding();
     const Point offset = scroll_position();
@@ -300,8 +314,9 @@ void BlockFlowPanel::publish_slots(const BlockFlowLayoutWorkspace& workspace) {
         arranged_ids_.push_back((*child).runtime_id());
         if (index >= results.size() || !is_current_layout_child(child)) continue;
         const Rect bounds = results[index].bounds;
-        const Rect slot{inset.left + bounds.x - offset.x, inset.top + bounds.y - offset.y, bounds.width,
-                        bounds.height};
+        const Point shift = relative_position_offset(record_for(*child).positioning, content_box, direction);
+        const Rect slot{inset.left + bounds.x - offset.x + shift.x, inset.top + bounds.y - offset.y + shift.y,
+                        bounds.width, bounds.height};
         set_child_layout(child, slot);
     }
 }
@@ -331,7 +346,7 @@ BlockFlowPanel::SolveResult BlockFlowPanel::solve(const SolveRequest& request, B
     if (!is_alive()) return result;
     result.outcome = solve_block_flow(container, inputs_, workspace);
     if (result.outcome != BlockFlowSolveOutcome::solved) return result;
-    if (request.assign) publish_slots(workspace);
+    if (request.assign) publish_slots(workspace, Size{request.width, request.height});
     double content = workspace.content_height();
     if (container.shares_leading_margin) result.shared.leading = workspace.leading_margin();
     result.shared.open = workspace.leading_open();
@@ -507,6 +522,42 @@ void BlockFlowPanel::arrange(Rect final_bounds) {
     const SolveResult solved = solve(request, arranged_);
     arranged_outcome_ = solved.outcome;
     if (solved.outcome != BlockFlowSolveOutcome::solved) arranged_ids_.clear();
+    if (!is_alive()) return;
+    place_absolute_children(client);
+}
+
+void BlockFlowPanel::place_absolute_children(Size client) {
+    if (absolute_children_.empty()) {
+        if (registered_dependencies_) set_containing_block_dependencies({});
+        registered_dependencies_ = false;
+        return;
+    }
+    const out_of_flow::ContainingBlock block = out_of_flow::resolve_containing_block(*this);
+    out_of_flow::fill_dependency_path(*this, block, dependency_path_);
+    set_containing_block_dependencies(dependency_path_);
+    registered_dependencies_ = true;
+    out_of_flow::AbsoluteContainer container{};
+    container.padding = padding();
+    container.size = client;
+    container.scroll = scroll_position();
+    container.direction = effective_layout_direction();
+    for (const Control::Ptr& child : absolute_children_) {
+        if (!is_current_layout_child(child)) continue;
+        // The block holds its ancestor, so a measure callback that changes
+        // the tree leaves it readable; such a change is laid out by the
+        // next pass.
+        note_containing_block(*child, *block.ancestor);
+        const out_of_flow::AbsoluteItem item = out_of_flow::absolute_item(record_for(*child));
+        const Rect slot = out_of_flow::place_absolute_child(*child, item, block, container);
+        if (!is_alive()) return;
+        if (!is_current_layout_child(child)) continue;
+        set_child_layout(child, slot);
+    }
+}
+
+ItemPositioning BlockFlowPanel::item_positioning(const Control& child) const noexcept {
+    if (child.parent().get() != this) return ItemPositioning{};
+    return record_for(child).positioning;
 }
 
 bool BlockFlowPanel::measures_children_in_arrange() const noexcept {

@@ -177,6 +177,10 @@ Related types
 
    .. cpp:member:: BoxSides<bool> auto_margin
 
+   .. cpp:member:: ItemPositioning positioning
+
+      ``position`` and the insets (PLAN section 2.5): a relative item is offset after layout without moving its neighbours; an absolute item leaves the flow and is placed in its containing block after the in-flow items. Either makes the child a positioned box, the containing block of absolute children below it.
+
    .. cpp:member:: InlineVerticalAlignment vertical_align
 
       An inline item's alignment on its line. Default: ``{InlineVerticalAlignment::baseline}``.
@@ -611,6 +615,10 @@ Related types
 
    .. cpp:member:: BoxSides<bool> auto_margin
 
+   .. cpp:member:: ItemPositioning positioning
+
+      ``position`` and the insets (PLAN section 2.5): a relative item is offset after layout without moving its neighbours; an absolute item leaves the flow and is placed in its containing block after the in-flow items. Either makes the child a positioned box, the containing block of absolute children below it.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: GridItemLayout final
@@ -652,6 +660,10 @@ Related types
       Default: ``{SizeKind::none, {}}``.
 
    .. cpp:member:: BoxSides<bool> auto_margin
+
+   .. cpp:member:: ItemPositioning positioning
+
+      ``position`` and the insets (PLAN section 2.5): a relative item is offset after layout without moving its neighbours; an absolute item leaves the flow and is placed in its containing block after the in-flow items. Either makes the child a positioned box, the containing block of absolute children below it.
 
 .. cpp:namespace:: gui_forms
 

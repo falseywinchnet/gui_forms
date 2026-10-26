@@ -2,6 +2,7 @@
 
 #include "gui_forms/controls/scrollable_control/container_control/container_control.hpp"
 #include "gui_forms/layout/grid_solver/grid_solver.hpp"
+#include "gui_forms/layout/positioning/positioning.hpp"
 #include "gui_forms/layout/style/layout_style.hpp"
 
 #include <cstdint>
@@ -37,13 +38,19 @@ struct GridItemLayout final {
     SizeValue max_width{SizeKind::none, {}};
     SizeValue max_height{SizeKind::none, {}};
     BoxSides<bool> auto_margin{};
+    // `position` and the insets (PLAN section 2.5): a relative item is
+    // offset after layout without moving its neighbours; an absolute item
+    // leaves the flow and is placed in its containing block after the
+    // in-flow items. Either makes the child a positioned box, the
+    // containing block of absolute children below it.
+    ItemPositioning positioning{};
 
     friend bool operator==(const GridItemLayout& left, const GridItemLayout& right) {
         return left.placement == right.placement && left.justify_self == right.justify_self &&
                left.align_self == right.align_self && left.width == right.width && left.height == right.height &&
                left.min_width == right.min_width && left.min_height == right.min_height &&
                left.max_width == right.max_width && left.max_height == right.max_height &&
-               left.auto_margin == right.auto_margin;
+               left.auto_margin == right.auto_margin && left.positioning == right.positioning;
     }
 };
 
@@ -105,6 +112,9 @@ public:
     // the default one (auto-placed into one cell).
     void set_item_layout(const Control& child, const GridItemLayout& layout);
     [[nodiscard]] GridItemLayout item_layout(const Control& child) const;
+    // The child's `position` and insets, without copying its whole record;
+    // static for a control that is not a live direct child.
+    [[nodiscard]] ItemPositioning item_positioning(const Control& child) const noexcept;
 
     // The last arrange's resolution (PLAN 3.4): the tracks with their base
     // sizes, growth limits and positions, and per laid-out child, in the
@@ -167,7 +177,13 @@ private:
     // reads (an item stretched over fixed columns needs none).
     void measure_column_contributions(const SolveRequest& request, const GridLayoutWorkspace& workspace);
     void measure_row_contributions(const GridContainerInput& container, const GridLayoutWorkspace& workspace);
-    void publish_slots(const GridLayoutWorkspace& workspace);
+    // Assigns the in-flow children's slots, with relative offsets against
+    // the content box.
+    void publish_slots(const GridLayoutWorkspace& workspace, Size content_box);
+    // Places the absolutely positioned children gathered for the pass in
+    // their containing block (out_of_flow.hpp), registers the controls it
+    // depends on with the window, and reports each child's resolution.
+    void place_absolute_children(Size client);
     [[nodiscard]] GridContainerInput container_input(const SolveRequest& request) const noexcept;
     [[nodiscard]] const GridItemLayout& record_for(const Control& child) const noexcept;
     void forget_departed_children();
@@ -197,6 +213,12 @@ private:
     GridLayoutWorkspace workspace_{};
     GridLayoutWorkspace arranged_{};
     std::vector<RuntimeId> arranged_ids_{};
+    // The pass's absolutely positioned children, outside the solve, and
+    // the controls their containing block depends on (registered with the
+    // window while there are any).
+    std::vector<Control::Ptr> absolute_children_{};
+    std::vector<RuntimeId> dependency_path_{};
+    bool registered_dependencies_{};
     GridSolveOutcome arranged_outcome_{GridSolveOutcome::solved};
 };
 

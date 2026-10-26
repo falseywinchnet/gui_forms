@@ -1956,6 +1956,7 @@ void Window::detach_subtree_state(const Control::Ptr& control,
     if (released > 0U) metrics_.record_engine_parts_released(released, engine_parts_.record_count());
     // So do its motion values: they jump to their ends, without listeners.
     motion_clock_.release_owner(*control);
+    erase_containing_block_entries((*control).runtime_id());
     (*control).on_detaching_from_window(*this);
     (*control).window_ = nullptr;
     {
@@ -2893,6 +2894,7 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
     if (has_dirty((*control).dirty_, Dirty::arrange)) {
         const Rect old_bounds = visual_bounds_of(
             *control, (*control).last_painted_visual_outsets_);
+        const Rect old_arranged = (*control).arranged_bounds_;
         (*control).clear_dirty(Dirty::arrange | Dirty::hit_test);
         try {
             (*control).arrange(final_bounds);
@@ -2903,6 +2905,11 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
         }
         ++callbacks;
         if (!(*control).is_alive() || (*control).window_ != this) return;
+        // The containers below whose absolutely positioned children were
+        // placed against this control's box arrange in this same descent.
+        if (!containing_block_watches_.empty() && (*control).arranged_bounds_ != old_arranged) {
+            mark_containing_block_dependents(*control);
+        }
         const Rect new_bounds = visual_bounds_of(
             *control, (*control).effective_visual_outsets());
         if (old_bounds != new_bounds) {
@@ -2977,6 +2984,145 @@ void Window::mark_layout_ancestors(Control& control) noexcept {
         (*ancestor).subtree_dirty_ |= Dirty::measure | Dirty::arrange;
         ancestor = std::move(placing_parent);
     }
+}
+
+void Window::clear_layout_diagnostics() noexcept {
+    layout_diagnostics_.clear();
+    dropped_layout_diagnostics_ = 0U;
+}
+
+void Window::record_layout_diagnostic(LayoutDiagnostic diagnostic) {
+    if (layout_diagnostics_.size() >= maximum_layout_diagnostics) {
+        ++dropped_layout_diagnostics_;
+        return;
+    }
+    layout_diagnostics_.push_back(std::move(diagnostic));
+}
+
+void Window::note_containing_block(const Control& child, const Control& ancestor) {
+    const RuntimeId resolved = ancestor.runtime_id();
+    const std::uint64_t key = child.runtime_id().value;
+    const std::unordered_map<std::uint64_t, RuntimeId>::iterator found = containing_block_resolutions_.find(key);
+    if (found != containing_block_resolutions_.end()) {
+        if ((*found).second == resolved) return;
+        (*found).second = resolved;
+    } else {
+        containing_block_resolutions_.emplace(key, resolved);
+    }
+    const Control::Ptr parent = child.parent();
+    if (parent.get() == &ancestor) return;
+    LayoutDiagnostic diagnostic{};
+    diagnostic.code = LayoutDiagnosticCode::containing_block_not_parent;
+    diagnostic.severity = layout_diagnostic_severity(diagnostic.code);
+    diagnostic.child = std::string(child.stable_id().value());
+    diagnostic.ancestor = std::string(ancestor.stable_id().value());
+    record_layout_diagnostic(std::move(diagnostic));
+}
+
+std::size_t Window::containing_block_dependent_count(RuntimeId watched) const noexcept {
+    const std::unordered_map<std::uint64_t, ContainingBlockWatch>::const_iterator found =
+        containing_block_watches_.find(watched.value);
+    if (found == containing_block_watches_.end()) return 0U;
+    return (*found).second.dependents.size();
+}
+
+void Window::withdraw_containing_block_dependent(RuntimeId watched, RuntimeId dependent) noexcept {
+    const std::unordered_map<std::uint64_t, ContainingBlockWatch>::iterator watch =
+        containing_block_watches_.find(watched.value);
+    if (watch == containing_block_watches_.end()) return;
+    std::vector<ContainingBlockDependent>& dependents = (*watch).second.dependents;
+    for (std::size_t index = 0U; index < dependents.size(); ++index) {
+        if (dependents[index].id != dependent) continue;
+        dependents[index] = std::move(dependents.back());
+        dependents.pop_back();
+        break;
+    }
+    if (dependents.empty() && !(*watch).second.overflowed) containing_block_watches_.erase(watch);
+}
+
+void Window::set_containing_block_dependencies(Control& dependent, std::span<const RuntimeId> watched) {
+    const RuntimeId id = dependent.runtime_id();
+    const std::unordered_map<std::uint64_t, std::vector<RuntimeId>>::iterator found =
+        containing_block_paths_.find(id.value);
+    if (found == containing_block_paths_.end() && watched.empty()) return;
+    if (found != containing_block_paths_.end()) {
+        const std::vector<RuntimeId>& registered = (*found).second;
+        if (std::equal(registered.begin(), registered.end(), watched.begin(), watched.end())) return;
+        for (const RuntimeId& old : registered) withdraw_containing_block_dependent(old, id);
+        if (watched.empty()) {
+            containing_block_paths_.erase(found);
+            return;
+        }
+    }
+    std::vector<RuntimeId>& path = containing_block_paths_[id.value];
+    path.assign(watched.begin(), watched.end());
+    const Control::WeakPtr observer = dependent.weak_from_this();
+    for (const RuntimeId& watch_id : watched) {
+        ContainingBlockWatch& watch = containing_block_watches_[watch_id.value];
+        if (watch.overflowed) continue;
+        if (watch.dependents.size() >= maximum_containing_block_dependents) {
+            watch.overflowed = true;
+            continue;
+        }
+        watch.dependents.push_back(ContainingBlockDependent{id, observer});
+    }
+}
+
+void Window::mark_subtree_arrange(Control& control) noexcept {
+    constexpr Dirty effects = Dirty::arrange | Dirty::hit_test;
+    control.dirty_ |= effects;
+    control.subtree_dirty_ |= effects;
+    for (const Control::Ptr& child : control.children_) {
+        if (child) mark_subtree_arrange(*child);
+    }
+}
+
+void Window::mark_containing_block_dependents(Control& watched) {
+    const std::unordered_map<std::uint64_t, ContainingBlockWatch>::const_iterator found =
+        containing_block_watches_.find(watched.runtime_id().value);
+    if (found == containing_block_watches_.end()) return;
+    constexpr Dirty effects = Dirty::arrange | Dirty::hit_test;
+    const ContainingBlockWatch& watch = (*found).second;
+    if (watch.overflowed) {
+        // Below the watched control only: it has arranged already.
+        for (const Control::Ptr& child : watched.children_) {
+            if (child) mark_subtree_arrange(*child);
+        }
+        ++containing_block_subtree_arranges_;
+    }
+    // Each dependent is below the watched control: its own mark, and the
+    // subtree marks from it up to the root, let the descent reach it.
+    for (const ContainingBlockDependent& entry : watch.dependents) {
+        const Control::Ptr dependent = entry.control.lock();
+        if (!dependent || !(*dependent).is_alive() || (*dependent).window_ != this) continue;
+        (*dependent).dirty_ |= effects;
+        (*dependent).subtree_dirty_ |= effects;
+        note_suspended_layout_request(*dependent);
+        for (Control::Ptr ancestor = (*dependent).parent(); ancestor && ancestor.get() != &watched;
+             ancestor = (*ancestor).parent()) {
+            (*ancestor).subtree_dirty_ |= effects;
+        }
+    }
+    watched.subtree_dirty_ |= effects;
+    for (Control::Ptr ancestor = watched.parent(); ancestor; ancestor = (*ancestor).parent()) {
+        (*ancestor).subtree_dirty_ |= effects;
+    }
+    layout_dirty_ = true;
+    hit_test_dirty_ = true;
+}
+
+void Window::erase_containing_block_entries(RuntimeId control) noexcept {
+    if (containing_block_resolutions_.empty() && containing_block_paths_.empty() &&
+        containing_block_watches_.empty()) {
+        return;
+    }
+    containing_block_resolutions_.erase(control.value);
+    containing_block_watches_.erase(control.value);
+    const std::unordered_map<std::uint64_t, std::vector<RuntimeId>>::iterator found =
+        containing_block_paths_.find(control.value);
+    if (found == containing_block_paths_.end()) return;
+    for (const RuntimeId& watched : (*found).second) withdraw_containing_block_dependent(watched, control);
+    containing_block_paths_.erase(found);
 }
 
 void Window::note_suspended_layout_request(Control& control) noexcept {

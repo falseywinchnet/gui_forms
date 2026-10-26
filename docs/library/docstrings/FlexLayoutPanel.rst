@@ -11,6 +11,15 @@ cards whose items share space by rules; use a `FlowLayoutPanel` for the
 Windows Forms flow, and a `TableLayoutPanel` when items must line up in
 columns.
 
+A child's record can also position it, as CSS's `position` does. A
+relative child is offset by its insets after layout without moving its
+neighbours. An absolute child leaves the flow and is placed by its insets,
+size and margins in the padding box of its nearest positioned box: this
+panel when its own parent positions it, otherwise a positioned ancestor,
+or the window's client area. When that box is not this panel, the window
+records a `containing_block_not_parent` warning in
+`Window::layout_diagnostics()`, once for each change of the box.
+
 Parameters
 ----------
 stable_id

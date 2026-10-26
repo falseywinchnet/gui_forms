@@ -1596,6 +1596,20 @@ gui_forms::Control
 
       *Protected.*
 
+   .. cpp:function:: void note_containing_block(const Control& child, const Control& ancestor)
+
+      *Protected.*
+
+      Containing blocks of absolutely positioned children (stage L, phase L5; PLAN sections 2.5 and 3.3). A container reports each such child's resolution (the window records containing_block_not_parent once per change), registers the controls whose arrangement moves its children's containing block (an empty list withdraws it), and reports a direct child whose positioning changed, so that the containers that resolved through it arrange again. Each does nothing while detached.
+
+   .. cpp:function:: void set_containing_block_dependencies(std::span<const RuntimeId> watched)
+
+      *Protected.*
+
+   .. cpp:function:: void notify_positioning_changed(const Control& child)
+
+      *Protected.*
+
    .. cpp:function:: void arrange_self(Rect final_bounds) noexcept
 
       *Protected.*

@@ -220,6 +220,15 @@ gui_forms::Window
          has settled it schedules nothing. Tests install a :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>` on
          it so that motion is sampled from their own time.
 
+      **layout_diagnostics** : ``std::span<const LayoutDiagnostic>``, read-only
+         Nonfatal layout diagnostics (stage L, phase L5; PLAN section 2.5), in the order the layout passes recorded them: at most maximum_layout_diagnostics, the later ones counted in dropped_layout_diagnostics(). Clearing empties both. The span is valid until the next layout pass or clear.
+
+      **dropped_layout_diagnostics** : ``std::uint64_t``, read-only
+
+      **containing_block_watch_count** : ``std::size_t``, read-only
+
+      **containing_block_subtree_arranges** : ``std::uint64_t``, read-only
+
       **semantic_generation** : ``std::uint64_t``, read-only
          A number that changes whenever the semantic (accessibility) tree may
          have changed.
@@ -405,6 +414,10 @@ gui_forms::Window
         - The live instrumentation counters, for hosts and renderers that record into them.
       * - :cpp:func:`reset_activity_metrics <gui_forms::Window::reset_activity_metrics>`
         - Zeroes the activity counters, keeping the population and depth values, so a test can measure one workload.
+      * - :cpp:func:`clear_layout_diagnostics <gui_forms::Window::clear_layout_diagnostics>`
+        -  
+      * - :cpp:func:`containing_block_dependent_count <gui_forms::Window::containing_block_dependent_count>`
+        - Containing-block dependencies (PLAN section 3.3), for inspection: how many containers resolved an absolutely positioned child's containing block through ``watched`` (the block's control, or one between it and the container), the number of controls watched, and how many times a watched control over maximum_containing_block_dependents marked its whole subtree for arrange instead.
       * - :cpp:func:`visual_inspection_snapshot <gui_forms::Window::visual_inspection_snapshot>`
         - Captures the committed retained visual state without exposing a renderer or native host object.
       * - :cpp:func:`semantic_snapshot <gui_forms::Window::semantic_snapshot>`
@@ -820,6 +833,16 @@ gui_forms::Window
       has settled it schedules nothing. Tests install a :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>` on
       it so that motion is sampled from their own time.
 
+   .. cpp:function:: std::span<const LayoutDiagnostic> layout_diagnostics() const& noexcept
+
+      Nonfatal layout diagnostics (stage L, phase L5; PLAN section 2.5), in the order the layout passes recorded them: at most maximum_layout_diagnostics, the later ones counted in dropped_layout_diagnostics(). Clearing empties both. The span is valid until the next layout pass or clear.
+
+   .. cpp:function:: std::uint64_t dropped_layout_diagnostics() const noexcept
+
+   .. cpp:function:: std::size_t containing_block_watch_count() const noexcept
+
+   .. cpp:function:: std::uint64_t containing_block_subtree_arranges() const noexcept
+
    .. cpp:function:: std::uint64_t semantic_generation() const noexcept
 
       A number that changes whenever the semantic (accessibility) tree may
@@ -1229,6 +1252,12 @@ gui_forms::Window
 
       Zeroes the activity counters, keeping the population and depth values,
       so a test can measure one workload.
+
+   .. cpp:function:: void clear_layout_diagnostics() noexcept
+
+   .. cpp:function:: std::size_t containing_block_dependent_count(RuntimeId watched) const noexcept
+
+      Containing-block dependencies (PLAN section 3.3), for inspection: how many containers resolved an absolutely positioned child's containing block through ``watched`` (the block's control, or one between it and the container), the number of controls watched, and how many times a watched control over maximum_containing_block_dependents marked its whole subtree for arrange instead.
 
    .. cpp:function:: VisualInspectionSnapshot visual_inspection_snapshot(VisualInspectionOptions options = {})
 

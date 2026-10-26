@@ -1476,6 +1476,29 @@ void Control::set_child_layout(const Ptr& child, Rect bounds) {
     }
 }
 
+void Control::note_containing_block(const Control& child, const Control& ancestor) {
+    if (window_ != nullptr) (*window_).note_containing_block(child, ancestor);
+}
+
+void Control::set_containing_block_dependencies(std::span<const RuntimeId> watched) {
+    if (window_ != nullptr) (*window_).set_containing_block_dependencies(*this, watched);
+}
+
+void Control::notify_positioning_changed(const Control& child) {
+    if (window_ == nullptr) return;
+    // The child places its own absolute children against a new box, and
+    // the containers that resolved through it re-resolve. The window marks
+    // below the child, which it needs mutable; the child is found among
+    // this control's own children (a positioning change is rare, so the
+    // search is not per pass).
+    for (const Ptr& candidate : children_) {
+        if (candidate.get() != &child) continue;
+        (*candidate).invalidate(Dirty::arrange);
+        (*window_).mark_containing_block_dependents(*candidate);
+        return;
+    }
+}
+
 void Control::arrange_self(Rect final_bounds) noexcept {
     final_bounds.width = std::max(final_bounds.width, minimum_size_.width);
     final_bounds.height = std::max(final_bounds.height, minimum_size_.height);

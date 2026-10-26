@@ -32,6 +32,10 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`AbsoluteAxisInput <gui_forms::AbsoluteAxisInput>`
+     - One axis of an absolutely positioned box in its containing block's padding box: left and right with the width, or top and bottom with the height.
+   * - :cpp:class:`AbsoluteAxisResult <gui_forms::AbsoluteAxisResult>`
+     -  
    * - :cpp:class:`AccentIndex <gui_forms::AccentIndex>`
      - A position in the theme's accent ramp (design language §8.5; owner decision RB-22): the ordered colours a theme offers for telling sets of items apart, such as a ribbon's contextual tab sets.
    * - :cpp:class:`AnatomyStateSet <gui_forms::AnatomyStateSet>`
@@ -138,12 +142,16 @@ Related types
      - One interaction.
    * - :cpp:class:`InteractionValidation <gui_forms::InteractionValidation>`
      - The result of validate_interactions: the first defect found and the index of the interaction it concerns, or none.
+   * - :cpp:class:`ItemPositioning <gui_forms::ItemPositioning>`
+     - An item's ``position`` and its insets, ``auto`` by default.
    * - :cpp:class:`ItemSystemDeclaration <gui_forms::ItemSystemDeclaration>`
      - One kind of repeated item a control paints (owner decision 5): a list row, a tree node, a details-view column header.
    * - :cpp:class:`ItemSystemIndex <gui_forms::ItemSystemIndex>`
      - Position of an item system in its control type's declaration list.
    * - :cpp:class:`LayoutConstraint <gui_forms::LayoutConstraint>`
      - A measure query on both axes.
+   * - :cpp:class:`LayoutDiagnostic <gui_forms::LayoutDiagnostic>`
+     -  
    * - :cpp:class:`LayoutStyle <gui_forms::LayoutStyle>`
      -  
    * - :cpp:class:`LayoutTransactionState <gui_forms::LayoutTransactionState>`
@@ -178,6 +186,78 @@ Related types
      - StaticNode is an inert declarative node containing a registered type name, stable ID, and owned child descriptions.
    * - :cpp:class:`TrackBreadth <gui_forms::TrackBreadth>`
      -  
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: AbsoluteAxisInput final
+
+   ``#include <gui_forms/layout/positioning/positioning.hpp>``
+
+   One axis of an absolutely positioned box in its containing block's padding box: left and right with the width, or top and bottom with the height. Lengths are resolved by the caller; the insets keep ``auto``.
+
+   .. cpp:member:: double containing_extent
+
+   .. cpp:member:: AutoLengthPercentage start_inset
+
+      left or top, and right or bottom. Default: ``{true, {}}``.
+
+   .. cpp:member:: AutoLengthPercentage end_inset
+
+      Default: ``{true, {}}``.
+
+   .. cpp:member:: bool definite_size
+
+      The item's own size when it is definite.
+
+   .. cpp:member:: double size
+
+   .. cpp:member:: double content_minimum
+
+      The content's size range: for a width the min-content and max-content widths (shrink-to-fit takes a width between them); for a height the content's height at the used width, twice.
+
+   .. cpp:member:: double content_maximum
+
+   .. cpp:member:: double minimum
+
+      The used minimum and maximum (a minimum wins).
+
+   .. cpp:member:: double maximum
+
+      Default: ``{std::numeric_limits<double>::infinity()}``.
+
+   .. cpp:member:: double margin_start
+
+   .. cpp:member:: double margin_end
+
+   .. cpp:member:: bool auto_margin_start
+
+   .. cpp:member:: bool auto_margin_end
+
+   .. cpp:member:: double static_position
+
+      Where the box's start margin edge would be with both insets ``auto`` (its static position), or with static_from_end its end margin edge (the horizontal axis of a right-to-left container).
+
+   .. cpp:member:: bool static_from_end
+
+   .. cpp:member:: bool end_wins
+
+      The horizontal axis of a right-to-left containing block: an over-constrained box keeps its end inset, and auto margins too large to share leave the end one.
+
+   .. cpp:member:: bool vertical
+
+      The vertical axis: auto margins share what is left even when it is negative (10.6.4).
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: AbsoluteAxisResult final
+
+   ``#include <gui_forms/layout/positioning/positioning.hpp>``
+
+   .. cpp:member:: double position
+
+      The border box's start edge and size in the containing block.
+
+   .. cpp:member:: double size
 
 .. cpp:namespace:: gui_forms
 
@@ -1311,6 +1391,20 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ItemPositioning final
+
+   ``#include <gui_forms/layout/positioning/positioning.hpp>``
+
+   An item's ``position`` and its insets, ``auto`` by default. A positioned item (relative or absolute) is a containing block for its absolutely positioned descendants.
+
+   .. cpp:member:: PositionKind position
+
+      Default: ``{PositionKind::static_position}``.
+
+   .. cpp:member:: BoxSides<AutoLengthPercentage> inset{AutoLengthPercentage{true, {}}, AutoLengthPercentage{true, {}},
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ItemSystemDeclaration final
 
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
@@ -1348,6 +1442,26 @@ Related types
    .. cpp:member:: AvailableExtent width
 
    .. cpp:member:: AvailableExtent height
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: LayoutDiagnostic final
+
+   ``#include <gui_forms/layout/diagnostics/layout_diagnostics.hpp>``
+
+   .. cpp:member:: LayoutDiagnosticSeverity severity
+
+      Default: ``{LayoutDiagnosticSeverity::warning}``.
+
+   .. cpp:member:: LayoutDiagnosticCode code
+
+      Default: ``{LayoutDiagnosticCode::containing_block_not_parent}``.
+
+   .. cpp:member:: std::string child
+
+      The stable identities of the child the pass placed and of the ancestor whose box it was placed in (the window's root control for its client area).
+
+   .. cpp:member:: std::string ancestor
 
 .. cpp:namespace:: gui_forms
 
@@ -2258,6 +2372,24 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: LayoutDiagnosticCode
+
+   ``#include <gui_forms/layout/diagnostics/layout_diagnostics.hpp>``
+
+   .. cpp:enumerator:: containing_block_not_parent
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: LayoutDiagnosticSeverity
+
+   ``#include <gui_forms/layout/diagnostics/layout_diagnostics.hpp>``
+
+   .. cpp:enumerator:: warning
+
+   .. cpp:enumerator:: error
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: LayoutDirection
 
    ``#include <gui_forms/layout/types/layout_types.hpp>``
@@ -2589,6 +2721,24 @@ Functions, constants and aliases
 
 .. cpp:namespace:: gui_forms
 
+``#include <gui_forms/layout/diagnostics/layout_diagnostics.hpp>``
+
+.. cpp:function:: LayoutDiagnosticSeverity layout_diagnostic_severity(LayoutDiagnosticCode code) noexcept
+
+.. cpp:function:: std::string_view layout_diagnostic_code_name(LayoutDiagnosticCode code) noexcept
+
+   The code's snake_case name, such as ``containing_block_not_parent``.
+
+.. cpp:var:: constexpr std::size_t maximum_layout_diagnostics
+
+   The most records a window keeps; later ones are counted. Value: ``1000U``.
+
+.. cpp:var:: constexpr std::size_t maximum_containing_block_dependents
+
+   The most out-of-flow dependents one containing block keeps (PLAN section 3.3); above it the block arranges its whole subtree instead. Value: ``4'096U``.
+
+.. cpp:namespace:: gui_forms
+
 ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
 
 .. cpp:function:: FlexSolveOutcome resolve_flex_main_sizes(const FlexContainerInput& container, std::span<const FlexItemInput> items, FlexLayoutWorkspace& workspace)
@@ -2634,6 +2784,20 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_grid_repetitions
 
    The most repetitions one ``repeat(auto-fill | auto-fit, ...)`` generates. Value: ``10'000U``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/positioning/positioning.hpp>``
+
+.. cpp:function:: Point relative_position_offset(const ItemPositioning& positioning, Size containing_block, LayoutDirection direction) noexcept
+
+   ``position: relative``'s offset (CSS 2.1 9.4.3), with percentages of the containing block's width and height. Of left and right, the start side wins when both are set (left for left to right, right for right to left); of top and bottom, top. A static or absolute item has none.
+
+.. cpp:function:: AbsoluteAxisResult resolve_absolute_axis(const AbsoluteAxisInput& input) noexcept
+
+.. cpp:function:: bool absolute_axis_reads_content(const AbsoluteAxisInput& input) noexcept
+
+   Whether the axis's size comes from the content: neither the item's own size nor both insets fix it. A caller measures the content only then.
 
 .. cpp:namespace:: gui_forms
 

@@ -762,6 +762,7 @@ private:
             layout.max_width = style.max_width;
             layout.max_height = style.max_height;
             layout.vertical_align = style.vertical_align;
+            layout.positioning = ItemPositioning{style.position, style.inset};
         }
         if (roles.flex_item) {
             FlexItemLayout& layout = child.flex_item;
@@ -773,6 +774,7 @@ private:
             layout.min_height = style.min_height;
             layout.max_width = style.max_width;
             layout.max_height = style.max_height;
+            layout.positioning = ItemPositioning{style.position, style.inset};
         }
         if (roles.grid_item) {
             GridItemLayout& layout = child.grid_item;
@@ -785,6 +787,7 @@ private:
             layout.min_height = style.min_height;
             layout.max_width = style.max_width;
             layout.max_height = style.max_height;
+            layout.positioning = ItemPositioning{style.position, style.inset};
         }
     }
 
@@ -820,9 +823,6 @@ private:
     // one.
     static void refuse_unbuilt_values(const LayoutStyle& style, const LayoutStyle& base, const ReaderRoles& roles,
                                       const std::string& where) {
-        if (style.position != base.position || !(style.inset == base.inset)) {
-            fault(where, "positioning belongs to phase L5");
-        }
         if (!roles.block_container && style.text_align != base.text_align) {
             fault(where, "text-align on an element that is not a block-flow-panel");
         }
@@ -873,6 +873,33 @@ private:
                                       style.alignment.justify_self != base.alignment.justify_self;
         if (!roles.grid_item && grid_item_values) {
             fault(where, "grid item values on an element that is not one");
+        }
+        const bool positioned = style.position != base.position || !(style.inset == base.inset);
+        if (!item && positioned) fault(where, "position and insets on an element that is not an item");
+        // An absolute item with both insets `auto` on an axis is placed at
+        // its static position, which the containers take as the content
+        // box's start (a recorded limit), not CSS's in-flow position.
+        const BoxSides<AutoLengthPercentage>& inset = style.inset;
+        const bool static_axis = (inset.left.automatic && inset.right.automatic) ||
+                                 (inset.top.automatic && inset.bottom.automatic);
+        if (style.position == PositionKind::absolute && static_axis) {
+            fault(where, "an absolute item with both insets auto on an axis (its static position) is not compared");
+        }
+        // The containers take percentages of their content box, and an
+        // absolute item's containing block whole (recorded limits): CSS
+        // takes a grid item's area, and a block's height only when it is
+        // definite.
+        if (style.position == PositionKind::absolute && roles.grid_item && !(style.grid_item == base.grid_item)) {
+            fault(where, "grid placement on an absolute item is not built");
+        }
+        const bool percent_inset = inset.top.value.percent != 0.0 || inset.right.value.percent != 0.0 ||
+                                   inset.bottom.value.percent != 0.0 || inset.left.value.percent != 0.0;
+        const bool percent_vertical = inset.top.value.percent != 0.0 || inset.bottom.value.percent != 0.0;
+        if (style.position == PositionKind::relative && roles.grid_item && percent_inset) {
+            fault(where, "a relative grid item's percentage inset (of its grid area in CSS) is not built");
+        }
+        if (style.position == PositionKind::relative && roles.block_item && percent_vertical) {
+            fault(where, "a relative block flow item's vertical percentage inset is not built");
         }
         const BoxSides<AutoLengthPercentage>& margin = style.margin;
         const bool automatic_margin =
