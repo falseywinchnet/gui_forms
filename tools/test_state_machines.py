@@ -450,6 +450,20 @@ int b(E e) {
         self.assertEqual(hunt.gate_failures(found), 2)
         self.assertIn("tools/check_state_machines.py", hunt.CHECKER_FILES)
 
+    def test_workflow_keeps_checker_failure_through_tee(self) -> None:
+        root: Path = Path(__file__).resolve().parents[1]
+        workflow: str = (root / ".github/workflows/state-machines.yml").read_text(encoding="utf-8")
+        step: str = workflow.split("- name: Check the state machines\n", 1)[1].split("- name: Show the findings\n", 1)[0]
+        self.assertIn("shell: bash", step)
+        self.assertLess(step.index("set -o pipefail"), step.index("| tee state-machines.txt"))
+        with tempfile.TemporaryDirectory() as directory:
+            output: Path = Path(directory) / "findings.txt"
+            command: str = "set -o pipefail\npython3 -c 'print(\"finding\"); raise SystemExit(1)' | tee '" + str(output) + "'"
+            completed: subprocess.CompletedProcess[str] = subprocess.run(
+                ["bash", "-c", command], capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(completed.returncode, 1)
+            self.assertEqual(output.read_text(encoding="utf-8"), "finding\n")
+
     def test_areas_follow_ownership(self) -> None:
         self.assertEqual(hunt.area_of("src/controls/ribbon/ribbon.cpp"), "controls")
         self.assertEqual(hunt.area_of("include/gui_forms/controls/x.hpp"), "controls")
