@@ -1,6 +1,7 @@
 # Stage RT plan: `stx_rtf`, the RTF and rich-markdown library
 
 Status 2026-10-25: **proposed; waiting for the owner's answers to section 12**.
+Revised the same day after W's review of section 11 (items 6 and 8).
 Written by the SwiftEdit worker, which builds the library (owner decision W-Q1,
 2026-10-25). Authority: the W stage README, "Owner decisions, 2026-10-25",
 item 1, and W's companion brief
@@ -172,9 +173,9 @@ can be compared field by field:
   first or last in a block, and two line breaks are never adjacent;
 - text is valid UTF-8 without paragraph or line separators, without C0
   controls other than tab, and without U+FEFF;
-- a block's text starts and ends with neither space nor tab. Markdown
-  cannot hold leading or trailing blanks, so readers trim them and count
-  the trims (section 7);
+- blanks (spaces and tabs) are kept wherever they appear, including at the
+  start and end of a block. The markdown writer escapes the ones CommonMark
+  would strip (section 4), so nothing the user can see is lost;
 - `code` excludes the other run attributes. Code blocks have one unstyled
   text run per line, separated by line breaks;
 - `size_step` is 0 in headings, whose level stands for their size.
@@ -200,7 +201,7 @@ built. This section fixes its shape.
 | code block | a backtick fence one longer than the longest run of backticks inside, at least three |
 | bold, italic | `**text**`, `*text*` |
 | strikethrough | `~~text~~` |
-| inline code | a backtick string one longer than the longest run of backticks inside, padded with a space when the text starts or ends with a backtick |
+| inline code | a backtick string one longer than the longest run of backticks inside, padded with one space on each side when the text starts or ends with a backtick or a space and is not all spaces (CommonMark strips exactly that padding) |
 | link | `[text](target)`, or `[text](<target>)` when the target holds a space or parenthesis |
 | line break | `\` at the end of the line |
 | underline, superscript, subscript, colour, background, size | an attribute span: `[text]{u}`, `{sup}`, `{sub}`, `{color=#rrggbb}`, `{bg=#rrggbb}`, `{size=+1}`. One span may combine attributes, `[text]{u color=#c00000 size=-1}`, written in that fixed key order |
@@ -208,20 +209,27 @@ built. This section fixes its shape.
 
 When a run has both CommonMark emphasis and span attributes, the emphasis
 goes inside the span: `[**text**]{u}`. Within the text, the writer escapes
-`\`, `` ` ``, `*`, `_`, `[`, `]`, `~`, `<` and `{` with a backslash wherever
-they appear. At the start of a line it also escapes `#`, `>`, `-`, `+`, `=`,
-`|`, and a digit run followed by `.` or `)`. Nothing else is escaped. The
-writer emits LF line endings and ends with one LF.
+`\`, `` ` ``, `*`, `_`, `[`, `]`, `~`, `<`, `{` and `&` with a backslash
+wherever they appear. At the start of a line it also escapes `#`, `>`, `-`,
+`+`, `=`, `|`, and a digit run followed by `.` or `)`. Blanks that
+CommonMark would strip, those at the start of a line and at the end of a
+block, are written as numeric character references, `&#32;` for a space and
+`&#9;` for a tab. Numeric character references are CommonMark syntax, not
+raw HTML, and escaping every `&` keeps literal text from reading as one.
+Nothing else is escaped. The writer emits LF line endings and ends with one
+LF.
 
 **What the reader accepts.** The reader accepts the canonical form exactly,
 plus the CommonMark spellings people type: `__bold__` and `_italic_`, `*`
 and `+` bullets, `1)` ordered markers, setext headings, indented code
 blocks, `<https://...>` autolinks, hard breaks made of two trailing spaces,
-and CommonMark's delimiter-run rules for emphasis. Constructs outside the
-dialect are kept as literal text and counted in the loss report: raw HTML,
-images, reference links and their definitions, tables, task-list markers,
-footnotes and entity references. Nothing is discarded silently, and nothing
-outside the dialect is interpreted.
+CommonMark's delimiter-run rules for emphasis, and numeric character
+references (decimal and hexadecimal) for any Unicode scalar the normal form
+admits. Constructs outside the dialect are kept as literal text and counted
+in the loss report: raw HTML, images, reference links and their
+definitions, tables, task-list markers, footnotes, named entity references,
+and numeric references to a character the normal form forbids. Nothing is
+discarded silently, and nothing outside the dialect is interpreted.
 
 **Degrading to plain markdown.** In a CommonMark or GFM renderer that does
 not know the extensions, including SwiftEdit's MD4C configuration, an
@@ -261,9 +269,12 @@ document-variable destinations. A control word the reader does not know,
 outside such a group, is ignored and counted. Nothing in a skipped group
 reaches the document.
 
-**Size steps.** Size steps are absolute against a 12-point body. Word's
-11-point default and TextEdit's 12-point default both read as step 0. The
-half-point value `h` maps as follows: h ≤ 17 is -2; 18-21 is -1; 22-25 is 0;
+**Size steps.** Size steps are relative to the document's body size: step
+0 is body text. A consumer maps step 0 to its own body font, as
+`RichTextBox` maps it to the control's `Font`, and scales the other steps
+with it. RTF sizes are absolute, so the reader converts them against a
+12-point body. Word's 11-point default and TextEdit's 12-point default
+both read as step 0. The half-point value `h` maps as follows: h ≤ 17 is -2; 18-21 is -1; 22-25 is 0;
 26-31 is +1; 32-39 is +2; 40-55 is +3; h ≥ 56 is +4. A size that is not one
 of the canonical values written in section 6 is counted as quantised.
 
@@ -281,7 +292,8 @@ given document:
   then its runs, then `\par`. Quote depth n is `\s` Quote with
   `\li` = 720 × n. A list item writes `\ls`/`\ilvl` and a `{\listtext ...}`
   marker, so readers without list tables still show a marker;
-- size steps -2 to +4 are written as `\fs` 16, 20, 24, 28, 36, 48 and 64;
+- size steps -2 to +4 are written against a 12-point body, as `\fs` 16,
+  20, 24, 28, 36, 48 and 64;
 - text is written in ASCII. Characters above 0x7E are `\uN?` (a signed
   16-bit value, with surrogate pairs for characters beyond the BMP), and
   `\`, `{` and `}` are escaped;
@@ -306,11 +318,12 @@ source offset of the first occurrence, for each `LossKind`:
 `destination_skipped`, `picture_skipped`, `object_skipped`,
 `control_word_ignored`, `field_result_kept`, `table_flattened`,
 `justify_read_as_left`, `underline_style_collapsed`, `font_dropped`,
-`size_quantised`, `indent_dropped`, `spacing_dropped`, `blank_trimmed`,
+`size_quantised`, `indent_dropped`, `spacing_dropped`,
 `control_character_dropped`, and for markdown input `html_kept_as_text`,
 `image_kept_as_text`, `reference_link_kept_as_text`, `table_kept_as_text`,
 `task_marker_kept_as_text`, `footnote_kept_as_text`,
-`entity_kept_as_text`. The report needs no allocation, so SwiftEdit can
+`entity_kept_as_text` (named references, and numeric references to
+forbidden characters). The report needs no allocation, so SwiftEdit can
 tell the user what an import dropped without inspecting the document.
 
 **Results.** Every call returns a `Result`. It holds a `Status`, the
@@ -413,6 +426,9 @@ tables, and pictures.
 ## 11. Differences from the W brief
 
 For the coordinator to route to W. None changes the brief's direction.
+W's review (2026-10-25, through the coordinator): items 1, 4, 5, 7 and 9
+accepted; items 2 and 3 are with the owner; items 6 and 8 revised as the
+coordinator decided and recorded below.
 
 1. **Quote is a depth on any block, not a block kind.** This lets a quoted
    list item or heading be represented. `BlockKind` keeps paragraph,
@@ -432,14 +448,22 @@ For the coordinator to route to W. None changes the brief's direction.
    stops with `unsupported_encoding` when a byte above 0x7F would need
    another code page, not when `\ansicpgN` is merely declared. Word and
    TextEdit declare their system code page and then write `\u` anyway.
-6. **Normal form also trims leading and trailing blanks** (counted), since
-   markdown cannot hold them, and sets size steps to 0 inside headings.
+6. **Normal form sets size steps to 0 inside headings, and keeps every
+   blank.** The first draft trimmed leading and trailing blanks. The
+   coordinator decided against that: trimming drops text the user can see,
+   and `RichTextBox.text()` must keep the document's spaces. Instead, the
+   writer escapes blanks that CommonMark would strip as numeric character
+   references (`&#32;`, `&#9;`), and the reader decodes them, so the normal
+   form is lossless.
 7. **The corpus starts first-party.** Saved files from WordPad, Word,
    TextEdit and Windows Forms depend on applications on the owner's
    machines. WordPad is no longer installed by default on Windows 11 24H2
    and later. Real saves are added only as the owner decides.
-8. **Size steps are absolute against a 12-point body** and have a stated
-   table (sections 5 and 6), so that sizes round-trip.
+8. **Size steps have a stated table** (sections 5 and 6), so that sizes
+   round-trip. The steps are relative to the document's body size, so
+   `RichTextBox` can map body text to the control's `Font` and scale the
+   steps with it. Only RTF's absolute sizes are converted against a
+   12-point body.
 9. **Phase order puts markdown first**, so W can build the run model before
    RTF reading exists.
 
