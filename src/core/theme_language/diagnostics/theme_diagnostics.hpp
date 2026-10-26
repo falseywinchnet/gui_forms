@@ -19,8 +19,8 @@ namespace gui_forms::theme_language {
 enum class DiagnosticSeverity : std::uint8_t { error, warning };
 
 // Each code's number is its stable record; its class is its hundreds digit
-// (PLAN.md section 2): E1xx lexical, E2xx structure, E5xx limits, W1xx
-// unknown names. Later phases add the other classes. An error's enumerator
+// (PLAN.md section 2): E1xx lexical, E2xx structure, E3xx selectors, E5xx
+// limits, W1xx unknown names. Later phases add the other classes. An error's enumerator
 // value is its number; a warning's is 1000 plus its number, so W104 and
 // E104 stay distinct values.
 enum class DiagnosticCode : std::uint16_t {
@@ -53,6 +53,15 @@ enum class DiagnosticCode : std::uint16_t {
     // A rule or at-rule inside a rule's block, or an at-rule inside an
     // at-rule's block (B1).
     nesting_not_admitted = 206,
+    // E3xx selectors (B1).
+    // A selector that is not one compound selector of the admitted forms.
+    selector_syntax = 301,
+    // A descendant (whitespace), `>`, `+` or `~` combinator, or nesting `&`.
+    combinator_not_admitted = 302,
+    // A CSS pseudo-class or pseudo-element outside the language: `:not()`,
+    // `:where()`, `:has()`, the structural ones, `::before` and the rest.
+    pseudo_class_not_admitted = 303,
+    attribute_selector_not_admitted = 304,
     // E5xx limits (T3 decision E2).
     sheet_too_large = 501,
     too_many_rules = 502,
@@ -60,10 +69,20 @@ enum class DiagnosticCode : std::uint16_t {
     nesting_too_deep = 504,
     string_too_long = 505,
     too_many_imports = 506,
+    // 507 and 508 (expression_over_budget, too_many_variable_combinations)
+    // arrive with P4 and P12. The derived limits of PLAN.md section 6:
+    // more than maximum_is_arguments arguments in one `:is()`.
+    too_many_is_arguments = 509,
+    // An expanded selector of more than maximum_simple_selectors simple
+    // selectors.
+    selector_too_long = 510,
     // W1xx unknown names (B3): the item is dropped and the rest applies.
     // An at-rule other than @import, @media and @keyframes; its block is
     // skipped.
     unknown_at_rule = 1104,
+    // A control type, part, role, state or pseudo-class the vocabulary does
+    // not know; the rule is dropped.
+    unknown_selector_name = 1106,
 };
 
 [[nodiscard]] DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept;
@@ -124,6 +143,13 @@ private:
 // below 0x20 and 0x7F are written as '%' and two uppercase hex digits, so a
 // line holds exactly the fields it names.
 [[nodiscard]] std::string theme_diagnostic_log_line(const ThemeDiagnostic& diagnostic);
+
+// The longest detail a diagnostic copies from a sheet.
+inline constexpr std::size_t maximum_detail_bytes = 64U;
+
+// At most maximum_detail_bytes of `text`, cut before a UTF-8 continuation
+// byte so the detail stays whole scalar values.
+[[nodiscard]] std::string clipped_theme_detail(std::string_view text);
 
 // Writes each kept record's log line to `stream` (the library passes
 // stderr), then, when records were dropped, one line counting them:

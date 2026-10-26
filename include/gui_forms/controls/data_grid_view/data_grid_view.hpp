@@ -28,14 +28,21 @@ namespace gui_forms {
 class BindingSource;
 
 // The kind of cell a column shows (Windows Forms' DataGridViewTextBoxColumn,
-// DataGridViewCheckBoxColumn, DataGridViewComboBoxColumn and
-// DataGridViewButtonColumn).
+// DataGridViewCheckBoxColumn, DataGridViewComboBoxColumn,
+// DataGridViewButtonColumn and DataGridViewImageColumn).
 enum class DataGridViewColumnKind : std::uint8_t {
     text,
     check_box,
     combo_box,
     button,
+    image,
 };
+
+// How an image cell places its image (Windows Forms'
+// DataGridViewImageCellLayout): at its own size, centred and cut at the
+// cell's edges; stretched to the cell; or as large as fits with its shape
+// kept, centred.
+enum class DataGridViewImageLayout : std::uint8_t { normal, stretch, zoom };
 
 // Where a cell's text sits across the cell.
 enum class DataGridViewCellAlignment : std::uint8_t { start, center, end };
@@ -60,7 +67,11 @@ enum class DataGridViewRowSource : std::uint8_t { unbound, virtual_rows, binding
 // `value_kind` is the kind a committed text edit converts to (text by
 // default; a number column takes signed_integer or number). `items` are a
 // combo box column's choices and must be empty for other kinds.
-// `button_text` is shown on a button cell whose value is empty.
+// `button_text` is shown on a button cell whose value is empty. An image
+// column's cells hold ImageId values, images of the grid's window, placed by
+// `image_layout`; `image_description` is the text an image cell gives in
+// place of its image (Windows Forms' Description), as its cell text and its
+// semantic name.
 // `data_property_name` names the BindingSource field a bound column shows.
 struct DataGridViewColumn final {
     std::string name{};
@@ -73,6 +84,8 @@ struct DataGridViewColumn final {
     BindingValueKind value_kind{BindingValueKind::text};
     std::vector<std::string> items{};
     std::string button_text{};
+    DataGridViewImageLayout image_layout{DataGridViewImageLayout::normal};
+    std::string image_description{};
     std::string data_property_name{};
     DataGridViewSortDirection sort_glyph{DataGridViewSortDirection::none};
 };
@@ -147,7 +160,7 @@ public:
 };
 
 // A grid of rows and typed columns (Windows Forms' DataGridView): text,
-// check box, combo box and button columns over unbound rows the grid owns,
+// check box, combo box, button and image columns over unbound rows the grid owns,
 // virtual rows whose values an application provider supplies on demand, or a
 // BindingSource's records. Every row has a stable ID (DataGridViewRowId), and
 // the grid keeps its selection, current cell and edit by ID; row numbers in
@@ -172,8 +185,9 @@ public:
     // values past the new column count are dropped and new columns start
     // empty. Ends any edit and clears the selection and current cell. Throws
     // std::invalid_argument for an empty, duplicate or dotted name, invalid
-    // UTF-8, a width that is not finite or below the minimum, or items on a
-    // column that is not a combo box.
+    // UTF-8, a width that is not finite or below the minimum, items on a
+    // column that is not a combo box, or an image layout outside the
+    // enumeration.
     void set_columns(std::vector<DataGridViewColumn> columns);
     void add_column(DataGridViewColumn column);
     // Throws std::out_of_range for an index past the end.
@@ -212,7 +226,7 @@ public:
     // Throws std::out_of_range for a cell past the rows or columns.
     [[nodiscard]] BindingValue cell_value(DataGridViewRowPosition row, std::size_t column) const;
     // The text a cell shows: its value as text, a button column's text for
-    // an empty button cell.
+    // an empty button cell, an image column's description.
     [[nodiscard]] std::string cell_text(DataGridViewRowPosition row, std::size_t column) const;
     // Stores a value from the program (read-only does not apply) and raises
     // cell_value_changed when it differs. Returns false when a provider or
@@ -404,8 +418,8 @@ public:
     [[nodiscard]] Event<const DataGridViewCellEvent&>& cell_value_changed() noexcept {
         return cell_value_changed_;
     }
-    // Raised when a button cell is clicked or a check box cell toggled by the
-    // user.
+    // Raised when a button cell or an image cell's image is clicked, or a
+    // check box cell toggled, by the user.
     [[nodiscard]] Event<const DataGridViewCellEvent&>& cell_content_click() noexcept {
         return cell_content_click_;
     }
@@ -488,6 +502,7 @@ public:
         PartGeometry cell;
         PartGeometry cell_selection;
         PartGeometry cell_content;
+        PartGeometry cell_image;
         PartGeometry cell_check_well;
         PartGeometry cell_check_indicator;
         PartGeometry cell_button_face;
@@ -599,7 +614,8 @@ private:
     using SelectedColumns = std::vector<std::size_t>;
     using SelectedCells = std::unordered_map<std::string, SelectedColumns, RowIdHash, std::equal_to<>>;
     // A cell by its row's identity: the current cell, the selection anchor
-    // and a pressed button cell, which stay on their row when rows move.
+    // and a pressed button or image cell, which stay on their row when rows
+    // move.
     struct CellKey final {
         std::string row_id{};
         std::size_t column{};
@@ -686,6 +702,15 @@ private:
     [[nodiscard]] RowParts row_parts(DataGridViewRowPosition row, const GridLayout& layout) const;
     [[nodiscard]] CellParts cell_parts(DataGridViewRowPosition row, std::size_t column,
                                        const GridLayout& layout) const;
+    // Where an image cell draws its image, before the cut at the cell's
+    // edges, and the image; none for another kind of cell, an empty value or
+    // an image the window does not hold.
+    struct CellImage final {
+        ImageId image{};
+        Rect bounds{};
+    };
+    [[nodiscard]] std::optional<CellImage> cell_image(DataGridViewRowPosition row, std::size_t column,
+                                                      Rect inside) const;
     [[nodiscard]] ColumnParts column_parts(std::size_t column, const GridLayout& layout) const;
     [[nodiscard]] AnatomyStateSet row_states(DataGridViewRowPosition row) const;
     [[nodiscard]] AnatomyStateSet cell_states(DataGridViewRowPosition row, std::size_t column) const;
@@ -739,7 +764,7 @@ private:
     void on_editor_focus(bool focused);
     void finish_edit();
     bool toggle_check(DataGridViewCellAddress cell);
-    void click_button(DataGridViewCellAddress cell);
+    void click_content(DataGridViewCellAddress cell);
     bool activate_current();
 
     // Navigation.
@@ -805,11 +830,12 @@ private:
 
     DataGridViewSelectionMode selection_mode_{DataGridViewSelectionMode::cell_select};
     bool multi_select_{true};
-    // The current cell, the anchor of an extended selection and a held
-    // button cell, by row ID. Each names a row in the index or is empty.
+    // The current cell, the anchor of an extended selection and a button or
+    // image cell held by the pointer, by row ID. Each names a row in the
+    // index or is empty.
     std::optional<CellKey> current_{};
     std::optional<CellKey> anchor_{};
-    std::optional<CellKey> pressed_button_{};
+    std::optional<CellKey> pressed_content_{};
     // Cell-mode selections by row ID; a row with no selected cell has no
     // entry.
     SelectedCells selected_cells_{};

@@ -102,6 +102,8 @@ Types
      - One sized variant of an image resource: the image resampled to ``extent`` device pixels, for display ``scale``.
    * - :cpp:class:`Insets <gui_forms::Insets>`
      - Insets stores independent logical left, top, right, and bottom extents for margin, padding, damage, and visual outsets.
+   * - :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>`
+     - One item's content to paint (owner decision W-Q6), raised while the control paints, after the item's plate and selection and before its focus cue.
    * - :cpp:class:`LentImageVariants <gui_forms::LentImageVariants>`
      - The variants lent for one bake, by fill layer; null where none is lent.
    * - :cpp:class:`MaterialBorder <gui_forms::MaterialBorder>`
@@ -1412,6 +1414,32 @@ Types
    .. cpp:member:: double right
 
    .. cpp:member:: double bottom
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ItemContentPaint final
+
+   ``#include <gui_forms/theme/owner_draw/owner_draw.hpp>``
+
+   One item's content to paint (owner decision W-Q6), raised while the control paints, after the item's plate and selection and before its focus cue. ``painter`` is the control's, borrowed for the call, in the control's local coordinates and clipped to ``content``; the handler draws with it and does not keep it. ``content`` is the item's content rectangle in local coordinates. ``index`` is the item's position in the control's model and ``stable_id`` its identity, borrowed for the call; ``column`` is the column of a cell in a view with columns (0 for the item's own content, n for its sub-item in column n, as Windows Forms' DrawSubItem), else 0. ``states`` are the item's anatomy states, and ``text`` and ``font`` are the colour and font the control's default content uses for them, so that owner-drawn text can match. A handler sets ``draw_default`` to have the control draw its default content over what the handler drew. A handler paints only: it must not change, dispose or re-parent the control, or anything else in its window, while the event is raised.
+
+   .. cpp:member:: Painter& painter
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: std::string_view stable_id
+
+   .. cpp:member:: Rect content
+
+   .. cpp:member:: AnatomyStateSet states
+
+   .. cpp:member:: FontSpec font
+
+   .. cpp:member:: Color text
+
+   .. cpp:member:: bool draw_default
 
 .. cpp:namespace:: gui_forms
 
@@ -3350,7 +3378,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one.
+   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one. ``specificity``, when set, is the rule's specificity in place of the one its selector gives (T3 engine change EC2): a rule expanded from CSS's ``:is()`` takes its most specific argument's. A class or stable-ID rule with a given specificity then needs a class or an ID in it rather than in its selector; an inline style still needs its selector's stable ID.
 
    .. cpp:member:: std::string label
 
@@ -3359,6 +3387,8 @@ Types
       Default: ``{CascadeLevel::theme_sheet}``.
 
    .. cpp:member:: RuleSelector selector
+
+   .. cpp:member:: std::optional<RuleSpecificity> specificity
 
    .. cpp:member:: std::vector<RuleDeclaration> declarations
 
@@ -3581,6 +3611,10 @@ Enumerations
 
    .. cpp:enumerator:: tool_tip
 
+   .. cpp:enumerator:: link
+
+   .. cpp:enumerator:: visited_link
+
    .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms
@@ -3774,6 +3808,16 @@ Enumerations
    .. cpp:enumerator:: nearest
 
    .. cpp:enumerator:: linear
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ItemDrawMode
+
+   ``#include <gui_forms/theme/owner_draw/owner_draw.hpp>``
+
+   .. cpp:enumerator:: normal
+
+   .. cpp:enumerator:: owner_draw
 
 .. cpp:namespace:: gui_forms
 
@@ -4827,6 +4871,18 @@ Functions, constants and aliases
 .. cpp:var:: constexpr double maximum_procedural_tile
 
    Value: ``256.0``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/theme/owner_draw/owner_draw.hpp>``
+
+.. cpp:function:: Color item_content_text(const Control& control, ControlVisualRole family, AnatomyStateSet states) noexcept
+
+   The text colour ``family``'s recipe gives ``control`` for an item in ``states``: the colour a control's default item content is drawn in, which it reports as ItemContentPaint::text.
+
+.. cpp:function:: bool raise_item_content_paint(Event<ItemContentPaint&>& event, ItemContentPaint& item)
+
+   Raises ``event`` once with ``item``, with ``item.painter`` saved and clipped to ``item.content`` and restored afterwards (also when a handler throws), so that nothing a handler draws reaches the plate, the focus cue or another item. Returns whether the control then draws its default content: true only when a handler set ``draw_default``. An empty or non-finite content rectangle raises nothing and returns false.
 
 .. cpp:namespace:: gui_forms
 

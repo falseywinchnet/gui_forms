@@ -11,7 +11,7 @@
     "marks": ["check", "indeterminate", "radio_dot", "toggle_knob", "arrow_up", "arrow_down", "arrow_left", "arrow_right", "chevron_down", "chevron_right", "close", "grip_dots", "dialog_launcher", "more", "overflow", "customize", "pin", "dock_shape"],
     "engine_inputs": ["pointer_x", "pointer_y", "time_in_state", "display_scale", "text_scale"],
     "values": ["accent_index", "text_orientation", "dock_region", "content_color"],
-    "families": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"],
+    "families": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip", "link", "visited_link"],
     "semantic_roles": ["generic", "group", "static_text", "button", "check_box", "radio_button", "link", "text_box", "list", "list_item", "check_list_item", "combo_box", "slider", "scroll_bar", "progress_bar", "image", "tab_group", "tab", "split_pane", "numeric_field", "tool_tip", "date_picker", "calendar", "date_cell", "property_grid", "property_group", "property_row", "menu_bar", "menu_bar_item", "menu", "menu_item", "separator", "toolbar", "radio_group", "split_button", "menu_button", "pane", "tab_panel", "tree", "tree_item", "table", "row", "cell", "column_header", "row_header", "tree_grid", "dialog", "status_bar", "live_region"],
     "semantic_actions": ["focus", "press", "select", "increment", "decrement", "expand", "collapse", "show_menu", "set_value", "close"],
     "semantic_states": ["enabled", "visible", "focusable", "focused", "selected", "checked", "mixed", "read_only", "expanded", "busy", "protected_content", "invalid", "checkable", "multiselectable"],
@@ -197,7 +197,7 @@
         "cost": {"per_device_pixel": 512, "fixed": 64, "preparation_per_device_pixel": 0},
         "outsets": [8, 8, 8, 8],
         "parameters": [
-          {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"], "default": "button", "animated": false},
+          {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip", "link", "visited_link"], "default": "button", "animated": false},
           {"name": "shape", "kind": "choice", "choices": ["rounded_rectangle", "pill", "circle", "cap_start", "cap_end"], "default": "rounded_rectangle", "animated": false}
         ]
       },
@@ -237,7 +237,7 @@
           {"name": "blur", "kind": "number", "minimum": 0, "maximum": 8, "default": 6, "animated": false},
           {"name": "tint", "kind": "colour", "default": "#ffffff40", "animated": false},
           {"name": "corner", "kind": "number", "minimum": 0, "maximum": 64, "default": 0, "animated": false},
-          {"name": "recipe", "kind": "choice", "choices": ["none", "window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"], "default": "none", "animated": false}
+          {"name": "recipe", "kind": "choice", "choices": ["none", "window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip", "link", "visited_link"], "default": "none", "animated": false}
         ]
       }
     ],
@@ -1718,6 +1718,7 @@
             {"name": "cell", "role": "region", "composed_from": null, "states": []},
             {"name": "cell_selection", "role": "selection", "composed_from": null, "states": []},
             {"name": "cell_content", "role": "content", "composed_from": null, "states": []},
+            {"name": "cell_image", "role": "image", "composed_from": null, "states": []},
             {"name": "cell_check_well", "role": "well", "composed_from": "check_box", "states": []},
             {"name": "cell_check_indicator", "role": "indicator", "composed_from": null, "states": []},
             {"name": "cell_button_face", "role": "face", "composed_from": "button", "states": []},
@@ -3352,7 +3353,8 @@
             {"name": "tab", "role": "face", "composed_from": null, "states": []},
             {"name": "tab_label", "role": "label", "composed_from": null, "states": []},
             {"name": "tab_focus", "role": "focus", "composed_from": null, "states": []},
-            {"name": "tab_seam", "role": "seam", "composed_from": null, "states": []}
+            {"name": "tab_seam", "role": "seam", "composed_from": null, "states": []},
+            {"name": "tab_icon", "role": "icon", "composed_from": null, "states": []}
           ],
           "states": ["selected"],
           "custom_states": []
@@ -5681,6 +5683,14 @@
       ]
     },
     {
+      "id": "thread_exception_dialog",
+      "type": "ThreadExceptionDialog",
+      "kind": "component",
+      "interactions": [
+        {"name": "closed", "payload": "DialogResult", "mutable_payload": false}
+      ]
+    },
+    {
       "id": "tool_tip",
       "type": "ToolTip",
       "kind": "component",
@@ -6086,6 +6096,14 @@
         {"name": "balloon_tip_clicked", "payload": "", "mutable_payload": false},
         {"name": "balloon_tip_closed", "payload": "", "mutable_payload": false},
         {"name": "menu_item_invoked", "payload": "MenuItemInvocation", "mutable_payload": false}
+      ]
+    },
+    {
+      "id": "open_file_dialog",
+      "type": "OpenFileDialog",
+      "kind": "component",
+      "interactions": [
+        {"name": "file_ok", "payload": "FileDialogOk", "mutable_payload": true}
       ]
     },
     {

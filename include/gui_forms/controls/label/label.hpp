@@ -107,6 +107,15 @@ public:
 
 protected:
     void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
+    // Min-content is the widest unbreakable segment: the widest
+    // whitespace-delimited word of any paragraph, so word wrapping never has
+    // to break a word (CSS `overflow-wrap: break-word`). Max-content is the
+    // widest paragraph unwrapped. Both include the 4 px text inset, and the
+    // height is the wrapped height at that width. A label that does not wrap,
+    // or has a requested width, answers both from its preferred size. The
+    // label does not wrap within 4 px of content width, so when the widest
+    // word is at most 4 px wide min-content equals max-content.
+    [[nodiscard]] Size measure_intrinsic(const LayoutConstraint& constraint) override;
     // The lines of a label's text placed in its arranged bounds (stage T1):
     // each line's drawing origin (left edge, snapped baseline) and width, and
     // the block the lines fill. Paint and published geometry share it.
@@ -126,6 +135,12 @@ protected:
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
+    // Measure with the text wrapped at `content_width_limit` (the width
+    // inside the 4 px inset), clamped to `available`.
+    [[nodiscard]] Size measure_wrapped_text(double content_width_limit,
+                                            Size available) const;
+    [[nodiscard]] double widest_unbreakable_segment(std::string_view text,
+                                                    FontSpec font) const;
     [[nodiscard]] PropertyValueOrigin font_property_origin() const noexcept;
     [[nodiscard]] PropertyValueOrigin foreground_property_origin() const noexcept;
     [[nodiscard]] BindingValue maximum_lines_property_value() const;

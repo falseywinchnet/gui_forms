@@ -156,10 +156,13 @@ WindowBackdropReason window_backdrop_refusal(WindowBackdrop backdrop, const Comp
     if (backdrop == WindowBackdrop::opaque) return WindowBackdropReason::granted;
     if (!backdrop_known(backdrop)) return WindowBackdropReason::host_unsupported;
     if (!conditions.declared) return WindowBackdropReason::not_declared;
+    // High contrast withdraws every effect whatever the host offers, and
+    // says so: a host that misreads its compositor under a contrast theme
+    // still reports the user's setting (MEASUREMENTS.md, the owner's C2 run).
+    if (conditions.high_contrast) return WindowBackdropReason::high_contrast;
     const WindowBackdropReason support = support_refusal(state.support_of(backdrop));
     if (support != WindowBackdropReason::granted) return support;
     if (state.compositing == CompositorPresence::absent) return WindowBackdropReason::no_compositor;
-    if (conditions.high_contrast) return WindowBackdropReason::high_contrast;
     if (conditions.reduced_transparency) return WindowBackdropReason::reduced_transparency;
     if (!state.transparency_enabled) return WindowBackdropReason::transparency_disabled;
     return WindowBackdropReason::granted;

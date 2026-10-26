@@ -137,8 +137,26 @@ void test_refusal_order() {
     everything_off.transparency_enabled = false;
     require(window_backdrop_refusal(WindowBackdrop::transparent, everything_off,
                                     WindowBackdropConditions{true, true, true}) ==
+                WindowBackdropReason::high_contrast,
+            "high contrast wins over every host refusal");
+    require(window_backdrop_refusal(WindowBackdrop::transparent, everything_off,
+                                    WindowBackdropConditions{true, false, true}) ==
                 WindowBackdropReason::no_compositor,
-            "host support is checked before the user's settings");
+            "no compositor is checked before reduced transparency");
+    require(window_backdrop_refusal(WindowBackdrop::window_material, old_build,
+                                    WindowBackdropConditions{true, true, false}) ==
+                WindowBackdropReason::high_contrast,
+            "high contrast is checked before the OS build");
+    require(window_backdrop_refusal(WindowBackdrop::window_material, CompositorState{},
+                                    WindowBackdropConditions{true, true, false}) ==
+                WindowBackdropReason::high_contrast,
+            "high contrast is checked before the host's support");
+    require(window_backdrop_refusal(WindowBackdrop::transparent, absent, WindowBackdropConditions{false, true, true}) ==
+                WindowBackdropReason::not_declared,
+            "an undeclared window is refused before high contrast");
+    require(window_backdrop_refusal(WindowBackdrop::opaque, absent, WindowBackdropConditions{true, true, true}) ==
+                WindowBackdropReason::granted,
+            "opaque is granted under high contrast");
     require(window_backdrop_refusal(WindowBackdrop::transparent, full, WindowBackdropConditions{true, true, true}) ==
                 WindowBackdropReason::high_contrast,
             "high contrast is checked before reduced transparency");

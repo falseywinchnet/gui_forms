@@ -3150,7 +3150,7 @@ Functions, constants and aliases
 
 .. cpp:function:: WindowBackdropReason window_backdrop_refusal(WindowBackdrop backdrop, const CompositorState& state, const WindowBackdropConditions& conditions) noexcept
 
-   Why ``backdrop`` cannot be given now, or ``granted``. The one decision point (PLAN.md §2.3): adapters report state and apply grants, never decide. ``opaque`` is always granted. For any other backdrop the refusals are checked in this order: not declared; the host's support for it; no compositor running; high contrast; reduced transparency; transparency effects off.
+   Why ``backdrop`` cannot be given now, or ``granted``. The one decision point (PLAN.md §2.3): adapters report state and apply grants, never decide. ``opaque`` is always granted. For any other backdrop the refusals are checked in this order: not declared; high contrast; the host's support for it; no compositor running; reduced transparency; transparency effects off.
 
 .. cpp:function:: WindowBackdropGrant resolve_window_backdrop(const WindowBackdropRequest& request, const CompositorState& state, const WindowBackdropConditions& conditions) noexcept
 
