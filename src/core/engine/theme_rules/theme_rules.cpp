@@ -233,6 +233,7 @@ constexpr std::array<std::string_view, material_field_count> material_field_name
     "border_left_style",
     "border_left_width",
     "border_left_colour",
+    "border_image",
     "keylines",
     "corner_top_left",
     "corner_top_right",
@@ -321,6 +322,7 @@ void apply_material_declaration(const MaterialDeclaration& declaration, SurfaceM
     case MaterialField::fill_positions:
     case MaterialField::fill_sizes:
     case MaterialField::fill_repeats:
+    case MaterialField::border_image:
     case MaterialField::corner_top_left:
     case MaterialField::corner_top_right:
     case MaterialField::corner_bottom_right:
@@ -512,6 +514,7 @@ bool edge_field(MaterialField field) noexcept {
 struct AssembledEdge final {
     bool drawn{};
     MaterialBorder border{};
+    MaterialEdgeLines lines{MaterialEdgeLines::single};
 };
 
 // Writes an edge field's value into `edge`: a style (none stops the edge
@@ -521,6 +524,7 @@ void apply_edge_declaration(const MaterialDeclaration& declaration, AssembledEdg
     if (part == 0U) {
         edge.drawn = declaration.border_style.has_value();
         if (declaration.border_style) edge.border.style = *declaration.border_style;
+        edge.lines = declaration.edge_lines;
         return;
     }
     if (part == 1U) {
@@ -537,8 +541,48 @@ std::optional<MaterialBorder> drawn_edge(const AssembledEdge& edge) {
     return edge.border;
 }
 
+// A colour with each channel halved, rounded down: a groove's or ridge's
+// shaded half.
+Color edge_shade(Color colour) noexcept {
+    const Color shade{static_cast<std::uint8_t>(colour.red / 2U), static_cast<std::uint8_t>(colour.green / 2U),
+                      static_cast<std::uint8_t>(colour.blue / 2U), colour.alpha};
+    return shade;
+}
+
+// Appends edge `edge`'s two lines (MaterialEdgeLines) for `border` to
+// `keylines`, the outer first.
+void append_edge_lines(MaterialEdge edge, const MaterialBorder& border, MaterialEdgeLines lines,
+                       std::vector<MaterialKeyline>& keylines) {
+    const double width = border.width;
+    MaterialKeyline outer{};
+    outer.edge = edge;
+    outer.color = border.color;
+    MaterialKeyline inner = outer;
+    if (lines == MaterialEdgeLines::double_line) {
+        outer.width = width / 3.0;
+        inner.width = width / 3.0;
+        inner.inset = width * 2.0 / 3.0;
+    } else {
+        outer.width = width / 2.0;
+        inner.width = width / 2.0;
+        inner.inset = width / 2.0;
+        const bool lit_side = edge == MaterialEdge::bottom || edge == MaterialEdge::right;
+        // A groove's outer half is shaded on the top and left; a ridge's on
+        // the bottom and right.
+        const bool outer_shaded = (lines == MaterialEdgeLines::groove) != lit_side;
+        if (outer_shaded) {
+            outer.color = edge_shade(border.color);
+        } else {
+            inner.color = edge_shade(border.color);
+        }
+    }
+    keylines.push_back(outer);
+    keylines.push_back(inner);
+}
+
 // Each edge from the floor's, then its declared fields; into `material`,
-// as one uniform border when the four are equal.
+// as one uniform border when the four are equal, and an edge of two lines
+// as its keylines.
 void assemble_edges(const SurfaceMaterial& floor,
                     const std::array<const MaterialDeclaration*, material_field_count>& fields,
                     SurfaceMaterial& material) {
@@ -557,6 +601,9 @@ void assemble_edges(const SurfaceMaterial& floor,
             if (declaration != nullptr && !(*declaration).initial) apply_edge_declaration(*declaration, edge);
         }
         drawn[edge_index] = drawn_edge(edge);
+        if (!drawn[edge_index] || edge.lines == MaterialEdgeLines::single) continue;
+        append_edge_lines(static_cast<MaterialEdge>(edge_index), *drawn[edge_index], edge.lines, material.keylines);
+        drawn[edge_index].reset();
     }
     const bool uniform = drawn[0] == drawn[1] && drawn[0] == drawn[2] && drawn[0] == drawn[3];
     if (uniform) {
@@ -608,6 +655,13 @@ bool image_size_admitted(const MaterialImageSize& size) noexcept {
 bool material_declaration_admitted(const MaterialDeclaration& declaration) {
     SurfaceMaterial checked{};
     if (declaration.initial || declaration.field == MaterialField::background_colour) return true;
+    if (declaration.field == MaterialField::border_image) {
+        if (!declaration.border_image) return true;
+        if ((*declaration.border_image).image_mode != MaterialImageMode::nine_patch) return false;
+        checked.fills = {*declaration.border_image};
+        const bool admitted = valid_surface_material(checked);
+        return admitted;
+    }
     if (declaration.field == MaterialField::fill_positions) {
         for (const MaterialImagePosition& position : declaration.image_positions) {
             if (!image_position_admitted(position)) return false;
@@ -666,6 +720,9 @@ bool material_declaration_admitted(const MaterialDeclaration& declaration) {
         const bool admitted = valid_surface_material(checked);
         return admitted;
     }
+    const bool lines_known =
+        static_cast<std::uint8_t>(declaration.edge_lines) <= static_cast<std::uint8_t>(MaterialEdgeLines::ridge);
+    if (!lines_known) return false;
     AssembledEdge edge{};
     edge.drawn = true;
     apply_edge_declaration(declaration, edge);
@@ -735,7 +792,14 @@ void assemble_material(const SurfaceMaterial& floor,
     }
     if (fills) compose_fills(floor, fields, box, material);
     if (corners) compose_corners(floor, fields, std::min(box.width, box.height), material);
-    if (edges) assemble_edges(floor, fields, material);
+    const MaterialDeclaration* const border_image = set_field(fields, MaterialField::border_image);
+    const bool framed = border_image != nullptr && (*border_image).border_image.has_value();
+    if (edges && !framed) assemble_edges(floor, fields, material);
+    if (!framed) return;
+    // The border image replaces the border's drawing.
+    material.fills.push_back(*(*border_image).border_image);
+    material.border.reset();
+    material.border_edges = MaterialBorderEdges{};
 }
 
 RuleDeclaration RuleDeclaration::primitive(std::string_view primitive_name) {

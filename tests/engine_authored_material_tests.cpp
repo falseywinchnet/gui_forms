@@ -132,7 +132,7 @@ void test_field_names() {
         "border_top_style",    "border_top_width",    "border_top_colour",
         "border_right_style",  "border_right_width",  "border_right_colour",
         "border_bottom_style", "border_bottom_width", "border_bottom_colour",
-        "border_left_style",   "border_left_width",   "border_left_colour",
+        "border_left_style",   "border_left_width",   "border_left_colour",  "border_image",
         "keylines",      "corner_top_left", "corner_top_right", "corner_bottom_right", "corner_bottom_left",
         "colour_filter",
         "drop_shadow",   "filter_blur",       "finish",

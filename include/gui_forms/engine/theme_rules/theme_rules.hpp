@@ -336,6 +336,18 @@ struct MaterialImagePosition final {
 // tile alone (MaterialImageMode::single).
 enum class MaterialImageRepeat : std::uint8_t { repeat, no_repeat };
 
+// How a drawn edge's line is made (T3 P6e, CSS `border-style`): one line
+// in its MaterialBorderStyle, or, drawn as two keylines on the edge in
+// place of the border (each edge's pair in CSS's order, top first, the
+// outer line first, so a later edge's line covers an earlier one's in the
+// corner square they share):
+// - double_line: two lines each a third of the width, a third apart;
+// - groove and ridge: two halves, one in the edge's colour and one in its
+//   shade (each colour channel halved, rounded down): a groove's outer
+//   half is the shade on the top and left edges and the colour on the
+//   bottom and right, and a ridge's the reverse.
+enum class MaterialEdgeLines : std::uint8_t { single, double_line, groove, ridge };
+
 // The material fields a rule may set (T3 engine change EC1, owner R2-02).
 // Each cascades on its own, as a parameter does: a part's material is the
 // recipe material its primitive draws (the cascade's floor), with each
@@ -373,6 +385,7 @@ enum class MaterialField : std::uint8_t {
     border_left_style,
     border_left_width,
     border_left_colour,
+    border_image,
     keylines,
     corner_top_left,
     corner_top_right,
@@ -409,8 +422,9 @@ inline constexpr std::size_t material_field_count = static_cast<std::size_t>(Mat
 // - shadows, glows, keylines: the lists;
 // - glow_placements: `glow_placements`, in the glows' order, repeated
 //   over them as CSS repeats a short list (`glow-placement`);
-// - an edge's style: `border_style`, empty for none (CSS's `none`); its
-//   width: `number`, 0 for none; its colour: `colour`;
+// - an edge's style: `border_style`, empty for none (CSS's `none`), and
+//   `edge_lines`; its width: `number`, 0 for none; its colour: `colour`;
+// - border_image: `border_image`, a nine-patch image fill, empty for none;
 // - a corner: `number`, its radius in logical units, or, with `relative`,
 //   a fraction of the box's shorter side (CSS's percentage, R2-11),
 //   resolved when the material is assembled for a part;
@@ -434,6 +448,8 @@ struct MaterialDeclaration final {
     std::vector<MaterialGlow> glows{};
     std::vector<MaterialGlowPlacement> glow_placements{};
     std::optional<MaterialBorderStyle> border_style{};
+    MaterialEdgeLines edge_lines{MaterialEdgeLines::single};
+    std::optional<MaterialFillLayer> border_image{};
     Color colour{};
     std::vector<MaterialKeyline> keylines{};
     double number{};
@@ -448,7 +464,8 @@ struct MaterialDeclaration final {
                left.image_positions == right.image_positions && left.image_sizes == right.image_sizes &&
                left.image_repeats == right.image_repeats && left.shadows == right.shadows &&
                left.glows == right.glows && left.glow_placements == right.glow_placements &&
-               left.border_style == right.border_style &&
+               left.border_style == right.border_style && left.edge_lines == right.edge_lines &&
+               left.border_image == right.border_image &&
                left.colour == right.colour && left.keylines == right.keylines &&
                left.number == right.number && left.relative == right.relative &&
                left.colour_filter == right.colour_filter && left.drop_shadow == right.drop_shadow &&
@@ -482,8 +499,12 @@ struct MaterialDeclaration final {
 // its style is none or its width 0. Four equal edges are drawn as one
 // uniform border, which keeps a dash and rounded corners, and unequal ones
 // as single edges, which a material admits only with square corners
-// (valid_surface_material). `box` is the part's box in logical units:
-// relative corners are fractions of its shorter side.
+// (valid_surface_material); an edge drawn as two lines (MaterialEdgeLines)
+// is not a border edge but its two keylines, after the declared ones. A
+// border image is the top fill layer, and the border (its edges and their
+// lines) is not drawn, as CSS draws a border image in place of the
+// border's style. `box` is the part's box in logical units: relative
+// corners are fractions of its shorter side.
 void assemble_material(const SurfaceMaterial& floor,
                        const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
                        SurfaceMaterial& material);

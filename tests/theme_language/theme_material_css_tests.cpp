@@ -420,6 +420,26 @@ void test_border_lowering() {
     require(all_initial, "border: initial resets the twelve longhands");
 }
 
+void test_line_lowering() {
+    const std::string_view sheet = "#pad::part(face) { border-style: double groove }";
+    const Compilation compiled = compile(sheet);
+    const ThemeRule& rule = only_rule(compiled, sheet);
+    const MaterialDeclaration* const top = field_of(rule, MaterialField::border_top_style);
+    const MaterialDeclaration* const right = field_of(rule, MaterialField::border_right_style);
+    require(top != nullptr && (*top).border_style == MaterialBorderStyle::solid &&
+                (*top).edge_lines == MaterialEdgeLines::double_line && right != nullptr &&
+                (*right).edge_lines == MaterialEdgeLines::groove,
+            "double and groove are solid edges drawn as two lines");
+    const std::string_view image_sheet =
+        "#pad::part(face) { border-image: url(\"resource:tile.quadrant\") 25% fill / auto }";
+    const Compilation framed = compile(image_sheet);
+    const MaterialDeclaration* const image = field_of(only_rule(framed, image_sheet), MaterialField::border_image);
+    require(image != nullptr && (*image).border_image &&
+                *(*image).border_image ==
+                    MaterialFillLayer::nine_patch(ImageId{1U}, Size{4.0, 4.0}, Insets{1.0, 1.0, 1.0, 1.0}, 1.0),
+            "a border image's percentage slices are of the image, auto widths its own size");
+}
+
 void test_filter_lowering() {
     const std::string_view none_sheet = "#pad::part(face) { filter: none }";
     const Compilation none = compile(none_sheet);
@@ -570,7 +590,7 @@ struct Refusal final {
 };
 
 void test_refusals() {
-    const std::array<Refusal, 58> refusals{{
+    const std::array<Refusal, 65> refusals{{
         {"#a { background-image: "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
@@ -592,7 +612,7 @@ void test_refusals() {
         {"#a { background-image: radial-gradient(at left 10px top, red, blue) }",
          DiagnosticCode::value_form_not_admitted},
         {"#a { background-image: linear-gradient(red 1em, blue) }", DiagnosticCode::not_yet_built},
-        {"#a { border-style: double }", DiagnosticCode::not_yet_built},
+        {"#a { border-image: url(\"resource:tile.quadrant\") 1 / 2px }", DiagnosticCode::value_form_not_admitted},
         {"#a { border-style: inset }", DiagnosticCode::value_form_not_admitted},
         {"#a { border-style: wavy }", DiagnosticCode::keyword_unknown},
         {"#a { border-radius: 4px / 2px }", DiagnosticCode::value_form_not_admitted},
@@ -636,6 +656,15 @@ void test_refusals() {
         {"#a { background-position: left 10px top }", DiagnosticCode::value_form_not_admitted},
         {"#a { background: linear-gradient(red, blue) center }", DiagnosticCode::value_form_not_admitted},
         {"#a { background: url(\"resource:tile.quadrant\") / 4px }", DiagnosticCode::value_syntax},
+        {"#a { border-image: url(\"resource:tile.quadrant\") 1 fill }", DiagnosticCode::value_form_not_admitted},
+        {"#a { border-image: linear-gradient(red, blue) 1 fill / 2px }", DiagnosticCode::value_form_not_admitted},
+        {"#a { border-image: url(\"resource:tile.quadrant\") 1 fill / 2px round }",
+         DiagnosticCode::value_form_not_admitted},
+        {"#a { border-image: url(\"resource:tile.quadrant\") 1 2 fill / 2px }", DiagnosticCode::value_form_not_admitted},
+        {"#a { border-image: url(\"resource:tile.quadrant\") 1 fill / 2px / 1px }",
+         DiagnosticCode::value_form_not_admitted},
+        {"#a { border-image: url(\"resource:tile.quadrant\") 1 fill / 1 }", DiagnosticCode::value_form_not_admitted},
+        {"#a { border-image: url(\"resource:icon.check\") 1 fill / 2px }", DiagnosticCode::value_wrong_kind},
     }};
     for (const Refusal& refusal : refusals) {
         const Compilation compiled = compile(refusal.sheet);
@@ -921,6 +950,37 @@ std::vector<GateRow> gate_rows(const GateImages& images) {
     image_mask.material.fills = {MaterialFillLayer::solid(blue)};
     image_mask.material.mask = MaterialFillLayer::tiled_image(images.dots, Size{2.0, 2.0}, 0.5);
     rows.push_back(image_mask);
+
+    // Each edge's two lines, the outer first, in CSS's edge order.
+    const std::array<MaterialEdge, 4> each_edge{MaterialEdge::top, MaterialEdge::right, MaterialEdge::bottom,
+                                                MaterialEdge::left};
+    GateRow doubled{};
+    doubled.declarations = "border: 3px double red";
+    for (const MaterialEdge edge : each_edge) {
+        doubled.material.keylines.push_back(MaterialKeyline{edge, red, 1.0, 0.0});
+        doubled.material.keylines.push_back(MaterialKeyline{edge, red, 1.0, 2.0});
+    }
+    rows.push_back(doubled);
+    const Color clay = Color::rgba(200, 100, 50);
+    const Color shade = Color::rgba(100, 50, 25);
+    GateRow grooved{};
+    grooved.declarations = "border: 4px groove rgb(200 100 50)";
+    for (const MaterialEdge edge : each_edge) {
+        const bool lit = edge == MaterialEdge::bottom || edge == MaterialEdge::right;
+        grooved.material.keylines.push_back(MaterialKeyline{edge, lit ? clay : shade, 2.0, 0.0});
+        grooved.material.keylines.push_back(MaterialKeyline{edge, lit ? shade : clay, 2.0, 2.0});
+    }
+    rows.push_back(grooved);
+    GateRow ridged{};
+    ridged.declarations = "border-top: 2px ridge blue";
+    ridged.material.keylines = {MaterialKeyline{MaterialEdge::top, blue, 1.0, 0.0},
+                                MaterialKeyline{MaterialEdge::top, Color::rgba(0, 0, 127), 1.0, 1.0}};
+    rows.push_back(ridged);
+    GateRow framed{};
+    framed.declarations = "border: 2px solid red; border-image: url(\"resource:tile.quadrant\") 1 fill / 2px";
+    framed.material.fills = {white,
+                             MaterialFillLayer::nine_patch(images.quadrant, four, Insets{1.0, 1.0, 1.0, 1.0}, 0.5)};
+    rows.push_back(framed);
     return rows;
 }
 
@@ -987,6 +1047,7 @@ int main() {
     test_conic_geometry();
     test_lowering();
     test_border_lowering();
+    test_line_lowering();
     test_filter_lowering();
     test_image_lowering();
     test_refusals();

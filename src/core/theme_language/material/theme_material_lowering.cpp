@@ -36,7 +36,7 @@ struct NamedMaterialProperty final {
 };
 
 // Sorted by name.
-constexpr std::array<NamedMaterialProperty, 38> material_properties{{
+constexpr std::array<NamedMaterialProperty, 39> material_properties{{
     {.name = "background", .property = MaterialProperty::background},
     {.name = "background-blend-mode", .property = MaterialProperty::background_blend_mode},
     {.name = "background-color", .property = MaterialProperty::background_color},
@@ -52,6 +52,7 @@ constexpr std::array<NamedMaterialProperty, 38> material_properties{{
     {.name = "border-bottom-style", .property = MaterialProperty::border_bottom_style},
     {.name = "border-bottom-width", .property = MaterialProperty::border_bottom_width},
     {.name = "border-color", .property = MaterialProperty::border_color},
+    {.name = "border-image", .property = MaterialProperty::border_image},
     {.name = "border-left", .property = MaterialProperty::border_left},
     {.name = "border-left-color", .property = MaterialProperty::border_left_color},
     {.name = "border-left-style", .property = MaterialProperty::border_left_style},
@@ -300,7 +301,7 @@ private:
     [[nodiscard]] bool size_component(std::size_t index) const noexcept;
     bool read_background_layer(ComponentRange range, bool last, MaterialDeclaration& colour,
                                std::vector<WrittenLayer>& written, BackgroundLayer& layer);
-    bool read_style(std::size_t index, std::optional<MaterialBorderStyle>& style);
+    bool read_style(std::size_t index, MaterialDeclaration& styled);
     bool read_width(std::size_t index, double& width);
     bool read_radius(std::size_t index, MaterialDeclaration& corner);
     bool read_shadow(ComponentRange range, MaterialShadow& shadow);
@@ -322,6 +323,7 @@ private:
     bool lower_edges(std::size_t first_edge, std::size_t edge_count);
     bool lower_sides(std::size_t part);
     bool lower_edge_field(std::size_t edge, std::size_t part);
+    bool lower_border_image();
     bool lower_radii();
     bool lower_corner(std::size_t corner);
     bool lower_shadows();
@@ -936,31 +938,40 @@ bool MaterialReader::width_word(std::size_t index) const noexcept {
     return word;
 }
 
-// A <line-style>: empty for none (CSS's `none` and `hidden`).
-bool MaterialReader::read_style(std::size_t index, std::optional<MaterialBorderStyle>& style) {
+// A <line-style> into `styled`'s border_style, empty for none (CSS's
+// `none` and `hidden`), and edge_lines: double, groove and ridge are a
+// solid edge drawn as two lines (MaterialEdgeLines).
+bool MaterialReader::read_style(std::size_t index, MaterialDeclaration& styled) {
     const ValueComponent& component = value_.components[index];
     if (component.kind != ValueComponentKind::keyword) {
         return fail(DiagnosticCode::value_wrong_kind, component.token, "a border style");
     }
+    styled.edge_lines = MaterialEdgeLines::single;
+    styled.border_style = MaterialBorderStyle::solid;
     if (keyword(index, "none") || keyword(index, "hidden")) {
-        style.reset();
+        styled.border_style.reset();
         return true;
     }
-    if (keyword(index, "solid")) {
-        style = MaterialBorderStyle::solid;
-        return true;
-    }
+    if (keyword(index, "solid")) return true;
     if (keyword(index, "dashed")) {
-        style = MaterialBorderStyle::dashed;
+        styled.border_style = MaterialBorderStyle::dashed;
         return true;
     }
     if (keyword(index, "dotted")) {
-        style = MaterialBorderStyle::dotted;
+        styled.border_style = MaterialBorderStyle::dotted;
         return true;
     }
-    // P6c lowers the three to keyline pairs.
-    if (keyword(index, "double") || keyword(index, "groove") || keyword(index, "ridge")) {
-        return fail(DiagnosticCode::not_yet_built, component.token, clipped_theme_detail(component.text));
+    if (keyword(index, "double")) {
+        styled.edge_lines = MaterialEdgeLines::double_line;
+        return true;
+    }
+    if (keyword(index, "groove")) {
+        styled.edge_lines = MaterialEdgeLines::groove;
+        return true;
+    }
+    if (keyword(index, "ridge")) {
+        styled.edge_lines = MaterialEdgeLines::ridge;
+        return true;
     }
     if (keyword(index, "inset") || keyword(index, "outset")) {
         return fail(DiagnosticCode::value_form_not_admitted, component.token, clipped_theme_detail(component.text));
@@ -1013,7 +1024,7 @@ bool MaterialReader::lower_edges(std::size_t first_edge, std::size_t edge_count)
         if (slot) return fail(DiagnosticCode::value_syntax, component.token, "one width, one style and one colour");
         slot = index;
     }
-    std::optional<MaterialBorderStyle> style{};
+    MaterialDeclaration style{};
     double width = 0.0;
     Color colour{};
     if (style_at && !read_style(*style_at, style)) return false;
@@ -1025,7 +1036,8 @@ bool MaterialReader::lower_edges(std::size_t first_edge, std::size_t edge_count)
         MaterialDeclaration coloured = initial_field(edge_field(edge, 2U));
         if (style_at) {
             styled.initial = false;
-            styled.border_style = style;
+            styled.border_style = style.border_style;
+            styled.edge_lines = style.edge_lines;
         }
         if (width_at) {
             wide.initial = false;
@@ -1053,7 +1065,7 @@ bool MaterialReader::lower_sides(std::size_t part) {
     std::size_t index = 0U;
     for (std::size_t value = 0U; value < values; ++value) {
         MaterialDeclaration& declaration = read[value];
-        if (part == 0U && !read_style(index, declaration.border_style)) return false;
+        if (part == 0U && !read_style(index, declaration)) return false;
         if (part == 1U && !read_width(index, declaration.number)) return false;
         if (part == 2U && !read_colour(index, declaration.colour)) return false;
         index = next(index);
@@ -1073,9 +1085,198 @@ bool MaterialReader::lower_edge_field(std::size_t edge, std::size_t part) {
     }
     MaterialDeclaration declaration{};
     declaration.field = edge_field(edge, part);
-    if (part == 0U && !read_style(0U, declaration.border_style)) return false;
+    if (part == 0U && !read_style(0U, declaration)) return false;
     if (part == 1U && !read_width(0U, declaration.number)) return false;
     if (part == 2U && !read_colour(0U, declaration.colour)) return false;
+    lowering_.declarations.push_back(std::move(declaration));
+    return true;
+}
+
+// `border-image`: none, or a bound image resource with `<slice>{1,4} fill`,
+// `/ <width>{1,4}` and optionally `stretch`, as the engine's nine-patch
+// (CSS_COVERAGE section 2). The nine-patch draws its middle and stretches
+// its edges at one scale, so the language admits what it draws: `fill`
+// written, the widths written (`auto`, the slices at the image's own
+// size, or lengths), each in the same proportion to its slice, no outset
+// and only `stretch`. Its longhands wait (E999). The engine draws it as the
+// top fill layer in place of the border's lines.
+bool MaterialReader::lower_border_image() {
+    MaterialDeclaration declaration{};
+    declaration.field = MaterialField::border_image;
+    const std::size_t end = value_.components.size();
+    if (count(ComponentRange{0U, end}) == 1U && keyword(0U, "none")) {
+        lowering_.declarations.push_back(std::move(declaration));
+        return true;
+    }
+    std::optional<std::size_t> source_at{};
+    bool no_source = false;
+    bool filled = false;
+    ComponentRange slices{};
+    ComponentRange widths{};
+    ComponentRange outsets{};
+    ComponentRange repeats{};
+    std::size_t index = 0U;
+    while (index < end) {
+        const ValueComponent& component = value_.components[index];
+        const bool source =
+            component.kind == ValueComponentKind::function || component.kind == ValueComponentKind::resource;
+        if (source || keyword(index, "none")) {
+            if (source_at || no_source) return fail(DiagnosticCode::value_syntax, component.token, "one image");
+            no_source = !source;
+            if (source) source_at = index;
+            index = next(index);
+            continue;
+        }
+        const bool slice_part = component.kind == ValueComponentKind::number || keyword(index, "fill");
+        if (slice_part) {
+            if (slices.end != 0U) return fail(DiagnosticCode::value_syntax, component.token, "one slice");
+            slices.first = index;
+            while (index < end) {
+                const bool part = value_.components[index].kind == ValueComponentKind::number;
+                if (keyword(index, "fill")) {
+                    if (filled) return fail(DiagnosticCode::value_syntax, value_.components[index].token, "one fill");
+                    filled = true;
+                } else if (!part) {
+                    break;
+                }
+                index = next(index);
+            }
+            slices.end = index;
+            if (index < end && value_.components[index].kind == ValueComponentKind::slash) {
+                index = next(index);
+                widths.first = index;
+                while (index < end && (value_.components[index].kind == ValueComponentKind::number ||
+                                       keyword(index, "auto"))) {
+                    index = next(index);
+                }
+                widths.end = index;
+            }
+            if (index < end && value_.components[index].kind == ValueComponentKind::slash) {
+                index = next(index);
+                outsets.first = index;
+                while (index < end && value_.components[index].kind == ValueComponentKind::number) index = next(index);
+                outsets.end = index;
+            }
+            continue;
+        }
+        const bool repeat_part = keyword(index, "stretch") || keyword(index, "repeat") || keyword(index, "round") ||
+                                 keyword(index, "space");
+        if (repeat_part) {
+            if (repeats.end != 0U) return fail(DiagnosticCode::value_syntax, component.token, "one repetition");
+            repeats.first = index;
+            while (index < end && (keyword(index, "stretch") || keyword(index, "repeat") || keyword(index, "round") ||
+                                   keyword(index, "space"))) {
+                index = next(index);
+            }
+            repeats.end = index;
+            continue;
+        }
+        if (component.kind == ValueComponentKind::slash) {
+            return fail(DiagnosticCode::value_syntax, component.token, "a width after the slices");
+        }
+        if (component.kind == ValueComponentKind::keyword) {
+            return fail(DiagnosticCode::keyword_unknown, component.token, clipped_theme_detail(component.text));
+        }
+        return fail(DiagnosticCode::value_wrong_kind, component.token, "a border image");
+    }
+    if (!source_at) {
+        // CSS's initial source, none: nothing is drawn.
+        lowering_.declarations.push_back(std::move(declaration));
+        return true;
+    }
+    const ValueComponent& source = value_.components[*source_at];
+    if (source.kind == ValueComponentKind::function) {
+        return fail(DiagnosticCode::value_form_not_admitted, source.token, "a gradient as a border image");
+    }
+    const std::uint32_t whole = source.token;
+    for (std::size_t repeat = repeats.first; repeat < repeats.end; repeat = next(repeat)) {
+        if (keyword(repeat, "stretch")) continue;
+        return fail(DiagnosticCode::value_form_not_admitted, value_.components[repeat].token,
+                    clipped_theme_detail(value_.components[repeat].text));
+    }
+    if (repeats.end != 0U && count(repeats) > 2U) return fail(DiagnosticCode::value_syntax, whole, "one or two repetitions");
+    const std::size_t slice_count = slices.end == 0U ? 0U : count(slices) - (filled ? 1U : 0U);
+    if (slice_count == 0U) return fail(DiagnosticCode::value_form_not_admitted, whole, "a border image without slices");
+    if (slice_count > 4U) return fail(DiagnosticCode::value_syntax, whole, "one to four slices");
+    if (!filled) {
+        return fail(DiagnosticCode::value_form_not_admitted, whole, "a border image without fill (its middle)");
+    }
+    const std::size_t width_count = widths.end == 0U ? 0U : count(widths);
+    if (width_count == 0U) {
+        return fail(DiagnosticCode::value_form_not_admitted, whole, "a border image without its widths");
+    }
+    if (width_count > 4U) return fail(DiagnosticCode::value_syntax, whole, "one to four widths");
+    for (std::size_t outset = outsets.first; outset < outsets.end; outset = next(outset)) {
+        if (value_.components[outset].number == 0.0) continue;
+        return fail(DiagnosticCode::value_form_not_admitted, value_.components[outset].token, "a border image outset");
+    }
+    MaterialFillLayer image{};
+    if (!read_resource_image(*source_at, image)) return false;
+    const double density = image.image_scale;
+    // The slices in source pixels and the widths in logical units, in CSS's
+    // order: top, right, bottom, left.
+    std::array<double, 4> slice_pixels{};
+    std::array<double, 4> read_slices{};
+    std::array<bool, 4> slice_percent{};
+    std::size_t written = 0U;
+    for (std::size_t at = slices.first; at < slices.end; at = next(at)) {
+        if (keyword(at, "fill")) continue;
+        const ValueComponent& component = value_.components[at];
+        const bool plain = component.unit == ValueUnit::none;
+        const bool percent = component.unit == ValueUnit::percent;
+        if (!plain && !percent) return fail(DiagnosticCode::value_wrong_kind, component.token, "a slice");
+        if (component.number < 0.0) {
+            return fail(DiagnosticCode::value_out_of_range, component.token, clipped_theme_detail(component.text));
+        }
+        read_slices[written] = percent ? component.number / 100.0 : component.number;
+        slice_percent[written] = percent;
+        written = written + 1U;
+    }
+    std::array<std::optional<double>, 4> read_widths{};
+    written = 0U;
+    for (std::size_t at = widths.first; at < widths.end; at = next(at)) {
+        const ValueComponent& component = value_.components[at];
+        if (!keyword(at, "auto")) {
+            if (component.kind == ValueComponentKind::number && component.unit == ValueUnit::none &&
+                component.number != 0.0) {
+                return fail(DiagnosticCode::value_form_not_admitted, component.token,
+                            "a border image width in border widths");
+            }
+            BoxLength length{};
+            if (!read_length(at, false, false, length)) return false;
+            read_widths[written] = length.units;
+        }
+        written = written + 1U;
+    }
+    const std::array<std::size_t, 4>& slice_sides = four_sides[slice_count - 1U];
+    const std::array<std::size_t, 4>& width_sides = four_sides[width_count - 1U];
+    std::optional<double> scale{};
+    for (std::size_t side = 0U; side < 4U; ++side) {
+        const double slice = read_slices[slice_sides[side]];
+        // A percentage is of the image's height for the top and bottom,
+        // its width for the sides.
+        const double across = side % 2U == 0U ? image.image_pixel_size.height : image.image_pixel_size.width;
+        slice_pixels[side] = slice_percent[slice_sides[side]] ? slice * across : slice;
+        const std::optional<double> width = read_widths[width_sides[side]];
+        const double logical = width ? *width : slice_pixels[side] / density;
+        if (slice_pixels[side] == 0.0 && logical == 0.0) continue;
+        if (slice_pixels[side] == 0.0 || logical == 0.0) {
+            return fail(DiagnosticCode::value_form_not_admitted, whole, "a border image width without its slice");
+        }
+        const double side_scale = slice_pixels[side] / logical;
+        if (scale && *scale != side_scale) {
+            return fail(DiagnosticCode::value_form_not_admitted, whole,
+                        "border image widths out of proportion to their slices");
+        }
+        scale = side_scale;
+    }
+    const Insets slice{slice_pixels[3], slice_pixels[0], slice_pixels[1], slice_pixels[2]};
+    const MaterialFillLayer patch =
+        MaterialFillLayer::nine_patch(image.image, image.image_pixel_size, slice, scale ? *scale : density);
+    SurfaceMaterial checked{};
+    checked.fills = {patch};
+    if (!valid_surface_material(checked)) return fail(DiagnosticCode::value_out_of_range, whole, "a border image");
+    declaration.border_image = patch;
     lowering_.declarations.push_back(std::move(declaration));
     return true;
 }
@@ -1731,6 +1932,7 @@ void MaterialReader::lower(MaterialProperty property) {
     case MaterialProperty::border_left_style: static_cast<void>(lower_edge_field(3U, 0U)); return;
     case MaterialProperty::border_left_width: static_cast<void>(lower_edge_field(3U, 1U)); return;
     case MaterialProperty::border_left_color: static_cast<void>(lower_edge_field(3U, 2U)); return;
+    case MaterialProperty::border_image: static_cast<void>(lower_border_image()); return;
     case MaterialProperty::border_radius: static_cast<void>(lower_radii()); return;
     case MaterialProperty::border_top_left_radius: static_cast<void>(lower_corner(0U)); return;
     case MaterialProperty::border_top_right_radius: static_cast<void>(lower_corner(1U)); return;
@@ -1818,6 +2020,7 @@ void material_property_fields(MaterialProperty property, std::vector<MaterialFie
     case MaterialProperty::border_left_style: fields.push_back(edge_field(3U, 0U)); return;
     case MaterialProperty::border_left_width: fields.push_back(edge_field(3U, 1U)); return;
     case MaterialProperty::border_left_color: fields.push_back(edge_field(3U, 2U)); return;
+    case MaterialProperty::border_image: fields.push_back(MaterialField::border_image); return;
     case MaterialProperty::border_radius:
         for (std::size_t corner = 0U; corner < 4U; ++corner) fields.push_back(corner_field(corner));
         return;

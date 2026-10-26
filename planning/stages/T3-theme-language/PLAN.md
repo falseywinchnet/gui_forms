@@ -916,9 +916,41 @@ one bake per distinct assembly. 3 PRs.
   of each property, `cover` at assembly, nine more refusals, and the
   single mode's pixels in the engine's own image test.
 
-*P6e, still to build:* `border-image`, `double`, `groove` and `ridge` as
-keyline pairs, `backdrop-filter` to the glass, and §14's `color`,
-`outline` and `text-shadow`, which need an engine carrier.
+*P6e, border lines and border images, done:*
+- **Lines** (§2): `double`, `groove` and `ridge` are a solid edge drawn
+  as two keylines in place of the border edge (`MaterialEdgeLines`, a
+  style field's second member, so each edge's style still cascades as
+  one field). A double edge is two lines a third of its width, a third
+  apart; a groove or ridge two halves, one in the edge's colour and one
+  in its shade, each channel halved and rounded down (CSS leaves the
+  shades to the engine): a groove's outer half is the shade on the top
+  and left and the colour on the bottom and right, a ridge's the
+  reverse. The pairs follow the declared keylines in CSS's edge order,
+  so the corner square two edges share shows the later edge's line; they
+  count toward the material's 8 keylines, past which the assembled
+  material is invalid and the part draws its built-in recipe. The
+  keylines are clipped to a rounded box, as keylines are.
+- **Border images** (§2): `border-image: none` or a bound image with
+  `<slice>{1,4} fill / <width>{1,4}` and optionally `stretch`, a new
+  field (`border_image`) holding the engine's nine-patch, drawn as the
+  top fill layer in place of the border (its edges and their lines), as
+  CSS draws a border image in place of the border's style. The
+  nine-patch fills its middle and stretches at one scale, so the
+  language admits what it draws: `fill` and the widths written (`auto`,
+  the slices at the image's own size, or lengths), each width in the
+  same proportion to its slice; slices are image pixels or percentages
+  of the image. A missing `fill` or width, a width in border widths, a
+  gradient source, an outset and `repeat`, `round` and `space` are
+  E405; the longhands wait (E999).
+- Gate: four more rows (a double border, a groove border, one ridge
+  edge, a border image over a declared border) bake the pixels of the
+  same C++ material; plus the lowering of the styles and of a
+  percentage-sliced border image, and seven more refusals.
+
+*Still to build in P6:* `backdrop-filter` to the glass primitive, the
+sheen's pointer gradient, and §14's `color`, `outline` and
+`text-shadow`, which need a carrier for the recipe's own fields (owner
+decision pending, T3 track).
 
 **P7. Motion.** `transition`, the timing functions, delays, `@keyframes`,
 `animation`, ambient loops, and the state-machine grouping. Gate: a fixture

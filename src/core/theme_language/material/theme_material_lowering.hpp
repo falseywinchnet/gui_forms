@@ -56,6 +56,7 @@ enum class MaterialProperty : std::uint8_t {
     border_left_style,
     border_left_width,
     border_left_color,
+    border_image,
     border_radius,
     border_top_left_radius,
     border_top_right_radius,

@@ -469,7 +469,7 @@ void test_refusals() {
         {"#a { opacity: 1 } @media (min-width: 1px) { #a { opacity: 1 } }", DiagnosticCode::not_yet_built, "@media"},
         {"@keyframes k { from { opacity: 0 } }", DiagnosticCode::not_yet_built, "@keyframes"},
         {"#a { text-shadow: 1px 1px red }", DiagnosticCode::not_yet_built, "text-shadow"},
-        {"#a { border-image: none }", DiagnosticCode::not_yet_built, "border"},
+        {"#a { border-image-slice: 1 }", DiagnosticCode::not_yet_built, "border"},
         {"#a { transition: opacity 1s }", DiagnosticCode::not_yet_built, "transition"},
         {"#a { color: red }", DiagnosticCode::not_yet_built, "color"},
         {"#a { font: ui }", DiagnosticCode::not_yet_built, "font"},
