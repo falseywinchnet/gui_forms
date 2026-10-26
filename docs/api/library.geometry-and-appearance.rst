@@ -117,7 +117,7 @@ Types
    * - :cpp:class:`MaterialCornerRadii <gui_forms::MaterialCornerRadii>`
      - A material's four corner radii (E9.6, CSS ``border-*-radius``), in logical units: top-left, top-right, bottom-right and bottom-left.
    * - :cpp:class:`MaterialDeclaration <gui_forms::MaterialDeclaration>`
-     - One material field a rule sets and its value.
+     -  
    * - :cpp:class:`MaterialDropShadow <gui_forms::MaterialDropShadow>`
      - A drop shadow of the part's own drawn alpha (E9.6, CSS ``filter: drop-shadow()``): the baked raster's alpha, blurred by ``blur_radius`` (σ = blur / 2, as a shadow's), moved by ``offset``, in ``color``, drawn beneath the raster.
    * - :cpp:class:`MaterialFillLayer <gui_forms::MaterialFillLayer>`
@@ -206,6 +206,8 @@ Types
      - The raster cache's counters, for instrumentation.
    * - :cpp:class:`Rect <gui_forms::Rect>`
      - Rect is a half-open logical rectangle with finite/empty checks, containment, exact intersection, and bounding union operations.
+   * - :cpp:class:`RelativeCorners <gui_forms::RelativeCorners>`
+     - One material field a rule sets and its value.
    * - :cpp:class:`RetainedDrawCache <gui_forms::RetainedDrawCache>`
      -  
    * - :cpp:class:`RetainedDrawMemo <gui_forms::RetainedDrawMemo>`
@@ -267,11 +269,13 @@ Types
 
    ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
 
-   A part's assembled material (T3 EC1): its recipe's material, the floor, with the winning material fields of the theme's rules in place, and what it was assembled from. It is assembled again only when that changes: - ``rules_serial`` and ``fields``: the compiled rules' serial (CompiledThemeRules::serial) and the winning declaration of each field, by address within those rules (null for none); - ``floor``: a copy of the recipe material, compared by value, since the theme's recipe may be replaced and another may occupy its address.
+   A part's assembled material (T3 EC1): its recipe's material, the floor, with the winning material fields of the theme's rules in place, and what it was assembled from. It is assembled again only when that changes: - ``rules_serial`` and ``fields``: the compiled rules' serial (CompiledThemeRules::serial) and the winning declaration of each field, by address within those rules (null for none); - ``floor``: a copy of the recipe material, compared by value, since the theme's recipe may be replaced and another may occupy its address; - ``shorter_side``: the box's shorter side, which relative corners read.
 
    .. cpp:member:: std::uint64_t rules_serial
 
    .. cpp:member:: std::array<const MaterialDeclaration*, material_field_count> fields
+
+   .. cpp:member:: double shorter_side
 
    .. cpp:member:: SurfaceMaterial floor
 
@@ -1607,11 +1611,11 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One material field a rule sets and its value. Only the members ``field`` names are read; the others stay empty: - fills, shadows, glows, keylines: the lists (fills: 1 to SurfaceMaterial::maximum_fill_layers); - the edges: ``border``, empty for none; - corners: ``number`` (corner_radius) and ``corner_radii``, empty when every corner takes corner_radius; - colour_filter: ``colour_filter``; drop_shadow: ``drop_shadow``, empty for none; mask: ``mask``, empty for none; - filter_blur and finish: ``number``.
-
    .. cpp:member:: MaterialField field
 
       Default: ``{MaterialField::fills}``.
+
+   .. cpp:member:: bool initial
 
    .. cpp:member:: std::vector<MaterialFillLayer> fills
 
@@ -1619,13 +1623,17 @@ Types
 
    .. cpp:member:: std::vector<MaterialGlow> glows
 
-   .. cpp:member:: std::optional<MaterialBorder> border
+   .. cpp:member:: std::optional<MaterialBorderStyle> border_style
+
+   .. cpp:member:: Color colour
 
    .. cpp:member:: std::vector<MaterialKeyline> keylines
 
    .. cpp:member:: double number
 
    .. cpp:member:: std::optional<MaterialCornerRadii> corner_radii
+
+   .. cpp:member:: RelativeCorners relative
 
    .. cpp:member:: MaterialColourFilter colour_filter
 
@@ -2975,6 +2983,22 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RelativeCorners final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   One material field a rule sets and its value. Only the members ``field`` names are read; the others stay empty: - background_colour: ``colour``, a solid layer under the image layers; - fills: the image layers (gradients, images, patterns), bottom first, at most SurfaceMaterial::maximum_fill_layers, empty for none; - shadows, glows, keylines: the lists; - an edge's style: ``border_style``, empty for none (CSS's ``none``); its width: ``number``, 0 for none; its colour: ``colour``; - corners: ``number`` (corner_radius) and ``corner_radii``, empty when every corner takes corner_radius; a corner ``relative`` marks is a fraction of the box's shorter side (CSS's percentage, R2-11), resolved when the material is assembled for a part (``number`` is relative when top_left is marked); - colour_filter: ``colour_filter``; drop_shadow: ``drop_shadow``, empty for none; mask: ``mask``, empty for none; - filter_blur and finish: ``number``. ``initial``, set, is CSS's ``initial``: the field keeps the floor's value, and the declaration still wins over those beneath it; its value members are not read.
+
+   .. cpp:member:: bool top_left
+
+   .. cpp:member:: bool top_right
+
+   .. cpp:member:: bool bottom_right
+
+   .. cpp:member:: bool bottom_left
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: RetainedDrawCache final
 
    ``#include <gui_forms/types/painter/painter.hpp>``
@@ -3903,19 +3927,37 @@ Enumerations
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
+   .. cpp:enumerator:: background_colour
+
    .. cpp:enumerator:: fills
 
    .. cpp:enumerator:: shadows
 
    .. cpp:enumerator:: glows
 
-   .. cpp:enumerator:: border_top
+   .. cpp:enumerator:: border_top_style
 
-   .. cpp:enumerator:: border_right
+   .. cpp:enumerator:: border_top_width
 
-   .. cpp:enumerator:: border_bottom
+   .. cpp:enumerator:: border_top_colour
 
-   .. cpp:enumerator:: border_left
+   .. cpp:enumerator:: border_right_style
+
+   .. cpp:enumerator:: border_right_width
+
+   .. cpp:enumerator:: border_right_colour
+
+   .. cpp:enumerator:: border_bottom_style
+
+   .. cpp:enumerator:: border_bottom_width
+
+   .. cpp:enumerator:: border_bottom_colour
+
+   .. cpp:enumerator:: border_left_style
+
+   .. cpp:enumerator:: border_left_width
+
+   .. cpp:enumerator:: border_left_colour
 
    .. cpp:enumerator:: keylines
 
@@ -4756,9 +4798,9 @@ Functions, constants and aliases
 
 .. cpp:function:: std::string_view material_field_name(MaterialField field) noexcept
 
-.. cpp:function:: void assemble_material(const SurfaceMaterial& floor, const std::array<const MaterialDeclaration*, material_field_count>& fields, SurfaceMaterial& material)
+.. cpp:function:: void assemble_material(const SurfaceMaterial& floor, const std::array<const MaterialDeclaration*, material_field_count>& fields, double shorter_side, SurfaceMaterial& material)
 
-   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1). The border's edges are assembled together when any is declared: each is its declaration's, else the floor's (its single edge, else its uniform border); four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material).
+   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value. The fills are composed when either fill field is declared: the colour layer (the declared colour, else the floor's bottom layer when it is solid) under the image layers (the declared ones, else the floor's others); a colour of alpha 0 adds no layer, and with no layer at all the fill is one transparent solid. More than SurfaceMaterial::maximum_fill_layers is no material. The border's edges are assembled together when any of their fields is declared: each starts as the floor's (its single edge, else its uniform border; an edge the floor lacks has the default MaterialBorder's width and colour and is not drawn), takes its declared style, width and colour, and is drawn unless its style is none or its width 0. Four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material). Relative corners are resolved against ``shorter_side``, the box's shorter side in logical units.
 
 .. cpp:function:: std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept
 

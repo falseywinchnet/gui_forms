@@ -652,8 +652,9 @@ constexpr double built_in_group_margin = 4.0;
 // Whether `assembled` was assembled from `floor` and the winning fields of
 // `resolution` in the compiled rules numbered `rules_serial`.
 bool same_assembly(const AssembledPartMaterial& assembled, std::uint64_t rules_serial, const SurfaceMaterial& floor,
-                   const CompiledThemeRules::Resolution& resolution) noexcept {
+                   double shorter_side, const CompiledThemeRules::Resolution& resolution) noexcept {
     if (assembled.rules_serial != rules_serial || assembled.fields != resolution.materials) return false;
+    if (assembled.shorter_side != shorter_side) return false;
     const bool same_floor = assembled.floor == floor;
     return same_floor;
 }
@@ -663,22 +664,26 @@ bool same_assembly(const AssembledPartMaterial& assembled, std::uint64_t rules_s
 // a part without a record, `unkept`, assembled for this paint. Each
 // assembly is counted. The result is borrowed from `kept` or `unkept`.
 const SurfaceMaterial& authored_material(EnginePartRecord* kept, std::uint64_t rules_serial,
-                                         const SurfaceMaterial& floor,
+                                         const SurfaceMaterial& floor, Rect box,
                                          const CompiledThemeRules::Resolution& resolution,
                                          std::optional<SurfaceMaterial>& unkept, Metrics& metrics) {
+    const double shorter_side = std::min(box.width, box.height);
     if (kept == nullptr) {
         unkept.emplace();
-        assemble_material(floor, resolution.materials, *unkept);
+        assemble_material(floor, resolution.materials, shorter_side, *unkept);
         metrics.record_engine_material_assembly();
         return *unkept;
     }
     std::unique_ptr<AssembledPartMaterial>& held = (*kept).assembled_material;
-    if (held != nullptr && same_assembly(*held, rules_serial, floor, resolution)) return (*held).material;
+    if (held != nullptr && same_assembly(*held, rules_serial, floor, shorter_side, resolution)) {
+        return (*held).material;
+    }
     if (held == nullptr) held = std::make_unique<AssembledPartMaterial>();
     (*held).rules_serial = rules_serial;
     (*held).fields = resolution.materials;
+    (*held).shorter_side = shorter_side;
     (*held).floor = floor;
-    assemble_material(floor, resolution.materials, (*held).material);
+    assemble_material(floor, resolution.materials, shorter_side, (*held).material);
     metrics.record_engine_material_assembly();
     return (*held).material;
 }
@@ -978,8 +983,8 @@ void ThemeEngine::paint_planned(Painter& painter, const Control& control, const 
         const ControlVisualRecipe& recipe = control.effective_theme().resolve(*material_role, context);
         request.target.material = &recipe.material;
         if (resolution.materials_authored) {
-            request.target.material = &authored_material(kept, rules_.serial(), recipe.material, resolution,
-                                                         unkept_material, (*window).metrics());
+            request.target.material = &authored_material(kept, rules_.serial(), recipe.material, part.bounds,
+                                                         resolution, unkept_material, (*window).metrics());
         }
         request.target.corner_radius = part.corner_radius;
         request.target.images = &(*window).image_resources();

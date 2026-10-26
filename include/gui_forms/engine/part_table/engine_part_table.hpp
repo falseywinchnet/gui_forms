@@ -123,10 +123,12 @@ struct CachedPartRaster final {
 //   (CompiledThemeRules::serial) and the winning declaration of each field,
 //   by address within those rules (null for none);
 // - `floor`: a copy of the recipe material, compared by value, since the
-//   theme's recipe may be replaced and another may occupy its address.
+//   theme's recipe may be replaced and another may occupy its address;
+// - `shorter_side`: the box's shorter side, which relative corners read.
 struct AssembledPartMaterial final {
     std::uint64_t rules_serial{};
     std::array<const MaterialDeclaration*, material_field_count> fields{};
+    double shorter_side{};
     SurfaceMaterial floor{};
     SurfaceMaterial material{};
 };

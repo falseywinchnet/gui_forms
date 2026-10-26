@@ -304,18 +304,31 @@ struct AmbientEffect final {
 // Each cascades on its own, as a parameter does: a part's material is the
 // recipe material its primitive draws (the cascade's floor), with each
 // field the winning matching rule sets in its place. The fields are
-// SurfaceMaterial's, except that `corners` is corner_radius and
-// corner_radii together, as CSS's border-radius sets them, and that the
-// border is its four edges, as CSS's longhands are (a theme's `border`
-// sets all four).
+// SurfaceMaterial's, except that the fills are two fields, CSS's
+// background-color and background-image (owner C6, 2026-10-26: they
+// combine across rules, the colour under the image layers), that `corners`
+// is corner_radius and corner_radii together, as CSS's border-radius sets
+// them, and that the
+// border is CSS's twelve longhands: each edge's style, width and colour, in
+// that order, the edges in CSS's order (a theme's `border` sets all
+// twelve).
 enum class MaterialField : std::uint8_t {
+    background_colour,
     fills,
     shadows,
     glows,
-    border_top,
-    border_right,
-    border_bottom,
-    border_left,
+    border_top_style,
+    border_top_width,
+    border_top_colour,
+    border_right_style,
+    border_right_width,
+    border_right_colour,
+    border_bottom_style,
+    border_bottom_width,
+    border_bottom_colour,
+    border_left_style,
+    border_left_width,
+    border_left_colour,
     keylines,
     corners,
     colour_filter,
@@ -332,31 +345,58 @@ inline constexpr std::size_t material_field_count = static_cast<std::size_t>(Mat
 
 // One material field a rule sets and its value. Only the members `field`
 // names are read; the others stay empty:
-// - fills, shadows, glows, keylines: the lists (fills: 1 to
-//   SurfaceMaterial::maximum_fill_layers);
-// - the edges: `border`, empty for none;
+// - background_colour: `colour`, a solid layer under the image layers;
+// - fills: the image layers (gradients, images, patterns), bottom first,
+//   at most SurfaceMaterial::maximum_fill_layers, empty for none;
+// - shadows, glows, keylines: the lists;
+// - an edge's style: `border_style`, empty for none (CSS's `none`); its
+//   width: `number`, 0 for none; its colour: `colour`;
 // - corners: `number` (corner_radius) and `corner_radii`, empty when every
-//   corner takes corner_radius;
+//   corner takes corner_radius; a corner `relative` marks is a fraction of
+//   the box's shorter side (CSS's percentage, R2-11), resolved when the
+//   material is assembled for a part (`number` is relative when top_left
+//   is marked);
 // - colour_filter: `colour_filter`; drop_shadow: `drop_shadow`, empty for
 //   none; mask: `mask`, empty for none;
 // - filter_blur and finish: `number`.
+// `initial`, set, is CSS's `initial`: the field keeps the floor's value,
+// and the declaration still wins over those beneath it; its value members
+// are not read.
+struct RelativeCorners final {
+    bool top_left{};
+    bool top_right{};
+    bool bottom_right{};
+    bool bottom_left{};
+
+    friend constexpr bool operator==(RelativeCorners left, RelativeCorners right) noexcept {
+        return left.top_left == right.top_left && left.top_right == right.top_right &&
+               left.bottom_right == right.bottom_right && left.bottom_left == right.bottom_left;
+    }
+};
+
 struct MaterialDeclaration final {
     MaterialField field{MaterialField::fills};
+    bool initial{};
     std::vector<MaterialFillLayer> fills{};
     std::vector<MaterialShadow> shadows{};
     std::vector<MaterialGlow> glows{};
-    std::optional<MaterialBorder> border{};
+    std::optional<MaterialBorderStyle> border_style{};
+    Color colour{};
     std::vector<MaterialKeyline> keylines{};
     double number{};
     std::optional<MaterialCornerRadii> corner_radii{};
+    RelativeCorners relative{};
     MaterialColourFilter colour_filter{};
     std::optional<MaterialDropShadow> drop_shadow{};
     std::optional<MaterialFillLayer> mask{};
 
     friend bool operator==(const MaterialDeclaration& left, const MaterialDeclaration& right) noexcept {
-        return left.field == right.field && left.fills == right.fills && left.shadows == right.shadows &&
-               left.glows == right.glows && left.border == right.border && left.keylines == right.keylines &&
+        return left.field == right.field && left.initial == right.initial && left.fills == right.fills &&
+               left.shadows == right.shadows &&
+               left.glows == right.glows && left.border_style == right.border_style &&
+               left.colour == right.colour && left.keylines == right.keylines &&
                left.number == right.number && left.corner_radii == right.corner_radii &&
+               left.relative == right.relative &&
                left.colour_filter == right.colour_filter && left.drop_shadow == right.drop_shadow &&
                left.mask == right.mask;
     }
@@ -364,15 +404,27 @@ struct MaterialDeclaration final {
 
 // Replaces `material` with `floor` and the declarations of `fields` (the
 // winning declaration of each field, by the field's position, null where
-// none) in place: a part's assembled material (EC1). The border's edges
-// are assembled together when any is declared: each is its declaration's,
-// else the floor's (its single edge, else its uniform border); four equal
-// edges are drawn as one uniform border, which keeps a dash and rounded
-// corners, and unequal ones as single edges, which a material admits only
-// with square corners (valid_surface_material).
+// none) in place: a part's assembled material (EC1); an `initial`
+// declaration keeps the floor's value. The fills are composed when either
+// fill field is declared: the colour layer (the declared colour, else the
+// floor's bottom layer when it is solid) under the image layers (the
+// declared ones, else the floor's others); a colour of alpha 0 adds no
+// layer, and with no layer at all the fill is one transparent solid. More
+// than SurfaceMaterial::maximum_fill_layers is no material. The border's
+// edges are assembled
+// together when any of their fields is declared: each starts as the
+// floor's (its single edge, else its uniform border; an edge the floor
+// lacks has the default MaterialBorder's width and colour and is not
+// drawn), takes its declared style, width and colour, and is drawn unless
+// its style is none or its width 0. Four equal edges are drawn as one
+// uniform border, which keeps a dash and rounded corners, and unequal ones
+// as single edges, which a material admits only with square corners
+// (valid_surface_material). Relative corners are
+// resolved against `shorter_side`, the box's shorter side in logical
+// units.
 void assemble_material(const SurfaceMaterial& floor,
                        const std::array<const MaterialDeclaration*, material_field_count>& fields,
-                       SurfaceMaterial& material);
+                       double shorter_side, SurfaceMaterial& material);
 
 // One rule. `label` names it in diagnostics (T3: its source position).
 // `requires_engine`, when set, is the engine version the rule needs, in

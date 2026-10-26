@@ -39,8 +39,8 @@ void require(bool condition, const char* message) {
 
 MaterialDeclaration fills_of(Color colour) {
     MaterialDeclaration declaration{};
-    declaration.field = MaterialField::fills;
-    declaration.fills.push_back(MaterialFillLayer::solid(colour));
+    declaration.field = MaterialField::background_colour;
+    declaration.colour = colour;
     return declaration;
 }
 
@@ -51,11 +51,23 @@ MaterialDeclaration number_of(MaterialField field, double value) {
     return declaration;
 }
 
-MaterialDeclaration edge_of(MaterialField field, std::optional<MaterialBorder> border) {
+MaterialDeclaration style_of(MaterialField field, std::optional<MaterialBorderStyle> style) {
     MaterialDeclaration declaration{};
     declaration.field = field;
-    declaration.border = border;
+    declaration.border_style = style;
     return declaration;
+}
+
+MaterialDeclaration colour_of(MaterialField field, Color colour) {
+    MaterialDeclaration declaration{};
+    declaration.field = field;
+    declaration.colour = colour;
+    return declaration;
+}
+
+std::size_t at(MaterialField field) {
+    const std::size_t position = static_cast<std::size_t>(field);
+    return position;
 }
 
 MaterialBorder border_of(Color colour, double width) {
@@ -86,8 +98,14 @@ bool has_diagnostic(const CompiledThemeRules& rules, RuleDiagnosticKind kind, st
 
 void test_field_names() {
     const std::array<std::string_view, material_field_count> expected{
-        "fills",    "shadows", "glows",         "border_top",  "border_right", "border_bottom", "border_left",
-        "keylines", "corners", "colour_filter", "drop_shadow", "filter_blur",  "finish",        "mask"};
+        "background_colour", "fills",         "shadows",           "glows",
+        "border_top_style",    "border_top_width",    "border_top_colour",
+        "border_right_style",  "border_right_width",  "border_right_colour",
+        "border_bottom_style", "border_bottom_width", "border_bottom_colour",
+        "border_left_style",   "border_left_width",   "border_left_colour",
+        "keylines",      "corners",           "colour_filter",
+        "drop_shadow",   "filter_blur",       "finish",
+        "mask"};
     for (std::size_t index = 0U; index < material_field_count; ++index) {
         require(material_field_name(static_cast<MaterialField>(index)) == expected[index],
                 "each material field has its name, in enum order");
@@ -113,21 +131,26 @@ void test_compile() {
     invalid.materials.push_back(number_of(MaterialField::corners, -1.0));
     invalid.materials.push_back(number_of(MaterialField::finish, 2.0));
     invalid.materials.push_back(number_of(MaterialField::count, 0.0));
+    invalid.materials.push_back(number_of(MaterialField::border_left_width, -1.0));
+    invalid.materials.push_back(number_of(MaterialField::border_top_width, 65.0));
     sheet.rules.push_back(invalid);
     const CompiledThemeRules rules = CompiledThemeRules::compile(sheet, builtin_primitive_registry());
 
     require(!has_diagnostic(rules, RuleDiagnosticKind::rule_empty, "fields", {}),
             "a rule declaring only material fields declares something");
-    require(has_diagnostic(rules, RuleDiagnosticKind::duplicate_declaration, "repeated", "fills"),
+    require(has_diagnostic(rules, RuleDiagnosticKind::duplicate_declaration, "repeated", "background_colour"),
             "a second declaration of a field in one rule is a duplicate");
     require(has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", "fills") &&
                 has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", "corners") &&
                 has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", "finish") &&
-                has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", {}),
-            "a field no material admits is dropped: nine fills, a negative radius, a finish past 1, no field");
+                has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", {}) &&
+                has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", "border_left_width") &&
+                has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", "border_top_width"),
+            "a field no material admits is dropped: nine fills, a negative radius, a finish past 1, no field, "
+            "a negative or over-wide edge");
     require(has_diagnostic(rules, RuleDiagnosticKind::rule_empty, "invalid", {}),
             "a rule whose every field is dropped is empty");
-    require(rules.diagnostics().size() == 6U, "nothing else is reported");
+    require(rules.diagnostics().size() == 8U, "nothing else is reported");
     require(rule_diagnostic_name(RuleDiagnosticKind::material_field_invalid) == "material_field_invalid",
             "the new diagnostic has its name");
 }
@@ -138,12 +161,20 @@ void test_cascade() {
     ThemeRuleSheet sheet{};
     ThemeRule faces = part_rule("faces", {}, "face");
     faces.materials.push_back(fills_of(Color::rgba(200, 0, 0)));
-    faces.materials.push_back(edge_of(MaterialField::border_top, border_of(Color::rgba(0, 0, 0), 2.0)));
+    faces.materials.push_back(number_of(MaterialField::border_top_width, 2.0));
     sheet.rules.push_back(faces);
     // More specific, so later in the cascade whatever its position.
     ThemeRule pad = part_rule("pad", "pad", "face");
     pad.materials.push_back(fills_of(Color::rgba(0, 0, 200)));
+    MaterialDeclaration initial_glows{};
+    initial_glows.field = MaterialField::glows;
+    initial_glows.initial = true;
+    pad.materials.push_back(initial_glows);
     sheet.rules.insert(sheet.rules.begin(), pad);
+    MaterialDeclaration glows{};
+    glows.field = MaterialField::glows;
+    glows.glows.push_back(MaterialGlow{});
+    sheet.rules[1].materials.push_back(glows);
     const CompiledThemeRules rules = CompiledThemeRules::compile(sheet, builtin_primitive_registry());
     require(rules.diagnostics().empty(), "the cascade sheet compiles cleanly");
 
@@ -153,20 +184,22 @@ void test_cascade() {
     facts.part = "face";
     facts.role = PartRole::face;
     const CompiledThemeRules::Resolution both = rules.resolve(facts);
-    const MaterialDeclaration* const fills = both.materials[static_cast<std::size_t>(MaterialField::fills)];
-    const MaterialDeclaration* const top = both.materials[static_cast<std::size_t>(MaterialField::border_top)];
+    const MaterialDeclaration* const fills = both.materials[at(MaterialField::background_colour)];
+    const MaterialDeclaration* const top = both.materials[at(MaterialField::border_top_width)];
     require(both.materials_authored && fills != nullptr && top != nullptr, "both rules set fields of the pad's face");
     require((*fills) == fills_of(Color::rgba(0, 0, 200)), "the more specific rule's fills win");
-    require((*top).border == border_of(Color::rgba(0, 0, 0), 2.0),
+    require((*top).number == 2.0,
             "a field only the less specific rule sets is still its: each field cascades on its own");
     require(both.materials[static_cast<std::size_t>(MaterialField::corners)] == nullptr,
             "a field no rule sets has no winner");
+    const MaterialDeclaration* const glow = both.materials[static_cast<std::size_t>(MaterialField::glows)];
+    require(glow != nullptr && (*glow).initial, "an initial declaration wins over the rules beneath it");
     require(both.outcome == CompiledThemeRules::Outcome::no_rule,
             "material fields select no primitive: they change a part only where one draws a material");
 
     facts.stable_id = "other";
     const CompiledThemeRules::Resolution other = rules.resolve(facts);
-    const MaterialDeclaration* const other_fills = other.materials[static_cast<std::size_t>(MaterialField::fills)];
+    const MaterialDeclaration* const other_fills = other.materials[at(MaterialField::background_colour)];
     require(other_fills != nullptr && (*other_fills) == fills_of(Color::rgba(200, 0, 0)),
             "another face takes the general rule's fills");
     facts.part = "label";
@@ -203,52 +236,159 @@ void test_assembly() {
     SurfaceMaterial assembled{};
 
     std::array<const MaterialDeclaration*, material_field_count> fields = no_fields();
-    assemble_material(floor, fields, assembled);
+    assemble_material(floor, fields, 20.0, assembled);
     require(assembled == floor, "with no field set the assembly is the floor");
 
     const MaterialDeclaration red = fills_of(Color::rgba(200, 0, 0));
     const MaterialDeclaration radius = number_of(MaterialField::corners, 2.0);
-    fields[static_cast<std::size_t>(MaterialField::fills)] = &red;
+    fields[at(MaterialField::background_colour)] = &red;
     fields[static_cast<std::size_t>(MaterialField::corners)] = &radius;
-    assemble_material(floor, fields, assembled);
+    assemble_material(floor, fields, 20.0, assembled);
     SurfaceMaterial expected = floor;
-    expected.fills = red.fills;
+    expected.fills.assign(1U, MaterialFillLayer::solid(Color::rgba(200, 0, 0)));
     expected.corner_radius = 2.0;
     require(assembled == expected, "each set field replaces the floor's, and the others stay");
 
     // An edge equal to the floor's border leaves a uniform border, its dash
     // and its rounding kept.
-    const MaterialDeclaration same_top = edge_of(MaterialField::border_top, floor.border);
+    const MaterialDeclaration same_width = number_of(MaterialField::border_top_width, 1.0);
     fields = no_fields();
-    fields[static_cast<std::size_t>(MaterialField::border_top)] = &same_top;
-    assemble_material(floor, fields, assembled);
+    fields[at(MaterialField::border_top_width)] = &same_width;
+    assemble_material(floor, fields, 20.0, assembled);
     require(assembled == floor, "four equal edges are one uniform border");
 
-    const MaterialDeclaration thick_top = edge_of(MaterialField::border_top, border_of(Color::rgba(0, 0, 0), 3.0));
-    fields[static_cast<std::size_t>(MaterialField::border_top)] = &thick_top;
-    assemble_material(floor, fields, assembled);
-    require(!assembled.border && assembled.border_edges.top == thick_top.border &&
+    // The longhands combine: a width and a colour from two declarations.
+    const MaterialDeclaration thick = number_of(MaterialField::border_top_width, 3.0);
+    const MaterialDeclaration black = colour_of(MaterialField::border_top_colour, Color::rgba(0, 0, 0));
+    fields[at(MaterialField::border_top_width)] = &thick;
+    fields[at(MaterialField::border_top_colour)] = &black;
+    assemble_material(floor, fields, 20.0, assembled);
+    MaterialBorder expected_top = *floor.border;
+    expected_top.width = 3.0;
+    expected_top.color = Color::rgba(0, 0, 0);
+    require(!assembled.border && assembled.border_edges.top == expected_top &&
                 assembled.border_edges.right == floor.border && assembled.border_edges.bottom == floor.border &&
                 assembled.border_edges.left == floor.border,
-            "an unequal edge splits the border: the others keep the floor's");
+            "an unequal edge splits the border, keeping the floor's style; the others keep the floor's");
     require(!valid_surface_material(assembled), "single edges with rounded corners are no material");
     const MaterialDeclaration square = number_of(MaterialField::corners, 0.0);
-    fields[static_cast<std::size_t>(MaterialField::corners)] = &square;
-    assemble_material(floor, fields, assembled);
+    fields[at(MaterialField::corners)] = &square;
+    assemble_material(floor, fields, 20.0, assembled);
     require(valid_surface_material(assembled), "with square corners they are");
+
+    // A floor with no border: a style draws the default border; a width
+    // alone draws nothing, as CSS's style none.
+    const SurfaceMaterial bare{};
+    std::array<MaterialDeclaration, 4> solids{};
+    const std::array<MaterialField, 4> style_fields{MaterialField::border_top_style, MaterialField::border_right_style,
+                                                    MaterialField::border_bottom_style,
+                                                    MaterialField::border_left_style};
+    fields = no_fields();
+    for (std::size_t edge = 0U; edge < solids.size(); ++edge) {
+        solids[edge] = style_of(style_fields[edge], MaterialBorderStyle::solid);
+        fields[at(style_fields[edge])] = &solids[edge];
+    }
+    assemble_material(bare, fields, 20.0, assembled);
+    require(assembled.border == MaterialBorder{} && assembled.border_edges.empty(),
+            "four solid edges over no border are the default uniform border");
+    const MaterialDeclaration none_width = number_of(MaterialField::border_left_width, 0.0);
+    fields[at(MaterialField::border_left_width)] = &none_width;
+    assemble_material(bare, fields, 20.0, assembled);
+    require(!assembled.border && !assembled.border_edges.left && assembled.border_edges.top == MaterialBorder{},
+            "a zero width draws no edge");
+    fields = no_fields();
+    fields[at(MaterialField::border_top_width)] = &thick;
+    assemble_material(bare, fields, 20.0, assembled);
+    require(assembled == bare, "a width with no style draws nothing");
 
     // A floor drawn with single edges lends them edge by edge.
     SurfaceMaterial edged{};
     edged.border_edges.bottom = border_of(Color::rgba(1, 2, 3), 1.0);
-    const MaterialDeclaration no_top = edge_of(MaterialField::border_top, std::nullopt);
+    const MaterialDeclaration no_top = style_of(MaterialField::border_top_style, std::nullopt);
     fields = no_fields();
-    fields[static_cast<std::size_t>(MaterialField::border_top)] = &no_top;
-    assemble_material(edged, fields, assembled);
+    fields[at(MaterialField::border_top_style)] = &no_top;
+    assemble_material(edged, fields, 20.0, assembled);
     require(assembled == edged, "the floor's single edges stay where no edge is set");
-    const MaterialDeclaration bottom_none = edge_of(MaterialField::border_bottom, std::nullopt);
-    fields[static_cast<std::size_t>(MaterialField::border_bottom)] = &bottom_none;
-    assemble_material(edged, fields, assembled);
+    const MaterialDeclaration bottom_none = style_of(MaterialField::border_bottom_style, std::nullopt);
+    fields[at(MaterialField::border_bottom_style)] = &bottom_none;
+    assemble_material(edged, fields, 20.0, assembled);
     require(!assembled.border && assembled.border_edges.empty(), "four absent edges are no border");
+
+    // Relative corners are fractions of the shorter side.
+    MaterialDeclaration relative = number_of(MaterialField::corners, 0.5);
+    relative.relative.top_left = true;
+    fields = no_fields();
+    fields[static_cast<std::size_t>(MaterialField::corners)] = &relative;
+    assemble_material(floor, fields, 20.0, assembled);
+    require(assembled.corner_radius == 10.0 && !assembled.corner_radii, "50% of a 20-unit side is 10");
+    relative.corner_radii = MaterialCornerRadii{0.25, 3.0, 0.5, 1.0};
+    relative.relative.bottom_right = true;
+    assemble_material(floor, fields, 20.0, assembled);
+    require(assembled.corner_radii == (MaterialCornerRadii{5.0, 3.0, 10.0, 1.0}),
+            "each marked corner is resolved, the others kept in units");
+    fields = no_fields();
+    fields[at(MaterialField::border_top_style)] = &no_top;
+
+    // `initial` keeps the floor's value, for an edge as for any field.
+    MaterialDeclaration initial_bottom = bottom_none;
+    initial_bottom.initial = true;
+    MaterialDeclaration initial_fills{};
+    initial_fills.initial = true;
+    fields[at(MaterialField::border_bottom_style)] = &initial_bottom;
+    initial_fills.field = MaterialField::fills;
+    fields[at(MaterialField::fills)] = &initial_fills;
+    assemble_material(edged, fields, 20.0, assembled);
+    require(assembled == edged, "an initial field is the floor's");
+}
+
+// The fill fields compose (owner C6): the colour under the image layers,
+// each the declared one, else the floor's.
+MaterialFillLayer veil() {
+    const std::vector<GradientStop> stops{GradientStop{0.0, Color::rgba(255, 255, 255, 160)},
+                                          GradientStop{1.0, Color::rgba(0, 0, 0, 64)}};
+    const MaterialFillLayer layer = MaterialFillLayer::linear(Point{0.0, 0.0}, Point{0.0, 1.0}, stops);
+    return layer;
+}
+
+MaterialDeclaration images_of(std::vector<MaterialFillLayer> layers) {
+    MaterialDeclaration declaration{};
+    declaration.field = MaterialField::fills;
+    declaration.fills = std::move(layers);
+    return declaration;
+}
+
+void test_fill_composition() {
+    SurfaceMaterial floor{};
+    floor.fills = {MaterialFillLayer::solid(Color::rgba(9, 9, 9)), veil()};
+    SurfaceMaterial assembled{};
+    std::array<const MaterialDeclaration*, material_field_count> fields = no_fields();
+    const MaterialDeclaration red = fills_of(Color::rgba(200, 0, 0));
+    fields[at(MaterialField::background_colour)] = &red;
+    assemble_material(floor, fields, 20.0, assembled);
+    require(assembled.fills == (std::vector<MaterialFillLayer>{MaterialFillLayer::solid(Color::rgba(200, 0, 0)), veil()}),
+            "a colour replaces the floor's solid bottom layer, under the floor's image layers");
+    const MaterialDeclaration none = images_of({});
+    fields[at(MaterialField::fills)] = &none;
+    assemble_material(floor, fields, 20.0, assembled);
+    require(assembled.fills == (std::vector<MaterialFillLayer>{MaterialFillLayer::solid(Color::rgba(200, 0, 0))}),
+            "no image layers leave the colour alone");
+    const MaterialDeclaration clear = fills_of(Color::rgba(0, 0, 0, 0));
+    fields[at(MaterialField::background_colour)] = &clear;
+    assemble_material(floor, fields, 20.0, assembled);
+    require(assembled.fills == (std::vector<MaterialFillLayer>{MaterialFillLayer::solid(Color::rgba(0, 0, 0, 0))}),
+            "with no layer at all the fill is one transparent solid");
+    SurfaceMaterial graded{};
+    graded.fills = {veil()};
+    fields = no_fields();
+    fields[at(MaterialField::background_colour)] = &red;
+    assemble_material(graded, fields, 20.0, assembled);
+    require(assembled.fills == (std::vector<MaterialFillLayer>{MaterialFillLayer::solid(Color::rgba(200, 0, 0)), veil()}),
+            "a floor whose bottom layer is not solid keeps every layer as an image layer");
+    const MaterialDeclaration eight = images_of(std::vector<MaterialFillLayer>(8U, veil()));
+    fields[at(MaterialField::fills)] = &eight;
+    assemble_material(graded, fields, 20.0, assembled);
+    require(assembled.fills.size() == 9U && !valid_surface_material(assembled),
+            "a colour under eight image layers is more than a material holds");
 }
 
 // -- the engine ------------------------------------------------------------------------
@@ -301,14 +441,14 @@ struct Fixture final {
 // `button_radius` when set (the C++ equivalent of the fields).
 struct FixtureTheme final {
     std::vector<ThemeRule> rules{};
-    std::optional<Color> button_fills{};
+    std::optional<std::vector<MaterialFillLayer>> button_fills{};
     std::optional<double> button_radius{};
     ControlVisualRole family{ControlVisualRole::button};
     bool keyed{true};
 };
 
 void replace_recipe(ControlVisualRecipe& recipe, const FixtureTheme& theme) {
-    if (theme.button_fills) recipe.material.fills.assign(1U, MaterialFillLayer::solid(*theme.button_fills));
+    if (theme.button_fills) recipe.material.fills = *theme.button_fills;
     if (theme.button_radius) {
         recipe.material.corner_radius = *theme.button_radius;
         recipe.material.corner_radii.reset();
@@ -383,6 +523,9 @@ FixtureTheme authored_theme() {
     // matching rule, whatever primitive it selects.
     ThemeRule fields = part_rule("faces", {}, "face");
     fields.materials.push_back(fills_of(Color::rgba(40, 120, 200)));
+    MaterialDeclaration no_images{};
+    no_images.field = MaterialField::fills;
+    fields.materials.push_back(no_images);
     fields.materials.push_back(number_of(MaterialField::corners, 6.0));
     theme.rules.push_back(fields);
     return theme;
@@ -391,7 +534,7 @@ FixtureTheme authored_theme() {
 FixtureTheme written_theme() {
     FixtureTheme theme{};
     theme.rules.push_back(material_rule("button"));
-    theme.button_fills = Color::rgba(40, 120, 200);
+    theme.button_fills = std::vector<MaterialFillLayer>{MaterialFillLayer::solid(Color::rgba(40, 120, 200))};
     theme.button_radius = 6.0;
     return theme;
 }
@@ -422,6 +565,36 @@ void test_engine_equivalence() {
     (*(*authored).pad).invalidate(Dirty::paint);
     repaint(*authored);
     require(assemblies(window) == 2U && bakes(window) == first_bakes + 1U, "which is kept in turn");
+}
+
+// The colour in one rule and the image layers in another, the colour's rule
+// less specific (`colour_general`) or more: both compose as CSS has them,
+// and bake as the same layers written into the recipe in C++.
+FixtureTheme split_fill_theme(bool colour_general) {
+    FixtureTheme theme{};
+    theme.rules.push_back(material_rule("button"));
+    ThemeRule general = part_rule("general", {}, "face");
+    ThemeRule specific = part_rule("specific", "pad", "face");
+    const MaterialDeclaration colour = fills_of(Color::rgba(40, 120, 200));
+    const MaterialDeclaration images = images_of({veil()});
+    (colour_general ? general : specific).materials.push_back(colour);
+    (colour_general ? specific : general).materials.push_back(images);
+    theme.rules.push_back(general);
+    theme.rules.push_back(specific);
+    return theme;
+}
+
+void test_split_fills() {
+    FixtureTheme written{};
+    written.rules.push_back(material_rule("button"));
+    written.button_fills = std::vector<MaterialFillLayer>{MaterialFillLayer::solid(Color::rgba(40, 120, 200)), veil()};
+    std::unique_ptr<Fixture> expected = make_fixture(written);
+    std::unique_ptr<Fixture> colour_general = make_fixture(split_fill_theme(true));
+    std::unique_ptr<Fixture> colour_specific = make_fixture(split_fill_theme(false));
+    require(pixels_hash(*colour_general) == pixels_hash(*expected),
+            "a general colour goes under a specific rule's image layers");
+    require(pixels_hash(*colour_specific) == pixels_hash(*expected),
+            "a specific colour goes under a general rule's image layers");
 }
 
 void test_unkeyed_part() {
@@ -492,7 +665,9 @@ int main() {
     test_cascade();
     test_serials();
     test_assembly();
+    test_fill_composition();
     test_engine_equivalence();
+    test_split_fills();
     test_unkeyed_part();
     test_family_default();
     test_refused_assembly();

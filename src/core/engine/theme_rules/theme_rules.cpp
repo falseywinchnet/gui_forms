@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstddef>
+#include <vector>
 #include <utility>
 
 namespace gui_forms {
@@ -208,8 +210,35 @@ std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept {
 namespace {
 
 constexpr std::array<std::string_view, material_field_count> material_field_names{
-    "fills",    "shadows", "glows",         "border_top",  "border_right", "border_bottom", "border_left",
-    "keylines", "corners", "colour_filter", "drop_shadow", "filter_blur",  "finish",        "mask"};
+    "background_colour",
+    "fills",
+    "shadows",
+    "glows",
+    "border_top_style",
+    "border_top_width",
+    "border_top_colour",
+    "border_right_style",
+    "border_right_width",
+    "border_right_colour",
+    "border_bottom_style",
+    "border_bottom_width",
+    "border_bottom_colour",
+    "border_left_style",
+    "border_left_width",
+    "border_left_colour",
+    "keylines",
+    "corners",
+    "colour_filter",
+    "drop_shadow",
+    "filter_blur",
+    "finish",
+    "mask"};
+
+// The edge fields: four edges of three fields each, from border_top_style.
+constexpr std::size_t first_edge_field = static_cast<std::size_t>(MaterialField::border_top_style);
+constexpr std::size_t edge_field_count = 12U;
+static_assert(static_cast<std::size_t>(MaterialField::border_left_colour) == first_edge_field + edge_field_count - 1U,
+              "the edge fields are contiguous: style, width, colour per edge");
 
 // Draws the serial number of a new compilation; the first is 1.
 std::uint64_t next_rules_serial() noexcept {
@@ -228,82 +257,215 @@ std::string_view material_field_name(MaterialField field) noexcept {
 
 namespace {
 
-// Writes `declaration`'s field into `material`, replacing what was there;
-// an edge is written as a single edge.
-void apply_material_declaration(const MaterialDeclaration& declaration, SurfaceMaterial& material) {
+double resolved_corner(double value, bool relative, double shorter_side) noexcept {
+    const double resolved = relative ? value * shorter_side : value;
+    return resolved;
+}
+
+// Writes `declaration`'s field into `material`, replacing what was there,
+// with relative corners resolved against `shorter_side`. An edge field is
+// not written here (assembled_edges).
+void apply_material_declaration(const MaterialDeclaration& declaration, double shorter_side,
+                                SurfaceMaterial& material) {
     switch (declaration.field) {
-    case MaterialField::fills: material.fills = declaration.fills; return;
     case MaterialField::shadows: material.shadows = declaration.shadows; return;
     case MaterialField::glows: material.glows = declaration.glows; return;
-    case MaterialField::border_top: material.border_edges.top = declaration.border; return;
-    case MaterialField::border_right: material.border_edges.right = declaration.border; return;
-    case MaterialField::border_bottom: material.border_edges.bottom = declaration.border; return;
-    case MaterialField::border_left: material.border_edges.left = declaration.border; return;
     case MaterialField::keylines: material.keylines = declaration.keylines; return;
-    case MaterialField::corners:
-        material.corner_radius = declaration.number;
+    case MaterialField::corners: {
+        const RelativeCorners relative = declaration.relative;
+        material.corner_radius = resolved_corner(declaration.number, relative.top_left, shorter_side);
         material.corner_radii = declaration.corner_radii;
+        if (material.corner_radii) {
+            MaterialCornerRadii& radii = *material.corner_radii;
+            radii.top_left = resolved_corner(radii.top_left, relative.top_left, shorter_side);
+            radii.top_right = resolved_corner(radii.top_right, relative.top_right, shorter_side);
+            radii.bottom_right = resolved_corner(radii.bottom_right, relative.bottom_right, shorter_side);
+            radii.bottom_left = resolved_corner(radii.bottom_left, relative.bottom_left, shorter_side);
+        }
         return;
+    }
     case MaterialField::colour_filter: material.colour_filter = declaration.colour_filter; return;
     case MaterialField::drop_shadow: material.drop_shadow = declaration.drop_shadow; return;
     case MaterialField::filter_blur: material.filter_blur = declaration.number; return;
     case MaterialField::finish: material.finish = declaration.number; return;
     case MaterialField::mask: material.mask = declaration.mask; return;
+    case MaterialField::border_top_style:
+    case MaterialField::border_top_width:
+    case MaterialField::border_top_colour:
+    case MaterialField::border_right_style:
+    case MaterialField::border_right_width:
+    case MaterialField::border_right_colour:
+    case MaterialField::border_bottom_style:
+    case MaterialField::border_bottom_width:
+    case MaterialField::border_bottom_colour:
+    case MaterialField::border_left_style:
+    case MaterialField::border_left_width:
+    case MaterialField::border_left_colour:
+    case MaterialField::background_colour:
+    case MaterialField::fills:
     case MaterialField::count: return;
     }
 }
 
+bool fill_field(MaterialField field) noexcept {
+    const bool fill = field == MaterialField::background_colour || field == MaterialField::fills;
+    return fill;
+}
+
+// The declaration of `field` among `fields` that sets a value, or null
+// (none, or an `initial` one: the floor's value).
+const MaterialDeclaration* set_field(const std::array<const MaterialDeclaration*, material_field_count>& fields,
+                                     MaterialField field) noexcept {
+    const MaterialDeclaration* const declaration = fields[static_cast<std::size_t>(field)];
+    if (declaration == nullptr || (*declaration).initial) return nullptr;
+    return declaration;
+}
+const MaterialDeclaration* set_field(std::array<const MaterialDeclaration*, material_field_count>&& fields,
+                                     MaterialField field) = delete;
+
+// The fills composed from the colour layer and the image layers, each the
+// declared one, else the floor's: its bottom layer when solid is its
+// colour, its others its image layers.
+void compose_fills(const SurfaceMaterial& floor,
+                   const std::array<const MaterialDeclaration*, material_field_count>& fields,
+                   SurfaceMaterial& material) {
+    const MaterialDeclaration* const colour = set_field(fields, MaterialField::background_colour);
+    const MaterialDeclaration* const images = set_field(fields, MaterialField::fills);
+    const bool floor_colour = !floor.fills.empty() && floor.fills.front().kind == MaterialFillKind::solid;
+    const std::size_t floor_images_first = floor_colour ? 1U : 0U;
+    material.fills.clear();
+    if (colour != nullptr) {
+        if ((*colour).colour.alpha != 0U) material.fills.push_back(MaterialFillLayer::solid((*colour).colour));
+    } else if (floor_colour) {
+        material.fills.push_back(floor.fills.front());
+    }
+    if (images != nullptr) {
+        material.fills.insert(material.fills.end(), (*images).fills.begin(), (*images).fills.end());
+    } else {
+        const std::vector<MaterialFillLayer>::const_iterator first =
+            floor.fills.begin() + static_cast<std::ptrdiff_t>(floor_images_first);
+        material.fills.insert(material.fills.end(), first, floor.fills.end());
+    }
+    if (material.fills.empty()) material.fills.push_back(MaterialFillLayer::solid(Color::rgba(0, 0, 0, 0)));
+}
+
 bool edge_field(MaterialField field) noexcept {
-    const bool edge = field == MaterialField::border_top || field == MaterialField::border_right ||
-                      field == MaterialField::border_bottom || field == MaterialField::border_left;
+    const std::size_t position = static_cast<std::size_t>(field);
+    const bool edge = position >= first_edge_field && position < first_edge_field + edge_field_count;
     return edge;
 }
 
-// One edge as assembled: its declaration's, else the floor's single edge,
-// else the floor's uniform border.
-std::optional<MaterialBorder> assembled_edge(const SurfaceMaterial& floor,
-                                             const std::optional<MaterialBorder>& floor_edge,
-                                             const MaterialDeclaration* declaration) {
-    if (declaration != nullptr) return (*declaration).border;
-    if (!floor.border_edges.empty()) return floor_edge;
-    return floor.border;
+// An edge as it is assembled: whether it is drawn, and its line.
+struct AssembledEdge final {
+    bool drawn{};
+    MaterialBorder border{};
+};
+
+// Writes an edge field's value into `edge`: a style (none stops the edge
+// being drawn), a width or a colour.
+void apply_edge_declaration(const MaterialDeclaration& declaration, AssembledEdge& edge) {
+    const std::size_t part = (static_cast<std::size_t>(declaration.field) - first_edge_field) % 3U;
+    if (part == 0U) {
+        edge.drawn = declaration.border_style.has_value();
+        if (declaration.border_style) edge.border.style = *declaration.border_style;
+        return;
+    }
+    if (part == 1U) {
+        edge.border.width = declaration.number;
+        return;
+    }
+    edge.border.color = declaration.colour;
+}
+
+// The edge as a material draws it: none when it is not drawn or has no
+// width.
+std::optional<MaterialBorder> drawn_edge(const AssembledEdge& edge) {
+    if (!edge.drawn || edge.border.width == 0.0) return std::nullopt;
+    return edge.border;
+}
+
+// Each edge from the floor's, then its declared fields; into `material`,
+// as one uniform border when the four are equal.
+void assemble_edges(const SurfaceMaterial& floor,
+                    const std::array<const MaterialDeclaration*, material_field_count>& fields,
+                    SurfaceMaterial& material) {
+    const bool single = !floor.border_edges.empty();
+    const std::array<const std::optional<MaterialBorder>*, 4> floor_edges{
+        single ? &floor.border_edges.top : &floor.border, single ? &floor.border_edges.right : &floor.border,
+        single ? &floor.border_edges.bottom : &floor.border, single ? &floor.border_edges.left : &floor.border};
+    std::array<std::optional<MaterialBorder>, 4> drawn{};
+    for (std::size_t edge_index = 0U; edge_index < drawn.size(); ++edge_index) {
+        const std::optional<MaterialBorder>& base = *floor_edges[edge_index];
+        AssembledEdge edge{};
+        edge.drawn = base.has_value();
+        if (base) edge.border = *base;
+        for (std::size_t part = 0U; part < 3U; ++part) {
+            const MaterialDeclaration* const declaration = fields[first_edge_field + 3U * edge_index + part];
+            if (declaration != nullptr && !(*declaration).initial) apply_edge_declaration(*declaration, edge);
+        }
+        drawn[edge_index] = drawn_edge(edge);
+    }
+    const bool uniform = drawn[0] == drawn[1] && drawn[0] == drawn[2] && drawn[0] == drawn[3];
+    if (uniform) {
+        material.border = drawn[0];
+        material.border_edges = MaterialBorderEdges{};
+        return;
+    }
+    material.border.reset();
+    material.border_edges.top = drawn[0];
+    material.border_edges.right = drawn[1];
+    material.border_edges.bottom = drawn[2];
+    material.border_edges.left = drawn[3];
+}
+
+// Whether `declaration`, alone over the default material, is a material:
+// an edge field over a drawn default edge, relative corners as fractions
+// of a unit side.
+bool material_declaration_admitted(const MaterialDeclaration& declaration) {
+    SurfaceMaterial checked{};
+    if (declaration.initial || declaration.field == MaterialField::background_colour) return true;
+    if (declaration.field == MaterialField::fills) {
+        if (declaration.fills.empty()) return true;
+        checked.fills = declaration.fills;
+        const bool admitted = valid_surface_material(checked);
+        return admitted;
+    }
+    if (!edge_field(declaration.field)) {
+        apply_material_declaration(declaration, 1.0, checked);
+        const bool admitted = valid_surface_material(checked);
+        return admitted;
+    }
+    AssembledEdge edge{};
+    edge.drawn = true;
+    apply_edge_declaration(declaration, edge);
+    const bool width_ok = std::isfinite(edge.border.width) && edge.border.width >= 0.0;
+    checked.border_edges.top = drawn_edge(edge);
+    const bool admitted = width_ok && valid_surface_material(checked);
+    return admitted;
 }
 
 } // namespace
 
 void assemble_material(const SurfaceMaterial& floor,
                        const std::array<const MaterialDeclaration*, material_field_count>& fields,
-                       SurfaceMaterial& material) {
+                       double shorter_side, SurfaceMaterial& material) {
     material = floor;
     bool edges = false;
+    bool fills = false;
     for (const MaterialDeclaration* const declaration : fields) {
-        if (declaration == nullptr) continue;
+        if (declaration == nullptr || (*declaration).initial) continue;
         if (edge_field((*declaration).field)) {
             edges = true;
             continue;
         }
-        apply_material_declaration(*declaration, material);
+        if (fill_field((*declaration).field)) {
+            fills = true;
+            continue;
+        }
+        apply_material_declaration(*declaration, shorter_side, material);
     }
-    if (!edges) return;
-    const std::optional<MaterialBorder> top = assembled_edge(
-        floor, floor.border_edges.top, fields[static_cast<std::size_t>(MaterialField::border_top)]);
-    const std::optional<MaterialBorder> right = assembled_edge(
-        floor, floor.border_edges.right, fields[static_cast<std::size_t>(MaterialField::border_right)]);
-    const std::optional<MaterialBorder> bottom = assembled_edge(
-        floor, floor.border_edges.bottom, fields[static_cast<std::size_t>(MaterialField::border_bottom)]);
-    const std::optional<MaterialBorder> left = assembled_edge(
-        floor, floor.border_edges.left, fields[static_cast<std::size_t>(MaterialField::border_left)]);
-    const bool uniform = top == right && top == bottom && top == left;
-    if (uniform) {
-        material.border = top;
-        material.border_edges = MaterialBorderEdges{};
-        return;
-    }
-    material.border.reset();
-    material.border_edges.top = top;
-    material.border_edges.right = right;
-    material.border_edges.bottom = bottom;
-    material.border_edges.left = left;
+    if (fills) compose_fills(floor, fields, material);
+    if (edges) assemble_edges(floor, fields, material);
 }
 
 RuleDeclaration RuleDeclaration::primitive(std::string_view primitive_name) {
@@ -563,9 +725,7 @@ void CompiledThemeRules::add_materials(std::vector<RuleDiagnostic>& diagnostics,
             diagnostics.push_back(diagnostic(RuleDiagnosticKind::duplicate_declaration, index, rule, name));
             continue;
         }
-        SurfaceMaterial checked{};
-        apply_material_declaration(declaration, checked);
-        if (!valid_surface_material(checked)) {
+        if (!material_declaration_admitted(declaration)) {
             diagnostics.push_back(diagnostic(RuleDiagnosticKind::material_field_invalid, index, rule, name));
             continue;
         }
