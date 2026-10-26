@@ -2103,6 +2103,18 @@ if(GUI_FORMS_BUILD_TESTS)
             target_link_libraries(gui_forms_x11_cursor_tests PRIVATE gui_forms_core X11::Xcursor X11::Xfixes X11::X11)
             add_test(NAME gui_forms_x11_cursors COMMAND gui_forms_x11_cursor_tests)
         endif()
+        # Stage T5, C4's measurement: what the X server and a compositing
+        # manager do with premultiplied alpha, the 32-bit visual and the
+        # _NET_WM_CM_Sn selection (XWayland included). Xlib and XFixes only;
+        # prints JSON lines (kept in CI's LastTest.log evidence) and fails
+        # only when it cannot open the display. Serial: it reads the screen
+        # and may start xcompmgr.
+        if(TARGET X11::Xfixes)
+            add_executable(gui_forms_x11_compositor_probe tests/x11_compositor_probe.cpp)
+            target_link_libraries(gui_forms_x11_compositor_probe PRIVATE X11::Xfixes X11::X11)
+            add_test(NAME gui_forms_x11_compositor_probe COMMAND gui_forms_x11_compositor_probe)
+            set_tests_properties(gui_forms_x11_compositor_probe PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE)
+        endif()
     endif()
     add_executable(gui_forms_cursor_image_tests tests/cursor_image_tests.cpp)
     target_link_libraries(gui_forms_cursor_image_tests PRIVATE gui_forms_core)
