@@ -2684,6 +2684,12 @@ Properties beyond every control's: none.
 | `verification_changed` | `bool` |
 | `radio_button_changed` | `std::string` |
 
+## `thread_exception_dialog` (ThreadExceptionDialog, component)
+
+| Interaction | Payload |
+|---|---|
+| `closed` | `DialogResult` |
+
 ## `tool_tip` (ToolTip, component)
 
 | Interaction | Payload |
