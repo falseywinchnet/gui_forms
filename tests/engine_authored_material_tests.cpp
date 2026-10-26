@@ -265,14 +265,14 @@ void test_assembly() {
     SurfaceMaterial assembled{};
 
     std::array<const MaterialDeclaration*, material_field_count> fields = no_fields();
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     require(assembled == floor, "with no field set the assembly is the floor");
 
     const MaterialDeclaration red = fills_of(Color::rgba(200, 0, 0));
     const std::array<MaterialDeclaration, 4> radius = corners_of(2.0, false);
     fields[at(MaterialField::background_colour)] = &red;
     point_at(radius, fields);
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     SurfaceMaterial expected = floor;
     expected.fills.assign(1U, MaterialFillLayer::solid(Color::rgba(200, 0, 0)));
     expected.corner_radius = 2.0;
@@ -283,7 +283,7 @@ void test_assembly() {
     const MaterialDeclaration same_width = number_of(MaterialField::border_top_width, 1.0);
     fields = no_fields();
     fields[at(MaterialField::border_top_width)] = &same_width;
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     require(assembled == floor, "four equal edges are one uniform border");
 
     // The longhands combine: a width and a colour from two declarations.
@@ -291,7 +291,7 @@ void test_assembly() {
     const MaterialDeclaration black = colour_of(MaterialField::border_top_colour, Color::rgba(0, 0, 0));
     fields[at(MaterialField::border_top_width)] = &thick;
     fields[at(MaterialField::border_top_colour)] = &black;
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     MaterialBorder expected_top = *floor.border;
     expected_top.width = 3.0;
     expected_top.color = Color::rgba(0, 0, 0);
@@ -302,7 +302,7 @@ void test_assembly() {
     require(!valid_surface_material(assembled), "single edges with rounded corners are no material");
     const std::array<MaterialDeclaration, 4> square = corners_of(0.0, false);
     point_at(square, fields);
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     require(valid_surface_material(assembled), "with square corners they are");
 
     // A floor with no border: a style draws the default border; a width
@@ -317,17 +317,17 @@ void test_assembly() {
         solids[edge] = style_of(style_fields[edge], MaterialBorderStyle::solid);
         fields[at(style_fields[edge])] = &solids[edge];
     }
-    assemble_material(bare, fields, 20.0, assembled);
+    assemble_material(bare, fields, Size{20.0, 40.0}, assembled);
     require(assembled.border == MaterialBorder{} && assembled.border_edges.empty(),
             "four solid edges over no border are the default uniform border");
     const MaterialDeclaration none_width = number_of(MaterialField::border_left_width, 0.0);
     fields[at(MaterialField::border_left_width)] = &none_width;
-    assemble_material(bare, fields, 20.0, assembled);
+    assemble_material(bare, fields, Size{20.0, 40.0}, assembled);
     require(!assembled.border && !assembled.border_edges.left && assembled.border_edges.top == MaterialBorder{},
             "a zero width draws no edge");
     fields = no_fields();
     fields[at(MaterialField::border_top_width)] = &thick;
-    assemble_material(bare, fields, 20.0, assembled);
+    assemble_material(bare, fields, Size{20.0, 40.0}, assembled);
     require(assembled == bare, "a width with no style draws nothing");
 
     // A floor drawn with single edges lends them edge by edge.
@@ -336,29 +336,29 @@ void test_assembly() {
     const MaterialDeclaration no_top = style_of(MaterialField::border_top_style, std::nullopt);
     fields = no_fields();
     fields[at(MaterialField::border_top_style)] = &no_top;
-    assemble_material(edged, fields, 20.0, assembled);
+    assemble_material(edged, fields, Size{20.0, 40.0}, assembled);
     require(assembled == edged, "the floor's single edges stay where no edge is set");
     const MaterialDeclaration bottom_none = style_of(MaterialField::border_bottom_style, std::nullopt);
     fields[at(MaterialField::border_bottom_style)] = &bottom_none;
-    assemble_material(edged, fields, 20.0, assembled);
+    assemble_material(edged, fields, Size{20.0, 40.0}, assembled);
     require(!assembled.border && assembled.border_edges.empty(), "four absent edges are no border");
 
     // Relative corners are fractions of the shorter side.
     std::array<MaterialDeclaration, 4> relative = corners_of(0.5, true);
     fields = no_fields();
     point_at(relative, fields);
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     require(assembled.corner_radius == 10.0 && !assembled.corner_radii, "50% of a 20-unit side is 10");
     relative[0].number = 0.25;
     relative[1] = number_of(MaterialField::corner_top_right, 3.0);
     relative[3] = number_of(MaterialField::corner_bottom_left, 1.0);
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     require(assembled.corner_radii == (MaterialCornerRadii{5.0, 3.0, 10.0, 1.0}) && assembled.corner_radius == 1.0,
             "each relative corner is resolved, the others kept in units; the built-in path takes the smallest");
     fields = no_fields();
     const MaterialDeclaration one_corner = number_of(MaterialField::corner_bottom_right, 8.0);
     fields[at(MaterialField::corner_bottom_right)] = &one_corner;
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     require(assembled.corner_radii == (MaterialCornerRadii{5.0, 5.0, 8.0, 5.0}) && assembled.corner_radius == 5.0,
             "a corner set alone keeps the floor's others: each corner cascades on its own");
     fields = no_fields();
@@ -372,7 +372,7 @@ void test_assembly() {
     fields[at(MaterialField::border_bottom_style)] = &initial_bottom;
     initial_fills.field = MaterialField::fills;
     fields[at(MaterialField::fills)] = &initial_fills;
-    assemble_material(edged, fields, 20.0, assembled);
+    assemble_material(edged, fields, Size{20.0, 40.0}, assembled);
     require(assembled == edged, "an initial field is the floor's");
 }
 
@@ -399,29 +399,29 @@ void test_fill_composition() {
     std::array<const MaterialDeclaration*, material_field_count> fields = no_fields();
     const MaterialDeclaration red = fills_of(Color::rgba(200, 0, 0));
     fields[at(MaterialField::background_colour)] = &red;
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     require(assembled.fills == (std::vector<MaterialFillLayer>{MaterialFillLayer::solid(Color::rgba(200, 0, 0)), veil()}),
             "a colour replaces the floor's solid bottom layer, under the floor's image layers");
     const MaterialDeclaration none = images_of({});
     fields[at(MaterialField::fills)] = &none;
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     require(assembled.fills == (std::vector<MaterialFillLayer>{MaterialFillLayer::solid(Color::rgba(200, 0, 0))}),
             "no image layers leave the colour alone");
     const MaterialDeclaration clear = fills_of(Color::rgba(0, 0, 0, 0));
     fields[at(MaterialField::background_colour)] = &clear;
-    assemble_material(floor, fields, 20.0, assembled);
+    assemble_material(floor, fields, Size{20.0, 40.0}, assembled);
     require(assembled.fills == (std::vector<MaterialFillLayer>{MaterialFillLayer::solid(Color::rgba(0, 0, 0, 0))}),
             "with no layer at all the fill is one transparent solid");
     SurfaceMaterial graded{};
     graded.fills = {veil()};
     fields = no_fields();
     fields[at(MaterialField::background_colour)] = &red;
-    assemble_material(graded, fields, 20.0, assembled);
+    assemble_material(graded, fields, Size{20.0, 40.0}, assembled);
     require(assembled.fills == (std::vector<MaterialFillLayer>{MaterialFillLayer::solid(Color::rgba(200, 0, 0)), veil()}),
             "a floor whose bottom layer is not solid keeps every layer as an image layer");
     const MaterialDeclaration eight = images_of(std::vector<MaterialFillLayer>(8U, veil()));
     fields[at(MaterialField::fills)] = &eight;
-    assemble_material(graded, fields, 20.0, assembled);
+    assemble_material(graded, fields, Size{20.0, 40.0}, assembled);
     require(assembled.fills.size() == 9U && !valid_surface_material(assembled),
             "a colour under eight image layers is more than a material holds");
 
@@ -433,7 +433,7 @@ void test_fill_composition() {
     blends.blend_modes = {MaterialBlendMode::multiply, MaterialBlendMode::screen};
     fields = no_fields();
     fields[at(MaterialField::fill_blend_modes)] = &blends;
-    assemble_material(layered, fields, 20.0, assembled);
+    assemble_material(layered, fields, Size{20.0, 40.0}, assembled);
     require(assembled.fills[0].blend == MaterialBlendMode::normal && assembled.fills[3].blend == MaterialBlendMode::multiply &&
                 assembled.fills[2].blend == MaterialBlendMode::screen &&
                 assembled.fills[1].blend == MaterialBlendMode::multiply,

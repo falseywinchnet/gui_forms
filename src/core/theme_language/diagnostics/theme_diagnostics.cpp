@@ -51,6 +51,7 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::unit_not_admitted:
     case DiagnosticCode::value_form_not_admitted:
     case DiagnosticCode::keyword_unknown:
+    case DiagnosticCode::too_many_layers:
     case DiagnosticCode::expression_invalid:
     case DiagnosticCode::variable_undefined:
     case DiagnosticCode::variable_cycle:
@@ -113,6 +114,7 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
     case DiagnosticCode::unit_not_admitted: return "unit_not_admitted";
     case DiagnosticCode::value_form_not_admitted: return "value_form_not_admitted";
     case DiagnosticCode::keyword_unknown: return "keyword_unknown";
+    case DiagnosticCode::too_many_layers: return "too_many_layers";
     case DiagnosticCode::expression_invalid: return "expression_invalid";
     case DiagnosticCode::variable_undefined: return "variable_undefined";
     case DiagnosticCode::variable_cycle: return "variable_cycle";

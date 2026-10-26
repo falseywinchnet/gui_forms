@@ -339,7 +339,7 @@ const MaterialDeclaration* set_field(std::array<const MaterialDeclaration*, mate
 // declared one, else the floor's: its bottom layer when solid is its
 // colour, its others its image layers.
 void compose_fills(const SurfaceMaterial& floor,
-                   const std::array<const MaterialDeclaration*, material_field_count>& fields,
+                   const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
                    SurfaceMaterial& material) {
     const MaterialDeclaration* const colour = set_field(fields, MaterialField::background_colour);
     const MaterialDeclaration* const images = set_field(fields, MaterialField::fills);
@@ -355,6 +355,11 @@ void compose_fills(const SurfaceMaterial& floor,
     const std::size_t images_first = material.fills.size();
     if (images != nullptr) {
         material.fills.insert(material.fills.end(), (*images).fills.begin(), (*images).fills.end());
+        const std::vector<AuthoredGradient>& gradients = (*images).gradients;
+        for (std::size_t layer = 0U; layer < gradients.size(); ++layer) {
+            if (gradients[layer].kind == MaterialFillKind::solid) continue;
+            resolve_authored_gradient(gradients[layer], box, material.fills[images_first + layer]);
+        }
     } else {
         const std::vector<MaterialFillLayer>::const_iterator first =
             floor.fills.begin() + static_cast<std::ptrdiff_t>(floor_images_first);
@@ -476,9 +481,13 @@ void assemble_edges(const SurfaceMaterial& floor,
     material.border_edges.left = drawn[3];
 }
 
+// The box an authored gradient is resolved for when it is checked: a part's
+// own box may still refuse its assembly.
+constexpr Size sample_box{100.0, 100.0};
+
 // Whether `declaration`, alone over the default material, is a material:
 // an edge field over a drawn default edge, a relative corner as a fraction
-// of a unit side.
+// of a unit side, an authored gradient resolved for sample_box.
 bool material_declaration_admitted(const MaterialDeclaration& declaration) {
     SurfaceMaterial checked{};
     if (declaration.initial || declaration.field == MaterialField::background_colour) return true;
@@ -495,7 +504,14 @@ bool material_declaration_admitted(const MaterialDeclaration& declaration) {
     }
     if (declaration.field == MaterialField::fills) {
         if (declaration.fills.empty()) return true;
+        const std::vector<AuthoredGradient>& gradients = declaration.gradients;
+        if (!gradients.empty() && gradients.size() != declaration.fills.size()) return false;
         checked.fills = declaration.fills;
+        for (std::size_t layer = 0U; layer < gradients.size(); ++layer) {
+            if (gradients[layer].kind == MaterialFillKind::solid) continue;
+            if (!valid_authored_gradient(gradients[layer])) return false;
+            resolve_authored_gradient(gradients[layer], sample_box, checked.fills[layer]);
+        }
         const bool admitted = valid_surface_material(checked);
         return admitted;
     }
@@ -515,9 +531,22 @@ bool material_declaration_admitted(const MaterialDeclaration& declaration) {
 
 } // namespace
 
+bool material_fields_read_box(
+    const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept {
+    for (const MaterialDeclaration* const declaration : fields) {
+        if (declaration == nullptr || (*declaration).initial) continue;
+        if (corner_field((*declaration).field) && (*declaration).relative) return true;
+        if ((*declaration).field != MaterialField::fills) continue;
+        for (const AuthoredGradient& gradient : (*declaration).gradients) {
+            if (gradient.kind != MaterialFillKind::solid && !authored_gradient_fixed(gradient)) return true;
+        }
+    }
+    return false;
+}
+
 void assemble_material(const SurfaceMaterial& floor,
-                       const std::array<const MaterialDeclaration*, material_field_count>& fields,
-                       double shorter_side, SurfaceMaterial& material) {
+                       const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
+                       SurfaceMaterial& material) {
     material = floor;
     bool edges = false;
     bool fills = false;
@@ -538,8 +567,8 @@ void assemble_material(const SurfaceMaterial& floor,
         }
         apply_material_declaration(*declaration, material);
     }
-    if (fills) compose_fills(floor, fields, material);
-    if (corners) compose_corners(floor, fields, shorter_side, material);
+    if (fills) compose_fills(floor, fields, box, material);
+    if (corners) compose_corners(floor, fields, std::min(box.width, box.height), material);
     if (edges) assemble_edges(floor, fields, material);
 }
 

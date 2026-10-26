@@ -11,6 +11,7 @@
 
 #include "../custom_properties/theme_custom_properties.hpp"
 #include "../diagnostics/theme_diagnostics.hpp"
+#include "../material/theme_material_lowering.hpp"
 #include "../selector/theme_selector.hpp"
 #include "../source_text/theme_source_text.hpp"
 #include "../syntax_tree/theme_syntax_tree.hpp"
@@ -104,6 +105,9 @@ private:
     ThemeValue value_{};
     std::vector<std::string_view> parameter_names_{};
     std::vector<LoweredDeclaration> declarations_{};
+    std::vector<MaterialDeclaration> materials_{};
+    MaterialLowering material_lowering_{};
+    std::vector<MaterialField> material_fields_{};
     std::string folded_{};
 };
 

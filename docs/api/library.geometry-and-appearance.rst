@@ -18,10 +18,16 @@ Types
      - An ambient effect (E7): its part repaints as time passes, at most ``frames_per_second``, and reads time_in_state within one ``period`` (it wraps), so that the effect cycles.
    * - :cpp:class:`AssembledPartMaterial <gui_forms::AssembledPartMaterial>`
      - A part's assembled material (T3 EC1): its recipe's material, the floor, with the winning material fields of the theme's rules in place, and what it was assembled from.
+   * - :cpp:class:`AuthoredGradient <gui_forms::AuthoredGradient>`
+     - A gradient as written: - ``kind``: linear_gradient, radial_gradient or conic_gradient; - ``repeating``: CSS's repeating- form; - ``angle_degrees``: a linear gradient's CSS angle (0 up, 90 right), unless ``corner`` names one, or a conic gradient's ``from``; - ``centre_x``, ``centre_y``: a radial or conic gradient's centre, across and down the box; - ``circle``, ``extent``, ``radius_x``, ``radius_y``: a radial gradient's shape and size; with ``lengths``, an ellipse's radii, each along its own axis, or a circle's radius, radius_x's units; - ``stops``: at least one, at most maximum_authored_gradient_stops.
+   * - :cpp:class:`AuthoredGradientStop <gui_forms::AuthoredGradientStop>`
+     - One colour stop.
    * - :cpp:class:`BackplaneRegion <gui_forms::BackplaneRegion>`
      - One backplane image's region (E9-B): ``extent`` device pixels at ``scale``, its top-left pixel at ``origin`` in the window's device pixels (the window's logical origin times the scale; possibly fractional).
    * - :cpp:class:`BasicControlStyle <gui_forms::BasicControlStyle>`
      - BasicControlStyle retains the compact compatibility palette used by callers that do not select full role recipes.
+   * - :cpp:class:`BoxLength <gui_forms::BoxLength>`
+     - A length along one axis of the part's box: ``fraction`` of the box's extent on that axis plus ``units`` logical units, as CSS's <length-percentage> (a percentage, a length, or the calc() of both).
    * - :cpp:class:`CachedPartRaster <gui_forms::CachedPartRaster>`
      - A part's cached raster and what drew it: the primitive, every parameter (animated ones included, since they change the pixels), the target with its states restricted to those the primitive reads, and the extent.
    * - :cpp:class:`Color <gui_forms::Color>`
@@ -273,17 +279,73 @@ Types
 
    ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
 
-   A part's assembled material (T3 EC1): its recipe's material, the floor, with the winning material fields of the theme's rules in place, and what it was assembled from. It is assembled again only when that changes: - ``rules_serial`` and ``fields``: the compiled rules' serial (CompiledThemeRules::serial) and the winning declaration of each field, by address within those rules (null for none); - ``floor``: a copy of the recipe material, compared by value, since the theme's recipe may be replaced and another may occupy its address; - ``shorter_side``: the box's shorter side, which relative corners read.
+   A part's assembled material (T3 EC1): its recipe's material, the floor, with the winning material fields of the theme's rules in place, and what it was assembled from. It is assembled again only when that changes: - ``rules_serial`` and ``fields``: the compiled rules' serial (CompiledThemeRules::serial) and the winning declaration of each field, by address within those rules (null for none); - ``floor``: a copy of the recipe material, compared by value, since the theme's recipe may be replaced and another may occupy its address; - ``box``: the part's box size, for fields that read it (material_fields_read_box), else empty.
 
    .. cpp:member:: std::uint64_t rules_serial
 
    .. cpp:member:: std::array<const MaterialDeclaration*, material_field_count> fields
 
-   .. cpp:member:: double shorter_side
+   .. cpp:member:: Size box
 
    .. cpp:member:: SurfaceMaterial floor
 
    .. cpp:member:: SurfaceMaterial material
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: AuthoredGradient final
+
+   ``#include <gui_forms/engine/authored_gradient/authored_gradient.hpp>``
+
+   A gradient as written: - ``kind``: linear_gradient, radial_gradient or conic_gradient; - ``repeating``: CSS's repeating- form; - ``angle_degrees``: a linear gradient's CSS angle (0 up, 90 right), unless ``corner`` names one, or a conic gradient's ``from``; - ``centre_x``, ``centre_y``: a radial or conic gradient's centre, across and down the box; - ``circle``, ``extent``, ``radius_x``, ``radius_y``: a radial gradient's shape and size; with ``lengths``, an ellipse's radii, each along its own axis, or a circle's radius, radius_x's units; - ``stops``: at least one, at most maximum_authored_gradient_stops.
+
+   .. cpp:member:: MaterialFillKind kind
+
+      Default: ``{MaterialFillKind::linear_gradient}``.
+
+   .. cpp:member:: bool repeating
+
+   .. cpp:member:: double angle_degrees
+
+      Default: ``{180.0}``.
+
+   .. cpp:member:: GradientCorner corner
+
+      Default: ``{GradientCorner::none}``.
+
+   .. cpp:member:: BoxLength centre_x
+
+      Default: ``{0.5, 0.0}``.
+
+   .. cpp:member:: BoxLength centre_y
+
+      Default: ``{0.5, 0.0}``.
+
+   .. cpp:member:: bool circle
+
+   .. cpp:member:: RadialExtent extent
+
+      Default: ``{RadialExtent::farthest_corner}``.
+
+   .. cpp:member:: BoxLength radius_x
+
+   .. cpp:member:: BoxLength radius_y
+
+   .. cpp:member:: std::vector<AuthoredGradientStop> stops
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: AuthoredGradientStop final
+
+   ``#include <gui_forms/engine/authored_gradient/authored_gradient.hpp>``
+
+   One colour stop. ``position``, when ``positioned``, is along the gradient: - linear: a fraction of the gradient line plus logical units along it; - radial: a fraction of the gradient ray (the horizontal radius) plus logical units along it; - conic: a fraction of a turn (``units`` is 0). A stop without a position is placed as CSS places it.
+
+   .. cpp:member:: Color colour
+
+   .. cpp:member:: bool positioned
+
+   .. cpp:member:: BoxLength position
 
 .. cpp:namespace:: gui_forms
 
@@ -354,6 +416,18 @@ Types
    .. cpp:member:: Color visited_link
 
       Default: ``{Color::rgba(93, 65, 145)}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BoxLength final
+
+   ``#include <gui_forms/engine/authored_gradient/authored_gradient.hpp>``
+
+   A length along one axis of the part's box: ``fraction`` of the box's extent on that axis plus ``units`` logical units, as CSS's <length-percentage> (a percentage, a length, or the calc() of both).
+
+   .. cpp:member:: double fraction
+
+   .. cpp:member:: double units
 
 .. cpp:namespace:: gui_forms
 
@@ -1641,7 +1715,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One material field a rule sets and its value. Only the members ``field`` names are read; the others stay empty: - background_colour: ``colour``, a solid layer under the image layers; - fills: the image layers (gradients, images, patterns), bottom first, at most SurfaceMaterial::maximum_fill_layers, empty for none; - fill_blend_modes: ``blend_modes``, in CSS's order (the top image layer's first), repeated over the image layers as CSS repeats a short list; empty for normal; - shadows, glows, keylines: the lists; - an edge's style: ``border_style``, empty for none (CSS's ``none``); its width: ``number``, 0 for none; its colour: ``colour``; - a corner: ``number``, its radius in logical units, or, with ``relative``, a fraction of the box's shorter side (CSS's percentage, R2-11), resolved when the material is assembled for a part; - colour_filter: ``colour_filter``; drop_shadow: ``drop_shadow``, empty for none; mask: ``mask``, empty for none; - filter_blur and finish: ``number``. ``initial``, set, is CSS's ``initial``: the field keeps the floor's value, and the declaration still wins over those beneath it; its value members are not read.
+   One material field a rule sets and its value. Only the members ``field`` names are read; the others stay empty: - background_colour: ``colour``, a solid layer under the image layers; - fills: the image layers (gradients, images, patterns), bottom first, at most SurfaceMaterial::maximum_fill_layers, empty for none; and ``gradients``, empty, or one per layer: a gradient as a sheet wrote it (T3 P6b), resolved for the part's box when the material is assembled, in place of its layer; an entry of kind ``solid`` keeps its layer as written; - fill_blend_modes: ``blend_modes``, in CSS's order (the top image layer's first), repeated over the image layers as CSS repeats a short list; empty for normal; - shadows, glows, keylines: the lists; - an edge's style: ``border_style``, empty for none (CSS's ``none``); its width: ``number``, 0 for none; its colour: ``colour``; - a corner: ``number``, its radius in logical units, or, with ``relative``, a fraction of the box's shorter side (CSS's percentage, R2-11), resolved when the material is assembled for a part; - colour_filter: ``colour_filter``; drop_shadow: ``drop_shadow``, empty for none; mask: ``mask``, empty for none; - filter_blur and finish: ``number``. ``initial``, set, is CSS's ``initial``: the field keeps the floor's value, and the declaration still wins over those beneath it; its value members are not read.
 
    .. cpp:member:: MaterialField field
 
@@ -1650,6 +1724,8 @@ Types
    .. cpp:member:: bool initial
 
    .. cpp:member:: std::vector<MaterialFillLayer> fills
+
+   .. cpp:member:: std::vector<AuthoredGradient> gradients
 
    .. cpp:member:: std::vector<MaterialBlendMode> blend_modes
 
@@ -3908,6 +3984,22 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: GradientCorner
+
+   ``#include <gui_forms/engine/authored_gradient/authored_gradient.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: top_left
+
+   .. cpp:enumerator:: top_right
+
+   .. cpp:enumerator:: bottom_right
+
+   .. cpp:enumerator:: bottom_left
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: GradientSpreadMode
 
    ``#include <gui_forms/types/paint_types/paint_types.hpp>``
@@ -4408,6 +4500,22 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: RadialExtent
+
+   ``#include <gui_forms/engine/authored_gradient/authored_gradient.hpp>``
+
+   .. cpp:enumerator:: lengths
+
+   .. cpp:enumerator:: closest_side
+
+   .. cpp:enumerator:: farthest_side
+
+   .. cpp:enumerator:: closest_corner
+
+   .. cpp:enumerator:: farthest_corner
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: RasterOutcome
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -4622,6 +4730,26 @@ Functions, constants and aliases
    Renderer-neutral material composition used by ButtonBase and available to custom controls which need the same explicit connected physical grammar.
 
 .. cpp:function:: Insets connected_surface_visual_outsets(const SurfaceMaterial& material, std::optional<ConnectedControlTopology> topology) noexcept
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/authored_gradient/authored_gradient.hpp>``
+
+.. cpp:function:: bool valid_authored_gradient(const AuthoredGradient& gradient) noexcept
+
+   Whether ``gradient`` is one a layer can draw: a gradient kind; one to maximum_authored_gradient_stops stops; finite numbers; radii not negative; a circle's radius a length, without a fraction; a conic stop without units.
+
+.. cpp:function:: bool authored_gradient_fixed(const AuthoredGradient& gradient) noexcept
+
+   Whether a valid ``gradient`` resolves to the same layer for every box: no corner and no units anywhere, no circle (whose radius is the same in both directions, so a different fraction of each), and, for a repeating linear gradient, stops that run from 0 to 1 once placed. Such a layer is in normalized coordinates or a CSS angle.
+
+.. cpp:function:: void resolve_authored_gradient(const AuthoredGradient& gradient, Size box, MaterialFillLayer& layer)
+
+   Writes a valid ``gradient``, for a part's box ``box`` in logical units, into ``layer``, which is reset first: its kind, geometry, spread and stops, the other fields at MaterialFillLayer's defaults. A fixed gradient (authored_gradient_fixed) ignores ``box``. The layer: - places the stops as CSS does: a first stop without a position at 0, a last one at 1, a stop before an earlier one at the earlier one, the others evenly between their neighbours; - for a gradient that does not repeat, keeps the stops within the drawn range and adds the colours at its ends, interpolated as the engine interpolates (straight colour, rounded to 8 bits: at most half a step from the exact colour); - for a repeating one, scales its geometry to the span from the first stop to the last; a radial one's stops are rotated to begin at its centre. A span of 0 draws CSS's average colour, a solid; - separates coincident stops (CSS's hard stops) by 2^-20 of the gradient, which the layer's validity requires: under a tenth of a device pixel on a gradient shorter than 100,000 device pixels; - is a solid for a single stop.
+
+.. cpp:var:: constexpr std::size_t maximum_authored_gradient_stops
+
+   The most stops one gradient may have: resolving adds at most two, the colours at the ends of a clipped or rotated stop list. Value: ``maximum_gradient_stops - 2U``.
 
 .. cpp:namespace:: gui_forms
 
@@ -4881,9 +5009,13 @@ Functions, constants and aliases
 
 .. cpp:function:: std::string_view material_field_name(MaterialField field) noexcept
 
-.. cpp:function:: void assemble_material(const SurfaceMaterial& floor, const std::array<const MaterialDeclaration*, material_field_count>& fields, double shorter_side, SurfaceMaterial& material)
+.. cpp:function:: void assemble_material(const SurfaceMaterial& floor, const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box, SurfaceMaterial& material)
 
-   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value. The fills are composed when any fill field is declared: the colour layer (the declared colour, else the floor's bottom layer when it is solid) under the image layers (the declared ones, else the floor's others), which take the declared blend modes; a colour of alpha 0 adds no layer, and with no layer at all the fill is one transparent solid. More than SurfaceMaterial::maximum_fill_layers is no material. The corners are composed when any is declared: each is its declaration's, else the floor's (its corner_radii's, else its corner_radius); four equal corners are corner_radius alone, and others corner_radii, with corner_radius the smallest (the built-in path rounds every corner by it). The border's edges are assembled together when any of their fields is declared: each starts as the floor's (its single edge, else its uniform border; an edge the floor lacks has the default MaterialBorder's width and colour and is not drawn), takes its declared style, width and colour, and is drawn unless its style is none or its width 0. Four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material). Relative corners are resolved against ``shorter_side``, the box's shorter side in logical units.
+   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value. The fills are composed when any fill field is declared: the colour layer (the declared colour, else the floor's bottom layer when it is solid) under the image layers (the declared ones, each authored gradient resolved for ``box``, else the floor's others), which take the declared blend modes; a colour of alpha 0 adds no layer, and with no layer at all the fill is one transparent solid. More than SurfaceMaterial::maximum_fill_layers is no material. The corners are composed when any is declared: each is its declaration's, else the floor's (its corner_radii's, else its corner_radius); four equal corners are corner_radius alone, and others corner_radii, with corner_radius the smallest (the built-in path rounds every corner by it). The border's edges are assembled together when any of their fields is declared: each starts as the floor's (its single edge, else its uniform border; an edge the floor lacks has the default MaterialBorder's width and colour and is not drawn), takes its declared style, width and colour, and is drawn unless its style is none or its width 0. Four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material). ``box`` is the part's box in logical units: relative corners are fractions of its shorter side.
+
+.. cpp:function:: bool material_fields_read_box(const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept
+
+   Whether assembling ``fields`` reads the part's box: a relative corner or an authored gradient other than a fixed one (authored_gradient_fixed).
 
 .. cpp:function:: std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept
 
