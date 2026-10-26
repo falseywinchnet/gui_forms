@@ -14,9 +14,10 @@
 // rasters the backplane plane's display chunks recorded. Every other
 // drawing command in those chunks (text, fills, images and the rest that a
 // host painter draws) is skipped and counted, so that glass shows what it
-// omits (RasterCacheStatistics::backplane_skipped_commands). A host
-// capability that replays the whole backplane plane (option 2) is T5's
-// upgrade behind the same borrow.
+// omits (RasterCacheStatistics::backplane_skipped_commands). This is the
+// fallback: where the window's renderer makes a framebuffer, it replays the
+// whole backplane plane instead, behind the same borrow
+// (Window::replay_backplane; stage T5, C6).
 
 namespace gui_forms::detail {
 
