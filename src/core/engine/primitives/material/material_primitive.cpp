@@ -441,6 +441,8 @@ void add_keyline(MaterialLook& look, const MaterialKeyline& keyline, double scal
         add_band(look, Rect{box.x + inset, box.y + inset, width, box.height - inset * 2.0}, keyline.color, clipped);
         return;
     }
+    // An edge outside the enumeration draws no keyline.
+    return;
 }
 
 // A dashed or dotted border's path in `box`, `width` device pixels wide; a
