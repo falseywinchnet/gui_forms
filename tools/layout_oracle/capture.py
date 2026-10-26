@@ -138,7 +138,11 @@ def main(arguments: list[str]) -> int:
     template = (TOOL_DIRECTORY / "page_template.html").read_text(encoding="utf-8")
     faces = font_face_rules(options.fonts)
 
-    with tempfile.TemporaryDirectory(prefix="gf-layout-oracle-") as scratch:
+    # On Windows a Chromium helper process can still hold a profile file for
+    # a moment after the browser exits; the scratch directory is then left
+    # for the system's temporary-file cleanup rather than failing a capture
+    # whose references are already written.
+    with tempfile.TemporaryDirectory(prefix="gf-layout-oracle-", ignore_cleanup_errors=True) as scratch:
         scratch_path = Path(scratch)
         extra = ["--no-sandbox"] if options.no_sandbox else []
         browser = Browser(options.chromium, scratch_path / "profile", extra)

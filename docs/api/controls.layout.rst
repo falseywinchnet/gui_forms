@@ -17,6 +17,8 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
      - The two-list window switcher of docking: the active tool windows beside the active files.
    * - :cpp:class:`FlowLayoutPanel <gui_forms::FlowLayoutPanel>`
      - A container that lays its children out one after another in a row or column, wrapping onto new lines.
+   * - :cpp:class:`FlexLayoutPanel <gui_forms::FlexLayoutPanel>`
+     - A container that lays its children out as a CSS flex container: lines of items that grow, shrink and align along a row or column.
    * - :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>`
      - A container that arranges its children in a grid of sized rows and columns.
    * - :cpp:class:`ResponsiveTrackPanel <gui_forms::ResponsiveTrackPanel>`
@@ -38,6 +40,7 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
    generated/gui_forms.DockSite
    generated/gui_forms.DockNavigator
    generated/gui_forms.FlowLayoutPanel
+   generated/gui_forms.FlexLayoutPanel
    generated/gui_forms.TableLayoutPanel
    generated/gui_forms.ResponsiveTrackPanel
    generated/gui_forms.ScaledPanel
@@ -95,6 +98,8 @@ Related types
      - Item system drop_tile: a target tile and its dock-shape glyph, over the hovered pane (five) and at the window's edges (four), while dragging.
    * - :cpp:class:`DockSite::TileStates <gui_forms::DockSite::TileStates>`
      -  
+   * - :cpp:class:`FlexItemLayout <gui_forms::FlexItemLayout>`
+     - One child's flex item properties (CSS Flexbox's names; PLAN section 2.2).
    * - :cpp:class:`MasterDetailLayout <gui_forms::MasterDetailLayout>`
      - MasterDetailLayout defines bounded navigation width and inter-pane gap for deterministic responsive projection.
    * - :cpp:class:`MasterDetailPresentationChange <gui_forms::MasterDetailPresentationChange>`
@@ -497,6 +502,44 @@ Related types
    .. cpp:member:: bool disabled
 
    .. cpp:member:: bool expanding
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexItemLayout final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/flex_layout_panel/flex_layout_panel.hpp>``
+
+   One child's flex item properties (CSS Flexbox's names; PLAN section 2.2). The panel keeps one per child, keyed by its runtime id and dropped when the child leaves. Margins are the child's own ``margin``; ``auto_margin`` marks the sides that are ``auto`` instead. The child's minimum_size and maximum_size still bound it after these sizes are applied.
+
+   .. cpp:member:: FlexItemStyle flex
+
+      flex-grow, flex-shrink, flex-basis and order.
+
+   .. cpp:member:: LayoutAlignment align_self
+
+      ``auto`` takes the panel's align_items. Default: ``{LayoutAlignment::automatic}``.
+
+   .. cpp:member:: SizeValue width
+
+      CSS width and height: ``auto`` sizes the item from its content; a length or a percentage of the panel's content box is definite.
+
+   .. cpp:member:: SizeValue height
+
+   .. cpp:member:: SizeValue min_width
+
+      ``auto`` is CSS's automatic minimum, the content's minimum size (owner decision L-Q3); a length sets it.
+
+   .. cpp:member:: SizeValue min_height
+
+   .. cpp:member:: SizeValue max_width
+
+      Default: ``{SizeKind::none, {}}``.
+
+   .. cpp:member:: SizeValue max_height
+
+      Default: ``{SizeKind::none, {}}``.
+
+   .. cpp:member:: BoxSides<bool> auto_margin
 
 .. cpp:namespace:: gui_forms
 

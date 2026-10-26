@@ -62,12 +62,28 @@ Related types
      - One application-defined finite state, as written in ``:state(name)``.
    * - :cpp:class:`CustomStateIndex <gui_forms::CustomStateIndex>`
      - Position of an application-defined state in its control type's declaration list.
+   * - :cpp:class:`FlexAvailableExtent <gui_forms::FlexAvailableExtent>`
+     - One axis of the container's content box: a definite extent, or indefinite (sized from the items: the main axis never wraps then).
+   * - :cpp:class:`FlexContainerInput <gui_forms::FlexContainerInput>`
+     -  
    * - :cpp:class:`FlexContainerStyle <gui_forms::FlexContainerStyle>`
      -  
    * - :cpp:class:`FlexFactor <gui_forms::FlexFactor>`
      - Flex factors and grid fractions are unitless and never added to lengths.
+   * - :cpp:class:`FlexItemCross <gui_forms::FlexItemCross>`
+     - One item's measurement for the second call, at its resolved main size.
+   * - :cpp:class:`FlexItemInput <gui_forms::FlexItemInput>`
+     - One item's inputs to both calls.
+   * - :cpp:class:`FlexItemResult <gui_forms::FlexItemResult>`
+     - One item's results.
    * - :cpp:class:`FlexItemStyle <gui_forms::FlexItemStyle>`
      -  
+   * - :cpp:class:`FlexLayoutWorkspace <gui_forms::FlexLayoutWorkspace>`
+     - Caller-owned storage both calls fill, reused from layout to layout (house style section 5): ``items`` has one record per input item, in input order; ``order`` the input positions in (order, position) order; ``lines`` the lines in order.
+   * - :cpp:class:`FlexLine <gui_forms::FlexLine>`
+     - One flex line, its items being order[first, first + count).
+   * - :cpp:class:`FlexMargin <gui_forms::FlexMargin>`
+     - One margin as the solver reads it: a resolved length, or ``auto``.
    * - :cpp:class:`FractionFactor <gui_forms::FractionFactor>`
      -  
    * - :cpp:class:`GridContainerStyle <gui_forms::GridContainerStyle>`
@@ -409,6 +425,58 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: FlexAvailableExtent final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One axis of the container's content box: a definite extent, or indefinite (sized from the items: the main axis never wraps then).
+
+   .. cpp:member:: double extent
+
+   .. cpp:member:: bool definite
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexContainerInput final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   .. cpp:member:: FlexDirection direction
+
+      Default: ``{FlexDirection::row}``.
+
+   .. cpp:member:: FlexWrap wrap
+
+      Default: ``{FlexWrap::nowrap}``.
+
+   .. cpp:member:: LayoutAlignment justify_content
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment align_content
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment align_items
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: double row_gap
+
+      Resolved gaps: row_gap between lines of a row container and items of a column one; column_gap the other way.
+
+   .. cpp:member:: double column_gap
+
+   .. cpp:member:: FlexAvailableExtent width
+
+   .. cpp:member:: FlexAvailableExtent height
+
+   .. cpp:member:: LayoutDirection layout_direction
+
+      left_to_right or right_to_left (an ``inherit`` is resolved by the caller): mirrors the inline axis at output (PLAN section 4). Default: ``{LayoutDirection::left_to_right}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: FlexContainerStyle final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -441,6 +509,96 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: FlexItemCross final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One item's measurement for the second call, at its resolved main size.
+
+   .. cpp:member:: double hypothetical_cross
+
+      The cross size the item takes at its main size, before stretching.
+
+   .. cpp:member:: double baseline
+
+      Its first baseline, from the top of its border box; NaN for none, in which case the solver synthesizes one from the border box's bottom. Default: ``{std::numeric_limits<double>::quiet_NaN()}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexItemInput final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One item's inputs to both calls.
+
+   .. cpp:member:: FlexFactor grow
+
+      Default: ``{0.0}``.
+
+   .. cpp:member:: FlexFactor shrink
+
+      Default: ``{1.0}``.
+
+   .. cpp:member:: std::int32_t order
+
+   .. cpp:member:: double flex_base_size
+
+      The flex base size (CSS Flexbox 9.2.3), resolved by the caller.
+
+   .. cpp:member:: double minimum_main
+
+      The main size's resolved minimum, automatic minimum included, and its maximum (infinity for ``none``).
+
+   .. cpp:member:: double maximum_main
+
+      Default: ``{std::numeric_limits<double>::infinity()}``.
+
+   .. cpp:member:: double minimum_cross
+
+   .. cpp:member:: double maximum_cross
+
+      Default: ``{std::numeric_limits<double>::infinity()}``.
+
+   .. cpp:member:: BoxSides<FlexMargin> margin
+
+      Physical sides.
+
+   .. cpp:member:: LayoutAlignment align_self
+
+      ``auto`` takes the container's align-items. Default: ``{LayoutAlignment::automatic}``.
+
+   .. cpp:member:: bool definite_cross
+
+      Whether the item's cross size property is definite: such an item is never stretched.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexItemResult final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One item's results.
+
+   .. cpp:member:: double flex_base_size
+
+   .. cpp:member:: double hypothetical_main
+
+   .. cpp:member:: double main_size
+
+   .. cpp:member:: double cross_size
+
+   .. cpp:member:: Rect bounds
+
+      The item's border box in the container's content box.
+
+   .. cpp:member:: std::uint32_t line
+
+   .. cpp:member:: FlexFreezeReason freeze_reason
+
+      Default: ``{FlexFreezeReason::inflexible}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: FlexItemStyle final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -456,6 +614,70 @@ Related types
    .. cpp:member:: SizeValue basis
 
    .. cpp:member:: std::int32_t order
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: FlexLayoutWorkspace final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   Caller-owned storage both calls fill, reused from layout to layout (house style section 5): :cpp:func:`items <gui_forms::FlexLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`order <gui_forms::FlexLayoutWorkspace::order>` the input positions in (order, position) order; :cpp:func:`lines <gui_forms::FlexLayoutWorkspace::lines>` the lines in order. Its storage grows only when the item count does.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const FlexItemResult> items() const& noexcept
+
+   .. cpp:function:: std::span<const FlexLine> lines() const& noexcept
+
+   .. cpp:function:: std::span<const std::uint32_t> order() const& noexcept
+
+   .. cpp:function:: double content_main() const noexcept
+
+      The content's extent: the longest line's main extent, and the lines' cross sizes with the gaps between them; filled by each call.
+
+   .. cpp:function:: double content_cross() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void reserve(std::size_t count)
+
+      Reserves storage for ``count`` items, so a later layout of at most that many allocates nothing.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexLine final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One flex line, its items being order[first, first + count).
+
+   .. cpp:member:: std::uint32_t first
+
+   .. cpp:member:: std::uint32_t count
+
+   .. cpp:member:: double main_extent
+
+      The sum of its items' outer main sizes and gaps.
+
+   .. cpp:member:: double cross_size
+
+   .. cpp:member:: double cross_position
+
+      Its cross-start edge, flow-relative (before reversal).
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexMargin final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One margin as the solver reads it: a resolved length, or ``auto``.
+
+   .. cpp:member:: double length
+
+   .. cpp:member:: bool automatic
 
 .. cpp:namespace:: gui_forms
 
@@ -1332,6 +1554,32 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: FlexFreezeReason
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   .. cpp:enumerator:: inflexible
+
+   .. cpp:enumerator:: minimum_violation
+
+   .. cpp:enumerator:: maximum_violation
+
+   .. cpp:enumerator:: flexed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: FlexSolveOutcome
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   .. cpp:enumerator:: solved
+
+   .. cpp:enumerator:: refused_too_many_items
+
+   .. cpp:enumerator:: refused_mismatched_input
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: FlexWrap
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -1752,6 +2000,22 @@ Functions, constants and aliases
 ``#include <gui_forms/control/static_tree/control_factory/control_factory.hpp>``
 
 .. cpp:function:: Control::Ptr build_static_tree(const StaticNode& node, const ControlFactory& factory)
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+.. cpp:function:: FlexSolveOutcome resolve_flex_main_sizes(const FlexContainerInput& container, std::span<const FlexItemInput> items, FlexLayoutWorkspace& workspace)
+
+   The first call. Fills each item's flex_base_size, hypothetical_main, main_size, line and freeze_reason, the order and the lines, and content_main. ``items`` is borrowed for the call.
+
+.. cpp:function:: FlexSolveOutcome place_flex_items(const FlexContainerInput& container, std::span<const FlexItemInput> items, std::span<const FlexItemCross> crosses, FlexLayoutWorkspace& workspace)
+
+   The second call, after the first with the same container and items; ``crosses`` has one record per item. Fills each item's cross_size and bounds, the lines' cross sizes and positions, and content_cross.
+
+.. cpp:var:: constexpr std::size_t maximum_flex_items
+
+   The most items one container lays out (PLAN section 5). Value: ``65'536U``.
 
 .. cpp:namespace:: gui_forms
 

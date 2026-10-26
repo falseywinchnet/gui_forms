@@ -15,9 +15,14 @@
 // printed and counted. --native-out writes the native boxes in the
 // reference format, for tools/layout_oracle/compare.py's per-node report.
 //
-// The style reader here is deliberately small: it admits only the
-// declarations the existing containers can express, refuses everything
-// else by name, and is replaced by the layout value parser of phase L2.
+// The flow and table fixtures go through a deliberately small style reader
+// that admits only the declarations the Windows Forms containers can
+// express. Flex fixtures (phase L3) are read whole by the layout value
+// reader of phase L2: a container's declarations become FlexLayoutPanel
+// properties, an item's its FlexItemLayout, and every other declaration is
+// refused by name.
+
+#include "../src/core/layout/style_reader/layout_style_reader.hpp"
 
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/container_controls.hpp"
@@ -313,12 +318,14 @@ enum class FixtureKind : std::uint8_t {
     box,
     flow_layout_panel,
     table_layout_panel,
+    flex_layout_panel,
 };
 
 FixtureKind parse_kind(const std::string& kind, const std::string& where) {
     if (kind == "box") return FixtureKind::box;
     if (kind == "flow-layout-panel") return FixtureKind::flow_layout_panel;
     if (kind == "table-layout-panel") return FixtureKind::table_layout_panel;
+    if (kind == "flex-layout-panel") return FixtureKind::flex_layout_panel;
     fault(where, "data-gf-kind \"" + kind + "\" is not built by the corpus harness yet");
 }
 
@@ -418,6 +425,8 @@ struct ChildLayout final {
     std::optional<CellAlignment> align_self;
     bool explicit_width{};
     bool explicit_height{};
+    // Flex children: the whole item record.
+    FlexItemLayout flex_item;
 };
 
 struct ContainerDefaults final {
@@ -494,8 +503,14 @@ private:
         identities_.push_back(BuiltIdentity{*identity, built.control});
 
         const std::string* style_text = attribute(element, "style");
+        const bool flex_context = kind == FixtureKind::flex_layout_panel ||
+                                  parent_kind == FixtureKind::flex_layout_panel;
+        if (flex_context) {
+            apply_flex_style(control, kind, parent_kind, style_text, built.layout, where);
+        }
         const std::vector<StyleDeclaration> declarations =
-            style_text == nullptr ? std::vector<StyleDeclaration>{} : read_style(*style_text, where);
+            style_text == nullptr || flex_context ? std::vector<StyleDeclaration>{}
+                                                  : read_style(*style_text, where);
         ContainerDefaults defaults;
         std::vector<TableLayoutStyle> columns;
         std::vector<TableLayoutStyle> rows;
@@ -538,8 +553,137 @@ private:
                 place_table_child(static_cast<TableLayoutPanel&>(control), child, defaults,
                                   where);
             }
+            if (kind == FixtureKind::flex_layout_panel) {
+                static_cast<FlexLayoutPanel&>(control).set_item_layout(*child.control,
+                                                                       child.layout.flex_item);
+            }
         }
         return built;
+    }
+
+    // A flex container's or flex item's whole inline style, through the
+    // layout value reader. On a fault the fixture is abandoned, so the
+    // partly configured control is never laid out.
+    void apply_flex_style(Control& control, FixtureKind kind, std::optional<FixtureKind> parent_kind,
+                          const std::string* style_text, ChildLayout& child, const std::string& where) {
+        LayoutStyle base{};
+        base.display = DisplayKind::block;
+        LayoutStyle style = base;
+        if (style_text != nullptr) {
+            diagnostics_.clear();
+            const gui_forms::theme_language::ThemeSource source{where, *style_text};
+            const gui_forms::layout_style::StyleReadOutcome outcome =
+                style_reader_.read_inline_style(source, style, diagnostics_);
+            if (outcome != gui_forms::layout_style::StyleReadOutcome::applied ||
+                !diagnostics_.records().empty()) {
+                std::string reported;
+                for (const gui_forms::theme_language::ThemeDiagnostic& diagnostic : diagnostics_.records()) {
+                    reported += " ";
+                    reported += gui_forms::theme_language::diagnostic_code_label(diagnostic.code);
+                    reported += " ";
+                    reported += diagnostic.property;
+                    reported += ": ";
+                    reported += diagnostic.detail;
+                }
+                fault(where, "the layout value reader reported" + reported);
+            }
+        }
+        const bool container = kind == FixtureKind::flex_layout_panel;
+        const bool item = parent_kind == FixtureKind::flex_layout_panel;
+        refuse_unbuilt_flex_values(style, base, container, item, where);
+
+        // Margins: a length, or `auto` on a flex item's side.
+        const BoxSides<AutoLengthPercentage>& margin = style.margin;
+        child.flex_item.auto_margin = BoxSides<bool>{margin.top.automatic, margin.right.automatic,
+                                                     margin.bottom.automatic, margin.left.automatic};
+        Insets margins{};
+        margins.left = flex_margin_length(margin.left, where);
+        margins.top = flex_margin_length(margin.top, where);
+        margins.right = flex_margin_length(margin.right, where);
+        margins.bottom = flex_margin_length(margin.bottom, where);
+        control.set_margin(margins);
+        const BoxSides<LengthPercentage>& padding = style.padding;
+        if (padding.top.percent != 0.0 || padding.right.percent != 0.0 || padding.bottom.percent != 0.0 ||
+            padding.left.percent != 0.0) {
+            fault(where, "a percentage padding is not built by the corpus harness yet");
+        }
+        Insets paddings{};
+        paddings.left = padding.left.length.value();
+        paddings.top = padding.top.length.value();
+        paddings.right = padding.right.length.value();
+        paddings.bottom = padding.bottom.length.value();
+        control.set_padding(paddings);
+
+        if (container) {
+            FlexLayoutPanel& panel = static_cast<FlexLayoutPanel&>(control);
+            panel.set_flex_direction(style.flex.direction);
+            panel.set_flex_wrap(style.flex.wrap);
+            panel.set_justify_content(style.alignment.justify_content);
+            panel.set_align_content(style.alignment.align_content);
+            panel.set_align_items(style.alignment.align_items);
+            panel.set_row_gap(style.row_gap);
+            panel.set_column_gap(style.column_gap);
+        }
+        if (item) {
+            FlexItemLayout& layout = child.flex_item;
+            layout.flex = style.flex_item;
+            layout.align_self = style.alignment.align_self;
+            layout.width = style.width;
+            layout.height = style.height;
+            layout.min_width = style.min_width;
+            layout.min_height = style.min_height;
+            layout.max_width = style.max_width;
+            layout.max_height = style.max_height;
+        }
+    }
+
+    static double flex_margin_length(const AutoLengthPercentage& side, const std::string& where) {
+        if (side.automatic) return 0.0;
+        if (side.value.percent != 0.0) fault(where, "a percentage margin is not built by the corpus harness yet");
+        return side.value.length.value();
+    }
+
+    // The values a flex fixture may not use: those of another layout, and
+    // item or container values on an element that is not one.
+    static void refuse_unbuilt_flex_values(const LayoutStyle& style, const LayoutStyle& base, bool container,
+                                           bool item, const std::string& where) {
+        if (style.position != base.position || !(style.inset == base.inset)) {
+            fault(where, "positioning belongs to phase L5");
+        }
+        if (!(style.grid == base.grid) || !(style.grid_item == base.grid_item) ||
+            style.alignment.justify_items != base.alignment.justify_items ||
+            style.alignment.justify_self != base.alignment.justify_self) {
+            fault(where, "grid values belong to phase L4");
+        }
+        if (style.text_align != base.text_align || style.vertical_align != base.vertical_align) {
+            fault(where, "inline values belong to phase L5");
+        }
+        if (container && style.display != DisplayKind::flex) {
+            fault(where, "a flex-layout-panel is display: flex");
+        }
+        if (!container && style.display != DisplayKind::block) {
+            fault(where, "only a flex-layout-panel changes display");
+        }
+        const bool container_values = !(style.flex == base.flex) || !(style.row_gap == base.row_gap) ||
+                                      !(style.column_gap == base.column_gap) ||
+                                      style.alignment.justify_content != base.alignment.justify_content ||
+                                      style.alignment.align_content != base.alignment.align_content ||
+                                      style.alignment.align_items != base.alignment.align_items;
+        if (!container && container_values) {
+            fault(where, "flex container values on an element that is not one");
+        }
+        const bool sized = !(style.width == base.width) || !(style.height == base.height) ||
+                           !(style.min_width == base.min_width) || !(style.min_height == base.min_height) ||
+                           !(style.max_width == base.max_width) || !(style.max_height == base.max_height);
+        const bool item_values = sized || !(style.flex_item == base.flex_item) ||
+                                 style.alignment.align_self != base.alignment.align_self;
+        if (!item && item_values) {
+            fault(where, "flex item values on an element that is not one (the root fills the window)");
+        }
+        const BoxSides<AutoLengthPercentage>& margin = style.margin;
+        const bool automatic_margin =
+            margin.top.automatic || margin.right.automatic || margin.bottom.automatic || margin.left.automatic;
+        if (!item && automatic_margin) fault(where, "an auto margin outside a flex container");
     }
 
     static Control::Ptr make_kind(FixtureKind kind, const std::string& identity) {
@@ -550,6 +694,8 @@ private:
             return make_control<FlowLayoutPanel>(StableId(identity));
         case FixtureKind::table_layout_panel:
             return make_control<TableLayoutPanel>(StableId(identity));
+        case FixtureKind::flex_layout_panel:
+            return make_control<FlexLayoutPanel>(StableId(identity));
         }
         throw std::logic_error("unknown fixture kind");
     }
@@ -790,6 +936,9 @@ private:
 
     std::string fixture_name_;
     std::vector<BuiltIdentity> identities_;
+    // Reused for every flex element of the fixture.
+    gui_forms::layout_style::LayoutStyleReader style_reader_;
+    gui_forms::theme_language::ThemeDiagnosticList diagnostics_;
 };
 
 // ---------------------------------------------------------------------------

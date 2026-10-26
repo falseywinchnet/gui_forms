@@ -2363,6 +2363,8 @@ bool Control::size_depends_on_content() const noexcept { return true; }
 
 bool Control::sizes_children_from_content() const noexcept { return true; }
 
+bool Control::measures_children_in_arrange() const noexcept { return false; }
+
 void Control::set_layout_direction(LayoutDirection direction) {
     require_mutable();
     if (direction != LayoutDirection::inherit &&

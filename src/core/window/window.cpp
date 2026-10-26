@@ -2849,6 +2849,11 @@ void Window::measure_dirty_recursive(const Control::Ptr& control,
     if (!(*control).is_alive() || (*control).window_ != this) return;
     if (has_dirty((*control).dirty_, Dirty::measure)) {
         (*control).clear_dirty(Dirty::measure);
+        // A parent that asks its children its own questions while arranging
+        // measures this control there; the dirtiness already emptied its
+        // cache, so nothing stale is answered.
+        const Control::Ptr parent = (*control).parent_.lock();
+        if (parent && (*parent).measures_children_in_arrange()) return;
         try {
             // Kept in the control's measure cache, so its parent's arrange
             // asking the same question is answered without a callback. A

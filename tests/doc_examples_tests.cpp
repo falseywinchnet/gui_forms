@@ -1548,6 +1548,64 @@ void example() {
 }
 }  // namespace doc_example_FlagsValueEditor_2
 
+namespace doc_example_FlexLayoutPanel_1 {
+void example() {
+    std::shared_ptr<gf::FlexLayoutPanel> row =
+        gf::make_control<gf::FlexLayoutPanel>(gf::StableId("row"));
+    std::shared_ptr<gf::Button> fixed =
+        gf::make_control<gf::Button>(gf::StableId("row.fixed"), "Fixed");
+    std::shared_ptr<gf::Button> narrow =
+        gf::make_control<gf::Button>(gf::StableId("row.narrow"), "Narrow");
+    std::shared_ptr<gf::Button> wide =
+        gf::make_control<gf::Button>(gf::StableId("row.wide"), "Wide");
+    (*fixed).set_requested_bounds({0.0, 0.0, 20.0, 10.0});
+    (*narrow).set_requested_bounds({0.0, 0.0, 10.0, 10.0});
+    (*wide).set_requested_bounds({0.0, 0.0, 10.0, 10.0});
+    (*fixed).set_margin({});
+    (*narrow).set_margin({});
+    (*wide).set_margin({});
+    (*row).add_child(fixed);
+    (*row).add_child(narrow);
+    (*row).add_child(wide);
+    gf::FlexItemLayout one_share{};
+    one_share.flex.grow = gf::FlexFactor{1.0};
+    gf::FlexItemLayout two_shares{};
+    two_shares.flex.grow = gf::FlexFactor{2.0};
+    (*row).set_item_layout(*narrow, one_share);
+    (*row).set_item_layout(*wide, two_shares);
+
+    gf::Window window(row, {100.0, 20.0});
+    window.perform_layout();
+    // fixed stays 20 wide; narrow becomes 30 wide and wide 50 wide;
+    // all three stretch to the row's 20 height
+}
+}  // namespace doc_example_FlexLayoutPanel_1
+
+namespace doc_example_FlexLayoutPanel_2 {
+void example() {
+    std::shared_ptr<gf::FlexLayoutPanel> bar =
+        gf::make_control<gf::FlexLayoutPanel>(gf::StableId("bar"));
+    (*bar).set_align_items(gf::LayoutAlignment::center);
+    std::shared_ptr<gf::Button> save =
+        gf::make_control<gf::Button>(gf::StableId("bar.save"), "Save");
+    std::shared_ptr<gf::Button> close =
+        gf::make_control<gf::Button>(gf::StableId("bar.close"), "Close");
+    (*save).set_requested_bounds({0.0, 0.0, 40.0, 20.0});
+    (*close).set_requested_bounds({0.0, 0.0, 40.0, 20.0});
+    (*save).set_margin({});
+    (*close).set_margin({});
+    (*bar).add_child(save);
+    (*bar).add_child(close);
+    gf::FlexItemLayout pushed{};
+    pushed.auto_margin.left = true;
+    (*bar).set_item_layout(*close, pushed);
+
+    gf::Window window(bar, {200.0, 30.0});
+    window.perform_layout();
+    // save at {0, 5}, close pushed to {160, 5}, both 40 by 20
+}
+}  // namespace doc_example_FlexLayoutPanel_2
+
 namespace doc_example_FlowLayoutPanel_1 {
 void example() {
     std::shared_ptr<gf::FlowLayoutPanel> tools =
@@ -4041,6 +4099,8 @@ int main() {
     failures += run("ExpandableSections example 2", &doc_example_ExpandableSections_2::example);
     failures += run("FlagsValueEditor example 1", &doc_example_FlagsValueEditor_1::example);
     failures += run("FlagsValueEditor example 2", &doc_example_FlagsValueEditor_2::example);
+    failures += run("FlexLayoutPanel example 1", &doc_example_FlexLayoutPanel_1::example);
+    failures += run("FlexLayoutPanel example 2", &doc_example_FlexLayoutPanel_2::example);
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
     failures += run("FontCommand example 1", &doc_example_FontCommand_1::example);

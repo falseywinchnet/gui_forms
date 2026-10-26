@@ -580,6 +580,17 @@
       "doc": "api/generated/gui_forms.FlowLayoutPanel.rst"
     },
     {
+      "id": "flex_layout_panel",
+      "type": "FlexLayoutPanel",
+      "header": "gui_forms/controls/scrollable_control/container_control/flex_layout_panel/flex_layout_panel.hpp",
+      "category": "Layout",
+      "purpose": "CSS Flexbox container: rows or columns, wrapping lines, grow and shrink with frozen minimums and maximums, justify and align, auto margins, order and right-to-left mirroring.",
+      "winforms": "GUI.Forms-only",
+      "status": "stable",
+      "gallery_page": "retained-layout-panels",
+      "doc": "api/generated/gui_forms.FlexLayoutPanel.rst"
+    },
+    {
       "id": "table_layout_panel",
       "type": "TableLayoutPanel",
       "header": "gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp",
