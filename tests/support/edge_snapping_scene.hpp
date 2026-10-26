@@ -14,10 +14,12 @@
 
 #include "gui_forms/types.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <span>
 
@@ -32,6 +34,7 @@ constexpr gui_forms::Rect bottom_box{24.15, 6.43, 11.6, 10.11 - 6.43};
 constexpr gui_forms::Rect stroked{3.3, 13.6, 14.45, 7.2};
 constexpr double stroke_width = 1.3;
 constexpr gui_forms::Rect gradient_box{24.15, 13.6, 11.6, 7.2};
+constexpr int gradient_dither = 2; // bytes; see check_scene
 constexpr gui_forms::Rect rounded_box{6.35, 24.2, 27.4, 6.6};
 constexpr double rounded_radius = 2.2;
 
@@ -87,6 +90,26 @@ inline bool fail(const char* const what, const double scale, const int x, const 
     return false;
 }
 
+// As fail, with the pixel found and the one expected, as hexadecimal bytes in
+// the painter's order (lowest first).
+inline bool fail_values(const char* const what, const double scale, const int x, const int y,
+                        const std::uint32_t found, const std::uint32_t expected) {
+    std::cerr << "edge snapping: " << what << " at scale " << scale << ", pixel " << x << "," << y
+              << ": found 0x" << std::hex << found << ", expected 0x" << expected << std::dec << '\n';
+    return false;
+}
+
+// The largest difference between two pixels in any one byte.
+inline int channel_distance(const std::uint32_t first, const std::uint32_t second) {
+    int largest = 0;
+    for (unsigned int shift = 0U; shift < 32U; shift += 8U) {
+        const int one = static_cast<int>((first >> shift) & 0xffU);
+        const int other = static_cast<int>((second >> shift) & 0xffU);
+        largest = std::max(largest, std::abs(one - other));
+    }
+    return largest;
+}
+
 // Along one row (horizontal) or column: background before `start`, one
 // colour on [start, middle), another on [middle, end), background at `end`.
 inline bool shared_edge(const PixelImage& image, const double scale, const bool horizontal, const int line,
@@ -121,14 +144,18 @@ inline bool shared_edge(const PixelImage& image, const double scale, const bool 
 
 // Every pixel of `area` (logical, before the translation) is the background
 // or one ink colour, and some pixel is inked: coverage is all or nothing.
+// An inked pixel may differ from the first by `tolerance` in each byte, for
+// a painter that dithers what it fills; a partly covered pixel differs by far
+// more. The largest difference seen is printed, as evidence of the dither.
 inline bool whole_pixels(const PixelImage& image, const double scale, const gui_forms::Rect area,
-                         const std::uint32_t background) {
+                         const std::uint32_t background, const int tolerance, const char* const name) {
     const int left = device_edge(area.x, translation.x, scale);
     const int top = device_edge(area.y, translation.y, scale);
     const int right = device_edge(area.right(), translation.x, scale);
     const int bottom = device_edge(area.bottom(), translation.y, scale);
     bool inked = false;
     std::uint32_t ink = background;
+    int largest = 0;
     for (int y = top; y < bottom; ++y) {
         for (int x = left; x < right; ++x) {
             const std::uint32_t value = pixel_at(image, x, y);
@@ -138,10 +165,13 @@ inline bool whole_pixels(const PixelImage& image, const double scale, const gui_
                 ink = value;
                 continue;
             }
-            if (value != ink) return fail("a partly covered pixel", scale, x, y);
+            const int distance = channel_distance(value, ink);
+            if (distance > tolerance) return fail_values("a partly covered pixel", scale, x, y, value, ink);
+            largest = std::max(largest, distance);
         }
     }
     if (!inked) return fail("nothing painted", scale, left, top);
+    std::cout << "edge snapping: " << name << " at scale " << scale << ", largest ink difference " << largest << '\n';
     return true;
 }
 
@@ -179,7 +209,11 @@ inline bool border_on_fill(const PixelImage& image, const double scale, const bo
         }
         const bool expected = (stage == 0 && value == background) || ((stage == 1 || stage == 3) && value == border) ||
             (stage == 2 && value == fill) || (stage == 4 && value == background);
-        if (!expected) return fail("the border and its fill do not meet on whole pixels", scale, position[0], position[1]);
+        if (!expected) {
+            const std::uint32_t wanted = stage == 0 || stage == 4 ? background : (stage == 2 ? fill : border);
+            return fail_values("the border and its fill do not meet on whole pixels", scale, position[0], position[1],
+                               value, wanted);
+        }
     }
     if (stage != 4) return fail("the border and fill did not both appear", scale, position[0], position[1]);
     const double half = stroke_width * 0.5;
@@ -203,10 +237,12 @@ inline bool check_scene(const PixelImage& image, const double scale) {
         device_edge(bottom_box.bottom(), translation.y, scale), background);
     const gui_forms::Rect stroke_area{stroked.x - stroke_width, stroked.y - stroke_width,
                                       stroked.width + stroke_width * 2.0, stroked.height + stroke_width * 2.0};
-    const bool stroke = whole_pixels(image, scale, stroke_area, background);
+    const bool stroke = whole_pixels(image, scale, stroke_area, background, 0, "the stroke");
     const gui_forms::Rect gradient_area{gradient_box.x - 1.0, gradient_box.y - 1.0,
                                         gradient_box.width + 2.0, gradient_box.height + 2.0};
-    const bool gradient = whole_pixels(image, scale, gradient_area, background);
+    // Quartz dithers gradient shading, so a flat gradient's pixels may differ
+    // by a step of their bytes; the other painters fill it exactly.
+    const bool gradient = whole_pixels(image, scale, gradient_area, background, gradient_dither, "the gradient");
     const int rounded_row = device_edge(27.5, translation.y, scale);
     const bool rounded_across = border_on_fill(image, scale, true, rounded_row, rounded_box.x, rounded_box.right(),
         translation.x, device_edge(rounded_box.x - 2.0, translation.x, scale),

@@ -155,6 +155,39 @@ bool snapped_local_rect(const SkCanvas& canvas, const Rect rect, SkRect& local) 
     return true;
 }
 
+// The same snapped edges in device space, as whole numbers. An antialiased
+// shape whose edges must cover whole pixels is drawn here, with the canvas
+// transform reset: the local rectangle above, mapped back through the
+// transform in single precision, can land a hair inside a pixel edge, and
+// antialiasing then shows that pixel partly covered.
+bool snapped_device_rect(const SkMatrix& matrix, const Rect rect, SkRect& device) {
+    const double scale_x = static_cast<double>(matrix.getScaleX());
+    const double scale_y = static_cast<double>(matrix.getScaleY());
+    if (!matrix.isScaleTranslate() || !rect.finite() || scale_x == 0.0 || scale_y == 0.0) return false;
+    const double translate_x = static_cast<double>(matrix.getTranslateX());
+    const double translate_y = static_cast<double>(matrix.getTranslateY());
+    const double left = gui_forms::detail::snap_device_edge(rect.x * scale_x + translate_x);
+    const double top = gui_forms::detail::snap_device_edge(rect.y * scale_y + translate_y);
+    const double right = gui_forms::detail::snap_device_edge((rect.x + rect.width) * scale_x + translate_x);
+    const double bottom = gui_forms::detail::snap_device_edge((rect.y + rect.height) * scale_y + translate_y);
+    device = SkRect::MakeLTRB(static_cast<SkScalar>(left), static_cast<SkScalar>(top),
+                              static_cast<SkScalar>(right), static_cast<SkScalar>(bottom));
+    device.sort();
+    return true;
+}
+
+// A logical corner radius in device pixels along each axis, no more than
+// half of the device box it rounds.
+SkVector device_radii(const SkMatrix& matrix, const double radius, const SkRect& device) {
+    const double across = std::abs(static_cast<double>(matrix.getScaleX())) * radius;
+    const double down = std::abs(static_cast<double>(matrix.getScaleY())) * radius;
+    const double half_width = static_cast<double>(device.width()) * 0.5;
+    const double half_height = static_cast<double>(device.height()) * 0.5;
+    const SkVector radii = SkVector::Make(static_cast<SkScalar>(std::clamp(across, 0.0, half_width)),
+                                          static_cast<SkScalar>(std::clamp(down, 0.0, half_height)));
+    return radii;
+}
+
 // The rectangle to draw for a box filled with `paint`: snapped, with
 // antialiasing off, when the transform allows; otherwise the box as given.
 SkRect snapped_box(const SkCanvas& canvas, const Rect rect, SkPaint& paint) {
@@ -811,9 +844,20 @@ void SkiaRaster::fill_rect(Rect rect, Color color) {
 
 void SkiaRaster::fill_rounded_rect(Rect rect, double radius, Color color) {
     if (SkCanvas* canvas = (*impl_).canvas()) {
-        // The bounds snap; the corners keep their antialiasing.
-        SkRect bounds = to_sk_rect(rect);
-        static_cast<void>(snapped_local_rect(*canvas, rect, bounds));
+        // The bounds snap, in device space; the corners keep their
+        // antialiasing.
+        const SkMatrix matrix = (*canvas).getTotalMatrix();
+        SkRect device{};
+        if (snapped_device_rect(matrix, rect, device)) {
+            const double bounded = std::clamp(radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5));
+            const SkVector radii = device_radii(matrix, bounded, device);
+            (*canvas).save();
+            (*canvas).resetMatrix();
+            (*canvas).drawRRect(SkRRect::MakeRectXY(device, radii.x(), radii.y()), make_paint(color));
+            (*canvas).restore();
+            return;
+        }
+        const SkRect bounds = to_sk_rect(rect);
         const SkScalar bounded = static_cast<SkScalar>(std::clamp(
             radius, 0.0, std::max(0.0, static_cast<double>(std::min(bounds.width(), bounds.height())) * 0.5)));
         (*canvas).drawRRect(SkRRect::MakeRectXY(bounds, bounded, bounded), make_paint(color));
@@ -851,27 +895,29 @@ void SkiaRaster::stroke_rounded_rect(Rect rect, double radius, Color color,
     if (SkCanvas* canvas = (*impl_).canvas()) {
         SkPaint paint = make_paint(color);
         // The stroke is centred on the edges. Snapped, it is the ring between
-        // its snapped outer and inner bounds, as a rounded fill snaps its
-        // bounds; the corners keep their antialiasing.
+        // its snapped outer and inner bounds, in device space as a rounded
+        // fill snaps its bounds; the corners keep their antialiasing.
         const double half = width * 0.5;
+        const SkMatrix matrix = (*canvas).getTotalMatrix();
         SkRect outer{};
         SkRect inner{};
         const bool snapped = std::isfinite(half) && half > 0.0 &&
-            snapped_local_rect(*canvas, outset_rect(rect, half), outer) &&
-            snapped_local_rect(*canvas, outset_rect(rect, -half), inner);
+            snapped_device_rect(matrix, outset_rect(rect, half), outer) &&
+            snapped_device_rect(matrix, outset_rect(rect, -half), inner);
         if (snapped) {
             const double bounded = std::clamp(radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5));
-            const SkScalar outer_radius = static_cast<SkScalar>(std::min(bounded + half,
-                static_cast<double>(std::min(outer.width(), outer.height())) * 0.5));
-            const SkRRect outer_shape = SkRRect::MakeRectXY(outer, outer_radius, outer_radius);
+            const SkVector outer_radii = device_radii(matrix, bounded + half, outer);
+            const SkRRect outer_shape = SkRRect::MakeRectXY(outer, outer_radii.x(), outer_radii.y());
+            (*canvas).save();
+            (*canvas).resetMatrix();
             if (inner.isEmpty()) {
                 (*canvas).drawRRect(outer_shape, paint);
-                return;
+            } else {
+                const SkVector inner_radii = device_radii(matrix, std::max(0.0, bounded - half), inner);
+                const SkRRect inner_shape = SkRRect::MakeRectXY(inner, inner_radii.x(), inner_radii.y());
+                (*canvas).drawDRRect(outer_shape, inner_shape, paint);
             }
-            const SkScalar inner_radius = static_cast<SkScalar>(std::clamp(bounded - half, 0.0,
-                static_cast<double>(std::min(inner.width(), inner.height())) * 0.5));
-            const SkRRect inner_shape = SkRRect::MakeRectXY(inner, inner_radius, inner_radius);
-            (*canvas).drawDRRect(outer_shape, inner_shape, paint);
+            (*canvas).restore();
             return;
         }
         paint.setStyle(SkPaint::kStroke_Style);

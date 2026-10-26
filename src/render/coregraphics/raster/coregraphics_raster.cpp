@@ -617,9 +617,13 @@ void CoreGraphicsRaster::fill_linear_gradient(
     CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
     CGRect box = to_cg_rect(rect);
-    static_cast<void>(snapped_user_rect((*impl_).context, rect, box));
+    const bool snapped = snapped_user_rect((*impl_).context, rect, box);
     CGContextSaveGState((*impl_).context);
+    // A snapped box clips without antialiasing, as a snapped fill covers
+    // exactly its pixels; what is drawn inside keeps the painter's setting.
+    if (snapped) CGContextSetShouldAntialias((*impl_).context, false);
     CGContextClipToRect((*impl_).context, box);
+    CGContextSetShouldAntialias((*impl_).context, true);
     CGContextDrawLinearGradient(
         (*impl_).context, gradient, CGPointMake(start.x, start.y),
         CGPointMake(end.x, end.y),
@@ -683,9 +687,13 @@ void CoreGraphicsRaster::fill_linear_gradient_spread(
     }
 
     CGRect box = to_cg_rect(rect);
-    static_cast<void>(snapped_user_rect((*impl_).context, rect, box));
+    const bool snapped = snapped_user_rect((*impl_).context, rect, box);
     CGContextSaveGState((*impl_).context);
+    // A snapped box clips without antialiasing, as a snapped fill covers
+    // exactly its pixels; what is drawn inside keeps the painter's setting.
+    if (snapped) CGContextSetShouldAntialias((*impl_).context, false);
     CGContextClipToRect((*impl_).context, box);
+    CGContextSetShouldAntialias((*impl_).context, true);
     for (double period = first_period; period < final_period; period += 1.0) {
         const Point band_start{start.x + dx * period,
                                start.y + dy * period};
@@ -731,9 +739,13 @@ void CoreGraphicsRaster::fill_radial_gradient(
     CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
     CGRect box = to_cg_rect(rect);
-    static_cast<void>(snapped_user_rect((*impl_).context, rect, box));
+    const bool snapped = snapped_user_rect((*impl_).context, rect, box);
     CGContextSaveGState((*impl_).context);
+    // A snapped box clips without antialiasing, as a snapped fill covers
+    // exactly its pixels; what is drawn inside keeps the painter's setting.
+    if (snapped) CGContextSetShouldAntialias((*impl_).context, false);
     CGContextClipToRect((*impl_).context, box);
+    CGContextSetShouldAntialias((*impl_).context, true);
     CGContextTranslateCTM((*impl_).context, center.x, center.y);
     CGContextScaleCTM((*impl_).context, radii.width, radii.height);
     CGContextDrawRadialGradient(
