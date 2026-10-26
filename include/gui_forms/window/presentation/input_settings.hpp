@@ -8,8 +8,8 @@ namespace gui_forms {
 
 // Where a setting the host reports came from.
 enum class SettingOrigin : std::uint8_t {
-    // GUI.Forms' stated default: the host has no such setting (an X server
-    // without an XSETTINGS manager), or no host has reported yet.
+    // GUI.Forms' stated default: the host has no such setting (a desktop
+    // session that publishes none), or no host has reported yet.
     default_value,
     // The platform's own setting, read by the host.
     host,

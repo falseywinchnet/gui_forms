@@ -21,8 +21,8 @@ struct HostProtocolRevision final {
 // change to the protocol adds a row at the end, so two changes that claim
 // the same version both add the same line and conflict when merged, and
 // the checks below refuse a skipped or repeated version.
-inline constexpr std::array<HostProtocolRevision, 3> host_protocol_revisions{{
-    {8U, "the host's keyboard-command defaults (HostCapabilities::key_map)"},
+inline constexpr std::array<HostProtocolRevision, 3> host_protocol_revisions{
+    {{8U, "the host's keyboard-command defaults (HostCapabilities::key_map)"},
     {9U, "the compositor state report (HostCompositorEvent, stage T5)"},
     {10U, "the platform's input settings (HostInputSettingsEvent: the double-click interval)"},
 }};

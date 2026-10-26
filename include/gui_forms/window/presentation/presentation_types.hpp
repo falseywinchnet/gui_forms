@@ -34,8 +34,8 @@ struct PresentationSettings final {
     // counts as one double-click. A control that tells a slow second click
     // from a double-click (a list's label edit) compares against it. The
     // host reports it at attach and again when the system setting changes
-    // (HostInputSettingsEvent): Windows GetDoubleClickTime, macOS
-    // NSEvent.doubleClickInterval, X11 the XSETTINGS Net/DoubleClickTime.
+    // (HostInputSettingsEvent); each host's source is listed under "Input
+    // settings" in docs/user/hosts-and-capabilities.md.
     // `double_click_origin` says whether it is that host value or the stated
     // default. Between 1 and maximum_double_click_milliseconds.
     std::uint32_t double_click_milliseconds{default_double_click_milliseconds};

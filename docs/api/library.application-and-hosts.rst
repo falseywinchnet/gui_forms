@@ -3208,7 +3208,7 @@ Functions, constants and aliases
 
    Whether the rows run consecutively from 8, each with a feature.
 
-.. cpp:var:: constexpr std::array<HostProtocolRevision, 3> host_protocol_revisions{
+.. cpp:var:: constexpr std::array<HostProtocolRevision, 3> host_protocol_revisions
 
    The host protocol's versions, one row each, from version 8 (earlier versions are not recorded). The current version is the last row's. A change to the protocol adds a row at the end, so two changes that claim the same version both add the same line and conflict when merged, and the checks below refuse a skipped or repeated version.
 
