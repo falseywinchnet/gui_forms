@@ -29,6 +29,7 @@ using gui_forms::RuleSpecificity;
 using gui_forms::theme_language::ColumnNumber;
 using gui_forms::theme_language::DiagnosticCode;
 using gui_forms::theme_language::LineStartTable;
+using gui_forms::theme_language::LoweringBudget;
 using gui_forms::theme_language::LoweredSelector;
 using gui_forms::theme_language::ParseOutcome;
 using gui_forms::theme_language::SelectorInput;
@@ -44,7 +45,9 @@ using gui_forms::theme_language::ThemeSyntaxTree;
 using gui_forms::theme_language::ThemeTokenBuffer;
 using gui_forms::theme_language::TokenizeOutcome;
 using gui_forms::theme_language::diagnostic_code_name;
+using gui_forms::theme_language::lowered_selector_bytes;
 using gui_forms::theme_language::maximum_is_arguments;
+using gui_forms::theme_language::maximum_lowered_bytes;
 using gui_forms::theme_language::maximum_rules;
 using gui_forms::theme_language::maximum_simple_selectors;
 using gui_forms::theme_language::parse_theme_sheet;
@@ -94,6 +97,7 @@ struct Lowering final {
     std::vector<LoweredSelector> selectors{};
     std::vector<ThemeDiagnostic> diagnostics{};
     std::size_t budget_left{};
+    std::size_t bytes_left{};
 };
 
 // Lowers the selectors of the sheet `<selectors> {}`.
@@ -122,9 +126,11 @@ Lowering lower(std::string_view selectors, std::size_t budget = maximum_rules) {
     SelectorVocabulary vocabulary{};
     vocabulary.controls = controls;
     SelectorLowering lowering{};
-    std::size_t budget_left = budget;
+    LoweringBudget budget_left{};
+    budget_left.rules = budget;
     result.outcome = lowering.lower(input, vocabulary, budget_left, result.selectors, diagnostics);
-    result.budget_left = budget_left;
+    result.budget_left = budget_left.rules;
+    result.bytes_left = budget_left.bytes;
     for (const ThemeDiagnostic& diagnostic : diagnostics.records()) result.diagnostics.push_back(diagnostic);
     return result;
 }
@@ -359,6 +365,28 @@ void test_refused() {
     require(list_over.outcome == SelectorOutcome::refused && list_over.diagnostics.size() == 1U &&
                 list_over.diagnostics[0].code == DiagnosticCode::too_many_rules,
             "a list past the rule budget is refused");
+
+    // The expanded selectors' bytes are counted: 320 copies of a 60,000-byte
+    // stable ID pass the byte budget, as each copy is built.
+    std::string long_id(60'000U, 'a');
+    std::string twenty = ":is(.a0";
+    for (int index = 1; index < 20; ++index) twenty += ", .a" + std::to_string(index);
+    twenty += ")";
+    std::string sixteen = ":is(.b0";
+    for (int index = 1; index < 16; ++index) sixteen += ", .b" + std::to_string(index);
+    sixteen += ")";
+    const Lowering too_large = lower("#" + long_id + twenty + sixteen);
+    require(too_large.outcome == SelectorOutcome::refused && too_large.diagnostics.size() == 1U &&
+                too_large.diagnostics[0].code == DiagnosticCode::lowered_sheet_too_large &&
+                too_large.diagnostics[0].detail == std::to_string(maximum_lowered_bytes) &&
+                too_large.bytes_left == maximum_lowered_bytes,
+            "an expansion past the byte budget is refused, and the budget is unchanged");
+    const Lowering within = lower("#" + long_id + sixteen);
+    std::size_t counted = 0U;
+    for (const LoweredSelector& lowered : within.selectors) counted += lowered_selector_bytes(lowered.selector);
+    require(within.outcome == SelectorOutcome::lowered && within.selectors.size() == 16U &&
+                within.bytes_left == maximum_lowered_bytes - counted && counted > 16U * 60'000U,
+            "the lowered selectors' bytes are subtracted from the budget");
 }
 
 void test_dropped() {
@@ -409,7 +437,7 @@ void test_appending() {
     vocabulary.controls = controls;
     SelectorLowering lowering{};
     std::vector<LoweredSelector> output{};
-    std::size_t budget = maximum_rules;
+    LoweringBudget budget{};
     std::array<SelectorOutcome, 3> outcomes{};
     for (std::size_t rule = 0U; rule < 3U; ++rule) {
         const SelectorInput input{.source = source,
@@ -422,7 +450,8 @@ void test_appending() {
     require(outcomes[0] == SelectorOutcome::lowered && outcomes[1] == SelectorOutcome::dropped &&
                 outcomes[2] == SelectorOutcome::lowered,
             "each rule's outcome");
-    require(output.size() == 3U && budget == maximum_rules - 3U, "the lowered rules append; the dropped one adds none");
+    require(output.size() == 3U && budget.rules == maximum_rules - 3U,
+            "the lowered rules append; the dropped one adds none");
     require(diagnostics.records().size() == 1U && diagnostics.records()[0].position.column == ColumnNumber{11U},
             "the shared cursor locates each rule's diagnostics");
 }

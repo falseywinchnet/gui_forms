@@ -115,12 +115,6 @@ private:
     std::vector<ByteOffset> starts_{};
 };
 
-// Positions for offsets asked in increasing order, as a reader reports its
-// diagnostics: each continues counting columns from the previous position
-// when both lie on one line, so a run of positions over a sheet costs one
-// pass over its bytes, however long its lines. An offset before the previous
-// one is counted from its line's start. The table and text are borrowed and
-// must outlive the cursor; declare the cursor after them.
 // Whether `text` is `lower_name` in any ASCII case, as CSS matches its
 // keywords; `lower_name` is written in lower case.
 [[nodiscard]] bool equals_ascii_folded(std::string_view text, std::string_view lower_name) noexcept;
@@ -130,6 +124,12 @@ private:
 // registered name, so `focus_visible` is never read as `focus-visible`.
 [[nodiscard]] std::string registered_name_from_kebab(std::string_view written);
 
+// Positions for offsets asked in increasing order, as a reader reports its
+// diagnostics: each continues counting columns from the previous position
+// when both lie on one line, so a run of positions over a sheet costs one
+// pass over its bytes, however long its lines. An offset before the previous
+// one is counted from its line's start. The table and text are borrowed and
+// must outlive the cursor; declare the cursor after them.
 class SourcePositionCursor final {
 public:
     SourcePositionCursor(const LineStartTable& lines, std::string_view text) noexcept;

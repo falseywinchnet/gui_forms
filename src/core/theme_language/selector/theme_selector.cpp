@@ -6,7 +6,8 @@
 // `:is()` multiplies its compound's alternatives by the arguments' union.
 // Every alternative count is bounded by the rule budget, and every
 // alternative by maximum_simple_selectors, so expanding costs a constant
-// per rule the list expands into.
+// per rule the list expands into; the bytes the expanded selectors copy are
+// bounded by the byte budget.
 
 #include "theme_selector.hpp"
 
@@ -140,13 +141,14 @@ struct NameArgument final {
 
 class SelectorPass final {
 public:
-    SelectorPass(const SelectorInput& input, const SelectorVocabulary& vocabulary, std::size_t budget,
+    SelectorPass(const SelectorInput& input, const SelectorVocabulary& vocabulary, LoweringBudget budget,
                  std::vector<LoweredSelector>& output, ThemeDiagnosticList& diagnostics,
                  SelectorWorkspace& workspace) noexcept;
 
     [[nodiscard]] SelectorOutcome run();
-    // How many selectors run() appended.
+    // How many selectors run() expanded, and the bytes they count.
     [[nodiscard]] std::size_t emitted() const noexcept;
+    [[nodiscard]] std::size_t emitted_bytes() const noexcept;
 
 private:
     [[nodiscard]] bool read_simple();
@@ -168,7 +170,7 @@ private:
     const SelectorInput& input_;
     const SelectorVocabulary& vocabulary_;
     const std::vector<Token>& tokens_;
-    std::size_t budget_{};
+    LoweringBudget budget_{};
     std::vector<LoweredSelector>& output_;
     ThemeDiagnosticList& diagnostics_;
     SelectorWorkspace& workspace_;
@@ -176,12 +178,13 @@ private:
     std::uint32_t end_{};
     std::size_t depth_{};
     std::size_t emitted_{};
+    std::size_t emitted_bytes_{};
     // Whether an unknown name has dropped the rule (its one warning is
     // reported); reading goes on, since an error later still refuses.
     bool dropped_{};
 };
 
-SelectorPass::SelectorPass(const SelectorInput& input, const SelectorVocabulary& vocabulary, std::size_t budget,
+SelectorPass::SelectorPass(const SelectorInput& input, const SelectorVocabulary& vocabulary, LoweringBudget budget,
                            std::vector<LoweredSelector>& output, ThemeDiagnosticList& diagnostics,
                            SelectorWorkspace& workspace) noexcept
     : input_(input), vocabulary_(vocabulary), tokens_(input.tokens.tokens), budget_(budget), output_(output),
@@ -230,6 +233,10 @@ SelectorOutcome SelectorPass::run() {
 
 std::size_t SelectorPass::emitted() const noexcept {
     return emitted_;
+}
+
+std::size_t SelectorPass::emitted_bytes() const noexcept {
+    return emitted_bytes_;
 }
 
 bool SelectorPass::read_simple() {
@@ -470,7 +477,7 @@ bool SelectorPass::close_is(std::uint32_t closer) {
     const std::size_t left = parent.compound.size();
     const std::size_t right = arguments.arguments.size();
     // Both counts are at most the budget, so the product cannot overflow.
-    if (left * right > budget_) {
+    if (left * right > budget_.rules) {
         report(DiagnosticCode::too_many_rules, closer, std::to_string(maximum_rules));
         return false;
     }
@@ -519,7 +526,7 @@ bool SelectorPass::finish_compound(std::uint32_t at) {
             report(DiagnosticCode::too_many_is_arguments, at, std::to_string(maximum_is_arguments));
             return false;
         }
-        if (frame.arguments.size() + frame.compound.size() > budget_) {
+        if (frame.arguments.size() + frame.compound.size() > budget_.rules) {
             report(DiagnosticCode::too_many_rules, at, std::to_string(maximum_rules));
             return false;
         }
@@ -553,7 +560,7 @@ bool SelectorPass::add_simple(const Simple& simple) {
 // parts or roles in one expansion are an error; a part its control type
 // does not declare is an unknown name.
 bool SelectorPass::materialize(const Alternative& alternative, RuleSpecificity specificity) {
-    if (emitted_ == budget_) {
+    if (emitted_ == budget_.rules) {
         report(DiagnosticCode::too_many_rules, input_.selectors.first.value, std::to_string(maximum_rules));
         return false;
     }
@@ -611,6 +618,14 @@ bool SelectorPass::materialize(const Alternative& alternative, RuleSpecificity s
         }
         if (!declared) note_unknown(part_token, token_text(part_token));
     }
+    // A dropped rule's selectors count too: each was built.
+    const std::size_t bytes = lowered_selector_bytes(selector);
+    if (bytes > budget_.bytes - emitted_bytes_) {
+        report(DiagnosticCode::lowered_sheet_too_large, input_.selectors.first.value,
+               std::to_string(maximum_lowered_bytes));
+        return false;
+    }
+    emitted_bytes_ += bytes;
     lowered.specificity = specificity;
     lowered.level = level_of(specificity);
     if (!dropped_) output_.push_back(std::move(lowered));
@@ -689,17 +704,25 @@ void SelectorPass::report(DiagnosticCode code, std::uint32_t token, std::string 
 
 } // namespace
 
+std::size_t lowered_selector_bytes(const RuleSelector& selector) noexcept {
+    std::size_t bytes = lowered_record_bytes + selector.control_type.size() + selector.stable_id.size() +
+                        selector.part.size() + selector.states.size();
+    for (const std::string& name : selector.classes) bytes += name.size();
+    return bytes;
+}
+
 SelectorOutcome SelectorLowering::lower(const SelectorInput& input, const SelectorVocabulary& vocabulary,
-                                        std::size_t& rule_budget, std::vector<LoweredSelector>& output,
+                                        LoweringBudget& budget, std::vector<LoweredSelector>& output,
                                         ThemeDiagnosticList& diagnostics) {
     const std::size_t kept = output.size();
-    SelectorPass pass(input, vocabulary, rule_budget, output, diagnostics, workspace_);
+    SelectorPass pass(input, vocabulary, budget, output, diagnostics, workspace_);
     const SelectorOutcome outcome = pass.run();
     if (outcome != SelectorOutcome::lowered) {
         output.resize(kept);
         return outcome;
     }
-    rule_budget -= pass.emitted();
+    budget.rules -= pass.emitted();
+    budget.bytes -= pass.emitted_bytes();
     return outcome;
 }
 

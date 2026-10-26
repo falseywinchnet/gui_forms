@@ -218,6 +218,7 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/selector/theme_selector.cpp
     src/core/theme_language/custom_properties/theme_custom_properties.cpp
     src/core/theme_language/value/theme_value.cpp
+    src/core/theme_language/compiler/theme_compiler.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
     src/core/docking/dock_layout/dock_layout.cpp
@@ -2547,7 +2548,8 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_xml_tests COMMAND gui_forms_xml_tests)
 
     # The theme language (stage T3): numbers, tokens, diagnostics, the syntax
-    # tree, and the deterministic mutation run over the tokenizer and parser.
+    # tree, selectors, values, the compiler, and the deterministic mutation
+    # run over the tokenizer, parser and value reader.
     add_executable(gui_forms_theme_number_tests tests/theme_language/theme_number_tests.cpp)
     target_link_libraries(gui_forms_theme_number_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_number_tests COMMAND gui_forms_theme_number_tests)
@@ -2566,6 +2568,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_value_tests tests/theme_language/theme_value_tests.cpp)
     target_link_libraries(gui_forms_theme_value_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_value_tests COMMAND gui_forms_theme_value_tests)
+
+    add_executable(gui_forms_theme_compiler_tests tests/theme_language/theme_compiler_tests.cpp)
+    target_link_libraries(gui_forms_theme_compiler_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_compiler_tests COMMAND gui_forms_theme_compiler_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
