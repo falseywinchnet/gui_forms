@@ -97,8 +97,18 @@ The CSS containers have none.
 
 - The first two rows are L0's 64 differences, now counted in both
   directions.
-- The third row is the only new pattern. Left to right, the same nodes
-  match within tolerance.
+- The third row is the only new pattern. It is a consequence of the
+  right-to-left decision, option 1 (full mirroring, owner, 2026-10-26),
+  and is confined to `FlowLayoutPanelCompat`:
+  - 4 nodes (`a` to `d`) of 1 fixture differ at 8 right-to-left profiles,
+    32 node comparisons in all;
+  - they differ by 14 to 19 px, the mirrored asymmetry of the panel's
+    padding (20 px left, 6 px right) plus each item's own;
+  - left to right, the same nodes match within tolerance.
+
+  `TableLayoutPanelCompat` mirrors in the same way. Its fixtures' padding
+  and margins are the same on the left and the right, so its mirroring
+  adds no difference here. The coordinator passes the pattern to the owner as information.
 
 ## Counted bounds (section 5)
 

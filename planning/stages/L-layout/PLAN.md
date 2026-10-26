@@ -817,11 +817,18 @@ A leaf control that shows text as a CSS block of text does:
   sets it as a length, as CSS's `line-height: <length>` does. The
   calibration step (12.5) fixes how Chromium rounds these metrics, and
   the leaf follows it.
-- **Wrapping.** Soft wraps at the break opportunities that the Latin
-  fixtures exercise: spaces, and after a hyphen (UAX #14 classes SP and
-  HY). It does not hyphenate and does not break inside a word unless one
-  word overflows the line, as `overflow-wrap: normal` does. Full UAX #14
-  is H's, and the leaf's breaker is the one H extends.
+- **Wrapping** (coordinator, 2026-10-26). The text engine's existing
+  line breaker, with no second breaker written for L. That breaker is the
+  pinned libunibreak 8.0, a private UAX #14 (Unicode 17) subset with its
+  own conformance test (`third_party/LIBUNIBREAK_INTAKE_2026-10-01.md`,
+  `gui_forms_linebreak_conformance`).
+  - The leaf wraps at its break opportunities, intersected with shaping
+    clusters, as the text-mask layout does.
+  - It does not hyphenate.
+  - It breaks inside a word only when one word overflows the line, as
+    `overflow-wrap: normal` does.
+
+  12.9 records what the leaf and the harness need in order to reach it.
 - **Alignment.** `text_align` (`start`, `end`, `left`, `right`,
   `center`), which follows the effective `LayoutDirection` as CSS does.
   Inside a `BlockPanel` the leaf takes the panel's `text_align` unless it
@@ -856,7 +863,8 @@ invalidated by the same measure generation, so it never outlives the
 text or the font it was computed from.
 
 `BlockPanel`'s `line_strut` stays a property. A `BlockPanel` whose strut
-is not set takes it from its content font's metrics. That is CSS's strut,
+is not set takes it from its content font's metrics (coordinator,
+2026-10-26, option (a)). That is CSS's strut,
 and it scales with the text scale. The corpus's `font-size: 0` strut is
 unchanged.
 
@@ -936,10 +944,42 @@ About 30, each marked bidirectional where its boxes depend on direction:
 
 ### 12.8 Questions put to the coordinator
 
-1. **The name.** `TextBlock` is provisional; the owner is confirming it.
-2. **Wrapping.** **Recommended:** (a), the opportunities the fixtures
-   exercise (SP and HY), with full UAX #14 in H. The alternative, (b),
-   is full UAX #14 in L8.
-3. **The strut without a declared font.** **Recommended:** (a), from the
-   content font, scaling with the text scale, as CSS does. The
-   alternative, (b), keeps it a property only.
+1. **The name.** `TextBlock` is provisional, and the owner is confirming
+   it. The control is not added before then.
+2. **Wrapping.** Answered (coordinator, 2026-10-26): neither proposed
+   option. The leaf uses the text engine's existing line breaker (12.2).
+3. **The strut without a declared font.** Answered (coordinator,
+   2026-10-26): option (a). The strut comes from the content font and
+   scales with the text scale, as in CSS.
+
+### 12.9 Reaching the line breaker
+
+What is there today:
+- libunibreak is linked only into the development text-mask service
+  (`gui_forms_text_masks_impl`). That service is built only with
+  `GUI_FORMS_BUILD_TEXT_MASKS`, which is off by default.
+- The source is fetched separately (`third_party/fetch_linebreak.sh`) and
+  is ignored by Git.
+- The intake admits it for that profile only ("keep it out of normal OFF
+  builds").
+- Its one adapter is private to the mask job, which breaks inside a
+  worker.
+
+What is missing for a control:
+- A control reaches text only through `TextMetricsProvider`, which shapes
+  a string and returns its size. No public seam returns the break
+  opportunities of a string, so a control in `gui_forms_controls` cannot
+  reach the breaker.
+
+L8 needs three things:
+1. **A provider query for break opportunities.** A `TextMetricsProvider`
+   member that fills caller-owned storage with one break class per input
+   byte. It is answered by the bundled engine (Painter, the hosts and the
+   corpus harness).
+2. **The dependency in the default text build.** libunibreak would be
+   linked into `gui_forms_text_engine`, so that it is present wherever
+   HarfBuzz text is built, not only in the mask profile. This widens the
+   intake's admission, so it goes to the coordinator.
+3. **The estimated fallback.** When a window has no provider, wrapping
+   falls back to whitespace only. That answer is labelled estimated, as
+   `estimate_text_layout_utf8` is, and is never reported as the engine's.
