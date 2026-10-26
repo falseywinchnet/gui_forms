@@ -1389,6 +1389,20 @@ void test_picture_box_modes_registry_and_semantics() {
             "PictureBox must never submit a stale ImageId to a renderer");
 }
 
+// The value of the node with `stable_id` in `nodes` or below them; empty
+// (and `found` false) when no node has it.
+std::string semantic_value_of(const std::vector<SemanticNode>& nodes, const std::string_view stable_id, bool& found) {
+    for (const SemanticNode& node : nodes) {
+        if (node.stable_id == stable_id) {
+            found = true;
+            return node.value;
+        }
+        std::string below = semantic_value_of(node.children, stable_id, found);
+        if (found) return below;
+    }
+    return std::string{};
+}
+
 void test_public_drawing_metrics_and_control_tag() {
     std::weak_ptr<int> released_anchor{};
     {
@@ -1445,6 +1459,28 @@ void test_public_drawing_metrics_and_control_tag() {
                 metrics_semantics.value.find("controls") != std::string::npos &&
                 (*metrics).accent_width() == 9.0,
             "MetricsView must expose the structured runtime snapshot semantically");
+
+    // The accessible value is the painted text, and a paint that changes it
+    // advances the semantic generation: hosts keep a published tree until
+    // the generation changes, so a value that moved without it would reach
+    // them late (the macOS AX client saw "41 paints" against "42").
+    const std::string_view metrics_id = "controls.diagnostics.metrics";
+    const std::uint64_t generation_before = window.semantic_generation();
+    bool found_before = false;
+    const std::string value_before = semantic_value_of(window.semantic_snapshot().roots, metrics_id, found_before);
+    bool found_again = false;
+    const std::string value_again = semantic_value_of(window.semantic_snapshot().roots, metrics_id, found_again);
+    require(found_before && found_again && value_again == value_before && !value_before.empty() &&
+                window.semantic_generation() == generation_before,
+            "MetricsView's published value must not move without a paint");
+    (*metrics).invalidate(Dirty::paint);
+    window.paint(painter, {0.0, 0.0, 240.0, 150.0});
+    bool found_after = false;
+    const std::string value_after = semantic_value_of(window.semantic_snapshot().roots, metrics_id, found_after);
+    require(found_after && value_after != value_before && window.semantic_generation() != generation_before,
+            "a paint that changes MetricsView's counters must advance the semantic generation");
+    require(!window.needs_frame(),
+            "MetricsView's semantic invalidation must not owe another paint");
 }
 
 void test_button_disclosure_semantics() {
