@@ -2226,6 +2226,15 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_windows_part_composite_tests PRIVATE
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_part_composite_tests COMMAND gui_forms_windows_part_composite_tests)
+        # Stage T5, phase C2's measurement: what DWM composes from a
+        # premultiplied client through each documented route. Prints JSON
+        # lines (kept in CI's LastTest.log evidence); fails only when it
+        # cannot make its windows or read the screen.
+        add_executable(gui_forms_windows_compositor_probe tests/windows_compositor_probe.cpp)
+        target_compile_definitions(gui_forms_windows_compositor_probe PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_compositor_probe PRIVATE dwmapi runtimeobject)
+        add_test(NAME gui_forms_windows_compositor_probe COMMAND gui_forms_windows_compositor_probe)
         add_executable(gui_forms_windows_content_pixels_tests tests/windows_content_pixels_tests.cpp)
         target_compile_definitions(gui_forms_windows_content_pixels_tests PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
