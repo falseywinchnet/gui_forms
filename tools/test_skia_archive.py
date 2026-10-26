@@ -205,6 +205,57 @@ class PinTests(Fixture):
         run.assert_not_called()
         check_output.assert_not_called()
 
+    def plan_outputs(self, pins: dict[str, Any], artifact: int | None) -> dict[str, str]:
+        outputs: Path = self.scratch / 'outputs.txt'
+        outputs.write_text('', encoding='utf-8')
+        with patch.object(skia_archive, 'PIN_PATH', self.write_pin(pins)):
+            with patch.dict(skia_archive.os.environ, {'GITHUB_OUTPUT': str(outputs)}):
+                with patch.object(skia_archive, 'artifact_run', return_value=artifact):
+                    skia_archive.plan_command('owner/repository', PLATFORM)
+        values: dict[str, str] = {}
+        line: str
+        for line in outputs.read_text(encoding='utf-8').splitlines():
+            key: str
+            value: str
+            key, value = line.split('=', 1)
+            values[key] = value
+        return values
+
+    def test_plan_builds_only_when_no_archive_of_the_identity_exists(self) -> None:
+        current: str = skia_archive.identity(PLATFORM)
+        pinned: dict[str, Any] = {PLATFORM: {'identity': current, 'archive_sha256': '1' * 64, 'tag': 'build-abc'}}
+        stale: dict[str, Any] = {PLATFORM: {'identity': '0' * 64, 'archive_sha256': '1' * 64, 'tag': 'build-abc'}}
+        self.assertEqual(self.plan_outputs(pinned, None), {'identity': current, 'source': 'release', 'build': 'false'})
+        self.assertEqual(self.plan_outputs(stale, 7)['source'], 'artifact')
+        self.assertEqual(self.plan_outputs({}, None)['build'], 'true')
+
+    def test_local_fetch_without_a_pin_downloads_nothing(self) -> None:
+        with patch.object(skia_archive, 'PIN_PATH', self.write_pin({})):
+            with patch.object(skia_archive.subprocess, 'run') as run:
+                with self.assertRaises(skia_archive.SkiaArchiveError):
+                    skia_archive.fetch_command('owner/repository', PLATFORM, self.scratch / 'fetched', False)
+        run.assert_not_called()
+        self.assertFalse((self.scratch / 'fetched').exists())
+
+    def test_ci_fetch_falls_back_to_the_identity_artifact(self) -> None:
+        manifest: dict[str, Any] = self.packed()[1]
+        (self.destination / skia_archive.manifest_name(PLATFORM)).write_text(json.dumps(manifest), encoding='utf-8')
+        packed: Path = self.destination
+        requested: list[tuple[int, str]] = []
+
+        def copy_artifact(repository: str, run: int, name: str, directory: Path) -> None:
+            requested.append((run, name))
+            shutil.copytree(packed, directory, dirs_exist_ok=True)
+
+        with patch.object(skia_archive, 'PIN_PATH', self.write_pin({})):
+            with patch.object(skia_archive, 'identity', return_value=manifest['identity']):
+                with patch.object(skia_archive, 'artifact_run', return_value=7):
+                    with patch.object(skia_archive, 'download_artifact', side_effect=copy_artifact):
+                        target: Path = skia_archive.fetch_command('owner/repository', PLATFORM,
+                                                                  self.scratch / 'fetched', True)
+        self.assertEqual(requested, [(7, skia_archive.artifact_name(PLATFORM, manifest['identity']))])
+        self.assertEqual((target / 'out/libskcms.a').read_bytes(), b'!<arch>\nskcms')
+
     def test_checked_in_pin_file_parses(self) -> None:
         pins: dict[str, Any] = json.loads(skia_archive.PIN_PATH.read_text(encoding='utf-8'))
         self.assertIsInstance(pins['platforms'], dict)

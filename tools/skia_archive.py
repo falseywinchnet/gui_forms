@@ -16,10 +16,12 @@ compiler, the preprocessor definitions every consumer must share, and the
 layout below. The manifest beside each archive lists every file with its
 size and digest.
 
-CI builds the archive from the pinned source (third_party/fetch_skia_cpu.sh
-and the platform's build script), packs and checks it, and uploads it from
-the validating run as the artifact gui-forms-skia-<platform>-<identity>. A
-push to main publishes that artifact's bytes in the revision's build-<sha>
+CI builds the archive in its own job (native.yml, skia-<platform>), and only
+when no archive of the identity is pinned or uploaded yet. The job builds it
+from the pinned source (third_party/fetch_skia_cpu.sh and the platform's
+build script), packs and probes it, and uploads it as the artifact
+gui-forms-skia-<platform>-<identity>; the native job then fetches it. A push
+to main publishes that artifact's bytes in the revision's build-<sha>
 release. tools/skia_archive_release.json then pins the release per
 platform; the pin follows every identity change, as the Windows
 toolchain's pin does.
@@ -37,6 +39,9 @@ involved.
 
 Commands:
   identity --platform P          print the identity of the current inputs
+  plan --platform P              (CI) set the step outputs identity, source
+                                 (release, artifact or none) and build (true
+                                 only when no archive of this identity exists)
   pack --platform P --skia-out O [--skia-root R] [--destination D]
                                  write the archive and its manifest into D
                                  (the workspace by default)
@@ -48,10 +53,12 @@ Commands:
                                  archive unless the pin already names it
   describe --platform P          print the pinned archive's release, source
                                  address, size and digest (no download)
-  fetch --platform P --into D    download the pinned archive, verify it and
-                                 extract it into the new directory D
+  fetch --platform P --into D [--artifact-fallback]
+                                 download the pinned archive, verify it and
+                                 extract it into the new directory D; CI may
+                                 fall back to an artifact of this identity
 
-pack, probe, publish and fetch require Python 3.14 (stdlib zstd).
+pack, probe, publish and fetch require Python 3.14 (stdlib zstd); identity and plan do not.
 """
 from __future__ import annotations
 import argparse
@@ -361,27 +368,72 @@ def describe_command(repository: str, platform: str) -> None:
     print('  identity: ' + str(pin.get('identity')))
 
 
-def fetch_command(repository: str, platform: str, directory: Path) -> Path:
-    target: Path = fresh_directory(directory)
-    pin: dict[str, Any] = required_pin(platform)
+def download_release(repository: str, platform: str, pin: dict[str, Any], directory: Path) -> dict[str, Any]:
+    """Download the pinned release's archive and manifest into `directory`; return the manifest."""
     tag: str = pin['tag']
     asset: dict[str, Any] = release_asset(repository, tag, archive_name(platform))
     print('Fetching ' + str(asset['browser_download_url']) + ' (' + str(asset['size']) + ' bytes)', flush=True)
+    name: str
+    for name in (manifest_name(platform), archive_name(platform)):
+        subprocess.run(['gh', 'release', 'download', tag, '--repo', repository, '--pattern', name,
+                        '--dir', str(directory)], check=True)
+    manifest: dict[str, Any] = read_manifest(directory / manifest_name(platform))
+    if manifest.get('archive_sha256') != pin.get('archive_sha256'):
+        raise SkiaArchiveError('Release ' + tag + ' holds archive ' + str(manifest.get('archive_sha256'))
+                               + ', not the pinned ' + str(pin.get('archive_sha256')))
+    return manifest
+
+
+def fetch_command(repository: str, platform: str, directory: Path, artifact_fallback: bool) -> Path:
+    """Extract this tree's archive into the new `directory`: the pinned release, else (CI only) an artifact.
+
+    Local trees never pass artifact_fallback: they use only the published,
+    pinned archive. CI passes it so that a pull request that changes the
+    identity uses the archive its own Skia job (or an earlier run of the
+    same identity) uploaded.
+    """
+    target: Path = fresh_directory(directory)
+    current: str = identity(platform)
+    pin: dict[str, Any] | None = read_pin(platform)
+    if not artifact_fallback:
+        pin = required_pin(platform)
+    elif pin is not None and pin.get('identity') != current:
+        pin = None
     manifest: dict[str, Any]
     scratch: str
     with tempfile.TemporaryDirectory() as scratch:
-        name: str
-        for name in (manifest_name(platform), archive_name(platform)):
-            subprocess.run(['gh', 'release', 'download', tag, '--repo', repository, '--pattern', name,
-                            '--dir', scratch], check=True)
-        manifest = read_manifest(Path(scratch) / manifest_name(platform))
-        check_manifest(manifest, platform, identity(platform))
-        if manifest.get('archive_sha256') != pin.get('archive_sha256'):
-            raise SkiaArchiveError('Release ' + tag + ' holds archive ' + str(manifest.get('archive_sha256'))
-                                   + ', not the pinned ' + str(pin.get('archive_sha256')))
+        if pin is not None:
+            manifest = download_release(repository, platform, pin, Path(scratch))
+        else:
+            name: str = artifact_name(platform, current)
+            run: int | None = artifact_run(repository, name)
+            if run is None:
+                raise SkiaArchiveError('Skia identity ' + current + ' is neither pinned nor in an unexpired '
+                                       'artifact ' + name)
+            print('Fetching artifact ' + name + ' of run ' + str(run), flush=True)
+            download_artifact(repository, run, name, Path(scratch))
+            manifest = read_manifest(Path(scratch) / manifest_name(platform))
+        check_manifest(manifest, platform, current)
         extract(Path(scratch) / archive_name(platform), manifest, target)
-    print('Skia ' + manifest['skia_revision'] + ' for ' + platform + ' is in ' + str(target), flush=True)
+    print('Skia ' + manifest['skia_revision'] + ' for ' + platform + ' (' + str(manifest['archive_bytes'])
+          + ' bytes) is in ' + str(target), flush=True)
     return target
+
+
+def plan_command(repository: str, platform: str) -> None:
+    """Say whether CI must build this identity's archive: only when it is neither pinned nor in an artifact."""
+    current: str = identity(platform)
+    pin: dict[str, Any] | None = read_pin(platform)
+    source: str = 'none'
+    if pin is not None and pin.get('identity') == current:
+        source = 'release'
+    elif artifact_run(repository, artifact_name(platform, current)) is not None:
+        source = 'artifact'
+    build: str = 'true' if source == 'none' else 'false'
+    write_output('identity', current)
+    write_output('source', source)
+    write_output('build', build)
+    print('Skia identity ' + current + ' for ' + platform + ': source ' + source + ', build ' + build, flush=True)
 
 
 def producer_record() -> dict[str, str]:
@@ -423,8 +475,8 @@ def probe_command(platform: str, destination: Path) -> None:
         subprocess.run([str(program)], check=True)
 
 
-def find_artifact(repository: str, name: str, directory: Path) -> bool:
-    """Download the newest unexpired artifact `name` uploaded by a run of this repository into `directory`."""
+def artifact_run(repository: str, name: str) -> int | None:
+    """The run that uploaded the newest unexpired artifact `name` in this repository, or None."""
     listing: dict[str, Any] = json.loads(subprocess.check_output(
         ['gh', 'api', 'repos/' + repository + '/actions/artifacts?per_page=30&name=' + name], text=True))
     artifact: dict[str, Any]
@@ -432,19 +484,23 @@ def find_artifact(repository: str, name: str, directory: Path) -> bool:
         origin: dict[str, Any] = artifact['workflow_run']
         if artifact['expired'] or origin['head_repository_id'] != origin['repository_id']:
             continue
-        subprocess.run(['gh', 'run', 'download', str(origin['id']), '--repo', repository,
-                        '--name', name, '--dir', str(directory)], check=True)
-        return True
-    return False
+        run: int = int(origin['id'])
+        return run
+    return None
+
+
+def download_artifact(repository: str, run: int, name: str, directory: Path) -> None:
+    subprocess.run(['gh', 'run', 'download', str(run), '--repo', repository, '--name', name,
+                    '--dir', str(directory)], check=True)
 
 
 def publish_command(repository: str, platform: str, destination: Path) -> None:
     """Publish this identity's archive in the pushed revision's build release, unless already pinned.
 
-    The archive is the one this job packed, else the validating run's
-    artifact. When neither exists (the validating run reused an older
-    validation), nothing is published and the job warns: the pin stays
-    behind and consumers keep refusing the stale pin.
+    The archive is the one in `destination`, else the newest artifact of
+    this identity (uploaded by a Skia job). When neither exists, nothing is
+    published and the job warns: the pin stays behind and local consumers
+    keep refusing the stale pin.
     """
     current: str = identity(platform)
     pin: dict[str, Any] | None = read_pin(platform)
@@ -454,9 +510,11 @@ def publish_command(repository: str, platform: str, destination: Path) -> None:
     archive: Path = destination / archive_name(platform)
     if not archive.is_file():
         name: str = artifact_name(platform, current)
-        if not find_artifact(repository, name, destination):
+        run: int | None = artifact_run(repository, name)
+        if run is None:
             print('::warning::No packed Skia archive or artifact ' + name + ' exists; nothing published', flush=True)
             return
+        download_artifact(repository, run, name, destination)
     manifest_path: Path = destination / manifest_name(platform)
     manifest: dict[str, Any] = read_manifest(manifest_path)
     check_manifest(manifest, platform, current)
@@ -474,18 +532,23 @@ def publish_command(repository: str, platform: str, destination: Path) -> None:
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('command', choices=('identity', 'pack', 'probe', 'publish', 'describe', 'fetch'))
+    parser.add_argument('command', choices=('identity', 'plan', 'pack', 'probe', 'publish', 'describe',
+                                            'fetch'))
     parser.add_argument('--platform', required=True)
     parser.add_argument('--skia-root', type=Path, default=SOURCE / 'third_party/skia')
     parser.add_argument('--skia-out', type=Path)
     parser.add_argument('--destination', type=Path, default=WORKSPACE)
     parser.add_argument('--into', type=Path)
     parser.add_argument('--repository', default=os.environ.get('GITHUB_REPOSITORY', REPOSITORY))
+    parser.add_argument('--artifact-fallback', action='store_true',
+                        help='(CI only) fetch an artifact of this identity when no pinned release has it')
     args: argparse.Namespace = parser.parse_args()
     try:
         require_platform(args.platform)
         if args.command == 'identity':
             print(identity(args.platform))
+        elif args.command == 'plan':
+            plan_command(args.repository, args.platform)
         elif args.command == 'pack':
             if args.skia_out is None:
                 raise SkiaArchiveError('pack requires --skia-out')
@@ -499,7 +562,7 @@ def main() -> None:
         else:
             if args.into is None:
                 raise SkiaArchiveError('fetch requires --into')
-            fetch_command(args.repository, args.platform, args.into)
+            fetch_command(args.repository, args.platform, args.into, args.artifact_fallback)
     except SkiaArchiveError as error:
         print('skia_archive: ' + str(error), file=sys.stderr)
         sys.exit(1)
