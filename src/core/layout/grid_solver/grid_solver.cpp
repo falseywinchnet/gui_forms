@@ -108,9 +108,13 @@ bool intrinsic_breadth(Breadth breadth) noexcept {
 
 bool flexible(const TrackFunction& function) noexcept { return function.maximum == Breadth::fraction; }
 
-// Whether the maximum is a definite length: a fixed breadth, or the
-// fit-content() limit.
-bool fixed_maximum(const TrackFunction& function) noexcept {
+// Whether the maximum is a fixed sizing function (CSS Grid's definition: a
+// length or percentage, never fit-content()).
+bool fixed_maximum(const TrackFunction& function) noexcept { return function.maximum == Breadth::fixed; }
+
+// Whether the maximum limits a contribution (12.5's limited contributions):
+// a fixed breadth, or the fit-content() argument.
+bool limiting_maximum(const TrackFunction& function) noexcept {
     return function.maximum == Breadth::fixed || function.maximum == Breadth::fit_content;
 }
 
@@ -218,8 +222,14 @@ bool right_to_left(const GridContainerInput& container) noexcept {
 struct SpanFacts final {
     bool spans_automatic_minimum{};
     bool spans_flexible{};
+    // Every spanned maximum is fixed, and their sum: the area 6.6 clamps
+    // an automatic minimum to.
     bool all_fixed_maximum{true};
     double fixed_maximum_sum{};
+    // Every spanned maximum limits a contribution (fixed, or a
+    // fit-content() argument), and their sum.
+    bool all_limiting_maximum{true};
+    double limiting_maximum_sum{};
 };
 
 SpanFacts span_facts(const std::vector<TrackFunction>& functions, TrackRange range) noexcept {
@@ -232,6 +242,11 @@ SpanFacts span_facts(const std::vector<TrackFunction>& functions, TrackRange ran
             facts.fixed_maximum_sum += function.maximum_value;
         } else {
             facts.all_fixed_maximum = false;
+        }
+        if (limiting_maximum(function)) {
+            facts.limiting_maximum_sum += function.maximum_value;
+        } else {
+            facts.all_limiting_maximum = false;
         }
     }
     return facts;
@@ -256,13 +271,13 @@ double applied_minimum(const GridItemContribution& contribution, const SpanFacts
 }
 
 // A min-content or max-content contribution limited by the spanned tracks'
-// fixed maximums and floored by the minimum contribution (12.5, under a
-// min-content or max-content constraint).
+// fixed maximums or fit-content() arguments and floored by the minimum
+// contribution (12.5, under a min-content or max-content constraint).
 double limited_contribution(double contribution, double minimum, const SpanFacts& facts, TrackRange range,
                             const std::vector<GridTrack>& tracks, double gap) noexcept {
     double limited = contribution;
-    if (facts.all_fixed_maximum) {
-        limited = std::min(limited, facts.fixed_maximum_sum + inner_gaps(tracks, range, gap));
+    if (facts.all_limiting_maximum) {
+        limited = std::min(limited, facts.limiting_maximum_sum + inner_gaps(tracks, range, gap));
     }
     return std::max(limited, minimum);
 }

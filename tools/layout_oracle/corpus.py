@@ -26,9 +26,13 @@ import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from pathlib import Path
 
-# Text-bearing control kinds; a fixture with any of them is a text fixture
-# and takes the text tolerance.
-TEXT_KINDS = frozenset({"label"})
+# Text-bearing control kinds; a fixture with any of them is a text fixture:
+# it takes the text tolerance, its text leaves carry a first baseline, and
+# the text-scale profiles apply to it. A text leaf's text is its
+# data-gf-text attribute (PLAN section 12.4): the element itself is empty,
+# and the page builder writes the text as its content.
+TEXT_KINDS = frozenset({"text-block"})
+TEXT_ATTRIBUTE = "data-gf-text"
 
 
 class CorpusError(ValueError):
@@ -45,11 +49,19 @@ class Profile:
     scale: float
     # The root's inline direction: "ltr" or "rtl" (HTML's dir attribute).
     direction: str = "ltr"
+    # The text scale: Chromium's root font size is 13 px times it, and
+    # GUI.Forms' window text scale is it. Other than 1 only for text
+    # fixtures.
+    text_scale: float = 1.0
 
     @property
     def key(self) -> str:
-        base = f"{self.width}x{self.height}@{format_number(self.scale)}"
-        return base if self.direction == "ltr" else f"{base}/{self.direction}"
+        key = f"{self.width}x{self.height}@{format_number(self.scale)}"
+        if self.direction != "ltr":
+            key += f"/{self.direction}"
+        if self.text_scale != 1.0:
+            key += f"/text{format_number(self.text_scale * 100.0)}"
+        return key
 
 
 @dataclass(frozen=True)
@@ -77,9 +89,14 @@ class Corpus:
     fixtures: tuple[Fixture, ...]
 
     def profiles_for(self, fixture: Fixture) -> tuple[Profile, ...]:
-        """The manifest's profiles that apply to the fixture, in manifest order."""
+        """The manifest's profiles that apply to the fixture, in manifest order.
+
+        A right-to-left profile applies only to a bidirectional fixture, and
+        a text-scale profile only to a text fixture.
+        """
         return tuple(profile for profile in self.profiles
-                     if profile.direction == "ltr" or fixture.bidirectional)
+                     if (profile.direction == "ltr" or fixture.bidirectional) and
+                     (profile.text_scale == 1.0 or fixture.is_text))
 
     def reference_path(self, fixture: Fixture, directory: Path | None = None) -> Path:
         base = directory if directory is not None else self.root / "references"
@@ -92,6 +109,9 @@ class Box:
     y: float
     width: float
     height: float
+    # A text leaf's first baseline, in the same viewport coordinates as y;
+    # None for every other node and for a text leaf with no line box.
+    baseline: float | None = None
 
 
 # profile key -> node id -> box, in document order.
@@ -133,7 +153,12 @@ def _parse_profile(element: ElementTree.Element, source: Path) -> Profile:
     direction = element.get("direction", "ltr")
     if direction not in DIRECTIONS:
         raise CorpusError(f"{source}: profile direction {direction!r} is not ltr or rtl")
-    return Profile(width, height, scale, direction)
+    text_scale = 1.0
+    if element.get("text-scale") is not None:
+        text_scale = _number(element, "text-scale", source)
+    if not 0.5 <= text_scale <= 4.0:
+        raise CorpusError(f"{source}: profile text-scale {text_scale} is out of range")
+    return Profile(width, height, scale, direction, text_scale)
 
 
 def _walk(element: ElementTree.Element, is_text: list[bool], expected: dict[str, str],
@@ -151,6 +176,12 @@ def _walk(element: ElementTree.Element, is_text: list[bool], expected: dict[str,
             expected[identity] = reason
     if kind in TEXT_KINDS:
         is_text[0] = True
+        if element.get(TEXT_ATTRIBUTE) is None:
+            raise CorpusError(f"{source}: {identity}: a {kind} needs {TEXT_ATTRIBUTE}")
+        if len(element) != 0 or (element.text or "") != "":
+            raise CorpusError(f"{source}: {identity}: a {kind} is empty; its text is {TEXT_ATTRIBUTE}")
+    elif element.get(TEXT_ATTRIBUTE) is not None:
+        raise CorpusError(f"{source}: {identity}: only a text leaf carries {TEXT_ATTRIBUTE}")
     for child in element:
         _walk(child, is_text, expected, identities, source)
 
@@ -220,8 +251,12 @@ def read_box_file(path: Path) -> tuple[dict[str, str], BoxSet]:
             identity = node.get("id")
             if identity is None or identity in nodes:
                 raise CorpusError(f"{path}: a node id is missing or repeated")
+            baseline = None
+            if node.get("baseline") is not None:
+                baseline = _number(node, "baseline", path)
             nodes[identity] = Box(_number(node, "x", path), _number(node, "y", path),
-                                  _number(node, "width", path), _number(node, "height", path))
+                                  _number(node, "width", path), _number(node, "height", path),
+                                  baseline)
         if profile.key in boxes:
             raise CorpusError(f"{path}: profile {profile.key} repeats")
         boxes[profile.key] = nodes
@@ -237,13 +272,16 @@ def write_box_file(path: Path, tag: str, attributes: dict[str, str],
     lines.append(f"<{tag}{attribute_text}>")
     for profile in profiles:
         direction = "" if profile.direction == "ltr" else f' direction="{profile.direction}"'
+        text_scale = ("" if profile.text_scale == 1.0
+                      else f' text-scale="{format_number(profile.text_scale)}"')
         lines.append(f'  <profile viewport="{profile.width}x{profile.height}" '
-                     f'scale="{format_number(profile.scale)}"{direction}>')
+                     f'scale="{format_number(profile.scale)}"{direction}{text_scale}>')
         for identity, box in boxes[profile.key].items():
+            baseline = "" if box.baseline is None else f' baseline="{format_number(box.baseline)}"'
             lines.append(
                 f'    <node id="{_escape(identity)}" x="{format_number(box.x)}" '
                 f'y="{format_number(box.y)}" width="{format_number(box.width)}" '
-                f'height="{format_number(box.height)}"/>')
+                f'height="{format_number(box.height)}"{baseline}/>')
         lines.append("  </profile>")
     lines.append(f"</{tag}>")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -264,6 +302,9 @@ class NodeDifference:
     reference: Box | None
     observed: Box | None
     expected_reason: str | None
+    # The first-baseline difference: 0 where neither side has a baseline,
+    # infinite where only one has.
+    baseline: float = 0.0
 
     @property
     def missing(self) -> bool:
@@ -276,6 +317,7 @@ class Comparison:
     over_tolerance: tuple[NodeDifference, ...]
     recorded: tuple[NodeDifference, ...]
     largest_edge: float
+    largest_baseline: float = 0.0
 
 
 def edge_difference(reference: Box, observed: Box) -> float:
@@ -286,17 +328,30 @@ def edge_difference(reference: Box, observed: Box) -> float:
     return max(left, top, right, bottom)
 
 
+def baseline_difference(reference: Box, observed: Box) -> float:
+    """0 when neither box has a baseline; infinite when only one has."""
+    if reference.baseline is None and observed.baseline is None:
+        return 0.0
+    if reference.baseline is None or observed.baseline is None:
+        return math.inf
+    return abs(reference.baseline - observed.baseline)
+
+
 def compare_box_sets(reference: BoxSet, observed: BoxSet, tolerance: float,
-                     expected: dict[str, str]) -> Comparison:
-    """Every node of every profile, compared edge by edge.
+                     expected: dict[str, str],
+                     baseline_tolerance: float | None = None) -> Comparison:
+    """Every node of every profile, compared edge by edge and by baseline.
 
     A node over tolerance (or missing on one side) is listed. One that
     carries a recorded expected difference is listed separately and still
-    counted; nothing is folded into a pass.
+    counted; nothing is folded into a pass. The baseline tolerance is the
+    edge tolerance unless given.
     """
+    baseline_bound = tolerance if baseline_tolerance is None else baseline_tolerance
     over: list[NodeDifference] = []
     recorded: list[NodeDifference] = []
     largest = 0.0
+    largest_baseline = 0.0
     nodes = 0
     for profile in sorted(set(reference) | set(observed)):
         reference_nodes = reference.get(profile, {})
@@ -309,17 +364,21 @@ def compare_box_sets(reference: BoxSet, observed: BoxSet, tolerance: float,
             nodes += 1
             reference_box = reference_nodes.get(identity)
             observed_box = observed_nodes.get(identity)
+            baseline = 0.0
             if reference_box is None or observed_box is None:
                 edge = math.inf
             else:
                 edge = edge_difference(reference_box, observed_box)
                 largest = max(largest, edge)
-            if edge <= tolerance:
+                baseline = baseline_difference(reference_box, observed_box)
+                if math.isfinite(baseline):
+                    largest_baseline = max(largest_baseline, baseline)
+            if edge <= tolerance and baseline <= baseline_bound:
                 continue
             difference = NodeDifference(profile, identity, edge, reference_box, observed_box,
-                                        expected.get(identity))
+                                        expected.get(identity), baseline)
             if difference.expected_reason is not None:
                 recorded.append(difference)
             else:
                 over.append(difference)
-    return Comparison(nodes, tuple(over), tuple(recorded), largest)
+    return Comparison(nodes, tuple(over), tuple(recorded), largest, largest_baseline)
