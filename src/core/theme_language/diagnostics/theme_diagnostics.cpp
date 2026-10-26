@@ -41,14 +41,21 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::import_after_rules:
     case DiagnosticCode::important_in_keyframes:
     case DiagnosticCode::nesting_not_admitted:
+    case DiagnosticCode::selector_syntax:
+    case DiagnosticCode::combinator_not_admitted:
+    case DiagnosticCode::pseudo_class_not_admitted:
+    case DiagnosticCode::attribute_selector_not_admitted:
     case DiagnosticCode::sheet_too_large:
     case DiagnosticCode::too_many_rules:
     case DiagnosticCode::too_many_declarations:
     case DiagnosticCode::nesting_too_deep:
     case DiagnosticCode::string_too_long:
     case DiagnosticCode::too_many_imports:
+    case DiagnosticCode::too_many_is_arguments:
+    case DiagnosticCode::selector_too_long:
         return DiagnosticSeverity::error;
     case DiagnosticCode::unknown_at_rule:
+    case DiagnosticCode::unknown_selector_name:
         return DiagnosticSeverity::warning;
     }
     // A value outside the enumeration is treated as the stricter class.
@@ -72,15 +79,30 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
     case DiagnosticCode::import_after_rules: return "import_after_rules";
     case DiagnosticCode::important_in_keyframes: return "important_in_keyframes";
     case DiagnosticCode::nesting_not_admitted: return "nesting_not_admitted";
+    case DiagnosticCode::selector_syntax: return "selector_syntax";
+    case DiagnosticCode::combinator_not_admitted: return "combinator_not_admitted";
+    case DiagnosticCode::pseudo_class_not_admitted: return "pseudo_class_not_admitted";
+    case DiagnosticCode::attribute_selector_not_admitted: return "attribute_selector_not_admitted";
     case DiagnosticCode::sheet_too_large: return "sheet_too_large";
     case DiagnosticCode::too_many_rules: return "too_many_rules";
     case DiagnosticCode::too_many_declarations: return "too_many_declarations";
     case DiagnosticCode::nesting_too_deep: return "nesting_too_deep";
     case DiagnosticCode::string_too_long: return "string_too_long";
     case DiagnosticCode::too_many_imports: return "too_many_imports";
+    case DiagnosticCode::too_many_is_arguments: return "too_many_is_arguments";
+    case DiagnosticCode::selector_too_long: return "selector_too_long";
     case DiagnosticCode::unknown_at_rule: return "unknown_at_rule";
+    case DiagnosticCode::unknown_selector_name: return "unknown_selector_name";
     }
     return "unknown";
+}
+
+std::string clipped_theme_detail(std::string_view text) {
+    if (text.size() <= maximum_detail_bytes) return std::string(text);
+    std::size_t length = maximum_detail_bytes;
+    while (length > 0U && (static_cast<unsigned char>(text[length]) & 0xC0U) == 0x80U) --length;
+    std::string detail(text.substr(0U, length));
+    return detail;
 }
 
 std::string diagnostic_code_label(DiagnosticCode code) {

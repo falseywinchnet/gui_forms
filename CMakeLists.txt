@@ -96,6 +96,9 @@ add_subdirectory(stx_conv)
 # CNG, the native resource image codec (PNG stays for interchange); its
 # pinned Zstandard 1.5.7 comes from stx_cng/tools/fetch_zstd.sh.
 add_subdirectory(stx_cng)
+# The rich-text library: one document model, the markdown-like dialect and
+# RTF (planning/stages/RT-rich-text/PLAN.md).
+add_subdirectory(stx_rtf2md)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -148,6 +151,7 @@ add_library(gui_forms_core STATIC
     src/core/types/rect/rect.cpp
     src/core/theme/theme/theme.cpp
     src/core/theme/part_painting/part_painting.cpp
+    src/core/theme/owner_draw/owner_draw.cpp
     src/core/engine/types/engine_types.cpp
     src/core/engine/engine_math/engine_math.cpp
     src/core/engine/engine_expression/engine_expression.cpp
@@ -188,6 +192,7 @@ add_library(gui_forms_core STATIC
     src/core/text_shaping/validation/text_shaping_validation.cpp
     src/core/text/unicode/unicode_grapheme.cpp
     src/core/typography/resolution/typography_resolution.cpp
+    src/core/layout/types/layout_types.cpp
     src/core/metrics/metrics/metrics.cpp
     src/core/metrics/snapshot/metrics_snapshot.cpp
     src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp
@@ -213,6 +218,7 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/tokenizer/theme_tokenizer.cpp
     src/core/theme_language/syntax_tree/theme_syntax_tree.cpp
     src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
+    src/core/theme_language/selector/theme_selector.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
     src/core/docking/dock_layout/dock_layout.cpp
@@ -621,6 +627,8 @@ add_library(gui_forms_controls STATIC
     src/controls/data_grid_view/data_grid_view_row_order.cpp
     src/controls/task_dialog/task_dialog.cpp
     src/controls/notify_icon/notify_icon.cpp
+    src/controls/file_dialog/file_dialog_types.cpp
+    src/controls/open_file_dialog/open_file_dialog.cpp
     src/controls/thread_exception_dialog/thread_exception_dialog.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
@@ -2363,6 +2371,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
     target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_part_painting_tests COMMAND gui_forms_part_painting_tests)
+    add_executable(gui_forms_owner_draw_tests tests/owner_draw_tests.cpp)
+    target_link_libraries(gui_forms_owner_draw_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_owner_draw_tests COMMAND gui_forms_owner_draw_tests)
     add_executable(gui_forms_theme_high_contrast_tests tests/theme_high_contrast_tests.cpp)
     target_link_libraries(gui_forms_theme_high_contrast_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_high_contrast_tests COMMAND gui_forms_theme_high_contrast_tests)
@@ -2551,6 +2562,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_syntax_tests tests/theme_language/theme_syntax_tests.cpp)
     target_link_libraries(gui_forms_theme_syntax_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_syntax_tests COMMAND gui_forms_theme_syntax_tests)
+
+    add_executable(gui_forms_theme_selector_tests tests/theme_language/theme_selector_tests.cpp)
+    target_link_libraries(gui_forms_theme_selector_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_theme_selector_tests COMMAND gui_forms_theme_selector_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
@@ -2878,6 +2893,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_notify_icon_tests tests/notify_icon_tests.cpp)
     target_link_libraries(gui_forms_notify_icon_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_notify_icon_tests COMMAND gui_forms_notify_icon_tests)
+    add_executable(gui_forms_open_file_dialog_tests tests/open_file_dialog_tests.cpp)
+    target_link_libraries(gui_forms_open_file_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_open_file_dialog_tests COMMAND gui_forms_open_file_dialog_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)
@@ -2906,6 +2924,13 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_split_container_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_split_container_tests
              COMMAND gui_forms_split_container_tests)
+
+    add_executable(gui_forms_layout_contract_tests
+        tests/layout_contract_tests.cpp
+    )
+    target_link_libraries(gui_forms_layout_contract_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_layout_contract_tests
+             COMMAND gui_forms_layout_contract_tests)
 
     add_executable(gui_forms_layout_panel_tests
         tests/layout_panel_tests.cpp
@@ -3417,13 +3442,24 @@ if(GUI_FORMS_BUILD_TESTS)
 
         # Stage T5, C3's measurement: what the window server composes from a
         # non-opaque window and a behind-window effect view, AppKit only.
-        # Prints JSON lines (kept in CI's LastTest.log evidence); fails only
-        # when it cannot make its windows. Serial: it reads the screen.
-        add_executable(gui_forms_macos_compositor_probe tests/macos_compositor_probe.mm)
+        # An application bundle launched through LaunchServices, so that its
+        # windows are active as a real application's are; the script prints
+        # its JSON lines (kept in CI's LastTest.log evidence) and fails when
+        # a material case was read in an inactive window. Serial: it reads
+        # the screen.
+        add_executable(gui_forms_macos_compositor_probe MACOSX_BUNDLE tests/macos_compositor_probe.mm)
         target_compile_options(gui_forms_macos_compositor_probe PRIVATE -fobjc-arc)
         target_link_libraries(gui_forms_macos_compositor_probe PRIVATE
             "-framework AppKit" "-framework ApplicationServices")
-        add_test(NAME gui_forms_macos_compositor_probe COMMAND gui_forms_macos_compositor_probe)
+        set_target_properties(gui_forms_macos_compositor_probe PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "T5 Compositor Probe"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.t5-compositor-probe"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.3"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1")
+        add_test(NAME gui_forms_macos_compositor_probe
+            COMMAND /bin/sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/support/run_macos_probe_bundle.sh
+                $<TARGET_BUNDLE_DIR:gui_forms_macos_compositor_probe>
+                ${CMAKE_CURRENT_BINARY_DIR}/macos_compositor_probe.jsonl)
         set_tests_properties(gui_forms_macos_compositor_probe PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
 
         add_executable(gui_forms_macos_exposure_tests tests/macos_exposure_tests.mm)
@@ -3619,6 +3655,10 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_canvas_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
         add_test(NAME gui_forms_canvas_raster_tests COMMAND gui_forms_canvas_raster_tests)
 
+        add_executable(gui_forms_skia_edge_snapping_tests tests/skia_edge_snapping_tests.cpp)
+        target_link_libraries(gui_forms_skia_edge_snapping_tests PRIVATE gui_forms_skia)
+        add_test(NAME gui_forms_skia_edge_snapping_tests COMMAND gui_forms_skia_edge_snapping_tests)
+
 
         add_test(
             NAME gui_forms_skia_archive_policy
@@ -3662,6 +3702,15 @@ if(GUI_FORMS_BUILD_TESTS)
         )
         add_test(NAME gui_forms_coregraphics_smoke
                  COMMAND gui_forms_coregraphics_smoke)
+
+        add_executable(gui_forms_coregraphics_raster_edge_snapping_tests
+            tests/coregraphics_raster_edge_snapping_tests.cpp)
+        target_include_directories(gui_forms_coregraphics_raster_edge_snapping_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/render/coregraphics/raster)
+        target_link_libraries(gui_forms_coregraphics_raster_edge_snapping_tests PRIVATE
+            gui_forms_coregraphics)
+        add_test(NAME gui_forms_coregraphics_raster_edge_snapping_tests
+                 COMMAND gui_forms_coregraphics_raster_edge_snapping_tests)
     endif()
 
     if(TARGET gui_forms_renderer_benchmark)
@@ -3864,13 +3913,15 @@ include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
-# stx_zlib, stx_png, stx_conv and stx_cng install their own licences and provenance under
+# stx_zlib, stx_png, stx_conv, stx_cng and stx_rtf2md install their own licences and provenance under
 # share/licenses/<package>; the SDK also carries them beside GUI.Forms' others.
 install(FILES stx_zlib/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE.txt)
 install(FILES stx_zlib/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-puff.txt)
 install(FILES stx_zlib/LICENSE-zlib.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-zlib.txt)
 install(FILES stx_zlib/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-PROVENANCE.md)
 install(FILES stx_png/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-LICENSE.txt)
+install(FILES stx_rtf2md/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_rtf2md-LICENSE.txt)
+install(FILES stx_rtf2md/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_rtf2md-PROVENANCE.md)
 install(FILES stx_png/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-PROVENANCE.md)
 install(FILES stx_conv/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_conv-LICENSE.txt)
 install(FILES stx_conv/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_conv-PROVENANCE.md)

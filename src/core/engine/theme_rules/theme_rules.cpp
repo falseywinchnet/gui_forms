@@ -58,11 +58,17 @@ std::optional<RuleDiagnosticKind> selector_defect(const ThemeRule& rule) noexcep
     if (selector.role && static_cast<std::size_t>(*selector.role) >= part_role_count) {
         return RuleDiagnosticKind::selector_invalid;
     }
-    if (rule.level == CascadeLevel::class_rule && selector.classes.empty()) {
+    // A given specificity (EC2) stands in for the selector's class and ID.
+    const RuleSpecificity specificity = rule.specificity ? *rule.specificity : rule_specificity(selector);
+    if (rule.level == CascadeLevel::class_rule && specificity.classes == 0U) {
         return RuleDiagnosticKind::selector_missing_level_field;
     }
-    const bool needs_id = rule.level == CascadeLevel::stable_id_rule || rule.level == CascadeLevel::inline_style;
-    if (needs_id && selector.stable_id.empty()) return RuleDiagnosticKind::selector_missing_level_field;
+    if (rule.level == CascadeLevel::stable_id_rule && specificity.ids == 0U) {
+        return RuleDiagnosticKind::selector_missing_level_field;
+    }
+    if (rule.level == CascadeLevel::inline_style && selector.stable_id.empty()) {
+        return RuleDiagnosticKind::selector_missing_level_field;
+    }
     return std::nullopt;
 }
 
@@ -288,7 +294,7 @@ void CompiledThemeRules::add_rules(CompiledThemeRules& result, const ThemeRuleSh
         }
         CompiledRule compiled{};
         compiled.level = rule.level;
-        compiled.specificity = rule_specificity(rule.selector);
+        compiled.specificity = rule.specificity ? *rule.specificity : rule_specificity(rule.selector);
         compiled.order = index;
         compiled.selector = rule.selector;
         for (const AnatomyState state : rule.selector.states) compiled.states.insert(state);

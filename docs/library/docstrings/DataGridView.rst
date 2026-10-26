@@ -2,8 +2,12 @@ A grid of typed columns over rows the grid owns, virtual rows or a binding sourc
 
 A data grid view shows rows of cells under a row of column headers, with an
 optional column of row headers at the left. Each `DataGridViewColumn` is a
-text, check box, combo box or button column with a name, header text, width,
-read-only flag and alignment. The rows come from one of three sources: unbound
+text, check box, combo box, button or image column with a name, header text,
+width, read-only flag and alignment. An image column's cells hold `ImageId`
+values, images of the grid's window, placed by the column's `image_layout`
+(``normal``: at the image's own size, centred and cut at the cell's edges;
+``stretch``; ``zoom``: as large as fits, its shape kept), and its
+`image_description` stands for the image as the cell's text. The rows come from one of three sources: unbound
 rows the grid owns (`DataGridViewRow` records with stable IDs and
 `BindingValue` cells), virtual rows whose order the application publishes as
 stable row IDs and whose values an application `DataGridViewCellValueProvider`
@@ -143,7 +147,8 @@ cell_value_changed
     Raised after a cell's value changes: a committed edit, a toggled check
     box, a chosen item or `set_cell_value`.
 cell_content_click
-    Raised when the user clicks a button cell or toggles a check box cell.
+    Raised when the user clicks a button cell or an image cell's image, or
+    toggles a check box cell.
 column_header_click
     Raised when a column header is clicked, with the column's index.
 column_width_changed
@@ -191,8 +196,9 @@ cell_value
     A cell's value. A cell past the rows or columns throws
     `std::out_of_range`.
 cell_text
-    The text a cell shows: numbers in their shortest exact form, and a button
-    column's `button_text` for an empty button cell.
+    The text a cell shows: numbers in their shortest exact form, a button
+    column's `button_text` for an empty button cell, and an image column's
+    `image_description` for an image cell holding an image (empty otherwise).
 set_cell_value
     Stores a value from the program, read-only or not, and raises
     `cell_value_changed` when it differs. Returns false when a provider or
@@ -282,7 +288,7 @@ Cells are records, not child controls. Only the rows and columns in view are
 realized: the grid publishes them as three item systems, ``row`` (the row
 header with ``row_header``, ``row_header_label``, ``row_glyph`` and
 ``row_rule``), ``cell`` (``cell``, ``cell_selection``, ``cell_content``,
-``cell_check_well``, ``cell_check_indicator``, ``cell_button_face``,
+``cell_image``, ``cell_check_well``, ``cell_check_indicator``, ``cell_button_face``,
 ``cell_button_label``, ``cell_drop_down``, ``cell_drop_down_glyph``,
 ``cell_vertical_rule``, ``cell_horizontal_rule`` and ``cell_focus``) and
 ``column`` (``column_header``, ``column_label``, ``sort_glyph``,
@@ -352,10 +358,19 @@ whatever its kind, keeping its kind's behaviour as states and actions (a
 check box cell is `checkable` and `checked`). A cell's stable ID is its
 row's ID, ``.`` and its column's name. Cells take
 `SemanticAction::set_value` (text through the same validation and conversion
-as typing), `press` (toggle or click) and `expand` (open the choices).
+as typing), `press` (toggle or click) and `expand` (open the choices). An
+image cell's value is its description; it takes no `set_value`.
 
-Not supported yet: cell styles and their inheritance, image and link
-columns, frozen rows and columns beyond the headers, clipboard copy, sort
+An image cell draws its image through the ``image`` role, whole, under a clip
+at the cell's edges, so an image wider than its cell or one partly scrolled
+away keeps its shape; its ``cell_image`` part is the image as it is seen. The
+image's pixels are logical units, as in `PictureBox`. A cell whose value is
+empty, is not an `ImageId`, or names an image the window does not hold
+shows nothing. An image cell neither edits nor toggles.
+
+Not supported yet: cell styles and their inheritance, link columns (the
+by-role paint path has no link vocabulary yet), an image column's default
+image for empty cells and icon values, frozen rows and columns beyond the headers, clipboard copy, sort
 modes (the application sorts, or calls `sort` for unbound rows), automatic
 column and row sizing, row height resizing, the new-row and row-deletion
 editing interface, error icons and cell tool tips.

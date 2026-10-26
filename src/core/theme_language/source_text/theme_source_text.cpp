@@ -66,6 +66,17 @@ SourcePosition LineStartTable::position(std::string_view text, ByteOffset offset
     return result;
 }
 
+bool equals_ascii_folded(std::string_view text, std::string_view lower_name) noexcept {
+    if (text.size() != lower_name.size()) return false;
+    for (std::size_t index = 0U; index < text.size(); ++index) {
+        const char character = text[index];
+        const bool upper = character >= 'A' && character <= 'Z';
+        const char lower = upper ? static_cast<char>(character - 'A' + 'a') : character;
+        if (lower != lower_name[index]) return false;
+    }
+    return true;
+}
+
 SourcePositionCursor::SourcePositionCursor(const LineStartTable& lines, std::string_view text) noexcept
     : lines_(lines), text_(text) {}
 

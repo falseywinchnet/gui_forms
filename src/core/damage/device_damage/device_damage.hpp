@@ -7,6 +7,17 @@
 
 namespace gui_forms::detail {
 
+// Owner decision L-Q8: layout publishes unsnapped logical boxes, and painting
+// rounds each edge of a box (not its extent) to the nearest device-pixel
+// boundary, halves upward. Two boxes that share a logical edge then share a
+// device edge, with no seam and no overlap, at any scale. `device` is the
+// edge in device pixels; a box narrower than a device pixel may round to
+// nothing.
+[[nodiscard]] inline double snap_device_edge(const double device) noexcept {
+    const double snapped = std::floor(device + 0.5);
+    return snapped;
+}
+
 // Internal host/renderer contract: repaint whole device pixels even when a
 // retained control reports fractional logical bounds.
 [[nodiscard]] inline Rect align_damage_outward(Rect rect, double scale) noexcept {

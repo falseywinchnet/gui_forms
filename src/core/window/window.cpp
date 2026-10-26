@@ -2237,7 +2237,7 @@ void Window::mark_dirty(Control& control, Dirty requested_dirty) {
     if (has_dirty(requested_dirty, Dirty::measure)) {
         requested_dirty |= Dirty::arrange;
     }
-    control.dirty_ |= requested_dirty;
+    control.add_dirty(requested_dirty);
     control.subtree_dirty_ |= requested_dirty;
     metrics_.record_mutation();
 
@@ -2257,11 +2257,7 @@ void Window::mark_dirty(Control& control, Dirty requested_dirty) {
             }
         }
         note_suspended_layout_request(control);
-        for (Control::Ptr ancestor = control.parent(); ancestor;
-             ancestor = (*ancestor).parent()) {
-            (*ancestor).dirty_ |= Dirty::measure | Dirty::arrange;
-            (*ancestor).subtree_dirty_ |= Dirty::measure | Dirty::arrange;
-        }
+        mark_layout_ancestors(control);
         layout_dirty_ = true;
         if (in_layout_) {
             second_layout_pass_requested_ = true;
@@ -2512,7 +2508,7 @@ bool Window::semantic_scope_reaches(const Control::Ptr& control) const {
 
 void Window::apply_subtree_dirty(Control& control, Dirty requested_dirty,
                                  double& requested_damage_area) {
-    control.dirty_ |= requested_dirty;
+    control.add_dirty(requested_dirty);
     control.subtree_dirty_ |= requested_dirty;
     if (has_dirty(requested_dirty, Dirty::layout) &&
         control.layout_suspend_depth_ != 0U) {
@@ -2547,16 +2543,17 @@ void Window::mark_subtree_dirty(Control& control, Dirty requested_dirty) {
     for (Control::Ptr ancestor = control.parent(); ancestor;
          ancestor = (*ancestor).parent()) {
         (*ancestor).subtree_dirty_ |= requested_dirty;
-        if (has_dirty(requested_dirty, Dirty::layout)) {
-            (*ancestor).dirty_ |= Dirty::measure | Dirty::arrange;
-            if ((*ancestor).layout_suspend_depth_ != 0U) {
-                (*ancestor).layout_deferred_ = true;
+        if (has_dirty(requested_dirty, Dirty::layout) &&
+            (*ancestor).layout_suspend_depth_ != 0U) {
+            (*ancestor).layout_deferred_ = true;
+            ++(*ancestor).layout_requested_revision_;
+            if ((*ancestor).layout_requested_revision_ == 0U) {
                 ++(*ancestor).layout_requested_revision_;
-                if ((*ancestor).layout_requested_revision_ == 0U) {
-                    ++(*ancestor).layout_requested_revision_;
-                }
             }
         }
+    }
+    if (has_dirty(requested_dirty, Dirty::layout)) {
+        mark_layout_ancestors(control);
     }
     // Subtree mutation has the same semantic-generation contract as a
     // single-control mutation. Cached native accessibility trees must retire
@@ -2701,6 +2698,7 @@ void Window::ensure_layout(bool read_barrier) {
     try {
         std::uint32_t pass = 0;
         do {
+            ++layout_pass_sequence_;
             second_layout_pass_requested_ = false;
             std::uint64_t measure_visited = 0;
             std::uint64_t measured = 0;
@@ -2739,6 +2737,7 @@ void Window::ensure_layout(bool read_barrier) {
             ++pass;
         } while (has_any_runnable_layout_dirty() &&
                  pass < maximum_layout_passes);
+        ++layout_pass_sequence_;
 
         const bool popup_layout_dirty = has_popup_layout_dirty();
         if (has_any_runnable_layout_dirty()) {
@@ -2851,9 +2850,18 @@ void Window::measure_dirty_recursive(const Control::Ptr& control,
     if (has_dirty((*control).dirty_, Dirty::measure)) {
         (*control).clear_dirty(Dirty::measure);
         try {
-            static_cast<void>((*control).measure(available));
+            // Kept in the control's measure cache, so its parent's arrange
+            // asking the same question is answered without a callback. A
+            // client size of infinity is admitted by resize but is no
+            // layout constraint; it is measured uncached, as before.
+            const LayoutConstraint constraint = layout_constraint_at_most(available);
+            if (valid_layout_constraint(constraint)) {
+                static_cast<void>((*control).measure_for_layout(constraint));
+            } else {
+                static_cast<void>((*control).measure(available));
+            }
         } catch (...) {
-            (*control).dirty_ |= Dirty::measure | Dirty::arrange;
+            (*control).add_dirty(Dirty::measure | Dirty::arrange);
             (*control).subtree_dirty_ |= Dirty::measure | Dirty::arrange;
             throw;
         }
@@ -2945,6 +2953,25 @@ bool Window::has_popup_layout_dirty() const noexcept {
         }
     }
     return false;
+}
+
+void Window::mark_layout_ancestors(Control& control) noexcept {
+    Control::Ptr ancestor = control.parent();
+    while (ancestor) {
+        Control::Ptr placing_parent = (*ancestor).parent();
+        const bool size_can_change =
+            (*ancestor).size_depends_on_content() ||
+            (placing_parent && (*placing_parent).sizes_children_from_content());
+        if (!size_can_change) {
+            (*ancestor).add_dirty(Dirty::arrange);
+            (*ancestor).subtree_dirty_ |= Dirty::arrange;
+            metrics_.record_layout_boundary_stop();
+            return;
+        }
+        (*ancestor).add_dirty(Dirty::measure | Dirty::arrange);
+        (*ancestor).subtree_dirty_ |= Dirty::measure | Dirty::arrange;
+        ancestor = std::move(placing_parent);
+    }
 }
 
 void Window::note_suspended_layout_request(Control& control) noexcept {

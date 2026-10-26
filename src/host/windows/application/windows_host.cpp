@@ -1085,14 +1085,7 @@ public:
 
     void fill_rect(Rect rect, Color color) override {
         const PaintTimer timer(timings_[0]);
-        const PixelRect area = pixel_rect(rect);
-        if (area.empty()) return;
-        const unsigned alpha = color.alpha;
-        for (int y = area.top; y < area.bottom; ++y) {
-            std::uint32_t* row = row_at(y);
-            const PixelSpan span = clipped_row_span(area, y);
-            fill_span(row, span, color, alpha);
-        }
+        fill_area(edge_rect(rect), color);
     }
 
     void fill_rounded_rect(Rect rect, double radius, Color color) override {
@@ -1109,12 +1102,31 @@ public:
         }
     }
 
+    // The stroke lies inside the rectangle. Its four bands tile the ring
+    // between device edges computed once: the top and bottom bands span the
+    // width and the sides fill between them, so a translucent stroke covers
+    // no pixel twice.
     void stroke_rect(Rect rect, Color color, double width) override {
+        const PaintTimer timer(timings_[0]);
         const double line = std::max(width, 1.0 / scale_);
-        fill_rect({rect.x, rect.y, rect.width, line}, color);
-        fill_rect({rect.x, rect.y + rect.height - line, rect.width, line}, color);
-        fill_rect({rect.x, rect.y, line, rect.height}, color);
-        fill_rect({rect.x + rect.width - line, rect.y, line, rect.height}, color);
+        const double x = rect.x + state().tx;
+        const double y = rect.y + state().ty;
+        const double outer_left = gui_forms::detail::snap_device_edge(x * scale_);
+        const double inner_left = gui_forms::detail::snap_device_edge((x + line) * scale_);
+        const double inner_right = gui_forms::detail::snap_device_edge((x + rect.width - line) * scale_);
+        const double outer_right = gui_forms::detail::snap_device_edge((x + rect.width) * scale_);
+        const double outer_top = gui_forms::detail::snap_device_edge(y * scale_);
+        const double inner_top = gui_forms::detail::snap_device_edge((y + line) * scale_);
+        const double inner_bottom = gui_forms::detail::snap_device_edge((y + rect.height - line) * scale_);
+        const double outer_bottom = gui_forms::detail::snap_device_edge((y + rect.height) * scale_);
+        if (!(inner_left < inner_right) || !(inner_top < inner_bottom)) {
+            fill_area(device_area(outer_left, outer_top, outer_right, outer_bottom), color);
+            return;
+        }
+        fill_area(device_area(outer_left, outer_top, outer_right, inner_top), color);
+        fill_area(device_area(outer_left, inner_bottom, outer_right, outer_bottom), color);
+        fill_area(device_area(outer_left, inner_top, inner_left, inner_bottom), color);
+        fill_area(device_area(inner_right, inner_top, outer_right, inner_bottom), color);
     }
 
     void stroke_rounded_rect(Rect rect, double radius, Color color,
@@ -1154,7 +1166,7 @@ public:
         std::span<const GradientStop> stops,
         GradientSpreadMode spread) override {
         const PaintTimer timer(timings_[1]);
-        const PixelRect area = pixel_rect(rect);
+        const PixelRect area = edge_rect(rect);
         if (area.empty() || !valid_gradient_stops(stops) ||
             (spread != GradientSpreadMode::pad &&
              spread != GradientSpreadMode::repeat &&
@@ -1214,7 +1226,7 @@ public:
         Rect rect, Point center, Size radii,
         std::span<const GradientStop> stops) override {
         const PaintTimer timer(timings_[2]);
-        const PixelRect area = pixel_rect(rect);
+        const PixelRect area = edge_rect(rect);
         if (area.empty() || radii.width <= 0.0 || radii.height <= 0.0 ||
             !valid_gradient_stops(stops)) {
             return;
@@ -2149,6 +2161,8 @@ private:
     int logical_y(double value) const noexcept {
         return static_cast<int>(std::lround((value + state().ty) * scale_));
     }
+    // Every device pixel the box touches, under the clip's bounds: for
+    // coverage that is decided per pixel (rounded shapes, shadows, images).
     PixelRect pixel_rect(Rect rect) const noexcept {
         rect.x += state().tx;
         rect.y += state().ty;
@@ -2157,6 +2171,48 @@ private:
                 std::clamp(static_cast<int>(std::floor(rect.y * scale_)), row_origin_, row_end_),
                 std::clamp(static_cast<int>(std::ceil((rect.x + rect.width) * scale_)), 0, width_),
                 std::clamp(static_cast<int>(std::ceil((rect.y + rect.height) * scale_)), row_origin_, row_end_)};
+    }
+    // The device pixels a filled box covers: each edge rounded to the nearest
+    // device-pixel boundary (owner decision L-Q8, detail::snap_device_edge),
+    // so boxes sharing a logical edge share a device edge. The clip, whose
+    // row spans test pixel centres, applies to the result as to any fill.
+    PixelRect edge_rect(Rect rect) const noexcept {
+        rect.x += state().tx;
+        rect.y += state().ty;
+        const double left = gui_forms::detail::snap_device_edge(rect.x * scale_);
+        const double top = gui_forms::detail::snap_device_edge(rect.y * scale_);
+        const double right = gui_forms::detail::snap_device_edge((rect.x + rect.width) * scale_);
+        const double bottom = gui_forms::detail::snap_device_edge((rect.y + rect.height) * scale_);
+        const PixelRect result = device_area(left, top, right, bottom);
+        return result;
+    }
+    // Device pixels between whole-pixel edges, bounded by the clip's pixel
+    // bounds and the target; empty when they do not overlap.
+    PixelRect device_area(const double left, const double top, const double right,
+                          const double bottom) const noexcept {
+        const Rect clip = state().clip;
+        const double clip_left = std::floor(clip.x * scale_);
+        const double clip_top = std::floor(clip.y * scale_);
+        const double clip_right = std::ceil((clip.x + clip.width) * scale_);
+        const double clip_bottom = std::ceil((clip.y + clip.height) * scale_);
+        const double low_x = std::max({left, clip_left, 0.0});
+        const double low_y = std::max({top, clip_top, static_cast<double>(row_origin_)});
+        const double high_x = std::min({right, clip_right, static_cast<double>(width_)});
+        const double high_y = std::min({bottom, clip_bottom, static_cast<double>(row_end_)});
+        if (!(low_x < high_x) || !(low_y < high_y)) return {};
+        const PixelRect result{static_cast<int>(low_x), static_cast<int>(low_y),
+                               static_cast<int>(high_x), static_cast<int>(high_y)};
+        return result;
+    }
+    // Fills `area` under the clip, whose row spans test pixel centres.
+    void fill_area(const PixelRect area, const Color color) {
+        if (area.empty()) return;
+        const unsigned alpha = color.alpha;
+        for (int y = area.top; y < area.bottom; ++y) {
+            std::uint32_t* row = row_at(y);
+            const PixelSpan span = clipped_row_span(area, y);
+            fill_span(row, span, color, alpha);
+        }
     }
     // Rasterizes a shaped run at the device scale and blends it into the
     // DIB under the current clip. A memo keeps the coverage for its scale
@@ -2381,13 +2437,15 @@ public:
     [[nodiscard]] std::uint64_t group_refusals() const noexcept { return group_refusals_; }
 
 private:
+    // GDI's clip takes the pixels the painter's own clip keeps: each edge
+    // rounded to the nearest device pixel, as the row spans' centre test does.
     void apply_gdi_clip() const {
         const Rect clip = state().clip;
         IntersectClipRect(memory_dc_,
-            static_cast<int>(std::floor(clip.x * scale_)),
-            static_cast<int>(std::floor(clip.y * scale_)),
-            static_cast<int>(std::ceil((clip.x + clip.width) * scale_)),
-            static_cast<int>(std::ceil((clip.y + clip.height) * scale_)));
+            static_cast<int>(gui_forms::detail::snap_device_edge(clip.x * scale_)),
+            static_cast<int>(gui_forms::detail::snap_device_edge(clip.y * scale_)),
+            static_cast<int>(gui_forms::detail::snap_device_edge((clip.x + clip.width) * scale_)),
+            static_cast<int>(gui_forms::detail::snap_device_edge((clip.y + clip.height) * scale_)));
     }
     void reset_bitmap() noexcept {
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)

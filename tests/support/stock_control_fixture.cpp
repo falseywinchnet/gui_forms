@@ -669,10 +669,10 @@ void observe_effects(StockControlFixture& fixture) {
 }
 
 void omit_components(FixtureBuilder& builder) {
-    const std::array<const char*, 11> components{
+    const std::array<const char*, 12> components{
         "timer", "background_worker", "notify_icon", "thread_exception_dialog",
         "image_list", "error_provider", "help_provider",
-        "semantic_feedback", "binding", "binding_source", "binding_context"};
+        "semantic_feedback", "binding", "binding_source", "binding_context", "open_file_dialog"};
     for (const char* identifier : components) {
         builder.omit(identifier, "component without a place in the control tree");
     }

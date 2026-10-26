@@ -120,6 +120,10 @@ private:
 // pass over its bytes, however long its lines. An offset before the previous
 // one is counted from its line's start. The table and text are borrowed and
 // must outlive the cursor; declare the cursor after them.
+// Whether `text` is `lower_name` in any ASCII case, as CSS matches its
+// keywords; `lower_name` is written in lower case.
+[[nodiscard]] bool equals_ascii_folded(std::string_view text, std::string_view lower_name) noexcept;
+
 class SourcePositionCursor final {
 public:
     SourcePositionCursor(const LineStartTable& lines, std::string_view text) noexcept;

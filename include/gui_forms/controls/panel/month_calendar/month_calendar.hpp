@@ -83,9 +83,9 @@ public:
 
     // Today's date: the system clock's date in UTC (GUI.Forms has no
     // time-zone service) until set_today_date sets it.
-    [[nodiscard]] DateTimeValue today_date() const noexcept { return today_; }
+    [[nodiscard]] DateTimeValue today_date() const noexcept { return set_today_.value_or(system_today_); }
     void set_today_date(DateTimeValue date);
-    [[nodiscard]] bool today_date_set() const noexcept { return today_set_; }
+    [[nodiscard]] bool today_date_set() const noexcept { return set_today_.has_value(); }
     // Whether the "Today:" line is shown below the months.
     [[nodiscard]] bool show_today() const noexcept { return show_today_; }
     void set_show_today(bool show);
@@ -264,7 +264,10 @@ private:
     DateTimeValue focus_date_{};
     DateTimeValue minimum_{1753, 1U, 1U};
     DateTimeValue maximum_{9998, 12U, 31U};
-    DateTimeValue today_{};
+    // The system clock's date, read once at construction; set_today_ replaces
+    // it once set_today_date has run, so the two cannot disagree.
+    DateTimeValue system_today_{};
+    std::optional<DateTimeValue> set_today_{};
     std::int32_t first_year_{2000};
     std::uint8_t first_month_{1U};
     std::uint32_t max_selection_count_{7U};
@@ -280,7 +283,6 @@ private:
     Zone hot_zone_{Zone::none};
     Zone pressed_zone_{Zone::none};
     bool dragging_{};
-    bool today_set_{};
     bool show_today_{true};
     bool show_today_circle_{true};
     bool show_week_numbers_{};
