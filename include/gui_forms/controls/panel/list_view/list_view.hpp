@@ -18,6 +18,7 @@
 namespace gui_forms {
 
 class HScrollBar;
+class TextBox;
 class VScrollBar;
 
 // How a ListView arranges its items (Windows Forms' View; Tile is not
@@ -140,6 +141,20 @@ struct ListViewInsertionMark final {
     }
 };
 
+// One label edit (Windows Forms' LabelEditEventArgs). In before_label_edit
+// `label` is none, and a handler sets `cancel` to keep the item out of edit.
+// In after_label_edit `label` is the edited text, or none when the edit was
+// cancelled; a handler sets `cancel` to refuse the text, and the item keeps
+// the text it had. A handler's change to `label` is ignored. `index` is the
+// item's position when its edit began.
+struct ListViewLabelEdit final {
+    std::string list_id{};
+    std::size_t index{};
+    std::string item_id{};
+    std::optional<std::string> label{};
+    bool cancel{};
+};
+
 // A retained item list with details, list, small-icon and large-icon views
 // (Windows Forms' ListView). Items are records, not child controls; only the
 // visible ones are laid out, painted and described, so a virtual view of
@@ -150,9 +165,9 @@ struct ListViewInsertionMark final {
 // Selection, focus and check boxes are kept by index. Replacing the items
 // of an ordinary view carries the selection, the focused item and the anchor
 // over by stable ID; a virtual view keeps them by index, clamped to the new
-// count. Columns are resized by dragging a header's divider. Groups, the
-// tile view, label editing, owner drawing, tooltips and hot-tracking
-// activation are not supported yet.
+// count. Columns are resized by dragging a header's divider, and items'
+// labels are edited in place (label_edit). Groups, the tile view, owner
+// drawing, tooltips and hot-tracking activation are not supported yet.
 class ListView final : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
@@ -288,6 +303,41 @@ public:
     // when the view shows no items.
     [[nodiscard]] std::optional<ListViewInsertionMark> insertion_mark_at(Point window_point) const;
 
+    // Label editing (Windows Forms' LabelEdit, ListViewItem.BeginEdit,
+    // BeforeLabelEdit and AfterLabelEdit). While label_edit is on, F2 on the
+    // focused item, or begin_label_edit, places a TextBox (the
+    // `label_editor` part) over the item's text with its text selected.
+    // Enter, a press elsewhere in the view, or focus leaving the editor
+    // commits the edit; Escape and cancel_label_edit cancel it. Each ended
+    // edit raises after_label_edit once, after the editor has closed. A
+    // committed label after_label_edit does not cancel becomes an ordinary
+    // item's text; in a virtual view the application stores it while
+    // handling after_label_edit, and the view shows what the source then
+    // retrieves. Replacing or sorting the items, a new virtual source or
+    // refresh_virtual_items cancels the edit once the change is made, before
+    // any selection event; scrolling keeps it, the editor following its item.
+    // A slow second click on the focused item does not begin an edit yet: the
+    // host does not report its double-click interval. Turning label_edit off
+    // cancels an edit in progress.
+    [[nodiscard]] bool label_edit() const noexcept { return label_edit_; }
+    void set_label_edit(bool enabled);
+    // Begins editing the label of the item at `index`, after committing any
+    // other edit in progress: raises before_label_edit, scrolls the item into
+    // view and focuses the editor. True when the item is in edit (also when
+    // it already was); false when label_edit is off, the view does not show
+    // the item (a details view without columns), or a handler cancelled,
+    // changed the items or disposed the view. Throws std::out_of_range for an
+    // index past the end.
+    bool begin_label_edit(std::size_t index);
+    // Commits the edit in progress, if any.
+    void end_label_edit();
+    // Cancels the edit in progress, if any.
+    void cancel_label_edit();
+    // The item in edit, if any.
+    [[nodiscard]] std::optional<std::size_t> label_edit_index() const noexcept { return label_edit_index_; }
+    // The editor; null until the view's first edit.
+    [[nodiscard]] std::shared_ptr<TextBox> label_editor() const noexcept { return label_editor_; }
+
     [[nodiscard]] Event<const ListViewSelectionChange&>& selection_changed() noexcept {
         return selection_changed_;
     }
@@ -300,10 +350,13 @@ public:
     [[nodiscard]] Event<const ListViewColumnWidthChange&>& column_width_changed() noexcept {
         return column_width_changed_;
     }
+    [[nodiscard]] Event<ListViewLabelEdit&>& before_label_edit() noexcept { return before_label_edit_; }
+    [[nodiscard]] Event<ListViewLabelEdit&>& after_label_edit() noexcept { return after_label_edit_; }
 
     void arrange(Rect final_bounds) override;
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_pointer(PointerEvent& event) override;
+    void on_key_preview(KeyEvent& event) override;
     void on_key(KeyEvent& event) override;
     void on_text_input(TextInputEvent& event) override;
     void on_focus_changed(bool focused) override;
@@ -327,6 +380,8 @@ public:
         PartGeometry focus;
         // The bar of the insertion mark; absent without a shown mark.
         PartGeometry insertion_mark;
+        // The TextBox of a label edit; absent while no item is in edit.
+        PartGeometry label_editor;
     };
     [[nodiscard]] Parts parts() const;
 
@@ -515,6 +570,16 @@ private:
     void request_column_click(std::size_t column);
     void finish_column_resize();
     [[nodiscard]] Rect insertion_mark_bounds(const Layout& placed) const noexcept;
+    // Label editing. label_editor_bounds is the edited item's text part,
+    // empty while the item is scrolled out of view.
+    [[nodiscard]] Rect label_editor_bounds(const Layout& placed) const;
+    void place_label_editor(const Layout& placed);
+    void create_label_editor();
+    [[nodiscard]] ListViewLabelEdit label_edit_event(std::optional<std::string> label) const;
+    // Hides the editor and leaves edit, returning focus to the view when the
+    // editor held it. Raises no label event.
+    void close_label_editor();
+    void on_label_editor_focus(bool focused);
     [[nodiscard]] std::optional<std::size_t> navigation_target(std::uint32_t key, std::size_t from,
                                                                const Layout& placed) const;
     void type_select(std::string_view text);
@@ -534,6 +599,14 @@ private:
     std::optional<std::size_t> hot_index_{};
     std::optional<std::size_t> hot_column_{};
     std::optional<ListViewInsertionMark> insertion_mark_{};
+    bool label_edit_{};
+    // Set while close_label_editor moves focus, so that the editor's focus
+    // loss does not end the edit a second time.
+    bool closing_label_editor_{};
+    std::optional<std::size_t> label_edit_index_{};
+    std::string label_edit_item_id_{};
+    std::shared_ptr<TextBox> label_editor_{};
+    SubscriptionToken label_editor_focus_{};
     std::optional<std::size_t> pressed_column_{};
     std::optional<std::size_t> resizing_column_{};
     double resize_start_x_{};
@@ -570,6 +643,8 @@ private:
     Event<const ListViewItemCheck&> item_checked_{};
     Event<const ListViewColumnClick&> column_click_{};
     Event<const ListViewColumnWidthChange&> column_width_changed_{};
+    Event<ListViewLabelEdit&> before_label_edit_{};
+    Event<ListViewLabelEdit&> after_label_edit_{};
 };
 
 } // namespace gui_forms
