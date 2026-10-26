@@ -1,7 +1,9 @@
-# Stage RT plan: `stx_rtf`, the RTF and rich-markdown library
+# Stage RT plan: `stx_rtf2md`, the RTF and rich-markdown library
 
-Status 2026-10-25: **proposed; waiting for the owner's answers to section 12**.
-Revised the same day after W's review of section 11 (items 6 and 8).
+Status 2026-10-26: **accepted.** The owner answered section 12 on
+2026-10-26: every recommendation was accepted, and the library is named
+`stx_rtf2md`. Revised on 2026-10-25 after W's review of section 11 (items 6
+and 8).
 Written by the SwiftEdit worker, which builds the library (owner decision W-Q1,
 2026-10-25). Authority: the W stage README, "Owner decisions, 2026-10-25",
 item 1, and W's companion brief
@@ -38,7 +40,7 @@ Decisions this plan builds on:
 9. [Tests, fuzz targets and CI](#9-tests-fuzz-targets-and-ci)
 10. [Phases and gates](#10-phases-and-gates)
 11. [Differences from the W brief](#11-differences-from-the-w-brief)
-12. [Open questions for the owner](#12-open-questions-for-the-owner)
+12. [Owner decisions, 2026-10-26](#12-owner-decisions-2026-10-26)
 13. [House-style points](#13-house-style-points)
 
 ## 1. What exists today
@@ -58,12 +60,12 @@ Read from main at `8d1f2be0`.
   `MD_FLAG_TABLES | MD_FLAG_TASKLISTS | MD_FLAG_STRIKETHROUGH | MD_FLAG_NOHTML`
   (SwiftEdit's `src/markdown.cpp`). Its objectives (owner interview
   2026-09-30) exclude "RTF/Office/PDF editor" from its scope. Section 10,
-  phase RT4, and question 5 cover how RTF import fits that exclusion.
+  phase RT4, and decision 5 cover how RTF import fits that exclusion.
 
 ## 2. What RT builds
 
-The library is `gui_forms/stx_rtf/` with target `stx_rtf::stx_rtf`. The name
-is the owner's call (question 1). It is a static C++20 library with no
+The library is `gui_forms/stx_rtf2md/` with target `stx_rtf2md::stx_rtf2md`. The name
+is the owner's (decision 1). It is a static C++20 library with no
 GUI.Forms dependency. It builds as its own project or as a subdirectory of
 GUI.Forms, installs with its own CMake package, and is listed in the
 `stx-packages` workflow. It holds one document model and four conversions:
@@ -80,12 +82,12 @@ both formats go through one model, the program has one markdown reader.
 SwiftEdit, `RichTextBox` and its clipboard all use it.
 
 ```text
-stx_rtf/
+stx_rtf2md/
 ├── CMakeLists.txt          standalone or subdirectory; STX_RTF_TESTS
 ├── README.md               the dialect grammar and RTF subset (normative)
 ├── PROVENANCE.md           first-party; the RTF 1.9.1 specification consulted
 ├── LICENSE
-├── include/stx_rtf/
+├── include/stx_rtf2md/
 │   ├── document.hpp        Document, Block, Run, RunStyle, typed offsets
 │   ├── limits.hpp          Limits, Result, Status, LossReport
 │   ├── markdown.hpp        MarkdownReader, write_markdown
@@ -102,7 +104,7 @@ contiguous UTF-8 string, and runs refer to ranges of it, so no allocation is
 made per run.
 
 ```cpp
-namespace stx_rtf {
+namespace stx_rtf2md {
 
 struct TextOffset final { std::uint32_t value = 0; };   // byte offset into Document::text
 struct TextLength final { std::uint32_t value = 0; };   // UTF-8 byte count
@@ -187,7 +189,7 @@ many conversions without allocating again.
 
 The dialect is CommonMark 0.31 for what CommonMark has, plus GitHub's
 `~~strikethrough~~`, plus two attribute forms for what CommonMark lacks. The
-grammar is written in full in `stx_rtf/README.md` before the reader is
+grammar is written in full in `stx_rtf2md/README.md` before the reader is
 built. This section fixes its shape.
 
 **Canonical form (what `write_markdown` writes):**
@@ -250,7 +252,7 @@ pops them.
 | Area | Read | Mapped to |
 |---|---|---|
 | Header | `\rtf1`; `\ansi`, `\ansicpgN`, `\deffN`, `\ucN`, `\uN` | Text must start `{\rtf`; otherwise `malformed` at offset 0. After `\uN`, its `\ucN` fallback characters are skipped |
-| Bytes | `\'hh`, and literal bytes 0x20-0x7E | Code page 1252 only. Another declared code page is accepted until it decodes a byte above 0x7F; that byte stops the read with `unsupported_encoding` (question 3) |
+| Bytes | `\'hh`, and literal bytes 0x20-0x7E | Code page 1252 only. Another declared code page is accepted until it decodes a byte above 0x7F; that byte stops the read with `unsupported_encoding` (decision 3) |
 | Fonts | `\fonttbl`, `\fN`, family words, font names | A font is monospace when its family is `\fmodern` or its name is in a fixed list (Courier New, Courier, Consolas, Lucida Console, Menlo, Monaco, Cascadia Mono, Cascadia Code, DejaVu Sans Mono, Liberation Mono). Runs in a monospace font become inline code. Other font identity is dropped and counted |
 | Colours | `\colortbl`, `\redN\greenN\blueN`, `\cfN`, `\cbN`, `\highlightN` | `colour` and `background`. Index 0 (auto) means none |
 | Characters | `\b`, `\i`, `\ul` and its style variants, `\ulnone`, `\strike`, `\striked1`, `\super`, `\sub`, `\nosupersub`, `\fsN`, `\plain`, each with a `0` parameter to turn off | Run style. Underline styles collapse to one underline (counted). `\fsN` maps to a size step (below) |
@@ -366,7 +368,7 @@ than remain in the input.
 
 ## 9. Tests, fuzz targets and CI
 
-- `stx_rtf/tests/`: model and normal-form tests; the dialect's full grammar
+- `stx_rtf2md/tests/`: model and normal-form tests; the dialect's full grammar
   table (every row of section 4, read and written); every row of section 5;
   `write_rtf` output for each feature; every `Status` and every `LossKind`;
   `Limits` enforcement at each limit exactly and one past it.
@@ -382,14 +384,14 @@ than remain in the input.
   - `fuzz/markdown_round_trip_fuzz.cpp`: any bytes to the markdown reader;
     an `ok` document must satisfy rules 1 and 2. A second write must equal
     the first.
-- **Corpus**, `stx_rtf/tests/corpus/`: files authored first-party for this
+- **Corpus**, `stx_rtf2md/tests/corpus/`: files authored first-party for this
   repository, reproducing the control-word patterns of Word, WordPad,
   TextEdit and Windows Forms' RichTextBox as described by the specification.
   Each file records its provenance. Files saved by those programs are added
-  only as the owner decides (question 4). Nothing is downloaded.
+  only as the owner decides (decision 4). Nothing is downloaded.
 - Sanitizers: ASan and UBSan over every test locally, through the shared
   sanitizer tree; the Linux sanitizer job in CI.
-- CI lists: `stx_rtf` joins the `house-style` and `check_lifetime_rules.py`
+- CI lists: `stx_rtf2md` joins the `house-style` and `check_lifetime_rules.py`
   directory lists in `native.yml`, the `stx-packages` find-package check,
   and the paths that trigger `fuzz-smoke.yml`. Its licence and provenance
   are installed beside the other `stx_*` ones.
@@ -400,7 +402,7 @@ Each phase lands as its own pull request (or a stack of at most two) with
 its tests, sanitizer run and CI.
 
 - **RT0, this plan.** Gate: the owner answers section 12, and the plan is
-  revised to the answers.
+  revised to the answers. Met 2026-10-26.
 - **RT1, the model and markdown.** The library skeleton, `Document` and
   normal form, `write_markdown`, `MarkdownReader`, the markdown fuzz target
   (rule 1 only, until `write_rtf` exists), and the CI lists. Gate: rule 1
@@ -412,7 +414,7 @@ its tests, sanitizer run and CI.
 - **RT3, writing RTF.** `write_rtf`, and rule 2 in both fuzz targets. Gate:
   rule 2 over the corpus and the fuzz smoke.
 - **RT4, SwiftEdit dogfood** (in SwiftEdit's repository, against a pinned
-  GUI.Forms with `stx_rtf` installed). Opening a `.rtf` file reads it with
+  GUI.Forms with `stx_rtf2md` installed). Opening a `.rtf` file reads it with
   `RtfReader` and opens the `write_markdown` text as a new untitled Markdown
   document, never as an editable RTF file. A summary of the loss report is
   shown. The command session gains `rtf-to-markdown`. SwiftEdit's Markdown
@@ -436,8 +438,8 @@ coordinator decided and recorded below.
 2. **Three run attributes are added: superscript, subscript and background
    colour.** RTF documents use them often (footnote marks, formulae,
    highlighting), and dropping them would be the largest everyday loss.
-   They are written as `{sup}`, `{sub}` and `{bg=#rrggbb}`. This is
-   question 6.
+   They are written as `{sup}`, `{sub}` and `{bg=#rrggbb}`. The owner
+   admitted them (decision 6).
 3. **Alignment needs a markdown spelling**, which the brief does not give:
    the block attribute line `{align=center}`.
 4. **The reader reads style names from the stylesheet**, but not style
@@ -467,31 +469,28 @@ coordinator decided and recorded below.
 9. **Phase order puts markdown first**, so W can build the run model before
    RTF reading exists.
 
-## 12. Open questions for the owner
+## 12. Owner decisions, 2026-10-26
 
-1. **Name.** (a) `stx_rtf` (recommended: it matches the `stx_*` family, and
-   RTF is the format the library adds), or (b) `stx_richtext`.
-2. **Extension spelling.** (a) attribute spans `[text]{u color=#c00000}` and
-   block attribute lines `{align=center}` (recommended: one rule for every
-   attribute, and plain text in any other renderer), or (b) HTML-like tags
-   such as `<u>`, which the dialect otherwise excludes.
-3. **Code pages in the first version.** (a) 1252 only, with other code pages
-   refused when a byte actually needs them (recommended), or (b) the
-   single-byte Windows code pages 1250 to 1258 from generated tables.
-4. **Corpus.** (a) first-party authored files now, and real saves from Word
-   or TextEdit added later at the owner's request (recommended), or (b) the
-   owner saves a small set of documents from the programs on their machines
-   now.
-5. **SwiftEdit's use.** (a) import only: an RTF file opens as a new untitled
-   Markdown document, and SwiftEdit never writes RTF (recommended; this
-   keeps SwiftEdit's 2026-09-30 exclusion of an RTF editor), or (b) import
-   and Save As RTF.
-6. **Superscript, subscript and background colour.** (a) admit them
-   (recommended), or (b) keep W's list, and count them as dropped.
+The owner answered the questions this section asked, through the
+coordinator. Every recommendation was accepted, and question 1 was
+answered with a different name.
 
-Until the owner answers, RT1 starts with the recommended options where they
-do not affect the code (questions 3 to 5). Questions 1, 2 and 6 change file
-names or the grammar, so RT1 waits for them.
+1. **Name: `stx_rtf2md`.** The owner chose option 1 and wrote `stx_rtf2md`
+   in the note. It names the directory, the targets
+   (`stx_rtf2md::stx_rtf2md`), the namespace and the documents.
+2. **Extension spelling: attribute spans and block attribute lines**, as
+   section 4 gives them: `[text]{u color=#c00000}` and `{align=center}`.
+3. **Code pages: 1252 only.** Another declared code page is refused only
+   when a byte needs it (section 5).
+4. **Corpus: first-party authored files now.** Real saves from Word or
+   TextEdit are added later, at the owner's request.
+5. **SwiftEdit: RTF import only.** An RTF file opens as a new untitled
+   Markdown document, and SwiftEdit never writes RTF. This keeps SwiftEdit's
+   2026-09-30 exclusion of an RTF editor.
+6. **Superscript, subscript and background colour are admitted**, written
+   as `{sup}`, `{sub}` and `{bg=#rrggbb}`.
+
+With these answers RT0's gate is met, and RT1 proceeds.
 
 ## 13. House-style points
 
