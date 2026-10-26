@@ -126,7 +126,7 @@ class CorpusTests(unittest.TestCase):
                             'data-gf-expected-difference=" "></div>', encoding="utf-8")
             with self.assertRaises(corpus.CorpusError):
                 corpus.read_fixture("f", path)
-            path.write_text('<div data-gf-id="r" data-gf-kind="flow-layout-panel">'
+            path.write_text('<div data-gf-id="r" data-gf-kind="flow-layout-panel-compat">'
                             '<div data-gf-id="t" data-gf-kind="label">text</div></div>',
                             encoding="utf-8")
             self.assertTrue(corpus.read_fixture("f", path).is_text)

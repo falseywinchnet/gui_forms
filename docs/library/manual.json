@@ -459,13 +459,13 @@
         "arrange": "Reconciles live slots and scales each authored rectangle into the caption-aware GroupBox content area."
       }
     },
-    "FlowLayoutPanel": {
+    "FlowLayoutPanelCompat": {
       "status": "OBSERVED: bundle 003 split and item-spacing enhancement; M4 build, focused tests, and Screen Sharing pass",
       "capture": "captures/layout_panels.png",
       "capture_note": "M4 Complete Showcase crop showing all four FlowDirection values, wrapping, child margins, and explicit FlowBreak behavior.",
-      "summary": "FlowLayoutPanel is a retained directional packing algorithm with four flow directions, optional wrapping, explicit bounded inter-item/inter-line spacing, per-child margins, stable flow breaks, and optional content-driven size.",
+      "summary": "FlowLayoutPanelCompat is a retained directional packing algorithm with four flow directions, optional wrapping, explicit bounded inter-item/inter-line spacing, per-child margins, stable flow breaks, and optional content-driven size.",
       "methods": {
-        "FlowLayoutPanel": "Constructs a left-to-right wrapping ContainerControl with zero explicit inter-item spacing.",
+        "FlowLayoutPanelCompat": "Constructs a left-to-right wrapping ContainerControl with zero explicit inter-item spacing.",
         "flow_direction": "Returns left-to-right, right-to-left, top-down, or bottom-up packing order.",
         "set_flow_direction": "Validates the closed direction vocabulary and invalidates measurement, arrangement, and semantics.",
         "wrap_contents": "Reports whether overflowing items start a new line or column.",
@@ -481,13 +481,13 @@
         "semantic_descriptor": "Projects a named flow surface as a group while leaving unnamed structural layout unexposed."
       }
     },
-    "TableLayoutPanel": {
+    "TableLayoutPanelCompat": {
       "status": "OBSERVED: bundle 003 split; M4 build, focused tests, and Screen Sharing pass",
       "capture": "captures/layout_panels.png",
       "capture_note": "M4 Complete Showcase crop showing absolute, auto-size, and weighted-percent tracks, explicit and automatic cells, column spans, committed bounds, and border rendering.",
-      "summary": "TableLayoutPanel is a retained grid solver with bounded rows/columns, fixed/add-row/add-column growth, absolute/percent/auto tracks, explicit or automatic placement, row/column spans, cell borders, overflow inspection, and content-driven sizing.",
+      "summary": "TableLayoutPanelCompat is a retained grid solver with bounded rows/columns, fixed/add-row/add-column growth, absolute/percent/auto tracks, explicit or automatic placement, row/column spans, cell borders, overflow inspection, and content-driven sizing.",
       "methods": {
-        "TableLayoutPanel": "Constructs a one-by-one table that may add rows during automatic placement.",
+        "TableLayoutPanelCompat": "Constructs a one-by-one table that may add rows during automatic placement.",
         "column_count": "Returns the authored base column count.",
         "set_column_count": "Validates the bounded nonzero count, resizes style storage, reconciles placement, and invalidates layout.",
         "row_count": "Returns the authored base row count.",

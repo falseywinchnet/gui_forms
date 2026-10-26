@@ -166,6 +166,14 @@ Nothing else is downloaded.
     beside `FlexPanel` and `GridPanel`;
   - form documents and the interface builder offer `FlexPanel` and
     `GridPanel` first.
+- The importer's table is the registry's `windows_forms_name` field
+  (`manifests/controls.json`, checked by `tools/control_registry.py`;
+  coordinator, 2026-10-26): `FlowLayoutPanel` and `TableLayoutPanel` map to
+  the `Compat` records. The C# facade keeps the Windows Forms names.
+- The solvers' helper types keep their algorithm names (`FlexItemLayout`,
+  `GridItemLayout`, `BlockFlowItemLayout`, `block_flow_solver`), and the
+  historical records under `results/` and `planning/` keep the old
+  container names: they are history, not stale names to fix.
 
 **The Windows Forms containers are not rebased on the solvers**
 (coordinator, 2026-10-25, applying L-Q2's condition "wherever their

@@ -5,7 +5,7 @@ their requested bounds, `dock` and `anchor`, and with `auto_scroll` on the
 panel scrolls them when they do not fit. The user does not interact with the
 panel itself: it takes no focus and has no input of its own beyond its
 scroll bars. Use a `GroupBox` when the group needs a visible caption, a
-`FlowLayoutPanel` or `TableLayoutPanel` to arrange children automatically,
+`FlexPanel` or `GridPanel` to arrange children automatically,
 and a `MaterialPanel` to paint a custom gradient, image or shadow.
 
 Parameters
@@ -52,8 +52,8 @@ See Also
 --------
 GroupBox : A panel with a caption and a frame.
 MaterialPanel : A panel that paints a `SurfaceMaterial` of your own.
-FlowLayoutPanel : Arranges children in rows or columns.
-TableLayoutPanel : Arranges children in a grid of cells.
+FlexPanel : Arranges children in wrapping rows or columns.
+GridPanel : Arranges children in a grid of tracks and areas.
 ScrollableControl : The scrolling behaviour every panel inherits.
 
 Notes

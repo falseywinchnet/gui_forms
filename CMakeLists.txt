@@ -647,12 +647,12 @@ add_library(gui_forms_controls STATIC
     src/controls/scrollable_control/container_control/user_control/user_control.cpp
     src/controls/panel/scaled_panel/scaled_panel.cpp
     src/controls/panel/group_box/scaled_group_box/scaled_group_box.cpp
-    src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp
-    src/controls/scrollable_control/container_control/flex_layout_panel/flex_layout_panel.cpp
-    src/controls/scrollable_control/container_control/grid_layout_panel/grid_layout_panel.cpp
-    src/controls/scrollable_control/container_control/block_flow_panel/block_flow_panel.cpp
+    src/controls/scrollable_control/container_control/flow_layout_panel_compat/flow_layout_panel_compat.cpp
+    src/controls/scrollable_control/container_control/flex_panel/flex_panel.cpp
+    src/controls/scrollable_control/container_control/grid_panel/grid_panel.cpp
+    src/controls/scrollable_control/container_control/block_panel/block_panel.cpp
     src/controls/scrollable_control/container_control/out_of_flow.cpp
-    src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp
+    src/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.cpp
     src/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.cpp
     src/controls/scrollable_control/container_control/command_overflow_panel/command_overflow_panel.cpp
     src/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.cpp
@@ -2961,7 +2961,7 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_layout_style_tests
              COMMAND gui_forms_layout_style_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/layout_corpus)
 
-    # Stage L, phase L5: the block flow solver headless, and BlockFlowPanel
+    # Stage L, phase L5: the block flow solver headless, and BlockPanel
     # with the 10,000-child counts.
     add_executable(gui_forms_block_flow_solver_tests
         tests/block_flow_solver_tests.cpp
@@ -2970,12 +2970,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_block_flow_solver_tests
              COMMAND gui_forms_block_flow_solver_tests)
 
-    add_executable(gui_forms_block_flow_panel_tests
-        tests/block_flow_panel_tests.cpp
+    add_executable(gui_forms_block_panel_tests
+        tests/block_panel_tests.cpp
     )
-    target_link_libraries(gui_forms_block_flow_panel_tests PRIVATE gui_forms_controls)
-    add_test(NAME gui_forms_block_flow_panel_tests
-             COMMAND gui_forms_block_flow_panel_tests)
+    target_link_libraries(gui_forms_block_panel_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_block_panel_tests
+             COMMAND gui_forms_block_panel_tests)
 
     # Stage L, phase L5: absolute and relative positioning in the three CSS
     # containers, layout diagnostics and the containing-block dependency.
@@ -2986,7 +2986,7 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_positioning_tests
              COMMAND gui_forms_positioning_tests)
 
-    # Stage L, phase L4: the grid solver headless, and GridLayoutPanel with
+    # Stage L, phase L4: the grid solver headless, and GridPanel with
     # the 10,000-child counts.
     add_executable(gui_forms_grid_solver_tests
         tests/grid_solver_tests.cpp
@@ -2995,14 +2995,14 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_grid_solver_tests
              COMMAND gui_forms_grid_solver_tests)
 
-    add_executable(gui_forms_grid_layout_panel_tests
-        tests/grid_layout_panel_tests.cpp
+    add_executable(gui_forms_grid_panel_tests
+        tests/grid_panel_tests.cpp
     )
-    target_link_libraries(gui_forms_grid_layout_panel_tests PRIVATE gui_forms_controls)
-    add_test(NAME gui_forms_grid_layout_panel_tests
-             COMMAND gui_forms_grid_layout_panel_tests)
+    target_link_libraries(gui_forms_grid_panel_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_grid_panel_tests
+             COMMAND gui_forms_grid_panel_tests)
 
-    # Stage L, phase L3: the flex solver headless, and FlexLayoutPanel with
+    # Stage L, phase L3: the flex solver headless, and FlexPanel with
     # the 10,000-child counts.
     add_executable(gui_forms_flex_solver_tests
         tests/flex_solver_tests.cpp
@@ -3011,12 +3011,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_flex_solver_tests
              COMMAND gui_forms_flex_solver_tests)
 
-    add_executable(gui_forms_flex_layout_panel_tests
-        tests/flex_layout_panel_tests.cpp
+    add_executable(gui_forms_flex_panel_tests
+        tests/flex_panel_tests.cpp
     )
-    target_link_libraries(gui_forms_flex_layout_panel_tests PRIVATE gui_forms_controls)
-    add_test(NAME gui_forms_flex_layout_panel_tests
-             COMMAND gui_forms_flex_layout_panel_tests)
+    target_link_libraries(gui_forms_flex_panel_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_flex_panel_tests
+             COMMAND gui_forms_flex_panel_tests)
 
     add_executable(gui_forms_layout_panel_tests
         tests/layout_panel_tests.cpp

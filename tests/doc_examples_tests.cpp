@@ -262,10 +262,10 @@ void example() {
 }
 }  // namespace doc_example_BindingSource_2
 
-namespace doc_example_BlockFlowPanel_1 {
+namespace doc_example_BlockPanel_1 {
 void example() {
-    std::shared_ptr<gf::BlockFlowPanel> stack =
-        gf::make_control<gf::BlockFlowPanel>(gf::StableId("stack"));
+    std::shared_ptr<gf::BlockPanel> stack =
+        gf::make_control<gf::BlockPanel>(gf::StableId("stack"));
     std::vector<std::shared_ptr<gf::Button>> buttons;
     for (int index = 0; index < 3; ++index) {
         std::shared_ptr<gf::Button> button = gf::make_control<gf::Button>(
@@ -280,12 +280,12 @@ void example() {
     window.perform_layout();
     // each button is 200 wide and 20 high, at y 10, 40 and 70
 }
-}  // namespace doc_example_BlockFlowPanel_1
+}  // namespace doc_example_BlockPanel_1
 
-namespace doc_example_BlockFlowPanel_2 {
+namespace doc_example_BlockPanel_2 {
 void example() {
-    std::shared_ptr<gf::BlockFlowPanel> row =
-        gf::make_control<gf::BlockFlowPanel>(gf::StableId("row"));
+    std::shared_ptr<gf::BlockPanel> row =
+        gf::make_control<gf::BlockPanel>(gf::StableId("row"));
     (*row).set_text_align(gf::TextAlignment::center);
     gf::BlockFlowItemLayout atomic{};
     atomic.level = gf::BlockFlowLevel::inline_level;
@@ -308,7 +308,7 @@ void example() {
     // buttons 0 and 1 at x 20 and 100 on the first line (y 0); button 2
     // centred at x 60 on the second line (y 20)
 }
-}  // namespace doc_example_BlockFlowPanel_2
+}  // namespace doc_example_BlockPanel_2
 
 namespace doc_example_BreadcrumbTrail_1 {
 void example() {
@@ -1596,10 +1596,10 @@ void example() {
 }
 }  // namespace doc_example_FlagsValueEditor_2
 
-namespace doc_example_FlexLayoutPanel_1 {
+namespace doc_example_FlexPanel_1 {
 void example() {
-    std::shared_ptr<gf::FlexLayoutPanel> row =
-        gf::make_control<gf::FlexLayoutPanel>(gf::StableId("row"));
+    std::shared_ptr<gf::FlexPanel> row =
+        gf::make_control<gf::FlexPanel>(gf::StableId("row"));
     std::shared_ptr<gf::Button> fixed =
         gf::make_control<gf::Button>(gf::StableId("row.fixed"), "Fixed");
     std::shared_ptr<gf::Button> narrow =
@@ -1627,12 +1627,12 @@ void example() {
     // fixed stays 20 wide; narrow becomes 30 wide and wide 50 wide;
     // all three stretch to the row's 20 height
 }
-}  // namespace doc_example_FlexLayoutPanel_1
+}  // namespace doc_example_FlexPanel_1
 
-namespace doc_example_FlexLayoutPanel_2 {
+namespace doc_example_FlexPanel_2 {
 void example() {
-    std::shared_ptr<gf::FlexLayoutPanel> bar =
-        gf::make_control<gf::FlexLayoutPanel>(gf::StableId("bar"));
+    std::shared_ptr<gf::FlexPanel> bar =
+        gf::make_control<gf::FlexPanel>(gf::StableId("bar"));
     (*bar).set_align_items(gf::LayoutAlignment::center);
     std::shared_ptr<gf::Button> save =
         gf::make_control<gf::Button>(gf::StableId("bar.save"), "Save");
@@ -1652,12 +1652,12 @@ void example() {
     window.perform_layout();
     // save at {0, 5}, close pushed to {160, 5}, both 40 by 20
 }
-}  // namespace doc_example_FlexLayoutPanel_2
+}  // namespace doc_example_FlexPanel_2
 
-namespace doc_example_FlowLayoutPanel_1 {
+namespace doc_example_FlowLayoutPanelCompat_1 {
 void example() {
-    std::shared_ptr<gf::FlowLayoutPanel> tools =
-        gf::make_control<gf::FlowLayoutPanel>(gf::StableId("tools"));
+    std::shared_ptr<gf::FlowLayoutPanelCompat> tools =
+        gf::make_control<gf::FlowLayoutPanelCompat>(gf::StableId("tools"));
     (*tools).set_item_spacing({7.0, 9.0});
     std::shared_ptr<gf::Button> cut =
         gf::make_control<gf::Button>(gf::StableId("tools.cut"), "Cut");
@@ -1679,12 +1679,12 @@ void example() {
     window.perform_layout();
     // cut at {0, 0}, copy at {37, 0}, paste on the next line at {0, 29}
 }
-}  // namespace doc_example_FlowLayoutPanel_1
+}  // namespace doc_example_FlowLayoutPanelCompat_1
 
-namespace doc_example_FlowLayoutPanel_2 {
+namespace doc_example_FlowLayoutPanelCompat_2 {
 void example() {
-    std::shared_ptr<gf::FlowLayoutPanel> row =
-        gf::make_control<gf::FlowLayoutPanel>(gf::StableId("row"));
+    std::shared_ptr<gf::FlowLayoutPanelCompat> row =
+        gf::make_control<gf::FlowLayoutPanelCompat>(gf::StableId("row"));
     (*row).set_wrap_contents(false);
     std::shared_ptr<gf::Button> fixed =
         gf::make_control<gf::Button>(gf::StableId("row.fixed"), "Fixed");
@@ -1708,7 +1708,7 @@ void example() {
     window.perform_layout();
     // fixed stays 20 wide; narrow becomes 30 wide and wide 50 wide
 }
-}  // namespace doc_example_FlowLayoutPanel_2
+}  // namespace doc_example_FlowLayoutPanelCompat_2
 
 namespace doc_example_FontCommand_1 {
 void example() {
@@ -1739,10 +1739,10 @@ void example() {
 }
 }  // namespace doc_example_GalleryCommand_1
 
-namespace doc_example_GridLayoutPanel_1 {
+namespace doc_example_GridPanel_1 {
 void example() {
-    std::shared_ptr<gf::GridLayoutPanel> form =
-        gf::make_control<gf::GridLayoutPanel>(gf::StableId("form"));
+    std::shared_ptr<gf::GridPanel> form =
+        gf::make_control<gf::GridPanel>(gf::StableId("form"));
     gf::GridTrackSize fixed{};
     fixed.minimum.kind = gf::TrackBreadthKind::length_percentage;
     fixed.minimum.length = gf::LengthPercentage{gf::LogicalLength{80.0}, 0.0};
@@ -1770,12 +1770,12 @@ void example() {
     // buttons 0 and 2 are 80 wide at x 0, buttons 1 and 3 110 wide at x 90;
     // the rows are 20 high at y 0 and y 25
 }
-}  // namespace doc_example_GridLayoutPanel_1
+}  // namespace doc_example_GridPanel_1
 
-namespace doc_example_GridLayoutPanel_2 {
+namespace doc_example_GridPanel_2 {
 void example() {
-    std::shared_ptr<gf::GridLayoutPanel> cards =
-        gf::make_control<gf::GridLayoutPanel>(gf::StableId("cards"));
+    std::shared_ptr<gf::GridPanel> cards =
+        gf::make_control<gf::GridPanel>(gf::StableId("cards"));
     gf::GridTrackSize card{};
     card.minimum.kind = gf::TrackBreadthKind::length_percentage;
     card.minimum.length = gf::LengthPercentage{gf::LogicalLength{100.0}, 0.0};
@@ -1802,7 +1802,7 @@ void example() {
     // three 100-wide columns at x 0, 115 and 230; buttons 0 to 2 in the
     // first row at y 0, buttons 3 and 4 in the second at y 30
 }
-}  // namespace doc_example_GridLayoutPanel_2
+}  // namespace doc_example_GridPanel_2
 
 namespace doc_example_GroupBox_1 {
 void example() {
@@ -3374,10 +3374,10 @@ void example() {
 }
 }  // namespace doc_example_TabPage_1
 
-namespace doc_example_TableLayoutPanel_1 {
+namespace doc_example_TableLayoutPanelCompat_1 {
 void example() {
-    std::shared_ptr<gf::TableLayoutPanel> form =
-        gf::make_control<gf::TableLayoutPanel>(gf::StableId("form"));
+    std::shared_ptr<gf::TableLayoutPanelCompat> form =
+        gf::make_control<gf::TableLayoutPanelCompat>(gf::StableId("form"));
     (*form).set_column_count(2U);
     (*form).set_row_count(2U);
     (*form).set_column_style(0U, {gf::TableSizeMode::auto_size, 0.0});
@@ -3406,12 +3406,12 @@ void example() {
     // Each field stretches across the second column, less its margins;
     // the column's width is (*form).column_widths()[1].
 }
-}  // namespace doc_example_TableLayoutPanel_1
+}  // namespace doc_example_TableLayoutPanelCompat_1
 
-namespace doc_example_TableLayoutPanel_2 {
+namespace doc_example_TableLayoutPanelCompat_2 {
 void example() {
-    std::shared_ptr<gf::TableLayoutPanel> grid =
-        gf::make_control<gf::TableLayoutPanel>(gf::StableId("grid"));
+    std::shared_ptr<gf::TableLayoutPanelCompat> grid =
+        gf::make_control<gf::TableLayoutPanelCompat>(gf::StableId("grid"));
     (*grid).set_column_count(2U);
     (*grid).set_row_count(2U);
     (*grid).set_grow_style(gf::TableLayoutGrowStyle::fixed_size);
@@ -3437,7 +3437,7 @@ void example() {
     // top_right is heading; left and right fill row 1, and
     // (*grid).layout_overflowed() is true because extra found no cell.
 }
-}  // namespace doc_example_TableLayoutPanel_2
+}  // namespace doc_example_TableLayoutPanelCompat_2
 
 namespace doc_example_TaskDialog_1 {
 void example() {
@@ -4151,8 +4151,8 @@ int main() {
     failures += run("BindingNavigator example 1", &doc_example_BindingNavigator_1::example);
     failures += run("BindingSource example 1", &doc_example_BindingSource_1::example);
     failures += run("BindingSource example 2", &doc_example_BindingSource_2::example);
-    failures += run("BlockFlowPanel example 1", &doc_example_BlockFlowPanel_1::example);
-    failures += run("BlockFlowPanel example 2", &doc_example_BlockFlowPanel_2::example);
+    failures += run("BlockPanel example 1", &doc_example_BlockPanel_1::example);
+    failures += run("BlockPanel example 2", &doc_example_BlockPanel_2::example);
     failures += run("BreadcrumbTrail example 1", &doc_example_BreadcrumbTrail_1::example);
     failures += run("BreadcrumbTrail example 2", &doc_example_BreadcrumbTrail_2::example);
     failures += run("Button example 1", &doc_example_Button_1::example);
@@ -4214,15 +4214,15 @@ int main() {
     failures += run("ExpandableSections example 2", &doc_example_ExpandableSections_2::example);
     failures += run("FlagsValueEditor example 1", &doc_example_FlagsValueEditor_1::example);
     failures += run("FlagsValueEditor example 2", &doc_example_FlagsValueEditor_2::example);
-    failures += run("FlexLayoutPanel example 1", &doc_example_FlexLayoutPanel_1::example);
-    failures += run("FlexLayoutPanel example 2", &doc_example_FlexLayoutPanel_2::example);
-    failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
-    failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
+    failures += run("FlexPanel example 1", &doc_example_FlexPanel_1::example);
+    failures += run("FlexPanel example 2", &doc_example_FlexPanel_2::example);
+    failures += run("FlowLayoutPanelCompat example 1", &doc_example_FlowLayoutPanelCompat_1::example);
+    failures += run("FlowLayoutPanelCompat example 2", &doc_example_FlowLayoutPanelCompat_2::example);
     failures += run("FontCommand example 1", &doc_example_FontCommand_1::example);
     failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
     failures += run("GalleryCommand example 1", &doc_example_GalleryCommand_1::example);
-    failures += run("GridLayoutPanel example 1", &doc_example_GridLayoutPanel_1::example);
-    failures += run("GridLayoutPanel example 2", &doc_example_GridLayoutPanel_2::example);
+    failures += run("GridPanel example 1", &doc_example_GridPanel_1::example);
+    failures += run("GridPanel example 2", &doc_example_GridPanel_2::example);
     failures += run("GroupBox example 1", &doc_example_GroupBox_1::example);
     failures += run("GroupBox example 2", &doc_example_GroupBox_2::example);
     failures += run("HScrollBar example 1", &doc_example_HScrollBar_1::example);
@@ -4301,8 +4301,8 @@ int main() {
     failures += run("TabControl example 1", &doc_example_TabControl_1::example);
     failures += run("TabControl example 2", &doc_example_TabControl_2::example);
     failures += run("TabPage example 1", &doc_example_TabPage_1::example);
-    failures += run("TableLayoutPanel example 1", &doc_example_TableLayoutPanel_1::example);
-    failures += run("TableLayoutPanel example 2", &doc_example_TableLayoutPanel_2::example);
+    failures += run("TableLayoutPanelCompat example 1", &doc_example_TableLayoutPanelCompat_1::example);
+    failures += run("TableLayoutPanelCompat example 2", &doc_example_TableLayoutPanelCompat_2::example);
     failures += run("TaskDialog example 1", &doc_example_TaskDialog_1::example);
     failures += run("TextBox example 1", &doc_example_TextBox_1::example);
     failures += run("TextBox example 2", &doc_example_TextBox_2::example);

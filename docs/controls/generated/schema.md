@@ -1825,7 +1825,7 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 
-## `flow_layout_panel` (FlowLayoutPanel, control)
+## `flex_panel` (FlexPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1851,7 +1851,7 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `auto_validate_changed` | `AutoValidate` |
 
-## `flex_layout_panel` (FlexLayoutPanel, control)
+## `grid_panel` (GridPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1877,7 +1877,7 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `auto_validate_changed` | `AutoValidate` |
 
-## `grid_layout_panel` (GridLayoutPanel, control)
+## `block_panel` (BlockPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1903,7 +1903,7 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `auto_validate_changed` | `AutoValidate` |
 
-## `block_flow_panel` (BlockFlowPanel, control)
+## `flow_layout_panel_compat` (FlowLayoutPanelCompat, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1929,7 +1929,7 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `auto_validate_changed` | `AutoValidate` |
 
-## `table_layout_panel` (TableLayoutPanel, control)
+## `table_layout_panel_compat` (TableLayoutPanelCompat, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|

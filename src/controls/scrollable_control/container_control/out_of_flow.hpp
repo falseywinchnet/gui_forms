@@ -1,8 +1,8 @@
 #pragma once
 
 // Positioned children of the CSS containers (stage L, phase L5; PLAN
-// sections 2.5 and 3.3, decision L-Q6), shared by FlexLayoutPanel,
-// GridLayoutPanel and BlockFlowPanel. Private to the controls library.
+// sections 2.5 and 3.3, decision L-Q6), shared by FlexPanel,
+// GridPanel and BlockPanel. Private to the controls library.
 
 #include "gui_forms/control/control/control.hpp"
 #include "gui_forms/layout/positioning/positioning.hpp"
@@ -17,7 +17,7 @@ namespace gui_forms::out_of_flow {
 [[nodiscard]] bool admitted_positioning(const ItemPositioning& positioning) noexcept;
 
 // The `position` a control's parent gives it: its item record's when the
-// parent is a FlexLayoutPanel, GridLayoutPanel or BlockFlowPanel, static
+// parent is a FlexPanel, GridPanel or BlockPanel, static
 // otherwise.
 [[nodiscard]] PositionKind position_in_parent(const Control& control) noexcept;
 

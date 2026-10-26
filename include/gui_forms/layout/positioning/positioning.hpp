@@ -11,8 +11,8 @@ namespace gui_forms {
 // Positioning (stage L, phase L5; PLAN section 2.5) over named records,
 // with no control dependency: the offset of `position: relative`, and the
 // size and place of an absolutely positioned box in its containing block
-// (CSS 2.1 sections 10.3.7 and 10.6.4). FlexLayoutPanel, GridLayoutPanel and
-// BlockFlowPanel apply it to their children; which box is the containing
+// (CSS 2.1 sections 10.3.7 and 10.6.4). FlexPanel, GridPanel and
+// BlockPanel apply it to their children; which box is the containing
 // block, and the conversion into the parent's coordinates, are theirs.
 
 // The inset `auto`, every side's default.

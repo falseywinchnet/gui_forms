@@ -136,7 +136,7 @@ See Also
 --------
 SplitterPanel : The panel type that holds each pane's content.
 MasterDetailView : A list and its details that become one pane on narrow windows.
-TableLayoutPanel : Fixed rows and columns without a draggable seam.
+GridPanel : Fixed rows and columns without a draggable seam.
 
 Notes
 -----

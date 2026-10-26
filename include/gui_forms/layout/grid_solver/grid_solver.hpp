@@ -15,7 +15,7 @@ namespace gui_forms {
 // The grid solver (stage L, phase L4; PLAN sections 2.1 and 2.3): CSS Grid
 // Layout's placement (its section 8.5) and track sizing (sections 12.3 to
 // 12.8) over named records, with no control, painter or host dependency.
-// GridLayoutPanel realizes it over child controls; item systems may call it
+// GridPanel realizes it over child controls; item systems may call it
 // on their own records.
 //
 // One layout is four calls, because an item's height can depend on the

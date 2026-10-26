@@ -14,7 +14,7 @@ namespace gui_forms {
 
 // The flex solver (stage L, phase L3; PLAN sections 2.1 and 2.2): CSS
 // Flexible Box Layout Level 1's layout algorithm (its section 9) over named
-// records, with no control, painter or host dependency. FlexLayoutPanel
+// records, with no control, painter or host dependency. FlexPanel
 // realizes it over child controls; item systems may call it on their own
 // records.
 //

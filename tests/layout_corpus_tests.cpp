@@ -19,7 +19,7 @@
 // that admits only the declarations the Windows Forms containers can
 // express. Flex and grid fixtures (phases L3 and L4) are read whole by the
 // layout value reader of phase L2: a container's declarations become
-// FlexLayoutPanel or GridLayoutPanel properties, an item's its
+// FlexPanel or GridPanel properties, an item's its
 // FlexItemLayout or GridItemLayout, and every other declaration is refused
 // by name.
 
@@ -317,20 +317,20 @@ Insets parse_box_shorthand(std::string_view value, const std::string& where) {
 
 enum class FixtureKind : std::uint8_t {
     box,
-    flow_layout_panel,
-    table_layout_panel,
-    flex_layout_panel,
-    grid_layout_panel,
-    block_flow_panel,
+    flow_layout_panel_compat,
+    table_layout_panel_compat,
+    flex_panel,
+    grid_panel,
+    block_panel,
 };
 
 FixtureKind parse_kind(const std::string& kind, const std::string& where) {
     if (kind == "box") return FixtureKind::box;
-    if (kind == "flow-layout-panel") return FixtureKind::flow_layout_panel;
-    if (kind == "table-layout-panel") return FixtureKind::table_layout_panel;
-    if (kind == "flex-layout-panel") return FixtureKind::flex_layout_panel;
-    if (kind == "grid-layout-panel") return FixtureKind::grid_layout_panel;
-    if (kind == "block-flow-panel") return FixtureKind::block_flow_panel;
+    if (kind == "flow-layout-panel-compat") return FixtureKind::flow_layout_panel_compat;
+    if (kind == "table-layout-panel-compat") return FixtureKind::table_layout_panel_compat;
+    if (kind == "flex-panel") return FixtureKind::flex_panel;
+    if (kind == "grid-panel") return FixtureKind::grid_panel;
+    if (kind == "block-panel") return FixtureKind::block_panel;
     fault(where, "data-gf-kind \"" + kind + "\" is not built by the corpus harness yet");
 }
 
@@ -394,7 +394,7 @@ TableLayoutStyle parse_track(std::string_view component, const std::string& wher
     if (component.substr(0U, prefix.size()) == prefix && component.size() > prefix.size() + 3U &&
         component.substr(component.size() - 3U) == "fr)") {
         // minmax(0, Nfr) is the share of what is left after absolute and
-        // content-sized tracks, ignoring content: TableLayoutPanel's percent.
+        // content-sized tracks, ignoring content: TableLayoutPanelCompat's percent.
         style.size_mode = TableSizeMode::percent;
         style.size = parse_double(
             trimmed(component.substr(prefix.size(), component.size() - prefix.size() - 3U)),
@@ -450,8 +450,8 @@ struct ReaderRoles final {
 };
 
 bool reader_kind(FixtureKind kind) {
-    return kind == FixtureKind::flex_layout_panel || kind == FixtureKind::grid_layout_panel ||
-           kind == FixtureKind::block_flow_panel;
+    return kind == FixtureKind::flex_panel || kind == FixtureKind::grid_panel ||
+           kind == FixtureKind::block_panel;
 }
 
 // What a block flow panel's line boxes inherit from the fixture's text
@@ -586,8 +586,8 @@ private:
         std::string layout_style = style_text == nullptr ? std::string{} : *style_text;
         const TextDeclarations text = take_text_declarations(layout_style, where);
         const bool text_declared = text.zero_font || text.line_height || text.direction;
-        if (text_declared && kind != FixtureKind::block_flow_panel) {
-            fault(where, "font-size, line-height and direction are built on a block-flow-panel only");
+        if (text_declared && kind != FixtureKind::block_panel) {
+            fault(where, "font-size, line-height and direction are built on a block-panel only");
         }
         InheritedText own = inherited;
         if (text.zero_font) own.zero_font = true;
@@ -598,9 +598,9 @@ private:
         if (reader_context) {
             apply_reader_style(control, kind, parent_kind, style_text, built.layout, where);
         }
-        if (kind == FixtureKind::block_flow_panel && own.zero_font) {
+        if (kind == FixtureKind::block_panel && own.zero_font) {
             const double half = own.line_height < 0.0 ? 0.0 : own.line_height / 2.0;
-            static_cast<BlockFlowPanel&>(control).set_line_strut(LineStrut{half, half, 0.0});
+            static_cast<BlockPanel&>(control).set_line_strut(LineStrut{half, half, 0.0});
         }
         const std::vector<StyleDeclaration> declarations =
             style_text == nullptr || reader_context ? std::vector<StyleDeclaration>{}
@@ -611,21 +611,21 @@ private:
         for (const StyleDeclaration& declaration : declarations) {
             const std::string declaration_where = where + " " + declaration.name;
             if (apply_common(control, declaration, built.layout, declaration_where)) continue;
-            if (kind == FixtureKind::flow_layout_panel &&
-                apply_flow(static_cast<FlowLayoutPanel&>(control), declaration,
+            if (kind == FixtureKind::flow_layout_panel_compat &&
+                apply_flow(static_cast<FlowLayoutPanelCompat&>(control), declaration,
                            declaration_where)) {
                 continue;
             }
-            if (kind == FixtureKind::table_layout_panel &&
-                apply_table(static_cast<TableLayoutPanel&>(control), declaration, defaults,
+            if (kind == FixtureKind::table_layout_panel_compat &&
+                apply_table(static_cast<TableLayoutPanelCompat&>(control), declaration, defaults,
                             columns, rows, declaration_where)) {
                 continue;
             }
-            if (parent_kind == FixtureKind::flow_layout_panel &&
+            if (parent_kind == FixtureKind::flow_layout_panel_compat &&
                 apply_flow_child(declaration, built.layout, declaration_where)) {
                 continue;
             }
-            if (parent_kind == FixtureKind::table_layout_panel &&
+            if (parent_kind == FixtureKind::table_layout_panel_compat &&
                 apply_table_child(declaration, built.layout, declaration_where)) {
                 continue;
             }
@@ -633,41 +633,41 @@ private:
                                          declaration.value + "\" is not admitted here");
         }
 
-        if (kind == FixtureKind::table_layout_panel) {
-            configure_table(static_cast<TableLayoutPanel&>(control), columns, rows, where);
+        if (kind == FixtureKind::table_layout_panel_compat) {
+            configure_table(static_cast<TableLayoutPanelCompat&>(control), columns, rows, where);
         }
         for (const XmlElement& child_element : element.children) {
             const BuiltElement child = build_element(child_element, kind, own);
             control.add_child(child.control);
-            if (kind == FixtureKind::flow_layout_panel && child.layout.flow_grow != 0.0) {
-                static_cast<FlowLayoutPanel&>(control).set_flex_grow(*child.control,
+            if (kind == FixtureKind::flow_layout_panel_compat && child.layout.flow_grow != 0.0) {
+                static_cast<FlowLayoutPanelCompat&>(control).set_flex_grow(*child.control,
                                                                      child.layout.flow_grow);
             }
-            if (kind == FixtureKind::table_layout_panel) {
-                place_table_child(static_cast<TableLayoutPanel&>(control), child, defaults,
+            if (kind == FixtureKind::table_layout_panel_compat) {
+                place_table_child(static_cast<TableLayoutPanelCompat&>(control), child, defaults,
                                   where);
             }
-            if (kind == FixtureKind::flex_layout_panel) {
-                static_cast<FlexLayoutPanel&>(control).set_item_layout(*child.control,
+            if (kind == FixtureKind::flex_panel) {
+                static_cast<FlexPanel&>(control).set_item_layout(*child.control,
                                                                        child.layout.flex_item);
             }
-            if (kind == FixtureKind::grid_layout_panel) {
+            if (kind == FixtureKind::grid_panel) {
                 try {
-                    static_cast<GridLayoutPanel&>(control).set_item_layout(*child.control,
+                    static_cast<GridPanel&>(control).set_item_layout(*child.control,
                                                                            child.layout.grid_item);
                 } catch (const std::invalid_argument& error) {
-                    fault(where, std::string("GridLayoutPanel refused an item layout: ") + error.what());
+                    fault(where, std::string("GridPanel refused an item layout: ") + error.what());
                 }
             }
-            if (kind == FixtureKind::block_flow_panel) {
+            if (kind == FixtureKind::block_panel) {
                 if (child.layout.block_item.level == BlockFlowLevel::inline_level && !own.zero_font) {
                     fault(where, "inline content needs font-size: 0 (the corpus's strut has no font metrics)");
                 }
                 try {
-                    static_cast<BlockFlowPanel&>(control).set_item_layout(*child.control,
+                    static_cast<BlockPanel&>(control).set_item_layout(*child.control,
                                                                           child.layout.block_item);
                 } catch (const std::invalid_argument& error) {
-                    fault(where, std::string("BlockFlowPanel refused an item layout: ") + error.what());
+                    fault(where, std::string("BlockPanel refused an item layout: ") + error.what());
                 }
             }
         }
@@ -702,12 +702,12 @@ private:
             }
         }
         ReaderRoles roles{};
-        roles.flex_container = kind == FixtureKind::flex_layout_panel;
-        roles.grid_container = kind == FixtureKind::grid_layout_panel;
-        roles.flex_item = parent_kind == FixtureKind::flex_layout_panel;
-        roles.grid_item = parent_kind == FixtureKind::grid_layout_panel;
-        roles.block_container = kind == FixtureKind::block_flow_panel;
-        roles.block_item = parent_kind == FixtureKind::block_flow_panel;
+        roles.flex_container = kind == FixtureKind::flex_panel;
+        roles.grid_container = kind == FixtureKind::grid_panel;
+        roles.flex_item = parent_kind == FixtureKind::flex_panel;
+        roles.grid_item = parent_kind == FixtureKind::grid_panel;
+        roles.block_container = kind == FixtureKind::block_panel;
+        roles.block_item = parent_kind == FixtureKind::block_panel;
         refuse_unbuilt_values(style, base, roles, where);
 
         // Margins: a length, or `auto` on an item's side.
@@ -736,7 +736,7 @@ private:
         control.set_padding(paddings);
 
         if (roles.flex_container) {
-            FlexLayoutPanel& panel = static_cast<FlexLayoutPanel&>(control);
+            FlexPanel& panel = static_cast<FlexPanel&>(control);
             panel.set_flex_direction(style.flex.direction);
             panel.set_flex_wrap(style.flex.wrap);
             panel.set_justify_content(style.alignment.justify_content);
@@ -746,10 +746,10 @@ private:
             panel.set_column_gap(style.column_gap);
         }
         if (roles.grid_container) {
-            configure_grid(static_cast<GridLayoutPanel&>(control), style, where);
+            configure_grid(static_cast<GridPanel&>(control), style, where);
         }
         if (roles.block_container) {
-            static_cast<BlockFlowPanel&>(control).set_text_align(style.text_align);
+            static_cast<BlockPanel&>(control).set_text_align(style.text_align);
         }
         if (roles.block_item) {
             BlockFlowItemLayout& layout = child.block_item;
@@ -793,7 +793,7 @@ private:
 
     // A grid container's properties; a value the panel refuses abandons
     // the fixture.
-    static void configure_grid(GridLayoutPanel& panel, const LayoutStyle& style, const std::string& where) {
+    static void configure_grid(GridPanel& panel, const LayoutStyle& style, const std::string& where) {
         try {
             panel.set_template_columns(style.grid.template_columns);
             panel.set_template_rows(style.grid.template_rows);
@@ -808,7 +808,7 @@ private:
             panel.set_row_gap(style.row_gap);
             panel.set_column_gap(style.column_gap);
         } catch (const std::invalid_argument& error) {
-            fault(where, std::string("GridLayoutPanel refused a container value: ") + error.what());
+            fault(where, std::string("GridPanel refused a container value: ") + error.what());
         }
     }
 
@@ -824,7 +824,7 @@ private:
     static void refuse_unbuilt_values(const LayoutStyle& style, const LayoutStyle& base, const ReaderRoles& roles,
                                       const std::string& where) {
         if (!roles.block_container && style.text_align != base.text_align) {
-            fault(where, "text-align on an element that is not a block-flow-panel");
+            fault(where, "text-align on an element that is not a block-panel");
         }
         if (!roles.block_item && style.vertical_align != base.vertical_align) {
             fault(where, "vertical-align on an element that is not a block flow item");
@@ -832,17 +832,17 @@ private:
         const bool container = roles.flex_container || roles.grid_container;
         const bool item = roles.flex_item || roles.grid_item || roles.block_item;
         if (roles.flex_container && style.display != DisplayKind::flex) {
-            fault(where, "a flex-layout-panel is display: flex");
+            fault(where, "a flex-panel is display: flex");
         }
         if (roles.grid_container && style.display != DisplayKind::grid) {
-            fault(where, "a grid-layout-panel is display: grid");
+            fault(where, "a grid-panel is display: grid");
         }
         const bool inline_block = roles.block_item && style.display == DisplayKind::inline_block;
         if (inline_block && (roles.flex_container || roles.grid_container)) {
             fault(where, "inline-flex and inline-grid are not built by the corpus harness yet");
         }
         if (!container && style.display != DisplayKind::block && !inline_block) {
-            fault(where, "only a flex-layout-panel or a grid-layout-panel changes display, and a block flow "
+            fault(where, "only a flex-panel or a grid-panel changes display, and a block flow "
                          "item to inline-block");
         }
         if (!roles.flex_container && !(style.flex == base.flex)) {
@@ -911,16 +911,16 @@ private:
         switch (kind) {
         case FixtureKind::box:
             return make_control<Panel>(StableId(identity));
-        case FixtureKind::flow_layout_panel:
-            return make_control<FlowLayoutPanel>(StableId(identity));
-        case FixtureKind::table_layout_panel:
-            return make_control<TableLayoutPanel>(StableId(identity));
-        case FixtureKind::flex_layout_panel:
-            return make_control<FlexLayoutPanel>(StableId(identity));
-        case FixtureKind::grid_layout_panel:
-            return make_control<GridLayoutPanel>(StableId(identity));
-        case FixtureKind::block_flow_panel:
-            return make_control<BlockFlowPanel>(StableId(identity));
+        case FixtureKind::flow_layout_panel_compat:
+            return make_control<FlowLayoutPanelCompat>(StableId(identity));
+        case FixtureKind::table_layout_panel_compat:
+            return make_control<TableLayoutPanelCompat>(StableId(identity));
+        case FixtureKind::flex_panel:
+            return make_control<FlexPanel>(StableId(identity));
+        case FixtureKind::grid_panel:
+            return make_control<GridPanel>(StableId(identity));
+        case FixtureKind::block_panel:
+            return make_control<BlockPanel>(StableId(identity));
         }
         throw std::logic_error("unknown fixture kind");
     }
@@ -951,11 +951,11 @@ private:
         return false;
     }
 
-    static bool apply_flow(FlowLayoutPanel& flow, const StyleDeclaration& declaration,
+    static bool apply_flow(FlowLayoutPanelCompat& flow, const StyleDeclaration& declaration,
                            const std::string& where) {
         const std::string& value = declaration.value;
         if (declaration.name == "display") {
-            if (value != "flex") fault(where, "a flow-layout-panel is display: flex");
+            if (value != "flex") fault(where, "a flow-layout-panel-compat is display: flex");
             return true;
         }
         if (declaration.name == "flex-direction") {
@@ -969,7 +969,7 @@ private:
         if (declaration.name == "flex-wrap") {
             if (value == "wrap") flow.set_wrap_contents(true);
             else if (value == "nowrap") flow.set_wrap_contents(false);
-            else fault(where, "FlowLayoutPanel has no " + value);
+            else fault(where, "FlowLayoutPanelCompat has no " + value);
             return true;
         }
         if (declaration.name == "justify-content") {
@@ -1005,9 +1005,9 @@ private:
             return true;
         }
         if (declaration.name == "align-content") {
-            // FlowLayoutPanel packs its lines at the start.
+            // FlowLayoutPanelCompat packs its lines at the start.
             if (value != "flex-start" && value != "start") {
-                fault(where, "FlowLayoutPanel packs lines at the start only");
+                fault(where, "FlowLayoutPanelCompat packs lines at the start only");
             }
             return true;
         }
@@ -1034,7 +1034,7 @@ private:
             }
             const std::vector<std::string> components = value_components(value);
             if (components.size() != 3U || components[1] != "0" || components[2] != "auto") {
-                fault(where, "FlowLayoutPanel admits flex: none or flex: <grow> 0 auto");
+                fault(where, "FlowLayoutPanelCompat admits flex: none or flex: <grow> 0 auto");
             }
             grow = parse_double(components[0], where);
             return true;
@@ -1044,22 +1044,22 @@ private:
             return true;
         }
         if (declaration.name == "flex-shrink") {
-            if (value != "0") fault(where, "FlowLayoutPanel never shrinks items");
+            if (value != "0") fault(where, "FlowLayoutPanelCompat never shrinks items");
             return true;
         }
         if (declaration.name == "flex-basis") {
-            if (value != "auto") fault(where, "FlowLayoutPanel items have basis auto");
+            if (value != "auto") fault(where, "FlowLayoutPanelCompat items have basis auto");
             return true;
         }
         return false;
     }
 
-    static bool apply_table(TableLayoutPanel& table, const StyleDeclaration& declaration,
+    static bool apply_table(TableLayoutPanelCompat& table, const StyleDeclaration& declaration,
                             ContainerDefaults& defaults, std::vector<TableLayoutStyle>& columns,
                             std::vector<TableLayoutStyle>& rows, const std::string& where) {
         const std::string& value = declaration.value;
         if (declaration.name == "display") {
-            if (value != "grid") fault(where, "a table-layout-panel is display: grid");
+            if (value != "grid") fault(where, "a table-layout-panel-compat is display: grid");
             return true;
         }
         if (declaration.name == "grid-template-columns" || declaration.name == "grid-template-rows") {
@@ -1088,18 +1088,18 @@ private:
             return true;
         }
         if (declaration.name == "justify-content" || declaration.name == "align-content") {
-            // TableLayoutPanel packs its tracks at the start; CSS's default
+            // TableLayoutPanelCompat packs its tracks at the start; CSS's default
             // (normal) stretches auto tracks into free space, which a
             // fixture records as a difference where it shows.
             if (value != "start" && value != "normal") {
-                fault(where, "TableLayoutPanel packs tracks at the start only");
+                fault(where, "TableLayoutPanelCompat packs tracks at the start only");
             }
             return true;
         }
         if (declaration.name == "grid-auto-flow") {
             if (value == "row") table.set_grow_style(TableLayoutGrowStyle::add_rows);
             else if (value == "column") table.set_grow_style(TableLayoutGrowStyle::add_columns);
-            else fault(where, "TableLayoutPanel grows by rows or columns only");
+            else fault(where, "TableLayoutPanelCompat grows by rows or columns only");
             return true;
         }
         return false;
@@ -1126,9 +1126,9 @@ private:
         return false;
     }
 
-    static void configure_table(TableLayoutPanel& table, const std::vector<TableLayoutStyle>& columns,
+    static void configure_table(TableLayoutPanelCompat& table, const std::vector<TableLayoutStyle>& columns,
                                 const std::vector<TableLayoutStyle>& rows, const std::string& where) {
-        if (columns.empty()) fault(where, "a table-layout-panel needs grid-template-columns");
+        if (columns.empty()) fault(where, "a table-layout-panel-compat needs grid-template-columns");
         table.set_grow_style(TableLayoutGrowStyle::add_rows);
         table.set_column_count(columns.size());
         table.set_row_count(rows.empty() ? 1U : rows.size());
@@ -1140,12 +1140,12 @@ private:
         }
     }
 
-    static void place_table_child(TableLayoutPanel& table, const BuiltElement& child,
+    static void place_table_child(TableLayoutPanelCompat& table, const BuiltElement& child,
                                   const ContainerDefaults& defaults, const std::string& where) {
         const ChildLayout& layout = child.layout;
         Control& control = *child.control;
         if (layout.column.start_line.has_value() != layout.row.start_line.has_value()) {
-            fault(where, "TableLayoutPanel places a child on both axes or neither");
+            fault(where, "TableLayoutPanelCompat places a child on both axes or neither");
         }
         if (layout.column.start_line) {
             table.set_cell_position(control, TableLayoutCellPosition{*layout.column.start_line - 1U,

@@ -3902,8 +3902,8 @@
       ]
     },
     {
-      "id": "flow_layout_panel",
-      "type": "FlowLayoutPanel",
+      "id": "flex_panel",
+      "type": "FlexPanel",
       "kind": "control",
       "parts": [
         {"name": "region", "role": "region", "composed_from": null, "states": []},
@@ -3964,8 +3964,8 @@
       ]
     },
     {
-      "id": "flex_layout_panel",
-      "type": "FlexLayoutPanel",
+      "id": "grid_panel",
+      "type": "GridPanel",
       "kind": "control",
       "parts": [
         {"name": "region", "role": "region", "composed_from": null, "states": []},
@@ -4026,8 +4026,8 @@
       ]
     },
     {
-      "id": "grid_layout_panel",
-      "type": "GridLayoutPanel",
+      "id": "block_panel",
+      "type": "BlockPanel",
       "kind": "control",
       "parts": [
         {"name": "region", "role": "region", "composed_from": null, "states": []},
@@ -4088,8 +4088,8 @@
       ]
     },
     {
-      "id": "block_flow_panel",
-      "type": "BlockFlowPanel",
+      "id": "flow_layout_panel_compat",
+      "type": "FlowLayoutPanelCompat",
       "kind": "control",
       "parts": [
         {"name": "region", "role": "region", "composed_from": null, "states": []},
@@ -4150,8 +4150,8 @@
       ]
     },
     {
-      "id": "table_layout_panel",
-      "type": "TableLayoutPanel",
+      "id": "table_layout_panel_compat",
+      "type": "TableLayoutPanelCompat",
       "kind": "control",
       "parts": [
         {"name": "region", "role": "region", "composed_from": null, "states": []},

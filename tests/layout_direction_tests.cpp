@@ -121,7 +121,7 @@ void test_dock_anchor_and_requested_bounds_mirror() {
 }
 
 void test_flow_layout_starts_at_the_right() {
-    std::shared_ptr<FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(StableId("direction.flow"));
+    std::shared_ptr<FlowLayoutPanelCompat> flow = make_control<FlowLayoutPanelCompat>(StableId("direction.flow"));
     std::shared_ptr<Button> first = sized_button("direction.flow.first", 40.0, 20.0);
     std::shared_ptr<Button> second = sized_button("direction.flow.second", 40.0, 20.0);
     std::shared_ptr<Button> third = sized_button("direction.flow.third", 40.0, 20.0);
@@ -165,7 +165,7 @@ void test_flow_layout_starts_at_the_right() {
 }
 
 void test_flow_scrolls_toward_the_left() {
-    std::shared_ptr<FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(StableId("direction.scroll"));
+    std::shared_ptr<FlowLayoutPanelCompat> flow = make_control<FlowLayoutPanelCompat>(StableId("direction.scroll"));
     (*flow).set_auto_scroll(true);
     (*flow).set_wrap_contents(false);
     (*flow).set_item_spacing({4.0, 4.0});
@@ -196,7 +196,7 @@ void test_flow_scrolls_toward_the_left() {
 }
 
 void test_table_layout_starts_at_the_right() {
-    std::shared_ptr<TableLayoutPanel> table = make_control<TableLayoutPanel>(StableId("direction.table"));
+    std::shared_ptr<TableLayoutPanelCompat> table = make_control<TableLayoutPanelCompat>(StableId("direction.table"));
     (*table).set_padding({5.0, 5.0, 5.0, 5.0});
     (*table).set_column_count(2U);
     (*table).set_row_count(1U);
@@ -240,7 +240,7 @@ void test_table_layout_starts_at_the_right() {
 }
 
 void test_reentrant_measure_keeps_the_outer_pass() {
-    std::shared_ptr<FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(StableId("direction.reentrant.flow"));
+    std::shared_ptr<FlowLayoutPanelCompat> flow = make_control<FlowLayoutPanelCompat>(StableId("direction.reentrant.flow"));
     (*flow).set_auto_size(true);
     std::shared_ptr<ReentrantMeasureControl> nested =
         make_control<ReentrantMeasureControl>(StableId("direction.reentrant.flow.nested"));
@@ -254,7 +254,7 @@ void test_reentrant_measure_keeps_the_outer_pass() {
     std::shared_ptr<Panel> root = make_control<Panel>(StableId("direction.reentrant.root"));
     (*root).add_child(flow);
 
-    std::shared_ptr<TableLayoutPanel> table = make_control<TableLayoutPanel>(StableId("direction.reentrant.table"));
+    std::shared_ptr<TableLayoutPanelCompat> table = make_control<TableLayoutPanelCompat>(StableId("direction.reentrant.table"));
     (*table).set_auto_size(true);
     (*table).set_column_count(2U);
     std::shared_ptr<ReentrantMeasureControl> cell =

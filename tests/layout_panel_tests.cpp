@@ -42,7 +42,7 @@ public:
 
 class SetFlowWrapOffThread final {
 public:
-    SetFlowWrapOffThread(FlowLayoutPanel& flow, bool& rejected)
+    SetFlowWrapOffThread(FlowLayoutPanelCompat& flow, bool& rejected)
         : flow_(flow), rejected_(rejected) {}
 
     void operator()() const {
@@ -54,7 +54,7 @@ public:
     }
 
 private:
-    FlowLayoutPanel& flow_;
+    FlowLayoutPanelCompat& flow_;
     bool& rejected_;
 };
 
@@ -88,7 +88,7 @@ std::shared_ptr<Button> sized_button(std::string id, double width,
 }
 
 void test_margin_padding_validation_and_retained_slots() {
-    std::shared_ptr<gui_forms::FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(StableId("layout.flow.slots"));
+    std::shared_ptr<gui_forms::FlowLayoutPanelCompat> flow = make_control<FlowLayoutPanelCompat>(StableId("layout.flow.slots"));
     (*flow).set_accessible_name("Wrapping flow specimen");
     (*flow).set_padding({5.0, 5.0, 5.0, 5.0});
     std::shared_ptr<Button> first = sized_button("layout.flow.first", 40.0, 20.0);
@@ -141,7 +141,7 @@ void test_margin_padding_validation_and_retained_slots() {
 }
 
 void test_flow_direction_break_visibility_and_resize() {
-    std::shared_ptr<gui_forms::FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(StableId("layout.flow.policy"));
+    std::shared_ptr<gui_forms::FlowLayoutPanelCompat> flow = make_control<FlowLayoutPanelCompat>(StableId("layout.flow.policy"));
     std::shared_ptr<Button> first = sized_button("layout.flow.policy.first", 40.0, 20.0);
     std::shared_ptr<Button> second = sized_button("layout.flow.policy.second", 40.0, 20.0);
     std::shared_ptr<Button> third = sized_button("layout.flow.policy.third", 40.0, 20.0);
@@ -190,7 +190,7 @@ void test_flow_direction_break_visibility_and_resize() {
 }
 
 void test_flow_item_spacing_is_explicit_bounded_layout_state() {
-    std::shared_ptr<gui_forms::FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(StableId("layout.flow.spacing"));
+    std::shared_ptr<gui_forms::FlowLayoutPanelCompat> flow = make_control<FlowLayoutPanelCompat>(StableId("layout.flow.spacing"));
     std::shared_ptr<Button> first = sized_button("layout.flow.spacing.first", 30.0, 20.0);
     std::shared_ptr<Button> second = sized_button("layout.flow.spacing.second", 30.0, 20.0);
     std::shared_ptr<Button> third = sized_button("layout.flow.spacing.third", 30.0, 20.0);
@@ -204,7 +204,7 @@ void test_flow_item_spacing_is_explicit_bounded_layout_state() {
     require((*first).arranged_bounds() == Rect{0.0, 0.0, 30.0, 20.0} &&
                 (*second).arranged_bounds() == Rect{37.0, 0.0, 30.0, 20.0} &&
                 (*third).arranged_bounds() == Rect{0.0, 29.0, 30.0, 20.0},
-            "FlowLayoutPanel item spacing must separate items and wrapped lines");
+            "FlowLayoutPanelCompat item spacing must separate items and wrapped lines");
 
     bool rejected{};
     try {
@@ -213,12 +213,12 @@ void test_flow_item_spacing_is_explicit_bounded_layout_state() {
         rejected = true;
     }
     require(rejected && (*flow).item_spacing() == Size{7.0, 9.0},
-            "FlowLayoutPanel item spacing must reject invalid geometry atomically");
+            "FlowLayoutPanelCompat item spacing must reject invalid geometry atomically");
 }
 
 void test_flow_auto_size_mode_preserves_authored_extent() {
-    std::shared_ptr<gui_forms::FlowLayoutPanel> flow =
-        make_control<FlowLayoutPanel>(StableId("layout.flow.auto-size-mode"));
+    std::shared_ptr<gui_forms::FlowLayoutPanelCompat> flow =
+        make_control<FlowLayoutPanelCompat>(StableId("layout.flow.auto-size-mode"));
     std::shared_ptr<Button> child =
         sized_button("layout.flow.auto-size-mode.child", 72.0, 43.0);
     (*flow).set_padding({5.0, 2.0, 5.0, 0.0});
@@ -229,16 +229,16 @@ void test_flow_auto_size_mode_preserves_authored_extent() {
 
     require((*flow).auto_size_mode() == AutoSizeMode::grow_only &&
                 (*flow).measure({500.0, 500.0}) == Size{176.0, 60.0},
-            "GrowOnly FlowLayoutPanel AutoSize must retain authored extent");
+            "GrowOnly FlowLayoutPanelCompat AutoSize must retain authored extent");
 
     (*flow).set_auto_size_mode(AutoSizeMode::grow_and_shrink);
     require((*flow).measure({500.0, 500.0}) == Size{100.0, 50.0},
-            "GrowAndShrink FlowLayoutPanel AutoSize must derive content while honoring minimum size");
+            "GrowAndShrink FlowLayoutPanelCompat AutoSize must derive content while honoring minimum size");
 }
 
 void test_flow_alignment_projects_relational_flex_geometry() {
-    std::shared_ptr<gui_forms::FlowLayoutPanel> centered =
-        make_control<FlowLayoutPanel>(StableId("layout.flow.centered"));
+    std::shared_ptr<gui_forms::FlowLayoutPanelCompat> centered =
+        make_control<FlowLayoutPanelCompat>(StableId("layout.flow.centered"));
     std::shared_ptr<Button> centered_child =
         sized_button("layout.flow.centered.child", 40.0, 20.0);
     (*centered).add_child(centered_child);
@@ -251,8 +251,8 @@ void test_flow_alignment_projects_relational_flex_geometry() {
     require((*centered_child).arranged_bounds() == Rect{80.0, 40.0, 40.0, 20.0},
             "single-line flow must center a child on both live container axes");
 
-    std::shared_ptr<gui_forms::FlowLayoutPanel> distributed =
-        make_control<FlowLayoutPanel>(StableId("layout.flow.distributed"));
+    std::shared_ptr<gui_forms::FlowLayoutPanelCompat> distributed =
+        make_control<FlowLayoutPanelCompat>(StableId("layout.flow.distributed"));
     std::shared_ptr<Button> first =
         sized_button("layout.flow.distributed.first", 20.0, 10.0);
     std::shared_ptr<Button> second =
@@ -290,8 +290,8 @@ void test_flow_alignment_projects_relational_flex_geometry() {
                 (*distributed).cross_alignment() == FlowCrossAlignment::stretch,
             "flow alignment must reject unknown values without mutation");
 
-    std::shared_ptr<gui_forms::FlowLayoutPanel> growing =
-        make_control<FlowLayoutPanel>(StableId("layout.flow.growing"));
+    std::shared_ptr<gui_forms::FlowLayoutPanelCompat> growing =
+        make_control<FlowLayoutPanelCompat>(StableId("layout.flow.growing"));
     std::shared_ptr<Button> fixed =
         sized_button("layout.flow.growing.fixed", 20.0, 10.0);
     std::shared_ptr<Button> first_grow =
@@ -324,7 +324,7 @@ void test_flow_alignment_projects_relational_flex_geometry() {
 
 void test_layout_panels_revalidate_snapshot_after_measure_callback() {
     {
-        std::shared_ptr<gui_forms::FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(
+        std::shared_ptr<gui_forms::FlowLayoutPanelCompat> flow = make_control<FlowLayoutPanelCompat>(
             StableId("layout.flow.mutation"));
         std::shared_ptr<MeasureMutationControl> mutator =
             make_control<MeasureMutationControl>(
@@ -353,7 +353,7 @@ void test_layout_panels_revalidate_snapshot_after_measure_callback() {
     }
 
     {
-        std::shared_ptr<gui_forms::TableLayoutPanel> table = make_control<TableLayoutPanel>(
+        std::shared_ptr<gui_forms::TableLayoutPanelCompat> table = make_control<TableLayoutPanelCompat>(
             StableId("layout.table.mutation"));
         (*table).set_column_count(2U);
         (*table).set_row_count(1U);
@@ -385,7 +385,7 @@ void test_layout_panels_revalidate_snapshot_after_measure_callback() {
 }
 
 void test_table_mixed_tracks_spans_and_lookup() {
-    std::shared_ptr<gui_forms::TableLayoutPanel> table = make_control<TableLayoutPanel>(StableId("layout.table.mixed"));
+    std::shared_ptr<gui_forms::TableLayoutPanelCompat> table = make_control<TableLayoutPanelCompat>(StableId("layout.table.mixed"));
     (*table).set_accessible_name("Mixed table specimen");
     (*table).set_padding({5.0, 5.0, 5.0, 5.0});
     (*table).set_column_count(4U);
@@ -446,7 +446,7 @@ void test_table_mixed_tracks_spans_and_lookup() {
 }
 
 void test_table_growth_hidden_children_and_fixed_overflow() {
-    std::shared_ptr<gui_forms::TableLayoutPanel> table = make_control<TableLayoutPanel>(StableId("layout.table.growth"));
+    std::shared_ptr<gui_forms::TableLayoutPanelCompat> table = make_control<TableLayoutPanelCompat>(StableId("layout.table.growth"));
     (*table).set_column_count(2U);
     (*table).set_row_count(1U);
     (*table).set_grow_style(TableLayoutGrowStyle::add_rows);
@@ -495,7 +495,7 @@ void test_table_growth_hidden_children_and_fixed_overflow() {
 }
 
 void test_table_cell_dock_fill_consumes_growth() {
-    std::shared_ptr<gui_forms::TableLayoutPanel> table = make_control<TableLayoutPanel>(StableId("layout.table.fill"));
+    std::shared_ptr<gui_forms::TableLayoutPanelCompat> table = make_control<TableLayoutPanelCompat>(StableId("layout.table.fill"));
     (*table).set_column_count(1U);
     (*table).set_row_count(1U);
     (*table).set_column_style(0U, {TableSizeMode::percent, 100.0});
@@ -517,8 +517,8 @@ void test_table_cell_dock_fill_consumes_growth() {
 }
 
 void test_table_track_spacing_is_relational_and_bounded() {
-    std::shared_ptr<gui_forms::TableLayoutPanel> table =
-        make_control<TableLayoutPanel>(StableId("layout.table.spacing"));
+    std::shared_ptr<gui_forms::TableLayoutPanelCompat> table =
+        make_control<TableLayoutPanelCompat>(StableId("layout.table.spacing"));
     (*table).set_column_count(2U);
     (*table).set_row_count(1U);
     (*table).set_column_style(0U, {TableSizeMode::percent, 1.0});
@@ -568,7 +568,7 @@ public:
 };
 
 void test_table_border_paint_is_public_geometry() {
-    std::shared_ptr<gui_forms::TableLayoutPanel> table = make_control<TableLayoutPanel>(StableId("layout.table.paint"));
+    std::shared_ptr<gui_forms::TableLayoutPanelCompat> table = make_control<TableLayoutPanelCompat>(StableId("layout.table.paint"));
     (*table).set_column_count(2U);
     (*table).set_row_count(2U);
     (*table).set_cell_border_style(TableCellBorderStyle::inset);
@@ -763,7 +763,7 @@ void test_compound_anchor_resize_runtime_rebase_and_validation() {
 }
 
 void test_flow_auto_scroll_owns_viewport_and_input() {
-    std::shared_ptr<FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(StableId("flow.scroll"));
+    std::shared_ptr<FlowLayoutPanelCompat> flow = make_control<FlowLayoutPanelCompat>(StableId("flow.scroll"));
     (*flow).set_auto_scroll(true);
     (*flow).set_wrap_contents(false);
     (*flow).set_item_spacing({4.0, 4.0});

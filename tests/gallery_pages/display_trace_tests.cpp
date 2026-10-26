@@ -320,11 +320,16 @@ struct PageDigest final {
 // specimen's RuntimeId, its generation and the control count. Nothing else
 // changed. Phase L4's grid specimens changed css-layout-panels, and the
 // same counts on states-and-diagnostics and typography-and-inspection;
-// phase L5's block specimens (and the page header's BlockFlowPanel entry)
+// phase L5's block specimens (and the page header's BlockPanel entry)
 // did the same. Phase L6's `layout_direction` property added a row to
 // values-and-spinners' property grid (its editor two controls more), and
 // so the same counts on states-and-diagnostics and
 // typography-and-inspection.
+// The owner's container rename (FlexPanel, GridPanel, BlockPanel,
+// FlowLayoutPanelCompat, TableLayoutPanelCompat) changed every page's
+// navigation sidebar (the layout pages' order and the compatibility page's
+// new title), the layout pages' group captions and the compatibility
+// page's header; nothing else.
 //
 // Main's ThreadExceptionDialog, OpenFileDialog and SaveFileDialog lines on
 // dialogs-and-host-services, and its TabControl images on tabs-and-pages,
@@ -333,51 +338,52 @@ struct PageDigest final {
 // typography-and-inspection were recorded again, and every other page kept
 // L3's digest.
 //
-// Rebased onto main's dialog and tab-image pages, the pages whose
-// counts or RuntimeId moved were recorded again:
-// states-and-diagnostics, typography-and-inspection.
+// Each later phase, rebased onto those main pages, recorded again the
+// pages whose digests the combination moved: the counts on
+// states-and-diagnostics and the RuntimeId on typography-and-inspection,
+// and, where the phase had recorded every page, the two main pages too.
 //
 // typography-and-inspection's entry is the trace with the RuntimeId the
 // specimen has when this test runs first (#1311 since L6 on main); the digest
 // changes whenever a page made before it makes a control more or less.
 constexpr std::array<PageDigest, 30> expected_digests{{
-    {"basics", 0x39b168d11c02f1a0ULL},
-    {"values", 0x7d3d6f7a4762c460ULL},
-    {"retained-rows", 0x64869a82d1cde5efULL},
-    {"instrument", 0x2c1fcdba71058e01ULL},
-    {"control-spectrum", 0x321965cb85e7988dULL},
-    {"ranges-and-progress", 0x3fce5fb922ccc1b3ULL},
-    {"containers-and-focus", 0x3db877c0a3a4159dULL},
-    {"animation-laboratory", 0x5cdbb66bceae7737ULL},
-    {"states-and-diagnostics", 0x7a4d9ef54bc38703ULL},
-    {"text-and-input", 0x355fc10c66b1625aULL},
-    {"collections-and-popups", 0xed03175675f86512ULL},
-    {"values-and-spinners", 0x343454b87f4b9650ULL},
-    {"images-and-drawing", 0x3e2ade93d0061b3bULL},
-    {"tabs-and-pages", 0xb8177e51c8f143e6ULL},
-    {"checked-collections", 0x0f98e570c6e049a2ULL},
-    {"timing-and-tooltips", 0x8acc5f5800f761e3ULL},
-    {"dates-and-calendar", 0x7ca7f0d58684b984ULL},
-    {"dialogs-and-host-services", 0x795ab0672bc3aa46ULL},
-    {"retained-layout-panels", 0xeb41e855ad458af7ULL},
-    {"css-layout-panels", 0x18ca033e533b040dULL},
-    {"dock-and-anchor", 0x62078a167b51337fULL},
-    {"commands-and-menus", 0xea7a7b2ac5c63701ULL},
-    {"tree-and-object-views", 0x7a6a3c9d088ac325ULL},
-    {"choices-and-sections", 0x50d153a9d9d56c55ULL},
-    {"value-editors", 0xedf1413988628bbdULL},
-    {"responsive-layouts", 0x30aba8f5526dfd0cULL},
-    {"anchored-popups", 0xc8319f42bf15c17aULL},
-    {"live-surfaces", 0xe474c9d97d329af1ULL},
-    {"typography-and-inspection", 0x0d167bb5225c1f60ULL},
-    {"semantic-feedback", 0x48ae5da6e449bdc4ULL},
+    {"basics", 0x8ad3bd64955e6995ULL},
+    {"values", 0xb658b77505725da9ULL},
+    {"retained-rows", 0x025f72c7edad0514ULL},
+    {"instrument", 0x485187a50551e836ULL},
+    {"control-spectrum", 0xc1b6c7fbf50a9d0cULL},
+    {"ranges-and-progress", 0x2a06ace770e13138ULL},
+    {"containers-and-focus", 0x4bd8a3f439f8078cULL},
+    {"animation-laboratory", 0xd22492f193fdb022ULL},
+    {"states-and-diagnostics", 0xe08e3a5ddce44856ULL},
+    {"text-and-input", 0x6cea6c153578579dULL},
+    {"collections-and-popups", 0x5b75d7735fed6b79ULL},
+    {"values-and-spinners", 0x53974a1f042eaa19ULL},
+    {"images-and-drawing", 0xec142154440ee5c6ULL},
+    {"tabs-and-pages", 0x3cc40071993be32fULL},
+    {"checked-collections", 0xbcc8dc7a616e1b8fULL},
+    {"timing-and-tooltips", 0x99f306d142ff03deULL},
+    {"dates-and-calendar", 0x6f1eb88a51fed7cfULL},
+    {"dialogs-and-host-services", 0x5b7235ff76025a51ULL},
+    {"css-layout-panels", 0xcdbcfbcf6e561d16ULL},
+    {"retained-layout-panels", 0x9468a4553545fddeULL},
+    {"dock-and-anchor", 0x8f0e6fa2ea1031b2ULL},
+    {"commands-and-menus", 0xeefd420533055ee2ULL},
+    {"tree-and-object-views", 0x805651f12056426eULL},
+    {"choices-and-sections", 0x4e79ecf5a4a5e0c8ULL},
+    {"value-editors", 0x389978daaff76da8ULL},
+    {"responsive-layouts", 0x3f60bc621cdf06c9ULL},
+    {"anchored-popups", 0x898b0bfbbfdcc181ULL},
+    {"live-surfaces", 0xf100f9eb79b7356eULL},
+    {"typography-and-inspection", 0xa7920cdbbd5db32bULL},
+    {"semantic-feedback", 0x52902fede7280d09ULL},
 }};
 
 // live-surfaces names the platform's native live-surface pixel format.
 #if defined(_WIN32)
-constexpr std::uint64_t live_surfaces_digest = 0xe474c9d97d329af1ULL;
+constexpr std::uint64_t live_surfaces_digest = 0xf100f9eb79b7356eULL;
 #else
-constexpr std::uint64_t live_surfaces_digest = 0x0d3c5e3226cbaef1ULL;
+constexpr std::uint64_t live_surfaces_digest = 0xa14da949c725746eULL;
 #endif
 
 std::uint64_t expected_digest(std::string_view page) {

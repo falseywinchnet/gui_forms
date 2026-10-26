@@ -5,9 +5,9 @@
 
 #include "out_of_flow.hpp"
 
-#include "gui_forms/controls/scrollable_control/container_control/block_flow_panel/block_flow_panel.hpp"
-#include "gui_forms/controls/scrollable_control/container_control/flex_layout_panel/flex_layout_panel.hpp"
-#include "gui_forms/controls/scrollable_control/container_control/grid_layout_panel/grid_layout_panel.hpp"
+#include "gui_forms/controls/scrollable_control/container_control/block_panel/block_panel.hpp"
+#include "gui_forms/controls/scrollable_control/container_control/flex_panel/flex_panel.hpp"
+#include "gui_forms/controls/scrollable_control/container_control/grid_panel/grid_panel.hpp"
 #include "gui_forms/controls/scrollable_control/scrollable_control.hpp"
 
 #include <algorithm>
@@ -63,13 +63,13 @@ PositionKind position_in_parent(const Control& control) noexcept {
     const Control::Ptr parent = control.parent();
     const Control* const owner = parent.get();
     if (owner == nullptr) return PositionKind::static_position;
-    if (const FlexLayoutPanel* const flex = dynamic_cast<const FlexLayoutPanel*>(owner)) {
+    if (const FlexPanel* const flex = dynamic_cast<const FlexPanel*>(owner)) {
         return (*flex).item_positioning(control).position;
     }
-    if (const GridLayoutPanel* const grid = dynamic_cast<const GridLayoutPanel*>(owner)) {
+    if (const GridPanel* const grid = dynamic_cast<const GridPanel*>(owner)) {
         return (*grid).item_positioning(control).position;
     }
-    if (const BlockFlowPanel* const flow = dynamic_cast<const BlockFlowPanel*>(owner)) {
+    if (const BlockPanel* const flow = dynamic_cast<const BlockPanel*>(owner)) {
         return (*flow).item_positioning(control).position;
     }
     return PositionKind::static_position;

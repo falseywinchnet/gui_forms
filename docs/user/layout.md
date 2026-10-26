@@ -49,14 +49,16 @@ are stable: the authored input is still there to measure from.
   and hit testing front-to-back. Both inherit retained scrolling from
   `ScrollableControl`.
 
-`FlowLayoutPanel`
-: Orders visible children left-to-right, right-to-left, top-down or
+`FlowLayoutPanelCompat`
+: For Windows Forms migration (an imported `FlowLayoutPanel` becomes it);
+  use `FlexPanel` for new work. Orders visible children left-to-right, right-to-left, top-down or
   bottom-up, honouring child margins, container padding, optional wrapping
   and per-child flow breaks (`set_flow_break`). Hidden children leave no gap. It is a
   deterministic flow, not flexbox.
 
-`TableLayoutPanel`
-: Bounded row and column tracks with absolute, auto-size and weighted
+`TableLayoutPanelCompat`
+: For Windows Forms migration (an imported `TableLayoutPanel` becomes it);
+  use `GridPanel` for new work. Bounded row and column tracks with absolute, auto-size and weighted
   percent sizing; explicit or row-major automatic cell placement; row and
   column spans; fixed, add-rows or add-columns growth; cell borders;
   resolved-track inspection and overflow reporting. Dock fills or aligns a

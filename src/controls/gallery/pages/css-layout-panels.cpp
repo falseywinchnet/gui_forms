@@ -6,8 +6,8 @@ namespace gui_forms::gallery::pages {
 
 // Owner of the CSS Layout Panels page: the containers of stage L that lay
 // their children out by CSS rules, each as one group of specimens: the
-// FlexLayoutPanel group (phase L3), the GridLayoutPanel group (L4) and the
-// BlockFlowPanel group (L5).
+// FlexPanel group (phase L3), the GridPanel group (L4) and the
+// BlockPanel group (L5).
 class CssLayoutPanelsPage final : public gui_forms::Component {
 public:
     CssLayoutPanelsPage(const std::shared_ptr<Surface>& page,
@@ -32,11 +32,11 @@ private:
     void build_flex(const std::shared_ptr<Surface>& page) {
         std::shared_ptr<LayoutGroup> flex_group = group(
             "gallery.css-layout.flex.group",
-            "FlexLayoutPanel · grow shares · wrap · gaps · auto margin · centred column",
+            "FlexPanel · grow shares · wrap · gaps · auto margin · centred column",
             {930.0, 210.0});
         (*page).add_at(flex_group, {24.0, 92.0, 930.0, 210.0});
 
-        std::shared_ptr<FlexLayoutPanel> row = make_control<FlexLayoutPanel>(
+        std::shared_ptr<FlexPanel> row = make_control<FlexPanel>(
             StableId("gallery.css-layout.flex.row"));
         (*row).set_accessible_name("Growing flex row");
         (*row).set_flex_wrap(FlexWrap::wrap);
@@ -68,7 +68,7 @@ private:
         pushed_layout.auto_margin.left = true;
         (*row).set_item_layout(*pushed, pushed_layout);
 
-        std::shared_ptr<FlexLayoutPanel> column = make_control<FlexLayoutPanel>(
+        std::shared_ptr<FlexPanel> column = make_control<FlexPanel>(
             StableId("gallery.css-layout.flex.column"));
         (*column).set_accessible_name("Centred flex column");
         (*column).set_flex_direction(FlexDirection::column);
@@ -93,11 +93,11 @@ private:
     void build_grid(const std::shared_ptr<Surface>& page) {
         std::shared_ptr<LayoutGroup> grid_group = group(
             "gallery.css-layout.grid.group",
-            "GridLayoutPanel · named areas · fr tracks · auto-fill minmax cards · span",
+            "GridPanel · named areas · fr tracks · auto-fill minmax cards · span",
             {930.0, 210.0});
         (*page).add_at(grid_group, {24.0, 312.0, 930.0, 210.0});
 
-        std::shared_ptr<GridLayoutPanel> areas = make_control<GridLayoutPanel>(
+        std::shared_ptr<GridPanel> areas = make_control<GridPanel>(
             StableId("gallery.css-layout.grid.areas"));
         (*areas).set_accessible_name("Named grid areas");
         GridTrackList columns{};
@@ -130,7 +130,7 @@ private:
             (*areas).set_item_layout(*item, layout);
         }
 
-        std::shared_ptr<GridLayoutPanel> cards = make_control<GridLayoutPanel>(
+        std::shared_ptr<GridPanel> cards = make_control<GridPanel>(
             StableId("gallery.css-layout.grid.cards"));
         (*cards).set_accessible_name("Auto-fill grid cards");
         GridTrackSize card{};
@@ -170,11 +170,11 @@ private:
     void build_block(const std::shared_ptr<Surface>& page) {
         std::shared_ptr<LayoutGroup> block_group = group(
             "gallery.css-layout.block.group",
-            "BlockFlowPanel · collapsing margins · auto margins · centred inline lines",
+            "BlockPanel · collapsing margins · auto margins · centred inline lines",
             {930.0, 124.0});
         (*page).add_at(block_group, {24.0, 532.0, 930.0, 124.0});
 
-        std::shared_ptr<BlockFlowPanel> stack = make_control<BlockFlowPanel>(
+        std::shared_ptr<BlockPanel> stack = make_control<BlockPanel>(
             StableId("gallery.css-layout.block.stack"));
         (*stack).set_accessible_name("Stacked blocks");
         (*block_group).add_at(stack, {18.0, 36.0, 400.0, 76.0});
@@ -196,7 +196,7 @@ private:
             }
         }
 
-        std::shared_ptr<BlockFlowPanel> line = make_control<BlockFlowPanel>(
+        std::shared_ptr<BlockPanel> line = make_control<BlockPanel>(
             StableId("gallery.css-layout.block.line"));
         (*line).set_accessible_name("Centred inline line");
         (*line).set_text_align(TextAlignment::center);

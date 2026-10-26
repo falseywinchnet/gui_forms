@@ -15,16 +15,16 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
      - The docked part of a docking workspace in one window: tool stacks with captions around the document area, separated by seams.
    * - :cpp:class:`DockNavigator <gui_forms::DockNavigator>`
      - The two-list window switcher of docking: the active tool windows beside the active files.
-   * - :cpp:class:`FlowLayoutPanel <gui_forms::FlowLayoutPanel>`
-     - A container that lays its children out one after another in a row or column, wrapping onto new lines.
-   * - :cpp:class:`FlexLayoutPanel <gui_forms::FlexLayoutPanel>`
+   * - :cpp:class:`FlexPanel <gui_forms::FlexPanel>`
      - A container that lays its children out as a CSS flex container: lines of items that grow, shrink and align along a row or column.
-   * - :cpp:class:`GridLayoutPanel <gui_forms::GridLayoutPanel>`
+   * - :cpp:class:`GridPanel <gui_forms::GridPanel>`
      - A container that lays its children out as a CSS grid container: items placed in rows and columns of sized tracks, by line, by area name or automatically.
-   * - :cpp:class:`BlockFlowPanel <gui_forms::BlockFlowPanel>`
+   * - :cpp:class:`BlockPanel <gui_forms::BlockPanel>`
      - A container that lays its children out as a CSS block formatting context: blocks stacked with collapsing margins, and runs of inline items broken into lines.
-   * - :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>`
-     - A container that arranges its children in a grid of sized rows and columns.
+   * - :cpp:class:`FlowLayoutPanelCompat <gui_forms::FlowLayoutPanelCompat>`
+     - For Windows Forms migration: Windows Forms' FlowLayoutPanel, laying its children out one after another in wrapping lines.
+   * - :cpp:class:`TableLayoutPanelCompat <gui_forms::TableLayoutPanelCompat>`
+     - For Windows Forms migration: Windows Forms' TableLayoutPanel, arranging its children in a grid of sized rows and columns.
    * - :cpp:class:`ResponsiveTrackPanel <gui_forms::ResponsiveTrackPanel>`
      - A container that divides one axis into tracks which shrink, grow and collapse in an order you set.
    * - :cpp:class:`ScaledPanel <gui_forms::ScaledPanel>`
@@ -43,11 +43,11 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
 
    generated/gui_forms.DockSite
    generated/gui_forms.DockNavigator
-   generated/gui_forms.FlowLayoutPanel
-   generated/gui_forms.FlexLayoutPanel
-   generated/gui_forms.GridLayoutPanel
-   generated/gui_forms.BlockFlowPanel
-   generated/gui_forms.TableLayoutPanel
+   generated/gui_forms.FlexPanel
+   generated/gui_forms.GridPanel
+   generated/gui_forms.BlockPanel
+   generated/gui_forms.FlowLayoutPanelCompat
+   generated/gui_forms.TableLayoutPanelCompat
    generated/gui_forms.ResponsiveTrackPanel
    generated/gui_forms.ScaledPanel
    generated/gui_forms.SplitContainer
@@ -65,7 +65,7 @@ Related types
    * - :cpp:class:`BlockFlowItemLayout <gui_forms::BlockFlowItemLayout>`
      - One child's block flow properties (CSS's names; PLAN section 2.4).
    * - :cpp:class:`BlockFlowSharedMargins <gui_forms::BlockFlowSharedMargins>`
-     - The margins a nested BlockFlowPanel's content shares with the block flow that lays it out (CSS 2.1 8.3.1), its own margins excluded.
+     - The margins a nested BlockPanel's content shares with the block flow that lays it out (CSS 2.1 8.3.1), its own margins excluded.
    * - :cpp:class:`CommandOverflowGroupResult <gui_forms::CommandOverflowGroupResult>`
      -  
    * - :cpp:class:`CommandOverflowGroupSpec <gui_forms::CommandOverflowGroupSpec>`
@@ -138,7 +138,7 @@ Related types
      - Stage T1 anatomy, as dot members: the scrollable parts and the face.
    * - :cpp:class:`TableLayoutCellPosition <gui_forms::TableLayoutCellPosition>`
      - TableLayoutCellPosition names a zero-based row and column for exact retained child placement.
-   * - :cpp:class:`TableLayoutPanel::Parts <gui_forms::TableLayoutPanel::Parts>`
+   * - :cpp:class:`TableLayoutPanelCompat::Parts <gui_forms::TableLayoutPanelCompat::Parts>`
      - Stage T1 anatomy, as dot members: the scrollable parts and the cell grid.
    * - :cpp:class:`TableLayoutStyle <gui_forms::TableLayoutStyle>`
      - TableLayoutStyle pairs absolute, autosize, or percentage sizing policy with its validated authored value.
@@ -147,7 +147,7 @@ Related types
 
 .. cpp:struct:: BlockFlowItemLayout final
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/block_flow_panel/block_flow_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/block_panel/block_panel.hpp>``
 
    One child's block flow properties (CSS's names; PLAN section 2.4). The panel keeps one per child, keyed by its runtime id and dropped when the child leaves. Margins are the child's own ``margin``; ``auto_margin`` marks the sides that are ``auto`` instead, which matters only for a block item's left and right (CSS 2.1 10.3.3; any other ``auto`` margin is zero). The child's minimum_size and maximum_size bound its used size as its own min and max sizes do.
 
@@ -189,9 +189,9 @@ Related types
 
 .. cpp:struct:: BlockFlowSharedMargins final
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/block_flow_panel/block_flow_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/block_panel/block_panel.hpp>``
 
-   The margins a nested BlockFlowPanel's content shares with the block flow that lays it out (CSS 2.1 8.3.1), its own margins excluded.
+   The margins a nested BlockPanel's content shares with the block flow that lays it out (CSS 2.1 8.3.1), its own margins excluded.
 
    .. cpp:member:: CollapsedMargin leading
 
@@ -581,7 +581,7 @@ Related types
 
 .. cpp:struct:: FlexItemLayout final
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/flex_layout_panel/flex_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/flex_panel/flex_panel.hpp>``
 
    One child's flex item properties (CSS Flexbox's names; PLAN section 2.2). The panel keeps one per child, keyed by its runtime id and dropped when the child leaves. Margins are the child's own ``margin``; ``auto_margin`` marks the sides that are ``auto`` instead. The child's minimum_size and maximum_size still bound it after these sizes are applied.
 
@@ -623,7 +623,7 @@ Related types
 
 .. cpp:struct:: GridItemLayout final
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/grid_layout_panel/grid_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/grid_panel/grid_panel.hpp>``
 
    One child's grid item properties (CSS Grid's names; PLAN section 2.3). The panel keeps one per child, keyed by its runtime id and dropped when the child leaves. Margins are the child's own ``margin``; ``auto_margin`` marks the sides that are ``auto`` instead. The child's minimum_size and maximum_size bound its content contributions, and its used size where its own minimum is a length or its own maximum a length or ``none``.
 
@@ -974,7 +974,7 @@ Related types
 
 .. cpp:struct:: TableLayoutCellPosition final
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.hpp>``
 
    TableLayoutCellPosition names a zero-based row and column for exact retained child placement.
 
@@ -984,9 +984,9 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: TableLayoutPanel::Parts final
+.. cpp:struct:: TableLayoutPanelCompat::Parts final
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.hpp>``
 
    Stage T1 anatomy, as dot members: the scrollable parts and the cell grid.
 
@@ -998,7 +998,7 @@ Related types
 
 .. cpp:struct:: TableLayoutStyle final
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.hpp>``
 
    TableLayoutStyle pairs absolute, autosize, or percentage sizing policy with its validated authored value.
 
@@ -1105,7 +1105,7 @@ Enumerations
 
 .. cpp:enum-class:: FlowCrossAlignment
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/flow_layout_panel_compat/flow_layout_panel_compat.hpp>``
 
    .. cpp:enumerator:: start
 
@@ -1119,7 +1119,7 @@ Enumerations
 
 .. cpp:enum-class:: FlowDirection
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/flow_layout_panel_compat/flow_layout_panel_compat.hpp>``
 
    .. cpp:enumerator:: left_to_right
 
@@ -1133,7 +1133,7 @@ Enumerations
 
 .. cpp:enum-class:: FlowMainAlignment
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/flow_layout_panel_compat/flow_layout_panel_compat.hpp>``
 
    .. cpp:enumerator:: start
 
@@ -1275,7 +1275,7 @@ Enumerations
 
 .. cpp:enum-class:: TableCellBorderStyle
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.hpp>``
 
    .. cpp:enumerator:: none
 
@@ -1289,7 +1289,7 @@ Enumerations
 
 .. cpp:enum-class:: TableLayoutGrowStyle
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.hpp>``
 
    .. cpp:enumerator:: fixed_size
 
@@ -1301,7 +1301,7 @@ Enumerations
 
 .. cpp:enum-class:: TableSizeMode
 
-   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp>``
+   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.hpp>``
 
    .. cpp:enumerator:: absolute
 

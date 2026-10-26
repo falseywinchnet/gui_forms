@@ -437,11 +437,11 @@ void place_docking(FixtureBuilder& builder) {
 }
 
 void place_layout(FixtureBuilder& builder) {
-    std::shared_ptr<FlowLayoutPanel> flow = builder.place(
-        make_control<FlowLayoutPanel>(StableId("flow_layout_panel")), 30.0);
+    std::shared_ptr<FlowLayoutPanelCompat> flow = builder.place(
+        make_control<FlowLayoutPanelCompat>(StableId("flow_layout_panel_compat")), 30.0);
     (*flow).set_accessible_name("Flow");
-    std::shared_ptr<TableLayoutPanel> table = builder.place(
-        make_control<TableLayoutPanel>(StableId("table_layout_panel")), 30.0);
+    std::shared_ptr<TableLayoutPanelCompat> table = builder.place(
+        make_control<TableLayoutPanelCompat>(StableId("table_layout_panel_compat")), 30.0);
     (*table).set_accessible_name("Table");
     std::shared_ptr<ResponsiveTrackPanel> tracks = builder.place(
         make_control<ResponsiveTrackPanel>(StableId("responsive_track_panel")), 30.0);

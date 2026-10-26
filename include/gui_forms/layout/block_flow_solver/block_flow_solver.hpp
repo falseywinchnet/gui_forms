@@ -13,7 +13,7 @@ namespace gui_forms {
 
 // The block flow solver (stage L, phase L5; PLAN section 2.4): a CSS block
 // formatting context over named records, with no control, painter or host
-// dependency. BlockFlowPanel realizes it over child controls.
+// dependency. BlockPanel realizes it over child controls.
 //
 // Block-level items stack on the block axis with their vertical margins
 // collapsed (CSS 2.1 section 8.3.1, without floats or clearance) and their

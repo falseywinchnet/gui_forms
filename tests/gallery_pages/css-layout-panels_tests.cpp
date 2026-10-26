@@ -8,18 +8,18 @@ void test_css_layout_panels(gui_forms::Window& window) {
 
     // The flex row: equal bases, so the two-share item grows twice as much;
     // the auto-margin item ends flush with the content box's right edge.
-    const std::shared_ptr<FlexLayoutPanel> flex_row =
-        std::dynamic_pointer_cast<FlexLayoutPanel>(window.find("gallery.css-layout.flex.row"));
+    const std::shared_ptr<FlexPanel> flex_row =
+        std::dynamic_pointer_cast<FlexPanel>(window.find("gallery.css-layout.flex.row"));
     const Control::Ptr one = window.find("gallery.css-layout.flex.row.item.0");
     const Control::Ptr two = window.find("gallery.css-layout.flex.row.item.2");
     const Control::Ptr pushed = window.find("gallery.css-layout.flex.row.pushed");
-    const std::shared_ptr<FlexLayoutPanel> flex_column =
-        std::dynamic_pointer_cast<FlexLayoutPanel>(window.find("gallery.css-layout.flex.column"));
+    const std::shared_ptr<FlexPanel> flex_column =
+        std::dynamic_pointer_cast<FlexPanel>(window.find("gallery.css-layout.flex.column"));
     const Control::Ptr narrow = window.find("gallery.css-layout.flex.column.item.0");
     const Control::Ptr wide = window.find("gallery.css-layout.flex.column.item.2");
     window.perform_layout();
     require(flex_row && one && two && pushed && flex_column && narrow && wide,
-            "the page must retain its two FlexLayoutPanel specimens");
+            "the page must retain its two FlexPanel specimens");
     const double one_growth = (*one).arranged_bounds().width - (*one).requested_bounds().width;
     const double two_growth = (*two).arranged_bounds().width - (*two).requested_bounds().width;
     const Rect row_bounds = (*flex_row).arranged_bounds();
@@ -44,12 +44,12 @@ void test_css_layout_panels(gui_forms::Window& window) {
 
     // The named areas: the head and foot span both columns, the main area
     // follows the fixed 90 px side column and its gap.
-    const std::shared_ptr<GridLayoutPanel> areas =
-        std::dynamic_pointer_cast<GridLayoutPanel>(window.find("gallery.css-layout.grid.areas"));
+    const std::shared_ptr<GridPanel> areas =
+        std::dynamic_pointer_cast<GridPanel>(window.find("gallery.css-layout.grid.areas"));
     const Control::Ptr head = window.find("gallery.css-layout.grid.areas.head");
     const Control::Ptr main = window.find("gallery.css-layout.grid.areas.main");
     const Control::Ptr foot = window.find("gallery.css-layout.grid.areas.foot");
-    require(areas && head && main && foot, "the page must retain its named-area GridLayoutPanel");
+    require(areas && head && main && foot, "the page must retain its named-area GridPanel");
     const Rect area_bounds = (*areas).arranged_bounds();
     const Rect foot_bounds = (*foot).arranged_bounds();
     require(std::abs((*head).arranged_bounds().width - area_bounds.width) < 1.0e-6 &&
@@ -60,8 +60,8 @@ void test_css_layout_panels(gui_forms::Window& window) {
 
     // The cards: five minmax(86px, 1fr) columns fit 476 px; the spanning
     // card covers two of them and the gap between.
-    const std::shared_ptr<GridLayoutPanel> cards =
-        std::dynamic_pointer_cast<GridLayoutPanel>(window.find("gallery.css-layout.grid.cards"));
+    const std::shared_ptr<GridPanel> cards =
+        std::dynamic_pointer_cast<GridPanel>(window.find("gallery.css-layout.grid.cards"));
     const Control::Ptr first_card = window.find("gallery.css-layout.grid.cards.item.0");
     const Control::Ptr spanning = window.find("gallery.css-layout.grid.cards.item.1");
     require(cards && first_card && spanning && (*cards).layout_snapshot().columns().size() == 5U,
@@ -76,11 +76,11 @@ void test_css_layout_panels(gui_forms::Window& window) {
 
     // The stacked blocks: 4 px margins collapse to 4 between neighbours,
     // and the middle block is 200 px wide and centred.
-    const std::shared_ptr<BlockFlowPanel> stack =
-        std::dynamic_pointer_cast<BlockFlowPanel>(window.find("gallery.css-layout.block.stack"));
+    const std::shared_ptr<BlockPanel> stack =
+        std::dynamic_pointer_cast<BlockPanel>(window.find("gallery.css-layout.block.stack"));
     const Control::Ptr first_block = window.find("gallery.css-layout.block.stack.item.0");
     const Control::Ptr middle_block = window.find("gallery.css-layout.block.stack.item.1");
-    require(stack && first_block && middle_block, "the page must retain its stacked BlockFlowPanel");
+    require(stack && first_block && middle_block, "the page must retain its stacked BlockPanel");
     const Rect stack_bounds = (*stack).arranged_bounds();
     const Rect first_bounds = (*first_block).arranged_bounds();
     const Rect middle_bounds = (*middle_block).arranged_bounds();
@@ -92,8 +92,8 @@ void test_css_layout_panels(gui_forms::Window& window) {
 
     // The inline line: four 96 px margin boxes fit 476 px; the rest wrap,
     // and every line is centred.
-    const std::shared_ptr<BlockFlowPanel> line =
-        std::dynamic_pointer_cast<BlockFlowPanel>(window.find("gallery.css-layout.block.line"));
+    const std::shared_ptr<BlockPanel> line =
+        std::dynamic_pointer_cast<BlockPanel>(window.find("gallery.css-layout.block.line"));
     require(line && (*line).layout_snapshot().lines().size() == 2U && (*line).layout_snapshot().lines()[0].count == 4U,
             "the inline line must hold four buttons and wrap the other two");
     const Control::Ptr first_inline = window.find("gallery.css-layout.block.line.item.0");

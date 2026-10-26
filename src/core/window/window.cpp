@@ -494,7 +494,7 @@ PopupToken Window::open_popup(const Control::Ptr& owner,
         throw std::logic_error("GUI.Forms popup must be a live detached root");
     }
     // Popups are window overlays, not children in the consumer's layout
-    // vocabulary. Attaching one to root_ lets a TableLayoutPanel, Flow panel,
+    // vocabulary. Attaching one to root_ lets a TableLayoutPanelCompat, Flow panel,
     // or docking root assign it an application cell and silently collapse the
     // overlay. Keep it as a separate retained root while still registering the
     // subtree with this Window for lifetime, focus, semantics, and dispatch.

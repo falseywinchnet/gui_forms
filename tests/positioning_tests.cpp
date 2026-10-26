@@ -1,7 +1,7 @@
 // Stage L, phase L5: positioning in the CSS containers (PLAN sections 2.5
 // and 3.3, decision L-Q6). The core arithmetic of absolutely positioned
-// boxes and relative offsets; absolute children of FlexLayoutPanel,
-// GridLayoutPanel and BlockFlowPanel, out of the flow and placed in their
+// boxes and relative offsets; absolute children of FlexPanel,
+// GridPanel and BlockPanel, out of the flow and placed in their
 // containing block; the containing_block_not_parent warning, recorded once
 // per change of resolution; and the containing-block dependency: resizing
 // the ancestor moves a `bottom: 0` grandchild in one arrange pass, removing
@@ -197,7 +197,7 @@ void test_absolute_axis_arithmetic() {
 // -- absolute and relative children in each container -------------------------------
 
 void test_flex_children() {
-    std::shared_ptr<FlexLayoutPanel> root = container<FlexLayoutPanel>("pos.flex");
+    std::shared_ptr<FlexPanel> root = container<FlexPanel>("pos.flex");
     (*root).set_padding({10.0, 10.0, 10.0, 10.0});
     std::shared_ptr<Panel> first = box("pos.flex.a");
     std::shared_ptr<Panel> pinned = box("pos.flex.pinned");
@@ -241,7 +241,7 @@ void test_flex_children() {
 }
 
 void test_grid_and_block_children() {
-    std::shared_ptr<GridLayoutPanel> grid = container<GridLayoutPanel>("pos.grid");
+    std::shared_ptr<GridPanel> grid = container<GridPanel>("pos.grid");
     std::shared_ptr<Panel> cell = box("pos.grid.cell");
     std::shared_ptr<Panel> band = box("pos.grid.band");
     (*grid).add_child(cell);
@@ -257,7 +257,7 @@ void test_grid_and_block_children() {
 
     // Both insets `auto`: the static position, the content box's start
     // corner (its end edge right to left).
-    std::shared_ptr<BlockFlowPanel> flow = container<BlockFlowPanel>("pos.block");
+    std::shared_ptr<BlockPanel> flow = container<BlockPanel>("pos.block");
     (*flow).set_padding({8.0, 8.0, 8.0, 8.0});
     std::shared_ptr<Panel> stacked = box("pos.block.stacked");
     std::shared_ptr<Panel> loose = box("pos.block.loose");
@@ -287,9 +287,9 @@ void test_grid_and_block_children() {
 // 200 high) > middle (grid, 100 by 100 at the ancestor's start) > pinned
 // (absolute, left 0 and bottom 0, 30 by 10).
 struct Grandchild final {
-    std::shared_ptr<BlockFlowPanel> root{};
-    std::shared_ptr<FlexLayoutPanel> ancestor{};
-    std::shared_ptr<GridLayoutPanel> middle{};
+    std::shared_ptr<BlockPanel> root{};
+    std::shared_ptr<FlexPanel> ancestor{};
+    std::shared_ptr<GridPanel> middle{};
     std::shared_ptr<Panel> pinned{};
     std::unique_ptr<Window> window{};
 };
@@ -303,9 +303,9 @@ BlockFlowItemLayout ancestor_layout(double height, bool positioned) {
 
 Grandchild build_grandchild() {
     Grandchild built{};
-    built.root = container<BlockFlowPanel>("pos.root");
-    built.ancestor = container<FlexLayoutPanel>("pos.ancestor");
-    built.middle = container<GridLayoutPanel>("pos.middle");
+    built.root = container<BlockPanel>("pos.root");
+    built.ancestor = container<FlexPanel>("pos.ancestor");
+    built.middle = container<GridPanel>("pos.middle");
     built.pinned = box("pos.pinned");
     (*built.root).add_child(built.ancestor);
     (*built.ancestor).add_child(built.middle);
@@ -414,14 +414,14 @@ void test_removing_positioning_re_resolves() {
 // whole subtree; the window keeps 1,000 warnings and counts the rest.
 void test_dependent_and_diagnostic_limits() {
     constexpr std::size_t count = maximum_containing_block_dependents + 1U;
-    std::shared_ptr<BlockFlowPanel> root = container<BlockFlowPanel>("pos.many");
-    std::shared_ptr<FlexLayoutPanel> ancestor = container<FlexLayoutPanel>("pos.many.ancestor");
+    std::shared_ptr<BlockPanel> root = container<BlockPanel>("pos.many");
+    std::shared_ptr<FlexPanel> ancestor = container<FlexPanel>("pos.many.ancestor");
     (*ancestor).set_flex_wrap(FlexWrap::wrap);
     // Lines packed at the start, so the ancestor's resize moves no holder.
     (*ancestor).set_align_content(LayoutAlignment::flex_start);
     (*root).add_child(ancestor);
     (*root).set_item_layout(*ancestor, ancestor_layout(500.0, true));
-    std::vector<std::shared_ptr<FlexLayoutPanel>> holders;
+    std::vector<std::shared_ptr<FlexPanel>> holders;
     std::vector<std::shared_ptr<Panel>> pins;
     holders.reserve(count);
     pins.reserve(count);
@@ -434,7 +434,7 @@ void test_dependent_and_diagnostic_limits() {
     pin_layout.positioning = absolute(inset_auto, inset_auto, inset_px(0.0), inset_px(0.0));
     for (std::size_t index = 0U; index < count; ++index) {
         const std::string id = "pos.many." + std::to_string(index);
-        std::shared_ptr<FlexLayoutPanel> holder = container<FlexLayoutPanel>(id);
+        std::shared_ptr<FlexPanel> holder = container<FlexPanel>(id);
         std::shared_ptr<Panel> pin = box(id + ".pin");
         (*holder).add_child(pin);
         (*holder).set_item_layout(*pin, pin_layout);
