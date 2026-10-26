@@ -40,7 +40,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | plan accepted ([PLAN.md](T5-compositor/PLAN.md)), decisions T5-Q1 to T5-Q16 (2026-10-25), C0 next; reflection and full-fidelity glass moved here from T2 (owner decision 2026-10-23) |
 | L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | plan accepted 2026-10-25 (`L-layout/PLAN.md`, interview round 001 in the brief); L0 next |
 | FD | [Form documents](FD-form-documents/README.md) | 0.4 Flexible | T1, T3 | not started; format decided |
-| DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | in progress: rectangle sets painted and presented on every host, paint contract version 2 (#59 to #78); X11 direct live frames in #80; Windows gate recorded (`results/2026-10-13-dp-gate-windows`), macOS and X11 records pending PlaySuite's runs against #80 |
+| DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | complete 2026-10-25 (#320): rectangle sets painted on every host, paint contract version 2 (#59 to #78), X11 direct live frames (#80); gate records `results/2026-10-13-dp-gate-windows`, `results/2026-10-25-dp-gate-x11` and `results/2026-10-25-dp-gate-macos`; the owner accepted macOS's copy (AppKit's union over unchanged pixels) as recorded |
 | W | [Windows Forms control coverage (.NET 8+ only)](W-winforms-controls/README.md) | 0.4 Flexible to 0.6 Bindings | T4, or the by-role paint path (ruling 2026-10-14) | started 2026-10-14: catalogue regenerated from the official surface; by-role paint path in place |
 | R | [SDRSharp reflection](R-sdrsharp-reflection/README.md) | not on the public site | T4, F | last run 2026-08-10 |
 | C | [Stable installed C ABI](C-c-abi/README.md) | 0.5 ABI candidate | T1, T2 | experimental ABI 0.26, not installed |
@@ -67,8 +67,7 @@ complete. The next spine stage is
 **T3, the theme language front end**, now unblocked by T2; **T5** and **C**
 are also unblocked (T5 now carries reflection and full-fidelity glass), and
 **L** has been ready since T1. **W** continues under the by-role paint path
-(ruling 2026-10-14), and **DP** is open only for its macOS and X11 gate
-records. Read `planning/stages/T2-engine-core/README.md` and its gate record
+(ruling 2026-10-14), and **DP** is complete (2026-10-25). Read `planning/stages/T2-engine-core/README.md` and its gate record
 before starting T3, T4, T5 or C, and `planning/stages/T1-anatomy/README.md`
 "Hand-off" before T3, L, FD or C.
 

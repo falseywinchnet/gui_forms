@@ -548,6 +548,13 @@ void generate_fresco(const ProceduralFill& fill, const PatternInputs& inputs, co
     }
 }
 
+// Every pixel of `destination` in the ground colour.
+void fill_ground(const PatternInputs& inputs, const PartRasterView& destination) noexcept {
+    for (std::uint32_t y = 0U; y < inputs.height; ++y) {
+        for (std::uint32_t x = 0U; x < inputs.width; ++x) store_channels(pixel_at(destination, x, y), inputs.ground);
+    }
+}
+
 std::uint64_t generation_weight(ProceduralPattern pattern) noexcept {
     const ProceduralEffortWeights& weights = procedural_effort_weights;
     switch (pattern) {
@@ -623,9 +630,7 @@ void generate_procedural(const ProceduralFill& fill, double scale, const PartRas
         return;
     }
     // A pattern outside the enumeration is never accepted: the ground.
-    for (std::uint32_t y = 0U; y < inputs.height; ++y) {
-        for (std::uint32_t x = 0U; x < inputs.width; ++x) store_channels(pixel_at(destination, x, y), inputs.ground);
-    }
+    fill_ground(inputs, destination);
 }
 
 std::shared_ptr<PartRaster> make_procedural_pattern(const ProceduralFill& fill, double scale,

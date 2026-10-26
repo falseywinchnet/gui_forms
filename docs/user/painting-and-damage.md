@@ -167,7 +167,13 @@ bounding box shows them equal. Both Windows profiles copy each damage
 rectangle (the transactional one still swaps its whole candidate only after
 every rectangle is copied); the X11 host copies each damage rectangle; the
 macOS host copies the rectangles AppKit draws, with live frames counted inside
-the same copy. Every host composes a new opaque live frame the same way: the
+the same copy. AppKit merges the macOS host's display requests into their
+union, so its count shows one rectangle where the host painted several; the
+pixels outside the painted set are copied unchanged. A macOS draw with
+nothing to paint and no live frame (a window shown again, activated or
+restored, or an exposure while hidden) copies the raster as it stands and
+reports nothing: it adds no present, no pixels and no
+`screen_copy_nanoseconds`. Every host composes a new opaque live frame the same way: the
 frame's changed region is drawn straight into the raster, and retained
 painting covers only real damage, such as the share of an overlay above the
 change, in the same frame. On X11 a frame that is not opaque is composed by
