@@ -7,9 +7,10 @@
 Chromium is a test oracle only (L README, owner decision 2): this script
 runs at test-authoring time or in the layout-oracle CI job, never from
 GUI.Forms. It starts the pinned headless shell once, loads each fixture in
-the page template, and for every profile of the manifest sets the viewport
-and device scale, waits for fonts, and reads getBoundingClientRect() for
-every element with a data-gf-id. The boxes go to <output>/<name>.xml in the
+the page template, and for every profile that applies to it sets the
+viewport, the device scale and the root's direction (the dir attribute of
+<html>, absent for left to right), waits for fonts, and reads
+getBoundingClientRect() for every element with a data-gf-id. The boxes go to <output>/<name>.xml in the
 box-file format of corpus.py. --no-sandbox is for CI runners whose kernel
 refuses Chromium's sandbox; the page is a local fixture with no script but
 the capture expression.
@@ -25,7 +26,8 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from corpus import Box, BoxSet, Corpus, CorpusError, Fixture, read_corpus, write_box_file  # noqa: E402
+from corpus import (Box, BoxSet, CorpusError, Fixture, Profile,  # noqa: E402
+                    read_corpus, write_box_file)
 from devtools import Browser, DevToolsError, Session  # noqa: E402
 
 TOOL_DIRECTORY = Path(__file__).resolve().parent
@@ -73,17 +75,31 @@ def build_page(template: str, faces: str, fixture: Fixture) -> str:
     return template.replace("@@FONT_FACES@@", faces).replace("@@FIXTURE@@", fragment)
 
 
-def capture_fixture(session: Session, corpus: Corpus, page: Path) -> BoxSet:
+def direction_expression(direction: str) -> str:
+    # Left to right removes the attribute, so a left-to-right capture is the
+    # page exactly as the template builds it.
+    if direction == "ltr":
+        return "document.documentElement.removeAttribute('dir')"
+    return f"document.documentElement.setAttribute('dir', '{direction}')"
+
+
+def capture_fixture(session: Session, profiles: tuple[Profile, ...], page: Path) -> BoxSet:
     session.call("Page.navigate", {"url": page.resolve().as_uri()})
     session.wait_for_event("Page.loadEventFired")
     boxes: BoxSet = {}
-    for profile in corpus.profiles:
+    for profile in profiles:
         session.call("Emulation.setDeviceMetricsOverride", {
             "width": profile.width,
             "height": profile.height,
             "deviceScaleFactor": profile.scale,
             "mobile": False,
         })
+        directed = session.call("Runtime.evaluate", {
+            "expression": direction_expression(profile.direction),
+            "returnByValue": True,
+        })
+        if "exceptionDetails" in directed:
+            raise DevToolsError(f"setting the direction failed: {directed['exceptionDetails']}")
         result = session.call("Runtime.evaluate", {
             "expression": CAPTURE_EXPRESSION,
             "awaitPromise": True,
@@ -154,12 +170,13 @@ def main(arguments: list[str]) -> int:
                 page = scratch_path / "pages" / f"{fixture.name}.html"
                 page.parent.mkdir(parents=True, exist_ok=True)
                 page.write_text(build_page(template, faces, fixture), encoding="utf-8")
-                boxes = capture_fixture(session, corpus, page)
+                profiles = corpus.profiles_for(fixture)
+                boxes = capture_fixture(session, profiles, page)
                 attributes = {"fixture": fixture.name, "chromium": version}
                 if options.platform:
                     attributes["platform"] = options.platform
                 write_box_file(corpus.reference_path(fixture, options.output),
-                               "layout-reference", attributes, corpus.profiles, boxes)
+                               "layout-reference", attributes, profiles, boxes)
                 print(f"captured {fixture.name}")
         finally:
             browser.close()

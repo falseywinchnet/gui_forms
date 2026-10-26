@@ -3,8 +3,10 @@
 The corpus lives in tests/layout_corpus/ (planning/stages/L-layout/PLAN.md
 section 6.4):
 
-- corpus.xml, the manifest: the profiles every fixture is laid out at, the
-  tolerances, and the fixtures in order;
+- corpus.xml, the manifest: the profiles, the tolerances, and the fixtures
+  in order. Every fixture is laid out at every left-to-right profile; a
+  profile with direction="rtl" applies only to the fixtures the manifest
+  marks bidirectional="true", whose root is then laid out right to left;
 - fixtures/<name>.html, one well-formed HTML fragment per fixture, read by
   Chromium and, as XML, by the GUI.Forms corpus test;
 - references/<name>.xml, Chromium's boxes for every profile, written by
@@ -33,15 +35,21 @@ class CorpusError(ValueError):
     """A manifest, fixture or box file that does not follow the format."""
 
 
+DIRECTIONS = ("ltr", "rtl")
+
+
 @dataclass(frozen=True)
 class Profile:
     width: int
     height: int
     scale: float
+    # The root's inline direction: "ltr" or "rtl" (HTML's dir attribute).
+    direction: str = "ltr"
 
     @property
     def key(self) -> str:
-        return f"{self.width}x{self.height}@{format_number(self.scale)}"
+        base = f"{self.width}x{self.height}@{format_number(self.scale)}"
+        return base if self.direction == "ltr" else f"{base}/{self.direction}"
 
 
 @dataclass(frozen=True)
@@ -58,6 +66,7 @@ class Fixture:
     path: Path
     is_text: bool
     expected_differences: dict[str, str]
+    bidirectional: bool = False
 
 
 @dataclass(frozen=True)
@@ -66,6 +75,11 @@ class Corpus:
     profiles: tuple[Profile, ...]
     tolerances: Tolerances
     fixtures: tuple[Fixture, ...]
+
+    def profiles_for(self, fixture: Fixture) -> tuple[Profile, ...]:
+        """The manifest's profiles that apply to the fixture, in manifest order."""
+        return tuple(profile for profile in self.profiles
+                     if profile.direction == "ltr" or fixture.bidirectional)
 
     def reference_path(self, fixture: Fixture, directory: Path | None = None) -> Path:
         base = directory if directory is not None else self.root / "references"
@@ -116,7 +130,10 @@ def _parse_profile(element: ElementTree.Element, source: Path) -> Profile:
     scale = _number(element, "scale", source)
     if not (1 <= width <= 8192 and 1 <= height <= 8192 and 0.5 <= scale <= 4.0):
         raise CorpusError(f"{source}: profile {viewport}@{scale} is out of range")
-    return Profile(width, height, scale)
+    direction = element.get("direction", "ltr")
+    if direction not in DIRECTIONS:
+        raise CorpusError(f"{source}: profile direction {direction!r} is not ltr or rtl")
+    return Profile(width, height, scale, direction)
 
 
 def _walk(element: ElementTree.Element, is_text: list[bool], expected: dict[str, str],
@@ -138,7 +155,7 @@ def _walk(element: ElementTree.Element, is_text: list[bool], expected: dict[str,
         _walk(child, is_text, expected, identities, source)
 
 
-def read_fixture(name: str, path: Path) -> Fixture:
+def read_fixture(name: str, path: Path, bidirectional: bool = False) -> Fixture:
     try:
         root = ElementTree.parse(path).getroot()
     except ElementTree.ParseError as error:
@@ -148,7 +165,7 @@ def read_fixture(name: str, path: Path) -> Fixture:
     is_text = [False]
     expected: dict[str, str] = {}
     _walk(root, is_text, expected, set(), path)
-    return Fixture(name, path, is_text[0], expected)
+    return Fixture(name, path, is_text[0], expected, bidirectional)
 
 
 def read_corpus(root: Path) -> Corpus:
@@ -162,6 +179,8 @@ def read_corpus(root: Path) -> Corpus:
     profiles = tuple(_parse_profile(element, manifest) for element in document.iter("profile"))
     if not profiles:
         raise CorpusError(f"{manifest}: no profiles")
+    if len({profile.key for profile in profiles}) != len(profiles):
+        raise CorpusError(f"{manifest}: a profile repeats")
     tolerance = document.find("tolerance")
     if tolerance is None:
         raise CorpusError(f"{manifest}: no <tolerance>")
@@ -178,7 +197,10 @@ def read_corpus(root: Path) -> Corpus:
         if not name or name in names or ".." in name or name.startswith("/"):
             raise CorpusError(f"{manifest}: fixture name {name!r} is empty, repeated or unsafe")
         names.add(name)
-        fixtures.append(read_fixture(name, root / "fixtures" / f"{name}.html"))
+        marked = element.get("bidirectional", "false")
+        if marked not in ("true", "false"):
+            raise CorpusError(f"{manifest}: {name}: bidirectional is true or false")
+        fixtures.append(read_fixture(name, root / "fixtures" / f"{name}.html", marked == "true"))
     return Corpus(root, profiles, tolerances, tuple(fixtures))
 
 
@@ -214,8 +236,9 @@ def write_box_file(path: Path, tag: str, attributes: dict[str, str],
         f' {name}="{_escape(value)}"' for name, value in attributes.items())
     lines.append(f"<{tag}{attribute_text}>")
     for profile in profiles:
+        direction = "" if profile.direction == "ltr" else f' direction="{profile.direction}"'
         lines.append(f'  <profile viewport="{profile.width}x{profile.height}" '
-                     f'scale="{format_number(profile.scale)}">')
+                     f'scale="{format_number(profile.scale)}"{direction}>')
         for identity, box in boxes[profile.key].items():
             lines.append(
                 f'    <node id="{_escape(identity)}" x="{format_number(box.x)}" '

@@ -67,6 +67,7 @@ def report(corpus: Corpus, native: Path) -> tuple[dict[str, object], bool]:
         fixtures.append({
             "fixture": fixture.name,
             "class": "text" if fixture.is_text else "box",
+            "bidirectional": fixture.bidirectional,
             "tolerance": tolerance,
             "nodes": comparison.nodes,
             "largest_edge": comparison.largest_edge,
@@ -76,6 +77,7 @@ def report(corpus: Corpus, native: Path) -> tuple[dict[str, object], bool]:
     document = {
         "schema": "gui-forms.layout-oracle-report/1",
         "profiles": [profile.key for profile in corpus.profiles],
+        "bidirectional_fixtures": sum(1 for fixture in corpus.fixtures if fixture.bidirectional),
         "tolerances": {
             "box_edge": corpus.tolerances.box_edge,
             "text_edge": corpus.tolerances.text_edge,

@@ -6,9 +6,11 @@
 //
 //   gui_forms_layout_corpus_tests <corpus directory> [--native-out <dir>]
 //
-// For each fixture of corpus.xml and each profile, the fixture's HTML
-// fragment is read as XML, built into GUI.Forms controls, laid out in a
-// window of the profile's size and scale, and every element with a
+// For each fixture of corpus.xml and each profile that applies to it, the
+// fixture's HTML fragment is read as XML, built into GUI.Forms controls,
+// laid out in a window of the profile's size and scale (a right-to-left
+// profile, which applies only to a fixture marked bidirectional, sets the
+// root's LayoutDirection), and every element with a
 // data-gf-id is compared edge by edge with its reference box. A node over
 // tolerance fails the test unless the fixture records the difference with
 // data-gf-expected-difference="<reason>"; recorded differences are still
@@ -63,6 +65,14 @@ struct Profile final {
     std::uint32_t width{};
     std::uint32_t height{};
     double scale{1.0};
+    // The root's direction; right to left applies only to bidirectional
+    // fixtures.
+    LayoutDirection direction{LayoutDirection::left_to_right};
+};
+
+struct FixtureEntry final {
+    std::string name;
+    bool bidirectional{};
 };
 
 struct Tolerances final {
@@ -73,7 +83,7 @@ struct Tolerances final {
 struct Corpus final {
     std::vector<Profile> profiles;
     Tolerances tolerances;
-    std::vector<std::string> fixture_names;
+    std::vector<FixtureEntry> fixtures;
 };
 
 // One reference or native box in viewport coordinates, logical pixels.
@@ -157,17 +167,30 @@ Profile parse_profile(const XmlElement& element, const std::string& where) {
     profile.width = static_cast<std::uint32_t>(width);
     profile.height = static_cast<std::uint32_t>(height);
     profile.scale = scale;
+    const std::string* direction = attribute(element, "direction");
+    if (direction != nullptr) {
+        if (*direction == "rtl") {
+            profile.direction = LayoutDirection::right_to_left;
+        } else if (*direction != "ltr") {
+            fault(where, "profile direction " + *direction + " is not ltr or rtl");
+        }
+    }
     return profile;
 }
 
 bool same_profile(const Profile& left, const Profile& right) noexcept {
     return left.width == right.width && left.height == right.height &&
-           left.scale == right.scale;
+           left.scale == right.scale && left.direction == right.direction;
+}
+
+bool right_to_left(const Profile& profile) noexcept {
+    return profile.direction == LayoutDirection::right_to_left;
 }
 
 std::string profile_name(const Profile& profile) {
     std::ostringstream name;
     name << profile.width << 'x' << profile.height << '@' << profile.scale;
+    if (right_to_left(profile)) name << "/rtl";
     return name.str();
 }
 
@@ -192,13 +215,22 @@ Corpus read_corpus(const std::filesystem::path& root) {
                     (*name).find("..") != std::string::npos) {
                     fault(where, "a fixture name is missing or unsafe");
                 }
-                corpus.fixture_names.push_back(*name);
+                FixtureEntry entry;
+                entry.name = *name;
+                const std::string* marked = attribute(fixture, "bidirectional");
+                if (marked != nullptr) {
+                    if (*marked != "true" && *marked != "false") {
+                        fault(where, *name + ": bidirectional is true or false");
+                    }
+                    entry.bidirectional = *marked == "true";
+                }
+                corpus.fixtures.push_back(std::move(entry));
             }
         } else {
             fault(where, "unknown section <" + section.name + ">");
         }
     }
-    if (corpus.profiles.empty() || corpus.fixture_names.empty()) {
+    if (corpus.profiles.empty() || corpus.fixtures.empty()) {
         fault(where, "the corpus needs profiles and fixtures");
     }
     return corpus;
@@ -1202,6 +1234,7 @@ struct IdentityMatches final {
 };
 
 struct FixtureTally final {
+    std::uint64_t profiles{};
     std::uint64_t nodes{};
     std::uint64_t over_tolerance{};
     std::uint64_t recorded{};
@@ -1223,8 +1256,9 @@ std::map<std::string, std::string> expected_differences(const XmlElement& elemen
 }
 
 bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
-                 const std::string& name, const std::optional<std::filesystem::path>& native_out,
+                 const FixtureEntry& entry, const std::optional<std::filesystem::path>& native_out,
                  FixtureTally& tally) {
+    const std::string& name = entry.name;
     const XmlElement fixture = read_document(corpus_root / "fixtures" / (name + ".html"));
     const std::vector<ProfileBoxes> references =
         read_boxes(corpus_root / "references" / (name + ".xml"));
@@ -1236,6 +1270,8 @@ bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
            << "\">\n";
 
     for (const Profile& profile : corpus.profiles) {
+        if (right_to_left(profile) && !entry.bidirectional) continue;
+        ++tally.profiles;
         const std::vector<ProfileBoxes>::const_iterator reference = std::find_if(
             references.begin(), references.end(), ProfileMatches{profile});
         if (reference == references.end()) {
@@ -1245,13 +1281,15 @@ bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
         }
         FixtureBuilder builder(name);
         const Control::Ptr root = builder.build(fixture);
+        if (right_to_left(profile)) (*root).set_layout_direction(LayoutDirection::right_to_left);
         const std::unique_ptr<Window> held_window = std::make_unique<Window>(
             root, Size{static_cast<double>(profile.width), static_cast<double>(profile.height)});
         Window& window = *held_window;
         window.set_scale(profile.scale);
         window.perform_layout();
         native << "  <profile viewport=\"" << profile.width << 'x' << profile.height
-               << "\" scale=\"" << format_number(profile.scale) << "\">\n";
+               << "\" scale=\"" << format_number(profile.scale) << '"'
+               << (right_to_left(profile) ? " direction=\"rtl\"" : "") << ">\n";
         const std::span<const BuiltIdentity> built = builder.identities();
         for (const BuiltIdentity& entry : built) {
             const Rect observed = (*entry.control).absolute_bounds();
@@ -1322,20 +1360,22 @@ int main(int argument_count, char** arguments) {
         const Corpus corpus = read_corpus(corpus_root);
         bool passed = true;
         FixtureTally total;
-        for (const std::string& name : corpus.fixture_names) {
+        for (const FixtureEntry& entry : corpus.fixtures) {
             FixtureTally tally;
-            const bool fixture_passed = run_fixture(corpus_root, corpus, name, native_out, tally);
-            std::cout << name << ": " << tally.nodes << " nodes, largest edge difference "
+            const bool fixture_passed = run_fixture(corpus_root, corpus, entry, native_out, tally);
+            std::cout << entry.name << ": " << tally.profiles << " profiles, " << tally.nodes
+                      << " nodes, largest edge difference "
                       << tally.largest_edge << ", " << tally.over_tolerance
                       << " over tolerance, " << tally.recorded << " recorded\n";
             passed = passed && fixture_passed;
+            total.profiles += tally.profiles;
             total.nodes += tally.nodes;
             total.over_tolerance += tally.over_tolerance;
             total.recorded += tally.recorded;
             total.largest_edge = std::max(total.largest_edge, tally.largest_edge);
         }
-        std::cout << "corpus: " << corpus.fixture_names.size() << " fixtures, "
-                  << corpus.profiles.size() << " profiles, " << total.nodes << " nodes, "
+        std::cout << "corpus: " << corpus.fixtures.size() << " fixtures, "
+                  << total.profiles << " fixture profiles, " << total.nodes << " nodes, "
                   << total.over_tolerance << " over tolerance, " << total.recorded
                   << " recorded differences, largest edge difference " << total.largest_edge
                   << '\n';

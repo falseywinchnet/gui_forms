@@ -1,0 +1,4889 @@
+{
+ "schema": "gui-forms.layout-oracle-report/1",
+ "profiles": [
+  "320x240@1",
+  "800x600@1",
+  "1280x800@1",
+  "1440x900@1",
+  "320x240@2",
+  "800x600@2",
+  "1280x800@2",
+  "1440x900@2",
+  "320x240@1/rtl",
+  "800x600@1/rtl",
+  "1280x800@1/rtl",
+  "1440x900@1/rtl",
+  "320x240@2/rtl",
+  "800x600@2/rtl",
+  "1280x800@2/rtl",
+  "1440x900@2/rtl"
+ ],
+ "bidirectional_fixtures": 165,
+ "tolerances": {
+  "box_edge": 0.05,
+  "text_edge": 0.51,
+  "baseline": 1.0
+ },
+ "totals": {
+  "nodes": 17440,
+  "over_tolerance": 0,
+  "recorded": 160,
+  "largest_edge": 832.0
+ },
+ "fixtures": [
+  {
+   "fixture": "block/auto-margin-one-side",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 32,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/auto-margins-center",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.012500000000045475,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/block-in-grid",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/empty-block",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 48,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/empty-chain",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 72,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/flex-in-block",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/form-pattern",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 208,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/inline-margins",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/inline-run",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 192,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/inline-run-varied",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 160,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/line-height-strut",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 224,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/max-height-margins",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 56,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/min-height-margins",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/min-max-height",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/min-max-width",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/mixed-inline-block",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/nested-collapse-bottom",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 56,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/nested-collapse-top",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 72,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/over-constrained",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/padding-separates",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 56,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/percent-heights",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 32,
+   "largest_edge": 0.021875000000008527,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/percent-widths",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/right-to-left-blocks",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 32,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/right-to-left-lines",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 176,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/shrink-to-fit",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 176,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/sibling-margins",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 48,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/stacking",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 56,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/text-align",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 336,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/text-align-overflow",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/vertical-align-middle",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "block/vertical-align-top-bottom",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 240,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-content-center",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-content-flex-end",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-content-normal",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-content-space-around",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-content-space-between",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.005208333333342807,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-content-space-evenly",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-content-stretch",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-content-stretch-items",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-items-baseline",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-items-center",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-items-flex-end",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-items-flex-start",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-items-stretch",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/align-self",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/auto-margins",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.005208333333484916,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/auto-margins-cross",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/basis-length",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/basis-percent",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/column-basic",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/column-grow-shrink",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0066964285714306016,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/column-min-max-height",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/column-reverse",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 32,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/column-wrap",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/flex-keywords",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.005208333333371229,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/grow-basis-zero",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/grow-fractional-sum",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/grow-max-width",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/grow-shares",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/justify-center",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/justify-end",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/justify-flex-end",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/justify-flex-start",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/justify-overflow-fallback",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/justify-space-around",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.010416666666742458,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/justify-space-between",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/justify-space-evenly",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/justify-start",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/margins-padding",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/nested-content-sized",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 144,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/nested-grow",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.005208333333371229,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/order",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/row-reverse",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/shrink-equal",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0052083333333143855,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/shrink-min-width",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.005208333333428072,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/shrink-none",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/shrink-weighted",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.005208333333371229,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/width-percent-calc",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/wrap-gaps",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.03750000000002274,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/wrap-grow",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.015625,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/wrap-lines",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flex/wrap-reverse",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/align-center",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 416.0,
+   "over_tolerance": [],
+   "recorded": [
+    {
+     "profile": "1280x800@1",
+     "id": "item-0",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 4.0,
+      "y": 14.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 4.0,
+      "y": 380.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-1",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 130.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 130.0,
+      "y": 370.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-2",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 226.0,
+      "y": 19.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 226.0,
+      "y": 385.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-3",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 432.0,
+      "y": 9.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 432.0,
+      "y": 375.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-4",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 588.0,
+      "y": 24.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 588.0,
+      "y": 390.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-5",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 654.0,
+      "y": 12.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 654.0,
+      "y": 378.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-6",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 900.0,
+      "y": 16.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 900.0,
+      "y": 382.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-0",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 1156.0,
+      "y": 14.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1156.0,
+      "y": 380.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-1",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 1060.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 1060.0,
+      "y": 370.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-2",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 854.0,
+      "y": 19.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 854.0,
+      "y": 385.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-3",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 698.0,
+      "y": 9.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 698.0,
+      "y": 375.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-4",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 632.0,
+      "y": 24.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 632.0,
+      "y": 390.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-5",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 386.0,
+      "y": 12.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 386.0,
+      "y": 378.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-6",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 300.0,
+      "y": 16.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 300.0,
+      "y": 382.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-0",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 4.0,
+      "y": 14.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 4.0,
+      "y": 380.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-1",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 130.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 130.0,
+      "y": 370.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-2",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 226.0,
+      "y": 19.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 226.0,
+      "y": 385.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-3",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 432.0,
+      "y": 9.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 432.0,
+      "y": 375.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-4",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 588.0,
+      "y": 24.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 588.0,
+      "y": 390.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-5",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 654.0,
+      "y": 12.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 654.0,
+      "y": 378.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-6",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 900.0,
+      "y": 16.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 900.0,
+      "y": 382.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-0",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 1156.0,
+      "y": 14.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1156.0,
+      "y": 380.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-1",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 1060.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 1060.0,
+      "y": 370.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-2",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 854.0,
+      "y": 19.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 854.0,
+      "y": 385.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-3",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 698.0,
+      "y": 9.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 698.0,
+      "y": 375.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-4",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 632.0,
+      "y": 24.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 632.0,
+      "y": 390.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-5",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 386.0,
+      "y": 12.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 386.0,
+      "y": 378.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-6",
+     "edge": 366.0,
+     "missing": false,
+     "reference": {
+      "x": 300.0,
+      "y": 16.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 300.0,
+      "y": 382.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-0",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 4.0,
+      "y": 14.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 4.0,
+      "y": 430.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-1",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 130.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 130.0,
+      "y": 420.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-2",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 226.0,
+      "y": 19.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 226.0,
+      "y": 435.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-3",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 432.0,
+      "y": 9.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 432.0,
+      "y": 425.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-4",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 588.0,
+      "y": 24.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 588.0,
+      "y": 440.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-5",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 654.0,
+      "y": 12.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 654.0,
+      "y": 428.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-6",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 900.0,
+      "y": 16.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 900.0,
+      "y": 432.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-0",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 1316.0,
+      "y": 14.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1316.0,
+      "y": 430.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-1",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 1220.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 1220.0,
+      "y": 420.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-2",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 1014.0,
+      "y": 19.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 1014.0,
+      "y": 435.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-3",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 858.0,
+      "y": 9.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 858.0,
+      "y": 425.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-4",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 792.0,
+      "y": 24.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 792.0,
+      "y": 440.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-5",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 546.0,
+      "y": 12.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 546.0,
+      "y": 428.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-6",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 460.0,
+      "y": 16.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 460.0,
+      "y": 432.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-0",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 4.0,
+      "y": 14.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 4.0,
+      "y": 430.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-1",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 130.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 130.0,
+      "y": 420.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-2",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 226.0,
+      "y": 19.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 226.0,
+      "y": 435.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-3",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 432.0,
+      "y": 9.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 432.0,
+      "y": 425.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-4",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 588.0,
+      "y": 24.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 588.0,
+      "y": 440.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-5",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 654.0,
+      "y": 12.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 654.0,
+      "y": 428.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-6",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 900.0,
+      "y": 16.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 900.0,
+      "y": 432.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-0",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 1316.0,
+      "y": 14.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1316.0,
+      "y": 430.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-1",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 1220.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 1220.0,
+      "y": 420.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-2",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 1014.0,
+      "y": 19.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 1014.0,
+      "y": 435.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-3",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 858.0,
+      "y": 9.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 858.0,
+      "y": 425.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-4",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 792.0,
+      "y": 24.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 792.0,
+      "y": 440.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-5",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 546.0,
+      "y": 12.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 546.0,
+      "y": 428.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-6",
+     "edge": 416.0,
+     "missing": false,
+     "reference": {
+      "x": 460.0,
+      "y": 16.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 460.0,
+      "y": 432.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    }
+   ]
+  },
+  {
+   "fixture": "flow/align-flex-end",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 832.0,
+   "over_tolerance": [],
+   "recorded": [
+    {
+     "profile": "1280x800@1",
+     "id": "item-0",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 4.0,
+      "y": 24.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 4.0,
+      "y": 756.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-1",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 130.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 130.0,
+      "y": 736.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-2",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 226.0,
+      "y": 34.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 226.0,
+      "y": 766.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-3",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 432.0,
+      "y": 14.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 432.0,
+      "y": 746.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-4",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 588.0,
+      "y": 44.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 588.0,
+      "y": 776.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-5",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 654.0,
+      "y": 20.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 654.0,
+      "y": 752.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1",
+     "id": "item-6",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 900.0,
+      "y": 28.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 900.0,
+      "y": 760.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-0",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 1156.0,
+      "y": 24.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1156.0,
+      "y": 756.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-1",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 1060.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 1060.0,
+      "y": 736.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-2",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 854.0,
+      "y": 34.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 854.0,
+      "y": 766.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-3",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 698.0,
+      "y": 14.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 698.0,
+      "y": 746.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-4",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 632.0,
+      "y": 44.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 632.0,
+      "y": 776.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-5",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 386.0,
+      "y": 20.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 386.0,
+      "y": 752.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "item-6",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 300.0,
+      "y": 28.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 300.0,
+      "y": 760.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-0",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 4.0,
+      "y": 24.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 4.0,
+      "y": 756.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-1",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 130.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 130.0,
+      "y": 736.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-2",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 226.0,
+      "y": 34.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 226.0,
+      "y": 766.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-3",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 432.0,
+      "y": 14.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 432.0,
+      "y": 746.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-4",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 588.0,
+      "y": 44.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 588.0,
+      "y": 776.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-5",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 654.0,
+      "y": 20.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 654.0,
+      "y": 752.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "item-6",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 900.0,
+      "y": 28.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 900.0,
+      "y": 760.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-0",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 1156.0,
+      "y": 24.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1156.0,
+      "y": 756.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-1",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 1060.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 1060.0,
+      "y": 736.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-2",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 854.0,
+      "y": 34.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 854.0,
+      "y": 766.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-3",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 698.0,
+      "y": 14.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 698.0,
+      "y": 746.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-4",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 632.0,
+      "y": 44.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 632.0,
+      "y": 776.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-5",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 386.0,
+      "y": 20.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 386.0,
+      "y": 752.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "item-6",
+     "edge": 732.0,
+     "missing": false,
+     "reference": {
+      "x": 300.0,
+      "y": 28.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 300.0,
+      "y": 760.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-0",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 4.0,
+      "y": 24.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 4.0,
+      "y": 856.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-1",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 130.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 130.0,
+      "y": 836.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-2",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 226.0,
+      "y": 34.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 226.0,
+      "y": 866.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-3",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 432.0,
+      "y": 14.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 432.0,
+      "y": 846.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-4",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 588.0,
+      "y": 44.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 588.0,
+      "y": 876.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-5",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 654.0,
+      "y": 20.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 654.0,
+      "y": 852.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "item-6",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 900.0,
+      "y": 28.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 900.0,
+      "y": 860.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-0",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 1316.0,
+      "y": 24.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1316.0,
+      "y": 856.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-1",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 1220.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 1220.0,
+      "y": 836.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-2",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 1014.0,
+      "y": 34.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 1014.0,
+      "y": 866.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-3",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 858.0,
+      "y": 14.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 858.0,
+      "y": 846.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-4",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 792.0,
+      "y": 44.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 792.0,
+      "y": 876.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-5",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 546.0,
+      "y": 20.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 546.0,
+      "y": 852.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "item-6",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 460.0,
+      "y": 28.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 460.0,
+      "y": 860.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-0",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 4.0,
+      "y": 24.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 4.0,
+      "y": 856.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-1",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 130.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 130.0,
+      "y": 836.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-2",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 226.0,
+      "y": 34.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 226.0,
+      "y": 866.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-3",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 432.0,
+      "y": 14.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 432.0,
+      "y": 846.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-4",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 588.0,
+      "y": 44.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 588.0,
+      "y": 876.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-5",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 654.0,
+      "y": 20.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 654.0,
+      "y": 852.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "item-6",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 900.0,
+      "y": 28.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 900.0,
+      "y": 860.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-0",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 1316.0,
+      "y": 24.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1316.0,
+      "y": 856.0,
+      "width": 120.0,
+      "height": 40.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-1",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 1220.0,
+      "y": 4.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "observed": {
+      "x": 1220.0,
+      "y": 836.0,
+      "width": 90.0,
+      "height": 60.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-2",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 1014.0,
+      "y": 34.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 1014.0,
+      "y": 866.0,
+      "width": 200.0,
+      "height": 30.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-3",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 858.0,
+      "y": 14.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 858.0,
+      "y": 846.0,
+      "width": 150.0,
+      "height": 50.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-4",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 792.0,
+      "y": 44.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 792.0,
+      "y": 876.0,
+      "width": 60.0,
+      "height": 20.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-5",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 546.0,
+      "y": 20.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "observed": {
+      "x": 546.0,
+      "y": 852.0,
+      "width": 240.0,
+      "height": 44.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "item-6",
+     "edge": 832.0,
+     "missing": false,
+     "reference": {
+      "x": 460.0,
+      "y": 28.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "observed": {
+      "x": 460.0,
+      "y": 860.0,
+      "width": 80.0,
+      "height": 36.0
+     },
+     "reason": "CSS sizes the one line of a wrapping container to its content (align-content: flex-start); FlowLayoutPanelCompat gives a single line the whole client height"
+    }
+   ]
+  },
+  {
+   "fixture": "flow/column-reverse",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/column-wrap",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/grow-single-line",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.005208333333371229,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/grow-wrapped",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.010416666666742458,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/justify-center",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/justify-flex-end",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/justify-space-around",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.015624999999886313,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/justify-space-between",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.005208333333484916,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/justify-space-evenly",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.015625,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/margins",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 19.0,
+   "over_tolerance": [],
+   "recorded": [
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "a",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 1167.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1153.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "b",
+     "edge": 19.0,
+     "missing": false,
+     "reference": {
+      "x": 1020.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 1001.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "c",
+     "edge": 16.0,
+     "missing": false,
+     "reference": {
+      "x": 923.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 907.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "d",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 759.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 745.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "a",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 1167.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1153.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "b",
+     "edge": 19.0,
+     "missing": false,
+     "reference": {
+      "x": 1020.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 1001.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "c",
+     "edge": 16.0,
+     "missing": false,
+     "reference": {
+      "x": 923.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 907.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "d",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 759.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 745.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "a",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 1327.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1313.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "b",
+     "edge": 19.0,
+     "missing": false,
+     "reference": {
+      "x": 1180.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 1161.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "c",
+     "edge": 16.0,
+     "missing": false,
+     "reference": {
+      "x": 1083.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 1067.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "d",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 919.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 905.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "a",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 1327.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1313.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "b",
+     "edge": 19.0,
+     "missing": false,
+     "reference": {
+      "x": 1180.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 1161.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "c",
+     "edge": 16.0,
+     "missing": false,
+     "reference": {
+      "x": 1083.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 1067.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "d",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 919.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 905.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "320x240@1/rtl",
+     "id": "a",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 207.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 193.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "320x240@1/rtl",
+     "id": "b",
+     "edge": 19.0,
+     "missing": false,
+     "reference": {
+      "x": 60.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 41.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "320x240@1/rtl",
+     "id": "c",
+     "edge": 16.0,
+     "missing": false,
+     "reference": {
+      "x": 222.0,
+      "y": 59.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 206.0,
+      "y": 59.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "320x240@1/rtl",
+     "id": "d",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 58.0,
+      "y": 58.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 44.0,
+      "y": 58.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "320x240@2/rtl",
+     "id": "a",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 207.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 193.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "320x240@2/rtl",
+     "id": "b",
+     "edge": 19.0,
+     "missing": false,
+     "reference": {
+      "x": 60.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 41.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "320x240@2/rtl",
+     "id": "c",
+     "edge": 16.0,
+     "missing": false,
+     "reference": {
+      "x": 222.0,
+      "y": 59.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 206.0,
+      "y": 59.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "320x240@2/rtl",
+     "id": "d",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 58.0,
+      "y": 58.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 44.0,
+      "y": 58.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "800x600@1/rtl",
+     "id": "a",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 687.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 673.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "800x600@1/rtl",
+     "id": "b",
+     "edge": 19.0,
+     "missing": false,
+     "reference": {
+      "x": 540.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 521.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "800x600@1/rtl",
+     "id": "c",
+     "edge": 16.0,
+     "missing": false,
+     "reference": {
+      "x": 443.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 427.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "800x600@1/rtl",
+     "id": "d",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 279.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 265.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "800x600@2/rtl",
+     "id": "a",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 687.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 673.0,
+      "y": 15.0,
+      "width": 100.0,
+      "height": 40.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "800x600@2/rtl",
+     "id": "b",
+     "edge": 19.0,
+     "missing": false,
+     "reference": {
+      "x": 540.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "observed": {
+      "x": 521.0,
+      "y": 22.0,
+      "width": 140.0,
+      "height": 30.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "800x600@2/rtl",
+     "id": "c",
+     "edge": 16.0,
+     "missing": false,
+     "reference": {
+      "x": 443.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "observed": {
+      "x": 427.0,
+      "y": 13.0,
+      "width": 90.0,
+      "height": 50.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    },
+    {
+     "profile": "800x600@2/rtl",
+     "id": "d",
+     "edge": 14.0,
+     "missing": false,
+     "reference": {
+      "x": 279.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "observed": {
+      "x": 265.0,
+      "y": 12.0,
+      "width": 160.0,
+      "height": 20.0
+     },
+     "reason": "Right to left, FlowLayoutPanelCompat mirrors the padding and the margins (full mirroring, owner, 2026-10-26, as Windows Forms RightToLeftLayout); CSS keeps padding-left, margin-left and their right counterparts physical"
+    }
+   ]
+  },
+  {
+   "fixture": "flow/nested",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/nowrap-overflow",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/row-reverse",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/row-wrap",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "flow/stretch-single-line",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/absolute-in-absolute",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/ancestor-block",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/ancestor-shifted",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/ancestor-window",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/block-absolute",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 48,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/block-content-height",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/block-inline-absolute",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/block-relative",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/block-right-to-left",
+   "class": "box",
+   "bidirectional": false,
+   "tolerance": 0.05,
+   "nodes": 48,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/flex-auto-margins",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/flex-corners",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/flex-min-max",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/flex-percent",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/flex-relative",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.010416666666685614,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/flex-shrink-to-fit",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 160,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/flex-stretch",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/form-overlay",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 192,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/grid-absolute",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/grid-percent",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.010416666666742458,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/grid-relative",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "position/relative-container",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "table/auto-placement",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "table/auto-tracks-normal",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 48,
+   "largest_edge": 620.0,
+   "over_tolerance": [],
+   "recorded": [
+    {
+     "profile": "1280x800@1",
+     "id": "b",
+     "edge": 540.0,
+     "missing": false,
+     "reference": {
+      "x": 610.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 70.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "1280x800@1/rtl",
+     "id": "b",
+     "edge": 540.0,
+     "missing": false,
+     "reference": {
+      "x": 540.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1080.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "1280x800@2",
+     "id": "b",
+     "edge": 540.0,
+     "missing": false,
+     "reference": {
+      "x": 610.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 70.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "1280x800@2/rtl",
+     "id": "b",
+     "edge": 540.0,
+     "missing": false,
+     "reference": {
+      "x": 540.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1080.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "1440x900@1",
+     "id": "b",
+     "edge": 620.0,
+     "missing": false,
+     "reference": {
+      "x": 690.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 70.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "1440x900@1/rtl",
+     "id": "b",
+     "edge": 620.0,
+     "missing": false,
+     "reference": {
+      "x": 620.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1240.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "1440x900@2",
+     "id": "b",
+     "edge": 620.0,
+     "missing": false,
+     "reference": {
+      "x": 690.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 70.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "1440x900@2/rtl",
+     "id": "b",
+     "edge": 620.0,
+     "missing": false,
+     "reference": {
+      "x": 620.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 1240.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "320x240@1",
+     "id": "b",
+     "edge": 60.0,
+     "missing": false,
+     "reference": {
+      "x": 130.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 70.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "320x240@1/rtl",
+     "id": "b",
+     "edge": 60.0,
+     "missing": false,
+     "reference": {
+      "x": 60.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 120.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "320x240@2",
+     "id": "b",
+     "edge": 60.0,
+     "missing": false,
+     "reference": {
+      "x": 130.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 70.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "320x240@2/rtl",
+     "id": "b",
+     "edge": 60.0,
+     "missing": false,
+     "reference": {
+      "x": 60.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 120.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "800x600@1",
+     "id": "b",
+     "edge": 300.0,
+     "missing": false,
+     "reference": {
+      "x": 370.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 70.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "800x600@1/rtl",
+     "id": "b",
+     "edge": 300.0,
+     "missing": false,
+     "reference": {
+      "x": 300.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 600.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "800x600@2",
+     "id": "b",
+     "edge": 300.0,
+     "missing": false,
+     "reference": {
+      "x": 370.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 70.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    },
+    {
+     "profile": "800x600@2/rtl",
+     "id": "b",
+     "edge": 300.0,
+     "missing": false,
+     "reference": {
+      "x": 300.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "observed": {
+      "x": 600.0,
+      "y": 0.0,
+      "width": 130.0,
+      "height": 40.0
+     },
+     "reason": "CSS justify-content: normal stretches auto tracks into free space; TableLayoutPanelCompat keeps auto tracks at their content size"
+    }
+   ]
+  },
+  {
+   "fixture": "table/auto-tracks-start",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "table/fixed-tracks",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "table/fraction-tracks",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "table/mixed-tracks",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "table/self-alignment",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "table/spans",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "table/stretched-cells",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/fixed-tracks",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/fraction-columns",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/fixed-and-fractions",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.005208333333257542,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/percent-columns",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/minmax-zero-fraction",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/minmax-length-fraction",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 48,
+   "largest_edge": 0.010416666666742458,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/repeat-count",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.015625,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/repeat-auto-fill-minmax",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 208,
+   "largest_edge": 0.013392857142889625,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/repeat-auto-fill-fixed",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/repeat-auto-fit",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.015625,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/repeat-with-fixed",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 160,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/auto-columns-content",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/content-keywords",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 160,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/fit-content",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 144,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/form-max-content",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/auto-rows-stretch",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/align-content-start",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/align-content-end",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/align-content-center",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/align-content-space-between",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/align-content-space-around",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.02604166666662877,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/align-content-space-evenly",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/justify-content-center",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/justify-content-end",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/justify-content-space-between",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/items-start",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/items-end",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/items-center",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/self-alignment",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/align-items-baseline",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/line-placement",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/negative-lines",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/spans",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/implicit-tracks",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/leading-implicit",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/auto-rows-pattern",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/auto-flow-column",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 128,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/auto-flow-dense",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/auto-flow-sparse",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/lane-locked",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/named-areas",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 96,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/areas-with-lines",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/gap-percent",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.009375000000005684,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/spanning-intrinsic",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 144,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/spanning-flexible",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.010416666666742458,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/item-sizes",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/auto-margins",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/padding",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/fraction-rows",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 64,
+   "largest_edge": 0.005208333333342807,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/intrinsic-rows",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/fraction-content-minimum",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 80,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  },
+  {
+   "fixture": "grid/nested-grid",
+   "class": "box",
+   "bidirectional": true,
+   "tolerance": 0.05,
+   "nodes": 112,
+   "largest_edge": 0.0,
+   "over_tolerance": [],
+   "recorded": []
+  }
+ ]
+}

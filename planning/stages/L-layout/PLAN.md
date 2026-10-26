@@ -39,6 +39,7 @@ Decisions this plan builds on:
 9. [Open questions for the owner](#9-open-questions-for-the-owner)
 10. [House-style points](#10-house-style-points)
 11. [Size](#11-size)
+12. [Phase L8: text fixtures](#12-phase-l8-text-fixtures)
 
 ## 1. What exists today
 
@@ -649,7 +650,16 @@ tests; their L0 fixtures still within tolerance. 2 PRs.
 
 **L7. The stage gate.** Run the whole corpus at every profile, record the
 report, rewrite `docs/user/layout.md` (its "Not provided" section is no
-longer true), and update the stage index and board. 1 PR.
+longer true), and update the stage index and board. 1 PR. Recorded in
+`results/2026-10-26-l-layout-gate`. The owner set its scope on 2026-10-26
+(option 1): the box fixtures in both directions, with the text-scale
+dimension recorded as not yet exercised.
+
+**L8. Text fixtures** (owner, 2026-10-26). A CSS-style text leaf,
+provisionally named `TextBlock`; the bundled engine in the corpus harness;
+first-baseline capture; and the text-scale profiles. Gate: the text
+fixtures within L-Q9's tolerances at both text scales. Section 12 is its
+plan. 2 PRs.
 
 **The stage gate** (README; the measurement to record): a corpus of at
 least 100 fixtures (about 40 flex, 40 grid, 20 block and inline, and
@@ -762,7 +772,174 @@ answered (b) with "warn on this behavior, but allow", and 10, answered
 
 ## 11. Size
 
-Eight phases, L0 to L7, of about 17 to 20 PRs: L0 2, L1 3, L2 1 to 2,
+Eight phases, L0 to L7, of about 17 to 20 PRs (L8, added 2026-10-26, is 2
+more): L0 2, L1 3, L2 1 to 2,
 L3 3, L4 3 to 4, L5 2 to 3, L6 2, L7 1. L2 waits for T3 P1; L0 and L1 start
 first. The corpus grows with each phase to at
 least 100 fixtures. No timing is claimed.
+
+## 12. Phase L8: text fixtures
+
+The owner's decision of 2026-10-26 (coordinator's option list, L7):
+- L7's gate runs on the box fixtures, in both directions;
+- L8 adds the text fixtures, with a new CSS-style text leaf;
+- `Label` stays as it is.
+
+The leaf is provisionally named `TextBlock`, after the owner's rule for
+panels: a name that cannot be confused with a CSS property. The
+coordinator is confirming the name with the owner. The control is not
+added until the name is confirmed.
+
+### 12.1 Why a new leaf
+
+`Label` is Windows Forms' label, and it differs from CSS text in two ways:
+- it draws its text inside a 4 px inset (2 px on each side);
+- its line height is `max(font size, line height) × line_spacing`.
+
+CSS text has no inset, and its line height is `line-height: normal`, which
+comes from the primary face's metrics. A text fixture laid out with
+`Label` would differ from Chromium on every edge by the inset. It would
+also differ on every line by the line-height rule. Neither is a defect, so
+neither should be recorded as a difference against `Label`. The new leaf
+has CSS's model, and `Label` keeps Windows Forms'.
+
+### 12.2 `TextBlock`
+
+A leaf control that shows text as a CSS block of text does:
+- **Content.** `text` (UTF-8) and `font` (a `FontSpec`; by default the
+  window's content role). The effective size is multiplied by the
+  effective text scale (section 4), and a text-scale change is
+  `invalidation::text_content`.
+- **No inset.** The border box is the text's box. Padding is the
+  control's own `padding`, as for any control.
+- **Line height.** CSS's `line-height: normal`: the primary face's ascent,
+  descent and line gap at the effective size. A `line_height` property
+  sets it as a length, as CSS's `line-height: <length>` does. The
+  calibration step (12.5) fixes how Chromium rounds these metrics, and
+  the leaf follows it.
+- **Wrapping.** Soft wraps at the break opportunities that the Latin
+  fixtures exercise: spaces, and after a hyphen (UAX #14 classes SP and
+  HY). It does not hyphenate and does not break inside a word unless one
+  word overflows the line, as `overflow-wrap: normal` does. Full UAX #14
+  is H's, and the leaf's breaker is the one H extends.
+- **Alignment.** `text_align` (`start`, `end`, `left`, `right`,
+  `center`), which follows the effective `LayoutDirection` as CSS does.
+  Inside a `BlockPanel` the leaf takes the panel's `text_align` unless it
+  sets its own.
+- **Measure.** `measure_intrinsic` answers with:
+  - min-content: the widest unbreakable segment;
+  - max-content: the widest paragraph;
+  - at a definite or at-most width: the wrapped height at that width.
+
+  No answer adds an inset.
+- **First baseline.** The baseline of its first line, from the top of its
+  border box, is published to the containers (12.3).
+- **Registration.** The control is registered like the other leaves:
+  - the registry, schema and docstring with examples;
+  - a specimen on the CSS layout panels Gallery page;
+  - the generated indexes.
+
+### 12.3 The baseline contract
+
+The three solvers already take an item's first baseline: flex and grid
+baseline alignment, and the baseline of an inline item in `BlockPanel`.
+The panels synthesize it today as the bottom of the border box, which is
+CSS's baseline for a box with no line boxes. L8 adds one virtual on
+`Control`: the first baseline at a given used width, or none. The
+default answers none, which keeps every existing control's synthesized
+baseline. `TextBlock` answers with its first line's baseline. A nested
+`FlexPanel`, `GridPanel` or `BlockPanel` answers with its first item's
+baseline, as CSS's first-baseline sets do.
+
+The answer is cached with the measure answer for the same width. It is
+invalidated by the same measure generation, so it never outlives the
+text or the font it was computed from.
+
+`BlockPanel`'s `line_strut` stays a property. A `BlockPanel` whose strut
+is not set takes it from its content font's metrics. That is CSS's strut,
+and it scales with the text scale. The corpus's `font-size: 0` strut is
+unchanged.
+
+### 12.4 The oracle and the harness
+
+- **Fixture form.** `<div data-gf-kind="text-block" data-gf-text="...">`,
+  as in section 6.4. The page builder writes the attribute's text as the
+  element's content, escaped, so Chromium lays out a real text node. The
+  fixture file stays the same bytes for both sides.
+- **The engine in the harness.** `gui_forms_layout_corpus_tests` links
+  `gui_forms_text_engine` (built on every CI host). It registers the
+  template's bundled faces from `assets/fonts` (Carlito regular, bold and
+  italic, and Portsmouth Rapids) and sets a `TextMetricsProvider` over
+  `HarfBuzzFontEngine::resolve` on each fixture's window. A build without
+  the engine reports the text fixtures as not run and fails the test, so
+  a text fixture is never counted as passed unmeasured.
+- **First-baseline capture.** For each profile, `capture.py` reads the
+  boxes, then inserts a zero-size `inline-block` probe as the first child
+  of each text leaf. The probe's top is the first baseline. The boxes are
+  read again with the probe in place, and a capture whose boxes moved is
+  refused, so the probe can never change what is recorded. Box files gain
+  a `baseline` attribute on text-leaf nodes. Both comparisons, Python and
+  C++, check it against the 1.0 px tolerance.
+- **Text-scale profiles.** A profile gains `text-scale="1.5"`, which
+  applies only to text fixtures, as `direction="rtl"` applies only to
+  bidirectional ones.
+  - Chromium side: the template's root font size becomes 13 px × 1.5.
+  - GUI.Forms side: the window's `presentation_settings().text_scale`
+    becomes 1.5.
+  - Report key: `/text150`.
+- **Tolerances.** Decision L-Q9: every edge of every node of a text
+  fixture within 0.51 logical px, and the first baseline within 1.0 px.
+  The report keeps the text class apart from geometry.
+
+### 12.5 Calibration first
+
+Before the leaf is written, probe pages (not checked in, as in L5) settle
+what the specifications leave to the engine:
+- `line-height: normal` for Carlito at 13 px and 19.5 px, at device
+  scales 1 and 2: how Chromium rounds ascent, descent and line gap;
+- the advance of a run, through Chromium's HarfBuzz shaping and ours.
+  Both use kerning by default, and the engine's advances are unhinted;
+- break placement around hyphens and runs of spaces;
+- the first baseline of a wrapped block, and of an empty one.
+
+A measured rounding rule that cannot be matched within tolerance at both
+scales goes to the owner with its numbers. It is not recorded as a
+difference.
+
+### 12.6 Fixtures
+
+About 30, each marked bidirectional where its boxes depend on direction:
+- **Flex.** Text items that grow and shrink; the automatic minimum (a
+  word's width); a wrapping row; `align-items: baseline` across different
+  sizes.
+- **Grid.** `auto`, `min-content`, `max-content` and `fit-content()`
+  tracks sized by text; a spanning text item; baseline alignment in a row.
+- **Block.** Text blocks with collapsing margins; `text-align` in both
+  directions; a text block beside inline boxes; the content-font strut.
+- **Nested.** The atlas's form row (a text block, a field-sized box and a
+  button-sized box in a flex row inside a grid cell), and a card of
+  wrapped text.
+
+### 12.7 Phases and gate
+
+- **L8a. The leaf.** `TextBlock`, the baseline contract and the strut from
+  font metrics, with unit tests (wrapping, intrinsic sizes, baseline,
+  text scale, direction) and registration. This starts only once the name
+  is confirmed. 1 PR.
+- **L8b. The text corpus.** The engine in the harness, baseline capture,
+  the text-scale profiles, the calibration record and the fixtures. 1 PR.
+- **Gate.** Every text fixture at the four viewports and both device
+  scales, at text scales 100 % and 150 %, in both directions where marked.
+  Zero nodes over the text tolerances other than recorded differences,
+  each with its reason. The L7 record gains the text-scale dimension, and
+  is then marked as exercised.
+
+### 12.8 Questions put to the coordinator
+
+1. **The name.** `TextBlock` is provisional; the owner is confirming it.
+2. **Wrapping.** **Recommended:** (a), the opportunities the fixtures
+   exercise (SP and HY), with full UAX #14 in H. The alternative, (b),
+   is full UAX #14 in L8.
+3. **The strut without a declared font.** **Recommended:** (a), from the
+   content font, scaling with the text scale, as CSS does. The
+   alternative, (b), keeps it a property only.

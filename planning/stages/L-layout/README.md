@@ -1,8 +1,10 @@
 # Stage L: real dynamic layout (flex, grid, flow)
 
 Release: 0.4 Flexible. Depends on: T1. Unblocks FD, D and H. Status
-2026-10-25: plan accepted ([`PLAN.md`](PLAN.md)); interview round 001
-answered (below); L0 next. T1's gate is recorded
+2026-10-26: phases L0 to L7 built; the box gate is recorded
+(`results/2026-10-26-l-layout-gate`), with the text-scale dimension not yet
+exercised; L8, the text fixtures, next (owner, 2026-10-26). Plan accepted
+2026-10-25 ([`PLAN.md`](PLAN.md)); interview round 001 answered (below). T1's gate is recorded
 (`results/2026-10-13-t1-anatomy-gate`). Authority: `planning/FORWARD_PROGRAMME.md` §4 L.
 
 Read [the shared brief](../README.md) first.
@@ -222,6 +224,28 @@ as Windows Forms' `RightToLeftLayout`. In a parent whose effective
 The layout is computed left to right and mirrored once, at output, about
 the parent's child viewport, so padding and margins mirror with it. Left
 to right changes nothing.
+
+**The gate's scope and the text fixtures** (owner, 2026-10-26, option 1):
+- L7's gate runs on the box fixtures. The fixtures whose boxes depend on
+  direction also run right to left, on both sides.
+- The text-scale dimension is recorded as "not yet exercised", never as
+  met or passed.
+- L8 adds the text fixtures with a new CSS-style text leaf: no inset,
+  CSS's `line-height: normal`, flowing inside `FlexPanel`, `GridPanel`
+  and `BlockPanel`. L8 also adds:
+  - the bundled engine in the corpus harness;
+  - first-baseline capture;
+  - the text-scale profiles.
+
+  It must meet L-Q9's tolerances: 0.51 px per edge and 1.0 px on the
+  baseline.
+- The leaf is provisionally named `TextBlock`, by the panels' rule of a
+  name that cannot be confused with a CSS property. The coordinator is
+  confirming the name with the owner. The control is not added before
+  then.
+- `Label` stays as it is.
+
+`PLAN.md` section 12 is L8's plan.
 
 ## Read first
 
