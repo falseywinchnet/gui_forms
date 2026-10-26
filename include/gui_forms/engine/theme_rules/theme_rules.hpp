@@ -516,6 +516,78 @@ void assemble_material(const SurfaceMaterial& floor,
 [[nodiscard]] bool material_fields_read_box(
     const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept;
 
+// The fields of a control's own recipe (ControlVisualRecipe) beside its
+// material that a rule may set (T3 P6f; design language §2, §3 and §14).
+// They are the control's, not a part's: a rule naming a part or a role
+// sets none (RuleDiagnosticKind::recipe_field_on_part). They cascade as
+// the material fields do, each on its own, from every matching rule, over
+// the theme's built-in recipe for the control's role and state (the floor,
+// Theme::resolve); a field no rule sets keeps the floor's value.
+enum class RecipeField : std::uint8_t {
+    // CSS `color`: the recipe's text colour.
+    text,
+    // CSS `outline-style`, `outline-color`, `outline-width` and
+    // `outline-offset`: the focus ring, drawn while the control shows
+    // focus.
+    outline_style,
+    outline_colour,
+    outline_width,
+    outline_offset,
+    // CSS `text-shadow`: the shadow under the recipe's text (data only
+    // until the text stage draws it).
+    text_shadow,
+    count,
+};
+
+inline constexpr std::size_t recipe_field_count = static_cast<std::size_t>(RecipeField::count);
+
+// The field's snake_case name, as diagnostics name it; empty for `count`.
+[[nodiscard]] std::string_view recipe_field_name(RecipeField field) noexcept;
+
+// How the focus ring is drawn (CSS `outline-style`): the theme's own ring
+// inside the control's bounds (CSS's `auto`), an outline outside them,
+// offset by the outline offset (CSS's `solid`), or none (a width of 0).
+enum class RecipeOutlineStyle : std::uint8_t { ring, solid, none };
+
+// What a recipe admits (valid_recipe): an outline at most 16 logical units
+// wide, offset at most 64 either way; a text shadow offset at most 16 on
+// each axis and blurred by at most 8.
+inline constexpr double maximum_recipe_outline_width = 16.0;
+inline constexpr double maximum_recipe_outline_offset = 64.0;
+inline constexpr double maximum_text_shadow_blur = 8.0;
+inline constexpr double maximum_text_shadow_offset = 16.0;
+
+// One recipe field's declared value. `initial` is CSS's `initial`: the
+// floor's value, and the declaration still wins over those beneath it; its
+// value members are not read. Otherwise, by field:
+// - text and outline_colour: `colour`;
+// - outline_style: `outline_style`;
+// - outline_width (0 to maximum_recipe_outline_width) and outline_offset
+//   (within ±maximum_recipe_outline_offset): `number`, in logical units;
+// - text_shadow: `shadowed`, false for none; its `shadow_offset`,
+//   `shadow_blur` (the shadows' blur-radius convention) and `colour`.
+struct RecipeDeclaration final {
+    RecipeField field{RecipeField::text};
+    bool initial{};
+    Color colour{};
+    double number{};
+    RecipeOutlineStyle outline_style{RecipeOutlineStyle::ring};
+    bool shadowed{};
+    Point shadow_offset{};
+    double shadow_blur{};
+
+    friend bool operator==(const RecipeDeclaration& left, const RecipeDeclaration& right) noexcept {
+        return left.field == right.field && left.initial == right.initial && left.colour == right.colour &&
+               left.number == right.number && left.outline_style == right.outline_style &&
+               left.shadowed == right.shadowed && left.shadow_offset == right.shadow_offset &&
+               left.shadow_blur == right.shadow_blur;
+    }
+};
+
+// Whether `declaration` is one a recipe admits: a field below `count`, and
+// a finite value within its field's range.
+[[nodiscard]] bool recipe_declaration_admitted(const RecipeDeclaration& declaration) noexcept;
+
 // One rule. `label` names it in diagnostics (T3: its source position).
 // `requires_engine`, when set, is the engine version the rule needs, in
 // place of its sheet's. Its transitions and its ambient effect cascade as
@@ -524,7 +596,9 @@ void assemble_material(const SurfaceMaterial& floor,
 // part's primitive), and the ambient effect of the last matching rule that
 // declares one. Its material fields (EC1) cascade the same way, each on
 // its own, from every matching rule, whatever primitive it selects: they
-// change a part only where its primitive draws a theme material.
+// change a part only where its primitive draws a theme material. Its
+// recipe fields (RecipeField) cascade the same way for the control as a
+// whole.
 //
 // `specificity`, when set, is the rule's specificity in place of the one
 // its selector gives (T3 engine change EC2): a rule expanded from CSS's
@@ -541,12 +615,14 @@ struct ThemeRule final {
     std::vector<PropertyTransition> transitions{};
     std::optional<AmbientEffect> ambient{};
     std::vector<MaterialDeclaration> materials{};
+    std::vector<RecipeDeclaration> recipe_fields{};
 
     friend bool operator==(const ThemeRule& left, const ThemeRule& right) noexcept {
         return left.label == right.label && left.level == right.level && left.selector == right.selector &&
                left.specificity == right.specificity && left.declarations == right.declarations &&
                left.requires_engine == right.requires_engine && left.transitions == right.transitions &&
-               left.ambient == right.ambient && left.materials == right.materials;
+               left.ambient == right.ambient && left.materials == right.materials &&
+               left.recipe_fields == right.recipe_fields;
     }
 };
 
@@ -644,6 +720,12 @@ enum class RuleDiagnosticKind : std::uint8_t {
     // A material field whose value no material admits
     // (valid_surface_material), such as a ninth fill or a negative radius.
     material_field_invalid,
+    // A recipe field the recipe does not admit
+    // (recipe_declaration_admitted), such as an outline 20 units wide.
+    recipe_field_invalid,
+    // A recipe field in a rule whose selector names a part or a role: the
+    // recipe's fields are the control's, so the field is dropped.
+    recipe_field_on_part,
 };
 
 [[nodiscard]] std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept;
@@ -779,6 +861,20 @@ public:
         bool materials_authored{};
     };
 
+    // The winning declaration of each recipe field (RecipeField) of the
+    // rules matching a control, by the field's position, or null where no
+    // matching rule sets it; they belong to the compiled rules. `authored`
+    // is whether any is set.
+    struct RecipeResolution final {
+        std::array<const RecipeDeclaration*, recipe_field_count> fields{};
+        bool authored{};
+    };
+
+    // The recipe fields' cascade for a control: `facts` name no part and
+    // the region role. Linear in the number of rules, and at once when no
+    // rule sets a recipe field.
+    [[nodiscard]] RecipeResolution resolve_recipe_fields(const PartFacts& facts) const noexcept;
+
     // The cascade for one part: the winning primitive declaration, then
     // each of that primitive's parameters from the winning declaration of
     // it among the matching rules that select the same primitive, else its
@@ -825,6 +921,8 @@ private:
         std::optional<PartBlend> blend{};
         // Checked material fields, at most one per field.
         std::vector<MaterialDeclaration> materials{};
+        // Checked recipe fields, at most one per field.
+        std::vector<RecipeDeclaration> recipe_fields{};
     };
 
     // Compiles `sheet`'s rules into `result` at their authored levels, or,
@@ -852,6 +950,11 @@ private:
                               CompiledRule& compiled);
     // The winning material fields of the matching rules into `result`.
     void resolve_materials(const PartFacts& facts, Resolution& result) const noexcept;
+    // A rule's recipe fields, checked; a defect, a second declaration of
+    // one field, or a selector naming a part or a role drops it with a
+    // diagnostic.
+    static void add_recipe_fields(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
+                                  CompiledRule& compiled);
 
     [[nodiscard]] static bool matches(const CompiledRule& rule, const PartFacts& facts) noexcept;
 
@@ -862,6 +965,8 @@ private:
     std::vector<std::string> published_values_{};
     std::size_t built_in_rules_{};
     std::uint64_t serial_{};
+    // Whether any rule sets a recipe field (resolve_recipe_fields).
+    bool recipe_fields_set_{};
 };
 
 // The engine's built-in rules (E7), compiled below every theme's: the

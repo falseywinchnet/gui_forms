@@ -40,6 +40,8 @@ Types
      - A checked transition: an engine property, or the parameter at ``parameter``.
    * - :cpp:class:`CompiledThemeRules::PartFacts <gui_forms::CompiledThemeRules::PartFacts>`
      - What a part is: the facts its selectors are matched against.
+   * - :cpp:class:`CompiledThemeRules::RecipeResolution <gui_forms::CompiledThemeRules::RecipeResolution>`
+     - The winning declaration of each recipe field (RecipeField) of the rules matching a control, by the field's position, or null where no matching rule sets it; they belong to the compiled rules.
    * - :cpp:class:`CompiledThemeRules::Resolution <gui_forms::CompiledThemeRules::Resolution>`
      -  
    * - :cpp:class:`ConnectedControlSeam <gui_forms::ConnectedControlSeam>`
@@ -55,7 +57,7 @@ Types
    * - :cpp:class:`ControlStateRecipes <gui_forms::ControlStateRecipes>`
      -  
    * - :cpp:class:`ControlTextShadow <gui_forms::ControlTextShadow>`
-     -  
+     - A text shadow (E9.6, CSS ``text-shadow``): the text's glyphs, moved by ``offset`` logical units (each axis within ±maximum_text_shadow_offset), blurred by ``blur_radius`` (the shadows' blur-radius convention, 0 to maximum_text_shadow_blur; both limits are the theme rules') and drawn in ``color`` under the glyphs.
    * - :cpp:class:`ControlVisualContext <gui_forms::ControlVisualContext>`
      - ControlVisualContext selects a role recipe from surface state plus selected, focused, defaulted, and high-contrast axes.
    * - :cpp:class:`ControlVisualRecipe <gui_forms::ControlVisualRecipe>`
@@ -214,8 +216,12 @@ Types
      - A transition on one resolved property: ``opacity``, or a number parameter of the rule's primitive that the primitive declares animated (such as the bulge's amplitude), so that its frames never remake the part's preparation.
    * - :cpp:class:`RasterCacheStatistics <gui_forms::RasterCacheStatistics>`
      - The raster cache's counters, for instrumentation.
+   * - :cpp:class:`RecipeDeclaration <gui_forms::RecipeDeclaration>`
+     - One recipe field's declared value.
    * - :cpp:class:`Rect <gui_forms::Rect>`
      - Rect is a half-open logical rectangle with finite/empty checks, containment, exact intersection, and bounding union operations.
+   * - :cpp:class:`ResolvedControlRecipe <gui_forms::ResolvedControlRecipe>`
+     - A control's recipe for one role and state (T3 P6f): the theme's built-in recipe (the floor, Theme::resolve(role, context), borrowed from the theme) or, when the theme's rules set a recipe field for the control (RecipeField), the floor's copy with those fields in place, which this value owns.
    * - :cpp:class:`RetainedDrawCache <gui_forms::RetainedDrawCache>`
      -  
    * - :cpp:class:`RetainedDrawMemo <gui_forms::RetainedDrawMemo>`
@@ -543,6 +549,10 @@ Types
 
       The position of the published value ``name``, or none when the sheet does not read it.
 
+   .. cpp:function:: RecipeResolution resolve_recipe_fields(const PartFacts& facts) const noexcept
+
+      The recipe fields' cascade for a control: ``facts`` name no part and the region role. Linear in the number of rules, and at once when no rule sets a recipe field.
+
    .. cpp:function:: Resolution resolve(const PartFacts& facts) const noexcept
 
       The cascade for one part: the winning primitive declaration, then each of that primitive's parameters from the winning declaration of it among the matching rules that select the same primitive, else its declared default; and each material field from its winning declaration among all the matching rules. Linear in the number of rules; tables are small, and a theme with no rules returns at once.
@@ -604,6 +614,18 @@ Types
       Default: ``{PartRole::region}``.
 
    .. cpp:member:: AnatomyStateSet states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CompiledThemeRules::RecipeResolution final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   The winning declaration of each recipe field (RecipeField) of the rules matching a control, by the field's position, or null where no matching rule sets it; they belong to the compiled rules. ``authored`` is whether any is set.
+
+   .. cpp:member:: std::array<const RecipeDeclaration*, recipe_field_count> fields
+
+   .. cpp:member:: bool authored
 
 .. cpp:namespace:: gui_forms
 
@@ -768,6 +790,8 @@ Types
 .. cpp:struct:: ControlTextShadow final
 
    ``#include <gui_forms/theme/types/theme_types.hpp>``
+
+   A text shadow (E9.6, CSS ``text-shadow``): the text's glyphs, moved by ``offset`` logical units (each axis within ±maximum_text_shadow_offset), blurred by ``blur_radius`` (the shadows' blur-radius convention, 0 to maximum_text_shadow_blur; both limits are the theme rules') and drawn in ``color`` under the glyphs. Data only in T2: the theme carries it, and the text stage (M4/M9) draws it, with a first-party blur so that it is the same on every host.
 
    .. cpp:member:: Point offset
 
@@ -3057,6 +3081,34 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RecipeDeclaration final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   One recipe field's declared value. ``initial`` is CSS's ``initial``: the floor's value, and the declaration still wins over those beneath it; its value members are not read. Otherwise, by field: - text and outline_colour: ``colour``; - outline_style: ``outline_style``; - outline_width (0 to maximum_recipe_outline_width) and outline_offset (within ±maximum_recipe_outline_offset): ``number``, in logical units; - text_shadow: ``shadowed``, false for none; its ``shadow_offset``, ``shadow_blur`` (the shadows' blur-radius convention) and ``colour``.
+
+   .. cpp:member:: RecipeField field
+
+      Default: ``{RecipeField::text}``.
+
+   .. cpp:member:: bool initial
+
+   .. cpp:member:: Color colour
+
+   .. cpp:member:: double number
+
+   .. cpp:member:: RecipeOutlineStyle outline_style
+
+      Default: ``{RecipeOutlineStyle::ring}``.
+
+   .. cpp:member:: bool shadowed
+
+   .. cpp:member:: Point shadow_offset
+
+   .. cpp:member:: double shadow_blur
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: Rect
 
    ``#include <gui_forms/types/geometry/geometry.hpp>``
@@ -3098,6 +3150,30 @@ Types
    .. cpp:member:: double width
 
    .. cpp:member:: double height
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: ResolvedControlRecipe final
+
+   ``#include <gui_forms/theme/types/theme_types.hpp>``
+
+   A control's recipe for one role and state (T3 P6f): the theme's built-in recipe (the floor, Theme::resolve(role, context), borrowed from the theme) or, when the theme's rules set a recipe field for the control (RecipeField), the floor's copy with those fields in place, which this value owns. The copy is made only then, so a theme whose rules set no recipe field costs nothing. A value for one paint or measurement: it borrows the theme, so it is not kept past the theme's use. ``recipe()`` borrows from the value, so it is read from a named value and never from a temporary.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit ResolvedControlRecipe(const ControlVisualRecipe& floor) noexcept
+
+   .. cpp:function:: ResolvedControlRecipe(const ControlVisualRecipe& floor, ControlVisualRecipe&& authored) noexcept
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: const ControlVisualRecipe& recipe() const& noexcept
+
+   .. cpp:function:: bool authored() const noexcept
+
+      Whether a rule's recipe field changed the floor.
 
 .. cpp:namespace:: gui_forms
 
@@ -3361,6 +3437,14 @@ Types
 
       Bounds role/state indices and chooses ordinary, selected, high-contrast, or high-contrast-selected recipe deterministically.
 
+   .. cpp:function:: ResolvedControlRecipe resolve(const Control& control, ControlVisualRole role, ControlVisualContext context) const
+
+      Bounds role/state indices and chooses ordinary, selected, high-contrast, or high-contrast-selected recipe deterministically.
+
+   .. cpp:function:: ResolvedControlRecipe resolve(const Control& control, ControlVisualRole role, ControlVisualContext context, AnatomyStateSet states) const
+
+      Bounds role/state indices and chooses ordinary, selected, high-contrast, or high-contrast-selected recipe deterministically.
+
    .. cpp:function:: Color accent(AccentIndex index) const noexcept
 
       The ramp colour for an accent index; an index past the end of the ramp wraps around it.
@@ -3546,7 +3630,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one. Its material fields (EC1) cascade the same way, each on its own, from every matching rule, whatever primitive it selects: they change a part only where its primitive draws a theme material. ``specificity``, when set, is the rule's specificity in place of the one its selector gives (T3 engine change EC2): a rule expanded from CSS's ``:is()`` takes its most specific argument's. A class or stable-ID rule with a given specificity then needs a class or an ID in it rather than in its selector; an inline style still needs its selector's stable ID.
+   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one. Its material fields (EC1) cascade the same way, each on its own, from every matching rule, whatever primitive it selects: they change a part only where its primitive draws a theme material. Its recipe fields (RecipeField) cascade the same way for the control as a whole. ``specificity``, when set, is the rule's specificity in place of the one its selector gives (T3 engine change EC2): a rule expanded from CSS's ``:is()`` takes its most specific argument's. A class or stable-ID rule with a given specificity then needs a class or an ID in it rather than in its selector; an inline style still needs its selector's stable ID.
 
    .. cpp:member:: std::string label
 
@@ -3567,6 +3651,8 @@ Types
    .. cpp:member:: std::optional<AmbientEffect> ambient
 
    .. cpp:member:: std::vector<MaterialDeclaration> materials
+
+   .. cpp:member:: std::vector<RecipeDeclaration> recipe_fields
 
 .. cpp:namespace:: gui_forms
 
@@ -4555,6 +4641,38 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: RecipeField
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: text
+
+   .. cpp:enumerator:: outline_style
+
+   .. cpp:enumerator:: outline_colour
+
+   .. cpp:enumerator:: outline_width
+
+   .. cpp:enumerator:: outline_offset
+
+   .. cpp:enumerator:: text_shadow
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RecipeOutlineStyle
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: ring
+
+   .. cpp:enumerator:: solid
+
+   .. cpp:enumerator:: none
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: RegistrationOutcome
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -4648,6 +4766,10 @@ Enumerations
    .. cpp:enumerator:: published_value_invalid
 
    .. cpp:enumerator:: material_field_invalid
+
+   .. cpp:enumerator:: recipe_field_invalid
+
+   .. cpp:enumerator:: recipe_field_on_part
 
 .. cpp:namespace:: gui_forms
 
@@ -5022,6 +5144,14 @@ Functions, constants and aliases
 
    Whether assembling ``fields`` reads the part's box: a relative corner, an authored gradient, of a fill or the mask, other than a fixed one (authored_gradient_fixed), or an image size of the box (a fraction of its side, cover or contain).
 
+.. cpp:function:: std::string_view recipe_field_name(RecipeField field) noexcept
+
+   The field's snake_case name, as diagnostics name it; empty for ``count``.
+
+.. cpp:function:: bool recipe_declaration_admitted(const RecipeDeclaration& declaration) noexcept
+
+   Whether ``declaration`` is one a recipe admits: a field below ``count``, and a finite value within its field's range.
+
 .. cpp:function:: std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept
 
 .. cpp:function:: const ThemeRuleSheet& built_in_theme_rules()
@@ -5091,6 +5221,26 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t material_field_count
 
    Value: ``static_cast<std::size_t>(MaterialField::count)``.
+
+.. cpp:var:: constexpr std::size_t recipe_field_count
+
+   Value: ``static_cast<std::size_t>(RecipeField::count)``.
+
+.. cpp:var:: constexpr double maximum_recipe_outline_width
+
+   What a recipe admits (valid_recipe): an outline at most 16 logical units wide, offset at most 64 either way; a text shadow offset at most 16 on each axis and blurred by at most 8. Value: ``16.0``.
+
+.. cpp:var:: constexpr double maximum_recipe_outline_offset
+
+   Value: ``64.0``.
+
+.. cpp:var:: constexpr double maximum_text_shadow_blur
+
+   Value: ``8.0``.
+
+.. cpp:var:: constexpr double maximum_text_shadow_offset
+
+   Value: ``16.0``.
 
 .. cpp:var:: constexpr std::uint32_t maximum_operations_per_device_pixel
 
@@ -5269,14 +5419,6 @@ Functions, constants and aliases
 .. cpp:function:: inline std::vector<MaterialShadow> provisional_overlay_shadow()
 
    The overlay shadow (owner decision RB-37, design language 12.9; the E4 level of 3.4 scaled to small overlays): a soft shadow cast down and right, away from the one upper-left light, by surfaces that really overlap content (tooltips, popups, menus). The ``shadow`` part role paints it around the casting surface. Two layers, in the units of MaterialShadow (blur is a CSS blur radius): a wide soft layer and a close contact layer, each offset right by at most half its drop (3.3). Provisional starting tokens until the default theme (stage T4) owns them.
-
-.. cpp:var:: constexpr double maximum_text_shadow_blur
-
-   A text shadow (E9.6, CSS ``text-shadow``): the text's glyphs, moved by ``offset`` logical units, blurred by ``blur_radius`` (the shadows' blur-radius convention, 0 to maximum_text_shadow_blur) and drawn in ``color`` under the glyphs. Data only in T2: the theme carries it, and the text stage (M4/M9) draws it, with a first-party blur so that it is the same on every host. Value: ``8.0``.
-
-.. cpp:var:: constexpr double maximum_text_shadow_offset
-
-   Value: ``16.0``.
 
 .. cpp:var:: constexpr std::size_t control_visual_role_count
 

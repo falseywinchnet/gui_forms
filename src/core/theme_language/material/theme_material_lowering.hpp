@@ -1,18 +1,21 @@
 #pragma once
 
-// The material properties' lowering (stage T3, PLAN.md P6b and P6c): CSS's
+// The material properties' lowering (stage T3, PLAN.md P6b to P6f): CSS's
 // background, border, border-radius, box-shadow, filter and mask-image
 // families and the language's glow and surface-finish, read from a
-// declaration's value, become the engine's material fields (EC1), each
-// longhand one field, so that each cascades as CSS cascades it. The compiler reads the
-// value and handles the CSS-wide keywords; this lowers what is left into
-// a result record and reports nothing itself.
+// declaration's value, become the engine's material fields (EC1), and
+// CSS's color, outline family and text-shadow the recipe's own fields
+// (RecipeField, P6f); each longhand is one field, so that each cascades as
+// CSS cascades it. The compiler reads the value and handles the CSS-wide
+// keywords; this lowers what is left into a result record and reports
+// nothing itself.
 
 #include "../diagnostics/theme_diagnostics.hpp"
 #include "../value/theme_value.hpp"
 
 #include "gui_forms/engine/theme_rules/theme_rules.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -23,11 +26,11 @@
 
 namespace gui_forms::theme_language {
 
-// The CSS properties lowered onto material fields: each family's
-// shorthands, then its longhands. The edges' and the corners' come in
-// CSS's order (top, right, bottom, left; top-left, top-right,
-// bottom-right, bottom-left), each edge's in the order of its fields
-// (style, width, colour).
+// The CSS properties lowered onto material fields, then those lowered onto
+// recipe fields (recipe_property): each family's shorthands, then its
+// longhands. The edges' and the corners' come in CSS's order (top, right,
+// bottom, left; top-left, top-right, bottom-right, bottom-left), each
+// edge's in the order of its fields (style, width, colour).
 enum class MaterialProperty : std::uint8_t {
     background,
     background_color,
@@ -68,6 +71,13 @@ enum class MaterialProperty : std::uint8_t {
     glow_placement,
     mask_image,
     surface_finish,
+    color,
+    outline,
+    outline_color,
+    outline_offset,
+    outline_style,
+    outline_width,
+    text_shadow,
 };
 
 // An image resource the theme's manifest lists, bound to the engine's image
@@ -92,8 +102,22 @@ struct ThemeImageResource final {
 [[nodiscard]] bool css_blend_mode_not_admitted(std::string_view name) noexcept;
 
 // The material fields `property` sets, in order, into `fields`, which is
-// cleared first: what CSS's `initial` resets.
+// cleared first: what CSS's `initial` resets. None for a recipe property.
 void material_property_fields(MaterialProperty property, std::vector<MaterialField>& fields);
+
+// Whether `property` sets the recipe's own fields (P6f) rather than the
+// material's: they are the control's, so a rule naming a part or a role
+// cannot declare them.
+[[nodiscard]] bool recipe_property(MaterialProperty property) noexcept;
+
+// The recipe fields a recipe property sets, in order (`count` of the
+// capacity are live): what CSS's `initial` resets. None for a material
+// property.
+struct RecipePropertyFields final {
+    std::array<RecipeField, 3> fields{};
+    std::size_t count{};
+};
+[[nodiscard]] RecipePropertyFields recipe_property_fields(MaterialProperty property) noexcept;
 
 enum class MaterialLoweringOutcome : std::uint8_t {
     // `declarations` hold the fields the value sets.
@@ -117,6 +141,8 @@ struct MaterialLoweringProblem final {
 struct MaterialLowering final {
     MaterialLoweringOutcome outcome{MaterialLoweringOutcome::refused};
     std::vector<MaterialDeclaration> declarations{};
+    // A recipe property's fields.
+    std::vector<RecipeDeclaration> recipe_fields{};
     MaterialLoweringProblem problem{};
 };
 

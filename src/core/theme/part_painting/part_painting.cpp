@@ -563,7 +563,10 @@ void paint_part_with_built_in_recipe(Painter& painter, const Control& control, c
     if (!paintable(part.bounds)) return;
     const ControlVisualContext context = part_visual_context(control, part.states);
     const Theme& theme = control.effective_theme();
-    const ControlVisualRecipe& recipe = theme.resolve(part.family, context);
+    // The control's recipe fields (T3 P6f) in the part's states: a label
+    // part takes the control's text colour.
+    const ResolvedControlRecipe resolved = theme.resolve(control, part.family, context, part.states);
+    const ControlVisualRecipe& recipe = resolved.recipe();
     if (part.role == PartRole::shadow) {
         paint_overlay_shadow(painter, part, recipe, theme.overlay_shadow(context.high_contrast));
         return;

@@ -280,6 +280,15 @@ const MaterialDeclaration* field_of(const ThemeRule& rule, MaterialField field) 
 }
 const MaterialDeclaration* field_of(ThemeRule&& rule, MaterialField field) = delete;
 
+const RecipeDeclaration* recipe_field_of(const ThemeRule& rule, RecipeField field) {
+    for (const RecipeDeclaration& declaration : rule.recipe_fields) {
+        if (declaration.field == field) return &declaration;
+    }
+    return nullptr;
+}
+
+const RecipeDeclaration* recipe_field_of(ThemeRule&& rule, RecipeField field) = delete;
+
 bool selects_material(const ThemeRule& rule) {
     for (const RuleDeclaration& declaration : rule.declarations) {
         if (declaration == RuleDeclaration::primitive("material")) return true;
@@ -440,6 +449,78 @@ void test_line_lowering() {
             "a border image's percentage slices are of the image, auto widths its own size");
 }
 
+// The recipe's own fields (P6f): `color`, the outline family and
+// `text-shadow` set the control's recipe, not its material.
+void test_recipe_lowering() {
+    const std::string_view colour_sheet = "#pad { color: red; background-color: blue }";
+    const Compilation coloured = compile(colour_sheet);
+    const ThemeRule& colour_rule = only_rule(coloured, colour_sheet);
+    const RecipeDeclaration* const text = recipe_field_of(colour_rule, RecipeField::text);
+    require(text != nullptr && (*text).colour == red && colour_rule.recipe_fields.size() == 1U &&
+                field_of(colour_rule, MaterialField::background_colour) != nullptr && selects_material(colour_rule),
+            "color is the recipe's text colour, beside the material fields");
+    const std::string_view text_sheet = "#pad { color: red }";
+    const Compilation text_only = compile(text_sheet);
+    require(!selects_material(only_rule(text_only, text_sheet)), "a rule of recipe fields alone selects no primitive");
+
+    const std::string_view outline_sheet = "#pad { outline: 2px solid green; outline-offset: -1px }";
+    const Compilation outlined = compile(outline_sheet);
+    const ThemeRule& outline_rule = only_rule(outlined, outline_sheet);
+    const RecipeDeclaration* const style = recipe_field_of(outline_rule, RecipeField::outline_style);
+    const RecipeDeclaration* const colour = recipe_field_of(outline_rule, RecipeField::outline_colour);
+    const RecipeDeclaration* const width = recipe_field_of(outline_rule, RecipeField::outline_width);
+    const RecipeDeclaration* const offset = recipe_field_of(outline_rule, RecipeField::outline_offset);
+    require(style != nullptr && !(*style).initial && (*style).outline_style == RecipeOutlineStyle::solid &&
+                colour != nullptr && (*colour).colour == green && width != nullptr && (*width).number == 2.0 &&
+                offset != nullptr && (*offset).number == -1.0,
+            "outline's colour, style and width, and the offset");
+    const std::string_view ring_sheet = "#pad { outline: auto }";
+    const Compilation ringed = compile(ring_sheet);
+    const ThemeRule& ring_rule = only_rule(ringed, ring_sheet);
+    const RecipeDeclaration* const ring = recipe_field_of(ring_rule, RecipeField::outline_style);
+    const RecipeDeclaration* const ring_colour = recipe_field_of(ring_rule, RecipeField::outline_colour);
+    const RecipeDeclaration* const ring_width = recipe_field_of(ring_rule, RecipeField::outline_width);
+    require(ring != nullptr && (*ring).outline_style == RecipeOutlineStyle::ring && ring_colour != nullptr &&
+                (*ring_colour).initial && ring_width != nullptr && (*ring_width).initial &&
+                recipe_field_of(ring_rule, RecipeField::outline_offset) == nullptr,
+            "auto is the theme's ring; the shorthand's omitted members are initial, and the offset not its");
+    const std::string_view none_sheet = "#pad { outline: thick none }";
+    const Compilation none = compile(none_sheet);
+    const ThemeRule& none_rule = only_rule(none, none_sheet);
+    const RecipeDeclaration* const no_style = recipe_field_of(none_rule, RecipeField::outline_style);
+    const RecipeDeclaration* const thick = recipe_field_of(none_rule, RecipeField::outline_width);
+    require(no_style != nullptr && (*no_style).outline_style == RecipeOutlineStyle::none && thick != nullptr &&
+                (*thick).number == 5.0,
+            "none and CSS's thick");
+
+    const std::string_view shadow_sheet = "#pad { text-shadow: blue 1px 2px 3px }";
+    const Compilation shadowed = compile(shadow_sheet);
+    const RecipeDeclaration* const shadow = recipe_field_of(only_rule(shadowed, shadow_sheet), RecipeField::text_shadow);
+    require(shadow != nullptr && (*shadow).shadowed && (*shadow).shadow_offset == Point{1.0, 2.0} &&
+                (*shadow).shadow_blur == 3.0 && (*shadow).colour == blue,
+            "a text shadow's offset, blur and colour");
+    const std::string_view no_shadow_sheet = "#pad { text-shadow: none }";
+    const Compilation unshadowed = compile(no_shadow_sheet);
+    const RecipeDeclaration* const no_shadow =
+        recipe_field_of(only_rule(unshadowed, no_shadow_sheet), RecipeField::text_shadow);
+    require(no_shadow != nullptr && !(*no_shadow).shadowed && !(*no_shadow).initial, "text-shadow: none");
+
+    const std::string_view initial_sheet = "#pad { outline: initial; color: initial }";
+    const Compilation reset = compile(initial_sheet);
+    const ThemeRule& reset_rule = only_rule(reset, initial_sheet);
+    bool all_initial = reset_rule.recipe_fields.size() == 4U;
+    for (const RecipeDeclaration& declaration : reset_rule.recipe_fields) {
+        if (!declaration.initial) all_initial = false;
+    }
+    require(all_initial, "initial resets each field the property sets");
+
+    const Compilation on_part = compile("#pad::part(face) { color: red }");
+    require(on_part.outcome == CompileOutcome::compiled && on_part.sheet.rules.empty() &&
+                on_part.diagnostics.size() == 1U &&
+                on_part.diagnostics[0].code == DiagnosticCode::property_not_admitted,
+            "a recipe field on a part is dropped with a warning: the recipe's fields are the control's");
+}
+
 void test_filter_lowering() {
     const std::string_view none_sheet = "#pad::part(face) { filter: none }";
     const Compilation none = compile(none_sheet);
@@ -590,7 +671,7 @@ struct Refusal final {
 };
 
 void test_refusals() {
-    const std::array<Refusal, 65> refusals{{
+    const std::array<Refusal, 78> refusals{{
         {"#a { background-image: "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
@@ -665,6 +746,19 @@ void test_refusals() {
          DiagnosticCode::value_form_not_admitted},
         {"#a { border-image: url(\"resource:tile.quadrant\") 1 fill / 1 }", DiagnosticCode::value_form_not_admitted},
         {"#a { border-image: url(\"resource:icon.check\") 1 fill / 2px }", DiagnosticCode::value_wrong_kind},
+        {"#a { color: inherit }", DiagnosticCode::not_yet_built},
+        {"#a { color: currentcolor }", DiagnosticCode::not_yet_built},
+        {"#a { color: red blue }", DiagnosticCode::value_syntax},
+        {"#a { outline: 2px dashed red }", DiagnosticCode::value_form_not_admitted},
+        {"#a { outline-style: hidden }", DiagnosticCode::keyword_unknown},
+        {"#a { outline-width: 17px }", DiagnosticCode::value_out_of_range},
+        {"#a { outline-offset: 65px }", DiagnosticCode::value_out_of_range},
+        {"#a { outline: 1px 2px }", DiagnosticCode::value_syntax},
+        {"#a { text-shadow: 1px 1px red, 2px 2px blue }", DiagnosticCode::too_many_layers},
+        {"#a { text-shadow: 1px 1px }", DiagnosticCode::not_yet_built},
+        {"#a { text-shadow: 1px 1px 9px red }", DiagnosticCode::value_out_of_range},
+        {"#a { text-shadow: 1px 1px 1px 1px red }", DiagnosticCode::value_syntax},
+        {"#a { text-shadow: 17px 0 red }", DiagnosticCode::value_out_of_range},
     }};
     for (const Refusal& refusal : refusals) {
         const Compilation compiled = compile(refusal.sheet);
@@ -1048,6 +1142,7 @@ int main() {
     test_lowering();
     test_border_lowering();
     test_line_lowering();
+    test_recipe_lowering();
     test_filter_lowering();
     test_image_lowering();
     test_refusals();

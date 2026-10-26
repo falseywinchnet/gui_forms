@@ -203,6 +203,8 @@ std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept {
     case RuleDiagnosticKind::blend_invalid: return "blend_invalid";
     case RuleDiagnosticKind::published_value_invalid: return "published_value_invalid";
     case RuleDiagnosticKind::material_field_invalid: return "material_field_invalid";
+    case RuleDiagnosticKind::recipe_field_invalid: return "recipe_field_invalid";
+    case RuleDiagnosticKind::recipe_field_on_part: return "recipe_field_on_part";
     }
     return {};
 }
@@ -1002,13 +1004,15 @@ void CompiledThemeRules::add_rules(CompiledThemeRules& result, const ThemeRuleSh
         add_transitions(result.diagnostics_, index, rule, compiled);
         add_ambient(result.diagnostics_, index, rule, compiled);
         add_materials(result.diagnostics_, index, rule, compiled);
+        add_recipe_fields(result.diagnostics_, index, rule, compiled);
         const bool declares = compiled.selects || !compiled.parameters.empty() || !compiled.transitions.empty() ||
                               compiled.ambient.has_value() || compiled.blend.has_value() ||
-                              !compiled.materials.empty();
+                              !compiled.materials.empty() || !compiled.recipe_fields.empty();
         if (!declares) {
             result.diagnostics_.push_back(diagnostic(RuleDiagnosticKind::rule_empty, index, rule, {}));
             continue;
         }
+        if (!compiled.recipe_fields.empty()) result.recipe_fields_set_ = true;
         result.rules_.push_back(std::move(compiled));
     }
 }
@@ -1068,7 +1072,7 @@ void CompiledThemeRules::add_materials(std::vector<RuleDiagnostic>& diagnostics,
     }
 }
 
-// -- transitions and ambient effects (E7) ------------------------------------------
+// -- recipe fields (T3 P6f) ---------------------------------------------------------
 
 namespace {
 
@@ -1076,6 +1080,76 @@ bool in_range(double value, double minimum, double maximum) noexcept {
     const bool inside = std::isfinite(value) && value >= minimum && value <= maximum;
     return inside;
 }
+
+constexpr std::array<std::string_view, recipe_field_count> recipe_field_names{
+    "text", "outline_style", "outline_colour", "outline_width", "outline_offset", "text_shadow",
+};
+
+} // namespace
+
+std::string_view recipe_field_name(RecipeField field) noexcept {
+    const std::size_t position = static_cast<std::size_t>(field);
+    if (position >= recipe_field_count) return {};
+    return recipe_field_names[position];
+}
+
+bool recipe_declaration_admitted(const RecipeDeclaration& declaration) noexcept {
+    switch (declaration.field) {
+    case RecipeField::text:
+    case RecipeField::outline_colour: return true;
+    case RecipeField::outline_style:
+        return declaration.outline_style == RecipeOutlineStyle::ring ||
+               declaration.outline_style == RecipeOutlineStyle::solid ||
+               declaration.outline_style == RecipeOutlineStyle::none;
+    case RecipeField::outline_width: return in_range(declaration.number, 0.0, maximum_recipe_outline_width);
+    case RecipeField::outline_offset:
+        return in_range(declaration.number, -maximum_recipe_outline_offset, maximum_recipe_outline_offset);
+    case RecipeField::text_shadow: {
+        if (!declaration.shadowed) return true;
+        const Point offset = declaration.shadow_offset;
+        const bool placed = in_range(offset.x, -maximum_text_shadow_offset, maximum_text_shadow_offset) &&
+                            in_range(offset.y, -maximum_text_shadow_offset, maximum_text_shadow_offset);
+        const bool blurred = in_range(declaration.shadow_blur, 0.0, maximum_text_shadow_blur);
+        return placed && blurred;
+    }
+    case RecipeField::count: break;
+    }
+    return false;
+}
+
+void CompiledThemeRules::add_recipe_fields(std::vector<RuleDiagnostic>& diagnostics, std::size_t index,
+                                           const ThemeRule& rule, CompiledRule& compiled) {
+    // The recipe's fields are the control's: a selector naming a part or a
+    // role sets none.
+    const bool on_part = !rule.selector.part.empty() || rule.selector.role.has_value();
+    std::array<bool, recipe_field_count> declared{};
+    for (const RecipeDeclaration& declaration : rule.recipe_fields) {
+        const std::size_t position = static_cast<std::size_t>(declaration.field);
+        const std::string_view name = recipe_field_name(declaration.field);
+        if (position >= recipe_field_count) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::recipe_field_invalid, index, rule, {}));
+            continue;
+        }
+        if (on_part) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::recipe_field_on_part, index, rule, name));
+            continue;
+        }
+        if (declared[position]) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::duplicate_declaration, index, rule, name));
+            continue;
+        }
+        if (!declaration.initial && !recipe_declaration_admitted(declaration)) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::recipe_field_invalid, index, rule, name));
+            continue;
+        }
+        declared[position] = true;
+        compiled.recipe_fields.push_back(declaration);
+    }
+}
+
+// -- transitions and ambient effects (E7) ------------------------------------------
+
+namespace {
 
 // Whether a state's stops (E9.6) are usable: none, or at most
 // maximum_motion_stops on a timed curve, offsets strictly increasing
@@ -1208,7 +1282,8 @@ CompiledThemeRules::CompiledThemeRules(const CompiledThemeRules& other)
       diagnostics_(other.diagnostics_),
       published_values_(other.published_values_),
       built_in_rules_(other.built_in_rules_),
-      serial_(next_rules_serial()) {}
+      serial_(next_rules_serial()),
+      recipe_fields_set_(other.recipe_fields_set_) {}
 
 CompiledThemeRules& CompiledThemeRules::operator=(const CompiledThemeRules& other) {
     if (this == &other) return *this;
@@ -1217,6 +1292,7 @@ CompiledThemeRules& CompiledThemeRules::operator=(const CompiledThemeRules& othe
     published_values_ = other.published_values_;
     built_in_rules_ = other.built_in_rules_;
     serial_ = next_rules_serial();
+    recipe_fields_set_ = other.recipe_fields_set_;
     return *this;
 }
 
@@ -1309,6 +1385,21 @@ void CompiledThemeRules::resolve_materials(const PartFacts& facts, Resolution& r
         }
         result.materials_authored = true;
     }
+}
+
+CompiledThemeRules::RecipeResolution CompiledThemeRules::resolve_recipe_fields(const PartFacts& facts) const noexcept {
+    RecipeResolution result{};
+    if (!recipe_fields_set_) return result;
+    // As for the material fields: the last matching declaration of each
+    // field wins, and a rule declares each field at most once.
+    for (const CompiledRule& rule : rules_) {
+        if (rule.recipe_fields.empty() || !matches(rule, facts)) continue;
+        for (const RecipeDeclaration& declaration : rule.recipe_fields) {
+            result.fields[static_cast<std::size_t>(declaration.field)] = &declaration;
+        }
+        result.authored = true;
+    }
+    return result;
 }
 
 void CompiledThemeRules::resolve_primitive(const PartFacts& facts, const CompiledRule& chosen,

@@ -36,7 +36,7 @@ struct NamedMaterialProperty final {
 };
 
 // Sorted by name.
-constexpr std::array<NamedMaterialProperty, 39> material_properties{{
+constexpr std::array<NamedMaterialProperty, 46> material_properties{{
     {.name = "background", .property = MaterialProperty::background},
     {.name = "background-blend-mode", .property = MaterialProperty::background_blend_mode},
     {.name = "background-color", .property = MaterialProperty::background_color},
@@ -71,11 +71,33 @@ constexpr std::array<NamedMaterialProperty, 39> material_properties{{
     {.name = "border-top-width", .property = MaterialProperty::border_top_width},
     {.name = "border-width", .property = MaterialProperty::border_width},
     {.name = "box-shadow", .property = MaterialProperty::box_shadow},
+    {.name = "color", .property = MaterialProperty::color},
     {.name = "filter", .property = MaterialProperty::filter},
     {.name = "glow", .property = MaterialProperty::glow},
     {.name = "glow-placement", .property = MaterialProperty::glow_placement},
     {.name = "mask-image", .property = MaterialProperty::mask_image},
+    {.name = "outline", .property = MaterialProperty::outline},
+    {.name = "outline-color", .property = MaterialProperty::outline_color},
+    {.name = "outline-offset", .property = MaterialProperty::outline_offset},
+    {.name = "outline-style", .property = MaterialProperty::outline_style},
+    {.name = "outline-width", .property = MaterialProperty::outline_width},
     {.name = "surface-finish", .property = MaterialProperty::surface_finish},
+    {.name = "text-shadow", .property = MaterialProperty::text_shadow},
+}};
+
+// The recipe's longhands (P6f), each the one recipe field it sets.
+struct RecipeLonghand final {
+    MaterialProperty property{MaterialProperty::color};
+    RecipeField field{RecipeField::text};
+};
+
+constexpr std::array<RecipeLonghand, 6> recipe_longhands{{
+    {.property = MaterialProperty::color, .field = RecipeField::text},
+    {.property = MaterialProperty::outline_color, .field = RecipeField::outline_colour},
+    {.property = MaterialProperty::outline_offset, .field = RecipeField::outline_offset},
+    {.property = MaterialProperty::outline_style, .field = RecipeField::outline_style},
+    {.property = MaterialProperty::outline_width, .field = RecipeField::outline_width},
+    {.property = MaterialProperty::text_shadow, .field = RecipeField::text_shadow},
 }};
 
 // CSS blend modes the engine does not composite (CSS_COVERAGE section 7).
@@ -332,6 +354,16 @@ private:
     bool lower_glows();
     bool lower_glow_placements();
     bool lower_mask();
+    [[nodiscard]] bool outline_style_word(std::size_t index) const noexcept;
+    bool read_outline_style(std::size_t index, RecipeOutlineStyle& style);
+    bool read_outline_width(std::size_t index, double& width);
+    bool lower_text_colour();
+    bool lower_outline();
+    bool lower_outline_style();
+    bool lower_outline_colour();
+    bool lower_outline_width();
+    bool lower_outline_offset();
+    bool lower_text_shadow();
 
     const ThemeValue& value_;
     std::uint32_t start_{};
@@ -343,6 +375,7 @@ bool MaterialReader::fail(DiagnosticCode code, std::uint32_t token, std::string 
     const bool warning = diagnostic_severity(code) == DiagnosticSeverity::warning;
     lowering_.outcome = warning ? MaterialLoweringOutcome::dropped : MaterialLoweringOutcome::refused;
     lowering_.declarations.clear();
+    lowering_.recipe_fields.clear();
     lowering_.problem.code = code;
     lowering_.problem.token = token;
     lowering_.problem.detail = std::move(detail);
@@ -1895,9 +1928,203 @@ bool MaterialReader::lower_background() {
     return push_fills(written);
 }
 
+// -- the recipe's own fields (P6f) ------------------------------------------------
+
+// A one-value recipe field: `color`, an outline longhand.
+RecipeDeclaration recipe_declaration(RecipeField field) noexcept {
+    RecipeDeclaration declaration{};
+    declaration.field = field;
+    return declaration;
+}
+
+bool MaterialReader::outline_style_word(std::size_t index) const noexcept {
+    const bool word = keyword(index, "auto") || style_word(index);
+    return word;
+}
+
+// An outline's style: `auto` is the theme's ring, `solid` an outline
+// outside the bounds, `none` none. The ring is stroked solid, so the other
+// line styles are not admitted; `hidden` is not an outline style.
+bool MaterialReader::read_outline_style(std::size_t index, RecipeOutlineStyle& style) {
+    const ValueComponent& component = value_.components[index];
+    if (component.kind != ValueComponentKind::keyword) {
+        return fail(DiagnosticCode::value_wrong_kind, component.token, "an outline style");
+    }
+    if (keyword(index, "auto")) {
+        style = RecipeOutlineStyle::ring;
+        return true;
+    }
+    if (keyword(index, "solid")) {
+        style = RecipeOutlineStyle::solid;
+        return true;
+    }
+    if (keyword(index, "none")) {
+        style = RecipeOutlineStyle::none;
+        return true;
+    }
+    if (style_word(index) && !keyword(index, "hidden")) {
+        return fail(DiagnosticCode::value_form_not_admitted, component.token, clipped_theme_detail(component.text));
+    }
+    return fail(DiagnosticCode::keyword_unknown, component.token, clipped_theme_detail(component.text));
+}
+
+// An outline's width: a <line-width>, at most maximum_recipe_outline_width.
+bool MaterialReader::read_outline_width(std::size_t index, double& width) {
+    if (!read_width(index, width)) return false;
+    if (width > maximum_recipe_outline_width) {
+        const ValueComponent& component = value_.components[index];
+        return fail(DiagnosticCode::value_out_of_range, component.token, clipped_theme_detail(component.text));
+    }
+    return true;
+}
+
+// `color`: one colour, the recipe's text colour.
+bool MaterialReader::lower_text_colour() {
+    if (value_.components.size() != 1U) {
+        return fail(DiagnosticCode::value_syntax, value_.components[next(0U)].token, "one colour");
+    }
+    RecipeDeclaration declaration = recipe_declaration(RecipeField::text);
+    if (!read_colour(0U, declaration.colour)) return false;
+    lowering_.recipe_fields.push_back(declaration);
+    return true;
+}
+
+// `outline`: a colour, a style and a width, each at most once and in any
+// order; one it omits takes its `initial` (the floor's value). The offset
+// is not the shorthand's.
+bool MaterialReader::lower_outline() {
+    RecipeDeclaration style = recipe_declaration(RecipeField::outline_style);
+    RecipeDeclaration colour = recipe_declaration(RecipeField::outline_colour);
+    RecipeDeclaration width = recipe_declaration(RecipeField::outline_width);
+    bool styled = false;
+    bool coloured = false;
+    bool sized = false;
+    for (std::size_t index = 0U; index < value_.components.size(); index = next(index)) {
+        const ValueComponent& component = value_.components[index];
+        if (outline_style_word(index)) {
+            if (styled) return fail(DiagnosticCode::value_syntax, component.token, "one outline style");
+            styled = true;
+            if (!read_outline_style(index, style.outline_style)) return false;
+            continue;
+        }
+        if (component.kind == ValueComponentKind::number || width_word(index)) {
+            if (sized) return fail(DiagnosticCode::value_syntax, component.token, "one outline width");
+            sized = true;
+            if (!read_outline_width(index, width.number)) return false;
+            continue;
+        }
+        if (coloured) return fail(DiagnosticCode::value_syntax, component.token, "one outline colour");
+        coloured = true;
+        if (!read_colour(index, colour.colour)) return false;
+    }
+    style.initial = !styled;
+    colour.initial = !coloured;
+    width.initial = !sized;
+    lowering_.recipe_fields.push_back(style);
+    lowering_.recipe_fields.push_back(colour);
+    lowering_.recipe_fields.push_back(width);
+    return true;
+}
+
+bool MaterialReader::lower_outline_style() {
+    if (value_.components.size() != 1U) {
+        return fail(DiagnosticCode::value_syntax, value_.components[next(0U)].token, "one outline style");
+    }
+    RecipeDeclaration declaration = recipe_declaration(RecipeField::outline_style);
+    if (!read_outline_style(0U, declaration.outline_style)) return false;
+    lowering_.recipe_fields.push_back(declaration);
+    return true;
+}
+
+bool MaterialReader::lower_outline_colour() {
+    if (value_.components.size() != 1U) {
+        return fail(DiagnosticCode::value_syntax, value_.components[next(0U)].token, "one colour");
+    }
+    RecipeDeclaration declaration = recipe_declaration(RecipeField::outline_colour);
+    if (!read_colour(0U, declaration.colour)) return false;
+    lowering_.recipe_fields.push_back(declaration);
+    return true;
+}
+
+bool MaterialReader::lower_outline_width() {
+    if (value_.components.size() != 1U) {
+        return fail(DiagnosticCode::value_syntax, value_.components[next(0U)].token, "one width");
+    }
+    RecipeDeclaration declaration = recipe_declaration(RecipeField::outline_width);
+    if (!read_outline_width(0U, declaration.number)) return false;
+    lowering_.recipe_fields.push_back(declaration);
+    return true;
+}
+
+// `outline-offset`: a length, negative inward, within
+// ±maximum_recipe_outline_offset. The theme's ring (`auto`) has none.
+bool MaterialReader::lower_outline_offset() {
+    if (value_.components.size() != 1U) {
+        return fail(DiagnosticCode::value_syntax, value_.components[next(0U)].token, "one length");
+    }
+    BoxLength length{};
+    if (!read_length(0U, false, true, length)) return false;
+    if (std::abs(length.units) > maximum_recipe_outline_offset) {
+        const ValueComponent& component = value_.components[0];
+        return fail(DiagnosticCode::value_out_of_range, component.token, clipped_theme_detail(component.text));
+    }
+    RecipeDeclaration declaration = recipe_declaration(RecipeField::outline_offset);
+    declaration.number = length.units;
+    lowering_.recipe_fields.push_back(declaration);
+    return true;
+}
+
+// `text-shadow`: none, or one shadow: two or three adjacent lengths (the
+// offset and the blur) and a colour, in either order. The recipe carries
+// one shadow; a shadow's colour is required until the colour roles bring
+// currentcolor (P8).
+bool MaterialReader::lower_text_shadow() {
+    RecipeDeclaration declaration = recipe_declaration(RecipeField::text_shadow);
+    const ComponentRange whole{0U, value_.components.size()};
+    if (count(whole) == 1U && keyword(0U, "none")) {
+        lowering_.recipe_fields.push_back(declaration);
+        return true;
+    }
+    std::vector<ComponentRange> shadows{};
+    split(whole, shadows);
+    if (shadows.size() > 1U) return fail(DiagnosticCode::too_many_layers, start_, "1 text shadow");
+    std::array<double, 3> lengths{};
+    std::size_t length_count = 0U;
+    bool lengths_done = false;
+    bool coloured = false;
+    for (std::size_t index = 0U; index < value_.components.size(); index = next(index)) {
+        const ValueComponent& component = value_.components[index];
+        if (component.kind == ValueComponentKind::number) {
+            if (lengths_done || length_count == lengths.size()) {
+                return fail(DiagnosticCode::value_syntax, component.token, "two or three adjacent lengths");
+            }
+            BoxLength length{};
+            if (!read_length(index, false, length_count != 2U, length)) return false;
+            lengths[length_count] = length.units;
+            length_count = length_count + 1U;
+            continue;
+        }
+        if (coloured) return fail(DiagnosticCode::value_syntax, component.token, "one colour");
+        coloured = true;
+        lengths_done = length_count > 0U;
+        if (!read_colour(index, declaration.colour)) return false;
+    }
+    if (length_count < 2U) return fail(DiagnosticCode::value_syntax, start_, "two or three lengths");
+    if (!coloured) return fail(DiagnosticCode::not_yet_built, start_, "a shadow without a colour (currentcolor)");
+    declaration.shadowed = true;
+    declaration.shadow_offset = Point{lengths[0], lengths[1]};
+    declaration.shadow_blur = lengths[2];
+    if (!recipe_declaration_admitted(declaration)) {
+        return fail(DiagnosticCode::value_out_of_range, start_, "a text shadow");
+    }
+    lowering_.recipe_fields.push_back(declaration);
+    return true;
+}
+
 void MaterialReader::lower(MaterialProperty property) {
     lowering_.outcome = MaterialLoweringOutcome::lowered;
     lowering_.declarations.clear();
+    lowering_.recipe_fields.clear();
     lowering_.problem = MaterialLoweringProblem{};
     if (value_.components.empty()) {
         fail(DiagnosticCode::value_syntax, start_, "a value");
@@ -1944,6 +2171,13 @@ void MaterialReader::lower(MaterialProperty property) {
     case MaterialProperty::glow_placement: static_cast<void>(lower_glow_placements()); return;
     case MaterialProperty::mask_image: static_cast<void>(lower_mask()); return;
     case MaterialProperty::surface_finish: static_cast<void>(lower_finish()); return;
+    case MaterialProperty::color: static_cast<void>(lower_text_colour()); return;
+    case MaterialProperty::outline: static_cast<void>(lower_outline()); return;
+    case MaterialProperty::outline_color: static_cast<void>(lower_outline_colour()); return;
+    case MaterialProperty::outline_offset: static_cast<void>(lower_outline_offset()); return;
+    case MaterialProperty::outline_style: static_cast<void>(lower_outline_style()); return;
+    case MaterialProperty::outline_width: static_cast<void>(lower_outline_width()); return;
+    case MaterialProperty::text_shadow: static_cast<void>(lower_text_shadow()); return;
     }
 }
 
@@ -2038,7 +2272,34 @@ void material_property_fields(MaterialProperty property, std::vector<MaterialFie
     case MaterialProperty::glow_placement: fields.push_back(MaterialField::glow_placements); return;
     case MaterialProperty::mask_image: fields.push_back(MaterialField::mask); return;
     case MaterialProperty::surface_finish: fields.push_back(MaterialField::finish); return;
+    case MaterialProperty::color:
+    case MaterialProperty::outline:
+    case MaterialProperty::outline_color:
+    case MaterialProperty::outline_offset:
+    case MaterialProperty::outline_style:
+    case MaterialProperty::outline_width:
+    case MaterialProperty::text_shadow: return;
     }
+}
+
+bool recipe_property(MaterialProperty property) noexcept {
+    const RecipePropertyFields fields = recipe_property_fields(property);
+    return fields.count != 0U;
+}
+
+RecipePropertyFields recipe_property_fields(MaterialProperty property) noexcept {
+    RecipePropertyFields result{};
+    if (property == MaterialProperty::outline) {
+        result.fields = {RecipeField::outline_style, RecipeField::outline_colour, RecipeField::outline_width};
+        result.count = 3U;
+        return result;
+    }
+    for (const RecipeLonghand& longhand : recipe_longhands) {
+        if (longhand.property != property) continue;
+        result.fields[0] = longhand.field;
+        result.count = 1U;
+    }
+    return result;
 }
 
 void lower_material_value(MaterialProperty property, const ThemeValue& value, std::uint32_t start,

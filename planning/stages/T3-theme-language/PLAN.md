@@ -947,10 +947,40 @@ one bake per distinct assembly. 3 PRs.
   same C++ material; plus the lowering of the styles and of a
   percentage-sliced border image, and seven more refusals.
 
-*Still to build in P6:* §14's `color`, `outline` and `text-shadow`,
-which the engine resolves per control from the rules matching it (P6f,
-coordinator D1). `backdrop-filter` and the sheen's pointer gradient are
-deferred (coordinator D2, T3 README).
+*P6f, the recipe's own fields, engine side done (coordinator D1, PR A):*
+- **Engine:** a rule's `recipe_fields` (`RecipeField`: text, the
+  outline's style, colour, width and offset, the text shadow) are the
+  control's, not a part's: a rule naming a part or a role sets none
+  (`recipe_field_on_part`). They are checked when the rules compile
+  (`recipe_field_invalid` past the recipe's ranges) and cascade one by one
+  over the matching rules (`CompiledThemeRules::resolve_recipe_fields`,
+  at once when no rule sets one). `Theme::resolve(control, role, context
+  [, states])` puts them over the built-in recipe (the floor,
+  `Theme::resolve(role, context)`), matching with no part, the region role
+  and the context's states (or the part's); forced high contrast and an
+  invalid result keep the floor. The result is a value,
+  `ResolvedControlRecipe`: the floor borrowed, or, only when a field is
+  set, the floor's copy with the fields in place. A value rather than a
+  record in the part table, since a control holds its recipe across
+  `paint_part` calls that may evict records, and its own painting is not
+  a keyed part. The built-in recipe's part path takes it, so a label part
+  is drawn in the control's resolved text colour.
+- **Outline:** `auto` is the theme's ring inside the bounds (no offset),
+  `solid` an outline outside them, `none` no width; the ring is stroked
+  solid, so the other line styles are E405. Width 0 to 16 (CSS's
+  keywords), offset within ±64. The shorthand's omitted members are
+  `initial` (the floor's), and the offset is not the shorthand's.
+- **Text shadow:** one, with a colour (currentcolor waits for P8), offset
+  within ±16 and blur 0 to 8; a second is E407.
+- `color: inherit` and `currentcolor` wait for P8 (E999).
+- Gate: the engine's cascade, resolution and label part
+  (engine_recipe_field_tests), the lowering of each property, and
+  thirteen more refusals.
+- PR B moves the controls' ~40 `Theme::resolve(role, context)` sites to
+  the control's resolution, once PR A is on main.
+
+`backdrop-filter` and the sheen's pointer gradient are deferred
+(coordinator D2, T3 README).
 
 **P7. Motion.** `transition`, the timing functions, delays, `@keyframes`,
 `animation`, ambient loops, and the state-machine grouping. Gate: a fixture

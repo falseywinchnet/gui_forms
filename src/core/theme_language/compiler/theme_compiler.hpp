@@ -111,6 +111,7 @@ private:
     std::vector<MaterialDeclaration> materials_{};
     MaterialLowering material_lowering_{};
     std::vector<MaterialField> material_fields_{};
+    std::vector<RecipeDeclaration> recipe_fields_{};
     std::string folded_{};
 };
 

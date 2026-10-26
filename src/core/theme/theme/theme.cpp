@@ -1,4 +1,5 @@
 #include "gui_forms/theme.hpp"
+#include "gui_forms/control/control/control.hpp"
 #include "gui_forms/surface_material/presets/material_presets.hpp"
 
 #include <algorithm>
@@ -550,8 +551,9 @@ bool valid_text_shadow(const std::optional<ControlTextShadow>& shadow) noexcept 
 bool valid_recipe(const ControlVisualRecipe& value) noexcept {
     return valid_surface_material(value.material) && valid_text_shadow(value.text_shadow) &&
            std::isfinite(value.focus_width) && value.focus_width >= 0.0 &&
-           value.focus_width <= 16.0 && std::isfinite(value.focus_offset) &&
-           value.focus_offset >= -64.0 && value.focus_offset <= 64.0 &&
+           value.focus_width <= maximum_recipe_outline_width && std::isfinite(value.focus_offset) &&
+           value.focus_offset >= -maximum_recipe_outline_offset &&
+           value.focus_offset <= maximum_recipe_outline_offset &&
            (value.authored_focus_outline || value.focus_offset == 0.0) &&
            std::isfinite(value.default_width) &&
            value.default_width >= 0.0 && value.default_width <= 16.0 &&
@@ -1071,6 +1073,110 @@ const ControlVisualRecipe& Theme::resolve(
     }
     return context.selected ? recipes.selected[state_index]
                             : recipes.ordinary[state_index];
+}
+
+namespace {
+
+// The anatomy states a visual context shows (Theme::resolve's first form).
+AnatomyStateSet visual_context_states(ControlVisualContext context) noexcept {
+    AnatomyStateSet states{};
+    states.insert(AnatomyState::normal);
+    switch (context.surface) {
+    case ControlSurfaceState::hot: states.insert(AnatomyState::hot); break;
+    case ControlSurfaceState::pressed: states.insert(AnatomyState::pressed); break;
+    case ControlSurfaceState::pending: states.insert(AnatomyState::pending); break;
+    case ControlSurfaceState::invalid: states.insert(AnatomyState::invalid); break;
+    case ControlSurfaceState::deactivated: states.insert(AnatomyState::deactivated); break;
+    case ControlSurfaceState::normal:
+    case ControlSurfaceState::disabled:
+    case ControlSurfaceState::count: break;
+    }
+    if (context.surface == ControlSurfaceState::disabled) {
+        states.insert(AnatomyState::disabled);
+    } else {
+        states.insert(AnatomyState::enabled);
+    }
+    if (context.selected) states.insert(AnatomyState::selected);
+    if (context.focused) {
+        states.insert(AnatomyState::focused);
+        states.insert(AnatomyState::focus_visible);
+    }
+    if (context.defaulted) states.insert(AnatomyState::preselect);
+    return states;
+}
+
+// The declaration of `field` that `fields` sets, or null where it sets
+// none or declares the field `initial` (the floor's value).
+const RecipeDeclaration* set_recipe_field(const CompiledThemeRules::RecipeResolution& fields,
+                                          RecipeField field) noexcept {
+    const RecipeDeclaration* const declaration = fields.fields[static_cast<std::size_t>(field)];
+    if (declaration == nullptr || (*declaration).initial) return nullptr;
+    return declaration;
+}
+
+// The recipe fields `fields` sets, over `recipe` (the floor's copy), in
+// place. The outline's style comes first: a ring has no offset, and no
+// outline no width.
+void apply_recipe_fields(const CompiledThemeRules::RecipeResolution& fields, ControlVisualRecipe& recipe) noexcept {
+    const RecipeDeclaration* const text = set_recipe_field(fields, RecipeField::text);
+    if (text != nullptr) recipe.text = (*text).colour;
+    const RecipeDeclaration* const style = set_recipe_field(fields, RecipeField::outline_style);
+    const bool no_outline = style != nullptr && (*style).outline_style == RecipeOutlineStyle::none;
+    if (style != nullptr) {
+        switch ((*style).outline_style) {
+        case RecipeOutlineStyle::ring:
+            recipe.authored_focus_outline = false;
+            recipe.focus_offset = 0.0;
+            break;
+        case RecipeOutlineStyle::solid: recipe.authored_focus_outline = true; break;
+        case RecipeOutlineStyle::none: recipe.focus_width = 0.0; break;
+        }
+    }
+    const RecipeDeclaration* const colour = set_recipe_field(fields, RecipeField::outline_colour);
+    if (colour != nullptr) recipe.focus_ring = (*colour).colour;
+    const RecipeDeclaration* const width = set_recipe_field(fields, RecipeField::outline_width);
+    if (width != nullptr && !no_outline) recipe.focus_width = (*width).number;
+    const RecipeDeclaration* const offset = set_recipe_field(fields, RecipeField::outline_offset);
+    if (offset != nullptr && recipe.authored_focus_outline) recipe.focus_offset = (*offset).number;
+    const RecipeDeclaration* const shadow = set_recipe_field(fields, RecipeField::text_shadow);
+    if (shadow == nullptr) return;
+    if (!(*shadow).shadowed) {
+        recipe.text_shadow.reset();
+        return;
+    }
+    ControlTextShadow written{};
+    written.offset = (*shadow).shadow_offset;
+    written.blur_radius = (*shadow).shadow_blur;
+    written.color = (*shadow).colour;
+    recipe.text_shadow = written;
+}
+
+} // namespace
+
+ResolvedControlRecipe Theme::resolve(const Control& control, ControlVisualRole role,
+                                     ControlVisualContext context) const {
+    const AnatomyStateSet states = visual_context_states(context);
+    ResolvedControlRecipe result = resolve(control, role, context, states);
+    return result;
+}
+
+ResolvedControlRecipe Theme::resolve(const Control& control, ControlVisualRole role, ControlVisualContext context,
+                                     AnatomyStateSet states) const {
+    const ControlVisualRecipe& floor = resolve(role, context);
+    // Forced high contrast is the engine's own last pass: the built-in
+    // recipe draws it.
+    if (context.high_contrast) return ResolvedControlRecipe(floor);
+    CompiledThemeRules::PartFacts facts{};
+    facts.control_type = control.anatomy().control_id;
+    facts.stable_id = control.stable_id().value();
+    facts.classes = control.classes();
+    facts.states = states;
+    const CompiledThemeRules::RecipeResolution fields = engine_.rules().resolve_recipe_fields(facts);
+    if (!fields.authored) return ResolvedControlRecipe(floor);
+    ControlVisualRecipe authored = floor;
+    apply_recipe_fields(fields, authored);
+    if (!valid_recipe(authored)) return ResolvedControlRecipe(floor);
+    return ResolvedControlRecipe(floor, std::move(authored));
 }
 
 ThemeDefinition windows_professional_theme_definition() {
