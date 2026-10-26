@@ -5,7 +5,7 @@
 Dialogs and popups
 ==================
 
-Anchored popups and tooltips.
+Anchored popups, tooltips, owned dialogs and the host's file and colour dialogs.
 
 .. list-table::
    :class: autosummary longtable
@@ -17,10 +17,14 @@ Anchored popups and tooltips.
      - A dialog for choosing one of GUI.Forms' bundled fonts.
    * - :cpp:class:`TaskDialog <gui_forms::TaskDialog>`
      - A message dialog of pages: heading, text, icon, buttons, choices, details and progress.
+   * - :cpp:class:`ThreadExceptionDialog <gui_forms::ThreadExceptionDialog>`
+     - The dialog for an exception the application did not handle.
    * - :cpp:class:`ToolTip <gui_forms::ToolTip>`
      - A provider of short help text that pops up when the pointer rests on a control or the control receives keyboard focus.
    * - :cpp:class:`RibbonToolTip <gui_forms::RibbonToolTip>`
      - A provider of enhanced tooltips: a title, a description, a shortcut, an image, why a command is unavailable, and an F1 help topic.
+   * - :cpp:class:`SaveFileDialog <gui_forms::SaveFileDialog>`
+     - The host's dialog for choosing where to save a file.
 
 .. toctree::
    :hidden:
@@ -28,8 +32,10 @@ Anchored popups and tooltips.
    generated/gui_forms.AnchoredPopupLayer
    generated/gui_forms.FontDialog
    generated/gui_forms.TaskDialog
+   generated/gui_forms.ThreadExceptionDialog
    generated/gui_forms.ToolTip
    generated/gui_forms.RibbonToolTip
+   generated/gui_forms.SaveFileDialog
 
 Related types
 -------------
@@ -44,6 +50,10 @@ Related types
      - AnchoredPopupPlacementResult is the exact output of placement resolution: client-relative bounds plus whether the popup moved above its anchor or had either dimension clamped.
    * - :cpp:class:`BundledFontFace <gui_forms::BundledFontFace>`
      - One face GUI.Forms bundles for a FontRole, as every host registers it: its family name, what the role is for, and whether it has italic faces.
+   * - :cpp:class:`FileDialogFilterParse <gui_forms::FileDialogFilterParse>`
+     - The result of parsing a filter string: the host filters in order, or the first error with no filters.
+   * - :cpp:class:`FileDialogOk <gui_forms::FileDialogOk>`
+     - Raised by a file dialog after the user accepts and before the dialog takes the names (Windows Forms' FileOk).
    * - :cpp:class:`FontDialog::Parts <gui_forms::FontDialog::Parts>`
      - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`FontDialogResult <gui_forms::FontDialogResult>`
@@ -70,6 +80,8 @@ Related types
      - One radio button; at most one of a page's radio buttons is checked.
    * - :cpp:class:`TaskDialogResult <gui_forms::TaskDialogResult>`
      - How a dialog closed: the button that closed it (the cancel button's ID, or "cancel", for Escape and a dialog revoked by its window), and the state of the verification check box and the radio buttons at that moment.
+   * - :cpp:class:`ThreadExceptionReport <gui_forms::ThreadExceptionReport>`
+     - What a ThreadExceptionDialog reports.
    * - :cpp:class:`ToolTipEvent <gui_forms::ToolTipEvent>`
      - ToolTipEvent is the immutable publication payload for a tooltip visibility transition.
 
@@ -130,6 +142,32 @@ Related types
    .. cpp:member:: std::string_view use
 
    .. cpp:member:: bool italic
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FileDialogFilterParse final
+
+   ``#include <gui_forms/components/file_dialog_types/file_dialog_types.hpp>``
+
+   The result of parsing a filter string: the host filters in order, or the first error with no filters.
+
+   .. cpp:member:: FileDialogFilterError error
+
+      Default: ``{FileDialogFilterError::none}``.
+
+   .. cpp:member:: std::vector<HostFileDialogFilter> filters
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FileDialogOk final
+
+   ``#include <gui_forms/components/file_dialog_types/file_dialog_types.hpp>``
+
+   Raised by a file dialog after the user accepts and before the dialog takes the names (Windows Forms' FileOk). ``file_names`` holds the chosen paths and stays valid for the handler's call only. Setting ``cancel`` keeps the dialog's old names and shows the dialog again with the same settings, where Windows Forms keeps its dialog open.
+
+   .. cpp:member:: std::span<const std::string> file_names
+
+   .. cpp:member:: bool cancel
 
 .. cpp:namespace:: gui_forms
 
@@ -429,6 +467,22 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ThreadExceptionReport final
+
+   ``#include <gui_forms/components/thread_exception_dialog/thread_exception_dialog.hpp>``
+
+   What a ThreadExceptionDialog reports. ``message`` is the exception's own text and ``details`` the diagnostic text behind the details expander (a stack trace, the operation that failed); C++ exceptions carry neither a portable type name nor a stack trace, so the application supplies what it has. An empty caption gives "Unhandled exception"; empty details leave the expander out. A ``warning`` report (Windows Forms' WarningException) shows the warning icon and offers Continue only.
+
+   .. cpp:member:: std::string caption
+
+   .. cpp:member:: std::string message
+
+   .. cpp:member:: std::string details
+
+   .. cpp:member:: bool warning
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ToolTipEvent final
 
    ``#include <gui_forms/components/tool_tip/tool_tip.hpp>``
@@ -445,6 +499,24 @@ Related types
 
 Enumerations
 ------------
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: FileDialogFilterError
+
+   ``#include <gui_forms/components/file_dialog_types/file_dialog_types.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: unpaired_label
+
+   .. cpp:enumerator:: empty_pattern
+
+   .. cpp:enumerator:: unsupported_pattern
+
+   .. cpp:enumerator:: invalid_text
+
+   .. cpp:enumerator:: too_many
 
 .. cpp:namespace:: gui_forms
 
@@ -526,6 +598,30 @@ Enumerations
 
 Functions, constants and aliases
 --------------------------------
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/components/file_dialog_types/file_dialog_types.hpp>``
+
+.. cpp:function:: FileDialogFilterParse parse_file_dialog_filter(std::string_view filter)
+
+   Parses a filter in Windows Forms' syntax, ``label|patterns|label|patterns``, where patterns are separated by ``;`` and spaces around a pattern are ignored: "Text files|*.txt;*.log|All files|*.*". ``*.extension`` becomes the host filter's extension (without the dot; ``*.tar.gz`` gives ``tar.gz``), and ``*`` and ``*.*`` become ``*``, which every host reads as any file. An empty string is no filter: the host shows every file.
+
+.. cpp:function:: bool file_dialog_text_valid(std::string_view text)
+
+   Whether ``text`` may be a dialog's title, directory or name: valid UTF-8 without NUL, of at most HostServices::maximum_dialog_text_bytes.
+
+.. cpp:function:: std::string file_dialog_name_part(std::string_view path)
+
+   The last component of a host path: the file's name without its directory, by the path rules of the platform the program runs on (Windows accepts ``\`` and ``/``, the others ``/`` only). Empty for a path that ends in a separator.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/components/thread_exception_dialog/thread_exception_dialog.hpp>``
+
+.. cpp:function:: ThreadExceptionReport describe_exception(const std::exception_ptr& error)
+
+   The report for a caught exception: the message of a std::exception, or "An exception of unknown type was thrown." for anything else, with no details. A null ``error`` gives an empty message.
 
 .. cpp:namespace:: gui_forms
 

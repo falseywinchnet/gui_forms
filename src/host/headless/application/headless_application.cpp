@@ -528,6 +528,8 @@ ApplicationWindowOpenResult HeadlessApplication::open(ApplicationWindow&& source
         result.status.error = HostServiceError::backend_failure;
         return result;
     }
+    // Before the session is bound (stage T5).
+    if (window.options.non_opaque) static_cast<void>((*window.model).declare_non_opaque());
     window.host = std::make_unique<HeadlessHost>(*window.model);
     const HostDispatchResult attached = (*window.host).dispatch(
         HostAttachEvent{window.options.initial_size, 1.0}, next_timestamp());
@@ -536,6 +538,13 @@ ApplicationWindowOpenResult HeadlessApplication::open(ApplicationWindow&& source
         result.status.error = HostServiceError::backend_failure;
         return result;
     }
+    // The simulated compositor's state, once one has been reported, as a
+    // native host reports it right after attach.
+    if (compositor_state_.generation.value != 0U) {
+        static_cast<void>((*window.host).dispatch(HostCompositorEvent{compositor_state_}, next_timestamp()));
+    }
+    const HostInputSettingsEvent input{headless_double_click_milliseconds, SettingOrigin::host};
+    static_cast<void>((*window.host).dispatch(input, next_timestamp()));
     const Rect content = default_placement(kind, owner, window.options.initial_size);
     if (!owner.valid() && kind != HostWindowKind::primary) ++placements_;
     windowing_.create_native(window.id, window.stable_id, content, window.options.minimum_size);
@@ -655,6 +664,22 @@ void HeadlessApplication::simulate_application_active(bool active) {
     line << "application active=" << (active ? 1 : 0);
     windowing_.note(line.str());
     windowing_.report_application_active(active);
+}
+
+void HeadlessApplication::simulate_compositor_state(CompositorState state) {
+    state.generation.value = compositor_state_.generation.value + 1U;
+    compositor_state_ = state;
+    std::ostringstream line;
+    line << "compositor generation=" << state.generation.value
+         << " compositing=" << compositor_presence_name(state.compositing);
+    windowing_.note(line.str());
+    // In opening order. A window's handler may open or close windows; the
+    // count is read on every turn and closed windows are skipped.
+    for (std::size_t index = 0; index < entries_.size(); ++index) {
+        WindowEntry& window = *entries_[index];
+        if (window.closed || !window.host) continue;
+        static_cast<void>((*window.host).dispatch(HostCompositorEvent{compositor_state_}, next_timestamp()));
+    }
 }
 
 void HeadlessApplication::simulate_minimized(HostWindowId window, bool minimized) {

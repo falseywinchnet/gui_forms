@@ -112,6 +112,8 @@ Types
      - One sized variant of an image resource: the image resampled to ``extent`` device pixels, for display ``scale``.
    * - :cpp:class:`Insets <gui_forms::Insets>`
      - Insets stores independent logical left, top, right, and bottom extents for margin, padding, damage, and visual outsets.
+   * - :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>`
+     - One item's content to paint (owner decision W-Q6), raised while the control paints, after the item's plate and selection and before its focus cue.
    * - :cpp:class:`LentImageVariants <gui_forms::LentImageVariants>`
      - The variants lent for one bake, by fill layer; null where none is lent.
    * - :cpp:class:`MaterialBorder <gui_forms::MaterialBorder>`
@@ -242,6 +244,8 @@ Types
      - SurfaceMaterial is a bounded ordered fill stack plus optional border, bounded shadow stack, and shared corner radius.
    * - :cpp:class:`Theme <gui_forms::Theme>`
      - Theme is an immutable validated role/state recipe table plus structural spacing, geometry, typography, and motion tokens; it resolves logical visual context without exposing renderer or platform objects.
+   * - :cpp:class:`ThemeBackdropBase <gui_forms::ThemeBackdropBase>`
+     - One backplane base: the material a window's backplane is drawn from while it is granted ``backdrop`` (ThemeWindowBackdrop).
    * - :cpp:class:`ThemeDefinition <gui_forms::ThemeDefinition>`
      - ThemeDefinition is one named, complete compatibility palette, role/state material matrix, and structural-token set.
    * - :cpp:class:`ThemeEngine <gui_forms::ThemeEngine>`
@@ -262,6 +266,8 @@ Types
      - ThemeStructureTokens groups spacing, geometry, typography, and motion vocabularies into one coherent structural contract.
    * - :cpp:class:`ThemeTypographyTokens <gui_forms::ThemeTypographyTokens>`
      - ThemeTypographyTokens defines role-aware control, field, caption, heading, title, and monospace font recipes.
+   * - :cpp:class:`ThemeWindowBackdrop <gui_forms::ThemeWindowBackdrop>`
+     - The theme's window backdrop (stage T5, owner decision T5-Q8, option 1): what a window showing the theme asks the compositor for, and the base its backplane is drawn from over each backdrop the window may be granted (planning/stages/T5-compositor/PLAN.md §4.1).
 
 .. cpp:namespace:: gui_forms
 
@@ -1554,6 +1560,32 @@ Types
    .. cpp:member:: double right
 
    .. cpp:member:: double bottom
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ItemContentPaint final
+
+   ``#include <gui_forms/theme/owner_draw/owner_draw.hpp>``
+
+   One item's content to paint (owner decision W-Q6), raised while the control paints, after the item's plate and selection and before its focus cue. ``painter`` is the control's, borrowed for the call, in the control's local coordinates and clipped to ``content``; the handler draws with it and does not keep it. ``content`` is the item's content rectangle in local coordinates. ``index`` is the item's position in the control's model and ``stable_id`` its identity, borrowed for the call; ``column`` is the column of a cell in a view with columns (0 for the item's own content, n for its sub-item in column n, as Windows Forms' DrawSubItem), else 0. ``states`` are the item's anatomy states, and ``text`` and ``font`` are the colour and font the control's default content uses for them, so that owner-drawn text can match. A handler sets ``draw_default`` to have the control draw its default content over what the handler drew. A handler paints only: it must not change, dispose or re-parent the control, or anything else in its window, while the event is raised.
+
+   .. cpp:member:: Painter& painter
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: std::string_view stable_id
+
+   .. cpp:member:: Rect content
+
+   .. cpp:member:: AnatomyStateSet states
+
+   .. cpp:member:: FontSpec font
+
+   .. cpp:member:: Color text
+
+   .. cpp:member:: bool draw_default
 
 .. cpp:namespace:: gui_forms
 
@@ -2933,6 +2965,8 @@ Types
 
       The backplane image's top-left pixel in the window's device pixels.
 
+   .. cpp:member:: bool reduced_transparency
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: ProceduralFill final
@@ -3455,6 +3489,20 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ThemeBackdropBase final
+
+   ``#include <gui_forms/theme/types/theme_types.hpp>``
+
+   One backplane base: the material a window's backplane is drawn from while it is granted ``backdrop`` (ThemeWindowBackdrop).
+
+   .. cpp:member:: WindowBackdrop backdrop
+
+      Default: ``{WindowBackdrop::transparent}``.
+
+   .. cpp:member:: SurfaceMaterial material
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ThemeDefinition final
 
    ``#include <gui_forms/theme/types/theme_types.hpp>``
@@ -3486,6 +3534,10 @@ Types
    .. cpp:member:: ThemeRuleSheet rules
 
       The theme's rules (the cascade, T2 E4): which primitive draws which part. Empty by default: every part keeps the built-in recipe. They are compiled when the theme is made; an invalid rule or declaration is dropped with a diagnostic (Theme::engine().rules().diagnostics()).
+
+   .. cpp:member:: ThemeWindowBackdrop window_backdrop
+
+      The backdrop request and backplane bases (stage T5). Empty by default: an opaque window, drawn as before.
 
 .. cpp:namespace:: gui_forms
 
@@ -3754,6 +3806,29 @@ Types
 
       Default: ``{FontRole::monospace, 12.0, 400, false}``.
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemeWindowBackdrop final
+
+   ``#include <gui_forms/theme/types/theme_types.hpp>``
+
+   The theme's window backdrop (stage T5, owner decision T5-Q8, option 1): what a window showing the theme asks the compositor for, and the base its backplane is drawn from over each backdrop the window may be granted (planning/stages/T5-compositor/PLAN.md §4.1).
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: const SurfaceMaterial* base_for(WindowBackdrop backdrop) const noexcept
+
+      The base for ``backdrop``, or null when the theme gives none.
+
+   .. cpp:member:: WindowBackdropRequest request
+
+      The request a window makes while its application has made none (Window::request_backdrop). Value-initialized: ``opaque`` alone, so a theme that says nothing asks for nothing. Theme::create refuses a request window_backdrop_request_valid refuses.
+
+   .. cpp:member:: std::vector<ThemeBackdropBase> bases
+
+      At most one base per non-opaque backdrop, in any order; held out of line, so the definition stays small. Over a granted non-opaque backdrop the window's backplane is drawn from that backdrop's base, typically a partly clear tint over a material, or clear around a drawn shape over ``transparent``. Without one it is drawn from the window recipe's material, as over ``opaque``, which has no base.
+
 Enumerations
 ------------
 
@@ -3866,6 +3941,10 @@ Enumerations
    .. cpp:enumerator:: progress
 
    .. cpp:enumerator:: tool_tip
+
+   .. cpp:enumerator:: link
+
+   .. cpp:enumerator:: visited_link
 
    .. cpp:enumerator:: count
 
@@ -4076,6 +4155,16 @@ Enumerations
    .. cpp:enumerator:: nearest
 
    .. cpp:enumerator:: linear
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ItemDrawMode
+
+   ``#include <gui_forms/theme/owner_draw/owner_draw.hpp>``
+
+   .. cpp:enumerator:: normal
+
+   .. cpp:enumerator:: owner_draw
 
 .. cpp:namespace:: gui_forms
 
@@ -4376,6 +4465,8 @@ Enumerations
    .. cpp:enumerator:: multiply
 
    .. cpp:enumerator:: screen
+
+   .. cpp:enumerator:: copy
 
 .. cpp:namespace:: gui_forms
 
@@ -5359,6 +5450,18 @@ Functions, constants and aliases
 .. cpp:var:: constexpr double maximum_procedural_tile
 
    Value: ``256.0``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/theme/owner_draw/owner_draw.hpp>``
+
+.. cpp:function:: Color item_content_text(const Control& control, ControlVisualRole family, AnatomyStateSet states) noexcept
+
+   The text colour ``family``'s recipe gives ``control`` for an item in ``states``: the colour a control's default item content is drawn in, which it reports as ItemContentPaint::text.
+
+.. cpp:function:: bool raise_item_content_paint(Event<ItemContentPaint&>& event, ItemContentPaint& item)
+
+   Raises ``event`` once with ``item``, with ``item.painter`` saved and clipped to ``item.content`` and restored afterwards (also when a handler throws), so that nothing a handler draws reaches the plate, the focus cue or another item. Returns whether the control then draws its default content: true only when a handler set ``draw_default``. An empty or non-finite content rectangle raises nothing and returns false.
 
 .. cpp:namespace:: gui_forms
 

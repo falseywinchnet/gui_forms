@@ -39,7 +39,24 @@ in check_house_style.py). They are heuristics and never fail a run:
 A comment on a candidate's line or the line above clears C1 to C3; F2's
 reason is a comment on the default label, the line above or in its body, or a
 body that throws or calls a function named for failure. Findings are grouped
-by owning area. The run never fails on findings (no gate yet).
+by owning area.
+
+Two scopes:
+
+  full tree (the default)     every first-party translation unit with a switch.
+  --changed-from BASE         only the translation units whose source changed
+                              since BASE, or which include (directly or through
+                              other first-party headers, matched by file name) a
+                              first-party header that changed; C1 to C3 only over
+                              the changed files. With no changed C or C++ file the
+                              run does nothing and passes. A change to this
+                              checker or to check_house_style.py checks the full
+                              tree. Changed paths come from change_selection.py.
+
+--gate fails the run (exit status 1) on any F1 or F2 in its scope; C1 to C3
+never fail it. --list-changed prints the changed C and C++ files ("every" when
+the checker itself changed, nothing when none) and exits, so a CI job can skip
+configuring a tree.
 """
 
 import argparse
@@ -53,10 +70,12 @@ import shlex
 import subprocess
 import sys
 
+import change_selection
 from check_house_style import EXCLUDED, EXTENSIONS, LEXEMES, mask_literal
 
 FIRST_PARTY: tuple[str, ...] = ("include", "src", "demo", "tests", "examples", "tools",
-                                "file_manager_demoboard", "stx_vorbis")
+                                "file_manager_demoboard", "stx_vorbis", "stx_zlib", "stx_png", "stx_conv",
+                                "fuzz")
 VOCABULARY_HEADERS: tuple[str, ...] = (
     "include/gui_forms/anatomy/types/anatomy_types.hpp",
     "include/gui_forms/semantics/types/semantic_types.hpp",
@@ -81,9 +100,18 @@ AREAS: tuple[tuple[str, str], ...] = (
     ("tests/", "tests"),
     ("file_manager_demoboard/", "demoboard"),
     ("stx_vorbis/", "stx_vorbis"),
+    ("stx_zlib/", "stx_zlib"),
+    ("stx_png/", "stx_png"),
+    ("stx_conv/", "stx_conv"),
+    ("fuzz/", "fuzz"),
     ("examples/", "examples"),
     ("tools/", "tools"),
 )
+# A change to one of these can change any verdict: the changed-code scope becomes the full tree.
+CHECKER_FILES: tuple[str, ...] = ("tools/check_state_machines.py", "tools/check_house_style.py")
+GATE_RULES: tuple[str, ...] = ("F1", "F2")
+HEADER_SUFFIXES: tuple[str, ...] = (".hpp", ".hh", ".h", ".inc")
+INCLUDE: re.Pattern[str] = re.compile(r'#\s*include\s*[<"]([^>"]+)[>"]')
 RULE_TEXT: dict[str, str] = {
     "F1": "switch-without-default",
     "F2": "default-hides-cases",
@@ -630,18 +658,65 @@ def missing_text(message: str) -> str:
 LEAVING: str = r"(?:\breturn\b|\bthrow\b|\b(?:std\s*::\s*)?(?:abort|terminate|unreachable|exit|quick_exit)\s*\()"
 
 
+# The head of a statement whose own `break` leaves it rather than the case around it.
+NESTED_BREAK_TARGET: re.Pattern[str] = re.compile(r"\b(?:for|while|switch)\s*\(|\bdo\b")
+# A word that starts a branch, loop or jump: a fallback tail holding one is not one fallback.
+CONTROL_WORD: re.Pattern[str] = re.compile(r"\b(?:if|else|for|while|do|switch|case|default|goto|try|catch)\b")
+# Words that may stand between a function's parameter list and its body.
+FUNCTION_QUALIFIERS: re.Pattern[str] = re.compile(r"(?:\s*(?:\bnoexcept\b|\bconst\b|\boverride\b|\bfinal\b|&&|&))+$")
+STATEMENT_HEADS: tuple[str, ...] = ("if", "for", "while", "switch", "catch")
+
+
+def without_nested_break_targets(body: str) -> str:
+    """`body` with the bodies of its loops and nested switches blanked, offsets kept: a
+    `break` there leaves that loop or switch, not the case around it."""
+    characters: list[str] = list(body)
+    index: int = 0
+    while index < len(body):
+        head: re.Match[str] | None = NESTED_BREAK_TARGET.search(body, index)
+        if head is None:
+            break
+        after_head: int = head.end()
+        if head.group(0).endswith("("):
+            close_paren: int = matching(body, head.end() - 1)
+            if close_paren < 0:
+                break
+            after_head = close_paren + 1
+        start: int = skip_space(body, after_head)
+        end: int = body.find(";", start)
+        if start < len(body) and body[start] == "{":
+            end = matching(body, start)
+        if end < 0:
+            break
+        position: int
+        for position in range(start, end + 1):
+            if characters[position] != "\n":
+                characters[position] = " "
+        index = end + 1
+    result: str = "".join(characters)
+    return result
+
+
 def every_case_leaves(text: str, switch: Switch) -> bool:
-    """Whether each case group ends with a leaving statement, so control passes the switch only when no case matched."""
+    """Whether each case group ends with a leaving statement, so control passes the switch
+    only when no case matched. A group that ends in `[[fallthrough]];` continues into the
+    next group, which is checked in its turn; the last group cannot."""
     seen: bool = False
+    falls_through: bool = False
     label: Label
     for label in switch.labels:
         statements: str = body_statements(text, label)
         if label.kind != "case" or statements == "":
             continue
         seen = True
-        if re.search(r"\bbreak\s*;", statements) or not re.search(LEAVING + r"[^;]*;$", statements):
+        body: str = without_preprocessor_lines(text[label.body_start:label.body_end])
+        own: str = without_nested_break_targets(body)
+        if re.search(r"\bbreak\s*;", own):
             return False
-    return seen
+        falls_through = statements.endswith("[[fallthrough]];")
+        if not falls_through and not re.search(LEAVING + r"[^;]*;$", statements):
+            return False
+    return seen and not falls_through
 
 
 def fallback_after(text: str, switch: Switch) -> bool:
@@ -650,13 +725,85 @@ def fallback_after(text: str, switch: Switch) -> bool:
     return re.match(LEAVING, text[following:following + 40]) is not None
 
 
+def enclosing_close(text: str, index: int) -> int:
+    """The closing brace of the block that holds `index`, or -1."""
+    depth: int = 0
+    position: int
+    for position in range(index, len(text)):
+        character: str = text[position]
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            if depth == 0:
+                return position
+            depth -= 1
+    return -1
+
+
+def opening_of(text: str, closing: int) -> int:
+    """The bracket opening the one at `closing`, or -1."""
+    pairs: dict[str, str] = {")": "(", "}": "{", "]": "["}
+    close_char: str = text[closing]
+    open_char: str = pairs[close_char]
+    depth: int = 0
+    position: int
+    for position in range(closing, -1, -1):
+        character: str = text[position]
+        if character == close_char:
+            depth += 1
+        elif character == open_char:
+            depth -= 1
+            if depth == 0:
+                return position
+    return -1
+
+
+def is_function_body(text: str, opening: int) -> bool:
+    """Whether the brace at `opening` opens a function's body: a parameter list (or a
+    constructor's last initializer), then only qualifiers, before it, and no statement
+    keyword before that list."""
+    before: str = FUNCTION_QUALIFIERS.sub("", text[:opening].rstrip())
+    if not before.endswith(")"):
+        return False
+    open_paren: int = opening_of(before, len(before) - 1)
+    if open_paren < 0:
+        return False
+    word: re.Match[str] | None = re.search(r"(\w+)\s*$", before[:open_paren])
+    if word is None:
+        return False
+    return word.group(1) not in STATEMENT_HEADS
+
+
+def fallback_at_end(text: str, switch: Switch) -> bool:
+    """Whether the code after the switch, to the end of its block, is one fallback:
+    straight-line statements (no branch, loop or jump) that end in a leaving statement,
+    or that end the function itself, as `return` would (owner tuning, 2026-10-23: a
+    fallback computed and then returned at the function's end)."""
+    close: int = enclosing_close(text, switch.body_end + 1)
+    if close < 0:
+        return False
+    tail: str = " ".join(without_preprocessor_lines(text[switch.body_end + 1:close]).split())
+    if tail == "" or CONTROL_WORD.search(tail) is not None or not tail.endswith(";"):
+        return False
+    statements: list[str] = tail[:-1].split(";")
+    last: str = statements[-1].strip()
+    if re.match(LEAVING, last) is not None:
+        return True
+    opening: int = opening_of(text, close)
+    return opening >= 0 and is_function_body(text, opening)
+
+
 def complete_with_fallback(text: str, switch: Switch) -> bool:
     """The compliant form (owner, 2026-10-21): an enumeration switch that lists every
-    enumerator, leaves from every case, and reaches one fallback directly after its
-    closing brace, which keeps the compiler's warning for a new enumerator. The caller
-    has established that no enumerator is unhandled; a qualified case label shows the
-    condition is an enumeration."""
-    return switch_enum(switch) != "" and every_case_leaves(text, switch) and fallback_after(text, switch)
+    enumerator, leaves from every case, and reaches one fallback after its closing
+    brace, which keeps the compiler's warning for a new enumerator. The fallback is the
+    statement directly after the switch, when that leaves, or the straight-line code
+    from there to the end of the block (fallback_at_end). The caller has established
+    that no enumerator is unhandled; a qualified case label shows the condition is an
+    enumeration."""
+    if switch_enum(switch) == "" or not every_case_leaves(text, switch):
+        return False
+    return fallback_after(text, switch) or fallback_at_end(text, switch)
 
 
 def syntax_command(command: str) -> list[str]:
@@ -716,41 +863,127 @@ def first_party(path: Path, root: Path) -> str:
     return relative.as_posix()
 
 
-def select_units(entries: list[dict], root: Path) -> list[Unit]:
-    """Translation units whose source has a switch or includes, by name, a first-party header that has one."""
-    switch_headers: set[str] = set()
+@dataclass(frozen=True)
+class Scope:
+    """The changed-code scope: the changed first-party C and C++ files (checkout-relative),
+    and the file names of the changed headers plus every first-party header that includes
+    one of them, directly or through others."""
+    changed: frozenset[str]
+    reached_headers: frozenset[str]
+
+
+def first_party_headers(root: Path) -> list[Path]:
+    headers: list[Path] = []
     directory: str
     for directory in FIRST_PARTY:
         header: Path
-        for header in (root / directory).rglob("*"):
-            if header.suffix in (".hpp", ".h", ".inc") and header.is_file():
-                if SWITCH.search(masked(header.read_text(encoding="utf-8", errors="replace"))):
-                    switch_headers.add(header.name)
+        for header in sorted((root / directory).rglob("*")):
+            if header.suffix in HEADER_SUFFIXES and header.is_file() and first_party(header, root):
+                headers.append(header)
+    return headers
+
+
+def included_names(text: str) -> set[str]:
+    """The file names (not paths) a source includes; first-party headers are matched by name."""
+    names: set[str] = set()
+    name: str
+    for name in INCLUDE.findall(text):
+        names.add(Path(name).name)
+    return names
+
+
+def changed_scope(root: Path, changed: list[str]) -> Scope:
+    """The scope of `changed` (checkout-relative C and C++ paths): the headers it reaches
+    are closed over first-party includes until no header is added."""
+    reached: set[str] = set()
+    path: str
+    for path in changed:
+        if Path(path).suffix in HEADER_SUFFIXES:
+            reached.add(Path(path).name)
+    includes: dict[str, set[str]] = {}
+    header: Path
+    for header in first_party_headers(root):
+        includes[header.name] = includes.get(header.name, set()) | included_names(
+            header.read_text(encoding="utf-8", errors="replace"))
+    grown: bool = bool(reached)
+    while grown:
+        grown = False
+        name: str
+        for name in sorted(includes):
+            if name not in reached and includes[name] & reached:
+                reached.add(name)
+                grown = True
+    result: Scope = Scope(frozenset(changed), frozenset(reached))
+    return result
+
+
+def select_units(entries: list[dict], root: Path, scope: Scope | None = None) -> list[Unit]:
+    """Translation units whose source has a switch or includes, by name, a first-party header
+    that has one. With a scope, only those whose source changed or which include a reached
+    header."""
+    switch_headers: set[str] = set()
+    header: Path
+    for header in first_party_headers(root):
+        if SWITCH.search(masked(header.read_text(encoding="utf-8", errors="replace"))):
+            switch_headers.add(header.name)
     units: list[Unit] = []
     seen: set[str] = set()
     entry: dict
     for entry in entries:
         source: Path = normalized(entry["file"], entry["directory"])
-        if not first_party(source, root) or str(source) in seen:
+        relative: str = first_party(source, root)
+        if not relative or str(source) in seen:
             continue
         seen.add(str(source))
         text: str = source.read_text(encoding="utf-8", errors="replace")
-        wanted: bool = SWITCH.search(masked(text)) is not None
-        if not wanted:
-            name: str
-            for name in re.findall(r'#\s*include\s*[<"]([^>"]+)[>"]', text):
-                if Path(name).name in switch_headers:
-                    wanted = True
-                    break
+        names: set[str] = included_names(text)
+        if scope is not None and relative not in scope.changed and not names & scope.reached_headers:
+            continue
+        wanted: bool = SWITCH.search(masked(text)) is not None or bool(names & switch_headers)
         if wanted:
             units.append(Unit(entry["directory"], tuple(syntax_command(entry["command"]))))
     return units
 
 
-def compiler_diagnostics(build_dir: Path, root: Path, jobs: int) -> tuple[list[Diagnostic], int]:
+def compiled_sources(entries: list[dict], root: Path) -> set[str]:
+    """The checkout-relative first-party sources a compile database compiles."""
+    sources: set[str] = set()
+    entry: dict
+    for entry in entries:
+        relative: str = first_party(normalized(entry["file"], entry["directory"]), root)
+        if relative:
+            sources.add(relative)
+    return sources
+
+
+def generate_headers(build_dir: Path) -> None:
+    """Builds the tree's generated headers (custom-command outputs such as the font
+    substitution records), which a syntax-only run reads but never builds."""
+    listing: str = subprocess.check_output(["ninja", "-C", str(build_dir), "-t", "targets", "all"], text=True,
+                                           encoding="utf-8", errors="replace")
+    outputs: list[str] = []
+    line: str
+    for line in listing.splitlines():
+        parts: list[str] = line.rsplit(": ", 1)
+        if len(parts) == 2 and parts[1].strip() == "CUSTOM_COMMAND" and Path(parts[0]).suffix in HEADER_SUFFIXES:
+            if not Path(parts[0]).is_absolute():
+                outputs.append(parts[0])
+    if outputs:
+        subprocess.run(["ninja", "-C", str(build_dir), *outputs], check=True, capture_output=True)
+
+
+def compile_database(build_dir: Path) -> list[dict]:
     compdb: str = subprocess.check_output(["ninja", "-C", str(build_dir), "-t", "compdb"], text=True,
                                           encoding="utf-8", errors="replace")
-    units: list[Unit] = select_units(json.loads(compdb), root)
+    entries: list[dict] = json.loads(compdb)
+    return entries
+
+
+def compiler_diagnostics(build_dir: Path, root: Path, jobs: int, entries: list[dict],
+                         scope: Scope | None) -> tuple[list[Diagnostic], int]:
+    units: list[Unit] = select_units(entries, root, scope)
+    if units:
+        generate_headers(build_dir)
     outputs: list[str] = []
     with ThreadPoolExecutor(max_workers=jobs) as pool:
         output: str
@@ -915,7 +1148,7 @@ def render(findings: list[Finding], units: int, files: int) -> str:
             row += str(counts[area].get(rule, 0)).rjust(5)
         lines.append(row)
     lines.append("OK counts compliant switches (every enumerator listed, every case leaves, one "
-                 "fallback directly after); they are not listed below.")
+                 "fallback after the switch); they are not listed below.")
     current: str = ""
     for finding in sorted(findings, key=finding_key):
         if finding.rule == "OK":
@@ -928,6 +1161,39 @@ def render(findings: list[Finding], units: int, files: int) -> str:
     return "\n".join(lines) + "\n"
 
 
+def changed_sources(root: Path, base: str) -> list[str] | None:
+    """The first-party C and C++ files changed since base that still exist, or None when
+    the checker itself changed (every file is then in scope)."""
+    paths: list[str] = change_selection.changed_paths(root, base)
+    sources: list[str] = []
+    path: str
+    for path in paths:
+        if path in CHECKER_FILES:
+            return None
+        if first_party(root / path, root) and (root / path).is_file():
+            sources.append(path)
+    return sources
+
+
+def uncompiled_sources(changed: list[str], compiled: set[str]) -> list[str]:
+    """Changed translation-unit sources (not headers) the tree does not compile."""
+    missing: list[str] = []
+    path: str
+    for path in changed:
+        if Path(path).suffix not in HEADER_SUFFIXES and path not in compiled:
+            missing.append(path)
+    return missing
+
+
+def gate_failures(findings: list[Finding]) -> int:
+    count: int = 0
+    finding: Finding
+    for finding in findings:
+        if finding.rule in GATE_RULES:
+            count += 1
+    return count
+
+
 def main() -> int:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__,
                                                               formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -935,15 +1201,41 @@ def main() -> int:
     parser.add_argument("--build-dir", help="a configured ninja tree; without it only C1 to C3 run")
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--json", dest="json_path", help="also write the findings as JSON here")
+    parser.add_argument("--changed-from", default="",
+                        help="check only the code changed since this git revision (see the module notes)")
+    parser.add_argument("--list-changed", action="store_true",
+                        help="print the changed C and C++ files (or 'every') and exit; needs --changed-from")
+    parser.add_argument("--gate", action="store_true", help="exit with status 1 on any F1 or F2 in the scope")
     args: argparse.Namespace = parser.parse_args()
     root: Path = Path(args.root)
+    changed: list[str] | None = None
+    if args.changed_from:
+        changed = changed_sources(root, args.changed_from)
+    if args.list_changed:
+        if not args.changed_from:
+            parser.error("--list-changed needs --changed-from")
+        listed: list[str] = ["every"] if changed is None else changed
+        name: str
+        for name in listed:
+            print(name)
+        return 0
+    if changed is not None and not changed:
+        print(f"no C or C++ file changed since {args.changed_from}; nothing to check")
+        return 0
+    scope: Scope | None = None if changed is None else changed_scope(root, changed)
     findings: list[Finding] = []
     units: int = 0
     if args.build_dir:
+        entries: list[dict] = compile_database(Path(args.build_dir))
         diagnostics: list[Diagnostic]
-        diagnostics, units = compiler_diagnostics(Path(args.build_dir), root, max(1, args.jobs))
+        diagnostics, units = compiler_diagnostics(Path(args.build_dir), root, max(1, args.jobs), entries, scope)
         findings.extend(compiler_findings(diagnostics, root, vocabulary_enums(root)))
-    files: list[str] = source_files(root)
+        if changed is not None:
+            uncovered: list[str] = uncompiled_sources(changed, compiled_sources(entries, root))
+            if uncovered:
+                print(f"{len(uncovered)} changed sources are not compiled in this tree, so only C1 to C3 "
+                      "read them: " + ", ".join(uncovered))
+    files: list[str] = source_files(root) if changed is None else changed
     path: str
     for path in files:
         findings.extend(source_candidates(path, (root / path).read_text(encoding="utf-8", errors="replace")))
@@ -955,6 +1247,13 @@ def main() -> int:
             records.append({"path": finding.path, "line": finding.line, "rule": finding.rule,
                             "name": RULE_TEXT[finding.rule], "area": finding.area, "detail": finding.detail})
         Path(args.json_path).write_text(json.dumps(records, indent=1) + "\n", encoding="utf-8")
+    if args.gate:
+        failing: int = gate_failures(findings)
+        if failing:
+            print(f"state-machine gate: {failing} F1/F2 findings (house style section 9); fix them to the "
+                  "compliant form or give the default its reason")
+            return 1
+        print("state-machine gate: no F1/F2 findings")
     return 0
 
 

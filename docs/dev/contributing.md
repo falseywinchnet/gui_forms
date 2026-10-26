@@ -15,8 +15,7 @@ for a new dependency or a new platform assumption is not.
   Vulkan, Metal, Direct3D, Dawn or WebGPU.
 - Skia only through the private CPU adapter in `src/render/skia/`; no Skia
   type in a public header, control API, DML, C ABI or renderer-neutral test.
-- CNG (native resources) and PNG (interchange) are the only image codecs,
-  both behind `src/core/image/`. HarfBuzz, FreeType, SheenBidi and libunibreak
+- PNG (`stx_png`) is the only image codec, behind `src/core/image/`. HarfBuzz, FreeType, SheenBidi and libunibreak
   are the only text dependencies, pinned by revision.
 - The core is retained. No immediate-mode control API, no perpetual redraw.
 - The portable core and host protocol encode no AppKit, Win32, Wayland or X11

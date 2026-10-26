@@ -438,12 +438,28 @@ std::optional<PaintReceipt> Window::paint_rectangles(
             ? ControlSurfaceState::normal
             : ControlSurfaceState::deactivated;
         backplane_context.high_contrast = presentation_settings_.high_contrast;
-        const SurfaceMaterial& backplane =
-            (*theme_).resolve(ControlVisualRole::window, backplane_context).material;
+        // Over a non-opaque grant, the theme's base for it (stage T5).
+        const SurfaceMaterial& backplane = backplane_base(backplane_context);
+        // A window granted a non-opaque backdrop (stage T5) starts each
+        // painted rectangle clear: its backplane is drawn in a copy group,
+        // which replaces the previous frame's pixels, transparent included,
+        // instead of blending over them. An opaque window draws exactly as
+        // before, so its presented bytes are unchanged.
+        const bool starts_clear = backdrop_grant_.granted != WindowBackdrop::opaque;
         for (std::size_t index = 0; index < painted.size(); ++index) {
             candidate.save();
             candidate.clip_rect(painted[index]);
-            paint_surface_material(candidate, window_bounds, backplane);
+            if (starts_clear) {
+                PaintGroup cleared{};
+                cleared.bounds = painted[index];
+                cleared.composite = PaintGroupComposite::copy;
+                cleared.isolated = true;
+                candidate.begin_group(cleared);
+                paint_surface_material(candidate, window_bounds, backplane);
+                candidate.end_group();
+            } else {
+                paint_surface_material(candidate, window_bounds, backplane);
+            }
             candidate.restore();
         }
         std::vector<Control::Ptr> popup_roots;

@@ -71,7 +71,7 @@ What history teaches:
 - **Resources**: image assets named by resource: tiling backgrounds,
   backplane frescoes and control faces. Image faces are supported: CONV
   prepares each face size ahead of the bake (T2, "CONV, image face
-  variants"). CNG is the native resource format, and PNG is for interop. No
+  variants"). PNG is the only image format. No
   font bytes; a theme selects among bundled typography roles. No executable
   code, filesystem or network access.
 - **Engine version**: a theme declares the engine version it needs.

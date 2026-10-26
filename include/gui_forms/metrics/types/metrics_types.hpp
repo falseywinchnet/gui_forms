@@ -19,6 +19,19 @@ struct MetricsSnapshot {
     std::uint64_t measure_nodes_visited{};
     std::uint64_t arrange_nodes_visited{};
     std::uint64_t paint_nodes_visited{};
+    // Control::measure_for_layout (stage L): answers from a control's measure
+    // cache, misses that called measure_intrinsic, and the most misses one
+    // control answered within one layout pass (a solver asking more than
+    // once per pass shows here). Measure calls that bypass the entry are
+    // counted only by controls_measured.
+    std::uint64_t measure_cache_hits{};
+    std::uint64_t measure_cache_misses{};
+    std::uint64_t maximum_measures_per_control_pass{};
+    // Measure propagations stopped at a layout boundary
+    // (Control::size_depends_on_content), and measure results with a
+    // negative or non-finite dimension clamped to zero.
+    std::uint64_t layout_boundary_stops{};
+    std::uint64_t layout_measure_clamps{};
     std::uint64_t paint_invalidations_consumed{};
     std::uint64_t display_chunks_rebuilt{};
     std::uint64_t display_chunks_reused{};

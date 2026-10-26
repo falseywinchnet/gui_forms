@@ -34,8 +34,6 @@ fi
 sanitizers="-fsanitize=address,undefined -fno-omit-frame-pointer"
 jobs=${GUI_FORMS_SANITIZER_JOBS:-3}
 
-# stx_cng's pinned Zstandard tarball (returns at once when present).
-sh "$source_directory/stx_cng/tools/fetch_zstd.sh"
 if test ! -f "$build_directory/build.ninja"; then
     cmake -S "$source_directory" -B "$build_directory" -G Ninja \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_LIBDIR=lib \

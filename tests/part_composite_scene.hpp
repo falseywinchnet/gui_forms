@@ -234,4 +234,52 @@ inline bool overlap_is_one_image(const std::uint8_t* bytes, std::size_t row_byte
     return one_image;
 }
 
+// The copy group (stage T5): over the opaque background, a copy group on
+// copy_bounds holding one translucent fill on copy_fill. Within the bounds
+// the group's image replaces the background, so that where it drew nothing
+// the colour is clear; outside them the background is untouched.
+inline constexpr Rect copy_bounds{10.0, 6.0, 60.0, 30.0};
+inline constexpr Rect copy_fill{20.0, 10.0, 20.0, 12.0};
+inline constexpr Color copy_tint = Color::rgba(200, 100, 40, 128);
+
+inline void paint_copy_scene(Painter& painter) {
+    paint_background(painter);
+    PaintGroup group{};
+    group.bounds = copy_bounds;
+    group.composite = PaintGroupComposite::copy;
+    painter.begin_group(group);
+    painter.fill_rect(copy_fill, copy_tint);
+    painter.end_group();
+}
+
+// Whether a channel is within one step of what it should be.
+inline bool near_channel(std::uint8_t observed, unsigned wanted) {
+    const unsigned value = observed;
+    const bool within = value + 1U >= wanted && value <= wanted + 1U;
+    return within;
+}
+
+// What paint_copy_scene must show at `scale`. `keeps_alpha` says whether
+// the target holds alpha (Skia's raster) or is opaque (the Windows DIB
+// before stage T5's C2), where alpha is 255 and the colour is the
+// premultiplied one. The tint premultiplied is (100, 50, 20) at alpha 128.
+inline bool copy_scene_holds(const std::uint8_t* bytes, std::size_t row_bytes, text_identity::Order order,
+                             double scale, bool keeps_alpha) {
+    const unsigned clear_alpha = keeps_alpha ? 0U : 255U;
+    const unsigned tint_alpha = keeps_alpha ? 128U : 255U;
+    const std::array<std::uint8_t, 4> tinted = scene_pixel(bytes, row_bytes, order, scale, 30.5, 16.5);
+    const bool tint_copied = near_channel(tinted[0], 100U) && near_channel(tinted[1], 50U) &&
+                             near_channel(tinted[2], 20U) && near_channel(tinted[3], tint_alpha);
+    const std::array<std::uint8_t, 4> cleared = scene_pixel(bytes, row_bytes, order, scale, 60.5, 30.5);
+    const std::array<std::uint8_t, 4> clear{0U, 0U, 0U, static_cast<std::uint8_t>(clear_alpha)};
+    const bool rest_cleared = cleared == clear;
+    const std::array<std::uint8_t, 4> outside = scene_pixel(bytes, row_bytes, order, scale, 90.5, 12.5);
+    // The background's colour; its alpha is the painter's own outside a
+    // group on a target that keeps none.
+    const bool outside_kept = outside[0] == 222U && outside[1] == 232U && outside[2] == 246U &&
+                              (!keeps_alpha || outside[3] == 255U);
+    const bool holds = tint_copied && rest_cleared && outside_kept;
+    return holds;
+}
+
 } // namespace gui_forms::part_composite_identity

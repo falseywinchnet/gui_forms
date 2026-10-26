@@ -40,10 +40,10 @@ namespace {
 // The recipe roles in ControlVisualRole's order, then `family`: the recipe
 // of the part's own family (PartPaint::family, T3 EC1), so that a theme's
 // material fields on any part keep that part's recipe as their floor.
-constexpr std::array<std::string_view, 13> recipe_names{
-    "window", "panel", "card", "button", "accent_button", "command_button", "choice",
-    "editor", "menu_item", "selection", "progress", "tool_tip", "family"};
-constexpr double family_recipe = 12.0;
+constexpr std::array<std::string_view, 15> recipe_names{
+    "window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor",
+    "menu_item", "selection", "progress", "tool_tip", "link", "visited_link", "family"};
+constexpr double family_recipe = 14.0;
 static_assert(recipe_names.size() == static_cast<std::size_t>(ControlVisualRole::count) + 1U,
               "one choice per recipe role, then the family's");
 
@@ -450,6 +450,8 @@ void add_keyline(MaterialLook& look, const MaterialKeyline& keyline, double scal
         add_band(look, Rect{box.x + inset, box.y + inset, width, box.height - inset * 2.0}, keyline.color, clipped);
         return;
     }
+    // An edge outside the enumeration draws no keyline.
+    return;
 }
 
 // A dashed or dotted border's path in `box`, `width` device pixels wide; a
