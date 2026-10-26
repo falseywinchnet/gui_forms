@@ -154,6 +154,14 @@ class ReuseTests(unittest.TestCase):
                 fixture.commits['merge'] = case
                 self.assertFalse(self.lookup(fixture))
 
+    def test_a_merge_group_run_is_trusted_and_another_event_is_not(self) -> None:
+        fixture: FixtureAPI = FixtureAPI()
+        fixture.run['event'] = 'merge_group'
+        self.assertTrue(self.lookup(fixture))
+        fixture = FixtureAPI()
+        fixture.run['event'] = 'pull_request_target'
+        self.assertFalse(self.lookup(fixture))
+
     def test_foreign_workflow_and_fork_are_rejected(self) -> None:
         fixture: FixtureAPI = FixtureAPI()
         fixture.run['path'] = '.github/workflows/other.yml'
