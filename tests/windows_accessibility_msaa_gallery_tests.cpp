@@ -72,13 +72,14 @@ constexpr std::string_view off_tree_page = "off-tree-controls";
 
 // Registry entries that are not controls (nonvisual components and the
 // LiveSurface service type), as the anatomy coverage test lists them.
-constexpr std::array<std::string_view, 22> nonvisual_entries{
+constexpr std::array<std::string_view, 24> nonvisual_entries{
     "command", "gallery_command", "font_command", "color_command", "context_menu",
     "tool_tip", "ribbon_tool_tip", "timer", "background_worker", "notify_icon",
-    "image_list", "error_provider", "help_provider", "semantic_feedback", "binding",
+    "thread_exception_dialog", "image_list", "error_provider", "help_provider", "semantic_feedback", "binding",
     "binding_source", "binding_context", "live_surface", "dock_workspace", "open_file_dialog",
     "save_file_dialog",
     "color_dialog",
+    "folder_browser_dialog",
 };
 
 // Registry controls that publish no node of their own: presentational

@@ -189,4 +189,19 @@ void HeadlessHostServices::shutdown_impl() noexcept {
     dialog_results_.clear();
     sound_trace_.clear();
 }
+HostServiceStatus HeadlessHostServices::apply_window_backdrop_impl(WindowBackdrop backdrop) {
+    HostServiceStatus status{};
+    // Opaque never fails (the HostServices contract).
+    if (fail_next_backdrop_ && backdrop != WindowBackdrop::opaque) {
+        fail_next_backdrop_ = false;
+        status.error = HostServiceError::backend_failure;
+    } else {
+        native_backdrop_ = backdrop;
+    }
+    backdrop_trace_ += "backdrop=";
+    backdrop_trace_ += window_backdrop_name(backdrop);
+    backdrop_trace_ += status.accepted() ? " accepted=1\n" : " accepted=0\n";
+    return status;
+}
+
 } // namespace gui_forms::host

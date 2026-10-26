@@ -17,16 +17,18 @@ Anchored popups, tooltips, owned dialogs and the host's file and colour dialogs.
      - A dialog for choosing one of GUI.Forms' bundled fonts.
    * - :cpp:class:`TaskDialog <gui_forms::TaskDialog>`
      - A message dialog of pages: heading, text, icon, buttons, choices, details and progress.
-   * - :cpp:class:`OpenFileDialog <gui_forms::OpenFileDialog>`
-     - The host's dialog for choosing one or more existing files.
-   * - :cpp:class:`SaveFileDialog <gui_forms::SaveFileDialog>`
-     - The host's dialog for choosing where to save a file.
+   * - :cpp:class:`ThreadExceptionDialog <gui_forms::ThreadExceptionDialog>`
+     - The dialog for an exception the application did not handle.
+   * - :cpp:class:`FolderBrowserDialog <gui_forms::FolderBrowserDialog>`
+     - The host's dialog for choosing a folder.
    * - :cpp:class:`ColorDialog <gui_forms::ColorDialog>`
      - The host's dialog for choosing a color.
    * - :cpp:class:`ToolTip <gui_forms::ToolTip>`
      - A provider of short help text that pops up when the pointer rests on a control or the control receives keyboard focus.
    * - :cpp:class:`RibbonToolTip <gui_forms::RibbonToolTip>`
      - A provider of enhanced tooltips: a title, a description, a shortcut, an image, why a command is unavailable, and an F1 help topic.
+   * - :cpp:class:`SaveFileDialog <gui_forms::SaveFileDialog>`
+     - The host's dialog for choosing where to save a file.
 
 .. toctree::
    :hidden:
@@ -34,11 +36,12 @@ Anchored popups, tooltips, owned dialogs and the host's file and colour dialogs.
    generated/gui_forms.AnchoredPopupLayer
    generated/gui_forms.FontDialog
    generated/gui_forms.TaskDialog
-   generated/gui_forms.OpenFileDialog
-   generated/gui_forms.SaveFileDialog
+   generated/gui_forms.ThreadExceptionDialog
+   generated/gui_forms.FolderBrowserDialog
    generated/gui_forms.ColorDialog
    generated/gui_forms.ToolTip
    generated/gui_forms.RibbonToolTip
+   generated/gui_forms.SaveFileDialog
 
 Related types
 -------------
@@ -83,6 +86,8 @@ Related types
      - One radio button; at most one of a page's radio buttons is checked.
    * - :cpp:class:`TaskDialogResult <gui_forms::TaskDialogResult>`
      - How a dialog closed: the button that closed it (the cancel button's ID, or "cancel", for Escape and a dialog revoked by its window), and the state of the verification check box and the radio buttons at that moment.
+   * - :cpp:class:`ThreadExceptionReport <gui_forms::ThreadExceptionReport>`
+     - What a ThreadExceptionDialog reports.
    * - :cpp:class:`ToolTipEvent <gui_forms::ToolTipEvent>`
      - ToolTipEvent is the immutable publication payload for a tooltip visibility transition.
 
@@ -468,6 +473,22 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ThreadExceptionReport final
+
+   ``#include <gui_forms/components/thread_exception_dialog/thread_exception_dialog.hpp>``
+
+   What a ThreadExceptionDialog reports. ``message`` is the exception's own text and ``details`` the diagnostic text behind the details expander (a stack trace, the operation that failed); C++ exceptions carry neither a portable type name nor a stack trace, so the application supplies what it has. An empty caption gives "Unhandled exception"; empty details leave the expander out. A ``warning`` report (Windows Forms' WarningException) shows the warning icon and offers Continue only.
+
+   .. cpp:member:: std::string caption
+
+   .. cpp:member:: std::string message
+
+   .. cpp:member:: std::string details
+
+   .. cpp:member:: bool warning
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ToolTipEvent final
 
    ``#include <gui_forms/components/tool_tip/tool_tip.hpp>``
@@ -599,6 +620,14 @@ Functions, constants and aliases
 .. cpp:function:: std::string file_dialog_name_part(std::string_view path)
 
    The last component of a host path: the file's name without its directory, by the path rules of the platform the program runs on (Windows accepts ``\`` and ``/``, the others ``/`` only). Empty for a path that ends in a separator.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/components/thread_exception_dialog/thread_exception_dialog.hpp>``
+
+.. cpp:function:: ThreadExceptionReport describe_exception(const std::exception_ptr& error)
+
+   The report for a caught exception: the message of a std::exception, or "An exception of unknown type was thrown." for anything else, with no details. A null ``error`` gives an empty message.
 
 .. cpp:namespace:: gui_forms
 

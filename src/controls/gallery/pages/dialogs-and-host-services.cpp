@@ -3,6 +3,10 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <exception>
+#include <stdexcept>
+#include <string>
+#include <utility>
 #include <variant>
 
 namespace gui_forms::gallery::pages {
@@ -47,6 +51,8 @@ private:
     void build_task_dialog(const std::shared_ptr<Surface>& body);
     void on_show_task_dialog();
     void on_task_dialog_closed(const TaskDialogResult& result);
+    void on_show_exception_dialog();
+    void on_exception_dialog_closed(DialogResult result);
     void build_notify_icon(const std::shared_ptr<Surface>& body);
     void on_toggle_notify_icon();
     void on_notify();
@@ -58,6 +64,7 @@ private:
     void show_open_file_dialog(bool multiple);
     void show_save_file_dialog();
     void show_color_dialog();
+    void show_folder_browser_dialog();
     void on_service(int index);
 
     [[nodiscard]] HostServices* services() const;
@@ -74,11 +81,11 @@ private:
     std::array<Command, 4> message_commands_{};
     std::array<Command, 5> dialog_commands_{};
     std::array<Command, 5> service_commands_{};
-    // Open file, Open multiple, Save file and Choose color show these
-    // components; the folder button sends a typed HostServices request
-    // directly.
+    // Open file, Open multiple, Save file, Choose folder and Choose color
+    // show these components.
     std::shared_ptr<OpenFileDialog> open_file_dialog_;
     std::shared_ptr<SaveFileDialog> save_file_dialog_;
+    std::shared_ptr<FolderBrowserDialog> folder_browser_dialog_;
     std::shared_ptr<ColorDialog> color_dialog_;
     std::shared_ptr<Label> status_;
     std::shared_ptr<TextBox> clipboard_;
@@ -89,6 +96,9 @@ private:
     Command task_dialog_command_{};
     std::shared_ptr<Button> task_dialog_button_;
     std::shared_ptr<TaskDialog> task_dialog_;
+    Command exception_dialog_command_{};
+    std::shared_ptr<Button> exception_dialog_button_;
+    std::shared_ptr<ThreadExceptionDialog> exception_dialog_;
     Command notify_toggle_command_{};
     Command notify_message_command_{};
     std::shared_ptr<Command> notify_menu_command_;
@@ -114,10 +124,11 @@ HostServicesPage::HostServicesPage(const std::shared_ptr<Surface>& body) {
 }
 
 // A TaskDialog: an owned dialog built from GUI.Forms controls inside the
-// window, the same on every host.
+// window, the same on every host; beside it, the ThreadExceptionDialog preset
+// over a TaskDialog, reporting an exception the specimen throws and catches.
 void HostServicesPage::build_task_dialog(const std::shared_ptr<Surface>& body) {
     std::shared_ptr<LayoutGroup> group_box = group(
-        "gallery.host.task-dialog", "TaskDialog · in-window owned dialog, the same on every host",
+        "gallery.host.task-dialog", "TaskDialog and ThreadExceptionDialog · in-window owned dialogs, the same on every host",
         {930.0, 96.0});
     (*body).add_at(group_box, {24.0, 648.0, 930.0, 96.0});
     task_dialog_command_.set_text("Show task dialog");
@@ -126,9 +137,16 @@ void HostServicesPage::build_task_dialog(const std::shared_ptr<Surface>& body) {
     (*task_dialog_button_).set_visual_style(ButtonVisualStyle::accent);
     (*task_dialog_button_).bind(task_dialog_command_);
     (*group_box).add_at(task_dialog_button_, {24.0, 40.0, 202.0, 38.0});
+    exception_dialog_command_.set_text("Show exception dialog");
+    exception_dialog_command_.set_description("Report a caught exception in a ThreadExceptionDialog");
+    exception_dialog_button_ =
+        make_control<Button>(StableId("gallery.host.exception-dialog.show"), "Show exception dialog");
+    (*exception_dialog_button_).set_visual_style(ButtonVisualStyle::command);
+    (*exception_dialog_button_).bind(exception_dialog_command_);
+    (*group_box).add_at(exception_dialog_button_, {238.0, 40.0, 202.0, 38.0});
     (*group_box).add_at(label("gallery.host.task-dialog.note",
-                              "Heading, text, icon, radio buttons, a check box, details and a footnote; the result arrives in closed.",
-                              11.0, 400, muted), {244.0, 46.0, 660.0, 24.0});
+                              "Each reports its result in closed: a button ID, or cancel and abort.",
+                              11.0, 400, muted), {458.0, 46.0, 446.0, 24.0});
     task_dialog_ = make_control<TaskDialog>(StableId("gallery.host.task-dialog.dialog"));
     TaskDialogPage page;
     page.caption = "Export evidence";
@@ -147,6 +165,27 @@ void HostServicesPage::build_task_dialog(const std::shared_ptr<Surface>& body) {
     (*task_dialog_).set_page(std::move(page));
     on(task_dialog_command_.invoked(), *this, &HostServicesPage::on_show_task_dialog);
     on((*task_dialog_).closed(), *this, &HostServicesPage::on_task_dialog_closed);
+    ThreadExceptionReport report =
+        describe_exception(std::make_exception_ptr(std::runtime_error("The evidence index is out of date.")));
+    report.caption = "GUI.Forms Gallery";
+    report.details = "Thrown and caught by this specimen. A C++ exception carries no stack trace, "
+                     "so an application supplies its own details.";
+    exception_dialog_ = std::make_shared<ThreadExceptionDialog>(
+        StableId("gallery.host.exception-dialog.dialog"), std::move(report));
+    on(exception_dialog_command_.invoked(), *this, &HostServicesPage::on_show_exception_dialog);
+    on((*exception_dialog_).closed(), *this, &HostServicesPage::on_exception_dialog_closed);
+}
+
+void HostServicesPage::on_show_exception_dialog() {
+    if (!(*exception_dialog_).show(exception_dialog_button_)) return;
+    (*status_).set_text("ThreadExceptionDialog shown · Continue, Quit or Escape closes it");
+}
+
+void HostServicesPage::on_exception_dialog_closed(DialogResult result) {
+    // The Gallery keeps running on Quit; an application would close itself.
+    const char* const outcome = result == DialogResult::abort ? "Quit · the application would close itself"
+                                                              : "Continue · the error is ignored";
+    (*status_).set_text(std::string("ThreadExceptionDialog closed with ") + outcome);
 }
 
 void HostServicesPage::on_show_task_dialog() {
@@ -342,6 +381,8 @@ void HostServicesPage::build_paths(const std::shared_ptr<Surface>& body) {
     color_dialog_ = std::make_shared<ColorDialog>();
     (*color_dialog_).set_title("Choose an accent color");
     (*color_dialog_).set_color(Color::rgba(0x27U, 0x74U, 0xB8U));
+    folder_browser_dialog_ = std::make_shared<FolderBrowserDialog>();
+    (*folder_browser_dialog_).set_description("Choose an evidence directory");
     (*paths).add_at(label("gallery.host.paths.note",
                           "Cancel never overwrites the last accepted path, choice, or color.",
                           11.0, 400, muted), {24.0, 98.0, 700.0, 24.0});
@@ -399,14 +440,13 @@ void HostServicesPage::on_message_dialog(const int index,
 }
 
 void HostServicesPage::on_path_dialog(const int index,
-                                      const CommandInvocation& invocation) {
+                                      const CommandInvocation&) {
     if (index <= 1) {
         show_open_file_dialog(index == 1);
     } else if (index == 2) {
         show_save_file_dialog();
     } else if (index == 3) {
-        show_dialog(invocation,
-                    HostFolderDialogRequest{"Choose an evidence directory", {}});
+        show_folder_browser_dialog();
     } else {
         show_color_dialog();
     }
@@ -479,6 +519,25 @@ void HostServicesPage::show_color_dialog() {
     std::array<char, 16> encoded{};
     std::snprintf(encoded.data(), encoded.size(), "#%08X", rgba);
     publish_accepted(std::string("color ") + encoded.data());
+}
+
+void HostServicesPage::show_folder_browser_dialog() {
+    Window* const window = (*status_).attached_window();
+    if (window == nullptr) {
+        (*status_).set_text("Host rejected request · unsupported");
+        return;
+    }
+    const DialogResult result = (*folder_browser_dialog_).show_dialog(*window);
+    if (result == DialogResult::none) {
+        (*status_).set_text(std::string("Host rejected request · ") +
+                            host_service_error_name((*folder_browser_dialog_).status().error));
+        return;
+    }
+    if (result != DialogResult::ok) {
+        publish_cancelled();
+        return;
+    }
+    publish_accepted("1 path · " + (*folder_browser_dialog_).selected_path());
 }
 
 void HostServicesPage::on_service(const int index) {

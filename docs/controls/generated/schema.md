@@ -32,7 +32,7 @@ Engine inputs: `pointer_x`, `pointer_y`, `time_in_state`, `display_scale`, `text
 
 Values: `accent_index`, `text_orientation`, `dock_region`, `content_color`.
 
-Recipe families: `window`, `panel`, `card`, `button`, `accent_button`, `command_button`, `choice`, `editor`, `menu_item`, `selection`, `progress`, `tool_tip`.
+Recipe families: `window`, `panel`, `card`, `button`, `accent_button`, `command_button`, `choice`, `editor`, `menu_item`, `selection`, `progress`, `tool_tip`, `link`, `visited_link`.
 
 Semantic roles: `generic`, `group`, `static_text`, `button`, `check_box`, `radio_button`, `link`, `text_box`, `list`, `list_item`, `check_list_item`, `combo_box`, `slider`, `scroll_bar`, `progress_bar`, `image`, `tab_group`, `tab`, `split_pane`, `numeric_field`, `tool_tip`, `date_picker`, `calendar`, `date_cell`, `property_grid`, `property_group`, `property_row`, `menu_bar`, `menu_bar_item`, `menu`, `menu_item`, `separator`, `toolbar`, `radio_group`, `split_button`, `menu_button`, `pane`, `tab_panel`, `tree`, `tree_item`, `table`, `row`, `cell`, `column_header`, `row_header`, `tree_grid`, `dialog`, `status_bar`, `live_region`.
 
@@ -799,6 +799,7 @@ Item system `cell`:
 | `cell` | region |  |  |
 | `cell_selection` | selection |  |  |
 | `cell_content` | content |  |  |
+| `cell_image` | image |  |  |
 | `cell_check_well` | well | `check_box` |  |
 | `cell_check_indicator` | indicator |  |  |
 | `cell_button_face` | face | `button` |  |
@@ -1577,6 +1578,7 @@ Item system `item`:
 | `tab_label` | label |  |  |
 | `tab_focus` | focus |  |  |
 | `tab_seam` | seam |  |  |
+| `tab_icon` | icon |  |  |
 
 Item states: `selected`.
 
@@ -2684,17 +2686,15 @@ Properties beyond every control's: none.
 | `verification_changed` | `bool` |
 | `radio_button_changed` | `std::string` |
 
-## `open_file_dialog` (OpenFileDialog, component)
+## `thread_exception_dialog` (ThreadExceptionDialog, component)
 
 | Interaction | Payload |
 |---|---|
-| `file_ok` | `FileDialogOk`, by reference |
+| `closed` | `DialogResult` |
 
-## `save_file_dialog` (SaveFileDialog, component)
+## `folder_browser_dialog` (FolderBrowserDialog, component)
 
-| Interaction | Payload |
-|---|---|
-| `file_ok` | `FileDialogOk`, by reference |
+Interactions: none.
 
 ## `color_dialog` (ColorDialog, component)
 
@@ -2843,6 +2843,18 @@ Interactions beyond every control's: none.
 | `balloon_tip_clicked` | none |
 | `balloon_tip_closed` | none |
 | `menu_item_invoked` | `MenuItemInvocation` |
+
+## `open_file_dialog` (OpenFileDialog, component)
+
+| Interaction | Payload |
+|---|---|
+| `file_ok` | `FileDialogOk`, by reference |
+
+## `save_file_dialog` (SaveFileDialog, component)
+
+| Interaction | Payload |
+|---|---|
+| `file_ok` | `FileDialogOk`, by reference |
 
 ## `image_list` (ImageList, component)
 

@@ -10,7 +10,8 @@ namespace gui_forms {
 
 struct HostCapabilities final {
     // 8: the host's keyboard-command defaults (`key_map`).
-    static constexpr std::uint32_t current_protocol_version = 8;
+    // 9: the compositor state report (HostCompositorEvent, stage T5).
+    static constexpr std::uint32_t current_protocol_version = 9;
 
     std::uint32_t protocol_version{current_protocol_version};
     std::string platform{"unknown"};

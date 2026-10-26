@@ -35,7 +35,7 @@ void append_chord(std::ostringstream& output, KeyChord chord, bool first) {
 } // namespace
 
 std::string HostCapabilities::to_json() const {
-    constexpr std::array<std::pair<HostCapability, const char*>, 28> names{{
+    constexpr std::array<std::pair<HostCapability, const char*>, 32> names{{
         {HostCapability::lifecycle, "lifecycle"},
         {HostCapability::scale_notifications, "scale_notifications"},
         {HostCapability::monitor_geometry, "monitor_geometry"},
@@ -64,6 +64,10 @@ std::string HostCapabilities::to_json() const {
         {HostCapability::screen_pointer, "screen_pointer"},
         {HostCapability::window_at_point, "window_at_point"},
         {HostCapability::window_ordering, "window_ordering"},
+        {HostCapability::transparent_windows, "transparent_windows"},
+        {HostCapability::window_backdrops, "window_backdrops"},
+        {HostCapability::compositor_notifications, "compositor_notifications"},
+        {HostCapability::presentation_preferences, "presentation_preferences"},
     }};
     std::ostringstream output;
     output << "{\"protocol_version\":" << protocol_version

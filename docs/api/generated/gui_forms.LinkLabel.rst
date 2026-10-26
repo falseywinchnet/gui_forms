@@ -67,8 +67,13 @@ gui_forms::LinkLabel
    is raised afterwards, so a handler already sees the visited state.
 
    The link is drawn as one line of text at the left, vertically centred, with
-   an underline as wide as the text, in ``style().link``, ``style().visited_link``
-   or, when disabled, ``style().disabled_text``. It does not draw the inherited
+   an underline as wide as the text, in the text colour of the theme's ``link``
+   recipe family, or of ``visited_link`` once visited, for the control's state:
+   the built-in theme gives every enabled state its compatibility style's
+   ``link`` or ``visited_link`` colour (hover does not change it) and the disabled
+   state its ``disabled_text``. A style set with ``set_style`` keeps its own
+   ``link``, ``visited_link`` and ``disabled_text`` outside high contrast. A link
+   draws no plate. It does not draw the inherited
    ``image``, and ignores ``text_alignment`` and multi-line captions. A focus
    rectangle is drawn around it when it has keyboard focus.
 
