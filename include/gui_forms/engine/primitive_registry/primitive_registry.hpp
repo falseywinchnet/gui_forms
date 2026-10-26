@@ -243,7 +243,11 @@ struct LentImageVariants final {
 // damage generation the image was made at; a raster drawn from it is
 // current only while the generation is. `backplane` is borrowed, as
 // `material` is, and null when the window lends none: the primitive then
-// draws without it.
+// draws without it. `reduced_transparency` is the window's presentation
+// setting (stage T5, PLAN.md §4.5), set for a primitive that samples the
+// backplane only: such a raster is never shared, and a change of the
+// setting damages every part that sampled it, so the setting needs no
+// place in a cache key.
 
 struct PrimitiveTarget final {
     Size logical_size{};
@@ -260,6 +264,7 @@ struct PrimitiveTarget final {
     std::uint64_t backplane_generation{};
     // The backplane image's top-left pixel in the window's device pixels.
     Point backplane_origin{};
+    bool reduced_transparency{};
 };
 
 // Slicing (E7r, owner 2026-10-22). A primitive whose raster repeats along

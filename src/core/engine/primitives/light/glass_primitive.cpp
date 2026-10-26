@@ -85,6 +85,25 @@ double unit_lane(std::uint32_t value) noexcept {
     return unit;
 }
 
+// The backplane's own pixel under destination pixel (column, row), unblurred.
+Unit backplane_pixel(const PartRaster& backplane, std::size_t margin, std::size_t column, std::size_t row) noexcept {
+    const std::span<const std::uint8_t> bytes = backplane.pixels();
+    const std::size_t at = (row + margin) * backplane.row_bytes() + (column + margin) * lanes;
+    const Unit pixel{unit_lane(bytes[at]), unit_lane(bytes[at + 1U]), unit_lane(bytes[at + 2U]),
+                     unit_lane(bytes[at + 3U])};
+    return pixel;
+}
+
+// A flattened pixel made opaque: its colour unpremultiplied at alpha 1.
+// The backplane under flattened glass is the window recipe's material,
+// which is opaque in every built-in theme; this keeps the promise for a
+// theme whose window material is not. A pixel with no alpha left is black.
+Unit opaque_of(Unit pixel) noexcept {
+    if (!(pixel.alpha > 0.0)) return Unit{0.0, 0.0, 0.0, 1.0};
+    const Unit opaque{pixel.red / pixel.alpha, pixel.green / pixel.alpha, pixel.blue / pixel.alpha, 1.0};
+    return opaque;
+}
+
 } // namespace
 
 std::uint32_t glass_box_half(double blur, double scale) noexcept {
@@ -131,26 +150,31 @@ void GlassPrimitive::fill(const PrimitiveParameterBlock& parameters, const Primi
     const Rect box{0.0, 0.0, target.logical_size.width, target.logical_size.height};
 
     // The blurred backplane, when one is lent at the margin this blur reads.
+    // Under reduced transparency (stage T5, PLAN.md §4.5) glass draws
+    // flattened instead: its tint over the backplane's own pixel, unblurred,
+    // and opaque.
     const std::uint32_t half = glass_box_half(parameters.values[glass_blur].number, scale);
     const std::size_t margin = static_cast<std::size_t>(half) * 3U;
+    const bool flattened = target.reduced_transparency;
+    bool fits = false;
+    if (target.backplane != nullptr && target.backplane_margin == margin) {
+        const PartRaster& backplane = *target.backplane;
+        fits = backplane.extent().width == width + margin * 2U && backplane.extent().height == height + margin * 2U;
+    }
     BoxBlurWork work{};
     Blurred blurred{};
     bool sampled = false;
-    if (target.backplane != nullptr && target.backplane_margin == margin) {
-        const PartRaster& backplane = *target.backplane;
-        const bool fits = backplane.extent().width == width + margin * 2U &&
-                          backplane.extent().height == height + margin * 2U;
-        if (fits) {
-            try {
-                prepare_box_blur(work, backplane.extent().width, backplane.extent().height, lanes);
-                blurred = blur_backplane(backplane, half, work);
-                sampled = true;
-            } catch (const std::exception&) {
-                // std::bad_alloc or std::length_error: no backdrop is sampled.
-                sampled = false;
-            }
+    if (fits && !flattened) {
+        try {
+            prepare_box_blur(work, (*target.backplane).extent().width, (*target.backplane).extent().height, lanes);
+            blurred = blur_backplane(*target.backplane, half, work);
+            sampled = true;
+        } catch (const std::exception&) {
+            // std::bad_alloc or std::length_error: no backdrop is sampled.
+            sampled = false;
         }
     }
+    const bool flattened_over_backplane = flattened && fits;
 
     // The backdrop's colour filter, from the recipe's material (E9.6).
     const SurfaceMaterial* const lent = target.material;
@@ -167,7 +191,12 @@ void GlassPrimitive::fill(const PrimitiveParameterBlock& parameters, const Primi
                              unit_lane(blurred.pixels[at + 2U]), unit_lane(blurred.pixels[at + 3U])};
                 if (filtered) pixel = colour_filtered(filter, pixel);
             }
+            if (flattened_over_backplane) {
+                pixel = backplane_pixel(*target.backplane, margin, column, row);
+                if (filtered) pixel = colour_filtered(filter, pixel);
+            }
             blend_over(pixel, over);
+            if (flattened) pixel = opaque_of(pixel);
             const double coverage = shape_coverage(shape, box, scale, static_cast<std::int64_t>(column),
                                                    static_cast<std::int64_t>(row));
             const Unit covered{pixel.red * coverage, pixel.green * coverage, pixel.blue * coverage,

@@ -534,6 +534,20 @@ bool valid_text_shadow(const std::optional<ControlTextShadow>& shadow) noexcept 
     return placed && blurred;
 }
 
+// A valid request, and at most one base per backdrop, none for `opaque`
+// (the window recipe is its base), each a valid material.
+bool valid_window_backdrop(const ThemeWindowBackdrop& backdrop) noexcept {
+    if (!window_backdrop_request_valid(backdrop.request)) return false;
+    std::array<bool, window_backdrop_count> seen{};
+    for (const ThemeBackdropBase& base : backdrop.bases) {
+        const std::size_t index = static_cast<std::size_t>(base.backdrop);
+        if (index >= window_backdrop_count || base.backdrop == WindowBackdrop::opaque || seen[index]) return false;
+        seen[index] = true;
+        if (!valid_surface_material(base.material)) return false;
+    }
+    return true;
+}
+
 bool valid_recipe(const ControlVisualRecipe& value) noexcept {
     return valid_surface_material(value.material) && valid_text_shadow(value.text_shadow) &&
            std::isfinite(value.focus_width) && value.focus_width >= 0.0 &&
@@ -1010,6 +1024,10 @@ std::shared_ptr<const Theme> Theme::create(const ThemeDefinition& definition) {
     if (!valid_structure(definition.structure)) {
         throw std::invalid_argument(
             "theme structural tokens must be finite, ordered, and bounded");
+    }
+    if (!valid_window_backdrop(definition.window_backdrop)) {
+        throw std::invalid_argument(
+            "theme window backdrop needs a valid request, no opaque base and valid base materials");
     }
     std::unique_ptr<Theme> theme(new Theme(definition));
     // The forced high-contrast pass: every family's high-contrast records

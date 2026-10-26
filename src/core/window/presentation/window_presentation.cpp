@@ -438,8 +438,8 @@ std::optional<PaintReceipt> Window::paint_rectangles(
             ? ControlSurfaceState::normal
             : ControlSurfaceState::deactivated;
         backplane_context.high_contrast = presentation_settings_.high_contrast;
-        const SurfaceMaterial& backplane =
-            (*theme_).resolve(ControlVisualRole::window, backplane_context).material;
+        // Over a non-opaque grant, the theme's base for it (stage T5).
+        const SurfaceMaterial& backplane = backplane_base(backplane_context);
         // A window granted a non-opaque backdrop (stage T5) starts each
         // painted rectangle clear: its backplane is drawn in a copy group,
         // which replaces the previous frame's pixels, transparent included,
