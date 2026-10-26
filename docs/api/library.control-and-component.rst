@@ -1401,7 +1401,9 @@ Related types
 
       Default: ``{PositionKind::static_position}``.
 
-   .. cpp:member:: BoxSides<AutoLengthPercentage> inset{AutoLengthPercentage{true, {}}, AutoLengthPercentage{true, {}},
+   .. cpp:member:: BoxSides<AutoLengthPercentage> inset
+
+      Default: ``{automatic_inset, automatic_inset, automatic_inset, automatic_inset}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2798,6 +2800,10 @@ Functions, constants and aliases
 .. cpp:function:: bool absolute_axis_reads_content(const AbsoluteAxisInput& input) noexcept
 
    Whether the axis's size comes from the content: neither the item's own size nor both insets fix it. A caller measures the content only then.
+
+.. cpp:var:: constexpr AutoLengthPercentage automatic_inset
+
+   The inset ``auto``, every side's default. Value: ``{true, {}}``.
 
 .. cpp:namespace:: gui_forms
 

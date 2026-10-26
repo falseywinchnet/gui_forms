@@ -15,13 +15,15 @@ namespace gui_forms {
 // BlockFlowPanel apply it to their children; which box is the containing
 // block, and the conversion into the parent's coordinates, are theirs.
 
+// The inset `auto`, every side's default.
+inline constexpr AutoLengthPercentage automatic_inset{true, {}};
+
 // An item's `position` and its insets, `auto` by default. A positioned item
 // (relative or absolute) is a containing block for its absolutely
 // positioned descendants.
 struct ItemPositioning final {
     PositionKind position{PositionKind::static_position};
-    BoxSides<AutoLengthPercentage> inset{AutoLengthPercentage{true, {}}, AutoLengthPercentage{true, {}},
-                                         AutoLengthPercentage{true, {}}, AutoLengthPercentage{true, {}}};
+    BoxSides<AutoLengthPercentage> inset{automatic_inset, automatic_inset, automatic_inset, automatic_inset};
 
     friend bool operator==(const ItemPositioning& left, const ItemPositioning& right) noexcept {
         return left.position == right.position && left.inset == right.inset;
