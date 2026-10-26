@@ -9,13 +9,16 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
 namespace gui_forms {
 
+class ImageList;
 class PageStrip;
+struct ImageListChange;
 struct PageInvocation;
 
 enum class TabAlignment : std::uint8_t {
@@ -89,6 +92,12 @@ public:
     void set_item_size(Size size);
     [[nodiscard]] const BasicControlStyle& style() const noexcept { return style_; }
     void set_style(BasicControlStyle style);
+    // The images the pages' image_key and image_index name (Windows Forms'
+    // ImageList); a tab shows its image before its text. Throws
+    // std::invalid_argument for a disposed list or one belonging to another
+    // window, and keeps the old list.
+    [[nodiscard]] std::shared_ptr<ImageList> image_list() const noexcept { return image_list_; }
+    void set_image_list(std::shared_ptr<ImageList> image_list);
     [[nodiscard]] Rect tab_bounds(std::size_t index) const;
     [[nodiscard]] Rect display_bounds() const noexcept;
     // Whether the tabs do not all fit, so the strip shows its scroll and list
@@ -122,12 +131,13 @@ public:
     };
     [[nodiscard]] Parts parts() const;
     // A tab's parts, in the control's coordinates: the strip's tab, label,
-    // focus and seam parts of the same names (the strip paints them).
+    // focus, seam and icon parts of the same names (the strip paints them).
     struct ItemParts final {
         PartGeometry tab;
         PartGeometry tab_label;
         PartGeometry tab_focus;
         PartGeometry tab_seam;
+        PartGeometry tab_icon;
     };
     struct ItemStates final {
         bool selected{};
@@ -165,6 +175,10 @@ private:
     void configure_strip();
     [[nodiscard]] Rect header_bounds() const noexcept;
     [[nodiscard]] ItemParts tab_parts(const TabPage& page) const;
+    // The key of the page's image in the image list: its image_key, or the
+    // key at its image_index; empty when it names none the list has.
+    [[nodiscard]] std::string tab_image_key(const TabPage& page) const;
+    void on_image_list_changed(const ImageListChange& change);
     [[nodiscard]] bool nested_tab_control_has_focus() const;
     void on_set_selecting(PageSelectingEvent& event);
     void on_set_selection_changed(const PageSelectionChange& change);
@@ -174,6 +188,8 @@ private:
     std::weak_ptr<TabPage> selected_page_;
     RememberedFocusMap remembered_focus_;
     BasicControlStyle style_;
+    // Shared with the strip, which paints the images.
+    std::shared_ptr<ImageList> image_list_{};
     Size item_size_{120.0, 30.0};
     TabAlignment alignment_{TabAlignment::top};
     TabAppearance appearance_{TabAppearance::normal};
@@ -190,6 +206,8 @@ private:
     SubscriptionToken selecting_token_;
     SubscriptionToken selection_token_;
     SubscriptionToken invoked_token_;
+    // The list's changes move the keys image_index names.
+    SubscriptionToken image_list_token_;
     Event<const TabSelectionChange&> selected_index_changed_;
 };
 
