@@ -392,10 +392,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 -B tools/skia_archive.py plan --platform windows-x64
 
+  # The job always runs. When the plan finds an archive of this identity, it
+  # is a no-op on Ubuntu. A skipped job here would make GitHub skip, or report
+  # as skipped, the jobs after it (programs-windows-x64, publish, engine-gate),
+  # even though native-windows-x64 itself runs.
   skia-windows-x64:
     needs: skia-windows-x64-plan
-    if: needs.skia-windows-x64-plan.outputs.build == 'true'
-    runs-on: windows-2022
+    runs-on: ${{ needs.skia-windows-x64-plan.outputs.build == 'true' && 'windows-2022' || 'ubuntu-24.04' }}
     timeout-minutes: 60
     env:
       GUI_FORMS_RUNNER: windows-2022
@@ -405,15 +408,22 @@ jobs:
       run:
         shell: 'msys2 {0}'
     steps:
+      - name: No archive to build
+        if: needs.skia-windows-x64-plan.outputs.build != 'true'
+        shell: bash
+        run: echo "An archive of identity ${{ needs.skia-windows-x64-plan.outputs.identity }} is pinned or uploaded; nothing to build."
       - uses: actions/checkout@v4
+        if: needs.skia-windows-x64-plan.outputs.build == 'true'
         with:
           path: gui_forms
       - uses: actions/setup-python@v5
+        if: needs.skia-windows-x64-plan.outputs.build == 'true'
         id: toolchain-python
         with:
           python-version: '3.14'
           update-environment: false
       - name: Restore the published Windows toolchain without MSYS2 mirrors
+        if: needs.skia-windows-x64-plan.outputs.build == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -423,6 +433,7 @@ jobs:
       # spelled-out order); then packed, and compiled against and run from a
       # fresh extraction. The log prints the build's own time.
       - name: Build, pack and probe the Windows CPU Skia archive
+        if: needs.skia-windows-x64-plan.outputs.build == 'true'
         id: archive
         env:
           TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
@@ -439,6 +450,7 @@ jobs:
           "$toolchain_python" gui_forms/tools/skia_archive.py pack --platform windows-x64 --skia-out "$skia_out"
           "$toolchain_python" gui_forms/tools/skia_archive.py probe --platform windows-x64
       - uses: actions/upload-artifact@v4
+        if: needs.skia-windows-x64-plan.outputs.build == 'true'
         with:
           name: ${{ steps.archive.outputs.artifact-name }}
           overwrite: true
@@ -451,11 +463,10 @@ jobs:
   native-windows-x64:
     name: native (windows-2022, windows-x64, msys2 {0})
     needs: [house-style, skia-windows-x64-plan, skia-windows-x64]
-    # Runs after the Skia job, or when the plan skipped it.
+    # Runs after the Skia job, which builds an archive or does nothing.
     if: >-
       !cancelled() && needs.house-style.result == 'success'
-      && needs.skia-windows-x64-plan.result == 'success'
-      && (needs.skia-windows-x64.result == 'success' || needs.skia-windows-x64.result == 'skipped')
+      && needs.skia-windows-x64-plan.result == 'success' && needs.skia-windows-x64.result == 'success'
     uses: ./.github/workflows/native-platform.yml
     with:
       runner: windows-2022
@@ -532,8 +543,11 @@ jobs:
       contents: write
       actions: read
 
+  # This job and publish name the results they need instead of relying on an
+  # implicit success(), which any skipped job before them turns false.
   programs-windows-x64:
     needs: native-windows-x64
+    if: ${{ !cancelled() && needs.native-windows-x64.result == 'success' }}
     uses: ./.github/workflows/release.yml
     with:
       from_native: true
@@ -546,7 +560,11 @@ jobs:
   # a release needs all four.
   publish:
     needs: [programs-macos-arm64, programs-linux-x64, programs-linux-arm64, programs-windows-x64]
-    if: needs.programs-linux-x64.outputs.publish == 'true'
+    if: >-
+      !cancelled()
+      && needs.programs-macos-arm64.result == 'success' && needs.programs-linux-x64.result == 'success'
+      && needs.programs-linux-arm64.result == 'success' && needs.programs-windows-x64.result == 'success'
+      && needs.programs-linux-x64.outputs.publish == 'true'
     uses: ./.github/workflows/publish-release.yml
     with:
       tag: ${{ needs.programs-linux-x64.outputs.tag }}
