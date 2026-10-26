@@ -33,8 +33,8 @@ This was an optional availability item until every host met it:
 |---|---|---|
 | Windows, default profile | each rectangle copied separately; live frames through the frame sequence | #59, #72, #74; `results/2026-10-13-dp-gate-windows` |
 | Windows, transactional DIB profile | `DibFrameStore::commit` copies each rectangle, swaps only when all succeed | #73; `test_rectangle_set_commit` |
-| macOS | AppKit clips each copy to the rectangles being drawn | #60, #74 |
-| X11 | each rectangle converted and copied with `XPutImage` | #76, #77; PlaySuite's Lima `x11_screen_check.py` runs (changes stay inside the damaged rectangles) |
+| macOS | paints only the gathered rectangle set (#320). AppKit merges the host's per-rectangle display requests into one union rectangle on a layer-backed view, and the copy is clipped to that union, over pixels the frame left unchanged: the screen changes only inside the set, but the copy is the union, not the set | #60, #74, #320; `results/2026-10-25-dp-gate-macos` (screencapture: 0 pixels changed outside) |
+| X11 | each rectangle converted and copied with `XPutImage` | #76, #77; PlaySuite's Lima `x11_screen_check.py` runs (changes stay inside the damaged rectangles); `results/2026-10-25-dp-gate-x11` |
 
 The three commits have distinct authorities:
 
