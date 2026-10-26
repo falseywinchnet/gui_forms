@@ -226,6 +226,14 @@ void install_page_fixtures(Window& window) {
             (*document_icons).add_image("folder", icon_normal.image);
             (*(*documents).strip()).set_image_list(std::move(document_icons));
         }
+        // The primary TabControl's first and third tabs show this icon.
+        if (const std::shared_ptr<gui_forms::TabControl> tabs = std::dynamic_pointer_cast<TabControl>(
+                window.find("gallery.tabs.primary"))) {
+            std::shared_ptr<gui_forms::ImageList> tab_icons =
+                std::make_shared<ImageList>(window, Size{16.0, 16.0});
+            (*tab_icons).add_image("folder", icon_normal.image);
+            (*tabs).set_image_list(std::move(tab_icons));
+        }
     }
     const std::vector<std::byte> patch_pixels = make_nine_patch_surface();
     const ImageLoadResult patch = window.load_bgra32_premultiplied(
