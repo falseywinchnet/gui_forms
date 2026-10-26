@@ -1021,6 +1021,7 @@ void ThemeEngine::paint_planned(Painter& painter, const Control& control, const 
         request.target.backplane_margin = *margin;
         request.target.backplane_generation = backplane.generation;
         request.target.backplane_origin = backplane.origin;
+        request.target.reduced_transparency = (*window).presentation_settings().reduced_transparency;
         request.target.corner_radius = part.corner_radius;
         request.shared = false;
     }

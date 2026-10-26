@@ -85,6 +85,7 @@ gui_forms::Window
          The host's compositor state as last reported. Before any report: compositing unknown and only ``opaque`` supported.
 
       **backdrop_request** : ``WindowBackdropRequest``, read-only
+         The request in force: the application's, else the theme's.
 
       **backdrop_grant** : ``WindowBackdropGrant``, read-only
 
@@ -649,6 +650,8 @@ gui_forms::Window
 
    .. cpp:function:: const WindowBackdropRequest& backdrop_request() const noexcept
 
+      The request in force: the application's, else the theme's.
+
    .. cpp:function:: const WindowBackdropGrant& backdrop_grant() const noexcept
 
    .. cpp:function:: HostServices* host_services() const noexcept
@@ -919,7 +922,7 @@ gui_forms::Window
 
    .. cpp:function:: WindowBackdropGrant request_backdrop(const WindowBackdropRequest& request)
 
-      Asks for a backdrop (owner decisions T5-Q3 and T5-Q5) and returns the grant now in force: the request's first entry this window may be given under the host's state and its presentation settings, else ``opaque``, with the reason the preferred entry was or was not given. The request stands: the grant is resolved again whenever the state, the settings or the declaration change. std::invalid_argument, changing nothing, for a request window_backdrop_request_valid refuses. UI thread.
+      Asks for a backdrop (owner decisions T5-Q3 and T5-Q5) and returns the grant now in force: the request's first entry this window may be given under the host's state and its presentation settings, else ``opaque``, with the reason the preferred entry was or was not given. The request stands: the grant is resolved again whenever the state, the settings or the declaration change. Until the application makes one, the window makes its theme's (ThemeWindowBackdrop::request) and follows each new theme's. std::invalid_argument, changing nothing, for a request window_backdrop_request_valid refuses. UI thread.
 
    .. cpp:function:: void rebind_key_command(KeyCommand command, KeyBinding binding)
 
