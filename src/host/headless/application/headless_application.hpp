@@ -162,6 +162,14 @@ public:
     void simulate_application_active(bool active);
     // The user minimizes or restores a window.
     void simulate_minimized(HostWindowId window, bool minimized);
+    // The platform's compositor or the user's settings change (stage T5):
+    // `state` replaces the simulated state with the next generation (its
+    // own generation is ignored), and every open window receives it as a
+    // HostCompositorEvent, in opening order. A window opened later receives
+    // the current state right after its attach. No state is reported until
+    // the first call.
+    void simulate_compositor_state(CompositorState state);
+    [[nodiscard]] const CompositorState& compositor_state() const noexcept { return compositor_state_; }
     // Applies `fault` to the next runtime open only, after admission and
     // after the entry is consumed.
     void inject_open_fault(HeadlessOpenFault fault) noexcept { open_fault_ = fault; }
@@ -216,6 +224,8 @@ private:
     std::uint32_t placements_{};
     HeadlessOpenFault open_fault_{HeadlessOpenFault::none};
     std::vector<std::unique_ptr<Window>> refused_models_;
+    // The simulated compositor; generation 0 until the first report.
+    CompositorState compositor_state_{};
 };
 
 } // namespace gui_forms::host

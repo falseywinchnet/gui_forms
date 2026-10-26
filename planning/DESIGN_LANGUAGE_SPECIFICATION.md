@@ -834,6 +834,13 @@ parent-owned overlap; a scroll arrow is a button (CONTROL_DNA §3.6, §4.1–4.2
    does not restate.
 3. Leading, middle, trailing and sole roles come from the parent's ordered
    membership, never coordinates (REGIONS §4 rule 3).
+4. Owner drawing is content-only (owner decision W-Q6, 2026-10-26). A
+   control with items may let the application draw an item's content
+   (`ItemDrawMode::owner_draw`, the `ItemContentPaint` event, in
+   `gui_forms/theme/owner_draw`): the application draws with GUI.Forms'
+   painter, clipped to the item's content rectangle, and the item's plate,
+   selection and focus cue stay painted by role, so a theme still styles
+   every owner-drawn item's chrome.
 
 ### 8.3 Participation
 
@@ -893,7 +900,10 @@ under `vocabulary` (`custom_states`, `marks`, `values`, `semantic_roles`,
 `semantic_actions`, `semantic_fields`), beside the recipe families a theme
 supplies (`ControlVisualRole`, `gui_forms/theme/types`: `window`, `panel`,
 `card`, `button`, `accent_button`, `command_button`, `choice`, `editor`,
-`menu_item`, `selection`, `progress` and, from RB-38 (§12.9), `tool_tip`).
+`menu_item`, `selection`, `progress`, from RB-38 (§12.9), `tool_tip`, and,
+from W-Q5, `link` and `visited_link`: a hyperlink's text, chosen by the
+link's visited flag, with no plate; hover keeps the normal link colour, and
+the built-in theme's recipes take its compatibility style's link colours).
 
 | Mark | What it shows | Used by |
 |---|---|---|

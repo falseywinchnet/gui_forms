@@ -67,7 +67,10 @@ void invalid_reset(InflateStream& stream, const InflateOptions& valid, unsigned 
     case 2: invalid.window_bits = 16; break;
     case 3: invalid.limits.input_bytes.value = std::numeric_limits<std::uint64_t>::max(); break;
     case 4: invalid.limits.output_bytes.value = std::numeric_limits<std::uint64_t>::max(); break;
-    case 5: invalid.limits.work.value = std::numeric_limits<std::uint64_t>::max(); break;
+    default:
+        // 5, the last value of choice % 6: an unbounded work limit.
+        invalid.limits.work.value = std::numeric_limits<std::uint64_t>::max();
+        break;
     }
     const InflateError error = stream.reset(invalid);
     require(error == InflateError::invalid_argument, "invalid reset accepted");

@@ -79,6 +79,15 @@ gui_forms::Window
          Whether the window is the active top-level window. Controls paint their
          inactive state when it is false. Setting it raises :cpp:func:`active_changed <gui_forms::Window::active_changed>`.
 
+      **non_opaque_declared** : ``bool``, read-only
+
+      **compositor_state** : ``CompositorState``
+         The host's compositor state as last reported. Before any report: compositing unknown and only ``opaque`` supported.
+
+      **backdrop_request** : ``WindowBackdropRequest``, read-only
+
+      **backdrop_grant** : ``WindowBackdropGrant``, read-only
+
       **host_services** : ``HostServices*``, read-only
          The services of the attached native host, or null when none is attached.
 
@@ -226,6 +235,9 @@ gui_forms::Window
       **active_changed** : ``Event<bool>``
          Raised after :cpp:func:`active <gui_forms::Window::active>` changes, with the new value.
 
+      **backdrop_changed** : ``Event<const WindowBackdropGrant&>``
+         Raised on the UI thread after the grant's backdrop, reason or request changes (not for a new generation alone), once per change. When the granted backdrop changes, the backplane's generation has advanced and the window is marked for repaint before it is raised. A handler may call request_backdrop; its change raises its own event within this one, and later handlers of this emission still see this emission's grant.
+
       **focused_control_changed** : ``Event<const FocusedControlChange&>``
          Raised after :cpp:func:`request_focus <gui_forms::Window::request_focus>` moved focus to another control (or to
          none), once the controls' own focus notifications ran, with the old and
@@ -273,6 +285,10 @@ gui_forms::Window
         -  
       * - :cpp:func:`shares_resources_with <gui_forms::Window::shares_resources_with>`
         -  
+      * - :cpp:func:`declare_non_opaque <gui_forms::Window::declare_non_opaque>`
+        - Compositor cooperation (stage T5, planning/stages/T5-compositor/ PLAN.md §2).
+      * - :cpp:func:`request_backdrop <gui_forms::Window::request_backdrop>`
+        - Asks for a backdrop (owner decisions T5-Q3 and T5-Q5) and returns the grant now in force: the request's first entry this window may be given under the host's state and its presentation settings, else ``opaque``, with the reason the preferred entry was or was not given.
       * - :cpp:func:`rebind_key_command <gui_forms::Window::rebind_key_command>`
         - Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in the window's key bindings, so in every window sharing them, over the host's default; an empty binding leaves the command without keys.
       * - :cpp:func:`restore_key_command <gui_forms::Window::restore_key_command>`
@@ -621,6 +637,20 @@ gui_forms::Window
 
       Sets :cpp:func:`active <gui_forms::Window::active>`; see the property's description above.
 
+   .. cpp:function:: bool non_opaque_declared() const noexcept
+
+   .. cpp:function:: const CompositorState& compositor_state() const noexcept
+
+      The host's compositor state as last reported. Before any report: compositing unknown and only ``opaque`` supported.
+
+   .. cpp:function:: void set_compositor_state(const CompositorState& state, bool host_preferences)
+
+      Host-only: the HostSession passes each accepted compositor report here. With ``host_preferences`` (capability presentation_preferences) a change in the host's high-contrast or reduced-transparency setting is copied into presentation_settings(); a setting the host did not change keeps what the application set. Then the backdrop grant is resolved again.
+
+   .. cpp:function:: const WindowBackdropRequest& backdrop_request() const noexcept
+
+   .. cpp:function:: const WindowBackdropGrant& backdrop_grant() const noexcept
+
    .. cpp:function:: HostServices* host_services() const noexcept
 
       The services of the attached native host, or null when none is attached.
@@ -810,6 +840,10 @@ gui_forms::Window
 
       Raised after :cpp:func:`active <gui_forms::Window::active>` changes, with the new value.
 
+   .. cpp:function:: Event<const WindowBackdropGrant&>& backdrop_changed() noexcept
+
+      Raised on the UI thread after the grant's backdrop, reason or request changes (not for a new generation alone), once per change. When the granted backdrop changes, the backplane's generation has advanced and the window is marked for repaint before it is raised. A handler may call request_backdrop; its change raises its own event within this one, and later handlers of this emission still see this emission's grant.
+
    .. cpp:function:: Event<const FocusedControlChange&>& focused_control_changed() noexcept
 
       Raised after :cpp:func:`request_focus <gui_forms::Window::request_focus>` moved focus to another control (or to
@@ -878,6 +912,14 @@ gui_forms::Window
    .. cpp:function:: ResolvedTextLayout resolve_text_layout_utf8(std::string_view utf8, FontSpec effective_font) const
 
    .. cpp:function:: bool shares_resources_with(const Window& other) const noexcept
+
+   .. cpp:function:: bool declare_non_opaque()
+
+      Compositor cooperation (stage T5, planning/stages/T5-compositor/ PLAN.md §2). Declares, before a host attaches, that this window may be presented non-opaque (owner decision T5-Q4); ApplicationWindowOptions::non_opaque does it for an application window. False, changing nothing, once a host session has been bound to the window: a host fixes what a native window can show when it creates it. UI thread.
+
+   .. cpp:function:: WindowBackdropGrant request_backdrop(const WindowBackdropRequest& request)
+
+      Asks for a backdrop (owner decisions T5-Q3 and T5-Q5) and returns the grant now in force: the request's first entry this window may be given under the host's state and its presentation settings, else ``opaque``, with the reason the preferred entry was or was not given. The request stands: the grant is resolved again whenever the state, the settings or the declaration change. std::invalid_argument, changing nothing, for a request window_backdrop_request_valid refuses. UI thread.
 
    .. cpp:function:: void rebind_key_command(KeyCommand command, KeyBinding binding)
 

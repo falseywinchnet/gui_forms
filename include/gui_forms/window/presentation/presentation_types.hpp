@@ -23,13 +23,19 @@ struct PresentationSettings final {
     // their static poses. Transitions are not affected; reduced motion,
     // the host's preference, ends them.
     bool ambient_motion{true};
+    // Reduced transparency (stage T5, owner decision T5-Q7): the host's
+    // setting where the host reports it (capability
+    // presentation_preferences), or the application's. With it, or with
+    // high_contrast, a window's backdrop is opaque (WindowBackdropReason).
+    bool reduced_transparency{};
     friend constexpr bool operator==(const PresentationSettings& left,
                                      const PresentationSettings& right) noexcept {
         return left.text_scale == right.text_scale &&
                left.high_contrast == right.high_contrast &&
                left.reduced_motion == right.reduced_motion &&
                left.sound_enabled == right.sound_enabled &&
-               left.ambient_motion == right.ambient_motion;
+               left.ambient_motion == right.ambient_motion &&
+               left.reduced_transparency == right.reduced_transparency;
     }
 };
 

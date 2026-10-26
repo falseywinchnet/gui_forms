@@ -306,10 +306,17 @@ struct AmbientEffect final {
 // rule that declares one (for a parameter, among the rules selecting the
 // part's primitive), and the ambient effect of the last matching rule that
 // declares one.
+//
+// `specificity`, when set, is the rule's specificity in place of the one
+// its selector gives (T3 engine change EC2): a rule expanded from CSS's
+// `:is()` takes its most specific argument's. A class or stable-ID rule
+// with a given specificity then needs a class or an ID in it rather than
+// in its selector; an inline style still needs its selector's stable ID.
 struct ThemeRule final {
     std::string label{};
     CascadeLevel level{CascadeLevel::theme_sheet};
     RuleSelector selector{};
+    std::optional<RuleSpecificity> specificity{};
     std::vector<RuleDeclaration> declarations{};
     std::optional<EngineVersion> requires_engine{};
     std::vector<PropertyTransition> transitions{};
@@ -317,8 +324,9 @@ struct ThemeRule final {
 
     friend bool operator==(const ThemeRule& left, const ThemeRule& right) noexcept {
         return left.label == right.label && left.level == right.level && left.selector == right.selector &&
-               left.declarations == right.declarations && left.requires_engine == right.requires_engine &&
-               left.transitions == right.transitions && left.ambient == right.ambient;
+               left.specificity == right.specificity && left.declarations == right.declarations &&
+               left.requires_engine == right.requires_engine && left.transitions == right.transitions &&
+               left.ambient == right.ambient;
     }
 };
 

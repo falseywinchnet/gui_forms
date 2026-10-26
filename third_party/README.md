@@ -14,13 +14,6 @@ builds and SDK exports. See
 [`LIBUNIBREAK_INTAKE_2026-10-01.md`](LIBUNIBREAK_INTAKE_2026-10-01.md) for the
 local conformance reproduction, caller-buffer boundary and license requirements.
 
-Zstandard 1.5.7, the entropy coder of the CNG resource codec, is fetched by
-`stx_cng/tools/fetch_zstd.sh` into `stx_cng/third_party/` (not committed) and
-pinned by the release tarball's SHA-256
-`eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3`, which
-configuration checks again. Only its library sources are built, privately
-inside `stx_cng`; see [`stx_cng/PROVENANCE.md`](../stx_cng/PROVENANCE.md).
-
 Unicode grapheme property tables and conformance cases are pinned, generated,
 and attributed under [`unicode/`](unicode/README.md). Unlike Skia, these are
 checked-in generated data so renderer-free builds stay offline.

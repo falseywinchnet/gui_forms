@@ -10,7 +10,6 @@ on:
       - 'stx_zlib/**'
       - 'stx_png/**'
       - 'stx_conv/**'
-      - 'stx_cng/**'
       - 'stx_rtf2md/**'
       - 'src/core/image/**'
       - 'include/gui_forms/compression/**'
@@ -34,7 +33,7 @@ jobs:
       fail-fast: false
       matrix:
         architecture: [x64, arm64]
-        target: [inflate, inflate_oracle_ordinary, inflate_oracle_strict, inflate_protocol, deflate, png_decode, conv, cng, rtf2md_markdown, rtf2md_rtf]
+        target: [inflate, inflate_oracle_ordinary, inflate_oracle_strict, inflate_protocol, deflate, png_decode, conv, rtf2md_markdown, rtf2md_rtf]
         include:
           - architecture: x64
             runner: ubuntu-24.04
@@ -67,23 +66,6 @@ jobs:
               if actual != expected:
                   sys.exit('oracle hash mismatch: ' + name)
           PY
-      # Zstandard 1.5.7 for the cng target: the pinned release tarball, built
-      # with the codec through its own CMake profile (stx_cng/cmake/zstd.cmake)
-      # under the same instrumentation; stx_zlib supplies CRC-32.
-      - name: Build the CNG libraries
-        if: matrix.target == 'cng'
-        run: |
-          set -eu
-          sh stx_cng/tools/fetch_zstd.sh
-          instrument="-O1 -g -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
-          sdk="$GITHUB_WORKSPACE/.build/cng-fuzz-sdk"
-          common="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=None"
-          cmake -S stx_zlib -B .build/cng-fuzz-zlib $common -DCMAKE_CXX_FLAGS="$instrument" -DSTX_ZLIB_TESTS=OFF -DCMAKE_INSTALL_PREFIX="$sdk"
-          cmake --build .build/cng-fuzz-zlib --parallel 4
-          cmake --install .build/cng-fuzz-zlib
-          cmake -S stx_cng -B .build/cng-fuzz $common -DCMAKE_C_FLAGS="$instrument" -DCMAKE_CXX_FLAGS="$instrument" \
-            -DSTX_CNG_TESTS=OFF -DCMAKE_PREFIX_PATH="$sdk"
-          cmake --build .build/cng-fuzz --parallel 4
       - name: Build the target
         run: |
           set -eu
@@ -110,8 +92,6 @@ jobs:
                    stx_rtf2md/src/markdown_inline.cpp stx_rtf2md/src/markdown_reader.cpp stx_rtf2md/src/markdown_writer.cpp \
                    stx_rtf2md/src/rtf_reader.cpp stx_rtf2md/src/rtf_writer.cpp -o smoke ;;
             conv) clang++ $flags -Istx_conv/include stx_conv/fuzz/conv_fuzz.cpp stx_conv/src/plan.cpp stx_conv/src/profile.cpp stx_conv/src/image.cpp -o smoke ;;
-            cng) clang++ $flags -Istx_cng/include stx_cng/fuzz/cng_fuzz.cpp .build/cng-fuzz/libstx_cng.a \
-                   .build/cng-fuzz/libstx_cng_zstd.a .build/cng-fuzz-zlib/libstx_zlib.a -o smoke ;;
             png_decode) clang++ $flags -Istx_png/include fuzz/png_decode_fuzz.cpp stx_png/src/decoder.cpp stx_png/src/encoder.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp stx_zlib/src/deflate.cpp -o smoke ;;
           esac
       - name: Run the smoke

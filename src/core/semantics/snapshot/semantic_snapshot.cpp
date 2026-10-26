@@ -213,33 +213,47 @@ const char* semantic_text_unit_name(SemanticTextUnit unit) noexcept {
     return "unknown";
 }
 
-void fill_semantic_text_boundaries(const SemanticTextLayout& layout, std::string_view value,
-                                   SemanticTextUnit unit, std::vector<Utf8Offset>& boundaries) {
-    boundaries.clear();
-    const Utf8Offset start{0U};
-    const Utf8Offset end{value.size()};
-    boundaries.push_back(start);
+namespace {
+
+// Appends the boundaries inside `value` that `unit` moves by, unsorted and
+// possibly repeated; the caller adds the two ends and orders them.
+void append_inner_boundaries(const SemanticTextLayout& layout, std::string_view value, SemanticTextUnit unit,
+                             std::vector<Utf8Offset>& boundaries) {
     switch (unit) {
     case SemanticTextUnit::character:
         for (const SemanticTextGrapheme& grapheme : layout.graphemes) {
             boundaries.push_back(grapheme.range.start);
             boundaries.push_back(grapheme.range.end);
         }
-        break;
+        return;
     case SemanticTextUnit::word:
         boundaries.insert(boundaries.end(), layout.word_starts.begin(), layout.word_starts.end());
-        break;
+        return;
     case SemanticTextUnit::line:
         for (const SemanticTextLine& line : layout.lines) boundaries.push_back(line.range.start);
-        break;
+        return;
     case SemanticTextUnit::paragraph:
         for (std::size_t index = 0U; index < value.size(); ++index) {
             if (value[index] == '\n') boundaries.push_back(Utf8Offset{index + 1U});
         }
-        break;
+        return;
     case SemanticTextUnit::document:
-        break;
+        // The whole text is one unit: only its two ends.
+        return;
     }
+    // A unit outside the enumeration moves by the whole text, as document does.
+    return;
+}
+
+} // namespace
+
+void fill_semantic_text_boundaries(const SemanticTextLayout& layout, std::string_view value,
+                                   SemanticTextUnit unit, std::vector<Utf8Offset>& boundaries) {
+    boundaries.clear();
+    const Utf8Offset start{0U};
+    const Utf8Offset end{value.size()};
+    boundaries.push_back(start);
+    append_inner_boundaries(layout, value, unit, boundaries);
     boundaries.push_back(end);
     // A layout read for other text could hold offsets past this value's
     // end; they are no boundaries of it.
