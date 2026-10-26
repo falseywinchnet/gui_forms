@@ -70,6 +70,9 @@ TrackFunction track_function(const GridTrackSize& size, const GridAvailableExten
     case TrackBreadthKind::automatic:
         function.minimum = Breadth::automatic;
         break;
+    default: // Not a TrackBreadthKind: the minimum is `auto`, the initial value.
+        function.minimum = Breadth::automatic;
+        break;
     }
     switch (size.maximum.kind) {
     case TrackBreadthKind::length_percentage: {
@@ -89,6 +92,9 @@ TrackFunction track_function(const GridTrackSize& size, const GridAvailableExten
         function.maximum = Breadth::max_content;
         break;
     case TrackBreadthKind::automatic:
+        function.maximum = Breadth::automatic;
+        break;
+    default: // Not a TrackBreadthKind: the maximum is `auto`, the initial value.
         function.maximum = Breadth::automatic;
         break;
     }
@@ -582,7 +588,7 @@ Packing content_packing(LayoutAlignment alignment) noexcept {
         return Packing::space_around;
     case LayoutAlignment::space_evenly:
         return Packing::space_evenly;
-    default:
+    default: // automatic, normal, stretch, start, flex_start and baseline pack at the start.
         return Packing::start;
     }
 }
@@ -663,7 +669,7 @@ SelfPacking self_packing(LayoutAlignment self, LayoutAlignment items, bool defin
         return SelfPacking::center;
     case LayoutAlignment::baseline:
         return row_axis ? SelfPacking::baseline : SelfPacking::start;
-    default:
+    default: // start and flex_start, and the content-distribution values, which self alignment does not take.
         return SelfPacking::start;
     }
 }
@@ -786,6 +792,9 @@ PlacedSpan place_in_area(const SelfPlacementInput& input) noexcept {
         break;
     case SelfPacking::start:
     case SelfPacking::stretch:
+        placed.offset = start_margin;
+        break;
+    default: // Not a SelfPacking: the item sits at the start.
         placed.offset = start_margin;
         break;
     }
@@ -1332,6 +1341,7 @@ GridSolveOutcome size_grid_tracks(GridAxis axis, const GridContainerInput& conta
         if (flexible(function)) continue;
         GridTrack& track = tracks[track_index];
         const GridItemContribution& contribution = used[index];
+        // A fixed minimum is already the base; only the intrinsic minima grow it.
         if (function.minimum == Breadth::min_content) {
             track.base = std::max(track.base, contribution.min_content);
         } else if (function.minimum == Breadth::max_content) {

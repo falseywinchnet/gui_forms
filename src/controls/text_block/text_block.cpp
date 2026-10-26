@@ -234,6 +234,7 @@ void TextBlock::set_text_align(TextAlignment alignment) {
     case TextAlignment::left:
     case TextAlignment::right:
     case TextAlignment::center:
+        // A listed alignment is stored as given, below.
         break;
     default:
         throw std::invalid_argument("TextBlock text alignment is invalid");
@@ -386,6 +387,7 @@ Size TextBlock::measure_intrinsic(const LayoutConstraint& constraint) {
         content_width = widest_unbreakable_run(workspace_, font);
         break;
     case AvailableExtentKind::max_content:
+    default: // Not an AvailableExtentKind: the text measures unbounded, as max-content.
         content_width = practical_unbounded_extent;
         break;
     case AvailableExtentKind::definite:

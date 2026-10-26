@@ -147,7 +147,8 @@ LineMetrics line_metrics(const LineStrut& strut, std::span<const BlockFlowItemIn
     for (const BlockFlowItemInput& item : line) {
         const double height = outer_height(item);
         switch (item.vertical_align) {
-        case InlineVerticalAlignment::baseline: {
+        case InlineVerticalAlignment::baseline:
+        default: { // Not an InlineVerticalAlignment: the item sits on the baseline, the initial value.
             const double ascent = item_ascent(item);
             metrics.ascent = std::max(metrics.ascent, ascent);
             metrics.descent = std::max(metrics.descent, height - ascent);
@@ -185,6 +186,7 @@ double inline_item_top(const BlockFlowItemInput& item, const LineMetrics& metric
     double margin_top = 0.0;
     switch (item.vertical_align) {
     case InlineVerticalAlignment::baseline:
+    default: // Not an InlineVerticalAlignment: the item sits on the baseline, the initial value.
         margin_top = metrics.ascent - item_ascent(item);
         break;
     case InlineVerticalAlignment::middle:
