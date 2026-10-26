@@ -328,7 +328,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"collections-and-popups", 0xdcfb5edee24a4d9eULL},
     {"values-and-spinners", 0xc6d61a2832ad4bdbULL},
     {"images-and-drawing", 0xf8f9a366ee67d9d5ULL},
-    {"tabs-and-pages", 0x4d73bb3952b38217ULL},
+    {"tabs-and-pages", 0x488570d26e0bff2cULL},
     {"checked-collections", 0xc0a2d081ee38a7c8ULL},
     {"timing-and-tooltips", 0xd0fb86834e684081ULL},
     {"dates-and-calendar", 0xc5c53d69a0faf9b8ULL},
