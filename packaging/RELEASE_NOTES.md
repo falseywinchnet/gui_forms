@@ -41,6 +41,26 @@ mail mockup.
 - **Removed:** `Command::set_key_tip` and `CommandState::key_tip`. The ribbon
   has no KeyTips, and nothing else read them.
 
+## Consumer migration
+
+- **TextBox passes Enter and Escape on** (f333fb12, 4f0be17f), as in Windows
+  Forms, so the window's accept and cancel buttons, menus, docking and
+  containers receive them. A single-line box consumes Enter only while it
+  has something to accept (an open suggestion list, an appended completion,
+  or an input-method composition). It consumes Escape only while it has
+  something to cancel (the same, or a selection drag). Otherwise it raises
+  neither `committed` nor `cancelled` for those keys.
+  - A box that is an edit session and relied on `committed()` or
+    `cancelled()` firing for plain Enter or Escape must opt in:
+    `set_accepts_enter(true)` and `set_accepts_escape(true)`. The box then
+    raises the event and stops the key there.
+  - A multi-line box still takes Enter to insert a newline.
+  - Known affected consumers: File Manager had five such boxes, and
+    SwiftEdit's CSV editor has the same pattern.
+  - The in-tree editors (BreadcrumbTrail, ColorValueEditor, InstrumentRack,
+    PropertyList and TokenBox editors, the Linux host's dialog fields and
+    the demoboard's search box) already opt in.
+
 ## Other changes
 
 ### Controls
