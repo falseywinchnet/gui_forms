@@ -41,7 +41,7 @@ details are under [Done and tested](#done-and-tested).
   with states and public geometry, described by one schema that the C++ API,
   form documents, themes and the visual tools share.
 - **Owned compression and image codecs on every host**: one zlib, an
-  owned PNG codec, CNG native resources and CONV interpolation, all GPL-free.
+  owned PNG codec and CONV interpolation, all GPL-free.
 
 ## 0.3 Themeable
 
@@ -155,8 +155,9 @@ gates as their own rows. "Done" means the deliverable exists and a test in
   sRGB blending) with identical output on macOS, Windows and Linux, enforced
   by a hash-compared identity test. Skia is built without any font backend.
 - Owned compression and image codecs on every host: one zlib (`stx_zlib`),
-  an owned PNG codec (`stx_png`), CNG as the native resource format with PNG
-  kept for interchange (`stx_cng`), and CONV interpolation (`stx_conv`). WIC
+  an owned PNG codec (`stx_png`), the only image codec, and CONV
+  interpolation (`stx_conv`). CNG (`stx_cng`), taken in for 0.2, was removed
+  on 2026-10-26 (the owner's decision: our own PNG and zlib suffice). WIC
   decoding is removed and FreeType is built without zlib.
 - The theme engine: a cascade of rules over named parts, layered materials,
   effect primitives with declared cost bounds, transitions and settling

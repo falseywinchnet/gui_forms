@@ -198,29 +198,39 @@ gui_forms::DateTimePicker
       (*due).set_format(gf::DateTimePickerFormat::short_date);
       // formatted_value() is "10/11/2026"
 
-   An optional date. Unchecking the box keeps the date, and stepping with the
-   keyboard checks it again before changing the date:
+   An optional date, held as one ``std::optional`` so that "no date" and a date
+   cannot disagree. Unchecking the box keeps the picker's own date, and
+   stepping with the keyboard checks it again before changing the date:
 
    .. code-block:: cpp
 
       struct Reminder final : gf::Component {
           std::shared_ptr<gf::DateTimePicker> when =
               gf::make_control<gf::DateTimePicker>(gf::StableId("reminder.when"));
-          bool has_date = true;
-          gf::DateTimeValue date{};
+          // Empty while the box is unchecked.
+          std::optional<gf::DateTimeValue> date{};
 
           Reminder() {
               (*when).set_show_check_box(true);
+              date = (*when).value();
               gf::on((*when).checked_changed(), *this, &Reminder::on_checked);
               gf::on((*when).value_changed(), *this, &Reminder::on_date);
           }
-          void on_checked(bool checked) { has_date = checked; }
-          void on_date(gf::DateTimeValue value) { date = value; }
+          void on_checked(bool checked) {
+              if (checked) {
+                  date = (*when).value();
+              } else {
+                  date.reset();
+              }
+          }
+          void on_date(gf::DateTimeValue value) {
+              if ((*when).checked()) date = value;
+          }
       };
 
       void example() {
           Reminder reminder;
-          (*reminder.when).set_checked(false);   // has_date is false
+          (*reminder.when).set_checked(false);   // date is empty
           std::shared_ptr<gf::Panel> root =
               gf::make_control<gf::Panel>(gf::StableId("reminder.root"));
           (*reminder.when).set_requested_bounds({10.0, 10.0, 240.0, 29.0});
@@ -229,7 +239,7 @@ gui_forms::DateTimePicker
           window.perform_layout();
           window.request_focus(reminder.when);
           window.dispatch_key({gf::KeyAction::down, gf::PhysicalKey::up});
-          // has_date is true again and date is January 2, 2000
+          // date is January 2, 2000
       }
 
 

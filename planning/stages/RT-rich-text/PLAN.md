@@ -123,7 +123,7 @@ struct RunStyle final {
     bool italic = false;
     bool underline = false;
     bool strikethrough = false;
-    bool code = false;                     // inline code; exclusive with the five below
+    bool code = false;                     // inline code; combines with every other attribute
     bool superscript = false;              // exclusive with subscript
     bool subscript = false;
     std::optional<LinkIndex> link;
@@ -144,7 +144,7 @@ struct Block final {
     std::uint8_t level = 0;                // heading 1-6; list nesting 0-7; else 0
     std::uint8_t quote_depth = 0;          // 0-7, any kind may be quoted
     ListMarker marker = ListMarker::bullet;
-    std::uint32_t ordered_start = 1;       // first number of an ordered list
+    std::uint32_t ordinal = 0;             // the number written on an ordered item; 0 otherwise
     Alignment alignment = Alignment::left;
     std::uint32_t first_run = 0;           // index into Document::runs
     std::uint32_t run_count = 0;
@@ -171,15 +171,24 @@ can be compared field by field:
 
 - runs are contiguous and in block order. Every block has at least one text
   run, and no run is empty except a line break;
-- adjacent text runs with equal styles are merged. A line break is never
-  first or last in a block, and two line breaks are never adjacent;
+- adjacent text runs with equal styles are merged. A line break may open a
+  block or follow another (markdown writes each as a backslash line), but
+  never ends a block, and headings have none;
+- a list item at nesting level L > 0 directly follows a list item at the
+  same quote depth whose level is at least L - 1, since markdown writes
+  nesting under a parent;
 - text is valid UTF-8 without paragraph or line separators, without C0
   controls other than tab, and without U+FEFF;
 - blanks (spaces and tabs) are kept wherever they appear, including at the
   start and end of a block. The markdown writer escapes the ones CommonMark
   would strip (section 4), so nothing the user can see is lost;
-- `code` excludes the other run attributes. Code blocks have one unstyled
-  text run per line, separated by line breaks;
+- `code` is an attribute like the others: inline code may be bold,
+  coloured, spanned or linked. A code block is one unstyled text run whose
+  text holds its lines joined by line feeds, so blank lines inside code are
+  kept; no other text contains a line feed;
+- an ordered list item's `ordinal` is the number written on its marker.
+  Readers keep the number they read, so renumbering is the consumer's
+  presentation choice; bullets and other blocks have ordinal 0;
 - `size_step` is 0 in headings, whose level stands for their size.
 
 `Document::clear` keeps capacity, so one `Document` can be reused across
@@ -198,9 +207,9 @@ built. This section fixes its shape.
 |---|---|
 | paragraph | its text; blocks are separated by one blank line |
 | heading level n | `#` × n, a space, then the text |
-| list item | `-` or `n.` then a space; nesting indents by the parent marker's width plus one space (2 for `-`, 3 for `1.`, 4 for `10.`) |
-| quote depth n | `> ` × n before every line of the block |
-| code block | a backtick fence one longer than the longest run of backticks inside, at least three |
+| list item | `-` or the ordinal and `.`, then a space; nesting indents by the parent marker's width plus one space (2 for `-`, 3 for `1.`, 4 for `10.`); continuation lines are indented to the item's content |
+| quote depth n | `> ` × n before every line of the block; the blank line between two quoted blocks is quoted to their shared depth, so the quote continues |
+| code block | a backtick fence one longer than the longest run of backticks inside, at least three; each line of the run's text on its own line |
 | bold, italic | `**text**`, `*text*` |
 | strikethrough | `~~text~~` |
 | inline code | a backtick string one longer than the longest run of backticks inside, padded with one space on each side when the text starts or ends with a backtick or a space and is not all spaces (CommonMark strips exactly that padding) |
@@ -210,10 +219,16 @@ built. This section fixes its shape.
 | alignment other than left | a block attribute line, `{align=center}` or `{align=right}`, on the line directly before the block (inside the quote markers when quoted) |
 
 When a run has both CommonMark emphasis and span attributes, the emphasis
-goes inside the span: `[**text**]{u}`. Within the text, the writer escapes
+goes inside the span: `[**text**]{u}`. A link is written outside the spans
+it contains. CommonMark's flanking rules cannot place `**`, `*` and `~~` at
+every run boundary (bold "foo." before plain "bar" cannot be `**foo.**bar`),
+so the writer reads each block back and, when the runs differ, writes that
+block's bold, italic and strikethrough as the span items `b`, `i` and `s`. Within the text, the writer escapes
 `\`, `` ` ``, `*`, `_`, `[`, `]`, `~`, `<`, `{` and `&` with a backslash
 wherever they appear. At the start of a line it also escapes `#`, `>`, `-`,
-`+`, `=`, `|`, and a digit run followed by `.` or `)`. Blanks that
+`+`, `=`, `|`, and a digit run followed by `.` or `)`; every `#` in a
+heading; and a `!` ending a run that another text run follows, where it
+could meet a link's or span's `[`. Blanks that
 CommonMark would strip, those at the start of a line and at the end of a
 block, are written as numeric character references, `&#32;` for a space and
 `&#9;` for a tab. Numeric character references are CommonMark syntax, not
@@ -468,6 +483,23 @@ coordinator decided and recorded below.
    12-point body.
 9. **Phase order puts markdown first**, so W can build the run model before
    RTF reading exists.
+
+Refinements found while building RT1, accepted by the coordinator on
+2026-10-26 and sent to W (who replies only to object):
+
+10. **A code block is one text run** holding its lines joined by line
+    feeds, so blank lines inside code survive.
+11. **List items carry `ordinal`**, the number written on the marker,
+    instead of `ordered_start`. Readers keep what they read; adjacent lists
+    with different delimiters would otherwise not round-trip.
+12. **The emphasis fallback**: the span items `b`, `i` and `s`, written only
+    for a block whose delimiters would not read back as the same runs.
+    They fall within the owner's attribute-span spelling (decision 2).
+13. **Inline code combines with other attributes** (bold code, coloured
+    code), where the first draft made it exclusive and lost them.
+14. **Line breaks** may open a block or follow one another; none ends a
+    block or sits in a heading. **A nested list item follows its parent**,
+    so nesting can always be written as indentation.
 
 ## 12. Owner decisions, 2026-10-26
 

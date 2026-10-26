@@ -1,6 +1,5 @@
 #pragma once
 
-#include "cng_pixels.hpp"
 #include "gui_forms/resources/types/image_resource_types.hpp"
 #include "pixel_target.hpp"
 #include "png_pixels.hpp"
@@ -12,11 +11,12 @@
 namespace gui_forms::image {
 
 // The one decode of encoded registry resources to 8-bit pixels, shared by
-// every renderer and host. CNG is the native resource format and PNG the
-// interchange format; both are admitted by the registry, and this decoder
-// chooses the codec from the resource's encoding. It is a concrete owner of
-// both decoders, not a codec interface (house style section 7). Clipboard
-// and GUI.Drawing decoding stay on the PNG path (png_pixels.hpp).
+// every renderer and host. PNG is the only encoded resource format; this
+// decoder chooses the codec from the resource's encoding, so another format
+// enters as one more encoding and one more owned decoder here. It is a
+// concrete owner of its decoder, not a codec interface (house style section
+// 7). Clipboard and GUI.Drawing decoding use the PNG path directly
+// (png_pixels.hpp).
 
 enum class ResourcePixelError : std::uint8_t {
     none,
@@ -38,10 +38,9 @@ struct ResourcePixelResult final {
 };
 
 // Owns the PNG decoder (purpose resource, limits from the admitted
-// dimensions) and the CNG decoder. Both keep their storage, grown to the
-// largest image decoded, until release() or destruction, so a consumer that
-// decodes a batch keeps one decoder for it. One execution context per
-// decoder.
+// dimensions). It keeps its storage, grown to the largest image decoded,
+// until release() or destruction, so a consumer that decodes a batch keeps
+// one decoder for it. One execution context per decoder.
 class ResourcePixelDecoder final {
 public:
     ResourcePixelDecoder();
@@ -59,12 +58,11 @@ public:
     [[nodiscard]] ResourcePixelResult decode(const ImageResourceView& resource, PixelTarget target,
                                              std::span<std::byte> pixels, std::size_t row_bytes) noexcept;
 
-    // Frees both decoders' storage; the next decode allocates again.
+    // Frees the decoder's storage; the next decode allocates again.
     void release() noexcept;
 
 private:
     PngPixelDecoder png_;
-    CngPixelDecoder cng_;
 };
 
 } // namespace gui_forms::image

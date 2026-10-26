@@ -745,6 +745,8 @@ void test_schema_export() {
     const std::shared_ptr<BackgroundWorker> background_worker = std::make_shared<BackgroundWorker>(window);
     const std::shared_ptr<ImageList> image_list = std::make_shared<ImageList>(window);
     const std::shared_ptr<NotifyIcon> notify_icon = std::make_shared<NotifyIcon>(window);
+    const std::shared_ptr<OpenFileDialog> open_file_dialog = std::make_shared<OpenFileDialog>();
+    const std::shared_ptr<SaveFileDialog> save_file_dialog = std::make_shared<SaveFileDialog>();
     const std::shared_ptr<ThreadExceptionDialog> thread_exception_dialog =
         std::make_shared<ThreadExceptionDialog>(StableId("schema.thread-exception"), ThreadExceptionReport{});
     const std::shared_ptr<ErrorProvider> error_provider = std::make_shared<ErrorProvider>(window);
@@ -767,6 +769,8 @@ void test_schema_export() {
     record_component("timer", *timer, records);
     record_component("background_worker", *background_worker, records);
     record_component("notify_icon", *notify_icon, records);
+    record_component("open_file_dialog", *open_file_dialog, records);
+    record_component("save_file_dialog", *save_file_dialog, records);
     record_component("thread_exception_dialog", *thread_exception_dialog, records);
     record_component("image_list", *image_list, records);
     record_component("error_provider", *error_provider, records);

@@ -1,4 +1,0 @@
-# Shell scripts keep LF on every checkout, including Windows runners.
-*.sh text eol=lf
-# The Zstandard licence copy must stay byte-identical to the release tarball's.
-LICENSE-zstd.txt text eol=lf
