@@ -73,6 +73,11 @@ private:
             (*copy).set_requested_bounds({22.0, 58.0, 660.0, 26.0});
             (*tab_page).add_child(copy);
             (*tab_page).add_child(page_content(index));
+            // The first tab names its image by key, the third by index; the
+            // Gallery gives the control its image list once the window
+            // holds the images.
+            if (index == 0U) (*tab_page).set_image_key("folder");
+            if (index == 2U) (*tab_page).set_image_index(0);
             (*primary_).add_page(tab_page);
         }
         (*primary_).set_selected_index(1U);

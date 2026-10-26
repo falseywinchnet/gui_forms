@@ -1577,6 +1577,7 @@ Item system `item`:
 | `tab_label` | label |  |  |
 | `tab_focus` | focus |  |  |
 | `tab_seam` | seam |  |  |
+| `tab_icon` | icon |  |  |
 
 Item states: `selected`.
 
