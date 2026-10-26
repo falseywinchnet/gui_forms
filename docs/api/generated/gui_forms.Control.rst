@@ -302,6 +302,15 @@ gui_forms::Control
 
       **property_descriptors** : ``std::vector<PropertyDescriptor>``, read-only
 
+      **measure_generation** : ``std::uint64_t``, read-only
+         Advances whenever this control becomes measure-dirty; a cache entry stored under an earlier generation is never answered.
+
+      **layout_direction** : ``LayoutDirection``
+         The authored inline direction, ``inherit`` by default (stage L, PLAN section 4). Setting it invalidates this subtree's arrangement.
+
+      **effective_layout_direction** : ``LayoutDirection``, read-only
+         The direction this control lays out in: its own when not ``inherit``, otherwise the nearest ancestor's, and left to right at a root.
+
       **parts** : ``Parts``, read-only
 
       **states** : ``States``, read-only
@@ -454,6 +463,8 @@ gui_forms::Control
         -  
       * - :cpp:func:`property_value_origin <gui_forms::Control::property_value_origin>`
         -  
+      * - :cpp:func:`measure_for_layout <gui_forms::Control::measure_for_layout>`
+        - The measure entry layout solvers call (stage L).
       * - :cpp:func:`apply_provider_semantics <gui_forms::Control::apply_provider_semantics>`
         - Extender providers enrich the final semantic projection after a stock or custom control has authored its own descriptor.
       * - :cpp:func:`fill_part_geometry <gui_forms::Control::fill_part_geometry>`
@@ -1041,6 +1052,20 @@ gui_forms::Control
 
    .. cpp:function:: std::vector<PropertyDescriptor> property_descriptors() const
 
+   .. cpp:function:: std::uint64_t measure_generation() const noexcept
+
+      Advances whenever this control becomes measure-dirty; a cache entry stored under an earlier generation is never answered.
+
+   .. cpp:function:: LayoutDirection layout_direction() const noexcept
+
+      The authored inline direction, ``inherit`` by default (stage L, PLAN section 4). Setting it invalidates this subtree's arrangement.
+
+   .. cpp:function:: void set_layout_direction(LayoutDirection direction)
+
+   .. cpp:function:: LayoutDirection effective_layout_direction() const noexcept
+
+      The direction this control lays out in: its own when not ``inherit``, otherwise the nearest ancestor's, and left to right at a root.
+
    .. cpp:function:: Parts parts() const
 
    .. cpp:function:: States states() const
@@ -1303,6 +1328,10 @@ gui_forms::Control
 
    .. cpp:function:: PropertyValueOrigin property_value_origin(std::string_view name) const
 
+   .. cpp:function:: Size measure_for_layout(const LayoutConstraint& constraint)
+
+      The measure entry layout solvers call (stage L). It answers from this control's measure cache when an entry was stored under exactly this constraint since the control last became measure-dirty, and otherwise calls measure_intrinsic once and stores the answer. The cache holds four entries: one min-content width, one max-content width, and the two most recent other queries. A result with a negative or non-finite dimension is clamped to zero and counted. Throws std::invalid_argument, with the cache unchanged, when valid_layout_constraint rejects the constraint. An attached control is measured on its window's UI thread only. The window's own measure pass calls this too, so a container's later query under the same constraint is a hit.
+
    .. cpp:function:: void apply_provider_semantics(SemanticDescriptor& descriptor) const
 
       Extender providers enrich the final semantic projection after a stock or custom control has authored its own descriptor. This keeps validation and help metadata from depending on every subclass remembering to call a particular base implementation.
@@ -1378,6 +1407,12 @@ gui_forms::Control
       the final bounds and lays out children by :cpp:func:`dock <gui_forms::Control::dock>` and :cpp:func:`anchor <gui_forms::Control::anchor>`. A layout
       container that places its own children calls ``arrange_self`` and
       ``set_child_layout`` instead.
+
+   .. cpp:function:: virtual bool size_depends_on_content() const noexcept
+
+      Layout boundaries (stage L, PLAN section 3.3). A descendant's measure dirtiness marks an ancestor for measure only while the ancestor's size can depend on it: while the ancestor's own measure reads its children (size_depends_on_content) or its parent sizes it from its measure (sizes_children_from_content). The first ancestor for which neither holds is a layout boundary: it is marked for arrange only, and nothing above it is marked. Both default to true, which keeps every existing control's measure propagation unchanged; a container overrides them only when it can state the answer for every configuration.
+
+   .. cpp:function:: virtual bool sizes_children_from_content() const noexcept
 
    .. cpp:function:: virtual void on_paint(Painter& painter, Rect local_damage)
 
@@ -1485,6 +1520,12 @@ gui_forms::Control
    .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
 
       *Protected.*
+
+   .. cpp:function:: virtual Size measure_intrinsic(const LayoutConstraint& constraint)
+
+      *Protected.*
+
+      Answers one measure_for_layout miss; ``constraint`` is already valid. The default maps the query onto measure(Size) through measure_available_size: a definite or at-most axis passes its extent and a content axis the practical unbounded extent, so a control that cannot rewrap reports its preferred size as both its min-content and its max-content size. A definite axis then reports exactly its extent. Text that wraps (Label) overrides it to answer min-content from its widest unbreakable segment.
 
    .. cpp:function:: virtual void publish_part_geometry(std::span<PartGeometry> geometry) const
 

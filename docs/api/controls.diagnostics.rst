@@ -159,6 +159,16 @@ Related types
 
       Counts one measure pass, visited nodes, and callbacks.
 
+   .. cpp:function:: void record_measure_cache_hit() noexcept
+
+   .. cpp:function:: void record_measure_cache_miss(std::uint64_t control_pass_misses) noexcept
+
+      ``control_pass_misses`` is the missing control's miss count in the current layout pass, this miss included.
+
+   .. cpp:function:: void record_layout_boundary_stop() noexcept
+
+   .. cpp:function:: void record_layout_measure_clamp() noexcept
+
    .. cpp:function:: void record_arrange(std::uint64_t nodes_visited, std::uint64_t callbacks) noexcept
 
       Counts one arrange pass, visited nodes, and callbacks.
@@ -391,6 +401,20 @@ Related types
    .. cpp:member:: std::uint64_t arrange_nodes_visited
 
    .. cpp:member:: std::uint64_t paint_nodes_visited
+
+   .. cpp:member:: std::uint64_t measure_cache_hits
+
+      Control::measure_for_layout (stage L): answers from a control's measure cache, misses that called measure_intrinsic, and the most misses one control answered within one layout pass (a solver asking more than once per pass shows here). Measure calls that bypass the entry are counted only by controls_measured.
+
+   .. cpp:member:: std::uint64_t measure_cache_misses
+
+   .. cpp:member:: std::uint64_t maximum_measures_per_control_pass
+
+   .. cpp:member:: std::uint64_t layout_boundary_stops
+
+      Measure propagations stopped at a layout boundary (Control::size_depends_on_content), and measure results with a negative or non-finite dimension clamped to zero.
+
+   .. cpp:member:: std::uint64_t layout_measure_clamps
 
    .. cpp:member:: std::uint64_t paint_invalidations_consumed
 

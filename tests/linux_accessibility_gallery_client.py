@@ -90,9 +90,10 @@ VIRTUAL_RUNTIME_BIT: int = 1 << 63
 # component that shows something does so through an internal control.
 NONVISUAL: tuple[str, ...] = (
     'command', 'gallery_command', 'font_command', 'color_command', 'context_menu', 'tool_tip',
-    'ribbon_tool_tip', 'timer', 'background_worker', 'notify_icon', 'image_list', 'error_provider',
+    'ribbon_tool_tip', 'timer', 'background_worker', 'notify_icon', 'thread_exception_dialog',
+    'image_list', 'error_provider',
     'help_provider', 'semantic_feedback', 'binding', 'binding_source', 'binding_context', 'live_surface',
-    'dock_workspace',
+    'dock_workspace', 'open_file_dialog', 'save_file_dialog',
 )
 
 # Registry types the Gallery opens on demand, and the node whose default
