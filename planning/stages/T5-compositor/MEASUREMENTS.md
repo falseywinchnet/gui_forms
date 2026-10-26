@@ -139,3 +139,91 @@ What this shows:
 The two builds agree on everything the adapter uses. CI's Windows runner
 can therefore run the C2 gate's `transparent` step for real, and its
 material step exercises the `os_version` fallback to `transparent`.
+
+## C3. macOS (the window server)
+
+**How.** `gui_forms_macos_compositor_probe` (`tests/macos_compositor_probe.mm`,
+AppKit only, nothing of GUI.Forms) shows a solid green backdrop window
+(0, 160, 0) and, over it, a titled window whose view draws premultiplied
+pixels with the copy blend mode, as the host presents today, in the same
+three columns as C2 (clear, half red, opaque blue). For each case it shows
+a fresh window and reads:
+
+- the composed screen at each column's centre and in the title bar
+  (`CGWindowListCreateImage` of the window and what lies below it);
+- the window's own image with its alpha (the window alone);
+- the window the window server reports under the clear column
+  (`windowNumberAtPoint:belowWindowWithWindowNumber:`), and the view a
+  click posted there through the HID event tap reaches;
+- what AppKit reads back: the window's opaque flag, its background
+  alpha, `ignoresMouseEvents`, and the effect view's material, blending
+  mode, state and appearance.
+
+The cases:
+
+- `none`: today's window;
+- `clear`: the window non-opaque on a clear background;
+- `clear_receiving`: as `clear`, with `ignoresMouseEvents` set to NO
+  explicitly;
+- one case per `NSVisualEffectMaterial`: a behind-window, follows-active
+  effect view under the drawing view, in a non-opaque window;
+- `under_window_background_opaque_window`: the effect view in an opaque
+  window;
+- `clear_then_none` and `effect_then_clear`: a change on a shown window.
+
+### macOS 15.7.9 (CI `macos-15`, arm64), 2026-10-25
+
+From the `macos-arm64` native job of #338 (run 40248265605, the
+`gui-forms-evidence-macos-arm64` artifact, `SDKLastTest.log`). The
+runner has **Reduce transparency on**; increase contrast and
+differentiate without colour off; appearance aqua; one screen at backing
+scale 1; screen capture and accessibility granted.
+
+| Case | Clear | Half | Own clear (with alpha) | Window under the clear pixel |
+|---|---|---|---|---|
+| none (today) | 246, 246, 246 | 223, 123, 123 | 246, 246, 246, 255 | the probe |
+| clear | **0, 160, 0** | 103, 66, 3 | **0, 0, 0, 0** | **the backdrop** |
+| clear_receiving | **0, 160, 0** | 103, 66, 3 | 0, 0, 0, 0 | **the probe** |
+| windowBackground, menu, sheet | 246, 246, 246 | 223, 123, 123 | 246, 246, 246, 255 | the probe |
+| underWindowBackground, underPageBackground, sidebar, titlebar, popover, toolTip | 236, 236, 236 | 218, 118, 118 | 236, 236, 236, 255 | the probe |
+| contentBackground, headerView | 255, 255, 255 | 227, 127, 127 | 255, 255, 255, 255 | the probe |
+| hudWindow | 240, 240, 240 | 220, 120, 120 | 240, 240, 240, 255 | the probe |
+| underWindowBackground, opaque window | 236, 236, 236 | 218, 118, 118 | 236, 236, 236, 255 | the probe |
+| clear, then none | 246, 246, 246 | 223, 123, 123 | 246, 246, 246, 255 | the probe |
+| underWindowBackground, then clear | **0, 160, 0** | 100, 80, 0 | 0, 0, 0, 0 | the backdrop |
+
+In every case the window's opaque flag and background alpha read back as
+set, and every effect view read back as behind-window and
+follows-active-state. No posted click reached any view, so the click
+column is left out; the hit test is the window server's answer.
+
+What this shows:
+
+1. **A non-opaque window on a clear background is `transparent`:** its
+   clear pixels show exactly what lies behind, even with reduce
+   transparency on, and the window's own image keeps the premultiplied
+   alpha (0, 0, 0, 0). The half column read (103, 66, 3) on a fresh
+   window and (100, 80, 0), the exact premultiplied composite, after a
+   change; the difference is colour management of the device-RGB image
+   and does not affect clear or opaque pixels.
+2. **Clear pixels are click-through unless `ignoresMouseEvents` is set to
+   NO explicitly,** although it reads back NO before it is set. The
+   adapter sets it on every non-opaque grant (owner decision T5-Q6).
+3. **With reduce transparency on, every material is AppKit's solid
+   fallback,** grey to white by material (236 to 255), never the
+   backdrop: the materials cannot be told apart from their fallbacks on
+   this runner. Whether `underWindowBackground` and `popover` look right
+   for `window_material` and `transient_material` is the bench Mac run's
+   question (the C3 run sheet in the T5 track); CI's gate records the
+   host's withdrawal instead and reports the material's screen check as
+   not exercised.
+4. **Withdrawing restores today's window:** opaque again, the clear
+   pixel the window's own background.
+
+**What the adapter takes from it** (`src/host/macos/compositor/`): the
+window server always composites; `transparent` is a non-opaque window on
+a clear background; the materials are a behind-window effect view under
+the raster view, inside a container made with the window, because moving
+the raster view out of its window stops its display link; reduce
+transparency comes from `NSWorkspace` and its change notification;
+`ignoresMouseEvents` is set to NO on every non-opaque grant.
