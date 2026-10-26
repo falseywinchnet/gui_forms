@@ -447,10 +447,13 @@ void test_full_subtree_invalidation_is_explicit() {
     (*fixture.window).resize({320.0, 190.0});
     (*fixture.window).perform_layout();
     const MetricsSnapshot metrics = (*fixture.window).metrics_snapshot();
-    require(metrics.controls_measured == 6 && metrics.controls_arranged == 6,
-            "window resize must explicitly invalidate the complete retained subtree");
-    require(metrics.measure_nodes_visited == 6 && metrics.arrange_nodes_visited == 6,
-            "full-subtree traversal count must equal the six retained controls");
+    // A resize arranges every retained control again, and measures again
+    // only the controls the client size reaches. The root requests its
+    // whole size, so its children are handed the same extent as before.
+    require(metrics.controls_arranged == 6 && metrics.arrange_nodes_visited == 6,
+            "window resize must arrange the complete retained subtree");
+    require(metrics.controls_measured == 1 && metrics.measure_nodes_visited == 1,
+            "window resize must measure only the controls the client size reaches");
 }
 
 void test_damage_take_commits_layout_generated_geometry_damage() {
