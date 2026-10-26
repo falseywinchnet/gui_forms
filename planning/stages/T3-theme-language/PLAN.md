@@ -873,11 +873,52 @@ one bake per distinct assembly. 3 PRs.
   the same C++ material, plus the lowering of each property and 21 more
   refusals.
 
-*P6d, still to build:* §10 image layers (the manifest's resources bound
-to the engine's images, with `background-size`, `-repeat` and
-`-position`) and image masks, `border-image`, `double`, `groove` and
-`ridge` as keyline pairs, `backdrop-filter` to the glass, and §14's
-`color`, `outline` and `text-shadow`, which need an engine carrier.
+*P6d, image layers, done:*
+- **Binding** (`ThemeImageResource`, in `ThemeCompileInput::images`): an
+  image resource the manifest lists is bound to the engine's image, its
+  pixel size and its density (source pixels per logical unit, its own
+  size). P10's loader binds them; until then the caller does. A listed
+  resource with no image is the wrong kind (E402).
+- **Images** (§10): `url("resource:...")` in `background-image`,
+  `background` and `mask-image` is the bound image, tiled at its own size
+  from the box's corner: CSS's initial size, repetition and position.
+- **Placement**: `background-position`, `background-size` and
+  `background-repeat` are three new fields (`fill_positions`,
+  `fill_sizes`, `fill_repeats`), cascaded apart and composed at assembly
+  as the blend modes are: in CSS's order, repeated over the image layers,
+  read by the image fills. The engine draws a gradient layer over the
+  whole box, so these do not move or size a gradient; the `background`
+  shorthand refuses a gradient layer written with them (E405), and the
+  longhands leave a gradient as it is.
+  - A position is CSS's of one or two values: its percentage is the
+    fill's anchor in the room the box leaves around the image (CSS's
+    reading), within 0 to 100% (E403 past them), its length the offset.
+  - A size keeps the image's proportions: `auto`, one length or
+    percentage across (`<l>` or `<l> auto`) or down (`auto <l>`),
+    `cover`, `contain`, and of two lengths only `100% 100%`, which
+    stretches the image over the box; other pairs and a zero size are
+    E405. A size of the box is resolved at assembly. A size the engine's
+    image scale cannot draw (1/8 to 8 source pixels a unit) makes the
+    assembled material invalid, so the part draws its built-in recipe.
+  - A repetition is `repeat` or `no-repeat` on both axes; the latter is
+    the engine's new `MaterialImageMode::single`, one tile placed as a
+    tile is and nothing around it (the material primitive and the
+    built-in path both draw it). `repeat-x`, `repeat-y`, `space` and
+    `round` are E405.
+  - A layer's attachment, origin and clip are E405: the engine draws
+    every layer over the whole box.
+- Masks take an image the same way, tiled at its own size; the mask's own
+  size, repetition and position longhands are not built (E999).
+- Gate: six more rows (a tiled image, a placed single image of a set
+  size over a colour, `contain` centred, a single image half the box
+  wide, a stretched image, an image mask) bake the pixels of the same C++
+  material, with the image in the window's resources; plus the lowering
+  of each property, `cover` at assembly, nine more refusals, and the
+  single mode's pixels in the engine's own image test.
+
+*P6e, still to build:* `border-image`, `double`, `groove` and `ridge` as
+keyline pairs, `backdrop-filter` to the glass, and §14's `color`,
+`outline` and `text-shadow`, which need an engine carrier.
 
 **P7. Motion.** `transition`, the timing functions, delays, `@keyframes`,
 `animation`, ambient loops, and the state-machine grouping. Gate: a fixture

@@ -33,6 +33,9 @@ enum class MaterialProperty : std::uint8_t {
     background_color,
     background_image,
     background_blend_mode,
+    background_position,
+    background_size,
+    background_repeat,
     border,
     border_top,
     border_right,
@@ -64,6 +67,19 @@ enum class MaterialProperty : std::uint8_t {
     glow_placement,
     mask_image,
     surface_finish,
+};
+
+// An image resource the theme's manifest lists, bound to the engine's image
+// (T3 P6d): `url("resource:<resource>")` draws `image`, of `pixel_size`
+// source pixels, at `pixels_per_logical_pixel` source pixels per logical
+// unit as its own size (CSS's natural size; 2 for an image drawn for twice
+// the density). The manifest's loader binds each (P10); `resource`
+// borrows the binding's storage.
+struct ThemeImageResource final {
+    std::string_view resource{};
+    ImageId image{};
+    Size pixel_size{};
+    double pixels_per_logical_pixel{1.0};
 };
 
 // The property `name` (lower case) names, or none for another property.
@@ -105,9 +121,10 @@ struct MaterialLowering final {
 
 // Lowers `value`, a value of `property` that is not a CSS-wide keyword,
 // into `lowering`. `start` is the token the value starts at, where a
-// problem with the whole value points. `value` is borrowed for the call;
-// the declarations own what they hold.
+// problem with the whole value points; `images` binds the image resources
+// a value may name. `value` and `images` are borrowed for the call; the
+// declarations own what they hold.
 void lower_material_value(MaterialProperty property, const ThemeValue& value, std::uint32_t start,
-                          MaterialLowering& lowering);
+                          std::span<const ThemeImageResource> images, MaterialLowering& lowering);
 
 } // namespace gui_forms::theme_language

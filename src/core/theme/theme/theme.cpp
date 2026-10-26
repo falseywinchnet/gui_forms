@@ -265,6 +265,19 @@ void paint_tiled_image(Painter& painter, Rect bounds,
     painter.restore();
 }
 
+// One tile placed as a tile is (E9.6, CSS `no-repeat`), clipped to the box.
+void paint_single_image(Painter& painter, Rect bounds, const MaterialFillLayer& fill) {
+    const double tile_width = fill.image_pixel_size.width / fill.image_scale;
+    const double tile_height = fill.image_pixel_size.height / fill.image_scale;
+    const double origin_x = bounds.x + (bounds.width - tile_width) * fill.image_anchor.x + fill.image_offset.x;
+    const double origin_y = bounds.y + (bounds.height - tile_height) * fill.image_anchor.y + fill.image_offset.y;
+    painter.save();
+    painter.clip_rect(bounds);
+    painter.draw_image_region(fill.image, {0.0, 0.0, fill.image_pixel_size.width, fill.image_pixel_size.height},
+                              {origin_x, origin_y, tile_width, tile_height}, fill.opacity);
+    painter.restore();
+}
+
 void paint_nine_patch(Painter& painter, Rect bounds,
                       const MaterialFillLayer& fill) {
     const Insets source = fill.image_slice;
@@ -562,6 +575,9 @@ void paint_image_fill(Painter& painter, Rect bounds, const MaterialFillLayer& fi
     case MaterialImageMode::nine_patch:
         paint_nine_patch(painter, bounds, fill);
         return;
+    case MaterialImageMode::single:
+        paint_single_image(painter, bounds, fill);
+        return;
     }
     // A mode outside the enumeration draws no image.
     return;
@@ -742,7 +758,8 @@ bool valid_fill_layer(const MaterialFillLayer& fill) noexcept {
         }
         if (fill.image_mode != MaterialImageMode::stretch &&
             fill.image_mode != MaterialImageMode::tile &&
-            fill.image_mode != MaterialImageMode::nine_patch) {
+            fill.image_mode != MaterialImageMode::nine_patch &&
+            fill.image_mode != MaterialImageMode::single) {
             return false;
         }
         if (fill.image_mode != MaterialImageMode::nine_patch &&

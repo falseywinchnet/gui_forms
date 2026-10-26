@@ -39,6 +39,7 @@ using theme_language::ThemeCompileInput;
 using theme_language::ThemeCompiler;
 using theme_language::ThemeDiagnostic;
 using theme_language::ThemeDiagnosticList;
+using theme_language::ThemeImageResource;
 using theme_language::ThemeSource;
 using theme_language::diagnostic_code_name;
 
@@ -222,7 +223,13 @@ constexpr std::array<PartDeclaration, 1> pad_parts{{
 const std::array<ControlAnatomy, 1> controls{{
     {.control_id = "button", .parts = pad_parts, .states = {}, .custom_states = {}, .item_systems = {}},
 }};
-const std::array<std::string_view, 1> resources{{"icon.check"}};
+// icon.check is listed but bound to no image; the others are images.
+const std::array<std::string_view, 3> resources{{"icon.check", "mask.dots", "tile.quadrant"}};
+
+// A binding for sheets that only compile: no window draws the image.
+const std::array<ThemeImageResource, 1> listed_images{{
+    {.resource = "tile.quadrant", .image = ImageId{1U}, .pixel_size = Size{4.0, 4.0}, .pixels_per_logical_pixel = 1.0},
+}};
 
 struct Compilation final {
     CompileOutcome outcome{CompileOutcome::refused};
@@ -230,7 +237,7 @@ struct Compilation final {
     std::vector<ThemeDiagnostic> diagnostics{};
 };
 
-Compilation compile(std::string_view text) {
+Compilation compile(std::string_view text, std::span<const ThemeImageResource> images = listed_images) {
     const PrimitiveRegistry& registry = builtin_primitive_registry();
     ThemeSource source{};
     source.file = "test.theme.css";
@@ -240,6 +247,7 @@ Compilation compile(std::string_view text) {
                             .vocabulary = SelectorVocabulary{},
                             .published_values = {},
                             .resources = resources,
+                            .images = images,
                             .requires_engine = current_engine_version};
     input.vocabulary.controls = controls;
     ThemeCompiler compiler{};
@@ -500,21 +508,77 @@ void test_filter_lowering() {
             "the mask is resolved for the part's box");
 }
 
+void test_image_lowering() {
+    const std::string_view position_sheet = "#pad::part(face) { background-position: right 25%, 10px 20px }";
+    const Compilation positioned = compile(position_sheet);
+    const MaterialDeclaration* const positions =
+        field_of(only_rule(positioned, position_sheet), MaterialField::fill_positions);
+    require(positions != nullptr && (*positions).image_positions.size() == 2U &&
+                (*positions).image_positions[0] == MaterialImagePosition{BoxLength{1.0, 0.0}, BoxLength{0.25, 0.0}} &&
+                (*positions).image_positions[1] == MaterialImagePosition{BoxLength{0.0, 10.0}, BoxLength{0.0, 20.0}},
+            "background-position reads a position per layer");
+
+    const std::string_view size_sheet = "#pad::part(face) { background-size: cover, 10px, auto 20%, 100% 100%, auto }";
+    const Compilation sized = compile(size_sheet);
+    const MaterialDeclaration* const sizes = field_of(only_rule(sized, size_sheet), MaterialField::fill_sizes);
+    const std::array<MaterialImageSize, 5> expected_sizes{{
+        {.sizing = MaterialImageSizing::cover, .length = BoxLength{}},
+        {.sizing = MaterialImageSizing::width, .length = BoxLength{0.0, 10.0}},
+        {.sizing = MaterialImageSizing::height, .length = BoxLength{0.2, 0.0}},
+        {.sizing = MaterialImageSizing::stretch, .length = BoxLength{}},
+        {.sizing = MaterialImageSizing::natural, .length = BoxLength{}},
+    }};
+    bool sizes_read = sizes != nullptr && (*sizes).image_sizes.size() == expected_sizes.size();
+    for (std::size_t index = 0U; sizes_read && index < expected_sizes.size(); ++index) {
+        sizes_read = (*sizes).image_sizes[index] == expected_sizes[index];
+    }
+    require(sizes_read, "background-size reads each layer's size");
+
+    const std::string_view repeat_sheet = "#pad::part(face) { background-repeat: no-repeat, repeat repeat }";
+    const Compilation repeated = compile(repeat_sheet);
+    const MaterialDeclaration* const repeats = field_of(only_rule(repeated, repeat_sheet), MaterialField::fill_repeats);
+    require(repeats != nullptr && (*repeats).image_repeats.size() == 2U &&
+                (*repeats).image_repeats[0] == MaterialImageRepeat::no_repeat &&
+                (*repeats).image_repeats[1] == MaterialImageRepeat::repeat,
+            "background-repeat reads each layer's repetition");
+
+    const std::string_view image_sheet = "#pad::part(face) { background-image: url(\"resource:tile.quadrant\") }";
+    const Compilation imaged = compile(image_sheet);
+    const MaterialDeclaration* const images = field_of(only_rule(imaged, image_sheet), MaterialField::fills);
+    require(images != nullptr && (*images).fills.size() == 1U && (*images).gradients.empty() &&
+                (*images).fills[0] == MaterialFillLayer::tiled_image(ImageId{1U}, Size{4.0, 4.0}, 1.0),
+            "an image resource is its bound image, tiled at its own size");
+
+    // Cover on a 4-pixel image in a 40 x 24 box: ten times its size.
+    const std::string_view cover_sheet = "#pad::part(face) { background-size: cover }";
+    const Compilation covered = compile(cover_sheet);
+    std::array<const MaterialDeclaration*, material_field_count> fields{};
+    fields[static_cast<std::size_t>(MaterialField::fills)] = images;
+    fields[static_cast<std::size_t>(MaterialField::fill_sizes)] =
+        field_of(only_rule(covered, cover_sheet), MaterialField::fill_sizes);
+    require(material_fields_read_box(fields), "cover reads the box");
+    SurfaceMaterial assembled{};
+    assemble_material(SurfaceMaterial{}, fields, Size{40.0, 24.0}, assembled);
+    require(assembled.fills.size() == 2U && assembled.fills.back().image_scale == 1.0 / 10.0 &&
+                assembled.fills.back().image_mode == MaterialImageMode::tile,
+            "cover scales the image to cover the box");
+}
+
 struct Refusal final {
     std::string_view sheet{};
     DiagnosticCode code{};
 };
 
 void test_refusals() {
-    const std::array<Refusal, 49> refusals{{
+    const std::array<Refusal, 58> refusals{{
         {"#a { background-image: "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue) }",
          DiagnosticCode::too_many_layers},
         {"#a { background-image: linear-gradient(red, 40%, blue) }", DiagnosticCode::value_form_not_admitted},
-        {"#a { background-image: url(\"resource:icon.check\") }", DiagnosticCode::not_yet_built},
-        {"#a { background: red center }", DiagnosticCode::not_yet_built},
+        {"#a { background-image: url(\"resource:icon.check\") }", DiagnosticCode::value_wrong_kind},
+        {"#a { background: red fixed }", DiagnosticCode::value_form_not_admitted},
         {"#a { background: red, linear-gradient(red, blue) }", DiagnosticCode::value_syntax},
         {"#a { background-image: none, linear-gradient(red, blue) }", DiagnosticCode::value_form_not_admitted},
         {"#a { background-blend-mode: overlay }", DiagnosticCode::value_form_not_admitted},
@@ -562,7 +626,16 @@ void test_refusals() {
         {"#a { glow-placement: sideways }", DiagnosticCode::keyword_unknown},
         {"#a { mask-image: linear-gradient(black, white), linear-gradient(black, white) }",
          DiagnosticCode::too_many_layers},
-        {"#a { mask-image: url(\"resource:icon.check\") }", DiagnosticCode::not_yet_built},
+        {"#a { mask-image: url(\"resource:icon.check\") }", DiagnosticCode::value_wrong_kind},
+        {"#a { background-size: 10px 20px }", DiagnosticCode::value_form_not_admitted},
+        {"#a { background-size: 0px }", DiagnosticCode::value_form_not_admitted},
+        {"#a { background-size: -1px }", DiagnosticCode::value_out_of_range},
+        {"#a { background-repeat: repeat-x }", DiagnosticCode::value_form_not_admitted},
+        {"#a { background-repeat: sideways }", DiagnosticCode::keyword_unknown},
+        {"#a { background-position: 150% }", DiagnosticCode::value_out_of_range},
+        {"#a { background-position: left 10px top }", DiagnosticCode::value_form_not_admitted},
+        {"#a { background: linear-gradient(red, blue) center }", DiagnosticCode::value_form_not_admitted},
+        {"#a { background: url(\"resource:tile.quadrant\") / 4px }", DiagnosticCode::value_syntax},
     }};
     for (const Refusal& refusal : refusals) {
         const Compilation compiled = compile(refusal.sheet);
@@ -617,12 +690,14 @@ public:
 // The face's pixels, drawn with `rules` over the button recipes' material
 // replaced by `recipe`: for a sheet the floor its fields assemble over, for
 // C++ the material the fields stand for.
-std::uint64_t face_pixels(const ThemeRuleSheet& rules, const SurfaceMaterial& recipe) {
+// `resources` holds the images the materials draw.
+std::uint64_t face_pixels(const ThemeRuleSheet& rules, const SurfaceMaterial& recipe,
+                          const std::shared_ptr<ApplicationResources>& resources) {
     std::shared_ptr<Panel> root = make_control<Panel>(StableId("root"));
     std::shared_ptr<Pad> pad = make_control<Pad>(StableId("pad"));
     (*pad).set_requested_bounds(Rect{0.0, 0.0, 100.0, 84.0});
     (*root).add_child(pad);
-    Window window(root, Size{140.0, 124.0});
+    Window window(root, Size{140.0, 124.0}, resources);
     const std::unique_ptr<ThemeDefinition> held = test_support::professional_definition();
     ThemeDefinition& definition = *held;
     definition.id = "theme-material-css-gate";
@@ -688,7 +763,13 @@ GateRow filled(std::string_view declarations, std::vector<MaterialFillLayer> fil
     return row;
 }
 
-std::vector<GateRow> gate_rows() {
+// The gate's images, in the window's resources.
+struct GateImages final {
+    ImageId quadrant{};
+    ImageId dots{};
+};
+
+std::vector<GateRow> gate_rows(const GateImages& images) {
     const std::vector<GradientStop> red_blue = stops_of({{0.0, red}, {1.0, blue}});
     const double diagonal = engine_arctangent2(24.0, 40.0) * (180.0 / pi);
     const double corner = 0.5 * 1.41421356237309504880168872420969808;
@@ -810,20 +891,88 @@ std::vector<GateRow> gate_rows() {
     radial_mask.material.mask =
         MaterialFillLayer::radial(Point{20.0, 12.0}, Size{10.0, 10.0}, fading, MaterialCoordinateSpace::logical);
     rows.push_back(radial_mask);
+
+    const Size four{4.0, 4.0};
+    const MaterialFillLayer tiles = MaterialFillLayer::tiled_image(images.quadrant, four, 1.0);
+    const MaterialFillLayer white = MaterialFillLayer::solid(Color::rgba(255, 255, 255));
+    rows.push_back(filled("background: url(\"resource:tile.quadrant\")", {tiles}));
+    MaterialFillLayer placed = tiles;
+    placed.image_scale = 0.5;
+    placed.image_mode = MaterialImageMode::single;
+    placed.image_anchor = Point{1.0, 0.25};
+    rows.push_back(filled("background: url(\"resource:tile.quadrant\") right 25% / 8px no-repeat blue",
+                          {MaterialFillLayer::solid(blue), placed}));
+    MaterialFillLayer contained = tiles;
+    contained.image_scale = 1.0 / 6.0;
+    contained.image_anchor = Point{0.5, 0.5};
+    rows.push_back(filled("background-image: url(\"resource:tile.quadrant\"); background-size: contain; "
+                          "background-position: center",
+                          {white, contained}));
+    MaterialFillLayer half = tiles;
+    half.image_scale = 4.0 / (0.5 * 40.0 + 0.0);
+    half.image_mode = MaterialImageMode::single;
+    rows.push_back(filled("background-image: url(\"resource:tile.quadrant\"); background-size: 50% auto; "
+                          "background-repeat: no-repeat",
+                          {white, half}));
+    rows.push_back(filled("background-image: url(\"resource:tile.quadrant\"); background-size: 100% 100%",
+                          {white, MaterialFillLayer::stretched_image(images.quadrant, four)}));
+    GateRow image_mask{};
+    image_mask.declarations = "background: blue; mask-image: url(\"resource:mask.dots\")";
+    image_mask.material.fills = {MaterialFillLayer::solid(blue)};
+    image_mask.material.mask = MaterialFillLayer::tiled_image(images.dots, Size{2.0, 2.0}, 0.5);
+    rows.push_back(image_mask);
     return rows;
 }
 
+// Premultiplied BGRA pixels: a 4 x 4 image of four coloured quadrants, and
+// a 2 x 2 one of black at alphas 255, 0, 128 and 0.
+std::vector<std::byte> quadrant_pixels() {
+    std::vector<std::byte> pixels(4U * 4U * 4U);
+    const std::array<std::array<std::uint8_t, 4>, 4> quadrants{{
+        {0U, 0U, 255U, 255U}, {0U, 255U, 0U, 255U}, {255U, 0U, 0U, 255U}, {255U, 255U, 255U, 255U}}};
+    for (std::size_t row = 0U; row < 4U; ++row) {
+        for (std::size_t column = 0U; column < 4U; ++column) {
+            const std::size_t quadrant = (row / 2U) * 2U + column / 2U;
+            const std::size_t offset = (row * 4U + column) * 4U;
+            for (std::size_t index = 0U; index < 4U; ++index) {
+                pixels[offset + index] = static_cast<std::byte>(quadrants[quadrant][index]);
+            }
+        }
+    }
+    return pixels;
+}
+
+std::vector<std::byte> dot_pixels() {
+    const std::array<std::uint8_t, 16> bytes{0U, 0U, 0U, 255U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 128U, 0U, 0U, 0U, 0U};
+    std::vector<std::byte> pixels(bytes.size());
+    for (std::size_t index = 0U; index < bytes.size(); ++index) pixels[index] = static_cast<std::byte>(bytes[index]);
+    return pixels;
+}
+
 void test_gate() {
+    const std::shared_ptr<ApplicationResources> resources = std::make_shared<ApplicationResources>();
+    const std::vector<std::byte> quadrant = quadrant_pixels();
+    const std::vector<std::byte> dots = dot_pixels();
+    const ImageLoadResult quadrant_loaded = (*resources).load_bgra32_premultiplied(4U, 4U, 16U, quadrant);
+    const ImageLoadResult dots_loaded = (*resources).load_bgra32_premultiplied(2U, 2U, 8U, dots);
+    require(static_cast<bool>(quadrant_loaded) && static_cast<bool>(dots_loaded), "the gate's images load");
+    const GateImages images{.quadrant = quadrant_loaded.image, .dots = dots_loaded.image};
+    // The dots are drawn at half the density: two logical units a pixel.
+    const std::array<ThemeImageResource, 2> bound{{
+        {.resource = "tile.quadrant", .image = images.quadrant, .pixel_size = Size{4.0, 4.0},
+         .pixels_per_logical_pixel = 1.0},
+        {.resource = "mask.dots", .image = images.dots, .pixel_size = Size{2.0, 2.0}, .pixels_per_logical_pixel = 0.5},
+    }};
     const SurfaceMaterial plain{};
-    const std::uint64_t floor_pixels = face_pixels(written_rules(), plain);
-    const std::vector<GateRow> rows = gate_rows();
+    const std::uint64_t floor_pixels = face_pixels(written_rules(), plain, resources);
+    const std::vector<GateRow> rows = gate_rows(images);
     for (const GateRow& row : rows) {
         const std::string sheet = "#pad::part(face) { " + std::string(row.declarations) + " }";
-        const Compilation compiled = compile(sheet);
+        const Compilation compiled = compile(sheet, bound);
         require(compiled.outcome == CompileOutcome::compiled, "the row compiles: " + sheet);
         require(valid_surface_material(row.material), "the C++ material is valid: " + sheet);
-        const std::uint64_t from_sheet = face_pixels(compiled.sheet, plain);
-        const std::uint64_t from_cpp = face_pixels(written_rules(), row.material);
+        const std::uint64_t from_sheet = face_pixels(compiled.sheet, plain, resources);
+        const std::uint64_t from_cpp = face_pixels(written_rules(), row.material, resources);
         require(from_sheet == from_cpp, "the sheet bakes the pixels of the C++ material: " + sheet);
         require(from_cpp != floor_pixels, "and the row changes the face: " + sheet);
     }
@@ -839,6 +988,7 @@ int main() {
     test_lowering();
     test_border_lowering();
     test_filter_lowering();
+    test_image_lowering();
     test_refusals();
     test_gate();
     if (failures != 0) {

@@ -39,6 +39,8 @@ namespace gui_forms::theme_language {
 // - `published_values`: the names the theme's manifest publishes (R2-06),
 //   which `var()` reads and which become the sheet's published values;
 // - `resources`: the resource names the manifest lists, for `url()`;
+// - `images`: those that are images, bound to the engine's images (P10's
+//   loader binds them; until then the caller does);
 // - `requires_engine`: the engine version the manifest declares (P9
 //   supplies it; until then the caller does).
 struct ThemeCompileInput final {
@@ -47,6 +49,7 @@ struct ThemeCompileInput final {
     SelectorVocabulary vocabulary{};
     std::span<const std::string> published_values{};
     std::span<const std::string_view> resources{};
+    std::span<const ThemeImageResource> images{};
     EngineVersion requires_engine{current_engine_version};
 };
 

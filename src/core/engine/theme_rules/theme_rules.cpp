@@ -215,6 +215,9 @@ constexpr std::array<std::string_view, material_field_count> material_field_name
     "background_colour",
     "fills",
     "fill_blend_modes",
+    "fill_positions",
+    "fill_sizes",
+    "fill_repeats",
     "shadows",
     "glows",
     "glow_placements",
@@ -315,6 +318,9 @@ void apply_material_declaration(const MaterialDeclaration& declaration, SurfaceM
     case MaterialField::background_colour:
     case MaterialField::fills:
     case MaterialField::fill_blend_modes:
+    case MaterialField::fill_positions:
+    case MaterialField::fill_sizes:
+    case MaterialField::fill_repeats:
     case MaterialField::corner_top_left:
     case MaterialField::corner_top_right:
     case MaterialField::corner_bottom_right:
@@ -324,9 +330,11 @@ void apply_material_declaration(const MaterialDeclaration& declaration, SurfaceM
 }
 
 bool fill_field(MaterialField field) noexcept {
-    const bool fill = field == MaterialField::background_colour || field == MaterialField::fills ||
-                      field == MaterialField::fill_blend_modes;
-    return fill;
+    const bool colour_or_layers = field == MaterialField::background_colour || field == MaterialField::fills ||
+                                  field == MaterialField::fill_blend_modes;
+    const bool placement = field == MaterialField::fill_positions || field == MaterialField::fill_sizes ||
+                           field == MaterialField::fill_repeats;
+    return colour_or_layers || placement;
 }
 
 bool corner_field(MaterialField field) noexcept {
@@ -349,6 +357,71 @@ const MaterialDeclaration* set_field(std::array<const MaterialDeclaration*, mate
 // The fills composed from the colour layer and the image layers, each the
 // declared one, else the floor's: its bottom layer when solid is its
 // colour, its others its image layers.
+// An image size's length along a side of `side` logical units.
+double sized_length(BoxLength length, double side) noexcept {
+    const double resolved = length.fraction * side + length.units;
+    return resolved;
+}
+
+// Sizes image fill `layer` by `size` for `box`, keeping its proportions:
+// its image_scale becomes the source pixels per logical unit of the size.
+void size_image(const MaterialImageSize& size, Size box, MaterialFillLayer& layer) noexcept {
+    const Size pixels = layer.image_pixel_size;
+    switch (size.sizing) {
+    case MaterialImageSizing::natural: return;
+    case MaterialImageSizing::stretch: layer.image_mode = MaterialImageMode::stretch; return;
+    case MaterialImageSizing::width:
+        layer.image_scale = pixels.width / sized_length(size.length, box.width);
+        break;
+    case MaterialImageSizing::height:
+        layer.image_scale = pixels.height / sized_length(size.length, box.height);
+        break;
+    case MaterialImageSizing::cover:
+    case MaterialImageSizing::contain: {
+        // The factor from the image's own size, its layer's scale as
+        // written, to the box's along each side.
+        const double across = box.width * layer.image_scale / pixels.width;
+        const double down = box.height * layer.image_scale / pixels.height;
+        const bool cover = size.sizing == MaterialImageSizing::cover;
+        const double factor = cover ? std::max(across, down) : std::min(across, down);
+        layer.image_scale = layer.image_scale / factor;
+        break;
+    }
+    }
+    // A sized image is tiled, unless repetition then makes it single.
+    if (layer.image_mode == MaterialImageMode::stretch) layer.image_mode = MaterialImageMode::tile;
+}
+
+// Places the image fills among `material`'s image layers, from
+// `images_first` up, by the declared sizes, repetitions and positions,
+// each list in CSS's order (the top layer's first) and repeated over the
+// image layers.
+void place_images(const MaterialDeclaration* sizes, const MaterialDeclaration* repeats,
+                  const MaterialDeclaration* positions, std::size_t images_first, Size box,
+                  SurfaceMaterial& material) noexcept {
+    const std::size_t image_count = material.fills.size() - images_first;
+    for (std::size_t from_top = 0U; from_top < image_count; ++from_top) {
+        MaterialFillLayer& layer = material.fills[material.fills.size() - 1U - from_top];
+        if (layer.kind != MaterialFillKind::image || layer.image_mode == MaterialImageMode::nine_patch) continue;
+        if (sizes != nullptr && !(*sizes).image_sizes.empty()) {
+            const std::vector<MaterialImageSize>& written = (*sizes).image_sizes;
+            size_image(written[from_top % written.size()], box, layer);
+        }
+        const bool tiled = layer.image_mode == MaterialImageMode::tile || layer.image_mode == MaterialImageMode::single;
+        if (repeats != nullptr && !(*repeats).image_repeats.empty() && tiled) {
+            const std::vector<MaterialImageRepeat>& written = (*repeats).image_repeats;
+            const bool alone = written[from_top % written.size()] == MaterialImageRepeat::no_repeat;
+            layer.image_mode = alone ? MaterialImageMode::single : MaterialImageMode::tile;
+        }
+        if (positions != nullptr && !(*positions).image_positions.empty()) {
+            const std::vector<MaterialImagePosition>& written = (*positions).image_positions;
+            const MaterialImagePosition& position = written[from_top % written.size()];
+            layer.image_anchor = Point{position.across.fraction, position.down.fraction};
+            layer.image_offset = Point{position.across.units, position.down.units};
+        }
+    }
+}
+
 void compose_fills(const SurfaceMaterial& floor,
                    const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
                    SurfaceMaterial& material) {
@@ -385,6 +458,12 @@ void compose_fills(const SurfaceMaterial& floor,
             MaterialFillLayer& layer = material.fills[material.fills.size() - 1U - from_top];
             layer.blend = modes.empty() ? MaterialBlendMode::normal : modes[from_top % modes.size()];
         }
+    }
+    const MaterialDeclaration* const sizes = set_field(fields, MaterialField::fill_sizes);
+    const MaterialDeclaration* const repeats = set_field(fields, MaterialField::fill_repeats);
+    const MaterialDeclaration* const positions = set_field(fields, MaterialField::fill_positions);
+    if (sizes != nullptr || repeats != nullptr || positions != nullptr) {
+        place_images(sizes, repeats, positions, images_first, box, material);
     }
     if (material.fills.empty()) material.fills.push_back(MaterialFillLayer::solid(Color::rgba(0, 0, 0, 0)));
 }
@@ -496,12 +575,57 @@ void assemble_edges(const SurfaceMaterial& floor,
 // own box may still refuse its assembly.
 constexpr Size sample_box{100.0, 100.0};
 
+// A position the image fills admit: anchors within [0, 1], offsets of at
+// most 4096 logical units (valid_surface_material's bounds).
+bool image_position_admitted(const MaterialImagePosition& position) noexcept {
+    const std::array<BoxLength, 2> axes{position.across, position.down};
+    for (const BoxLength axis : axes) {
+        const bool anchored = std::isfinite(axis.fraction) && axis.fraction >= 0.0 && axis.fraction <= 1.0;
+        const bool offset = std::isfinite(axis.units) && std::abs(axis.units) <= 4096.0;
+        if (!anchored || !offset) return false;
+    }
+    return true;
+}
+
+// A size of finite parts, a side's not negative and not zero for every box.
+// The image scale it makes is checked with the assembled material.
+bool image_size_admitted(const MaterialImageSize& size) noexcept {
+    const bool sided = size.sizing == MaterialImageSizing::width || size.sizing == MaterialImageSizing::height;
+    const BoxLength length = size.length;
+    if (!sided) {
+        const bool known = size.sizing == MaterialImageSizing::natural || size.sizing == MaterialImageSizing::cover ||
+                           size.sizing == MaterialImageSizing::contain || size.sizing == MaterialImageSizing::stretch;
+        return known && length == BoxLength{};
+    }
+    const bool finite_parts = std::isfinite(length.fraction) && std::isfinite(length.units);
+    const bool positive = length.fraction >= 0.0 && length.units >= 0.0 && (length.fraction > 0.0 || length.units > 0.0);
+    return finite_parts && positive;
+}
+
 // Whether `declaration`, alone over the default material, is a material:
 // an edge field over a drawn default edge, a relative corner as a fraction
 // of a unit side, an authored gradient resolved for sample_box.
 bool material_declaration_admitted(const MaterialDeclaration& declaration) {
     SurfaceMaterial checked{};
     if (declaration.initial || declaration.field == MaterialField::background_colour) return true;
+    if (declaration.field == MaterialField::fill_positions) {
+        for (const MaterialImagePosition& position : declaration.image_positions) {
+            if (!image_position_admitted(position)) return false;
+        }
+        return true;
+    }
+    if (declaration.field == MaterialField::fill_sizes) {
+        for (const MaterialImageSize& size : declaration.image_sizes) {
+            if (!image_size_admitted(size)) return false;
+        }
+        return true;
+    }
+    if (declaration.field == MaterialField::fill_repeats) {
+        for (const MaterialImageRepeat repeat : declaration.image_repeats) {
+            if (repeat != MaterialImageRepeat::repeat && repeat != MaterialImageRepeat::no_repeat) return false;
+        }
+        return true;
+    }
     if (declaration.field == MaterialField::fill_blend_modes) {
         for (const MaterialBlendMode mode : declaration.blend_modes) {
             if (static_cast<std::uint8_t>(mode) > static_cast<std::uint8_t>(MaterialBlendMode::screen)) return false;
@@ -558,6 +682,16 @@ bool material_fields_read_box(
     for (const MaterialDeclaration* const declaration : fields) {
         if (declaration == nullptr || (*declaration).initial) continue;
         if (corner_field((*declaration).field) && (*declaration).relative) return true;
+        if ((*declaration).field == MaterialField::fill_sizes) {
+            for (const MaterialImageSize& size : (*declaration).image_sizes) {
+                const bool proportional = size.sizing == MaterialImageSizing::cover ||
+                                          size.sizing == MaterialImageSizing::contain;
+                const bool sided = size.sizing == MaterialImageSizing::width ||
+                                   size.sizing == MaterialImageSizing::height;
+                if (proportional || (sided && size.length.fraction != 0.0)) return true;
+            }
+            continue;
+        }
         const bool layers = (*declaration).field == MaterialField::fills || (*declaration).field == MaterialField::mask;
         if (!layers) continue;
         for (const AuthoredGradient& gradient : (*declaration).gradients) {

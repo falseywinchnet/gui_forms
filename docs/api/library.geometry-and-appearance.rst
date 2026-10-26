@@ -130,6 +130,10 @@ Types
      - MaterialFillLayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity.
    * - :cpp:class:`MaterialGlow <gui_forms::MaterialGlow>`
      - A soft coloured emission of the material's box (E9-C): the box grown by ``spread`` on every side and blurred by ``blur_radius`` (σ = blur_radius / 2, as a shadow's), centred on the box.
+   * - :cpp:class:`MaterialImagePosition <gui_forms::MaterialImagePosition>`
+     - An image layer's position (CSS ``background-position``): each axis's fraction is the layer's image_anchor, of the room the box leaves around one tile, and its units its image_offset.
+   * - :cpp:class:`MaterialImageSize <gui_forms::MaterialImageSize>`
+     -  
    * - :cpp:class:`MaterialKeyline <gui_forms::MaterialKeyline>`
      - One ordered physical keyline.
    * - :cpp:class:`MaterialShadow <gui_forms::MaterialShadow>`
@@ -1683,7 +1687,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One material field a rule sets and its value. Only the members ``field`` names are read; the others stay empty: - background_colour: ``colour``, a solid layer under the image layers; - fills: the image layers (gradients, images, patterns), bottom first, at most SurfaceMaterial::maximum_fill_layers, empty for none; and ``gradients``, empty, or one per layer: a gradient as a sheet wrote it (T3 P6b), resolved for the part's box when the material is assembled, in place of its layer; an entry of kind ``solid`` keeps its layer as written; - fill_blend_modes: ``blend_modes``, in CSS's order (the top image layer's first), repeated over the image layers as CSS repeats a short list; empty for normal; - shadows, glows, keylines: the lists; - glow_placements: ``glow_placements``, in the glows' order, repeated over them as CSS repeats a short list (``glow-placement``); - an edge's style: ``border_style``, empty for none (CSS's ``none``); its width: ``number``, 0 for none; its colour: ``colour``; - a corner: ``number``, its radius in logical units, or, with ``relative``, a fraction of the box's shorter side (CSS's percentage, R2-11), resolved when the material is assembled for a part; - colour_filter: ``colour_filter``; drop_shadow: ``drop_shadow``, empty for none; mask: ``mask``, empty for none, and ``gradients``, empty or one entry, the mask's authored gradient as for a fill layer; - filter_blur and finish: ``number``. ``initial``, set, is CSS's ``initial``: the field keeps the floor's value, and the declaration still wins over those beneath it; its value members are not read.
+   One material field a rule sets and its value. Only the members ``field`` names are read; the others stay empty: - background_colour: ``colour``, a solid layer under the image layers; - fills: the image layers (gradients, images, patterns), bottom first, at most SurfaceMaterial::maximum_fill_layers, empty for none; and ``gradients``, empty, or one per layer: a gradient as a sheet wrote it (T3 P6b), resolved for the part's box when the material is assembled, in place of its layer; an entry of kind ``solid`` keeps its layer as written; - fill_blend_modes: ``blend_modes``, in CSS's order (the top image layer's first), repeated over the image layers as CSS repeats a short list; empty for normal; - fill_positions, fill_sizes, fill_repeats: ``image_positions``, ``image_sizes``, ``image_repeats``, in the same order and repeated the same way, read by the image fills (not a nine-patch) among the image layers: a gradient layer covers the box; - shadows, glows, keylines: the lists; - glow_placements: ``glow_placements``, in the glows' order, repeated over them as CSS repeats a short list (``glow-placement``); - an edge's style: ``border_style``, empty for none (CSS's ``none``); its width: ``number``, 0 for none; its colour: ``colour``; - a corner: ``number``, its radius in logical units, or, with ``relative``, a fraction of the box's shorter side (CSS's percentage, R2-11), resolved when the material is assembled for a part; - colour_filter: ``colour_filter``; drop_shadow: ``drop_shadow``, empty for none; mask: ``mask``, empty for none, and ``gradients``, empty or one entry, the mask's authored gradient as for a fill layer; - filter_blur and finish: ``number``. ``initial``, set, is CSS's ``initial``: the field keeps the floor's value, and the declaration still wins over those beneath it; its value members are not read.
 
    .. cpp:member:: MaterialField field
 
@@ -1696,6 +1700,12 @@ Types
    .. cpp:member:: std::vector<AuthoredGradient> gradients
 
    .. cpp:member:: std::vector<MaterialBlendMode> blend_modes
+
+   .. cpp:member:: std::vector<MaterialImagePosition> image_positions
+
+   .. cpp:member:: std::vector<MaterialImageSize> image_sizes
+
+   .. cpp:member:: std::vector<MaterialImageRepeat> image_repeats
 
    .. cpp:member:: std::vector<MaterialShadow> shadows
 
@@ -1862,7 +1872,7 @@ Types
 
    .. cpp:member:: Point image_anchor
 
-      A tiled image's position (E9.6, CSS ``background-position``): one tile's top-left corner lies at ``image_anchor`` of the room the box leaves around one tile (fractions in [0, 1] across and down, as CSS percentages: 0 the box's left or top, 1 a tile flush with its right or bottom) plus ``image_offset`` in logical units, and the tiling runs on from there both ways. Read in tile mode only: a stretched image and a nine-patch cover the box.
+      A tiled image's position (E9.6, CSS ``background-position``): one tile's top-left corner lies at ``image_anchor`` of the room the box leaves around one tile (fractions in [0, 1] across and down, as CSS percentages: 0 the box's left or top, 1 a tile flush with its right or bottom) plus ``image_offset`` in logical units, and the tiling runs on from there both ways. Read in tile and single modes only: a stretched image and a nine-patch cover the box.
 
    .. cpp:member:: Point image_offset
 
@@ -1899,6 +1909,30 @@ Types
    .. cpp:member:: MaterialGlowPlacement placement
 
       Default: ``{MaterialGlowPlacement::under}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaterialImagePosition final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   An image layer's position (CSS ``background-position``): each axis's fraction is the layer's image_anchor, of the room the box leaves around one tile, and its units its image_offset.
+
+   .. cpp:member:: BoxLength across
+
+   .. cpp:member:: BoxLength down
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaterialImageSize final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:member:: MaterialImageSizing sizing
+
+      Default: ``{MaterialImageSizing::natural}``.
+
+   .. cpp:member:: BoxLength length
 
 .. cpp:namespace:: gui_forms
 
@@ -4011,6 +4045,12 @@ Enumerations
 
    .. cpp:enumerator:: fill_blend_modes
 
+   .. cpp:enumerator:: fill_positions
+
+   .. cpp:enumerator:: fill_sizes
+
+   .. cpp:enumerator:: fill_repeats
+
    .. cpp:enumerator:: shadows
 
    .. cpp:enumerator:: glows
@@ -4102,6 +4142,36 @@ Enumerations
    .. cpp:enumerator:: tile
 
    .. cpp:enumerator:: nine_patch
+
+   .. cpp:enumerator:: single
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MaterialImageRepeat
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: repeat
+
+   .. cpp:enumerator:: no_repeat
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MaterialImageSizing
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: natural
+
+   .. cpp:enumerator:: width
+
+   .. cpp:enumerator:: height
+
+   .. cpp:enumerator:: cover
+
+   .. cpp:enumerator:: contain
+
+   .. cpp:enumerator:: stretch
 
 .. cpp:namespace:: gui_forms
 
@@ -4924,11 +4994,11 @@ Functions, constants and aliases
 
 .. cpp:function:: void assemble_material(const SurfaceMaterial& floor, const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box, SurfaceMaterial& material)
 
-   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value. The fills are composed when any fill field is declared: the colour layer (the declared colour, else the floor's bottom layer when it is solid) under the image layers (the declared ones, each authored gradient resolved for ``box``, else the floor's others), which take the declared blend modes; a colour of alpha 0 adds no layer, and with no layer at all the fill is one transparent solid. More than SurfaceMaterial::maximum_fill_layers is no material. The corners are composed when any is declared: each is its declaration's, else the floor's (its corner_radii's, else its corner_radius); four equal corners are corner_radius alone, and others corner_radii, with corner_radius the smallest (the built-in path rounds every corner by it). The glows take the declared placements; a mask's authored gradient is resolved for ``box``. The border's edges are assembled together when any of their fields is declared: each starts as the floor's (its single edge, else its uniform border; an edge the floor lacks has the default MaterialBorder's width and colour and is not drawn), takes its declared style, width and colour, and is drawn unless its style is none or its width 0. Four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material). ``box`` is the part's box in logical units: relative corners are fractions of its shorter side.
+   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value. The fills are composed when any fill field is declared: the colour layer (the declared colour, else the floor's bottom layer when it is solid) under the image layers (the declared ones, each authored gradient resolved for ``box``, else the floor's others), which take the declared blend modes, and whose image fills take the declared sizes (resolved for ``box``), then repetitions, then positions; a colour of alpha 0 adds no layer, and with no layer at all the fill is one transparent solid. More than SurfaceMaterial::maximum_fill_layers is no material. The corners are composed when any is declared: each is its declaration's, else the floor's (its corner_radii's, else its corner_radius); four equal corners are corner_radius alone, and others corner_radii, with corner_radius the smallest (the built-in path rounds every corner by it). The glows take the declared placements; a mask's authored gradient is resolved for ``box``. The border's edges are assembled together when any of their fields is declared: each starts as the floor's (its single edge, else its uniform border; an edge the floor lacks has the default MaterialBorder's width and colour and is not drawn), takes its declared style, width and colour, and is drawn unless its style is none or its width 0. Four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material). ``box`` is the part's box in logical units: relative corners are fractions of its shorter side.
 
 .. cpp:function:: bool material_fields_read_box(const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept
 
-   Whether assembling ``fields`` reads the part's box: a relative corner or an authored gradient, of a fill or the mask, other than a fixed one (authored_gradient_fixed).
+   Whether assembling ``fields`` reads the part's box: a relative corner, an authored gradient, of a fill or the mask, other than a fixed one (authored_gradient_fixed), or an image size of the box (a fraction of its side, cover or contain).
 
 .. cpp:function:: std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept
 

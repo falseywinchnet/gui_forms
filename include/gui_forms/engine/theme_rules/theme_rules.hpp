@@ -301,15 +301,51 @@ struct AmbientEffect final {
     }
 };
 
+// An image layer's size (T3 P6d, CSS `background-size`), applied when the
+// material is assembled. The engine keeps an image's proportions, so one
+// length sets the size:
+// - natural: the image's own size, its layer's image_scale as written
+//   (CSS `auto`);
+// - width or height: `length` across or down, a fraction of the box's
+//   side plus logical units, the other side in proportion;
+// - cover and contain: the smallest size that covers the box and the
+//   largest that fits in it;
+// - stretch: the box (CSS `100% 100%`, MaterialImageMode::stretch).
+enum class MaterialImageSizing : std::uint8_t { natural, width, height, cover, contain, stretch };
+
+struct MaterialImageSize final {
+    MaterialImageSizing sizing{MaterialImageSizing::natural};
+    BoxLength length{};
+    friend constexpr bool operator==(const MaterialImageSize& left, const MaterialImageSize& right) noexcept {
+        return left.sizing == right.sizing && left.length == right.length;
+    }
+};
+
+// An image layer's position (CSS `background-position`): each axis's
+// fraction is the layer's image_anchor, of the room the box leaves around
+// one tile, and its units its image_offset.
+struct MaterialImagePosition final {
+    BoxLength across{};
+    BoxLength down{};
+    friend constexpr bool operator==(const MaterialImagePosition& left, const MaterialImagePosition& right) noexcept {
+        return left.across == right.across && left.down == right.down;
+    }
+};
+
+// An image layer's repetition (CSS `background-repeat`): tiled, or one
+// tile alone (MaterialImageMode::single).
+enum class MaterialImageRepeat : std::uint8_t { repeat, no_repeat };
+
 // The material fields a rule may set (T3 engine change EC1, owner R2-02).
 // Each cascades on its own, as a parameter does: a part's material is the
 // recipe material its primitive draws (the cascade's floor), with each
 // field the winning matching rule sets in its place. The fields are
 // SurfaceMaterial's, split where CSS's longhands are, so that each
 // cascades as CSS cascades it:
-// - the fills are CSS's background-color, background-image and
-//   background-blend-mode (owner C6, 2026-10-26: they combine across
-//   rules, the colour under the image layers);
+// - the fills are CSS's background-color, background-image,
+//   background-blend-mode, background-position, background-size and
+//   background-repeat (owner C6, 2026-10-26: they combine across rules,
+//   the colour under the image layers);
 // - the border is its twelve longhands, each edge's style, width and
 //   colour, in that order, the edges in CSS's order (`border` sets all
 //   twelve);
@@ -319,6 +355,9 @@ enum class MaterialField : std::uint8_t {
     background_colour,
     fills,
     fill_blend_modes,
+    fill_positions,
+    fill_sizes,
+    fill_repeats,
     shadows,
     glows,
     glow_placements,
@@ -363,6 +402,10 @@ inline constexpr std::size_t material_field_count = static_cast<std::size_t>(Mat
 // - fill_blend_modes: `blend_modes`, in CSS's order (the top image
 //   layer's first), repeated over the image layers as CSS repeats a short
 //   list; empty for normal;
+// - fill_positions, fill_sizes, fill_repeats: `image_positions`,
+//   `image_sizes`, `image_repeats`, in the same order and repeated the
+//   same way, read by the image fills (not a nine-patch) among the image
+//   layers: a gradient layer covers the box;
 // - shadows, glows, keylines: the lists;
 // - glow_placements: `glow_placements`, in the glows' order, repeated
 //   over them as CSS repeats a short list (`glow-placement`);
@@ -384,6 +427,9 @@ struct MaterialDeclaration final {
     std::vector<MaterialFillLayer> fills{};
     std::vector<AuthoredGradient> gradients{};
     std::vector<MaterialBlendMode> blend_modes{};
+    std::vector<MaterialImagePosition> image_positions{};
+    std::vector<MaterialImageSize> image_sizes{};
+    std::vector<MaterialImageRepeat> image_repeats{};
     std::vector<MaterialShadow> shadows{};
     std::vector<MaterialGlow> glows{};
     std::vector<MaterialGlowPlacement> glow_placements{};
@@ -398,7 +444,9 @@ struct MaterialDeclaration final {
 
     friend bool operator==(const MaterialDeclaration& left, const MaterialDeclaration& right) noexcept {
         return left.field == right.field && left.initial == right.initial && left.fills == right.fills &&
-               left.gradients == right.gradients && left.blend_modes == right.blend_modes && left.shadows == right.shadows &&
+               left.gradients == right.gradients && left.blend_modes == right.blend_modes &&
+               left.image_positions == right.image_positions && left.image_sizes == right.image_sizes &&
+               left.image_repeats == right.image_repeats && left.shadows == right.shadows &&
                left.glows == right.glows && left.glow_placements == right.glow_placements &&
                left.border_style == right.border_style &&
                left.colour == right.colour && left.keylines == right.keylines &&
@@ -415,8 +463,10 @@ struct MaterialDeclaration final {
 // fill field is declared: the colour layer (the declared colour, else the
 // floor's bottom layer when it is solid) under the image layers (the
 // declared ones, each authored gradient resolved for `box`, else the
-// floor's others), which take the declared blend modes; a colour of alpha 0 adds no layer, and with no layer at all the
-// fill is one transparent solid. More than
+// floor's others), which take the declared blend modes, and whose image
+// fills take the declared sizes (resolved for `box`), then repetitions,
+// then positions; a colour of alpha 0 adds no layer, and with no layer at
+// all the fill is one transparent solid. More than
 // SurfaceMaterial::maximum_fill_layers is no material. The corners are
 // composed when any is declared: each is its declaration's, else the
 // floor's (its corner_radii's, else its corner_radius); four equal corners
@@ -438,9 +488,10 @@ void assemble_material(const SurfaceMaterial& floor,
                        const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
                        SurfaceMaterial& material);
 
-// Whether assembling `fields` reads the part's box: a relative corner or
-// an authored gradient, of a fill or the mask, other than a fixed one
-// (authored_gradient_fixed).
+// Whether assembling `fields` reads the part's box: a relative corner, an
+// authored gradient, of a fill or the mask, other than a fixed one
+// (authored_gradient_fixed), or an image size of the box (a fraction of
+// its side, cover or contain).
 [[nodiscard]] bool material_fields_read_box(
     const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept;
 

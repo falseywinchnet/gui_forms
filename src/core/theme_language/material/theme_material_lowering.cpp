@@ -36,11 +36,14 @@ struct NamedMaterialProperty final {
 };
 
 // Sorted by name.
-constexpr std::array<NamedMaterialProperty, 35> material_properties{{
+constexpr std::array<NamedMaterialProperty, 38> material_properties{{
     {.name = "background", .property = MaterialProperty::background},
     {.name = "background-blend-mode", .property = MaterialProperty::background_blend_mode},
     {.name = "background-color", .property = MaterialProperty::background_color},
     {.name = "background-image", .property = MaterialProperty::background_image},
+    {.name = "background-position", .property = MaterialProperty::background_position},
+    {.name = "background-repeat", .property = MaterialProperty::background_repeat},
+    {.name = "background-size", .property = MaterialProperty::background_size},
     {.name = "border", .property = MaterialProperty::border},
     {.name = "border-bottom", .property = MaterialProperty::border_bottom},
     {.name = "border-bottom-color", .property = MaterialProperty::border_bottom_color},
@@ -229,6 +232,28 @@ constexpr std::array<std::array<std::size_t, 4>, 4> four_sides{{
     {0U, 1U, 2U, 3U},
 }};
 
+// One image layer as a sheet wrote it: a gradient, or, `imaged`, an image
+// resource's tiled layer at its own size (CSS's initial size, repeat and
+// position).
+struct WrittenLayer final {
+    AuthoredGradient gradient{};
+    MaterialFillLayer image{};
+    bool imaged{};
+};
+
+// One layer of the `background` shorthand: its image, and the position,
+// size and repetition it names, else CSS's initial ones.
+struct BackgroundLayer final {
+    bool imaged{};
+    bool none{};
+    bool positioned{};
+    bool sized{};
+    bool repeated{};
+    MaterialImagePosition position{};
+    MaterialImageSize size{};
+    MaterialImageRepeat repeat{MaterialImageRepeat::repeat};
+};
+
 // Components [first, end) of a value, at one nesting level.
 struct ComponentRange final {
     std::size_t first{};
@@ -239,8 +264,9 @@ struct ComponentRange final {
 // function returns false once it has recorded a problem.
 class MaterialReader final {
 public:
-    MaterialReader(const ThemeValue& value, std::uint32_t start, MaterialLowering& lowering) noexcept
-        : value_(value), start_(start), lowering_(lowering) {}
+    MaterialReader(const ThemeValue& value, std::uint32_t start, std::span<const ThemeImageResource> images,
+                   MaterialLowering& lowering) noexcept
+        : value_(value), start_(start), images_(images), lowering_(lowering) {}
 
     void lower(MaterialProperty property);
 
@@ -264,8 +290,16 @@ private:
     bool read_radial_configuration(ComponentRange range, AuthoredGradient& gradient, bool& configured);
     bool read_conic_configuration(ComponentRange range, AuthoredGradient& gradient, bool& configured);
     bool read_gradient(std::size_t index, AuthoredGradient& gradient);
-    bool read_image(std::size_t index, AuthoredGradient& gradient);
-    bool push_fills(std::span<const AuthoredGradient> written);
+    bool read_image(std::size_t index, WrittenLayer& layer);
+    bool read_resource_image(std::size_t index, MaterialFillLayer& layer);
+    bool push_fills(std::span<const WrittenLayer> written);
+    bool read_image_position(ComponentRange range, MaterialImagePosition& position);
+    bool read_image_size(ComponentRange range, MaterialImageSize& size);
+    bool read_image_repeat(ComponentRange range, MaterialImageRepeat& repeat);
+    [[nodiscard]] bool repeat_word(std::size_t index) const noexcept;
+    [[nodiscard]] bool size_component(std::size_t index) const noexcept;
+    bool read_background_layer(ComponentRange range, bool last, MaterialDeclaration& colour,
+                               std::vector<WrittenLayer>& written, BackgroundLayer& layer);
     bool read_style(std::size_t index, std::optional<MaterialBorderStyle>& style);
     bool read_width(std::size_t index, double& width);
     bool read_radius(std::size_t index, MaterialDeclaration& corner);
@@ -281,6 +315,9 @@ private:
     bool lower_background_colour();
     bool lower_background_image();
     bool lower_blend_modes();
+    bool lower_positions();
+    bool lower_sizes();
+    bool lower_repeats();
     bool lower_background();
     bool lower_edges(std::size_t first_edge, std::size_t edge_count);
     bool lower_sides(std::size_t part);
@@ -296,6 +333,7 @@ private:
 
     const ThemeValue& value_;
     std::uint32_t start_{};
+    std::span<const ThemeImageResource> images_{};
     MaterialLowering& lowering_;
 };
 
@@ -676,45 +714,207 @@ bool MaterialReader::read_gradient(std::size_t index, AuthoredGradient& gradient
     return true;
 }
 
-bool MaterialReader::read_image(std::size_t index, AuthoredGradient& gradient) {
+bool MaterialReader::read_image(std::size_t index, WrittenLayer& layer) {
+    layer = WrittenLayer{};
     const ValueComponent& component = value_.components[index];
     const bool gradient_written =
         component.kind == ValueComponentKind::function && gradient_function(component.text) != nullptr;
-    if (gradient_written) return read_gradient(index, gradient);
+    if (gradient_written) return read_gradient(index, layer.gradient);
     if (component.kind == ValueComponentKind::resource) {
-        // P6c binds a theme's image resources to the engine's images.
-        return fail(DiagnosticCode::not_yet_built, component.token, "an image resource as a background");
+        layer.imaged = true;
+        return read_resource_image(index, layer.image);
     }
     return fail(DiagnosticCode::value_wrong_kind, component.token, "an image or a gradient");
 }
 
+// A resource the manifest lists and binds to an image: its tiled layer at
+// its own size. A listed resource that is no image is the wrong kind.
+bool MaterialReader::read_resource_image(std::size_t index, MaterialFillLayer& layer) {
+    const ValueComponent& component = value_.components[index];
+    for (const ThemeImageResource& resource : images_) {
+        if (resource.resource != component.text) continue;
+        layer = MaterialFillLayer::tiled_image(resource.image, resource.pixel_size, resource.pixels_per_logical_pixel);
+        return true;
+    }
+    return fail(DiagnosticCode::value_wrong_kind, component.token, "an image resource");
+}
+
 // The `fills` declaration of `written`, in CSS's order (the top layer
-// first): the layers bottom first, a fixed gradient resolved now and the
-// others when the material is assembled for a part.
-bool MaterialReader::push_fills(std::span<const AuthoredGradient> written) {
+// first): the layers bottom first, an image and a fixed gradient as they
+// are and the other gradients resolved when the material is assembled for
+// a part.
+bool MaterialReader::push_fills(std::span<const WrittenLayer> written) {
     MaterialDeclaration declaration{};
     declaration.field = MaterialField::fills;
     bool box_relative = false;
-    for (const AuthoredGradient& gradient : written) box_relative = box_relative || !authored_gradient_fixed(gradient);
+    for (const WrittenLayer& layer : written) {
+        box_relative = box_relative || (!layer.imaged && !authored_gradient_fixed(layer.gradient));
+    }
     SurfaceMaterial checked{};
     checked.fills.clear();
     for (std::size_t from_top = written.size(); from_top > 0U; --from_top) {
-        const AuthoredGradient& gradient = written[from_top - 1U];
-        const bool fixed = authored_gradient_fixed(gradient);
-        MaterialFillLayer layer{};
-        // A box only a gradient that reads the box uses; the check takes
-        // a sample one.
-        resolve_authored_gradient(gradient, Size{100.0, 100.0}, layer);
+        const WrittenLayer& source = written[from_top - 1U];
+        MaterialFillLayer layer = source.image;
+        bool fixed = true;
+        if (!source.imaged) {
+            fixed = authored_gradient_fixed(source.gradient);
+            // A box only a gradient that reads the box uses; the check
+            // takes a sample one.
+            resolve_authored_gradient(source.gradient, Size{100.0, 100.0}, layer);
+        }
         checked.fills.push_back(layer);
         if (!fixed) layer = MaterialFillLayer{};
         declaration.fills.push_back(layer);
         if (!box_relative) continue;
-        AuthoredGradient entry = fixed ? AuthoredGradient{} : gradient;
+        AuthoredGradient entry = fixed ? AuthoredGradient{} : source.gradient;
         if (fixed) entry.kind = MaterialFillKind::solid;
         declaration.gradients.push_back(std::move(entry));
     }
     if (!checked.fills.empty() && !valid_surface_material(checked)) {
-        return fail(DiagnosticCode::value_out_of_range, start_, "a gradient no material draws");
+        return fail(DiagnosticCode::value_out_of_range, start_, "a layer no material draws");
+    }
+    lowering_.declarations.push_back(std::move(declaration));
+    return true;
+}
+
+// -- image layers' positions, sizes and repetitions --------------------------------
+
+// A position the engine's image fills draw: CSS's <position> of one or two
+// values, its percentages within [0, 100%] of the room the box leaves
+// around the image and its lengths at most 4096 px.
+bool MaterialReader::read_image_position(ComponentRange range, MaterialImagePosition& position) {
+    if (!read_position(range, position.across, position.down)) return false;
+    const std::array<BoxLength, 2> axes{position.across, position.down};
+    for (const BoxLength axis : axes) {
+        const bool anchored = axis.fraction >= 0.0 && axis.fraction <= 1.0;
+        const bool offset = axis.units >= -4096.0 && axis.units <= 4096.0;
+        if (!anchored || !offset) {
+            return fail(DiagnosticCode::value_out_of_range, value_.components[range.first].token,
+                        "a position beyond the box's room");
+        }
+    }
+    return true;
+}
+
+bool MaterialReader::size_component(std::size_t index) const noexcept {
+    const bool length = value_.components[index].kind == ValueComponentKind::number;
+    const bool word = keyword(index, "auto") || keyword(index, "cover") || keyword(index, "contain");
+    return length || word;
+}
+
+// CSS's <bg-size>: auto, cover, contain, or one length-percentage across
+// with the other side auto. The engine keeps an image's proportions, so of
+// two lengths only `100% 100%`, the box, is admitted.
+bool MaterialReader::read_image_size(ComponentRange range, MaterialImageSize& size) {
+    size = MaterialImageSize{};
+    const std::size_t values = count(range);
+    const std::uint32_t token = range.first < range.end ? value_.components[range.first].token : start_;
+    if (values == 0U || values > 2U) return fail(DiagnosticCode::value_syntax, token, "one or two sizes");
+    const std::size_t first = range.first;
+    if (values == 1U && (keyword(first, "cover") || keyword(first, "contain"))) {
+        size.sizing = keyword(first, "cover") ? MaterialImageSizing::cover : MaterialImageSizing::contain;
+        return true;
+    }
+    const std::size_t second = values == 2U ? next(first) : first;
+    const bool first_auto = keyword(first, "auto");
+    const bool second_auto = values == 1U || keyword(second, "auto");
+    if (first_auto && second_auto) return true;
+    if (!first_auto && !second_auto) {
+        const ValueComponent& across = value_.components[first];
+        const ValueComponent& down = value_.components[second];
+        const bool whole_box = across.kind == ValueComponentKind::number && across.unit == ValueUnit::percent &&
+                               across.number == 100.0 && down.kind == ValueComponentKind::number &&
+                               down.unit == ValueUnit::percent && down.number == 100.0;
+        if (!whole_box) {
+            return fail(DiagnosticCode::value_form_not_admitted, token, "a size of two lengths but 100% 100%");
+        }
+        size.sizing = MaterialImageSizing::stretch;
+        return true;
+    }
+    const std::size_t length_index = first_auto ? second : first;
+    if (!read_length(length_index, true, false, size.length)) return false;
+    if (size.length.fraction == 0.0 && size.length.units == 0.0) {
+        return fail(DiagnosticCode::value_form_not_admitted, value_.components[length_index].token, "a size of zero");
+    }
+    size.sizing = first_auto ? MaterialImageSizing::height : MaterialImageSizing::width;
+    return true;
+}
+
+bool MaterialReader::repeat_word(std::size_t index) const noexcept {
+    const bool word = keyword(index, "repeat") || keyword(index, "no-repeat") || keyword(index, "repeat-x") ||
+                      keyword(index, "repeat-y") || keyword(index, "space") || keyword(index, "round");
+    return word;
+}
+
+// CSS's <repeat-style>: repeat, or no-repeat (one tile alone), on both
+// axes; repeating along one axis only, space and round are not admitted.
+bool MaterialReader::read_image_repeat(ComponentRange range, MaterialImageRepeat& repeat) {
+    const std::size_t values = count(range);
+    const std::uint32_t token = range.first < range.end ? value_.components[range.first].token : start_;
+    if (values == 0U || values > 2U) return fail(DiagnosticCode::value_syntax, token, "one or two repetitions");
+    for (std::size_t index = range.first; index < range.end; index = next(index)) {
+        const ValueComponent& component = value_.components[index];
+        if (repeat_word(index)) continue;
+        if (component.kind == ValueComponentKind::keyword) {
+            return fail(DiagnosticCode::keyword_unknown, component.token, clipped_theme_detail(component.text));
+        }
+        return fail(DiagnosticCode::value_wrong_kind, component.token, "a repetition");
+    }
+    const std::size_t first = range.first;
+    const std::size_t second = values == 2U ? next(first) : first;
+    const bool both_repeat = keyword(first, "repeat") && keyword(second, "repeat");
+    const bool both_alone = keyword(first, "no-repeat") && keyword(second, "no-repeat");
+    if (!both_repeat && !both_alone) {
+        return fail(DiagnosticCode::value_form_not_admitted, token,
+                    clipped_theme_detail(value_.components[first].text));
+    }
+    repeat = both_alone ? MaterialImageRepeat::no_repeat : MaterialImageRepeat::repeat;
+    return true;
+}
+
+bool MaterialReader::lower_positions() {
+    std::vector<ComponentRange> layers{};
+    split(ComponentRange{0U, value_.components.size()}, layers);
+    if (layers.size() > SurfaceMaterial::maximum_fill_layers) {
+        return fail(DiagnosticCode::too_many_layers, start_, std::to_string(SurfaceMaterial::maximum_fill_layers));
+    }
+    MaterialDeclaration declaration{};
+    declaration.field = MaterialField::fill_positions;
+    declaration.image_positions.resize(layers.size());
+    for (std::size_t layer = 0U; layer < layers.size(); ++layer) {
+        if (!read_image_position(layers[layer], declaration.image_positions[layer])) return false;
+    }
+    lowering_.declarations.push_back(std::move(declaration));
+    return true;
+}
+
+bool MaterialReader::lower_sizes() {
+    std::vector<ComponentRange> layers{};
+    split(ComponentRange{0U, value_.components.size()}, layers);
+    if (layers.size() > SurfaceMaterial::maximum_fill_layers) {
+        return fail(DiagnosticCode::too_many_layers, start_, std::to_string(SurfaceMaterial::maximum_fill_layers));
+    }
+    MaterialDeclaration declaration{};
+    declaration.field = MaterialField::fill_sizes;
+    declaration.image_sizes.resize(layers.size());
+    for (std::size_t layer = 0U; layer < layers.size(); ++layer) {
+        if (!read_image_size(layers[layer], declaration.image_sizes[layer])) return false;
+    }
+    lowering_.declarations.push_back(std::move(declaration));
+    return true;
+}
+
+bool MaterialReader::lower_repeats() {
+    std::vector<ComponentRange> layers{};
+    split(ComponentRange{0U, value_.components.size()}, layers);
+    if (layers.size() > SurfaceMaterial::maximum_fill_layers) {
+        return fail(DiagnosticCode::too_many_layers, start_, std::to_string(SurfaceMaterial::maximum_fill_layers));
+    }
+    MaterialDeclaration declaration{};
+    declaration.field = MaterialField::fill_repeats;
+    declaration.image_repeats.resize(layers.size());
+    for (std::size_t layer = 0U; layer < layers.size(); ++layer) {
+        if (!read_image_repeat(layers[layer], declaration.image_repeats[layer])) return false;
     }
     lowering_.declarations.push_back(std::move(declaration));
     return true;
@@ -1274,9 +1474,10 @@ bool MaterialReader::lower_glow_placements() {
     return true;
 }
 
-// `mask-image`: none or one gradient, whose alpha the engine multiplies the
-// finished part by; a fixed gradient resolved now, the others when the
-// material is assembled for a part.
+// `mask-image`: none, one gradient or one image, whose alpha the engine
+// multiplies the finished part by; an image tiled at its own size (CSS's
+// initial mask size and repetition), a fixed gradient resolved now, the
+// others when the material is assembled for a part.
 bool MaterialReader::lower_mask() {
     MaterialDeclaration declaration{};
     declaration.field = MaterialField::mask;
@@ -1289,22 +1490,18 @@ bool MaterialReader::lower_mask() {
     split(whole, layers);
     if (layers.size() > 1U) return fail(DiagnosticCode::too_many_layers, start_, "1 mask layer");
     if (count(layers[0]) != 1U) return fail(DiagnosticCode::value_syntax, start_, "one image");
-    const ValueComponent& component = value_.components[0];
-    if (component.kind == ValueComponentKind::resource) {
-        return fail(DiagnosticCode::not_yet_built, component.token, "an image resource as a mask");
-    }
-    AuthoredGradient gradient{};
-    if (!read_image(0U, gradient)) return false;
-    MaterialFillLayer layer{};
-    resolve_authored_gradient(gradient, Size{100.0, 100.0}, layer);
+    WrittenLayer written{};
+    if (!read_image(0U, written)) return false;
+    MaterialFillLayer layer = written.image;
+    if (!written.imaged) resolve_authored_gradient(written.gradient, Size{100.0, 100.0}, layer);
     SurfaceMaterial checked{};
     checked.mask = layer;
     if (!valid_surface_material(checked)) return fail(DiagnosticCode::value_out_of_range, start_, "a mask");
-    if (authored_gradient_fixed(gradient)) {
+    if (written.imaged || authored_gradient_fixed(written.gradient)) {
         declaration.mask = layer;
     } else {
         declaration.mask = MaterialFillLayer{};
-        declaration.gradients.push_back(std::move(gradient));
+        declaration.gradients.push_back(std::move(written.gradient));
     }
     lowering_.declarations.push_back(std::move(declaration));
     return true;
@@ -1325,7 +1522,7 @@ bool MaterialReader::lower_background_colour() {
 
 bool MaterialReader::lower_background_image() {
     const ComponentRange whole{0U, value_.components.size()};
-    std::vector<AuthoredGradient> written{};
+    std::vector<WrittenLayer> written{};
     if (count(whole) == 1U && keyword(0U, "none")) return push_fills(written);
     std::vector<ComponentRange> layers{};
     split(whole, layers);
@@ -1372,60 +1569,128 @@ bool MaterialReader::lower_blend_modes() {
     return true;
 }
 
-// The shorthand: the image layers, and the last layer's colour (CSS's
-// initial, transparent, when it names none). A layer's position, size,
-// repeat, attachment, origin and clip arrive with the image layers (P6c).
+// One layer of the shorthand: an image or `none`, a position with an
+// optional `/ size`, a repetition, and, in the last layer, a colour. A
+// layer's attachment, origin and clip are not admitted: the engine draws
+// every layer over the whole box, as it scrolls.
+bool MaterialReader::read_background_layer(ComponentRange range, bool last, MaterialDeclaration& colour,
+                                           std::vector<WrittenLayer>& written, BackgroundLayer& layer) {
+    if (range.first >= range.end) return fail(DiagnosticCode::value_syntax, start_, "a background layer");
+    bool coloured = false;
+    std::size_t index = range.first;
+    while (index < range.end) {
+        const ValueComponent& component = value_.components[index];
+        const bool image =
+            component.kind == ValueComponentKind::function || component.kind == ValueComponentKind::resource;
+        if (image || keyword(index, "none")) {
+            if (layer.imaged || layer.none) {
+                return fail(DiagnosticCode::value_syntax, component.token, "one image per layer");
+            }
+            layer.none = !image;
+            layer.imaged = image;
+            if (image) {
+                written.emplace_back();
+                if (!read_image(index, written.back())) return false;
+            }
+            index = next(index);
+            continue;
+        }
+        if (component.kind == ValueComponentKind::number || position_word(index) != PositionWord::none) {
+            if (layer.positioned) return fail(DiagnosticCode::value_syntax, component.token, "one position");
+            const std::size_t first = index;
+            while (index < range.end && (value_.components[index].kind == ValueComponentKind::number ||
+                                         position_word(index) != PositionWord::none)) {
+                index = next(index);
+            }
+            if (!read_image_position(ComponentRange{first, index}, layer.position)) return false;
+            layer.positioned = true;
+            if (index >= range.end || value_.components[index].kind != ValueComponentKind::slash) continue;
+            index = next(index);
+            const std::size_t size_first = index;
+            while (index < range.end && size_component(index)) index = next(index);
+            if (!read_image_size(ComponentRange{size_first, index}, layer.size)) return false;
+            layer.sized = true;
+            continue;
+        }
+        if (component.kind == ValueComponentKind::slash) {
+            return fail(DiagnosticCode::value_syntax, component.token, "a size after a position");
+        }
+        if (repeat_word(index)) {
+            if (layer.repeated) return fail(DiagnosticCode::value_syntax, component.token, "one repetition");
+            const std::size_t first = index;
+            while (index < range.end && repeat_word(index)) index = next(index);
+            if (!read_image_repeat(ComponentRange{first, index}, layer.repeat)) return false;
+            layer.repeated = true;
+            continue;
+        }
+        const bool named =
+            named_colour(component.text).has_value() || equals_ascii_folded(component.text, "currentcolor");
+        const bool colour_word = component.kind == ValueComponentKind::keyword && named;
+        if (component.kind == ValueComponentKind::colour || colour_word) {
+            if (!last || coloured) {
+                return fail(DiagnosticCode::value_syntax, component.token, "a colour only in the last layer");
+            }
+            coloured = true;
+            if (!read_colour(index, colour.colour)) return false;
+            index = next(index);
+            continue;
+        }
+        if (component.kind == ValueComponentKind::keyword) {
+            return fail(DiagnosticCode::value_form_not_admitted, component.token,
+                        "a background layer's attachment, origin or clip");
+        }
+        return fail(DiagnosticCode::value_wrong_kind, component.token, "a background layer");
+    }
+    return true;
+}
+
+// The shorthand: the image layers with their positions, sizes and
+// repetitions (CSS's initial ones where a layer names none), and the last
+// layer's colour (CSS's initial, transparent, when it names none). A
+// gradient layer covers the box, so one written with a position, size or
+// repetition other than the initial is not admitted.
 bool MaterialReader::lower_background() {
-    std::vector<ComponentRange> layers{};
-    split(ComponentRange{0U, value_.components.size()}, layers);
-    if (layers.size() > SurfaceMaterial::maximum_fill_layers) {
+    std::vector<ComponentRange> ranges{};
+    split(ComponentRange{0U, value_.components.size()}, ranges);
+    if (ranges.size() > SurfaceMaterial::maximum_fill_layers) {
         return fail(DiagnosticCode::too_many_layers, start_, std::to_string(SurfaceMaterial::maximum_fill_layers));
     }
     MaterialDeclaration colour{};
     colour.field = MaterialField::background_colour;
     colour.colour = Color::rgba(0, 0, 0, 0);
-    std::vector<AuthoredGradient> written{};
-    written.reserve(layers.size());
-    for (std::size_t layer = 0U; layer < layers.size(); ++layer) {
-        const ComponentRange range = layers[layer];
-        const bool last = layer + 1U == layers.size();
-        if (range.first >= range.end) return fail(DiagnosticCode::value_syntax, start_, "a background layer");
-        bool imaged = false;
-        bool coloured = false;
-        bool none = false;
-        for (std::size_t index = range.first; index < range.end; index = next(index)) {
-            const ValueComponent& component = value_.components[index];
-            const bool image =
-                component.kind == ValueComponentKind::function || component.kind == ValueComponentKind::resource;
-            if (image || keyword(index, "none")) {
-                if (imaged || none) return fail(DiagnosticCode::value_syntax, component.token, "one image per layer");
-                none = !image;
-                imaged = image;
-                if (!image) continue;
-                written.emplace_back();
-                if (!read_image(index, written.back())) return false;
-                continue;
-            }
-            const bool named = named_colour(component.text).has_value() ||
-                               equals_ascii_folded(component.text, "currentcolor");
-            const bool colour_word = component.kind == ValueComponentKind::keyword && named;
-            if (component.kind == ValueComponentKind::colour || colour_word) {
-                if (!last || coloured) {
-                    return fail(DiagnosticCode::value_syntax, component.token, "a colour only in the last layer");
-                }
-                coloured = true;
-                if (!read_colour(index, colour.colour)) return false;
-                continue;
-            }
-            return fail(DiagnosticCode::not_yet_built, component.token,
-                        "a background layer's position, size, repeat, attachment, origin or clip");
-        }
-        if (none && layers.size() > 1U) {
-            return fail(DiagnosticCode::value_form_not_admitted, value_.components[range.first].token,
+    MaterialDeclaration positions{};
+    positions.field = MaterialField::fill_positions;
+    MaterialDeclaration sizes{};
+    sizes.field = MaterialField::fill_sizes;
+    MaterialDeclaration repeats{};
+    repeats.field = MaterialField::fill_repeats;
+    std::vector<WrittenLayer> written{};
+    written.reserve(ranges.size());
+    for (std::size_t index = 0U; index < ranges.size(); ++index) {
+        const bool last = index + 1U == ranges.size();
+        const std::size_t before = written.size();
+        BackgroundLayer layer{};
+        if (!read_background_layer(ranges[index], last, colour, written, layer)) return false;
+        if (layer.none && ranges.size() > 1U) {
+            return fail(DiagnosticCode::value_form_not_admitted, value_.components[ranges[index].first].token,
                         "none among other layers");
         }
+        const bool gradient = written.size() > before && !written.back().imaged;
+        const bool placed = !(layer.position == MaterialImagePosition{}) || !(layer.size == MaterialImageSize{}) ||
+                            layer.repeat != MaterialImageRepeat::repeat;
+        if (gradient && placed) {
+            return fail(DiagnosticCode::value_form_not_admitted, value_.components[ranges[index].first].token,
+                        "a gradient layer's position, size or repetition");
+        }
+        if (written.size() == before) continue;
+        positions.image_positions.push_back(layer.position);
+        sizes.image_sizes.push_back(layer.size);
+        repeats.image_repeats.push_back(layer.repeat);
     }
     lowering_.declarations.push_back(std::move(colour));
+    lowering_.declarations.push_back(std::move(positions));
+    lowering_.declarations.push_back(std::move(sizes));
+    lowering_.declarations.push_back(std::move(repeats));
     return push_fills(written);
 }
 
@@ -1443,6 +1708,9 @@ void MaterialReader::lower(MaterialProperty property) {
     case MaterialProperty::background_color: static_cast<void>(lower_background_colour()); return;
     case MaterialProperty::background_image: static_cast<void>(lower_background_image()); return;
     case MaterialProperty::background_blend_mode: static_cast<void>(lower_blend_modes()); return;
+    case MaterialProperty::background_position: static_cast<void>(lower_positions()); return;
+    case MaterialProperty::background_size: static_cast<void>(lower_sizes()); return;
+    case MaterialProperty::background_repeat: static_cast<void>(lower_repeats()); return;
     case MaterialProperty::border: static_cast<void>(lower_edges(0U, 4U)); return;
     case MaterialProperty::border_top: static_cast<void>(lower_edges(0U, 1U)); return;
     case MaterialProperty::border_right: static_cast<void>(lower_edges(1U, 1U)); return;
@@ -1501,11 +1769,17 @@ void material_property_fields(MaterialProperty property, std::vector<MaterialFie
     switch (property) {
     case MaterialProperty::background:
         fields.push_back(MaterialField::background_colour);
+        fields.push_back(MaterialField::fill_positions);
+        fields.push_back(MaterialField::fill_sizes);
+        fields.push_back(MaterialField::fill_repeats);
         fields.push_back(MaterialField::fills);
         return;
     case MaterialProperty::background_color: fields.push_back(MaterialField::background_colour); return;
     case MaterialProperty::background_image: fields.push_back(MaterialField::fills); return;
     case MaterialProperty::background_blend_mode: fields.push_back(MaterialField::fill_blend_modes); return;
+    case MaterialProperty::background_position: fields.push_back(MaterialField::fill_positions); return;
+    case MaterialProperty::background_size: fields.push_back(MaterialField::fill_sizes); return;
+    case MaterialProperty::background_repeat: fields.push_back(MaterialField::fill_repeats); return;
     case MaterialProperty::border:
         for (std::size_t edge = 0U; edge < 4U; ++edge) {
             for (std::size_t part = 0U; part < 3U; ++part) fields.push_back(edge_field(edge, part));
@@ -1565,8 +1839,8 @@ void material_property_fields(MaterialProperty property, std::vector<MaterialFie
 }
 
 void lower_material_value(MaterialProperty property, const ThemeValue& value, std::uint32_t start,
-                          MaterialLowering& lowering) {
-    MaterialReader reader(value, start, lowering);
+                          std::span<const ThemeImageResource> images, MaterialLowering& lowering) {
+    MaterialReader reader(value, start, images, lowering);
     reader.lower(property);
 }
 

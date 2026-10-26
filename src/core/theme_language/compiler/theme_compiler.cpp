@@ -744,7 +744,7 @@ bool CompilePass::lower_material(const SyntaxNode& node) {
         }
         return true;
     }
-    lower_material_value(property, value_, node.content.first.value, material_lowering_);
+    lower_material_value(property, value_, node.content.first.value, input_.images, material_lowering_);
     if (material_lowering_.outcome != MaterialLoweringOutcome::lowered) {
         MaterialLoweringProblem& problem = material_lowering_.problem;
         // A keyword the running engine lacks, in a sheet for a newer one,
