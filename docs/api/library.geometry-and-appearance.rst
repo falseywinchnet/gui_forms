@@ -3959,6 +3959,8 @@ Enumerations
 
    .. cpp:enumerator:: screen
 
+   .. cpp:enumerator:: copy
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: ParameterAssignment
