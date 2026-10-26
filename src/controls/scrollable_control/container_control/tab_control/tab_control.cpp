@@ -1,6 +1,7 @@
 #include "gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp"
 #include "gui_forms/controls/pages/page_strip/page_strip.hpp"
 #include "gui_forms/delegate.hpp"
+#include "gui_forms/image_list.hpp"
 #include "gui_forms/theme/part_painting/part_painting.hpp"
 #include "gui_forms/window.hpp"
 #include "../../scrollable_anatomy.hpp"
@@ -136,6 +137,7 @@ void TabControl::on_dispose() noexcept {
     selecting_token_.disconnect();
     selection_token_.disconnect();
     invoked_token_.disconnect();
+    image_list_token_.disconnect();
     ContainerControl::on_dispose();
 }
 
@@ -186,6 +188,7 @@ void TabControl::add_page(std::shared_ptr<TabPage> page) {
     PageRecord record{};
     record.id = tab_page_id(*page);
     record.title = (*page).text();
+    record.image_key = tab_image_key(*page);
     PageEditStatus inserted = PageEditStatus::applied;
     {
         const TabSetEditScope editing(editing_tab_set_);
@@ -377,6 +380,35 @@ void TabControl::set_style(BasicControlStyle style) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+// The strip checks the list first, so a refused list changes neither.
+void TabControl::set_image_list(std::shared_ptr<ImageList> image_list) {
+    require_mutable();
+    if (image_list_ == image_list) return;
+    if (strip_) (*strip_).set_image_list(image_list);
+    image_list_token_.disconnect();
+    image_list_ = std::move(image_list);
+    if (image_list_) {
+        image_list_token_ = (*image_list_).changed().subscribe(
+            *this, Delegate<const ImageListChange&>::bind<TabControl, &TabControl::on_image_list_changed>(*this));
+    }
+    invalidate(Dirty::measure | Dirty::arrange | Dirty::paint | Dirty::hit_test);
+}
+
+void TabControl::on_image_list_changed(const ImageListChange&) {
+    // Arranging again maps each image_index to the key now at that index.
+    invalidate(Dirty::measure | Dirty::arrange | Dirty::paint | Dirty::hit_test);
+}
+
+std::string TabControl::tab_image_key(const TabPage& page) const {
+    if (!page.image_key().empty()) return page.image_key();
+    const int index = page.image_index();
+    if (index < 0 || !image_list_ || !(*image_list_).is_alive()) return {};
+    const std::size_t position = static_cast<std::size_t>(index);
+    if (position >= (*image_list_).count()) return {};
+    std::string key((*image_list_).key_at(position));
+    return key;
+}
+
 // -- the strip -----------------------------------------------------------------
 
 // The strip's edge, sizing and fixed width follow the control's alignment,
@@ -445,8 +477,14 @@ void TabControl::synchronize_tab_set() {
     }
     for (std::size_t index = 0; index < live.size() && index < tab_set_.count(); ++index) {
         const PageRecord& record = tab_set_.record_at(PagePosition{index});
-        if (record.title == (*live[index]).text()) continue;
-        static_cast<void>(tab_set_.set_title(record.id, (*live[index]).text()));
+        const PageId id = record.id;
+        if (record.title != (*live[index]).text()) {
+            static_cast<void>(tab_set_.set_title(id, (*live[index]).text()));
+        }
+        std::string image_key = tab_image_key(*live[index]);
+        if (tab_set_.record_at(PagePosition{index}).image_key != image_key) {
+            static_cast<void>(tab_set_.set_image_key(id, std::move(image_key)));
+        }
     }
     select_in_tab_set(selected_page_.lock());
 }
@@ -500,10 +538,11 @@ TabControl::ItemParts TabControl::tab_parts(const TabPage& page) const {
     const Rect own = absolute_bounds();
     const double dx = strip_bounds.x - own.x;
     const double dy = strip_bounds.y - own.y;
-    const std::array<const PartGeometry*, 4> sources{&strip_parts.tab, &strip_parts.tab_label,
-                                                     &strip_parts.tab_focus, &strip_parts.tab_seam};
-    const std::array<PartGeometry*, 4> targets{&record.tab, &record.tab_label, &record.tab_focus,
-                                               &record.tab_seam};
+    const std::array<const PartGeometry*, 5> sources{&strip_parts.tab, &strip_parts.tab_label,
+                                                     &strip_parts.tab_focus, &strip_parts.tab_seam,
+                                                     &strip_parts.tab_icon};
+    const std::array<PartGeometry*, 5> targets{&record.tab, &record.tab_label, &record.tab_focus,
+                                               &record.tab_seam, &record.tab_icon};
     for (std::size_t part = 0; part < sources.size(); ++part) {
         if (!(*sources[part]).present) continue;
         const Rect bounds = (*sources[part]).bounds;
@@ -751,7 +790,7 @@ constexpr std::array<PartField<TabControl::Parts>, 2> tab_control_extra_part_fie
      .member = &TabControl::Parts::display},
 }};
 
-constexpr std::array<PartField<TabControl::ItemParts>, 4> tab_control_item_part_fields{{
+constexpr std::array<PartField<TabControl::ItemParts>, 5> tab_control_item_part_fields{{
     {.declaration = {.name = "tab", .role = PartRole::face, .composed_from = {}},
      .member = &TabControl::ItemParts::tab},
     {.declaration = {.name = "tab_label", .role = PartRole::label, .composed_from = {}},
@@ -760,13 +799,15 @@ constexpr std::array<PartField<TabControl::ItemParts>, 4> tab_control_item_part_
      .member = &TabControl::ItemParts::tab_focus},
     {.declaration = {.name = "tab_seam", .role = PartRole::seam, .composed_from = {}},
      .member = &TabControl::ItemParts::tab_seam},
+    {.declaration = {.name = "tab_icon", .role = PartRole::icon, .composed_from = {}},
+     .member = &TabControl::ItemParts::tab_icon},
 }};
 
 constexpr std::array<StateField<TabControl::ItemStates>, 1> tab_control_item_state_fields{{
     {.state = AnatomyState::selected, .member = &TabControl::ItemStates::selected},
 }};
 
-constexpr std::array<PartDeclaration, 4> tab_control_item_parts =
+constexpr std::array<PartDeclaration, 5> tab_control_item_parts =
     part_declarations(tab_control_item_part_fields);
 constexpr std::array<AnatomyState, 1> tab_control_item_states =
     state_declarations(tab_control_item_state_fields);

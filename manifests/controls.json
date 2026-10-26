@@ -496,7 +496,7 @@
       "type": "TabControl",
       "header": "gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp",
       "category": "Grouping",
-      "purpose": "Owner of TabPage lifetime and selection with per-page focus restoration, tabs on an internal PageStrip (caption-sized, fill or fixed by size mode, scroll and list buttons when they overflow), four header alignments, three appearances, and virtual tab semantics.",
+      "purpose": "Owner of TabPage lifetime and selection with per-page focus restoration, tabs on an internal PageStrip (caption-sized, fill or fixed by size mode, scroll and list buttons when they overflow), four header alignments, three appearances, tab images from an ImageList by key or index, and virtual tab semantics.",
       "winforms": "TabControl",
       "status": "stable",
       "gallery_page": "tabs-and-pages",
@@ -930,6 +930,17 @@
       "status": "provisional",
       "gallery_page": "dialogs-and-host-services",
       "doc": "api/generated/gui_forms.TaskDialog.rst"
+    },
+    {
+      "id": "thread_exception_dialog",
+      "type": "ThreadExceptionDialog",
+      "header": "gui_forms/components/thread_exception_dialog/thread_exception_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "The dialog for an exception the application did not handle: a TaskDialog preset with the error icon, the message, details behind an expander, and Continue and Quit, returned as cancel and abort.",
+      "winforms": "ThreadExceptionDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.ThreadExceptionDialog.rst"
     },
     {
       "id": "tool_tip",

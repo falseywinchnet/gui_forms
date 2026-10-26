@@ -52,6 +52,12 @@ item_size : default ``{120.0, 30.0}``
 style
     Kept for compatibility: the control paints by role from the window's
     theme and no longer reads it.
+image_list : default null
+    The images the pages' `image_key` and `image_index` name. A tab shows its
+    image before its caption, painted by the strip as the tab's icon part.
+    Throws `std::invalid_argument` for a disposed list or one that belongs to
+    another window, and keeps the old list. Changes to the list move the
+    image an index names.
 overflowing
     Whether the tabs do not all fit, so the scroll and list buttons show.
 draw_mode : default ``ItemDrawMode::normal``

@@ -3352,7 +3352,8 @@
             {"name": "tab", "role": "face", "composed_from": null, "states": []},
             {"name": "tab_label", "role": "label", "composed_from": null, "states": []},
             {"name": "tab_focus", "role": "focus", "composed_from": null, "states": []},
-            {"name": "tab_seam", "role": "seam", "composed_from": null, "states": []}
+            {"name": "tab_seam", "role": "seam", "composed_from": null, "states": []},
+            {"name": "tab_icon", "role": "icon", "composed_from": null, "states": []}
           ],
           "states": ["selected"],
           "custom_states": []
@@ -5678,6 +5679,14 @@
         {"name": "expanded_changed", "payload": "bool", "mutable_payload": false},
         {"name": "verification_changed", "payload": "bool", "mutable_payload": false},
         {"name": "radio_button_changed", "payload": "std::string", "mutable_payload": false}
+      ]
+    },
+    {
+      "id": "thread_exception_dialog",
+      "type": "ThreadExceptionDialog",
+      "kind": "component",
+      "interactions": [
+        {"name": "closed", "payload": "DialogResult", "mutable_payload": false}
       ]
     },
     {

@@ -1577,6 +1577,7 @@ Item system `item`:
 | `tab_label` | label |  |  |
 | `tab_focus` | focus |  |  |
 | `tab_seam` | seam |  |  |
+| `tab_icon` | icon |  |  |
 
 Item states: `selected`.
 
@@ -2683,6 +2684,12 @@ Properties beyond every control's: none.
 | `expanded_changed` | `bool` |
 | `verification_changed` | `bool` |
 | `radio_button_changed` | `std::string` |
+
+## `thread_exception_dialog` (ThreadExceptionDialog, component)
+
+| Interaction | Payload |
+|---|---|
+| `closed` | `DialogResult` |
 
 ## `tool_tip` (ToolTip, component)
 

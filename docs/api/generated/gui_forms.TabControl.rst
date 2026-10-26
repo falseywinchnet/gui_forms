@@ -76,6 +76,13 @@ gui_forms::TabControl
          Kept for compatibility: the control paints by role from the window's
          theme and no longer reads it.
 
+      **image_list** : ``std::shared_ptr<ImageList>``, default null
+         The images the pages' ``image_key`` and ``image_index`` name. A tab shows its
+         image before its caption, painted by the strip as the tab's icon part.
+         Throws ``std::invalid_argument`` for a disposed list or one that belongs to
+         another window, and keeps the old list. Changes to the list move the
+         image an index names.
+
       **display_bounds** : ``Rect``, read-only
          The area given to the selected page, in the control's coordinates. With
          the default alignment it starts one pixel above the bottom of the tab
@@ -351,6 +358,18 @@ gui_forms::TabControl
    .. cpp:function:: void set_style(BasicControlStyle style)
 
       Sets :cpp:func:`style <gui_forms::TabControl::style>`; see the property's description above.
+
+   .. cpp:function:: std::shared_ptr<ImageList> image_list() const noexcept
+
+      The images the pages' ``image_key`` and ``image_index`` name. A tab shows its
+      image before its caption, painted by the strip as the tab's icon part.
+      Throws ``std::invalid_argument`` for a disposed list or one that belongs to
+      another window, and keeps the old list. Changes to the list move the
+      image an index names.
+
+   .. cpp:function:: void set_image_list(std::shared_ptr<ImageList> image_list)
+
+      Sets :cpp:func:`image_list <gui_forms::TabControl::image_list>`; see the property's description above.
 
    .. cpp:function:: Rect display_bounds() const noexcept
 

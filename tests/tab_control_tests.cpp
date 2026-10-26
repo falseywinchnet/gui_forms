@@ -31,12 +31,16 @@ public:
         texts.emplace_back(text);
         ++commands;
     }
-    void draw_image(ImageId, Rect, double) override { ++commands; }
+    void draw_image(ImageId image, Rect, double) override {
+        images.push_back(image);
+        ++commands;
+    }
 
     std::uint64_t commands{};
     std::uint64_t fills{};
     std::uint64_t strokes{};
     std::vector<std::string> texts;
+    std::vector<ImageId> images;
 };
 
 struct Fixture final {
@@ -221,6 +225,102 @@ void test_page_removal_and_disposal_reconciliation() {
             "direct selected-page disposal must reconcile without stale ownership");
 }
 
+template <typename Action>
+bool throws(Action action) {
+    try {
+        action();
+    } catch (const std::invalid_argument&) {
+        return true;
+    } catch (const std::out_of_range&) {
+        return true;
+    }
+    return false;
+}
+
+struct SetImageKey final {
+    TabPage* page{};
+    std::string key{};
+    void operator()() const { (*page).set_image_key(key); }
+};
+
+struct SetImageIndex final {
+    TabPage* page{};
+    int index{};
+    void operator()() const { (*page).set_image_index(index); }
+};
+
+struct SetImageList final {
+    TabControl* tabs{};
+    std::shared_ptr<ImageList> list{};
+    void operator()() const { (*tabs).set_image_list(list); }
+};
+
+bool painted(const RecordingPainter& painter, ImageId image) {
+    const bool found = std::find(painter.images.begin(), painter.images.end(), image) != painter.images.end();
+    return found;
+}
+
+void test_tab_images() {
+    Fixture fixture = make_fixture();
+    Window window(fixture.tabs, {480.0, 260.0});
+    const std::array<std::byte, 4> blue{std::byte{0xcc}, std::byte{0x77}, std::byte{0x33}, std::byte{0xff}};
+    const std::array<std::byte, 4> green{std::byte{0x33}, std::byte{0xcc}, std::byte{0x33}, std::byte{0xff}};
+    const ImageLoadResult folder = window.load_bgra32_premultiplied(1U, 1U, 4U, blue);
+    const ImageLoadResult chart = window.load_bgra32_premultiplied(1U, 1U, 4U, green);
+    require(static_cast<bool>(folder) && static_cast<bool>(chart), "tab image fixtures must load");
+
+    require(throws(SetImageIndex{fixture.first.get(), -2}), "an image index below -1 is refused");
+    require(throws(SetImageKey{fixture.first.get(), std::string("bad \xC3", 5U)}),
+            "an image key that is not UTF-8 is refused");
+    require(throws(SetImageKey{fixture.first.get(), std::string(257U, 'k')}), "an image key over 256 bytes is refused");
+    (*fixture.first).set_image_key("folder");
+    (*fixture.third).set_image_index(1);
+    require((*fixture.first).image_index() == -1 && (*fixture.third).image_key().empty(),
+            "a key and an index exclude each other");
+    window.perform_layout();
+    require(!(*fixture.tabs).realized_items().front().parts.tab_icon.present,
+            "a tab shows no image before the control has an image list");
+
+    std::shared_ptr<ImageList> images = std::make_shared<ImageList>(window, Size{16.0, 16.0});
+    (*images).add_image("folder", folder.image);
+    (*images).add_image("chart", chart.image);
+    (*fixture.tabs).set_image_list(images);
+    require((*fixture.tabs).image_list() == images, "the control keeps its image list");
+    window.perform_layout();
+    const std::vector<TabControl::Item> items = (*fixture.tabs).realized_items();
+    require(items.size() == 3U && items[0].parts.tab_icon.present && !items[1].parts.tab_icon.present &&
+                items[2].parts.tab_icon.present,
+            "tabs with a key or an index the list has show an icon part; the others do not");
+    require(items[0].parts.tab_icon.bounds.x + items[0].parts.tab_icon.bounds.width <=
+                    items[0].parts.tab_label.bounds.x + 0.5 &&
+                items[0].parts.tab_icon.bounds.x >= items[0].parts.tab.bounds.x,
+            "the icon sits inside the tab, before its text");
+    RecordingPainter painter;
+    window.paint(painter, {0.0, 0.0, 480.0, 260.0});
+    require(painted(painter, folder.image) && painted(painter, chart.image),
+            "the tabs paint the images their key and index name");
+
+    // The index names whatever the list holds there now.
+    static_cast<void>((*images).remove_by_key("chart"));
+    window.perform_layout();
+    require(!(*fixture.tabs).realized_items()[2].parts.tab_icon.present,
+            "an index past the list's end shows no image after the list shrinks");
+
+    (*fixture.third).set_image_index(-1);
+    (*fixture.first).set_image_key({});
+    window.perform_layout();
+    for (const TabControl::Item& item : (*fixture.tabs).realized_items()) {
+        require(!item.parts.tab_icon.present, "clearing the key and index removes the image");
+    }
+
+    Window other_window(make_control<Panel>(StableId("tabs.other.root")), {200.0, 100.0});
+    std::shared_ptr<ImageList> foreign = std::make_shared<ImageList>(other_window, Size{16.0, 16.0});
+    require(throws(SetImageList{fixture.tabs.get(), foreign}) && (*fixture.tabs).image_list() == images,
+            "a list of another window is refused and the old list kept");
+    (*fixture.tabs).set_image_list(nullptr);
+    require((*fixture.tabs).image_list() == nullptr, "the image list can be cleared");
+}
+
 } // namespace
 
 bool painted(const RecordingPainter& painter, std::string_view text) {
@@ -304,6 +404,7 @@ int main() {
         test_alignment_appearance_and_semantics();
         test_page_removal_and_disposal_reconciliation();
         test_owner_draw();
+        test_tab_images();
         std::cout << "gui_forms_tab_control_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
