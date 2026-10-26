@@ -39,6 +39,12 @@ extern char** environ;
 // while hidden, and the screen after the restore must equal the screen
 // before it apart from the changed block: a restored window must never come
 // back blank or white (the draw that copies the raster must always copy).
+// A restore repaints in full, because losing and regaining key status
+// changes the window's activation, which dirties the tree. So last, the
+// window is occluded for real without losing key status, under a borderless
+// non-activating panel, with and without a change while covered: uncovered,
+// it must show what it showed before, AppKit must draw it, and with nothing
+// changed it must paint nothing (the copy-only draw).
 
 // Existing private native diagnostics and occlusion hooks, not a public API addition.
 @interface NSView (DamageRectanglesProbe)
@@ -81,7 +87,7 @@ struct Capture final {
 
 enum class Stage {
     first_frame, drain, settle, changed, shown, hidden, revealed, bare_reveal,
-    resize_hidden, resized, minimize, minimized, restored
+    resize_hidden, resized, minimize, minimized, restored, cover, covered, uncovered
 };
 
 struct State final {
@@ -107,6 +113,12 @@ struct State final {
     bool change_while_minimized{false};
     double draws_before{0.0};
     Capture screen_before_minimize{};
+    // The real-occlusion passes: the second one changes a block while covered.
+    bool change_while_covered{false};
+    bool key_before_cover{false};
+    NSPanel* cover{nil}; // Owned (ARC) while it covers the window.
+    std::chrono::steady_clock::time_point cover_deadline{};
+    Capture screen_before_cover{};
     bool finished{false};
     bool host_closed{false};
     std::string failure{};
@@ -150,6 +162,9 @@ const char* stage_name(const Stage stage) {
     case Stage::minimize: return "minimize";
     case Stage::minimized: return "minimized";
     case Stage::restored: return "restored";
+    case Stage::cover: return "cover";
+    case Stage::covered: return "covered";
+    case Stage::uncovered: return "uncovered";
     }
     return "unknown";
 }
@@ -520,6 +535,91 @@ void advance(State& state) {
         set_stage(state, Stage::restored);
         return;
     }
+    if (state.stage == Stage::cover) {
+        // Let the restore's activation frame settle before the baseline.
+        ++state.settle_steps;
+        if (state.settle_steps < 6U) return;
+        state.screen_before_cover = capture_screen(window, view, state.change_while_covered ? "before_cover_changed" : "before_cover");
+        state.key_before_cover = window.isKeyWindow;
+        // Larger than the window's frame, above it, and never key: the window
+        // is occluded without a change of activation.
+        const NSRect frame = NSInsetRect(window.frame, -24.0, -24.0);
+        const NSWindowStyleMask style = NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel;
+        NSPanel* const panel = [[NSPanel alloc] initWithContentRect:frame styleMask:style
+                                                            backing:NSBackingStoreBuffered defer:NO];
+        panel.opaque = YES;
+        panel.backgroundColor = NSColor.blackColor;
+        panel.hidesOnDeactivate = NO;
+        panel.level = NSFloatingWindowLevel;
+        panel.releasedWhenClosed = NO;
+        [panel orderFrontRegardless];
+        state.cover = panel;
+        state.cover_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(8);
+        set_stage(state, Stage::covered);
+        return;
+    }
+    if (state.stage == Stage::covered) {
+        if (!(*state.model).occluded()) {
+            if (std::chrono::steady_clock::now() >= state.cover_deadline) {
+                throw std::runtime_error("not exercised: the window was never reported occluded under a covering panel");
+            }
+            return;
+        }
+        if (state.change_while_covered) {
+            (*state.top_left).set_color(Color::rgba(90, 40, 160));
+            [view collectDamage];
+        }
+        state.before_metrics = (*state.model).metrics_snapshot();
+        state.draws_before = host_number(view, "native_draw_count");
+        [state.cover orderOut:nil];
+        state.cover = nil;
+        state.settle_steps = 0;
+        set_stage(state, Stage::uncovered);
+        return;
+    }
+    if (state.stage == Stage::uncovered) {
+        const bool visible = !(*state.model).occluded() &&
+            (window.occlusionState & NSWindowOcclusionStateVisible) != 0;
+        if (!visible) return;
+        ++state.settle_steps;
+        if (state.settle_steps < 6U) return;
+        const Capture uncovered = capture_screen(window, view, state.change_while_covered ? "uncovered_changed" : "uncovered");
+        const MetricsSnapshot after = (*state.model).metrics_snapshot();
+        const double painted = after.painted_damage_area - state.before_metrics.painted_damage_area;
+        const std::uint64_t passes = after.paint_passes - state.before_metrics.paint_passes;
+        const double draws = host_number(view, "native_draw_count") - state.draws_before;
+        const bool key_after = window.isKeyWindow;
+        const std::array<gui_forms::Rect, 1> changed_block{state.blocks[0]};
+        const ChangedPixels changed = changed_pixels(state.screen_before_cover, uncovered, state.scale, changed_block);
+        const std::uint8_t root_red = red_at(uncovered, state.scale, 200.0, 150.0);
+        std::cout << "dp-reveal|occlusion|change_while_hidden=" << (state.change_while_covered ? 1 : 0)
+                  << "|native_draws=" << draws << "|painted_area=" << painted << "|paint_passes=" << passes
+                  << "|key_before=" << (state.key_before_cover ? 1 : 0) << "|key_after=" << (key_after ? 1 : 0)
+                  << "|screen_changed_inside=" << changed.inside << "|screen_changed_outside=" << changed.outside
+                  << "|root_red=" << static_cast<unsigned>(root_red) << '\n';
+        require(key_after == state.key_before_cover, "not exercised: covering the window changed its key status");
+        require(draws >= 1.0, "not exercised: AppKit did not draw the uncovered window");
+        require(root_red != 255U, "the uncovered window came back white");
+        require(changed.outside == 0U, "the uncovered window differs from the window before it was covered");
+        const double device_pixels_per_unit = state.scale * state.scale;
+        const std::size_t block_pixels =
+            static_cast<std::size_t>(std::llround(state.blocks[0].area() * device_pixels_per_unit));
+        if (state.change_while_covered) {
+            const double difference = painted - state.blocks[0].area();
+            require(difference < 1.0e-6 && difference > -1.0e-6,
+                "uncovering repainted more than what changed while covered");
+            require(changed.inside == block_pixels, "the change made while covered is not on the screen");
+            state.finished = true;
+            close_fixture(state);
+            return;
+        }
+        require(painted == 0.0 && passes == 0U, "uncovering with nothing changed repainted");
+        require(changed.inside == 0U, "the uncovered window changed although nothing changed while covered");
+        state.change_while_covered = true;
+        state.settle_steps = 0;
+        set_stage(state, Stage::cover);
+        return;
+    }
     const bool shown_again = !window.isMiniaturized && window.isVisible &&
         (window.occlusionState & NSWindowOcclusionStateVisible) != 0;
     if (!shown_again) return;
@@ -546,8 +646,8 @@ void advance(State& state) {
         static_cast<std::size_t>(std::llround(state.blocks[0].area() * device_pixels_per_unit));
     if (state.change_while_minimized) {
         require(changed.inside == block_pixels, "the change made while hidden is not on the screen after the restore");
-        state.finished = true;
-        close_fixture(state);
+        state.settle_steps = 0;
+        set_stage(state, Stage::cover);
         return;
     }
     require(changed.inside == 0U, "the restored window changed although nothing changed while hidden");
