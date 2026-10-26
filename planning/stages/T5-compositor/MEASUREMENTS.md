@@ -103,8 +103,39 @@ Not measured yet:
 
 ### Windows Server 2022, build 20348 (CI `windows-2022`)
 
-Pending: the probe runs in this PR's Windows job, and its JSON lines are
-in the `gui-forms-evidence-windows-x64` artifact's `LastTest.log`. The next
-C2 PR records them here: whether DWM composes per-pixel alpha in the
-runner's session at all, and what `DWMWA_SYSTEMBACKDROP_TYPE` returns below
-build 22621.
+From the `windows-x64` native job of this PR, 2026-10-25 (the
+`gui-forms-evidence-windows-x64` artifact, `SDKLastTest.log`). The
+runner's session composes: composition on, not a remote session,
+`EnableTransparency` 1 and `AdvancedEffectsEnabled` true, high contrast
+off.
+
+| Case | Clear, active | Clear, inactive | Half | Opaque | Caption | Clear pixel hits |
+|---|---|---|---|---|---|---|
+| none (today) | 0, 0, 0 | 0, 0, 0 | 100, 0, 0 | 0, 0, 220 | 255, 255, 255 | the window (client) |
+| extend_frame | 255, 255, 255 | 255, 255, 255 | 227, 127, 127 | 0, 0, 220 | 255, 255, 255 | the window (client) |
+| blur_behind | **0, 160, 0** | **0, 160, 0** | **100, 80, 0** | 0, 0, 220 | 255, 255, 255 | the window (client) |
+| mica, acrylic, mica_alt | 255, 255, 255 | 255, 255, 255 | 227, 127, 127 | 0, 0, 220 | 255, 255, 255 | the window (client) |
+| blur_mica | 0, 160, 0 | 0, 160, 0 | 100, 80, 0 | 0, 0, 220 | 255, 255, 255 | the window (client) |
+| mica, then none | 0, 0, 0 | 0, 0, 0 | 100, 0, 0 | 0, 0, 220 | 255, 255, 255 | the window (client) |
+| blur_behind, then mica | 255, 255, 255 | 255, 255, 255 | 227, 127, 127 | 0, 0, 220 | 255, 255, 255 | the window (client) |
+| mica, then blur_behind | 0, 160, 0 | 0, 160, 0 | 100, 80, 0 | 0, 0, 220 | 255, 255, 255 | the window (client) |
+
+Setting `DWMWA_SYSTEMBACKDROP_TYPE` returned `E_INVALIDARG` (0x80070057)
+in every material case, and reading it back returned `E_INVALIDARG` on
+every window. Every other call returned `S_OK`.
+
+What this shows:
+
+1. **Blur behind with an empty region is `transparent` here too,** with
+   the same exact premultiplied composition, active and inactive.
+2. **There are no materials below build 22621,** and the read-back says
+   so before anything is set: the attribute's `E_INVALIDARG` is the
+   adapter's `os_version` answer. A failed set leaves the route beneath
+   it as it was (blur_mica still shows the backdrop; mica over an
+   extended frame shows the frame's white).
+3. **Withdrawing still restores today's window,** and a clear pixel still
+   hits the window.
+
+The two builds agree on everything the adapter uses. CI's Windows runner
+can therefore run the C2 gate's `transparent` step for real, and its
+material step exercises the `os_version` fallback to `transparent`.
