@@ -994,6 +994,8 @@ private:
         anchor_styles_property_enum();
     [[nodiscard]] static std::shared_ptr<const PropertyEnumDescriptor>
         auto_size_mode_property_enum();
+    [[nodiscard]] static std::shared_ptr<const PropertyEnumDescriptor>
+        layout_direction_property_enum();
     [[nodiscard]] static BindingValue current_enum_property_value(
         std::shared_ptr<const PropertyEnumDescriptor> enumeration,
         std::int64_t value);
@@ -1131,6 +1133,7 @@ private:
         dock,
         anchor,
         auto_size_mode,
+        layout_direction,
         tab_index,
         tab_stop,
         allow_drop,
@@ -1183,6 +1186,11 @@ private:
                 return Control::current_enum_property_value(
                     Control::auto_size_mode_property_enum(),
                     static_cast<std::int64_t>((*control).auto_size_mode_));
+            } else if constexpr (
+                Property == RegisteredProperty::layout_direction) {
+                return Control::current_enum_property_value(
+                    Control::layout_direction_property_enum(),
+                    static_cast<std::int64_t>((*control).layout_direction_));
             } else if constexpr (Property == RegisteredProperty::tab_index) {
                 return BindingValue{static_cast<std::uint64_t>(
                     (*control).tab_index_)};
@@ -1261,6 +1269,10 @@ private:
             } else if constexpr (
                 Property == RegisteredProperty::auto_size_mode) {
                 (*control).set_auto_size_mode(static_cast<AutoSizeMode>(
+                    std::get<PropertyEnumValue>(value).value));
+            } else if constexpr (
+                Property == RegisteredProperty::layout_direction) {
+                (*control).set_layout_direction(static_cast<LayoutDirection>(
                     std::get<PropertyEnumValue>(value).value));
             } else if constexpr (Property == RegisteredProperty::tab_index) {
                 const std::uint64_t index = std::get<std::uint64_t>(value);

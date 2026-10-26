@@ -487,7 +487,7 @@ void test_property_metadata_defaults_reset_and_serialization() {
                 "visible"},
             "bindable property enumeration must be deterministic and use the registered names");
     const std::vector<PropertyDescriptor> descriptors = (*editor).property_descriptors();
-    require(descriptors.size() == 21U &&
+    require(descriptors.size() == 22U &&
                 descriptors.front().name == "accessible_description" &&
                 descriptors.back().name == "visible",
             "property descriptor snapshots must follow deterministic canonical order");

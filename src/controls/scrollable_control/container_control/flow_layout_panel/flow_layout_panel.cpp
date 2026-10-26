@@ -8,7 +8,6 @@
 #include <numeric>
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
 #include <utility>
 
 namespace gui_forms {
@@ -76,18 +75,22 @@ void FlowLayoutPanel::set_flow_break(const Control& child, bool flow_break) {
             "FlowLayoutPanel flow break requires a live direct child");
     }
     const std::uint64_t id = child.runtime_id().value;
-    const bool previous = flow_breaks_.contains(id) && flow_breaks_.at(id);
-    if (previous == flow_break) return;
-    if (flow_break) flow_breaks_[id] = true;
-    else flow_breaks_.erase(id);
+    if (FlowLayoutPanel::flow_break(child) == flow_break) return;
+    records_[id].flow_break = flow_break;
+    erase_default_record(id);
     invalidate(invalidation::bounds);
 }
 
 bool FlowLayoutPanel::flow_break(const Control& child) const {
     if (child.parent().get() != this || !child.is_alive()) return false;
-    const FlowBreakMap::const_iterator found =
-        flow_breaks_.find(child.runtime_id().value);
-    return found != flow_breaks_.end() && (*found).second;
+    const ItemMap::const_iterator found = records_.find(child.runtime_id().value);
+    return found != records_.end() && (*found).second.flow_break;
+}
+
+void FlowLayoutPanel::erase_default_record(std::uint64_t id) {
+    const ItemMap::iterator found = records_.find(id);
+    if (found == records_.end()) return;
+    if (!(*found).second.flow_break && (*found).second.grow == 0.0) records_.erase(found);
 }
 
 void FlowLayoutPanel::set_flex_grow(const Control& child, double grow) {
@@ -101,41 +104,33 @@ void FlowLayoutPanel::set_flex_grow(const Control& child, double grow) {
             "FlowLayoutPanel flex grow must be finite and between zero and 1024");
     }
     const std::uint64_t id = child.runtime_id().value;
-    const double previous = flex_grow(child);
-    if (previous == grow) return;
-    if (grow == 0.0) flex_grow_.erase(id);
-    else flex_grow_[id] = grow;
+    if (flex_grow(child) == grow) return;
+    records_[id].grow = grow;
+    erase_default_record(id);
     invalidate(invalidation::bounds);
 }
 
 double FlowLayoutPanel::flex_grow(const Control& child) const {
     if (child.parent().get() != this || !child.is_alive()) return 0.0;
-    const FlexGrowMap::const_iterator found =
-        flex_grow_.find(child.runtime_id().value);
-    return found == flex_grow_.end() ? 0.0 : (*found).second;
+    const ItemMap::const_iterator found = records_.find(child.runtime_id().value);
+    return found == records_.end() ? 0.0 : (*found).second.grow;
 }
 
-void FlowLayoutPanel::reconcile_flow_breaks() {
-    std::unordered_set<std::uint64_t> live;
+// Drops the records of children that have left, by marking the live ones
+// with this pass's number (no per-pass set).
+void FlowLayoutPanel::reconcile_records(std::uint64_t pass) {
+    if (records_.empty()) return;
     for (const Control::Ptr& child : children()) {
-        if (child && (*child).is_alive() && (*child).parent().get() == this) {
-            live.insert((*child).runtime_id().value);
-        }
+        if (!child || !(*child).is_alive() || (*child).parent().get() != this) continue;
+        const ItemMap::iterator found = records_.find((*child).runtime_id().value);
+        if (found != records_.end()) (*found).second.seen_pass = pass;
     }
-    FlowBreakMap::iterator entry = flow_breaks_.begin();
-    while (entry != flow_breaks_.end()) {
-        if (!live.contains((*entry).first)) {
-            entry = flow_breaks_.erase(entry);
+    ItemMap::iterator entry = records_.begin();
+    while (entry != records_.end()) {
+        if ((*entry).second.seen_pass != pass) {
+            entry = records_.erase(entry);
         } else {
             ++entry;
-        }
-    }
-    FlexGrowMap::iterator grow = flex_grow_.begin();
-    while (grow != flex_grow_.end()) {
-        if (!live.contains((*grow).first)) {
-            grow = flex_grow_.erase(grow);
-        } else {
-            ++grow;
         }
     }
 }
@@ -211,10 +206,28 @@ CrossPlacement place_across(FlowCrossAlignment alignment, double line, double it
 } // namespace
 
 Size FlowLayoutPanel::layout_children(Size available, bool assign) {
-    reconcile_flow_breaks();
+    if (workspace_busy_) {
+        // A child's measure laid this panel out again inside a pass: the
+        // nested pass takes its own storage, so the outer pass's survives.
+        Workspace nested{};
+        const Size nested_size = layout_pass(available, assign, nested);
+        return nested_size;
+    }
+    workspace_busy_ = true;
+    struct Release final {
+        bool& busy;
+        ~Release() { busy = false; }
+    } release{workspace_busy_};
+    const Size size = layout_pass(available, assign, workspace_);
+    return size;
+}
+
+Size FlowLayoutPanel::layout_pass(Size available, bool assign, Workspace& workspace) {
+    reconcile_records(++pass_);
     const Insets inset = padding();
     const Size inner{std::max(0.0, available.width - horizontal_extent(inset)),
                      std::max(0.0, available.height - vertical_extent(inset))};
+    const bool right_to_left = effective_layout_direction() == LayoutDirection::right_to_left;
     const bool horizontal = flow_direction_ == FlowDirection::left_to_right ||
                             flow_direction_ == FlowDirection::right_to_left;
     const double main_limit = horizontal ? inner.width : inner.height;
@@ -224,73 +237,67 @@ Size FlowLayoutPanel::layout_children(Size available, bool assign) {
     const double cross_spacing = horizontal ? item_spacing_.height
                                             : item_spacing_.width;
 
-    struct Item final {
-        Control::Ptr control;
-        Size desired;
-        Insets margin;
-        double grow{};
-        bool break_after{};
-    };
-    struct Line final {
-        std::vector<Item> items;
-        double main{};
-        double cross{};
-    };
-
-    std::vector<Line> lines;
-    Line line;
-    const std::vector<Control::Ptr> retained = snapshot_layout_children();
-    for (const Control::Ptr& child : retained) {
-        if (!is_current_layout_child(child) || !(*child).visible()) continue;
+    // The children, held for the pass: a measure callback may change the
+    // tree, so each is revalidated after it is measured.
+    const std::span<const Control::Ptr> all = children();
+    workspace.retained.assign(all.begin(), all.end());
+    workspace.items.clear();
+    workspace.items.reserve(workspace.retained.size());
+    workspace.lines.clear();
+    FlowLine line{};
+    for (const Control::Ptr& child : workspace.retained) {
+        if (!child || !is_current_layout_child(child) || !(*child).visible()) continue;
         const Size desired = preferred_child_size(child, inner);
         if (!is_alive()) return {};
         if (!is_current_layout_child(child) || !(*child).visible()) continue;
-        Item item{child, desired, (*child).margin(), flex_grow(*child),
-                  flow_break(*child)};
+        const FlowItem item{child, desired, (*child).margin(), flex_grow(*child), flow_break(*child)};
         const double item_main = horizontal
             ? horizontal_extent(item.margin) + item.desired.width
             : vertical_extent(item.margin) + item.desired.height;
         const double item_cross = horizontal
             ? vertical_extent(item.margin) + item.desired.height
             : horizontal_extent(item.margin) + item.desired.width;
-        const double preceding_spacing = line.items.empty() ? 0.0 : main_spacing;
-        if (!line.items.empty() && wrap_contents_ &&
+        const double preceding_spacing = line.count == 0U ? 0.0 : main_spacing;
+        if (line.count != 0U && wrap_contents_ &&
             line.main + preceding_spacing + item_main > main_limit) {
-            lines.push_back(std::move(line));
-            line = {};
+            workspace.lines.push_back(line);
+            line = FlowLine{workspace.items.size(), 0U, 0.0, 0.0};
         }
-        if (!line.items.empty()) line.main += main_spacing;
+        if (line.count != 0U) line.main += main_spacing;
         line.main += item_main;
         line.cross = std::max(line.cross, item_cross);
-        line.items.push_back(std::move(item));
-        if (!line.items.empty() && line.items.back().break_after) {
-            lines.push_back(std::move(line));
-            line = {};
+        workspace.items.push_back(item);
+        ++line.count;
+        if (item.break_after) {
+            workspace.lines.push_back(line);
+            line = FlowLine{workspace.items.size(), 0U, 0.0, 0.0};
         }
     }
-    if (!line.items.empty()) {
-        lines.push_back(std::move(line));
-        line = {};
-    }
+    if (line.count != 0U) workspace.lines.push_back(line);
+    // The items are held by the workspace now; the snapshot's references
+    // are not needed past this point.
+    workspace.retained.clear();
 
     double cross_origin = 0.0;
     double content_main = 0.0;
-    for (std::size_t line_index = 0U; line_index < lines.size(); ++line_index) {
-        const Line& current = lines[line_index];
+    for (std::size_t line_index = 0U; line_index < workspace.lines.size(); ++line_index) {
+        const FlowLine& current = workspace.lines[line_index];
+        const std::span<const FlowItem> line_items =
+            std::span<const FlowItem>(workspace.items).subspan(current.first, current.count);
         const double available_main = std::max(0.0, main_limit - current.main);
         double total_grow = 0.0;
-        for (const Item& item : current.items) total_grow += item.grow;
+        for (const FlowItem& item : line_items) total_grow += item.grow;
         const double free_main = assign && total_grow > 0.0
             ? 0.0 : available_main;
         const MainPlacement main_placement =
-            place_along(main_alignment_, free_main, current.items.size());
+            place_along(main_alignment_, free_main, line_items.size());
         double main_origin = main_placement.origin;
         const double distributed_spacing = main_placement.spacing;
-        const double line_cross = assign && lines.size() == 1U
+        const double line_cross = assign && workspace.lines.size() == 1U
             ? cross_limit : current.cross;
-        for (std::size_t item_index = 0U; item_index < current.items.size();
+        for (std::size_t item_index = 0U; item_index < line_items.size();
              ++item_index) {
-            const Item& item = current.items[item_index];
+            const FlowItem& item = line_items[item_index];
             if (item_index != 0U) {
                 main_origin += main_spacing + distributed_spacing;
             }
@@ -336,16 +343,21 @@ Size FlowLayoutPanel::layout_children(Size available, bool assign) {
                 main_origin += vertical_extent(item.margin) + assigned_main;
             }
             if (assign && is_current_layout_child(item.control)) {
+                // Right to left mirrors the scrolled slot about the
+                // viewport, once, at output.
                 const Point offset = scroll_position();
                 slot.x -= offset.x;
                 slot.y -= offset.y;
+                if (right_to_left) slot.x = available.width - slot.x - slot.width;
                 set_child_layout(item.control, slot);
             }
         }
         content_main = std::max(content_main, current.main);
         cross_origin += current.cross;
-        if (line_index + 1U < lines.size()) cross_origin += cross_spacing;
+        if (line_index + 1U < workspace.lines.size()) cross_origin += cross_spacing;
     }
+    // Releases the pass's references to the children; the capacity stays.
+    workspace.items.clear();
     const Size content = horizontal ? Size{content_main, cross_origin}
                                     : Size{cross_origin, content_main};
     return {content.width + horizontal_extent(inset),

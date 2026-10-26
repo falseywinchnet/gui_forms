@@ -22,6 +22,11 @@ gui_forms::TableLayoutPanel
    instead when items simply follow one another, and a :cpp:class:`ResponsiveTrackPanel <gui_forms::ResponsiveTrackPanel>`
    when regions must collapse in a set order as the window narrows.
 
+   In a right-to-left ``layout_direction`` the table is laid out left to right
+   and mirrored: the first column is at the right edge, a child anchored to
+   the left of its cell keeps to the cell's right, and padding, margins and the
+   cell borders mirror with it. Cell positions stay logical.
+
    *Status:* stable. *Windows Forms counterpart:* ``TableLayoutPanel``.
 
    :Parameters:

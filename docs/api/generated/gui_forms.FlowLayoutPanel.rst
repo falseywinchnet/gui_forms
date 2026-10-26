@@ -21,6 +21,11 @@ gui_forms::FlowLayoutPanel
    and a :cpp:class:`ResponsiveTrackPanel <gui_forms::ResponsiveTrackPanel>` when regions must give way in a fixed order as
    the window narrows.
 
+   In a right-to-left ``layout_direction`` the flow is laid out left to right and
+   mirrored: a :cpp:enumerator:`FlowDirection::left_to_right <gui_forms::FlowDirection::left_to_right>` flow starts at the right edge, a
+   vertical flow's columns start at the right, and padding and margins mirror
+   with it. A scrolled panel then scrolls its content toward the left.
+
    *Status:* stable. *Windows Forms counterpart:* ``FlowLayoutPanel``.
 
    :Parameters:

@@ -305,8 +305,16 @@ gui_forms::Control
       **measure_generation** : ``std::uint64_t``, read-only
          Advances whenever this control becomes measure-dirty; a cache entry stored under an earlier generation is never answered.
 
-      **layout_direction** : ``LayoutDirection``
-         The authored inline direction, ``inherit`` by default (stage L, PLAN section 4). Setting it invalidates this subtree's arrangement.
+      **layout_direction** : ``LayoutDirection``, default ``LayoutDirection::inherit``
+         The inline direction the control lays its children out in;
+         :cpp:enumerator:`LayoutDirection::inherit <gui_forms::LayoutDirection::inherit>` takes the parent's, and a control with no
+         parent is left to right. Right to left mirrors docking, anchoring and
+         requested bounds, as Windows Forms' ``RightToLeftLayout``: the layout is
+         computed left to right and mirrored about the control's viewport, so
+         :cpp:enumerator:`DockStyle::left <gui_forms::DockStyle::left>` docks at the right, an anchor to the left keeps the
+         distance to the right edge, a requested x is measured from the right
+         edge, and padding and margins mirror too. The CSS containers keep their
+         own start and end model.
 
       **effective_layout_direction** : ``LayoutDirection``, read-only
          The direction this control lays out in: its own when not ``inherit``, otherwise the nearest ancestor's, and left to right at a root.
@@ -1058,9 +1066,19 @@ gui_forms::Control
 
    .. cpp:function:: LayoutDirection layout_direction() const noexcept
 
-      The authored inline direction, ``inherit`` by default (stage L, PLAN section 4). Setting it invalidates this subtree's arrangement.
+      The inline direction the control lays its children out in;
+      :cpp:enumerator:`LayoutDirection::inherit <gui_forms::LayoutDirection::inherit>` takes the parent's, and a control with no
+      parent is left to right. Right to left mirrors docking, anchoring and
+      requested bounds, as Windows Forms' ``RightToLeftLayout``: the layout is
+      computed left to right and mirrored about the control's viewport, so
+      :cpp:enumerator:`DockStyle::left <gui_forms::DockStyle::left>` docks at the right, an anchor to the left keeps the
+      distance to the right edge, a requested x is measured from the right
+      edge, and padding and margins mirror too. The CSS containers keep their
+      own start and end model.
 
    .. cpp:function:: void set_layout_direction(LayoutDirection direction)
+
+      Sets :cpp:func:`layout_direction <gui_forms::Control::layout_direction>`; see the property's description above.
 
    .. cpp:function:: LayoutDirection effective_layout_direction() const noexcept
 

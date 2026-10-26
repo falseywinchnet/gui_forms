@@ -321,7 +321,10 @@ struct PageDigest final {
 // changed. Phase L4's grid specimens changed css-layout-panels, and the
 // same counts on states-and-diagnostics and typography-and-inspection;
 // phase L5's block specimens (and the page header's BlockFlowPanel entry)
-// did the same.
+// did the same. Phase L6's `layout_direction` property added a row to
+// values-and-spinners' property grid (its editor two controls more), and
+// so the same counts on states-and-diagnostics and
+// typography-and-inspection.
 //
 // Main's ThreadExceptionDialog, OpenFileDialog and SaveFileDialog lines on
 // dialogs-and-host-services, and its TabControl images on tabs-and-pages,
@@ -335,7 +338,7 @@ struct PageDigest final {
 // states-and-diagnostics, typography-and-inspection.
 //
 // typography-and-inspection's entry is the trace with the RuntimeId the
-// specimen has when this test runs first (#1309 since L5 on main); the digest
+// specimen has when this test runs first (#1311 since L6 on main); the digest
 // changes whenever a page made before it makes a control more or less.
 constexpr std::array<PageDigest, 30> expected_digests{{
     {"basics", 0x39b168d11c02f1a0ULL},
@@ -346,10 +349,10 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"ranges-and-progress", 0x3fce5fb922ccc1b3ULL},
     {"containers-and-focus", 0x3db877c0a3a4159dULL},
     {"animation-laboratory", 0x5cdbb66bceae7737ULL},
-    {"states-and-diagnostics", 0xfa56642764242581ULL},
+    {"states-and-diagnostics", 0x7a4d9ef54bc38703ULL},
     {"text-and-input", 0x355fc10c66b1625aULL},
     {"collections-and-popups", 0xed03175675f86512ULL},
-    {"values-and-spinners", 0xc39e52352d46689fULL},
+    {"values-and-spinners", 0x343454b87f4b9650ULL},
     {"images-and-drawing", 0x3e2ade93d0061b3bULL},
     {"tabs-and-pages", 0xb8177e51c8f143e6ULL},
     {"checked-collections", 0x0f98e570c6e049a2ULL},
@@ -366,7 +369,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"responsive-layouts", 0x30aba8f5526dfd0cULL},
     {"anchored-popups", 0xc8319f42bf15c17aULL},
     {"live-surfaces", 0xe474c9d97d329af1ULL},
-    {"typography-and-inspection", 0x46004ceab020a55dULL},
+    {"typography-and-inspection", 0x0d167bb5225c1f60ULL},
     {"semantic-feedback", 0x48ae5da6e449bdc4ULL},
 }};
 

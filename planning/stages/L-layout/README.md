@@ -143,6 +143,78 @@ its hash is verified before use. Each is unpacked into its own new, empty
 directory outside the repository, and its paths are passed as arguments.
 Nothing else is downloaded.
 
+## Decisions in force
+
+**Container names** (owner, 2026-10-26):
+- The Windows Forms-exact containers become `FlowLayoutPanelCompat` and
+  `TableLayoutPanelCompat`, and keep their own algorithms (below).
+- The CSS containers are named after their CSS models, as panels:
+  `FlexLayoutPanel` becomes `FlexPanel`, `GridLayoutPanel` becomes
+  `GridPanel`, and `BlockFlowPanel` becomes `BlockPanel`. The owner's
+  reason: "if they're going to be used as panels, i suggest panels so that
+  they're not confused with the property". (These supersede the shorter
+  `Flex`, `Grid` and `Block` first proposed.)
+- The plain names `FlowLayoutPanel` and `TableLayoutPanel` go away.
+- When a Windows Forms design or form document names `FlowLayoutPanel` or
+  `TableLayoutPanel`, the importer maps it to the `Compat` container, so
+  old layouts render the same.
+- The purpose, in the owner's words: "the point would be to discourage the
+  use in general by adding Compat". So:
+  - the `Compat` containers' docs open by saying they exist for Windows
+    Forms migration, and point to `FlexPanel` and `GridPanel` for new work;
+  - the Gallery shows them in a clearly labelled compatibility group, not
+    beside `FlexPanel` and `GridPanel`;
+  - form documents and the interface builder offer `FlexPanel` and
+    `GridPanel` first.
+
+**The Windows Forms containers are not rebased on the solvers**
+(coordinator, 2026-10-25, applying L-Q2's condition "wherever their
+existing tests pass unchanged"). Neither container can be rebased without
+changing what its tests pin. Both keep their own algorithm, gain a reused
+workspace in place of their per-pass and per-line vectors, and adopt
+`LayoutDirection` (phase L6).
+
+`FlowLayoutPanel` differs from CSS flex in four behaviours:
+1. A forced break (`set_flow_break`) ends a line even with `wrap_contents`
+   off. Pinned by `test_flow_direction_break_visibility_and_resize`.
+2. A single line takes the panel's whole cross extent, while several lines
+   pack at the start at their content's extent. Pinned by
+   `test_flow_alignment_projects_relational_flex_geometry` and L0's
+   recorded corpus differences.
+3. Items grow (`set_flex_grow`) only when arranged; a measure reports the
+   content without growth. Pinned by
+   `test_flow_alignment_projects_relational_flex_geometry` and
+   `test_flow_auto_size_mode_preserves_authored_extent`.
+4. With `wrap_contents` off, main-axis alignment still applies within the
+   panel's width. Pinned by
+   `test_flow_alignment_projects_relational_flex_geometry`.
+
+Matching them would need four Windows-Forms-only modes inside the CSS flex
+solver.
+
+`TableLayoutPanel` has two gaps:
+1. Its `Percent` styles are weights over the space left after the
+   `Absolute` and `AutoSize` tracks, not percentages of the panel. An `fr`
+   track would only approximate them.
+2. Its distribution of a spanning item's size over `AutoSize` tracks is
+   not CSS Grid's intrinsic sizing (section 11.5).
+
+Both gaps are pinned by `test_table_mixed_tracks_spans_and_lookup` and
+`test_table_growth_hidden_children_and_fixed_overflow` (all in
+`tests/layout_panel_tests.cpp`).
+
+**Right-to-left layout is full mirroring** (owner, 2026-10-26, option 1),
+as Windows Forms' `RightToLeftLayout`. In a parent whose effective
+`LayoutDirection` is right to left:
+- a child's requested x is measured from the right edge;
+- `Dock` left docks right, and `Anchor` left anchors right;
+- `FlowLayoutPanelCompat` and `TableLayoutPanelCompat` start at the right;
+- the CSS containers keep their own start and end model.
+
+The layout is computed left to right and mirrored once, at output, about
+the parent's child viewport, so padding and margins mirror with it. Left
+to right changes nothing.
+
 ## Read first
 
 - `docs/user/layout.md`

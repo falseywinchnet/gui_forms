@@ -9,6 +9,11 @@ sheets and any layout whose items must line up. Use a `FlowLayoutPanel`
 instead when items simply follow one another, and a `ResponsiveTrackPanel`
 when regions must collapse in a set order as the window narrows.
 
+In a right-to-left `layout_direction` the table is laid out left to right
+and mirrored: the first column is at the right edge, a child anchored to
+the left of its cell keeps to the cell's right, and padding, margins and the
+cell borders mirror with it. Cell positions stay logical.
+
 Parameters
 ----------
 stable_id

@@ -28,6 +28,7 @@ Every `Control` carries the inputs the containers consume:
 | `margin`, `padding` | Outside and inside spacing in logical pixels, finite and nonnegative |
 | `auto_size`, `auto_size_mode` | Grow-only or grow-and-shrink to the preferred size |
 | `dock`, `anchor` | Edge-relative placement inside the parent |
+| `layout_direction` | Inherited, left to right, or right to left; right to left mirrors docking, anchoring, requested bounds and the flow and table panels |
 | `visible` | Hidden children take no space in flow and table layout |
 
 `get_preferred_size(available)` returns the size a control wants. The base
