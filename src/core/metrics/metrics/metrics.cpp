@@ -20,6 +20,7 @@ void Metrics::reset_activity() noexcept {
     const std::uint64_t maximum_focus_scope_depth = values_.maximum_focus_scope_depth;
     const std::string renderer = values_.renderer_name;
     const bool cpu_only = values_.cpu_only;
+    const bool backplane_replay = values_.backplane_replay;
     const std::uint64_t display_cache_entries = values_.display_cache_entries;
     const std::uint64_t display_generation = values_.display_generation;
     const std::uint64_t active_surfaces = values_.active_surface_count;
@@ -36,6 +37,7 @@ void Metrics::reset_activity() noexcept {
     values_.maximum_focus_scope_depth = maximum_focus_scope_depth;
     values_.renderer_name = renderer;
     values_.cpu_only = cpu_only;
+    values_.backplane_replay = backplane_replay;
     values_.display_cache_entries = display_cache_entries;
     values_.display_generation = display_generation;
     values_.active_surface_count = active_surfaces;
@@ -259,6 +261,9 @@ void Metrics::record_live_present(std::uint64_t duration, std::uint64_t device_p
 void Metrics::set_renderer(std::string_view name, bool cpu_only) {
     values_.renderer_name.assign(name);
     values_.cpu_only = cpu_only;
+}
+void Metrics::set_backplane_replay(bool replayed) noexcept {
+    values_.backplane_replay = replayed;
 }
 
 } // namespace gui_forms

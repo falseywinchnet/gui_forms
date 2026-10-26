@@ -123,7 +123,8 @@ std::string MetricsSnapshot::to_json() const {
            << "\"engine_primitive_refusals\":" << engine_primitive_refusals << ','
            << "\"paint_group_refusals\":" << paint_group_refusals << ','
            << "\"renderer_name\":\"" << escaped_json(renderer_name) << "\","
-           << "\"cpu_only\":" << (cpu_only ? "true" : "false")
+           << "\"cpu_only\":" << (cpu_only ? "true" : "false") << ','
+           << "\"backplane_replay\":" << (backplane_replay ? "true" : "false")
            << '}';
     return output.str();
 }

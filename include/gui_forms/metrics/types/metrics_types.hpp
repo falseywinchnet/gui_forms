@@ -146,6 +146,11 @@ struct MetricsSnapshot {
     std::uint64_t paint_group_refusals{};
     std::string renderer_name{"unbound"};
     bool cpu_only{true};
+    // The renderer's backplane replay (stage T5, C6; owner decision
+    // T5-Q13): true once the window's renderer replayed a backplane image
+    // whole, false while it has not or could not (the part-raster image of
+    // E9-B is used instead). Kept across resets, as the renderer is.
+    bool backplane_replay{};
 
     [[nodiscard]] std::string to_json() const;
 };
