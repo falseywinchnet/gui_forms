@@ -157,6 +157,41 @@ void fill_plate(const PlateLook& look, const PartRasterView& destination) noexce
 
 constexpr Color white{255, 255, 255, 255};
 
+// How far the plate's rounding reaches into its box on each side, in
+// logical units: `half` is half the box's shorter side, and `across` says
+// the box is at least as wide as it is high.
+Insets plate_rounding(PartShape shape, double width, double plate_height, double half, bool across) noexcept {
+    // 1 - 1/sqrt(2): how far a rounded corner's arc lies inside its box's
+    // corner along each side, as a fraction of the radius.
+    constexpr double arc_fraction = 0.29289321881345247;
+    switch (shape.kind) {
+    case PartShapeKind::rounded_rectangle: {
+        const double cut = std::clamp(shape.corner_radius, 0.0, half) * arc_fraction;
+        const Insets rounded{cut, cut, cut, cut};
+        return rounded;
+    }
+    case PartShapeKind::circle: {
+        // The square inscribed in the centred circle.
+        const double cut = half * arc_fraction;
+        const double across_gap = (width - half * 2.0) * 0.5;
+        const double down_gap = (plate_height - half * 2.0) * 0.5;
+        const Insets inscribed{across_gap + cut, down_gap + cut, across_gap + cut, down_gap + cut};
+        return inscribed;
+    }
+    case PartShapeKind::pill:
+        return across ? Insets{half, 0.0, half, 0.0} : Insets{0.0, half, 0.0, half};
+    case PartShapeKind::cap_start:
+        return across ? Insets{half, 0.0, 0.0, 0.0} : Insets{0.0, half, 0.0, 0.0};
+    case PartShapeKind::cap_end:
+        return across ? Insets{0.0, 0.0, half, 0.0} : Insets{0.0, 0.0, 0.0, half};
+    case PartShapeKind::count:
+        // Not a shape: the square box, unrounded.
+        return Insets{};
+    }
+    // A kind outside the enumeration is the square box, unrounded.
+    return Insets{};
+}
+
 // A plate's text slot insets (see relief_primitives.hpp), in logical units.
 Insets plate_content_insets(PartShape shape, Size logical, DeviceScale scale, double padding,
                             double text_scale) noexcept {
@@ -165,36 +200,7 @@ Insets plate_content_insets(PartShape shape, Size logical, DeviceScale scale, do
     const double plate_height = std::max(0.0, logical.height - line);
     const double half = std::min(logical.width, plate_height) * 0.5;
     const bool across = logical.width >= plate_height;
-    // 1 - 1/sqrt(2): how far a rounded corner's arc lies inside its box's
-    // corner along each side, as a fraction of the radius.
-    constexpr double arc_fraction = 0.29289321881345247;
-    Insets rounding{};
-    switch (shape.kind) {
-    case PartShapeKind::rounded_rectangle: {
-        const double cut = std::clamp(shape.corner_radius, 0.0, half) * arc_fraction;
-        rounding = Insets{cut, cut, cut, cut};
-        break;
-    }
-    case PartShapeKind::circle: {
-        // The square inscribed in the centred circle.
-        const double cut = half * arc_fraction;
-        const double across_gap = (logical.width - half * 2.0) * 0.5;
-        const double down_gap = (plate_height - half * 2.0) * 0.5;
-        rounding = Insets{across_gap + cut, down_gap + cut, across_gap + cut, down_gap + cut};
-        break;
-    }
-    case PartShapeKind::pill:
-        rounding = across ? Insets{half, 0.0, half, 0.0} : Insets{0.0, half, 0.0, half};
-        break;
-    case PartShapeKind::cap_start:
-        rounding = across ? Insets{half, 0.0, 0.0, 0.0} : Insets{0.0, half, 0.0, 0.0};
-        break;
-    case PartShapeKind::cap_end:
-        rounding = across ? Insets{0.0, 0.0, half, 0.0} : Insets{0.0, 0.0, 0.0, half};
-        break;
-    case PartShapeKind::count:
-        break;
-    }
+    const Insets rounding = plate_rounding(shape, logical.width, plate_height, half, across);
     const double lines = line * 2.0;
     const double side = padding * text_scale;
     const Insets insets{rounding.left + lines + side, rounding.top + lines, rounding.right + lines + side,
