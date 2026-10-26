@@ -1,6 +1,7 @@
 #include "theme_source_text.hpp"
 
 #include "gui_forms/detail/algorithm/binary_search.hpp"
+#include "gui_forms/schema/types/schema_types.hpp"
 
 #include <span>
 
@@ -98,6 +99,16 @@ SourcePosition SourcePositionCursor::locate(ByteOffset offset) noexcept {
     previous_line_ = index;
     previous_ = result;
     return result;
+}
+
+std::string registered_name_from_kebab(std::string_view written) {
+    std::string registered(written);
+    for (char& character : registered) {
+        if (character == '_') return {};
+        if (character == '-') character = '_';
+    }
+    if (!is_registered_name(registered)) return {};
+    return registered;
 }
 
 } // namespace gui_forms::theme_language
