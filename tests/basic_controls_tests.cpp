@@ -87,8 +87,9 @@ public:
         line_ends.push_back(to);
         text_line_order.push_back('L');
     }
-    void draw_text_utf8(Point origin, std::string_view text, FontSpec font, Color) override {
+    void draw_text_utf8(Point origin, std::string_view text, FontSpec font, Color color) override {
         texts.emplace_back(text);
+        text_colors.push_back(color);
         roles.push_back(font.role);
         text_origins.push_back(origin);
         text_line_order.push_back('T');
@@ -124,6 +125,7 @@ public:
     double last_rounded_stroke_width{};
     std::vector<Color> fill_colors{};
     std::vector<std::string> texts{};
+    std::vector<Color> text_colors{};
     std::vector<FontRole> roles{};
     std::vector<Point> text_origins{};
     std::vector<Point> line_starts{};
@@ -814,6 +816,53 @@ void test_radio_group_scope_and_order() {
     require(!(*first).checked() && (*second).checked() && (*independent).checked() &&
                 order == "first:off\nsecond:on\nsecond:click\n",
             "RadioButton must uncheck its group peer before checking/clicking itself");
+}
+
+// The colour LinkLabel's text takes when it paints.
+Color painted_link_color(LinkLabel& link) {
+    RecordingPainter painter;
+    link.on_paint(painter, {});
+    require(painter.text_colors.size() == 1U, "LinkLabel must draw its text once");
+    const Color color = painter.text_colors.front();
+    return color;
+}
+
+// The link families (owner decision W-Q5): LinkLabel's text takes the link
+// family's colour, or visited_link's once visited, from its theme; the
+// default theme keeps the compatibility style's link colours, and a style
+// set on the control keeps its own.
+void test_link_families() {
+    std::shared_ptr<gui_forms::LinkLabel> link = make_control<LinkLabel>(StableId("link.family"), "Open");
+    (*link).set_requested_bounds({0.0, 0.0, 120.0, 24.0});
+    const std::unique_ptr<Window> held_window = std::make_unique<Window>(link, Size{120.0, 24.0});
+    const BasicControlStyle defaults{};
+    require(painted_link_color(*link) == defaults.link, "an unvisited link must keep the default link colour");
+    (*link).set_visited(true);
+    require(painted_link_color(*link) == defaults.visited_link,
+            "a visited link must keep the default visited colour");
+    (*link).set_enabled(false);
+    require(painted_link_color(*link) == defaults.disabled_text, "a disabled link must keep the disabled text colour");
+    (*link).set_enabled(true);
+
+    const std::unique_ptr<ThemeDefinition> held_definition = test_support::professional_definition();
+    ThemeDefinition& definition = *held_definition;
+    definition.id = "link-families";
+    constexpr Color themed_link = Color::rgba(0, 102, 51);
+    constexpr Color themed_visited = Color::rgba(128, 0, 64);
+    const std::size_t normal = static_cast<std::size_t>(ControlSurfaceState::normal);
+    definition.roles[static_cast<std::size_t>(ControlVisualRole::link)].ordinary[normal].text = themed_link;
+    definition.roles[static_cast<std::size_t>(ControlVisualRole::visited_link)].ordinary[normal].text =
+        themed_visited;
+    (*link).set_theme_override(Theme::create(definition));
+    require(painted_link_color(*link) == themed_visited, "a visited link must take the visited_link family's text");
+    (*link).set_visited(false);
+    require(painted_link_color(*link) == themed_link, "an unvisited link must take the link family's text");
+
+    BasicControlStyle compatibility;
+    compatibility.link = Color::rgba(10, 20, 30);
+    (*link).set_style(compatibility);
+    require(painted_link_color(*link) == compatibility.link,
+            "a style set on the link must keep its own link colour");
 }
 
 void test_link_and_callback_disposal() {
@@ -1753,6 +1802,7 @@ int main() {
         test_checkbox_state_and_click_order();
         test_radio_group_scope_and_order();
         test_link_and_callback_disposal();
+        test_link_families();
         test_wrong_thread_property_mutation_is_rejected();
         test_fixed_label_text_is_paint_only();
         test_fixed_label_measurement_does_not_resolve_unused_text();

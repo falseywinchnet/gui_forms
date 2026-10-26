@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -113,6 +114,15 @@ public:
 private:
     std::vector<ByteOffset> starts_{};
 };
+
+// Whether `text` is `lower_name` in any ASCII case, as CSS matches its
+// keywords; `lower_name` is written in lower case.
+[[nodiscard]] bool equals_ascii_folded(std::string_view text, std::string_view lower_name) noexcept;
+
+// The registered name (snake_case) a sheet's kebab-case name spells: each
+// '-' becomes '_'. Empty when the written name holds a '_' or is not a
+// registered name, so `focus_visible` is never read as `focus-visible`.
+[[nodiscard]] std::string registered_name_from_kebab(std::string_view written);
 
 // Positions for offsets asked in increasing order, as a reader reports its
 // diagnostics: each continues counting columns from the previous position

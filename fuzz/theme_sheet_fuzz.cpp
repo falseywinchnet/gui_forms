@@ -1,8 +1,11 @@
+#include "../src/core/theme_language/custom_properties/theme_custom_properties.hpp"
 #include "../src/core/theme_language/diagnostics/theme_diagnostics.hpp"
 #include "../src/core/theme_language/source_text/theme_source_text.hpp"
 #include "../src/core/theme_language/syntax_tree/theme_syntax_tree.hpp"
 #include "../src/core/theme_language/tokenizer/theme_tokenizer.hpp"
+#include "../src/core/theme_language/value/theme_value.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -10,10 +13,7 @@
 #include <span>
 #include <string>
 #include <string_view>
-
-#if defined(GUI_FORMS_FUZZ_STANDALONE)
-#include <array>
-#endif
+#include <vector>
 
 namespace {
 
@@ -85,11 +85,121 @@ bool same_records(std::span<const theme_language::ThemeDiagnostic> first,
 
 } // namespace
 
+// Whether each component's subtree lies within its parent's: a leaf's ends
+// at itself, a function's after its children.
+bool components_nest(const theme_language::ThemeValue& value) noexcept {
+    std::array<std::uint32_t, theme_language::maximum_nesting_depth> open_ends{};
+    std::size_t depth = 0U;
+    const std::size_t count = value.components.size();
+    for (std::size_t index = 0U; index < count; ++index) {
+        const theme_language::ValueComponent& component = value.components[index];
+        while (depth != 0U && open_ends[depth - 1U] <= index) --depth;
+        const std::size_t end = component.subtree_end;
+        if (end <= index || end > count) return false;
+        if (depth != 0U && end > open_ends[depth - 1U]) return false;
+        const bool function = component.kind == theme_language::ValueComponentKind::function;
+        if (!function && end != index + 1U) return false;
+        if (!function || end == index + 1U) continue;
+        if (depth == open_ends.size()) return false;
+        open_ends[depth] = static_cast<std::uint32_t>(end);
+        ++depth;
+    }
+    return true;
+}
+
+// Whether every expression names a program, and every program lies in the
+// value's instructions and compiles with the context's limits.
+bool programs_compile(const theme_language::ThemeValue& value, const theme_language::ValueContext& context) noexcept {
+    for (const theme_language::ValueComponent& component : value.components) {
+        const bool expression = component.kind == theme_language::ValueComponentKind::expression;
+        if (expression && component.program >= value.programs.size()) return false;
+    }
+    gui_forms::ExpressionLimits limits{};
+    limits.inputs = gui_forms::engine_input_count + context.published_values;
+    limits.parameters = context.parameters.size();
+    gui_forms::EngineExpression expression{};
+    for (const theme_language::ValueProgram program : value.programs) {
+        const std::size_t end = static_cast<std::size_t>(program.first) + program.count;
+        if (end > value.instructions.size()) return false;
+        const gui_forms::ExpressionCompilation compilation =
+            expression.compile(value.program_instructions(program), 0.0, limits);
+        if (compilation.defect != gui_forms::ExpressionDefect::none) return false;
+    }
+    return true;
+}
+
+// Substitutes and reads every declaration's value but the custom
+// properties'. A refusal adds exactly one error and leaves nothing; a read
+// value adds none, holds at most maximum_substituted_tokens tokens, nests,
+// compiles, and reads the same a second time.
+void read_values(const theme_language::ThemeSource& source, const theme_language::ThemeTokenBuffer& buffer,
+                 const theme_language::LineStartTable& lines, const theme_language::ThemeSyntaxTree& tree) {
+    theme_language::ThemeDiagnosticList diagnostics{};
+    theme_language::SourcePositionCursor cursor(lines, source.text);
+    const std::array<std::string, 1> published{{"progress"}};
+    theme_language::ReservedInputs reserved{};
+    reserved.published_values = published;
+    theme_language::CustomPropertyTable table{};
+    if (!table.collect(source, buffer, tree, reserved, cursor, diagnostics)) {
+        if (diagnostics.error_count() != 1U || table.name_count() != 0U) fail("a refused collection reports one error");
+        return;
+    }
+    const std::array<std::string_view, 2> parameters{{"depth", "radius"}};
+    const std::array<std::string_view, 1> resources{{"icon.check"}};
+    theme_language::ValueContext context{};
+    context.parameters = parameters;
+    context.published_values = published.size();
+    context.resources = resources;
+    const theme_language::SubstitutionInput substitution_input{
+        .source = source, .tokens = buffer, .table = table, .reserved = reserved, .cursor = cursor};
+    theme_language::VariableSubstitution substitution{};
+    theme_language::ValueReader reader{};
+    std::vector<theme_language::ValueToken> substituted{};
+    theme_language::ThemeValue value{};
+    theme_language::ThemeValue again{};
+    for (const theme_language::SyntaxNode& node : tree.nodes) {
+        if (node.kind != theme_language::SyntaxNodeKind::declaration) continue;
+        const theme_language::Token& property = buffer.tokens[node.tokens.first.value];
+        const std::string_view name = source.text.substr(property.offset.value, property.length.value);
+        if (name.substr(0U, 2U) == "--") continue;
+        const std::size_t errors = diagnostics.error_count();
+        const theme_language::SubstitutionOutcome outcome =
+            substitution.substitute(substitution_input, node.content, substituted, diagnostics);
+        if (outcome == theme_language::SubstitutionOutcome::refused) {
+            if (!substituted.empty() || diagnostics.error_count() != errors + 1U) {
+                fail("a refused substitution reports one error and keeps nothing");
+            }
+            continue;
+        }
+        if (substituted.size() > theme_language::maximum_substituted_tokens) fail("a value holds at most 4,096 tokens");
+        const theme_language::ValueInput value_input{.source = source,
+                                                     .tokens = buffer,
+                                                     .written = node.content,
+                                                     .substituted = substituted,
+                                                     .context = context,
+                                                     .cursor = cursor};
+        const theme_language::ValueOutcome read = reader.read(value_input, value, diagnostics);
+        if (read == theme_language::ValueOutcome::refused) {
+            if (!value.components.empty() || !value.programs.empty() || diagnostics.error_count() != errors + 1U) {
+                fail("a refused value reports one error and keeps nothing");
+            }
+            continue;
+        }
+        if (diagnostics.error_count() != errors) fail("a read value reports no error");
+        if (!components_nest(value)) fail("a value's components nest");
+        if (!programs_compile(value, context)) fail("a value's programs compile");
+        const theme_language::ValueOutcome reread = reader.read(value_input, again, diagnostics);
+        const bool same = reread == read && again.components == value.components &&
+                          again.programs == value.programs && again.instructions == value.instructions;
+        if (!same) fail("reading a value is repeatable");
+    }
+}
+
 // Tokenizes and parses the input. The tokens must cover it exactly; the
 // tree, complete or stopped, must nest and write back the input's bytes;
 // the parse adds at most one error; and a second tokenization and parse
 // into fresh storage must give the same tokens, numbers, nodes and
-// diagnostics.
+// diagnostics. A complete tree's values are then read (read_values).
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     theme_language::ThemeSource source{};
     source.file = "fuzz.theme.css";
@@ -142,6 +252,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         theme_language::parse_theme_sheet(source, again, lines, again_tree, again_diagnostics);
     if (reparsed != parsed || again_tree.nodes != tree.nodes) fail("parsing is repeatable");
     if (!same_records(diagnostics.records(), again_diagnostics.records())) fail("diagnostics are repeatable");
+    if (parsed == theme_language::ParseOutcome::tree_complete) read_values(source, buffer, lines, tree);
     return 0;
 }
 
@@ -160,7 +271,7 @@ std::uint64_t next_random(std::uint64_t& state) noexcept {
 
 int main() {
     // Each seed parses completely; the mutations explore around them.
-    const std::array<std::string_view, 4> seeds{
+    const std::array<std::string_view, 5> seeds{
         "@import \"palette.theme.css\";\n"
         "@gf-theme \"aurora\" { version: 1; }\n"
         "button:hover > part(face), #player-play[checked] {\n"
@@ -173,7 +284,11 @@ int main() {
         "\xEF\xBB\xBF" "caf\xC3\xA9 { width: calc(100% - 12px); }",
         "@keyframes pulse { from { scale: 1 } 50% { scale: f(g([1])); } }\n"
         "@x y { z { w } ; }\n"
-        "a { b: ; c: /* */ }"};
+        "a { b: ; c: /* */ }",
+        "a { --r: 4px; --c: var(--r, 1px); width: calc(var(--r) * 2 + var(--pointer-x) / 3);\n"
+        "  color: color-mix(in srgb, red 30%, rgb(0 0 0 / 50%)); x: hsl(120 50% 50%) #abc;\n"
+        "  y: url(\"resource:icon.check\") mix(1px, 2px, state(hot)) clamp(1, param(depth), 3);\n"
+        "  z: f(var(--progress), choose(less(1s, var(--time-in-state)), 2deg, 0.5turn)), 'q' / 2; }"};
     std::uint64_t state = 0xbb67ae8584caa73bULL;
     for (std::size_t run = 0; run < 100'000; ++run) {
         const std::uint64_t run_draw = next_random(state);

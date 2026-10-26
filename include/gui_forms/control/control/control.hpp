@@ -10,6 +10,7 @@
 #include "gui_forms/dirty.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/events.hpp"
+#include "gui_forms/layout/types/layout_types.hpp"
 #include "gui_forms/semantics.hpp"
 #include "gui_forms/scheduler.hpp"
 #include "gui_forms/types.hpp"
@@ -17,6 +18,7 @@
 
 #include <atomic>
 #include <any>
+#include <array>
 #include <compare>
 #include <cstdint>
 #include <functional>
@@ -671,6 +673,43 @@ public:
 
     [[nodiscard]] virtual Size measure(Size available);
     virtual void arrange(Rect final_bounds);
+    // The measure entry layout solvers call (stage L). It answers from this
+    // control's measure cache when an entry was stored under exactly this
+    // constraint since the control last became measure-dirty, and otherwise
+    // calls measure_intrinsic once and stores the answer. The cache holds
+    // four entries: one min-content width, one max-content width, and the
+    // two most recent other queries. A result with a negative or non-finite
+    // dimension is clamped to zero and counted. Throws std::invalid_argument,
+    // with the cache unchanged, when valid_layout_constraint rejects the
+    // constraint. An attached control is measured on its window's UI
+    // thread only. The window's own measure pass calls this too, so a
+    // container's later query under the same constraint is a hit.
+    [[nodiscard]] Size measure_for_layout(const LayoutConstraint& constraint);
+    // Advances whenever this control becomes measure-dirty; a cache entry
+    // stored under an earlier generation is never answered.
+    [[nodiscard]] std::uint64_t measure_generation() const noexcept {
+        return measure_generation_;
+    }
+    // Layout boundaries (stage L, PLAN section 3.3). A descendant's measure
+    // dirtiness marks an ancestor for measure only while the ancestor's size
+    // can depend on it: while the ancestor's own measure reads its children
+    // (size_depends_on_content) or its parent sizes it from its measure
+    // (sizes_children_from_content). The first ancestor for which neither
+    // holds is a layout boundary: it is marked for arrange only, and nothing
+    // above it is marked. Both default to true, which keeps every existing
+    // control's measure propagation unchanged; a container overrides them
+    // only when it can state the answer for every configuration.
+    [[nodiscard]] virtual bool size_depends_on_content() const noexcept;
+    [[nodiscard]] virtual bool sizes_children_from_content() const noexcept;
+    // The authored inline direction, `inherit` by default (stage L, PLAN
+    // section 4). Setting it invalidates this subtree's arrangement.
+    [[nodiscard]] LayoutDirection layout_direction() const noexcept {
+        return layout_direction_;
+    }
+    void set_layout_direction(LayoutDirection direction);
+    // The direction this control lays out in: its own when not `inherit`,
+    // otherwise the nearest ancestor's, and left to right at a root.
+    [[nodiscard]] LayoutDirection effective_layout_direction() const noexcept;
     virtual void on_paint(Painter& painter, Rect local_damage);
     // Bounded decoration may paint outside arranged bounds without changing
     // layout or hit testing. Parents still clip descendants to their client
@@ -783,6 +822,15 @@ public:
 
 protected:
     void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
+    // Answers one measure_for_layout miss; `constraint` is already valid.
+    // The default maps the query onto measure(Size) through
+    // measure_available_size: a definite or at-most axis passes its extent
+    // and a content axis the practical unbounded extent, so a control that
+    // cannot rewrap reports its preferred size as both its min-content and
+    // its max-content size. A definite axis then reports exactly its extent.
+    // Text that wraps (Label) overrides it to answer min-content from its
+    // widest unbreakable segment.
+    [[nodiscard]] virtual Size measure_intrinsic(const LayoutConstraint& constraint);
     // Called by fill_part_geometry with `geometry` already sized to
     // anatomy().parts.size() and every record reset to absent.
     virtual void publish_part_geometry(std::span<PartGeometry> geometry) const;
@@ -881,6 +929,12 @@ private:
 
     void clear_dirty(Dirty dirty) noexcept;
     void clear_subtree_dirty(Dirty dirty) noexcept;
+    // Adds `dirty` to this control's own flags and, when it carries
+    // Dirty::measure, advances the measure generation. Every addition of
+    // own dirtiness goes through here so the measure cache cannot outlive
+    // the invalidation that made it stale.
+    void add_dirty(Dirty dirty) noexcept;
+    void advance_measure_generation() noexcept;
     void set_provider_error(std::uint64_t provider_id, std::string error);
     void clear_provider_error(std::uint64_t provider_id);
     void set_provider_help(std::uint64_t provider_id, std::string help);
@@ -1018,6 +1072,24 @@ private:
     bool pending_initialization_subtree_{};
     DeferredInitializationChangeList pending_initialization_changes_;
     bool lifecycle_notification_{};
+    // One stored measure_for_layout answer. A generation of zero is never
+    // current, so a value-initialized entry is empty.
+    struct MeasureCacheEntry final {
+        LayoutConstraint constraint{};
+        Size result{};
+        std::uint64_t generation{};
+    };
+    // Slots: min-content width, max-content width, and two for every other
+    // query, replaced oldest first.
+    static constexpr std::size_t measure_cache_capacity = 4U;
+    std::array<MeasureCacheEntry, measure_cache_capacity> measure_cache_{};
+    std::size_t measure_cache_next_general_slot_{2U};
+    std::uint64_t measure_generation_{1U};
+    // The window layout pass in which this control last answered a miss,
+    // and how many misses it answered in that pass.
+    std::uint64_t measure_pass_sequence_{};
+    std::uint64_t measure_pass_callbacks_{};
+    LayoutDirection layout_direction_{LayoutDirection::inherit};
     std::uint32_t layout_suspend_depth_{};
     bool layout_deferred_{};
     std::uint64_t layout_requested_revision_{};

@@ -44,10 +44,10 @@ whole record for logs.
 | `screen_pointer` | the pointer's desktop position | yes | yes | yes |
 | `window_at_point` | the application's topmost window at a desktop point | yes | yes | yes |
 | `window_ordering` | bring a window to the front of the application's own windows | yes | yes | yes (the window manager may decline) |
-| `transparent_windows` | a window presented with per-pixel alpha when the compositor allows it | no | no | no |
-| `window_backdrops` | a system material behind a transparent window | no | no | no |
-| `compositor_notifications` | compositor and preference changes reported at run time | no | no | no |
-| `presentation_preferences` | the host's high contrast and reduced transparency fed to each window | no | no | no |
+| `transparent_windows` | a window presented with per-pixel alpha when the compositor allows it | no | yes | no |
+| `window_backdrops` | a system material behind a transparent window | no | yes (Windows 11 22H2 and later) | no |
+| `compositor_notifications` | compositor and preference changes reported at run time | no | yes | no |
+| `presentation_preferences` | the host's high contrast and reduced transparency fed to each window | no | yes | no |
 
 The table reflects the bits each adapter currently advertises; read
 `Application::capabilities()` rather than this page in code.
@@ -87,9 +87,22 @@ itself.
   the host's (`presentation_preferences`) or set by the application in
   `PresentationSettings`, withdraw every backdrop.
 
-No native host advertises these capabilities yet; they arrive with the
-Windows, macOS and X11 phases of stage T5. The headless reference host
-simulates them (`HeadlessApplication::simulate_compositor_state`).
+**Windows.** The client's premultiplied alpha is shown through
+`DwmEnableBlurBehindWindow` with an empty region, which keeps the native
+caption. `window_material` is Mica and `transient_material` is Acrylic,
+through `DWMWA_SYSTEMBACKDROP_TYPE`, where Windows offers it (Windows 11
+22H2 and later); elsewhere they are refused with `os_version`, so list
+`transparent` as a fallback if you want it. While a window is inactive,
+Windows draws its own solid colour in place of Mica or Acrylic. Turning
+transparency effects off in Windows settings counts as reduced
+transparency. High contrast is read from the system. Both are followed
+as they change. Clear pixels still receive the pointer: there is no
+click-through. The measurements behind this are in
+`planning/stages/T5-compositor/MEASUREMENTS.md`.
+
+macOS and X11 do not advertise these capabilities yet; they arrive with
+their phases of stage T5. The headless reference host simulates them
+(`HeadlessApplication::simulate_compositor_state`).
 
 ## Keyboard-command defaults
 

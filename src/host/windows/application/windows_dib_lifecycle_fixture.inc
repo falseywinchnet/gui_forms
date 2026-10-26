@@ -203,11 +203,58 @@ struct DibHostFixture final {
         SendMessageW(state.hwnd_, WM_CLOSE, 0, 0);
         require(state.hwnd_ == nullptr, "owned native window did not close");
     }
+    // A window frame keeps alpha while its backdrop grant is not opaque
+    // (stage T5, C2): the window's clear material presents clear, where
+    // the DIB otherwise presents every pixel opaque. The frame is painted
+    // over a stale opaque colour, standing for the previous frame.
+    static std::uint32_t frame_alpha_pixel(Window& model, bool kept) {
+        DibPainter raster{};
+        require(raster.resize({40.0, 30.0}, 1.0), "frame alpha DIB allocated");
+        raster.set_frame_alpha(kept);
+        require(raster.begin_frame(), "frame alpha DIB begun");
+        raster.fill_rect({0.0, 0.0, 40.0, 30.0}, Color::rgba(250, 0, 0, 255));
+        require(model.paint(raster, Rect{0.0, 0.0, 40.0, 30.0}).has_value(), "frame alpha window painted");
+        require(GdiFlush() != FALSE, "frame alpha DIB flushed");
+        const std::uint32_t pixel = raster.pixels_[15U * 40U + 20U];
+        return pixel;
+    }
+    static void frame_alpha() {
+        const std::unique_ptr<ThemeDefinition> held(new ThemeDefinition(windows_professional_theme_definition()));
+        SurfaceMaterial tint{};
+        tint.fills.clear();
+        tint.fills.push_back(MaterialFillLayer::solid(Color::rgba(40, 80, 120, 128)));
+        ControlRoleRecipes& recipes = (*held).roles[static_cast<std::size_t>(ControlVisualRole::window)];
+        for (ControlVisualRecipe& recipe : recipes.ordinary) recipe.material = tint;
+        const std::shared_ptr<Control> root = make_control<Control>(StableId("frame-alpha"));
+        Window model(root, {40.0, 30.0});
+        model.set_theme(Theme::create(*held));
+        require(model.declare_non_opaque(), "frame alpha window declared");
+        CompositorState state{};
+        state.generation = CompositorGeneration{1U};
+        state.compositing = CompositorPresence::present;
+        state.support[static_cast<std::size_t>(WindowBackdrop::transparent)] = WindowBackdropSupport::supported;
+        model.set_compositor_state(state, false);
+        const WindowBackdropGrant grant =
+            model.request_backdrop(WindowBackdropRequest::preferring(WindowBackdrop::transparent));
+        require(grant.granted == WindowBackdrop::transparent, "frame alpha window granted transparent");
+        // Premultiplied BGRA: the tint is (20, 40, 60) at alpha 128.
+        const std::uint32_t clear = frame_alpha_pixel(model, true);
+        const unsigned alpha = clear >> 24U;
+        const unsigned red = (clear >> 16U) & 255U;
+        const unsigned blue = clear & 255U;
+        require(alpha + 1U >= 128U && alpha <= 129U && red + 2U >= 20U && red <= 22U && blue + 2U >= 60U &&
+                    blue <= 62U,
+                "a frame that keeps alpha presents the window's translucent material, premultiplied");
+        const std::uint32_t opaque = frame_alpha_pixel(model, false);
+        require((opaque >> 24U) == 255U, "a frame that keeps no alpha presents every pixel opaque");
+    }
+
     static void run() {
         const HRESULT com_status = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         require(SUCCEEDED(com_status), "fixture COM setup");
         try {
             live_format_pixels();
+            frame_alpha();
             WNDCLASSEXW native_class{};
             native_class.cbSize = sizeof(native_class);
             native_class.lpfnWndProc = window_procedure;

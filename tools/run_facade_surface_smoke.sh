@@ -40,7 +40,6 @@ dotnet run --project "$repo/tools/facade_verifier/GuiForms.FacadeVerifier.csproj
   "$generated/System.Windows.Forms.Primitives/bin/Release/net10.0/System.Windows.Forms.Primitives.dll" \
   "$generated/System.Drawing.Common/bin/Release/net10.0/System.Drawing.Common.dll"
 
-sh "$repo/stx_cng/tools/fetch_zstd.sh"
 cmake -S "$repo" -B "$mac_build" -DGUI_FORMS_BUILD_GALLERY=OFF \
   -DGUI_FORMS_ENABLE_SKIA=OFF -DGUI_FORMS_ENABLE_MACOS_HOST=OFF \
   -DGUI_FORMS_BUILD_TESTS=ON
