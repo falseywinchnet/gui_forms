@@ -18,6 +18,16 @@ Properties
 text
     The caption on the page's tab, drawn exactly as written, and the page's
     accessible name unless you set one. Setting it repaints the tab strip.
+image_key : default empty
+    The key of the tab's image in the tab control's `image_list`. Setting it
+    clears `image_index`. An empty key, or one the list does not have, shows
+    no image. Throws `std::invalid_argument` for a key that is not valid
+    UTF-8 or is longer than 256 bytes.
+image_index : default ``-1``
+    The index of the tab's image in the tab control's `image_list`, used
+    while `image_key` is empty; setting it clears `image_key`. ``-1``, or an
+    index past the list's end, shows no image. Throws `std::out_of_range`
+    below ``-1``.
 
 See Also
 --------
