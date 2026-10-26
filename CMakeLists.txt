@@ -3615,6 +3615,10 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_canvas_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
         add_test(NAME gui_forms_canvas_raster_tests COMMAND gui_forms_canvas_raster_tests)
 
+        add_executable(gui_forms_skia_edge_snapping_tests tests/skia_edge_snapping_tests.cpp)
+        target_link_libraries(gui_forms_skia_edge_snapping_tests PRIVATE gui_forms_skia)
+        add_test(NAME gui_forms_skia_edge_snapping_tests COMMAND gui_forms_skia_edge_snapping_tests)
+
 
         add_test(
             NAME gui_forms_skia_archive_policy
@@ -3658,6 +3662,15 @@ if(GUI_FORMS_BUILD_TESTS)
         )
         add_test(NAME gui_forms_coregraphics_smoke
                  COMMAND gui_forms_coregraphics_smoke)
+
+        add_executable(gui_forms_coregraphics_raster_edge_snapping_tests
+            tests/coregraphics_raster_edge_snapping_tests.cpp)
+        target_include_directories(gui_forms_coregraphics_raster_edge_snapping_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/render/coregraphics/raster)
+        target_link_libraries(gui_forms_coregraphics_raster_edge_snapping_tests PRIVATE
+            gui_forms_coregraphics)
+        add_test(NAME gui_forms_coregraphics_raster_edge_snapping_tests
+                 COMMAND gui_forms_coregraphics_raster_edge_snapping_tests)
     endif()
 
     if(TARGET gui_forms_renderer_benchmark)

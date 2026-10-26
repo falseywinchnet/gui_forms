@@ -22,6 +22,56 @@ CGRect to_cg_rect(Rect rect) noexcept {
     return CGRectMake(rect.x, rect.y, rect.width, rect.height);
 }
 
+// Edge snapping (owner decision L-Q8, detail::snap_device_edge): `rect`'s
+// device edges, each rounded to a whole device pixel, as a device-space
+// rectangle. Only an axis-aligned transform on a bitmap snaps; otherwise
+// false, and the caller keeps antialiased geometry. Quartz's device space
+// rises from the bitmap's bottom row, while the rule rounds halves toward
+// the bottom of the y-down surface, so the vertical edges are rounded as
+// distances from the top row (`height` - y) and converted back.
+bool snapped_device_box(CGContextRef context, const Rect rect, CGRect& device_box) {
+    const CGAffineTransform transform = CGContextGetCTM(context);
+    if (transform.b != 0.0 || transform.c != 0.0 || !rect.finite()) return false;
+    const double height = static_cast<double>(CGBitmapContextGetHeight(context));
+    if (height == 0.0) return false;
+    const CGRect device = CGContextConvertRectToDeviceSpace(context, to_cg_rect(rect));
+    const double left = gui_forms::detail::snap_device_edge(static_cast<double>(CGRectGetMinX(device)));
+    const double right = gui_forms::detail::snap_device_edge(static_cast<double>(CGRectGetMaxX(device)));
+    const double top_down_top = gui_forms::detail::snap_device_edge(height - static_cast<double>(CGRectGetMaxY(device)));
+    const double top_down_bottom =
+        gui_forms::detail::snap_device_edge(height - static_cast<double>(CGRectGetMinY(device)));
+    device_box = CGRectMake(left, height - top_down_bottom, right - left, top_down_bottom - top_down_top);
+    return true;
+}
+
+// The user-space rectangle whose device edges are snapped_device_box's.
+bool snapped_user_rect(CGContextRef context, const Rect rect, CGRect& snapped) {
+    CGRect device_box{};
+    if (!snapped_device_box(context, rect, device_box)) return false;
+    snapped = CGContextConvertRectToUserSpace(context, device_box);
+    return true;
+}
+
+// The user-space rectangle for a clip without antialiasing to exactly the
+// pixels of the snapped box: its device edges a quarter pixel inside the
+// whole-pixel edges. Converted back to user space, a whole-pixel edge can
+// land a hair outside its pixel boundary, and Quartz's aliased rectangle
+// clip then takes the next row (seen at scale 1.25). A quarter pixel inside,
+// the clip selects the same pixels whether it samples pixel centres or
+// rounds its edges, outward or to the nearest.
+bool aliased_clip_rect(CGContextRef context, const Rect rect, CGRect& clip) {
+    CGRect device_box{};
+    if (!snapped_device_box(context, rect, device_box)) return false;
+    const CGRect inside = CGRectInset(device_box, 0.25, 0.25);
+    clip = CGContextConvertRectToUserSpace(context, inside);
+    return true;
+}
+
+Rect outset_rect(const Rect rect, const double amount) noexcept {
+    const Rect result{rect.x - amount, rect.y - amount, rect.width + amount * 2.0, rect.height + amount * 2.0};
+    return result;
+}
+
 CGPathRef rounded_path(Rect rect, double radius) noexcept {
     const CGFloat bounded = std::clamp(
         radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5));
@@ -496,12 +546,23 @@ void CoreGraphicsRaster::clip_rounded_rect(Rect rect, double radius) {
 void CoreGraphicsRaster::fill_rect(Rect rect, Color color) {
     if ((*impl_).context != nullptr) {
         set_color((*impl_).context, color);
-        CGContextFillRect((*impl_).context, to_cg_rect(rect));
+        CGRect box = to_cg_rect(rect);
+        const bool snapped = snapped_user_rect((*impl_).context, rect, box);
+        CGContextSaveGState((*impl_).context);
+        if (snapped) CGContextSetShouldAntialias((*impl_).context, false);
+        CGContextFillRect((*impl_).context, box);
+        CGContextRestoreGState((*impl_).context);
     }
 }
 
 void CoreGraphicsRaster::fill_rounded_rect(Rect rect, double radius, Color color) {
     if ((*impl_).context == nullptr) return;
+    // The bounds snap; the corners keep their antialiasing.
+    CGRect bounds = to_cg_rect(rect);
+    if (snapped_user_rect((*impl_).context, rect, bounds)) {
+        rect = Rect{static_cast<double>(bounds.origin.x), static_cast<double>(bounds.origin.y),
+                    static_cast<double>(bounds.size.width), static_cast<double>(bounds.size.height)};
+    }
     CGPathRef path = rounded_path(rect, radius);
     if (path == nullptr) return;
     set_color((*impl_).context, color);
@@ -513,6 +574,23 @@ void CoreGraphicsRaster::fill_rounded_rect(Rect rect, double radius, Color color
 void CoreGraphicsRaster::stroke_rect(Rect rect, Color color, double width) {
     if ((*impl_).context != nullptr) {
         set_color((*impl_).context, color);
+        // The stroke is centred on the edges. Snapped, it is the ring between
+        // its snapped outer and inner edges, filled without antialiasing.
+        const double half = width * 0.5;
+        CGRect outer = CGRectNull;
+        CGRect inner = CGRectNull;
+        const bool snapped = std::isfinite(half) && half > 0.0 &&
+            snapped_user_rect((*impl_).context, outset_rect(rect, half), outer) &&
+            snapped_user_rect((*impl_).context, outset_rect(rect, -half), inner);
+        if (snapped) {
+            CGContextSaveGState((*impl_).context);
+            CGContextSetShouldAntialias((*impl_).context, false);
+            CGContextAddRect((*impl_).context, outer);
+            if (!CGRectIsEmpty(inner)) CGContextAddRect((*impl_).context, inner);
+            CGContextEOFillPath((*impl_).context);
+            CGContextRestoreGState((*impl_).context);
+            return;
+        }
         CGContextSetLineWidth((*impl_).context, width);
         CGContextStrokeRect((*impl_).context, to_cg_rect(rect));
     }
@@ -521,6 +599,36 @@ void CoreGraphicsRaster::stroke_rect(Rect rect, Color color, double width) {
 void CoreGraphicsRaster::stroke_rounded_rect(Rect rect, double radius,
                                              Color color, double width) {
     if ((*impl_).context == nullptr) return;
+    // The stroke is centred on the edges. Snapped, it is the ring between its
+    // snapped outer and inner bounds, as a rounded fill snaps its bounds; the
+    // corners keep their antialiasing.
+    const double half = width * 0.5;
+    CGRect outer = CGRectNull;
+    CGRect inner = CGRectNull;
+    const bool snapped = std::isfinite(half) && half > 0.0 &&
+        snapped_user_rect((*impl_).context, outset_rect(rect, half), outer) &&
+        snapped_user_rect((*impl_).context, outset_rect(rect, -half), inner);
+    if (snapped) {
+        const double bounded = std::clamp(radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5));
+        const Rect outer_rect{static_cast<double>(outer.origin.x), static_cast<double>(outer.origin.y),
+                              static_cast<double>(outer.size.width), static_cast<double>(outer.size.height)};
+        CGPathRef outer_path = rounded_path(outer_rect, bounded + half);
+        if (outer_path == nullptr) return;
+        set_color((*impl_).context, color);
+        CGContextAddPath((*impl_).context, outer_path);
+        CGPathRelease(outer_path);
+        if (!CGRectIsEmpty(inner)) {
+            const Rect inner_rect{static_cast<double>(inner.origin.x), static_cast<double>(inner.origin.y),
+                                  static_cast<double>(inner.size.width), static_cast<double>(inner.size.height)};
+            CGPathRef inner_path = rounded_path(inner_rect, std::max(0.0, bounded - half));
+            if (inner_path != nullptr) {
+                CGContextAddPath((*impl_).context, inner_path);
+                CGPathRelease(inner_path);
+            }
+        }
+        CGContextEOFillPath((*impl_).context);
+        return;
+    }
     CGPathRef path = rounded_path(rect, radius);
     if (path == nullptr) return;
     set_color((*impl_).context, color);
@@ -536,8 +644,14 @@ void CoreGraphicsRaster::fill_linear_gradient(
     if ((*impl_).context == nullptr || rect.empty()) return;
     CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
+    CGRect box = to_cg_rect(rect);
+    const bool snapped = aliased_clip_rect((*impl_).context, rect, box);
     CGContextSaveGState((*impl_).context);
-    CGContextClipToRect((*impl_).context, to_cg_rect(rect));
+    // A snapped box clips without antialiasing, as a snapped fill covers
+    // exactly its pixels; what is drawn inside keeps the painter's setting.
+    if (snapped) CGContextSetShouldAntialias((*impl_).context, false);
+    CGContextClipToRect((*impl_).context, box);
+    CGContextSetShouldAntialias((*impl_).context, true);
     CGContextDrawLinearGradient(
         (*impl_).context, gradient, CGPointMake(start.x, start.y),
         CGPointMake(end.x, end.y),
@@ -600,8 +714,14 @@ void CoreGraphicsRaster::fill_linear_gradient_spread(
             (corner.y - start.y) * perpendicular.y) + 1.0);
     }
 
+    CGRect box = to_cg_rect(rect);
+    const bool snapped = aliased_clip_rect((*impl_).context, rect, box);
     CGContextSaveGState((*impl_).context);
-    CGContextClipToRect((*impl_).context, to_cg_rect(rect));
+    // A snapped box clips without antialiasing, as a snapped fill covers
+    // exactly its pixels; what is drawn inside keeps the painter's setting.
+    if (snapped) CGContextSetShouldAntialias((*impl_).context, false);
+    CGContextClipToRect((*impl_).context, box);
+    CGContextSetShouldAntialias((*impl_).context, true);
     for (double period = first_period; period < final_period; period += 1.0) {
         const Point band_start{start.x + dx * period,
                                start.y + dy * period};
@@ -646,8 +766,14 @@ void CoreGraphicsRaster::fill_radial_gradient(
     }
     CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
+    CGRect box = to_cg_rect(rect);
+    const bool snapped = aliased_clip_rect((*impl_).context, rect, box);
     CGContextSaveGState((*impl_).context);
-    CGContextClipToRect((*impl_).context, to_cg_rect(rect));
+    // A snapped box clips without antialiasing, as a snapped fill covers
+    // exactly its pixels; what is drawn inside keeps the painter's setting.
+    if (snapped) CGContextSetShouldAntialias((*impl_).context, false);
+    CGContextClipToRect((*impl_).context, box);
+    CGContextSetShouldAntialias((*impl_).context, true);
     CGContextTranslateCTM((*impl_).context, center.x, center.y);
     CGContextScaleCTM((*impl_).context, radii.width, radii.height);
     CGContextDrawRadialGradient(
