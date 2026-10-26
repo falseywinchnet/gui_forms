@@ -93,9 +93,6 @@ include(CMakePackageConfigHelpers)
 add_subdirectory(stx_zlib)
 add_subdirectory(stx_png)
 add_subdirectory(stx_conv)
-# CNG, the native resource image codec (PNG stays for interchange); its
-# pinned Zstandard 1.5.7 comes from stx_cng/tools/fetch_zstd.sh.
-add_subdirectory(stx_cng)
 # The rich-text library: one document model, the markdown-like dialect and
 # RTF (planning/stages/RT-rich-text/PLAN.md).
 add_subdirectory(stx_rtf2md)
@@ -219,6 +216,9 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/syntax_tree/theme_syntax_tree.cpp
     src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
     src/core/theme_language/selector/theme_selector.cpp
+    src/core/theme_language/custom_properties/theme_custom_properties.cpp
+    src/core/theme_language/value/theme_value.cpp
+    src/core/theme_language/compiler/theme_compiler.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
     src/core/docking/dock_layout/dock_layout.cpp
@@ -231,7 +231,6 @@ add_library(gui_forms_core STATIC
     src/core/host/image/clipboard_dib.cpp
     src/core/host/image/clipboard_png.cpp
     src/core/image/png_pixels.cpp
-    src/core/image/cng_pixels.cpp
     src/core/image/resource_pixels.cpp
     src/core/image/png_color.cpp
     src/core/image/color_conversion.cpp
@@ -281,9 +280,6 @@ add_library(gui_forms_core STATIC
 target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib stx_png::stx_png)
 # The interpolation seam's private engine; no stx_conv type is public.
 target_link_libraries(gui_forms_core PRIVATE stx_conv::stx_conv)
-# The resource decode seam's CNG engine (src/core/image/cng_pixels); no
-# stx_cng or Zstandard type is public.
-target_link_libraries(gui_forms_core PRIVATE stx_cng::stx_cng)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
 set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 # Compatibility properties alone do not traverse LINK_ONLY dependencies of
@@ -627,8 +623,10 @@ add_library(gui_forms_controls STATIC
     src/controls/data_grid_view/data_grid_view_row_order.cpp
     src/controls/task_dialog/task_dialog.cpp
     src/controls/notify_icon/notify_icon.cpp
+    src/controls/file_dialog/file_dialog_support.cpp
     src/controls/file_dialog/file_dialog_types.cpp
     src/controls/open_file_dialog/open_file_dialog.cpp
+    src/controls/save_file_dialog/save_file_dialog.cpp
     src/controls/thread_exception_dialog/thread_exception_dialog.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
@@ -1226,6 +1224,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         src/host/windows/services/windows_clipboard_image.cpp
         src/host/windows/services/windows_notify_icons.cpp
         src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
+        src/host/windows/compositor/windows_compositor.cpp
     )
     target_include_directories(gui_forms_host_windows PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/windows
@@ -2052,7 +2051,8 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/services/windows_clipboard_image.cpp
                 src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
-                src/host/windows/raster/dib_frame_store.cpp)
+                src/host/windows/raster/dib_frame_store.cpp
+                src/host/windows/compositor/windows_compositor.cpp)
             target_include_directories(gui_forms_windows_dib_lifecycle_tests PRIVATE
                 include src/host/windows)
             target_compile_definitions(gui_forms_windows_dib_lifecycle_tests PRIVATE
@@ -2074,7 +2074,8 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/services/windows_clipboard_image.cpp
                 src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
-                src/host/windows/raster/dib_frame_store.cpp)
+                src/host/windows/raster/dib_frame_store.cpp
+                src/host/windows/compositor/windows_compositor.cpp)
             target_include_directories(gui_forms_windows_tooltip_tests PRIVATE
                 include src/host/windows)
             target_compile_definitions(gui_forms_windows_tooltip_tests PRIVATE
@@ -2098,6 +2099,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     src/host/windows/services/windows_notify_icons.cpp
                     src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
                     src/host/windows/raster/dib_frame_store.cpp
+                    src/host/windows/compositor/windows_compositor.cpp
                     src/host/windows/raster/prepared_text_compositor.cpp)
                 target_include_directories(gui_forms_windows_prepared_text_tests PRIVATE
                     include src/host/windows)
@@ -2134,6 +2136,17 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_application_native_tests PRIVATE gui_forms_application)
         add_test(NAME gui_forms_application_native_tests COMMAND gui_forms_application_native_tests)
         set_tests_properties(gui_forms_application_native_tests PROPERTIES TIMEOUT 30)
+        if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST)
+            # Stage T5, phase C2's gate: a non-opaque window on the Windows
+            # host through each grant, read off the composed screen.
+            add_executable(gui_forms_windows_compositor_tests tests/windows_compositor_tests.cpp)
+            target_compile_definitions(gui_forms_windows_compositor_tests PRIVATE
+                WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+            target_link_libraries(gui_forms_windows_compositor_tests PRIVATE gui_forms_application dwmapi
+                runtimeobject)
+            add_test(NAME gui_forms_windows_compositor_tests COMMAND gui_forms_windows_compositor_tests)
+            set_tests_properties(gui_forms_windows_compositor_tests PROPERTIES TIMEOUT 60)
+        endif()
         if(GUI_FORMS_ENABLE_LINUX_HOST)
             # Stage T5, phase C4's gate: a non-opaque window under Xvfb with no
             # compositing manager, then with xcompmgr started, stopped and
@@ -2316,9 +2329,9 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_png_pixels_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_pixels_tests COMMAND gui_forms_png_pixels_tests)
 
-    # The codec-neutral resource seam: CNG and PNG admission and decoding.
+    # The codec-neutral resource seam: admission and decoding.
     add_executable(gui_forms_resource_pixels_tests tests/image/resource_pixels_tests.cpp)
-    target_link_libraries(gui_forms_resource_pixels_tests PRIVATE gui_forms_core stx_cng::stx_cng)
+    target_link_libraries(gui_forms_resource_pixels_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_resource_pixels_tests COMMAND gui_forms_resource_pixels_tests)
 
     # Deterministic malformed-input sweeps (owner revision of decision 6A).
@@ -2551,7 +2564,8 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_xml_tests COMMAND gui_forms_xml_tests)
 
     # The theme language (stage T3): numbers, tokens, diagnostics, the syntax
-    # tree, and the deterministic mutation run over the tokenizer and parser.
+    # tree, selectors, values, the compiler, and the deterministic mutation
+    # run over the tokenizer, parser and value reader.
     add_executable(gui_forms_theme_number_tests tests/theme_language/theme_number_tests.cpp)
     target_link_libraries(gui_forms_theme_number_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_number_tests COMMAND gui_forms_theme_number_tests)
@@ -2567,6 +2581,13 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_selector_tests tests/theme_language/theme_selector_tests.cpp)
     target_link_libraries(gui_forms_theme_selector_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_theme_selector_tests COMMAND gui_forms_theme_selector_tests)
+    add_executable(gui_forms_theme_value_tests tests/theme_language/theme_value_tests.cpp)
+    target_link_libraries(gui_forms_theme_value_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_theme_value_tests COMMAND gui_forms_theme_value_tests)
+
+    add_executable(gui_forms_theme_compiler_tests tests/theme_language/theme_compiler_tests.cpp)
+    target_link_libraries(gui_forms_theme_compiler_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_compiler_tests COMMAND gui_forms_theme_compiler_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
@@ -2897,6 +2918,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_open_file_dialog_tests tests/open_file_dialog_tests.cpp)
     target_link_libraries(gui_forms_open_file_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_open_file_dialog_tests COMMAND gui_forms_open_file_dialog_tests)
+    add_executable(gui_forms_save_file_dialog_tests tests/save_file_dialog_tests.cpp)
+    target_link_libraries(gui_forms_save_file_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_save_file_dialog_tests COMMAND gui_forms_save_file_dialog_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)
@@ -2939,6 +2963,13 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_layout_panel_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_layout_panel_tests
              COMMAND gui_forms_layout_panel_tests)
+
+    add_executable(gui_forms_window_resize_measure_tests
+        tests/window_resize_measure_tests.cpp
+    )
+    target_link_libraries(gui_forms_window_resize_measure_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_window_resize_measure_tests
+             COMMAND gui_forms_window_resize_measure_tests)
 
     # The layout fixture corpus against checked-in Chromium references
     # (planning/stages/L-layout/PLAN.md section 6). The corpus path on the
@@ -3827,7 +3858,8 @@ if(GUI_FORMS_BUILD_FUZZERS)
         )
     endif()
 
-    # The theme sheet tokenizer and parser (stage T3), from their own sources.
+    # The theme sheet tokenizer, parser and value reader (stage T3), from
+    # their own sources.
     add_executable(gui_forms_theme_sheet_fuzz
         fuzz/theme_sheet_fuzz.cpp
         src/core/theme_language/source_text/theme_source_text.cpp
@@ -3836,6 +3868,11 @@ if(GUI_FORMS_BUILD_FUZZERS)
         src/core/theme_language/tokenizer/theme_tokenizer.cpp
         src/core/theme_language/syntax_tree/theme_syntax_tree.cpp
         src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
+        src/core/theme_language/custom_properties/theme_custom_properties.cpp
+        src/core/theme_language/value/theme_value.cpp
+        src/core/engine/engine_expression/engine_expression.cpp
+        src/core/anatomy/types/anatomy_types.cpp
+        src/core/schema/types/schema_types.cpp
         src/core/xml/xml_characters/xml_characters.cpp
         src/core/xml/types/xml_types.cpp
     )
@@ -3914,7 +3951,7 @@ include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
-# stx_zlib, stx_png, stx_conv, stx_cng and stx_rtf2md install their own licences and provenance under
+# stx_zlib, stx_png, stx_conv and stx_rtf2md install their own licences and provenance under
 # share/licenses/<package>; the SDK also carries them beside GUI.Forms' others.
 install(FILES stx_zlib/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE.txt)
 install(FILES stx_zlib/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-puff.txt)
@@ -3926,9 +3963,6 @@ install(FILES stx_rtf2md/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/lice
 install(FILES stx_png/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-PROVENANCE.md)
 install(FILES stx_conv/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_conv-LICENSE.txt)
 install(FILES stx_conv/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_conv-PROVENANCE.md)
-install(FILES stx_cng/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_cng-LICENSE.txt)
-install(FILES stx_cng/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_cng-PROVENANCE.md)
-install(FILES stx_cng/LICENSE-zstd.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Zstandard-LICENSE.txt)
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 # Every third-party component the SDK and the programs ship, with its licence
 # and the FreeType credit (THIRD_PARTY_NOTICES.md).
@@ -4173,5 +4207,5 @@ endif()
 # Every test carries one area label (cmake/TestAreas.cmake, tools/test_areas.json).
 if(GUI_FORMS_BUILD_TESTS)
     include(cmake/TestAreas.cmake)
-    gui_forms_label_test_areas(stx_zlib stx_png stx_conv stx_cng)
+    gui_forms_label_test_areas(stx_zlib stx_png stx_conv)
 endif()

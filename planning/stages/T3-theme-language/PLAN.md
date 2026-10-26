@@ -376,7 +376,7 @@ Every diagnostic has:
 - a **severity**: `error` (the theme, or the inline style, is refused) or
   `warning` (one declaration, or one rule, is dropped);
 - a **code**: a stable number and snake_case name, such as
-  `E401 value_out_of_range`, for search and tests;
+  `E403 value_out_of_range`, for search and tests;
 - a **location**: the file (the sheet's name inside its package, such as
   `aurora/main.theme.css`; `inline:<control path>` for `set_style`; the form
   document's path for a `style` attribute), the byte offset, and the line
@@ -391,7 +391,7 @@ written once to the log on standard error in the library's trace form, so a
 developer sees it in the console (B2):
 
 ```text
-gui-forms-theme=error|code:E401 value_out_of_range|file:aurora/main.theme.css|line:12|column:9|rule:button:active::part(face)|property:scale|detail:3
+gui-forms-theme=error|code:E403 value_out_of_range|file:aurora/main.theme.css|line:12|column:9|rule:button:active::part(face)|property:scale|detail:3
 ```
 
 The classes (proposed codes; the numbering is the record, names may be
@@ -406,9 +406,9 @@ refined in P1):
 | E5xx limit | error | `sheet_too_large`, `too_many_rules`, `too_many_declarations`, `nesting_too_deep`, `string_too_long`, `too_many_imports`, `expression_over_budget`, `too_many_variable_combinations`, and the derived limits of section 6 |
 | E6xx package | error | `manifest_invalid`, `sheet_hash_mismatch`, `import_not_installed`, `import_hash_mismatch`, `import_cycle`, `published_value_invalid` |
 | E7xx reserved | error | `reserved_input_set` |
-| W1xx unknown name | warning | `unknown_property`, `unknown_primitive`, `unknown_function`, `unknown_at_rule` (W104, P2), `unknown_media_feature`, `unknown_selector_name`, `property_not_admitted`; numbered W101 to W107 in this order |
+| W1xx unknown name | warning | `unknown_property`, `unknown_primitive`, `unknown_function`, `unknown_at_rule` (W104, P2), `unknown_media_feature`, `unknown_selector_name`, `property_not_admitted`; numbered W101 to W107 in this order; then `primitive_over_budget` W108 and `primitive_cost_unbounded` W109 (P5) |
 | W2xx colour | warning | `literal_colour_unremappable` |
-| W3xx version | warning | `needs_newer_engine` (the sheet or a rule), `keyword_from_newer_engine` |
+| W3xx version | warning | `needs_newer_engine` (the sheet or a rule), `keyword_from_newer_engine`; W301 and W302 |
 | W4xx inline | warning | `inline_with_theme`, once per window (E1) |
 
 The engine's own `RuleDiagnosticKind`s still run after T3 (the engine
@@ -572,6 +572,58 @@ with several is refused with a temporary `not_yet_built` error, so no
 interim meaning ships. Gate: value fixtures for every form; budget overruns
 are errors; folded and unfolded programs give the same bits. 2 PRs.
 
+*Done in one PR* (one PR per phase, owner, 2026-10-25):
+- **Codes.** The E4xx codes it raises take their numbers in the order of
+  section 2's table: `value_syntax` E401, `value_wrong_kind` E402,
+  `value_out_of_range` E403, `unit_not_admitted` E404,
+  `value_form_not_admitted` E405, `keyword_unknown` E406 (defined here for
+  the layout stage's use, raised from P5), `expression_invalid` E408,
+  `variable_undefined` E409, `variable_cycle` E410 and `resource_unknown`
+  E413. E407, E411, E412 and E414 keep their numbers for the phases that
+  raise them. `unknown_property` W101 and `property_not_admitted` W107 are
+  defined here too, for the layout stage, and raised from P5. The
+  diagnostics source is the single definition of the code list; other
+  stages raise its codes and define none of their own. Also `expression_over_budget` E507,
+  `too_many_custom_properties` E511, `substitution_too_long` E512,
+  `reserved_input_set` E701, and the temporary `not_yet_built` E999, which
+  P12 removes.
+- **Custom properties.** One table per sheet holds every definition in a
+  style rule (inside `@media` too), sorted by name. A `var()` is replaced by
+  its name's single definition, a reserved input, or its fallback. The
+  4,096-token bound counts every token the substitution passes over once:
+  whitespace and comments, each `var()`'s own tokens and a fallback it
+  skips. So its work is bounded however the definitions nest, and a cycle
+  is found by a flag per name rather than a search. Until P12, two definitions of one name anywhere in the sheet (in
+  one rule too) refuse the `var()` that reads it, so the candidate check
+  of section 1.11 has only one candidate to check.
+- **Values.** A value is a flat list of components in written order, each
+  function followed by its arguments. rgb(), rgba(), hsl(), hsla() and
+  color-mix() become colours as they close; each rounds to 8-bit channels
+  half up. color-mix() follows CSS Color 5: premultiplied interpolation in
+  srgb, the percentage normalisation, and a sum below 100% scaling the
+  alpha; other spaces are E405. A named colour stays a keyword, which
+  `named_colour()` resolves. Other functions stay generic for the
+  lowering. These are E405: the other colour spaces, relative colours,
+  the CSS math functions outside section 1.6, `attr()`, `env()` and
+  similar. An empty value is E401.
+- **Expressions** compile to the engine's postfix programs in one pass,
+  with precedence and an explicit stack. CSS's rules hold: `+` and `-`
+  need whitespace on both sides; units must agree for `+`, `-`, `min()`,
+  `max()` and comparisons; a product has one plain-number factor; a
+  quotient's divisor is a plain number or has the dividend's unit (giving a
+  plain number). `clamp(MIN, VAL, MAX)` compiles to `max(MIN, min(VAL,
+  MAX))`, as CSS defines it, not to the engine's clamp, which differs when
+  MIN exceeds MAX. The engine inputs' units: the pointer px,
+  `--time-in-state` seconds, the scales and published values plain numbers.
+  Each constant operation is folded with the engine's `EngineExpression` as
+  it is applied, unless it gives the fallback. A value that reads nothing
+  is a number; one whose evaluation gives the fallback (`calc(1px / 0)`)
+  is E403. An unknown name in `state()` or `param()` is E401 for now; P5
+  decides whether a W1xx warning suits it better.
+- The fuzz harness also substitutes and reads every value of a complete
+  tree: a refusal adds one error and keeps nothing; a read value nests,
+  its programs compile, and a second read gives the same value.
+
 **P5. Lowering onto today's engine.** `primitive`, `shape`, `blend`,
 primitive parameters by name, static `opacity`, `scale` and `translate`,
 the unknown-name warnings and the version warnings (W1xx, W3xx). This is
@@ -579,6 +631,74 @@ the first end-to-end compile: a sheet in, a `Theme` out, through
 `Window::set_theme`. Gate: a sheet equal to an existing C++-authored test
 theme compiles to equal `ThemeRuleSheet` records, and the parts it draws
 hash equal. 1 PR.
+
+*Done in one PR:*
+- **The compiler** (`compiler/`, internal, E3) runs the stages in order
+  and lowers each style rule once: its selectors, then its `primitive`
+  declarations (the last usable one selects the primitive, so a parameter
+  may be written before it), then its other declarations. Within a rule
+  the later declaration of a property wins, in its place, with no
+  diagnostic. Each expanded selector gets one copy of the rule's records,
+  labelled with the selector list as written (clipped to 64 bytes); a
+  rule left with nothing to declare gives no rule. A given specificity
+  (EC2) is set only where CSS's differs from the engine's own count.
+  The first error refuses the sheet, which is then empty.
+- **Properties.** A parameter is written by its registered name in
+  kebab-case: a number takes a plain number or px, or an expression (its
+  fallback the parameter's default; `param()` of a colour or a choice is
+  E402); a colour takes a colour or a named colour; a choice takes its
+  keyword in kebab-case, matched in any case (`shape: cap-start`).
+  `opacity` (a number or a percentage, 0 to 1), `scale` (one number or
+  percentage, or `none`; one per axis is E405) and `translate` (one or two
+  px lengths, or `none`; a percentage or a depth is E405) become one-state
+  machines reached at once; out-of-range values are E403, not clamped as
+  CSS clamps opacity, so a refusal is never silent. `mix-blend-mode`
+  lowers to `blend`; CSS's other modes are E405. `isolation` is accepted
+  and adds nothing. `initial` is the default (the built-in recipe for
+  `primitive`, `built-in` naming it too); `inherit` is E402 until P8;
+  `unset`, `revert` and `revert-layer` are E405. An expression reading an
+  input in a presentational property is E405 until motion (P7). An
+  unknown name in `state()` or `param()` stays E401 (P4's question): the
+  states are the engine's fixed vocabulary and the parameters the rule's
+  own primitive's, so an unknown one is a mistake in the sheet, not a name
+  from a newer engine.
+- **Refused until their phases** (E999): `!important` (P9), `@import`
+  (P10), `@media` and `@keyframes` (P7), and the properties of P6 to P8:
+  the `background`, `border`, `outline`, `mask`, `transition` and
+  `animation` families, `box-shadow`, `text-shadow`, `filter`,
+  `backdrop-filter`, `surface-finish`, `glow`, `glow-placement`, `color`
+  and `font`.
+- **Warnings.** An unknown property is W101 and a known CSS property the
+  language leaves out W107 (a table of layout, typography and geometry
+  properties, and the `column`, `flex`, `font`, `grid`, `inset`, `margin`,
+  `overflow`, `overscroll`, `padding`, `scroll`, `text-decoration` and
+  `transform` families); neither value is read. A parameter with no
+  `primitive` in its rule is W101. An unknown primitive is W102 and its
+  parameters are dropped with it, silently. A generic function as a value
+  is W103. The engine's budget refusals take their own codes,
+  `primitive_over_budget` W108 and `primitive_cost_unbounded` W109,
+  appended to the W1xx row. A role the primitive cannot paint is E402
+  (R2-08).
+- **Engine versions.** When the declared engine (the manifest's, P9;
+  until then the caller's) is newer than the running one, W301 is reported
+  once (detail `major.minor`), a keyword the running engine lacks is W302
+  and dropped, and the sheet is handed to the engine at the running
+  version, so the rest applies (B3, R2-07). Otherwise the declared version
+  is kept.
+- **Lowered size** (a new derived limit, `lowered_sheet_too_large` E513,
+  for owner confirmation): the records a sheet lowers to count at most
+  16 MiB, estimated as 64 bytes a record plus the bytes of its strings and
+  16 a program instruction, the selectors (P3) included. Without it a
+  selector list expanding into 10,000 rules, each copying a long stable ID
+  or 64 expression declarations, would build gigabytes from a 1 MiB sheet.
+- Gate: the sheet `tests/theme_language/theme_compiler_tests.cpp` writes
+  equals its hand-built `ThemeRuleSheet` (a bulge with an expression
+  reading the pointer and a custom property, colours, a blend and a static
+  opacity; a hover rule with a later-wins parameter, a scale and a
+  translation; a material with a recipe and a pill shape), and the two
+  themes' windows draw identical part rasters, offsets and groups at rest,
+  hot at two pointer positions, and away. Every sheet the tests compile
+  also compiles in the engine with no diagnostic.
 
 **P6. Authored materials (engine change EC1) and their CSS.** The engine
 first: a rule's material fields cascade one by one, as parameters do, and

@@ -99,16 +99,45 @@ void Window::resize(Size client_size) {
         return;
     }
     const Rect old_bounds{0.0, 0.0, client_size_.width, client_size_.height};
+    const bool width_changed = client_size_.width != client_size.width;
+    const bool height_changed = client_size_.height != client_size.height;
     client_size_ = client_size;
     invalidate_cursor_interaction(CursorError::stale_metrics);
     ++surface_epoch_;
     if (surface_epoch_ == 0U) ++surface_epoch_;
     add_damage_all_planes(old_bounds);
-    mark_subtree_dirty(*root_, invalidation::bounds);
+    // Every control is arranged, painted and hit-tested again, as before.
+    // Only the controls whose measure input the client size reaches are
+    // measured again; the others are handed the same available size as
+    // before, so their measure would answer as it did (stage L, L7).
+    mark_subtree_dirty(*root_, without_dirty(invalidation::bounds, Dirty::measure));
+    mark_resized_measure(*root_, width_changed, height_changed);
     for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
         if (const Control::Ptr overlay = (*popup).popup()) {
             mark_subtree_dirty(*overlay, invalidation::bounds);
         }
+    }
+}
+
+// The window's measure pass hands the root the client size, and hands each
+// child its parent's requested extent on each axis, or, where that is zero,
+// what the parent was handed (measure_dirty_recursive). A client-size change
+// therefore changes what a control is handed exactly when it reaches the
+// control: on a changed axis, through ancestors that request no extent on
+// that axis. Those controls, and only those, are marked for measure. The
+// reached set contains each reached control's ancestors, so their subtree
+// flags already cover it.
+void Window::mark_resized_measure(Control& control, bool width_reaches, bool height_reaches) {
+    // add_dirty advances the measure generation, so a reached control's
+    // cached measure answers (measure_for_layout) are not answered again.
+    control.add_dirty(Dirty::measure);
+    control.subtree_dirty_ |= Dirty::measure;
+    const bool child_width_reaches = width_reaches && control.requested_bounds_.width <= 0.0;
+    const bool child_height_reaches = height_reaches && control.requested_bounds_.height <= 0.0;
+    if (!child_width_reaches && !child_height_reaches) return;
+    for (const Control::Ptr& child : control.children_) {
+        if (!child) continue;
+        mark_resized_measure(*child, child_width_reaches, child_height_reaches);
     }
 }
 

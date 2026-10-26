@@ -5,6 +5,7 @@
 #include "../services/windows_clipboard_open.hpp"
 #include "../services/windows_cursor.hpp"
 #include "../services/windows_notify_icons.hpp"
+#include "../compositor/windows_compositor.hpp"
 #include "../input/windows_key_translation.hpp"
 #include "../input/windows_message_queue.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
@@ -799,7 +800,7 @@ public:
         // A frame starts on the DIB, with no paint group open.
         row_origin_ = 0;
         row_end_ = height_;
-        maintain_alpha_ = false;
+        maintain_alpha_ = frame_alpha_;
         group_depth_ = 0U;
         refused_open_ = 0U;
         SetBkMode(memory_dc_, TRANSPARENT);
@@ -1029,6 +1030,12 @@ public:
     // Encodes the presented front pixels as an opaque PNG through the
     // renderer-neutral core writer. The DIB is 32-bit BGRX whose alpha byte
     // GDI leaves undefined, so the alpha channel is deliberately dropped.
+    // Whether the frames begun after this keep premultiplied alpha on the
+    // DIB itself, as inside a paint group: true while the window's backdrop
+    // grant is not opaque (stage T5, C2), so that DWM composes the client's
+    // alpha. Otherwise every frame pixel is presented opaque, as before.
+    void set_frame_alpha(bool kept) noexcept { frame_alpha_ = kept; }
+
     [[nodiscard]] bool encode_png(std::vector<std::byte>& output) const {
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
         const detail::DibFrontView front = frames_.front();
@@ -1050,7 +1057,9 @@ public:
             reinterpret_cast<const std::byte*>(saved_pixels),
             static_cast<std::size_t>(saved_width) * static_cast<std::size_t>(saved_height) * 4U);
         input.order = gui_forms::image::PngChannelOrder::bgra;
-        input.alpha = gui_forms::image::PngSourceAlpha::opaque;
+        // A frame that keeps alpha is captured with it (stage T5, PLAN.md §3).
+        input.alpha = frame_alpha_ ? gui_forms::image::PngSourceAlpha::premultiplied
+                                   : gui_forms::image::PngSourceAlpha::opaque;
         return gui_forms::image::encode_png(input, output);
     }
 
@@ -2458,7 +2467,7 @@ private:
         glyph_runs_.reset();
     }
 
-    // The shared owned CNG or PNG decode (src/core/image/resource_pixels), as
+    // The shared owned resource decode (src/core/image/resource_pixels), as
     // on every host: premultiplied BGRA, the DIB's native order.
     static bool decode_resource(gui_forms::image::ResourcePixelDecoder& decoder,
                                 const ImageResourceView& resource,
@@ -2497,10 +2506,13 @@ private:
     int width_{};
     int height_{};
     // The current target's rows: [0, height_) on the DIB, a paint group's
-    // rows inside one. maintain_alpha_ is true inside a group.
+    // rows inside one. maintain_alpha_ is true inside a group, and on the
+    // DIB itself while frame_alpha_ holds.
     int row_origin_{};
     int row_end_{};
     bool maintain_alpha_{};
+    // Whether frames keep premultiplied alpha (set_frame_alpha).
+    bool frame_alpha_{};
     // One level per open paint group: its scratch rows (reused, never
     // shrunk; released with the painter), what it covers, and the target it
     // will composite into.
@@ -2707,6 +2719,7 @@ public:
         const HostDispatchResult attached = dispatch(HostAttachEvent{logical, scale_});
         if (!attached.accepted()) return false;
         native_phase_ = NativePhase::attached;
+        report_compositor_state();
         accessibility_.attach(hwnd_, *model_, scale_);
         (*model_).set_dispatch_wake_handler(
             gui_forms::detail::BoundMemberFunction<
@@ -2766,6 +2779,27 @@ public:
         native_phase_ = NativePhase::ready;
         collect_damage();
         return true;
+    }
+
+    // Reports DWM's state to the window (stage T5, C2): after attach, and
+    // whenever a message may have changed a setting it reads. A reading
+    // that differs from the window's last report only by its generation is
+    // not sent.
+    void report_compositor_state() {
+        const CompositorGeneration next{compositor_generation_.value + 1U};
+        const CompositorState state = detail::read_windows_compositor_state(hwnd_, next);
+        CompositorState unchanged = state;
+        unchanged.generation = (*model_).compositor_state().generation;
+        if (compositor_generation_.value != 0U && unchanged == (*model_).compositor_state()) return;
+        compositor_generation_ = next;
+        static_cast<void>(dispatch(HostCompositorEvent{state}));
+        collect_damage();
+    }
+
+    // The next frame keeps alpha while the window's backdrop is not opaque.
+    void prepare_frame_alpha() noexcept {
+        const bool kept = (*model_).backdrop_grant().granted != WindowBackdrop::opaque;
+        raster_.set_frame_alpha(kept);
     }
 
     bool will_show() noexcept {
@@ -2856,6 +2890,11 @@ public:
             }
         }
         switch (message) {
+        case WM_SETTINGCHANGE:
+        case WM_THEMECHANGED:
+        case WM_DWMCOMPOSITIONCHANGED:
+            if (detail::windows_compositor_message(message, wparam, lparam)) report_compositor_state();
+            break;
         case WM_ACTIVATEAPP:
             // Sent to every top-level window of the thread; the windowing
             // ignores repeated reports of the same state.
@@ -3489,6 +3528,7 @@ private:
         // Where the placement is unchanged and the frame opaque, only the
         // changed region is drawn and copied: outside it the raster already
         // holds this frame's pixels (as on macOS).
+        prepare_frame_alpha();
         raster_.begin_frame();
         static_cast<void>(raster_.synchronize_images((*model_).image_resources()));
         const bool regions_usable = !live_region_lost_;
@@ -3717,6 +3757,7 @@ private:
         bool presented = false;
         std::uint64_t transactional_copy_nanoseconds = 0U;
         try {
+            prepare_frame_alpha();
             const bool begun = raster_.begin_frame();
             if (begun) {
                 const bool images_ready = raster_.synchronize_images((*model_).image_resources());
@@ -3788,6 +3829,7 @@ private:
         for (std::size_t index = 0; index < painted_rectangles.size(); ++index) {
             present_rectangles.push_back(device_rect(painted_rectangles[index]));
         }
+        prepare_frame_alpha();
         raster_.begin_frame();
         static_cast<void>(raster_.synchronize_images((*model_).image_resources()));
         const std::optional<PaintReceipt> receipt =
@@ -4269,6 +4311,8 @@ private:
     // A taken presentation region that was never presented: the next tick
     // copies whole clips.
     bool live_region_lost_{};
+    // The last compositor state report's generation; 0 before the first.
+    CompositorGeneration compositor_generation_{};
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
     bool recovery_expose_pending_{};
 #endif
@@ -4397,7 +4441,11 @@ HostCapabilities windows_capabilities() {
                 HostCapability::window_frames |
                 HostCapability::screen_pointer |
                 HostCapability::window_at_point |
-                HostCapability::window_ordering,
+                HostCapability::window_ordering |
+                HostCapability::transparent_windows |
+                HostCapability::window_backdrops |
+                HostCapability::compositor_notifications |
+                HostCapability::presentation_preferences,
             // Windows follows the PC keyboard convention (Ctrl+F4 closes a
             // document).
             pc_key_map()};

@@ -95,8 +95,8 @@ raster. Every present is then a plain copy: no host reorders bytes.
 - the C ABI (`GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED`, `GD_PIXEL_BGRA32_PREMULTIPLIED`,
   `gf_windows_paint_endpoint_submit_bgra_v1`);
 - image resources, text compositing (`TextPixelOrder`), live surfaces, the
-  T2 engine's feature samples and material images, CNG pixels and the Windows
-  notify icons.
+  T2 engine's feature samples and material images, and the Windows notify
+  icons.
 
 RGBA appears beside it: `PixelFormat::rgba32_premultiplied`,
 `LiveSurfacePixelFormat::rgba32_premultiplied_srgb` (the non-Windows answer
@@ -152,7 +152,8 @@ its description. Stacks stay at most two deep.
 
 - Every surface, resource and raster is BGRA8 premultiplied sRGB, on every
   platform, MinGW included: rasters, part rasters, live surfaces, image
-  resources, text compositing, engine samples and materials, CNG.
+  resources, text compositing, engine samples and materials. PNG resources
+  decode once into BGRA (CNG was removed on 2026-10-26).
 - Skia is configured BGRA on all four platforms with the same four shift
   definitions, in each profile's GN arguments and in every GUI.Forms
   translation unit that includes Skia's headers. A static assertion in the
