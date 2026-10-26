@@ -713,11 +713,12 @@ one bake per distinct assembly. 3 PRs.
 *P6a, the engine (EC1), done:*
 - **Fields.** A `ThemeRule` carries `materials`, a list of
   `MaterialDeclaration`s, each one `MaterialField` and its value:
-  `background_colour`, `fills` (the image layers), `shadows`, `glows`, the border's twelve longhands (each edge's style,
-  width and colour), `keylines`, `corners` (`corner_radius` with
-  `corner_radii`, as `border-radius` sets them), `colour_filter`,
-  `drop_shadow`, `filter_blur`, `finish` and `mask`. The border cascades
-  by CSS longhand, so that `border-color` in one rule and `border-width`
+  `background_colour`, `fills` (the image layers), `fill_blend_modes`,
+  `shadows`, `glows`, the border's twelve longhands (each edge's style,
+  width and colour), `keylines`, the four corners (`corner_top_left` to
+  `corner_bottom_left`, in CSS's order), `colour_filter`, `drop_shadow`,
+  `filter_blur`, `finish` and `mask`. The fields are CSS's longhands, so
+  each cascades as CSS cascades it. The border cascades by CSS longhand, so that `border-color` in one rule and `border-width`
   in another combine as CSS has them: the compiler (P6b) lowers `border`
   and its shorthands to the longhands. The fills are two fields (owner
   C6, 2026-10-26), CSS's `background-color` and `background-image`,
@@ -725,10 +726,18 @@ one bake per distinct assembly. 3 PRs.
   under the image layers, composed at assembly. The floor's bottom layer,
   when solid, is its colour and its other layers its image layers; a
   colour of alpha 0 adds no layer, and with no layer at all the fill is
-  one transparent solid.
+  one transparent solid. `fill_blend_modes` is `background-blend-mode`:
+  the modes in CSS's order (the top image layer's first), repeated over
+  the image layers; the colour layer keeps normal.
+- **Corners.** Each corner cascades on its own, as `border-top-left-radius`
+  does; the compiler lowers `border-radius` to the four. At assembly each
+  corner is its declaration's, else the floor's. Four equal corners are
+  `corner_radius` alone; unequal ones are `corner_radii`, with
+  `corner_radius` the smallest, which the built-in path rounds every
+  corner by.
 - **`initial`** (`MaterialDeclaration::initial`) keeps the floor's value
   and still wins over the rules beneath it.
-- **Percentage radii** (R2-11): a corner marked in `relative` is a
+- **Percentage radii** (R2-11): a corner marked `relative` is a
   fraction of the box's shorter side, resolved when the material is
   assembled for a part.
 - **Checking.** Each field is checked alone, written into the default

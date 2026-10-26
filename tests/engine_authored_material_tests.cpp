@@ -70,6 +70,34 @@ std::size_t at(MaterialField field) {
     return position;
 }
 
+constexpr std::array<MaterialField, 4> corner_fields{MaterialField::corner_top_left, MaterialField::corner_top_right,
+                                                     MaterialField::corner_bottom_right,
+                                                     MaterialField::corner_bottom_left};
+
+// The four corners at `radius` (a fraction of the shorter side when
+// `relative`), as `border-radius` sets them.
+std::array<MaterialDeclaration, 4> corners_of(double radius, bool relative) {
+    std::array<MaterialDeclaration, 4> corners{};
+    for (std::size_t corner = 0U; corner < corners.size(); ++corner) {
+        corners[corner].field = corner_fields[corner];
+        corners[corner].number = radius;
+        corners[corner].relative = relative;
+    }
+    return corners;
+}
+
+void push_corners(ThemeRule& rule, double radius) {
+    const std::array<MaterialDeclaration, 4> corners = corners_of(radius, false);
+    for (const MaterialDeclaration& corner : corners) rule.materials.push_back(corner);
+}
+
+void point_at(const std::array<MaterialDeclaration, 4>& corners,
+              std::array<const MaterialDeclaration*, material_field_count>& fields) {
+    for (const MaterialDeclaration& corner : corners) fields[at(corner.field)] = &corner;
+}
+void point_at(std::array<MaterialDeclaration, 4>&& corners,
+              std::array<const MaterialDeclaration*, material_field_count>& fields) = delete;
+
 MaterialBorder border_of(Color colour, double width) {
     MaterialBorder border{};
     border.color = colour;
@@ -98,12 +126,13 @@ bool has_diagnostic(const CompiledThemeRules& rules, RuleDiagnosticKind kind, st
 
 void test_field_names() {
     const std::array<std::string_view, material_field_count> expected{
-        "background_colour", "fills",         "shadows",           "glows",
+        "background_colour", "fills",         "fill_blend_modes", "shadows",           "glows",
         "border_top_style",    "border_top_width",    "border_top_colour",
         "border_right_style",  "border_right_width",  "border_right_colour",
         "border_bottom_style", "border_bottom_width", "border_bottom_colour",
         "border_left_style",   "border_left_width",   "border_left_colour",
-        "keylines",      "corners",           "colour_filter",
+        "keylines",      "corner_top_left", "corner_top_right", "corner_bottom_right", "corner_bottom_left",
+        "colour_filter",
         "drop_shadow",   "filter_blur",       "finish",
         "mask"};
     for (std::size_t index = 0U; index < material_field_count; ++index) {
@@ -117,7 +146,7 @@ void test_compile() {
     ThemeRuleSheet sheet{};
     ThemeRule fields_only = part_rule("fields", "pad", "face");
     fields_only.materials.push_back(fills_of(Color::rgba(200, 0, 0)));
-    fields_only.materials.push_back(number_of(MaterialField::corners, 4.0));
+    fields_only.materials.push_back(number_of(MaterialField::corner_top_left, 4.0));
     sheet.rules.push_back(fields_only);
     ThemeRule repeated = part_rule("repeated", "pad", "face");
     repeated.materials.push_back(fills_of(Color::rgba(200, 0, 0)));
@@ -128,7 +157,7 @@ void test_compile() {
     nine_fills.field = MaterialField::fills;
     nine_fills.fills.assign(SurfaceMaterial::maximum_fill_layers + 1U, MaterialFillLayer::solid(Color::rgba(0, 0, 0)));
     invalid.materials.push_back(nine_fills);
-    invalid.materials.push_back(number_of(MaterialField::corners, -1.0));
+    invalid.materials.push_back(number_of(MaterialField::corner_top_left, -1.0));
     invalid.materials.push_back(number_of(MaterialField::finish, 2.0));
     invalid.materials.push_back(number_of(MaterialField::count, 0.0));
     invalid.materials.push_back(number_of(MaterialField::border_left_width, -1.0));
@@ -141,7 +170,7 @@ void test_compile() {
     require(has_diagnostic(rules, RuleDiagnosticKind::duplicate_declaration, "repeated", "background_colour"),
             "a second declaration of a field in one rule is a duplicate");
     require(has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", "fills") &&
-                has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", "corners") &&
+                has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", "corner_top_left") &&
                 has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", "finish") &&
                 has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", {}) &&
                 has_diagnostic(rules, RuleDiagnosticKind::material_field_invalid, "invalid", "border_left_width") &&
@@ -190,7 +219,7 @@ void test_cascade() {
     require((*fills) == fills_of(Color::rgba(0, 0, 200)), "the more specific rule's fills win");
     require((*top).number == 2.0,
             "a field only the less specific rule sets is still its: each field cascades on its own");
-    require(both.materials[static_cast<std::size_t>(MaterialField::corners)] == nullptr,
+    require(both.materials[at(MaterialField::corner_top_left)] == nullptr,
             "a field no rule sets has no winner");
     const MaterialDeclaration* const glow = both.materials[static_cast<std::size_t>(MaterialField::glows)];
     require(glow != nullptr && (*glow).initial, "an initial declaration wins over the rules beneath it");
@@ -240,9 +269,9 @@ void test_assembly() {
     require(assembled == floor, "with no field set the assembly is the floor");
 
     const MaterialDeclaration red = fills_of(Color::rgba(200, 0, 0));
-    const MaterialDeclaration radius = number_of(MaterialField::corners, 2.0);
+    const std::array<MaterialDeclaration, 4> radius = corners_of(2.0, false);
     fields[at(MaterialField::background_colour)] = &red;
-    fields[static_cast<std::size_t>(MaterialField::corners)] = &radius;
+    point_at(radius, fields);
     assemble_material(floor, fields, 20.0, assembled);
     SurfaceMaterial expected = floor;
     expected.fills.assign(1U, MaterialFillLayer::solid(Color::rgba(200, 0, 0)));
@@ -271,8 +300,8 @@ void test_assembly() {
                 assembled.border_edges.left == floor.border,
             "an unequal edge splits the border, keeping the floor's style; the others keep the floor's");
     require(!valid_surface_material(assembled), "single edges with rounded corners are no material");
-    const MaterialDeclaration square = number_of(MaterialField::corners, 0.0);
-    fields[at(MaterialField::corners)] = &square;
+    const std::array<MaterialDeclaration, 4> square = corners_of(0.0, false);
+    point_at(square, fields);
     assemble_material(floor, fields, 20.0, assembled);
     require(valid_surface_material(assembled), "with square corners they are");
 
@@ -315,17 +344,23 @@ void test_assembly() {
     require(!assembled.border && assembled.border_edges.empty(), "four absent edges are no border");
 
     // Relative corners are fractions of the shorter side.
-    MaterialDeclaration relative = number_of(MaterialField::corners, 0.5);
-    relative.relative.top_left = true;
+    std::array<MaterialDeclaration, 4> relative = corners_of(0.5, true);
     fields = no_fields();
-    fields[static_cast<std::size_t>(MaterialField::corners)] = &relative;
+    point_at(relative, fields);
     assemble_material(floor, fields, 20.0, assembled);
     require(assembled.corner_radius == 10.0 && !assembled.corner_radii, "50% of a 20-unit side is 10");
-    relative.corner_radii = MaterialCornerRadii{0.25, 3.0, 0.5, 1.0};
-    relative.relative.bottom_right = true;
+    relative[0].number = 0.25;
+    relative[1] = number_of(MaterialField::corner_top_right, 3.0);
+    relative[3] = number_of(MaterialField::corner_bottom_left, 1.0);
     assemble_material(floor, fields, 20.0, assembled);
-    require(assembled.corner_radii == (MaterialCornerRadii{5.0, 3.0, 10.0, 1.0}),
-            "each marked corner is resolved, the others kept in units");
+    require(assembled.corner_radii == (MaterialCornerRadii{5.0, 3.0, 10.0, 1.0}) && assembled.corner_radius == 1.0,
+            "each relative corner is resolved, the others kept in units; the built-in path takes the smallest");
+    fields = no_fields();
+    const MaterialDeclaration one_corner = number_of(MaterialField::corner_bottom_right, 8.0);
+    fields[at(MaterialField::corner_bottom_right)] = &one_corner;
+    assemble_material(floor, fields, 20.0, assembled);
+    require(assembled.corner_radii == (MaterialCornerRadii{5.0, 5.0, 8.0, 5.0}) && assembled.corner_radius == 5.0,
+            "a corner set alone keeps the floor's others: each corner cascades on its own");
     fields = no_fields();
     fields[at(MaterialField::border_top_style)] = &no_top;
 
@@ -389,6 +424,20 @@ void test_fill_composition() {
     assemble_material(graded, fields, 20.0, assembled);
     require(assembled.fills.size() == 9U && !valid_surface_material(assembled),
             "a colour under eight image layers is more than a material holds");
+
+    // Blend modes are in CSS's order, top layer first, repeated.
+    SurfaceMaterial layered{};
+    layered.fills = {MaterialFillLayer::solid(Color::rgba(9, 9, 9)), veil(), veil(), veil()};
+    MaterialDeclaration blends{};
+    blends.field = MaterialField::fill_blend_modes;
+    blends.blend_modes = {MaterialBlendMode::multiply, MaterialBlendMode::screen};
+    fields = no_fields();
+    fields[at(MaterialField::fill_blend_modes)] = &blends;
+    assemble_material(layered, fields, 20.0, assembled);
+    require(assembled.fills[0].blend == MaterialBlendMode::normal && assembled.fills[3].blend == MaterialBlendMode::multiply &&
+                assembled.fills[2].blend == MaterialBlendMode::screen &&
+                assembled.fills[1].blend == MaterialBlendMode::multiply,
+            "the colour layer keeps normal; the image layers take the modes from the top, repeated");
 }
 
 // -- the engine ------------------------------------------------------------------------
@@ -526,7 +575,7 @@ FixtureTheme authored_theme() {
     MaterialDeclaration no_images{};
     no_images.field = MaterialField::fills;
     fields.materials.push_back(no_images);
-    fields.materials.push_back(number_of(MaterialField::corners, 6.0));
+    push_corners(fields, 6.0);
     theme.rules.push_back(fields);
     return theme;
 }

@@ -304,17 +304,20 @@ struct AmbientEffect final {
 // Each cascades on its own, as a parameter does: a part's material is the
 // recipe material its primitive draws (the cascade's floor), with each
 // field the winning matching rule sets in its place. The fields are
-// SurfaceMaterial's, except that the fills are two fields, CSS's
-// background-color and background-image (owner C6, 2026-10-26: they
-// combine across rules, the colour under the image layers), that `corners`
-// is corner_radius and corner_radii together, as CSS's border-radius sets
-// them, and that the
-// border is CSS's twelve longhands: each edge's style, width and colour, in
-// that order, the edges in CSS's order (a theme's `border` sets all
-// twelve).
+// SurfaceMaterial's, split where CSS's longhands are, so that each
+// cascades as CSS cascades it:
+// - the fills are CSS's background-color, background-image and
+//   background-blend-mode (owner C6, 2026-10-26: they combine across
+//   rules, the colour under the image layers);
+// - the border is its twelve longhands, each edge's style, width and
+//   colour, in that order, the edges in CSS's order (`border` sets all
+//   twelve);
+// - the radii are the four corners, in CSS's order (`border-radius` sets
+//   all four).
 enum class MaterialField : std::uint8_t {
     background_colour,
     fills,
+    fill_blend_modes,
     shadows,
     glows,
     border_top_style,
@@ -330,7 +333,10 @@ enum class MaterialField : std::uint8_t {
     border_left_width,
     border_left_colour,
     keylines,
-    corners,
+    corner_top_left,
+    corner_top_right,
+    corner_bottom_right,
+    corner_bottom_left,
     colour_filter,
     drop_shadow,
     filter_blur,
@@ -348,55 +354,43 @@ inline constexpr std::size_t material_field_count = static_cast<std::size_t>(Mat
 // - background_colour: `colour`, a solid layer under the image layers;
 // - fills: the image layers (gradients, images, patterns), bottom first,
 //   at most SurfaceMaterial::maximum_fill_layers, empty for none;
+// - fill_blend_modes: `blend_modes`, in CSS's order (the top image
+//   layer's first), repeated over the image layers as CSS repeats a short
+//   list; empty for normal;
 // - shadows, glows, keylines: the lists;
 // - an edge's style: `border_style`, empty for none (CSS's `none`); its
 //   width: `number`, 0 for none; its colour: `colour`;
-// - corners: `number` (corner_radius) and `corner_radii`, empty when every
-//   corner takes corner_radius; a corner `relative` marks is a fraction of
-//   the box's shorter side (CSS's percentage, R2-11), resolved when the
-//   material is assembled for a part (`number` is relative when top_left
-//   is marked);
+// - a corner: `number`, its radius in logical units, or, with `relative`,
+//   a fraction of the box's shorter side (CSS's percentage, R2-11),
+//   resolved when the material is assembled for a part;
 // - colour_filter: `colour_filter`; drop_shadow: `drop_shadow`, empty for
 //   none; mask: `mask`, empty for none;
 // - filter_blur and finish: `number`.
 // `initial`, set, is CSS's `initial`: the field keeps the floor's value,
 // and the declaration still wins over those beneath it; its value members
 // are not read.
-struct RelativeCorners final {
-    bool top_left{};
-    bool top_right{};
-    bool bottom_right{};
-    bool bottom_left{};
-
-    friend constexpr bool operator==(RelativeCorners left, RelativeCorners right) noexcept {
-        return left.top_left == right.top_left && left.top_right == right.top_right &&
-               left.bottom_right == right.bottom_right && left.bottom_left == right.bottom_left;
-    }
-};
-
 struct MaterialDeclaration final {
     MaterialField field{MaterialField::fills};
     bool initial{};
     std::vector<MaterialFillLayer> fills{};
+    std::vector<MaterialBlendMode> blend_modes{};
     std::vector<MaterialShadow> shadows{};
     std::vector<MaterialGlow> glows{};
     std::optional<MaterialBorderStyle> border_style{};
     Color colour{};
     std::vector<MaterialKeyline> keylines{};
     double number{};
-    std::optional<MaterialCornerRadii> corner_radii{};
-    RelativeCorners relative{};
+    bool relative{};
     MaterialColourFilter colour_filter{};
     std::optional<MaterialDropShadow> drop_shadow{};
     std::optional<MaterialFillLayer> mask{};
 
     friend bool operator==(const MaterialDeclaration& left, const MaterialDeclaration& right) noexcept {
         return left.field == right.field && left.initial == right.initial && left.fills == right.fills &&
-               left.shadows == right.shadows &&
+               left.blend_modes == right.blend_modes && left.shadows == right.shadows &&
                left.glows == right.glows && left.border_style == right.border_style &&
                left.colour == right.colour && left.keylines == right.keylines &&
-               left.number == right.number && left.corner_radii == right.corner_radii &&
-               left.relative == right.relative &&
+               left.number == right.number && left.relative == right.relative &&
                left.colour_filter == right.colour_filter && left.drop_shadow == right.drop_shadow &&
                left.mask == right.mask;
     }
@@ -405,12 +399,17 @@ struct MaterialDeclaration final {
 // Replaces `material` with `floor` and the declarations of `fields` (the
 // winning declaration of each field, by the field's position, null where
 // none) in place: a part's assembled material (EC1); an `initial`
-// declaration keeps the floor's value. The fills are composed when either
+// declaration keeps the floor's value. The fills are composed when any
 // fill field is declared: the colour layer (the declared colour, else the
 // floor's bottom layer when it is solid) under the image layers (the
-// declared ones, else the floor's others); a colour of alpha 0 adds no
-// layer, and with no layer at all the fill is one transparent solid. More
-// than SurfaceMaterial::maximum_fill_layers is no material. The border's
+// declared ones, else the floor's others), which take the declared blend
+// modes; a colour of alpha 0 adds no layer, and with no layer at all the
+// fill is one transparent solid. More than
+// SurfaceMaterial::maximum_fill_layers is no material. The corners are
+// composed when any is declared: each is its declaration's, else the
+// floor's (its corner_radii's, else its corner_radius); four equal corners
+// are corner_radius alone, and others corner_radii, with corner_radius the
+// smallest (the built-in path rounds every corner by it). The border's
 // edges are assembled
 // together when any of their fields is declared: each starts as the
 // floor's (its single edge, else its uniform border; an edge the floor

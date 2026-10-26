@@ -6,9 +6,11 @@
 #include "gui_forms/surface_material/painting/surface_material_painting.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 #include <utility>
 
@@ -212,6 +214,7 @@ namespace {
 constexpr std::array<std::string_view, material_field_count> material_field_names{
     "background_colour",
     "fills",
+    "fill_blend_modes",
     "shadows",
     "glows",
     "border_top_style",
@@ -227,7 +230,10 @@ constexpr std::array<std::string_view, material_field_count> material_field_name
     "border_left_width",
     "border_left_colour",
     "keylines",
-    "corners",
+    "corner_top_left",
+    "corner_top_right",
+    "corner_bottom_right",
+    "corner_bottom_left",
     "colour_filter",
     "drop_shadow",
     "filter_blur",
@@ -239,6 +245,14 @@ constexpr std::size_t first_edge_field = static_cast<std::size_t>(MaterialField:
 constexpr std::size_t edge_field_count = 12U;
 static_assert(static_cast<std::size_t>(MaterialField::border_left_colour) == first_edge_field + edge_field_count - 1U,
               "the edge fields are contiguous: style, width, colour per edge");
+
+// The corner fields, in CSS's order: top-left, top-right, bottom-right,
+// bottom-left.
+constexpr std::size_t first_corner_field = static_cast<std::size_t>(MaterialField::corner_top_left);
+constexpr std::size_t corner_field_count = 4U;
+static_assert(static_cast<std::size_t>(MaterialField::corner_bottom_left) ==
+                  first_corner_field + corner_field_count - 1U,
+              "the corner fields are contiguous, in CSS's order");
 
 // Draws the serial number of a new compilation; the first is 1.
 std::uint64_t next_rules_serial() noexcept {
@@ -262,28 +276,14 @@ double resolved_corner(double value, bool relative, double shorter_side) noexcep
     return resolved;
 }
 
-// Writes `declaration`'s field into `material`, replacing what was there,
-// with relative corners resolved against `shorter_side`. An edge field is
-// not written here (assembled_edges).
-void apply_material_declaration(const MaterialDeclaration& declaration, double shorter_side,
-                                SurfaceMaterial& material) {
+// Writes `declaration`'s field into `material`, replacing what was there.
+// The fill, edge and corner fields are composed together, not written
+// here (compose_fills, assemble_edges, compose_corners).
+void apply_material_declaration(const MaterialDeclaration& declaration, SurfaceMaterial& material) {
     switch (declaration.field) {
     case MaterialField::shadows: material.shadows = declaration.shadows; return;
     case MaterialField::glows: material.glows = declaration.glows; return;
     case MaterialField::keylines: material.keylines = declaration.keylines; return;
-    case MaterialField::corners: {
-        const RelativeCorners relative = declaration.relative;
-        material.corner_radius = resolved_corner(declaration.number, relative.top_left, shorter_side);
-        material.corner_radii = declaration.corner_radii;
-        if (material.corner_radii) {
-            MaterialCornerRadii& radii = *material.corner_radii;
-            radii.top_left = resolved_corner(radii.top_left, relative.top_left, shorter_side);
-            radii.top_right = resolved_corner(radii.top_right, relative.top_right, shorter_side);
-            radii.bottom_right = resolved_corner(radii.bottom_right, relative.bottom_right, shorter_side);
-            radii.bottom_left = resolved_corner(radii.bottom_left, relative.bottom_left, shorter_side);
-        }
-        return;
-    }
     case MaterialField::colour_filter: material.colour_filter = declaration.colour_filter; return;
     case MaterialField::drop_shadow: material.drop_shadow = declaration.drop_shadow; return;
     case MaterialField::filter_blur: material.filter_blur = declaration.number; return;
@@ -303,13 +303,25 @@ void apply_material_declaration(const MaterialDeclaration& declaration, double s
     case MaterialField::border_left_colour:
     case MaterialField::background_colour:
     case MaterialField::fills:
+    case MaterialField::fill_blend_modes:
+    case MaterialField::corner_top_left:
+    case MaterialField::corner_top_right:
+    case MaterialField::corner_bottom_right:
+    case MaterialField::corner_bottom_left:
     case MaterialField::count: return;
     }
 }
 
 bool fill_field(MaterialField field) noexcept {
-    const bool fill = field == MaterialField::background_colour || field == MaterialField::fills;
+    const bool fill = field == MaterialField::background_colour || field == MaterialField::fills ||
+                      field == MaterialField::fill_blend_modes;
     return fill;
+}
+
+bool corner_field(MaterialField field) noexcept {
+    const std::size_t position = static_cast<std::size_t>(field);
+    const bool corner = position >= first_corner_field && position < first_corner_field + corner_field_count;
+    return corner;
 }
 
 // The declaration of `field` among `fields` that sets a value, or null
@@ -331,6 +343,7 @@ void compose_fills(const SurfaceMaterial& floor,
                    SurfaceMaterial& material) {
     const MaterialDeclaration* const colour = set_field(fields, MaterialField::background_colour);
     const MaterialDeclaration* const images = set_field(fields, MaterialField::fills);
+    const MaterialDeclaration* const blends = set_field(fields, MaterialField::fill_blend_modes);
     const bool floor_colour = !floor.fills.empty() && floor.fills.front().kind == MaterialFillKind::solid;
     const std::size_t floor_images_first = floor_colour ? 1U : 0U;
     material.fills.clear();
@@ -339,6 +352,7 @@ void compose_fills(const SurfaceMaterial& floor,
     } else if (floor_colour) {
         material.fills.push_back(floor.fills.front());
     }
+    const std::size_t images_first = material.fills.size();
     if (images != nullptr) {
         material.fills.insert(material.fills.end(), (*images).fills.begin(), (*images).fills.end());
     } else {
@@ -346,7 +360,51 @@ void compose_fills(const SurfaceMaterial& floor,
             floor.fills.begin() + static_cast<std::ptrdiff_t>(floor_images_first);
         material.fills.insert(material.fills.end(), first, floor.fills.end());
     }
+    if (blends != nullptr) {
+        // The modes are in CSS's order, the top layer's first; the layers
+        // bottom first.
+        const std::vector<MaterialBlendMode>& modes = (*blends).blend_modes;
+        const std::size_t image_count = material.fills.size() - images_first;
+        for (std::size_t from_top = 0U; from_top < image_count; ++from_top) {
+            MaterialFillLayer& layer = material.fills[material.fills.size() - 1U - from_top];
+            layer.blend = modes.empty() ? MaterialBlendMode::normal : modes[from_top % modes.size()];
+        }
+    }
     if (material.fills.empty()) material.fills.push_back(MaterialFillLayer::solid(Color::rgba(0, 0, 0, 0)));
+}
+
+// One corner of the floor: its corner_radii's, else its corner_radius.
+double floor_corner(const SurfaceMaterial& floor, std::size_t corner) noexcept {
+    if (!floor.corner_radii) return floor.corner_radius;
+    const MaterialCornerRadii& radii = *floor.corner_radii;
+    const std::array<double, corner_field_count> corners{radii.top_left, radii.top_right, radii.bottom_right,
+                                                         radii.bottom_left};
+    return corners[corner];
+}
+
+// The corners, each the declared one (a relative one resolved against
+// `shorter_side`), else the floor's; one corner_radius when the four are
+// equal.
+void compose_corners(const SurfaceMaterial& floor,
+                     const std::array<const MaterialDeclaration*, material_field_count>& fields,
+                     double shorter_side, SurfaceMaterial& material) {
+    std::array<double, corner_field_count> corners{};
+    for (std::size_t corner = 0U; corner < corners.size(); ++corner) {
+        const MaterialDeclaration* const declaration = fields[first_corner_field + corner];
+        if (declaration == nullptr || (*declaration).initial) {
+            corners[corner] = floor_corner(floor, corner);
+            continue;
+        }
+        corners[corner] = resolved_corner((*declaration).number, (*declaration).relative, shorter_side);
+    }
+    const double smallest = *std::min_element(corners.begin(), corners.end());
+    material.corner_radius = smallest;
+    const bool uniform = corners[0] == corners[1] && corners[0] == corners[2] && corners[0] == corners[3];
+    if (uniform) {
+        material.corner_radii.reset();
+        return;
+    }
+    material.corner_radii = MaterialCornerRadii{corners[0], corners[1], corners[2], corners[3]};
 }
 
 bool edge_field(MaterialField field) noexcept {
@@ -419,11 +477,22 @@ void assemble_edges(const SurfaceMaterial& floor,
 }
 
 // Whether `declaration`, alone over the default material, is a material:
-// an edge field over a drawn default edge, relative corners as fractions
+// an edge field over a drawn default edge, a relative corner as a fraction
 // of a unit side.
 bool material_declaration_admitted(const MaterialDeclaration& declaration) {
     SurfaceMaterial checked{};
     if (declaration.initial || declaration.field == MaterialField::background_colour) return true;
+    if (declaration.field == MaterialField::fill_blend_modes) {
+        for (const MaterialBlendMode mode : declaration.blend_modes) {
+            if (static_cast<std::uint8_t>(mode) > static_cast<std::uint8_t>(MaterialBlendMode::screen)) return false;
+        }
+        return true;
+    }
+    if (corner_field(declaration.field)) {
+        checked.corner_radius = declaration.number;
+        const bool admitted = valid_surface_material(checked);
+        return admitted;
+    }
     if (declaration.field == MaterialField::fills) {
         if (declaration.fills.empty()) return true;
         checked.fills = declaration.fills;
@@ -431,7 +500,7 @@ bool material_declaration_admitted(const MaterialDeclaration& declaration) {
         return admitted;
     }
     if (!edge_field(declaration.field)) {
-        apply_material_declaration(declaration, 1.0, checked);
+        apply_material_declaration(declaration, checked);
         const bool admitted = valid_surface_material(checked);
         return admitted;
     }
@@ -452,6 +521,7 @@ void assemble_material(const SurfaceMaterial& floor,
     material = floor;
     bool edges = false;
     bool fills = false;
+    bool corners = false;
     for (const MaterialDeclaration* const declaration : fields) {
         if (declaration == nullptr || (*declaration).initial) continue;
         if (edge_field((*declaration).field)) {
@@ -462,9 +532,14 @@ void assemble_material(const SurfaceMaterial& floor,
             fills = true;
             continue;
         }
-        apply_material_declaration(*declaration, shorter_side, material);
+        if (corner_field((*declaration).field)) {
+            corners = true;
+            continue;
+        }
+        apply_material_declaration(*declaration, material);
     }
     if (fills) compose_fills(floor, fields, material);
+    if (corners) compose_corners(floor, fields, shorter_side, material);
     if (edges) assemble_edges(floor, fields, material);
 }
 
