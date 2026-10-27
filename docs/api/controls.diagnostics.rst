@@ -359,6 +359,10 @@ Related types
 
       Sets renderer identity and the explicit CPU-only assertion.
 
+   .. cpp:function:: void set_backplane_replay(bool replayed) noexcept
+
+      Whether the window's renderer replayed its last backplane image whole (stage T5, C6; owner decision T5-Q13).
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: MetricsSnapshot
@@ -605,6 +609,10 @@ Related types
    .. cpp:member:: bool cpu_only
 
       Default: ``{true}``.
+
+   .. cpp:member:: bool backplane_replay
+
+      The renderer's backplane replay (stage T5, C6; owner decision T5-Q13): true once the window's renderer replayed a backplane image whole, false while it has not or could not (the part-raster image of E9-B is used instead). Kept across resets, as the renderer is.
 
 .. cpp:namespace:: gui_forms
 

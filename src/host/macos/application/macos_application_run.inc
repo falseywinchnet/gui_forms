@@ -247,7 +247,7 @@ MacApplicationRun::OpenOutcome MacApplicationRun::open(MacApplicationWindow entr
     }
     [nativeWindow setContentMinSize:NSMakeSize(entry.options.minimum_size.width,
                                                entry.options.minimum_size.height)];
-    [nativeWindow setContentView:view];
+    [nativeWindow setContentView:[view hostContentView]];
 
     std::unique_ptr<MacRunSlot> created = std::make_unique<MacRunSlot>();
     (*created).id = id;

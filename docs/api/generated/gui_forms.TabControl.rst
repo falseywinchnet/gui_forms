@@ -91,12 +91,26 @@ gui_forms::TabControl
       **overflowing** : ``bool``, read-only
          Whether the tabs do not all fit, so the scroll and list buttons show.
 
+      **draw_mode** : ``ItemDrawMode``, default ``ItemDrawMode::normal``
+         With ``ItemDrawMode::owner_draw`` the application draws the tabs'
+         content (Windows Forms' ``DrawMode.OwnerDrawFixed``): see
+         :cpp:func:`draw_item_content <gui_forms::TabControl::draw_item_content>`. Throws ``std::invalid_argument`` for an unknown mode.
+
       **parts** : ``Parts``, read-only
 
       **realized_items** : ``std::vector<Item>``, read-only
          The items currently realized, in paint order (owner decision 5).
 
    :Events:
+
+      **draw_item_content** : ``Event<ItemContentPaint&>``
+         Raised while the tabs paint in the owner-draw mode, once per painted
+         tab, with an :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>` whose index is the tab's and whose
+         stable ID is its page's (Windows Forms' ``DrawItem``). The painter is
+         clipped to the tab's icon and label area; the tab's plate and focus cue
+         are painted by role. Set ``draw_default`` to add the default content. A
+         handler paints only; one that changes the tabs ends that paint, and the
+         tabs are painted again.
 
       **selected_index_changed** : ``Event<const TabSelectionChange&>``
          Raised after the selection changes, by the user or by a setter, with a
@@ -367,6 +381,16 @@ gui_forms::TabControl
 
       Whether the tabs do not all fit, so the scroll and list buttons show.
 
+   .. cpp:function:: ItemDrawMode draw_mode() const noexcept
+
+      With ``ItemDrawMode::owner_draw`` the application draws the tabs'
+      content (Windows Forms' ``DrawMode.OwnerDrawFixed``): see
+      :cpp:func:`draw_item_content <gui_forms::TabControl::draw_item_content>`. Throws ``std::invalid_argument`` for an unknown mode.
+
+   .. cpp:function:: void set_draw_mode(ItemDrawMode mode)
+
+      Sets :cpp:func:`draw_mode <gui_forms::TabControl::draw_mode>`; see the property's description above.
+
    .. cpp:function:: Parts parts() const
 
    .. cpp:function:: std::vector<Item> realized_items() const
@@ -375,6 +399,16 @@ gui_forms::TabControl
 
 
    .. rubric:: Events
+
+   .. cpp:function:: Event<ItemContentPaint&>& draw_item_content() noexcept
+
+      Raised while the tabs paint in the owner-draw mode, once per painted
+      tab, with an :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>` whose index is the tab's and whose
+      stable ID is its page's (Windows Forms' ``DrawItem``). The painter is
+      clipped to the tab's icon and label area; the tab's plate and focus cue
+      are painted by role. Set ``draw_default`` to add the default content. A
+      handler paints only; one that changes the tabs ends that paint, and the
+      tabs are painted again.
 
    .. cpp:function:: Event<const TabSelectionChange&>& selected_index_changed() noexcept
 

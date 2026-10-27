@@ -3,6 +3,7 @@
 #include "gui_forms/controls/scrollable_control/container_control/container_control.hpp"
 #include "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp"
 #include "gui_forms/pages/page_set/page_set.hpp"
+#include "gui_forms/theme/owner_draw/owner_draw.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -103,6 +104,14 @@ public:
     // Whether the tabs do not all fit, so the strip shows its scroll and list
     // buttons.
     [[nodiscard]] bool overflowing() const;
+    // Content-only owner drawing of the tabs (owner decision W-Q6; Windows
+    // Forms' DrawMode with DrawItem), the strip's: in ItemDrawMode::owner_draw
+    // draw_item_content is raised for each painted tab's icon and label, with
+    // the tab's index and its page's stable ID; the tab's plate and focus cue
+    // stay painted by role. See PageStrip::draw_item_content.
+    [[nodiscard]] ItemDrawMode draw_mode() const noexcept;
+    void set_draw_mode(ItemDrawMode mode);
+    [[nodiscard]] Event<ItemContentPaint&>& draw_item_content() noexcept { return draw_item_content_; }
     [[nodiscard]] Event<const TabSelectionChange&>& selected_index_changed() noexcept {
         return selected_index_changed_;
     }
@@ -183,6 +192,8 @@ private:
     void on_set_selecting(PageSelectingEvent& event);
     void on_set_selection_changed(const PageSelectionChange& change);
     void on_strip_invoked(const PageInvocation& invocation);
+    // Raises draw_item_content for the strip's owner-draw event.
+    void on_strip_draw_item_content(ItemContentPaint& item);
 
     std::vector<std::weak_ptr<TabPage>> pages_;
     std::weak_ptr<TabPage> selected_page_;
@@ -206,9 +217,11 @@ private:
     SubscriptionToken selecting_token_;
     SubscriptionToken selection_token_;
     SubscriptionToken invoked_token_;
+    SubscriptionToken draw_item_content_token_;
     // The list's changes move the keys image_index names.
     SubscriptionToken image_list_token_;
     Event<const TabSelectionChange&> selected_index_changed_;
+    Event<ItemContentPaint&> draw_item_content_;
 };
 
 } // namespace gui_forms

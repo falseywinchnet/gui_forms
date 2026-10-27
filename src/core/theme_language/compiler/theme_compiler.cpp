@@ -57,12 +57,12 @@ constexpr std::array<std::string_view, 12> not_admitted_families{
     "overflow", "overscroll", "padding", "scroll", "text-decoration", "transform",
 };
 
-// The properties of P6c to P8 (the rest of the authored materials, motion
+// The properties of P6d to P8 (the rest of the authored materials, motion
 // and the colour and font roles): refused with not_yet_built until their
 // phases, so that no interim meaning ships. Sorted. A family's members the
-// material lowering lists (P6b) are lowered before these are consulted.
-constexpr std::array<std::string_view, 8> later_properties{
-    "backdrop-filter", "color", "filter", "font", "glow", "glow-placement", "surface-finish", "text-shadow",
+// material lowering lists (P6b, P6c) are lowered before these are consulted.
+constexpr std::array<std::string_view, 2> later_properties{
+    "backdrop-filter", "font",
 };
 static_assert(std::is_sorted(later_properties.begin(), later_properties.end()), "binary_search needs the table sorted");
 
@@ -103,6 +103,8 @@ enum class PropertyClass : std::uint8_t {
     // A material property (P6b): its fields are lowered by the material
     // lowering.
     material,
+    // `transition` and its longhands (P7a).
+    transition,
     later,
     not_admitted,
     // A primitive parameter, or an unknown name.
@@ -119,6 +121,7 @@ enum class PropertyClass : std::uint8_t {
     if (name == "mix-blend-mode") return PropertyClass::blend;
     if (name == "isolation") return PropertyClass::isolation;
     if (material_property(name)) return PropertyClass::material;
+    if (transition_property(name)) return PropertyClass::transition;
     if (listed(later_properties, name) || in_family(later_families, name)) return PropertyClass::later;
     if (listed(not_admitted_properties, name) || in_family(not_admitted_families, name)) {
         return PropertyClass::not_admitted;
@@ -204,6 +207,7 @@ public:
                 ThemeValue& value, std::vector<std::string_view>& parameter_names,
                 std::vector<LoweredDeclaration>& declarations, std::vector<MaterialDeclaration>& materials,
                 MaterialLowering& material_lowering, std::vector<MaterialField>& material_fields,
+                std::vector<RecipeDeclaration>& recipe_fields, TransitionStorage& transitions,
                 std::string& folded) noexcept;
 
     [[nodiscard]] CompileOutcome run();
@@ -219,7 +223,15 @@ private:
     [[nodiscard]] bool lower_translate(const SyntaxNode& node);
     [[nodiscard]] bool lower_keyword_property(const SyntaxNode& node, PropertyClass kind);
     [[nodiscard]] bool lower_material(const SyntaxNode& node);
+    [[nodiscard]] bool lower_transition(const SyntaxNode& node);
+    // The rule's declared curves on its machines (P7a), the machines'
+    // origins into transitions_.rule_machines; false after an error.
+    [[nodiscard]] bool apply_transitions(const PrimitiveSelection& selection, ThemeRule& lowered);
     void add_material(MaterialDeclaration declaration);
+    void add_recipe_field(const RecipeDeclaration& declaration);
+    // Whether a selector of the rule names a part or a role: the recipe's
+    // fields are the control's (P6f).
+    [[nodiscard]] bool rule_selects_part() const noexcept;
     [[nodiscard]] bool emit_rule(const PrimitiveSelection& selection, std::uint32_t at);
 
     // Substitutes and reads the declaration's value into value_, the
@@ -258,6 +270,8 @@ private:
     std::vector<MaterialDeclaration>& materials_;
     MaterialLowering& material_lowering_;
     std::vector<MaterialField>& material_fields_;
+    std::vector<RecipeDeclaration>& recipe_fields_;
+    TransitionStorage& transitions_;
     std::string& folded_;
     SourcePositionCursor cursor_;
     ReservedInputs reserved_{};
@@ -276,12 +290,14 @@ CompilePass::CompilePass(const ThemeCompileInput& input, ThemeRuleSheet& sheet, 
                          ThemeValue& value, std::vector<std::string_view>& parameter_names,
                          std::vector<LoweredDeclaration>& declarations, std::vector<MaterialDeclaration>& materials,
                          MaterialLowering& material_lowering, std::vector<MaterialField>& material_fields,
+                         std::vector<RecipeDeclaration>& recipe_fields, TransitionStorage& transitions,
                          std::string& folded) noexcept
     : input_(input), sheet_(sheet), diagnostics_(diagnostics), tokens_(tokens), lines_(lines), tree_(tree),
       custom_properties_(custom_properties), selectors_(selectors), substitution_(substitution), reader_(reader),
       lowered_selectors_(lowered_selectors), substituted_(substituted), value_(value),
       parameter_names_(parameter_names), declarations_(declarations), materials_(materials),
-      material_lowering_(material_lowering), material_fields_(material_fields), folded_(folded),
+      material_lowering_(material_lowering), material_fields_(material_fields), recipe_fields_(recipe_fields),
+      transitions_(transitions), folded_(folded),
       cursor_(lines, input.source.text) {}
 
 CompileOutcome CompilePass::run() {
@@ -300,6 +316,7 @@ CompileOutcome CompilePass::run() {
         return CompileOutcome::refused;
     }
     parameter_names_.reserve(maximum_primitive_parameters);
+    transitions_.origins.clear();
     const std::vector<SyntaxNode>& nodes = tree_.nodes;
     std::size_t index = 1U;
     while (index < nodes.size()) {
@@ -315,6 +332,14 @@ CompileOutcome CompilePass::run() {
         if (node.kind == SyntaxNodeKind::style_rule && !lower_rule(index)) return CompileOutcome::refused;
         // An unknown at-rule was reported by the parser and is skipped.
         index = next;
+    }
+    // Each transition takes the state values of the rules refining its own
+    // (R2-18).
+    const MotionLoweringOutcome grouped = group_transitions(sheet_, transitions_.origins, transitions_.problem);
+    if (grouped != MotionLoweringOutcome::lowered) {
+        MotionLoweringProblem& problem = transitions_.problem;
+        report(problem.code, problem.token, std::move(problem.detail));
+        return CompileOutcome::refused;
     }
     sheet_.requires_engine = newer_engine_ ? current_engine_version : input_.requires_engine;
     sheet_.published_values.assign(input_.published_values.begin(), input_.published_values.end());
@@ -354,6 +379,8 @@ bool CompilePass::lower_rule(std::size_t rule_index) {
     }
     declarations_.clear();
     materials_.clear();
+    recipe_fields_.clear();
+    clear_written_transitions(transitions_.written);
     for (std::size_t child = rule_index + 1U; child < end; child = tree_.nodes[child].subtree_end.value) {
         const SyntaxNode& node = tree_.nodes[child];
         const std::uint32_t property = node.tokens.first.value;
@@ -439,6 +466,7 @@ bool CompilePass::lower_declaration(const SyntaxNode& node, PropertyClass kind, 
     case PropertyClass::blend:
     case PropertyClass::isolation: return lower_keyword_property(node, kind);
     case PropertyClass::material: return lower_material(node);
+    case PropertyClass::transition: return lower_transition(node);
     case PropertyClass::later:
         report(DiagnosticCode::not_yet_built, property, property_);
         return false;
@@ -721,15 +749,27 @@ bool CompilePass::lower_keyword_property(const SyntaxNode& node, PropertyClass k
     return true;
 }
 
-// A material property's fields (P6b): its CSS-wide `initial` resets each
-// field it sets; any other value is lowered by the material lowering.
+// A material property's fields (P6b), or the recipe's (P6f): its CSS-wide
+// `initial` resets each field it sets; any other value is lowered by the
+// material lowering. A recipe property in a rule naming a part or a role
+// is dropped with a warning, since the recipe's fields are the control's.
 bool CompilePass::lower_material(const SyntaxNode& node) {
     // folded_ holds the property's name, which classify() found listed.
     const MaterialProperty property = *material_property(folded_);
+    const bool recipe = recipe_property(property);
+    if (recipe && rule_selects_part()) {
+        report(DiagnosticCode::property_not_admitted, node.tokens.first.value, property_ + " on a part or a role");
+        return true;
+    }
     parameter_names_.clear();
     if (!read_value(node)) return false;
     const ValueComponent& first = value_.components[0];
     const WideKeyword wide = wide_keyword();
+    if (wide == WideKeyword::inherit && property == MaterialProperty::color) {
+        // P8 builds inheritance, for the colour and font roles.
+        report(DiagnosticCode::not_yet_built, first.token, "inherit");
+        return false;
+    }
     if (wide == WideKeyword::inherit || wide == WideKeyword::outside) {
         const DiagnosticCode code =
             wide == WideKeyword::inherit ? DiagnosticCode::value_wrong_kind : DiagnosticCode::value_form_not_admitted;
@@ -744,9 +784,16 @@ bool CompilePass::lower_material(const SyntaxNode& node) {
             reset.initial = true;
             add_material(std::move(reset));
         }
+        const RecipePropertyFields recipe_fields = recipe_property_fields(property);
+        for (std::size_t index = 0U; index < recipe_fields.count; ++index) {
+            RecipeDeclaration reset{};
+            reset.field = recipe_fields.fields[index];
+            reset.initial = true;
+            add_recipe_field(reset);
+        }
         return true;
     }
-    lower_material_value(property, value_, node.content.first.value, material_lowering_);
+    lower_material_value(property, value_, node.content.first.value, input_.images, material_lowering_);
     if (material_lowering_.outcome != MaterialLoweringOutcome::lowered) {
         MaterialLoweringProblem& problem = material_lowering_.problem;
         // A keyword the running engine lacks, in a sheet for a newer one,
@@ -757,7 +804,106 @@ bool CompilePass::lower_material(const SyntaxNode& node) {
         return newer || material_lowering_.outcome == MaterialLoweringOutcome::dropped;
     }
     for (MaterialDeclaration& declaration : material_lowering_.declarations) add_material(std::move(declaration));
+    for (const RecipeDeclaration& declaration : material_lowering_.recipe_fields) add_recipe_field(declaration);
     return true;
+}
+
+// `transition` and its longhands (P7a): CSS-wide `initial` resets the
+// lists the property sets; any other value is lowered into the rule's
+// lists, which become curves when the rule is emitted.
+bool CompilePass::lower_transition(const SyntaxNode& node) {
+    // folded_ holds the property's name, which classify() found listed.
+    const TransitionProperty property = *transition_property(folded_);
+    parameter_names_.clear();
+    if (!read_value(node)) return false;
+    const ValueComponent& first = value_.components[0];
+    const WideKeyword wide = wide_keyword();
+    if (wide == WideKeyword::inherit || wide == WideKeyword::outside) {
+        const DiagnosticCode code =
+            wide == WideKeyword::inherit ? DiagnosticCode::value_wrong_kind : DiagnosticCode::value_form_not_admitted;
+        report(code, first.token, clipped_theme_detail(first.text));
+        return false;
+    }
+    if (wide == WideKeyword::initial) {
+        reset_transition_lists(property, transitions_.written);
+        transitions_.written.token = node.content.first.value;
+        return true;
+    }
+    const MotionLoweringOutcome outcome = lower_transition_value(property, value_, node.content.first.value,
+                                                                 transitions_.written, transitions_.problem);
+    if (outcome == MotionLoweringOutcome::lowered) return true;
+    MotionLoweringProblem& problem = transitions_.problem;
+    report(problem.code, problem.token, std::move(problem.detail));
+    return outcome == MotionLoweringOutcome::dropped;
+}
+
+bool CompilePass::apply_transitions(const PrimitiveSelection& selection, ThemeRule& lowered) {
+    transitions_.rule_machines.clear();
+    const PrimitiveDescriptor* const primitive =
+        selection.primitive == nullptr ? nullptr : &(*selection.primitive).descriptor();
+    const MotionLoweringOutcome built =
+        build_declared_transitions(transitions_.written, primitive, transitions_.declared, transitions_.problem);
+    if (built != MotionLoweringOutcome::lowered) {
+        MotionLoweringProblem& problem = transitions_.problem;
+        report(problem.code, problem.token, std::move(problem.detail));
+        return false;
+    }
+    // A static value's machine takes its property's declared curve and
+    // becomes the transition's resting state; a declared curve with no
+    // static value is a machine of its own, whose states the grouping adds.
+    for (PropertyTransition& machine : lowered.transitions) {
+        MachineOrigin origin{};
+        origin.machine = transitions_.rule_machines.size();
+        for (const DeclaredTransition& declared : transitions_.declared) {
+            if (declared.property != machine.property) continue;
+            machine.curve = declared.curve;
+            origin.curved = true;
+            origin.token = declared.token;
+        }
+        transitions_.rule_machines.push_back(origin);
+    }
+    for (const DeclaredTransition& declared : transitions_.declared) {
+        bool held = false;
+        for (const PropertyTransition& machine : lowered.transitions) {
+            if (machine.property == declared.property) held = true;
+        }
+        if (held) continue;
+        PropertyTransition machine{};
+        machine.property = declared.property;
+        machine.curve = declared.curve;
+        lowered.transitions.push_back(std::move(machine));
+        MachineOrigin origin{};
+        origin.machine = transitions_.rule_machines.size();
+        origin.curved = true;
+        origin.token = declared.token;
+        transitions_.rule_machines.push_back(origin);
+    }
+    // The engine runs at most maximum_part_transitions machines a part and
+    // would drop the rest; only a primitive with two animated parameters
+    // can reach it.
+    if (lowered.transitions.size() > maximum_part_transitions) {
+        report(DiagnosticCode::too_many_layers, transitions_.written.token,
+               std::to_string(maximum_part_transitions) + " transitions of one part");
+        return false;
+    }
+    return true;
+}
+
+void CompilePass::add_recipe_field(const RecipeDeclaration& declaration) {
+    // As for the material fields, the later declaration of a field wins.
+    for (std::size_t index = 0U; index < recipe_fields_.size(); ++index) {
+        if (recipe_fields_[index].field != declaration.field) continue;
+        recipe_fields_.erase(recipe_fields_.begin() + static_cast<std::ptrdiff_t>(index));
+        break;
+    }
+    recipe_fields_.push_back(declaration);
+}
+
+bool CompilePass::rule_selects_part() const noexcept {
+    for (const LoweredSelector& lowered : lowered_selectors_) {
+        if (!lowered.selector.part.empty() || lowered.selector.role.has_value()) return true;
+    }
+    return false;
 }
 
 void CompilePass::add_material(MaterialDeclaration declaration) {
@@ -792,12 +938,18 @@ bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t a
             lowered.transitions.push_back(std::move(declaration.transitions[index]));
         }
     }
+    if (!apply_transitions(selection, lowered)) return false;
     lowered.materials = materials_;
-    if (lowered.declarations.empty() && lowered.transitions.empty() && lowered.materials.empty()) return true;
+    lowered.recipe_fields = recipe_fields_;
+    if (lowered.declarations.empty() && lowered.transitions.empty() && lowered.materials.empty() &&
+        lowered.recipe_fields.empty()) {
+        return true;
+    }
     std::size_t bytes = lowered_record_bytes + lowered.label.size();
     for (const RuleDeclaration& declaration : lowered.declarations) bytes += declaration_bytes(declaration);
     for (const MaterialDeclaration& declaration : lowered.materials) bytes += material_bytes(declaration);
     for (const PropertyTransition& transition : lowered.transitions) bytes += transition_bytes(transition);
+    bytes += lowered.recipe_fields.size() * lowered_record_bytes;
     for (const LoweredSelector& selector : lowered_selectors_) {
         if (bytes > budget_.bytes) {
             report(DiagnosticCode::lowered_sheet_too_large, at, std::to_string(maximum_lowered_bytes));
@@ -811,6 +963,11 @@ bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t a
         // A given specificity only where CSS's differs from the engine's
         // own count of the selector (EC2: an `:is()` argument's).
         if (!(selector.specificity == rule_specificity(selector.selector))) rule.specificity = selector.specificity;
+        for (const MachineOrigin& machine : transitions_.rule_machines) {
+            MachineOrigin origin = machine;
+            origin.rule = sheet_.rules.size() - 1U;
+            transitions_.origins.push_back(origin);
+        }
     }
     return true;
 }
@@ -934,7 +1091,7 @@ CompileOutcome ThemeCompiler::compile(const ThemeCompileInput& input, ThemeRuleS
     sheet.requires_engine = current_engine_version;
     CompilePass pass(input, sheet, diagnostics, tokens_, lines_, tree_, custom_properties_, selectors_, substitution_,
                      reader_, lowered_selectors_, substituted_, value_, parameter_names_, declarations_, materials_,
-                     material_lowering_, material_fields_, folded_);
+                     material_lowering_, material_fields_, recipe_fields_, transitions_, folded_);
     const CompileOutcome outcome = pass.run();
     if (outcome == CompileOutcome::refused) {
         sheet.rules.clear();

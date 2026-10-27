@@ -12,6 +12,7 @@
 #include "../custom_properties/theme_custom_properties.hpp"
 #include "../diagnostics/theme_diagnostics.hpp"
 #include "../material/theme_material_lowering.hpp"
+#include "../motion/theme_motion_lowering.hpp"
 #include "../selector/theme_selector.hpp"
 #include "../source_text/theme_source_text.hpp"
 #include "../syntax_tree/theme_syntax_tree.hpp"
@@ -39,6 +40,8 @@ namespace gui_forms::theme_language {
 // - `published_values`: the names the theme's manifest publishes (R2-06),
 //   which `var()` reads and which become the sheet's published values;
 // - `resources`: the resource names the manifest lists, for `url()`;
+// - `images`: those that are images, bound to the engine's images (P10's
+//   loader binds them; until then the caller does);
 // - `requires_engine`: the engine version the manifest declares (P9
 //   supplies it; until then the caller does).
 struct ThemeCompileInput final {
@@ -47,6 +50,7 @@ struct ThemeCompileInput final {
     SelectorVocabulary vocabulary{};
     std::span<const std::string> published_values{};
     std::span<const std::string_view> resources{};
+    std::span<const ThemeImageResource> images{};
     EngineVersion requires_engine{current_engine_version};
 };
 
@@ -75,6 +79,18 @@ struct LoweredDeclaration final {
     RuleDeclaration declaration{};
     std::array<PropertyTransition, 2> transitions{};
     std::size_t transition_count{};
+};
+
+// The transitions' storage (P7a): a rule's written lists and declared
+// curves, and the origin of every machine of the sheet, for the grouping
+// once every rule is lowered.
+struct TransitionStorage final {
+    WrittenTransitions written{};
+    std::vector<DeclaredTransition> declared{};
+    std::vector<MachineOrigin> origins{};
+    // The machines of the rule being emitted, `rule` unset.
+    std::vector<MachineOrigin> rule_machines{};
+    MotionLoweringProblem problem{};
 };
 
 // Compiles theme sheets. It keeps every stage's storage from sheet to
@@ -108,6 +124,8 @@ private:
     std::vector<MaterialDeclaration> materials_{};
     MaterialLowering material_lowering_{};
     std::vector<MaterialField> material_fields_{};
+    std::vector<RecipeDeclaration> recipe_fields_{};
+    TransitionStorage transitions_{};
     std::string folded_{};
 };
 

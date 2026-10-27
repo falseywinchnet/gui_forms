@@ -624,6 +624,7 @@ Properties beyond every control's: none.
 | `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `insertion_mark` | drop |  | drop_accepted |
+| `label_editor` | well | `text_box` |  |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
@@ -666,12 +667,15 @@ Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
+| `draw_item_content` | `ItemContentPaint`, by reference |
 | `selection_changed` | `ListViewSelectionChange` |
 | `item_activated` | `ListViewItemActivation` |
 | `item_checking` | `ListViewItemCheck`, by reference |
 | `item_checked` | `ListViewItemCheck` |
 | `column_click` | `ListViewColumnClick` |
 | `column_width_changed` | `ListViewColumnWidthChange` |
+| `before_label_edit` | `ListViewLabelEdit`, by reference |
+| `after_label_edit` | `ListViewLabelEdit`, by reference |
 
 ## `tree_list_view` (TreeListView, control)
 
@@ -1604,6 +1608,7 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 | `auto_validate_changed` | `AutoValidate` |
+| `draw_item_content` | `ItemContentPaint`, by reference |
 | `selected_index_changed` | `TabSelectionChange` |
 
 ## `page_strip` (PageStrip, control)
@@ -1645,6 +1650,7 @@ Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
+| `draw_item_content` | `ItemContentPaint`, by reference |
 | `page_invoked` | `PageInvocation` |
 | `page_close_requested` | `PageCloseRequest`, by reference |
 | `page_pin_requested` | `PagePinRequest`, by reference |
@@ -2785,6 +2791,14 @@ Properties beyond every control's: none.
 | Interaction | Payload |
 |---|---|
 | `closed` | `DialogResult` |
+
+## `folder_browser_dialog` (FolderBrowserDialog, component)
+
+Interactions: none.
+
+## `color_dialog` (ColorDialog, component)
+
+Interactions: none.
 
 ## `tool_tip` (ToolTip, component)
 

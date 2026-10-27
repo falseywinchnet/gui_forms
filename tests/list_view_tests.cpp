@@ -115,6 +115,21 @@ struct StoreVirtualCheck final {
     }
 };
 
+// Records label edits; cancels the next before or after event on request.
+struct RecordLabelEdits final {
+    std::vector<ListViewLabelEdit>* seen{};
+    bool* cancel{};
+    void operator()(ListViewLabelEdit& edit) const {
+        (*seen).push_back(edit);
+        edit.cancel = *cancel;
+    }
+};
+
+std::shared_ptr<Control> as_control(const std::shared_ptr<TextBox>& editor) {
+    const std::shared_ptr<Control> control = editor;
+    return control;
+}
+
 Point centre(Rect bounds) {
     const Point point{bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5};
     return point;
@@ -163,6 +178,13 @@ std::vector<ListViewItem> sample_items(std::size_t count) {
     }
     return items;
 }
+
+// Replaces the items from inside after_label_edit, as an application that
+// reloads its list on a rename.
+struct ReloadOnAfterEdit final {
+    ListView* view{};
+    void operator()(ListViewLabelEdit&) const { (*view).set_items(sample_items(3U)); }
+};
 
 std::shared_ptr<ListView> details_view(std::size_t count) {
     std::shared_ptr<ListView> view = make_control<ListView>(StableId("list"));
@@ -396,6 +418,101 @@ void views_lay_out_items() {
             "the large-icon label sits under the icon's place");
 }
 
+// One owner-draw call as a handler saw it.
+struct ContentCall final {
+    std::size_t index{};
+    std::size_t column{};
+    std::string stable_id{};
+    Rect content{};
+    bool selected{};
+};
+
+// Draws a marker string into each item's content and records the call;
+// asks for the default content when `draw_default` is set.
+struct DrawContent final {
+    std::vector<ContentCall>* calls{};
+    bool draw_default{};
+    void operator()(ItemContentPaint& item) const {
+        (*calls).push_back({item.index, item.column, std::string(item.stable_id), item.content,
+                            item.states.contains(AnatomyState::selected)});
+        item.painter.draw_text_utf8({item.content.x, item.content.y}, "owner", item.font, item.text);
+        item.draw_default = draw_default;
+    }
+};
+
+// Replaces the view's items from inside its paint.
+struct ReplaceItems final {
+    ListView* view{};
+    std::size_t* calls{};
+    void operator()(ItemContentPaint&) const {
+        ++*calls;
+        (*view).set_items(sample_items(2U));
+    }
+};
+
+// Leaves and re-enters the owner-draw mode, so that the next paint covers
+// the whole view: a window paints only what changed.
+void repaint_owner_drawn(ListView& view) {
+    view.set_draw_mode(ItemDrawMode::normal);
+    view.set_draw_mode(ItemDrawMode::owner_draw);
+}
+
+// Content-only owner drawing (owner decision W-Q6): the application draws
+// each item's content and, in the details view, each sub-item cell; the
+// plate and focus cue stay by role, and draw_default adds the default
+// content.
+void owner_draw() {
+    std::shared_ptr<ListView> view = details_view(3U);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    require((*view).draw_mode() == ItemDrawMode::normal, "a view draws its own content by default");
+    bool refused = false;
+    try {
+        (*view).set_draw_mode(static_cast<ItemDrawMode>(9));
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused && (*view).draw_mode() == ItemDrawMode::normal, "an unknown draw mode is refused");
+
+    std::vector<ContentCall> calls;
+    SubscriptionToken drawing = (*view).draw_item_content().subscribe(DrawContent{&calls, false});
+    RecordingPainter normal;
+    static_cast<void>(window.paint(normal, {0.0, 0.0, 400.0, 240.0}));
+    require(calls.empty() && painted(normal, "Delta 0"), "the normal mode raises nothing");
+
+    (*view).set_draw_mode(ItemDrawMode::owner_draw);
+    (*view).set_selected(1U, true);
+    window.perform_layout();
+    RecordingPainter owner;
+    static_cast<void>(window.paint(owner, {0.0, 0.0, 400.0, 240.0}));
+    const std::vector<ListView::Item> items = (*view).realized_items();
+    require(calls.size() == 9U && calls[0].index == 0U && calls[0].column == 0U && calls[1].column == 1U &&
+                calls[2].column == 2U && calls[3].index == 1U && calls[3].stable_id == "item-1" && calls[3].selected,
+            "each row raises its content, then each visible sub-item, in paint order");
+    require(calls[0].content == items[0].parts.text.bounds, "a row's content is its icon and text area");
+    require(!painted(owner, "Delta 0") && !painted(owner, "1 KB") && painted(owner, "owner") && painted(owner, "Name"),
+            "owner-drawn rows show only what the handler drew; headers stay the view's");
+
+    drawing.disconnect();
+    calls.clear();
+    SubscriptionToken with_default = (*view).draw_item_content().subscribe(DrawContent{&calls, true});
+    repaint_owner_drawn(*view);
+    RecordingPainter both;
+    static_cast<void>(window.paint(both, {0.0, 0.0, 400.0, 240.0}));
+    require(painted(both, "owner") && painted(both, "Delta 0") && painted(both, "1 KB"),
+            "draw_default adds the default content after the handler's");
+    with_default.disconnect();
+
+    std::size_t replaced = 0U;
+    SubscriptionToken replacing = (*view).draw_item_content().subscribe(ReplaceItems{view.get(), &replaced});
+    repaint_owner_drawn(*view);
+    RecordingPainter interrupted;
+    static_cast<void>(window.paint(interrupted, {0.0, 0.0, 400.0, 240.0}));
+    require(replaced == 1U && (*view).item_count() == 2U,
+            "a handler that replaces the items ends that paint at once");
+    replacing.disconnect();
+}
+
 // The insertion mark (Windows Forms' InsertionMark): a drop-role bar in the
 // gap beside an item, across rows in the details and list views and
 // between cells in the icon views, cleared by any change to the items or
@@ -458,6 +575,134 @@ void insertion_mark() {
     (*view).clear_insertion_mark();
     require(!(*view).insertion_mark().has_value() && !(*view).parts().insertion_mark.present,
             "clear_insertion_mark removes the mark");
+}
+
+void label_editing() {
+    std::shared_ptr<ListView> view = details_view(20U);
+    const std::shared_ptr<Control> view_control = view;
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    std::vector<ListViewLabelEdit> before;
+    std::vector<ListViewLabelEdit> after;
+    bool cancel_before = false;
+    bool cancel_after = false;
+    SubscriptionToken before_token = (*view).before_label_edit().subscribe(RecordLabelEdits{&before, &cancel_before});
+    SubscriptionToken after_token = (*view).after_label_edit().subscribe(RecordLabelEdits{&after, &cancel_after});
+    require(window.request_focus(view), "the view takes focus");
+    (*view).set_focused_index(2U);
+    require(!key(window, PhysicalKey::f2) && !(*view).begin_label_edit(2U) && before.empty() &&
+                !(*view).label_editor(),
+            "without label_edit, F2 and begin_label_edit begin nothing and make no editor");
+
+    (*view).set_label_edit(true);
+    require(key(window, PhysicalKey::f2) && (*view).label_edit_index() == 2U && before.size() == 1U &&
+                before[0].index == 2U && before[0].item_id == "item-2" && !before[0].label,
+            "F2 raises before_label_edit for the focused item and puts it in edit");
+    const std::shared_ptr<TextBox> editor = (*view).label_editor();
+    window.perform_layout();
+    std::vector<ListView::Item> items = (*view).realized_items();
+    require(editor && window.focused_control() == as_control(editor) && (*editor).text() == "Charlie 2" &&
+                (*editor).selected_text() == "Charlie 2",
+            "the editor takes focus with the item's text selected");
+    require((*view).parts().label_editor.present &&
+                (*view).parts().label_editor.bounds == items[2].parts.text.bounds,
+            "the label_editor part covers the item's text");
+    require(window.dispatch_text({"Renamed"}) && key(window, PhysicalKey::enter) && !(*view).label_edit_index() &&
+                after.size() == 1U && after[0].label == std::optional<std::string>("Renamed") &&
+                (*view).items()[2].text == "Renamed" && window.focused_control() == view_control &&
+                !(*view).parts().label_editor.present,
+            "Enter commits the typed label, closes the editor and returns focus to the view");
+
+    require(key(window, PhysicalKey::f2) && window.dispatch_text({"Dropped"}) && key(window, PhysicalKey::escape) &&
+                after.size() == 2U && !after[1].label && (*view).items()[2].text == "Renamed" &&
+                window.focused_control() == view_control,
+            "Escape cancels: after_label_edit has no label and the text stays");
+
+    cancel_after = true;
+    require(key(window, PhysicalKey::f2) && window.dispatch_text({"Refused"}) && key(window, PhysicalKey::enter) &&
+                after.size() == 3U && after[2].label == std::optional<std::string>("Refused") &&
+                (*view).items()[2].text == "Renamed",
+            "an after_label_edit handler refuses the label and the item keeps its text");
+    cancel_after = false;
+
+    cancel_before = true;
+    require(!(*view).begin_label_edit(4U) && !(*view).label_edit_index() && before.size() == 4U,
+            "a before_label_edit handler keeps the item out of edit");
+    cancel_before = false;
+
+    require((*view).begin_label_edit(1U) && window.dispatch_text({"Clicked"}), "begin_label_edit opens an edit");
+    items = (*view).realized_items();
+    click(window, to_window(*view, centre(items[5].parts.text.bounds)));
+    require(!(*view).label_edit_index() && (*view).items()[1].text == "Clicked" && (*view).is_selected(5U) &&
+                (*view).focused_index() == 5U,
+            "a press elsewhere in the view commits the edit and then selects as usual");
+
+    require((*view).begin_label_edit(3U) && window.dispatch_text({"Focus"}) && window.request_focus(view) &&
+                !(*view).label_edit_index() && (*view).items()[3].text == "Focus",
+            "focus leaving the editor commits the edit");
+
+    require((*view).begin_label_edit(0U) && (*view).begin_label_edit(6U) && (*view).label_edit_index() == 6U &&
+                (*view).items()[0].text == "Delta 0" && after.back().index == 0U,
+            "beginning another edit commits the one in progress");
+    (*view).ensure_visible(19U);
+    window.perform_layout();
+    require((*view).label_edit_index() == 6U && window.focused_control() == as_control(editor) &&
+                !(*view).parts().label_editor.present,
+            "scrolling keeps the edit, its editor at no size while the item is out of view");
+    (*view).ensure_visible(6U);
+    window.perform_layout();
+    require((*view).parts().label_editor.present, "the editor returns with its item");
+
+    const std::size_t ended = after.size();
+    (*view).sort_items(0U, ListViewSortOrder::ascending);
+    require(!(*view).label_edit_index() && after.size() == ended + 1U && !after.back().label &&
+                after.back().item_id == "item-6",
+            "sorting the items cancels the edit");
+
+    require((*view).begin_label_edit(1U), "an edit opens again");
+    (*view).set_label_edit(false);
+    require(!(*view).label_edit_index() && after.size() == ended + 2U && !after.back().label,
+            "turning label_edit off cancels the edit");
+
+    // An after_label_edit handler that replaces the items: the commit finds
+    // no item with the edited ID to rename.
+    (*view).set_label_edit(true);
+    require((*view).begin_label_edit(7U) && window.dispatch_text({"Lost"}), "an edit of the eighth item opens");
+    SubscriptionToken reload = (*view).after_label_edit().subscribe(ReloadOnAfterEdit{view.get()});
+    (*view).end_label_edit();
+    require((*view).item_count() == 3U && !(*view).label_edit_index() && (*view).items()[0].text == "Delta 0",
+            "a handler that replaces the items leaves the new items as they are");
+    reload.disconnect();
+    bool threw = false;
+    try {
+        static_cast<void>((*view).begin_label_edit(3U));
+    } catch (const std::out_of_range&) {
+        threw = true;
+    }
+    require(threw, "begin_label_edit refuses an index past the end");
+}
+
+void virtual_label_editing() {
+    std::shared_ptr<ListView> view = make_control<ListView>(StableId("virtual"));
+    (*view).set_columns(sample_columns());
+    const std::shared_ptr<CountingSource> source = std::make_shared<CountingSource>(1000U);
+    (*view).set_virtual_source(source);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    std::vector<ListViewLabelEdit> after;
+    bool cancel = false;
+    SubscriptionToken token = (*view).after_label_edit().subscribe(RecordLabelEdits{&after, &cancel});
+    (*view).set_label_edit(true);
+    require((*view).begin_label_edit(4U) && (*(*view).label_editor()).text() == "Row 4",
+            "a virtual item's label is edited from the source's text");
+    require(window.dispatch_text({"Four"}) && key(window, PhysicalKey::enter) && after.size() == 1U &&
+                after[0].item_id == "row-4" && after[0].label == std::optional<std::string>("Four"),
+            "the application receives the label; the source still owns the text");
+    (*source).set_count(2U);
+    require((*view).begin_label_edit(1U), "an edit opens");
+    (*view).refresh_virtual_items();
+    require(!(*view).label_edit_index() && after.size() == 2U && !after[1].label,
+            "refresh_virtual_items cancels the edit");
 }
 
 void scrolling() {
@@ -630,12 +875,16 @@ int main() {
     check_boxes();
     columns_click_sort_and_resize();
     views_lay_out_items();
+    owner_draw();
     insertion_mark();
+    label_editing();
+    virtual_label_editing();
     scrolling();
     virtual_mode();
     semantics();
     refusals();
-    std::cout << "ListView: parts, views, selection, keys, checks, columns, sorting, resizing, insertion mark, "
+    std::cout << "ListView: parts, views, selection, keys, checks, columns, sorting, resizing, owner drawing, "
+                 "insertion mark, label editing, "
                  "virtual mode, "
                  "scrolling, semantics and refusals passed\n";
     return 0;
