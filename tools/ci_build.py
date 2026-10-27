@@ -102,9 +102,12 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
 
     With sanitize, the toolkit is built in its own directory with the
     sanitizers and only tested: nothing is installed and the installed-SDK
-    examples are not built. tests, a ctest -R pattern, narrows that run to
+    examples are not built. tests, a ctest -R pattern, narrows the run to
     the matching tests and the build to the outputs they read (fails when it
-    matches none); empty builds everything and runs the whole suite.
+    matches none); empty builds everything and runs the whole suite. A
+    narrowed run without sanitize (the bootstrap's smoke build) is a plain
+    build and those tests only: it installs nothing, builds no examples and
+    writes no JUnit report, which names the whole suite's results.
     test_jobs is how many tests ctest runs at once (1, the default, runs
     them one after another). debug_info is the sanitized build's debug
     information, `lines` or `full` (see DEBUG_INFO_FLAGS). skip_labels, a
@@ -181,7 +184,7 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         print('the selected tests read no build output; nothing to build', flush=True)
         write_build_record(toolkit, BUILT_NOTHING, 'the selected tests read no build output')
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
-    if sanitize:
+    if sanitize or tests:
         run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
             '--parallel', test_jobs, *selection)
         return
@@ -216,7 +219,8 @@ def main() -> None:
                         help='build in gui-forms-sanitize with ASan and UBSan (and LSan on Linux '
                              'and macOS) and only test')
     parser.add_argument('--tests', default='',
-                        help='with --sanitize, build and run only what the tests matching this ctest -R pattern need')
+                        help='build and run only what the tests matching this ctest -R pattern need; without '
+                             '--sanitize nothing is installed (the bootstrap smoke build)')
     parser.add_argument('--changed-from', default='',
                         help='with --sanitize, build and run only the tests the paths changed since this ref '
                              'can affect (tools/change_selection.py); every test when a path touches everything')
@@ -228,8 +232,6 @@ def main() -> None:
         parser.error('--jobs must be positive')
     if args.test_jobs < 1:
         parser.error('--test-jobs must be positive')
-    if args.tests and not args.sanitize:
-        parser.error('--tests narrows the sanitized run only')
     if args.changed_from and not args.sanitize:
         parser.error('--changed-from narrows the sanitized run only')
     if args.debug_info and not args.sanitize:
