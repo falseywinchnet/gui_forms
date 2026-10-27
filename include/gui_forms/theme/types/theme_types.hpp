@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/engine/theme_rules/theme_rules.hpp"
+#include "gui_forms/host/compositor/window_backdrop.hpp"
 #include "gui_forms/surface_material.hpp"
 
 #include <array>
@@ -346,6 +347,48 @@ struct ThemeStructureTokens final {
     return layers;
 }
 
+// One backplane base: the material a window's backplane is drawn from
+// while it is granted `backdrop` (ThemeWindowBackdrop).
+struct ThemeBackdropBase final {
+    WindowBackdrop backdrop{WindowBackdrop::transparent};
+    SurfaceMaterial material{};
+
+    friend bool operator==(const ThemeBackdropBase& left, const ThemeBackdropBase& right) noexcept {
+        return left.backdrop == right.backdrop && left.material == right.material;
+    }
+};
+
+// The theme's window backdrop (stage T5, owner decision T5-Q8, option 1):
+// what a window showing the theme asks the compositor for, and the base its
+// backplane is drawn from over each backdrop the window may be granted
+// (planning/stages/T5-compositor/PLAN.md §4.1).
+struct ThemeWindowBackdrop final {
+    // The request a window makes while its application has made none
+    // (Window::request_backdrop). Value-initialized: `opaque` alone, so a
+    // theme that says nothing asks for nothing. Theme::create refuses a
+    // request window_backdrop_request_valid refuses.
+    WindowBackdropRequest request{};
+    // At most one base per non-opaque backdrop, in any order; held out of
+    // line, so the definition stays small. Over a granted non-opaque
+    // backdrop the window's backplane is drawn from that backdrop's base,
+    // typically a partly clear tint over a material, or clear around a
+    // drawn shape over `transparent`. Without one it is drawn from the
+    // window recipe's material, as over `opaque`, which has no base.
+    std::vector<ThemeBackdropBase> bases{};
+
+    // The base for `backdrop`, or null when the theme gives none.
+    [[nodiscard]] const SurfaceMaterial* base_for(WindowBackdrop backdrop) const noexcept {
+        for (const ThemeBackdropBase& base : bases) {
+            if (base.backdrop == backdrop) return &base.material;
+        }
+        return nullptr;
+    }
+
+    friend bool operator==(const ThemeWindowBackdrop& left, const ThemeWindowBackdrop& right) noexcept {
+        return left.request == right.request && left.bases == right.bases;
+    }
+};
+
 // A theme's whole authored description. Its role recipes are held out of
 // line (ControlRoleTable), so the definition itself is a small value, but
 // copying one still copies every recipe: pass it by reference, and let
@@ -369,6 +412,9 @@ struct ThemeDefinition final {
     // compiled when the theme is made; an invalid rule or declaration is
     // dropped with a diagnostic (Theme::engine().rules().diagnostics()).
     ThemeRuleSheet rules{};
+    // The backdrop request and backplane bases (stage T5). Empty by
+    // default: an opaque window, drawn as before.
+    ThemeWindowBackdrop window_backdrop{};
     friend bool operator==(const ThemeDefinition& left,
                            const ThemeDefinition& right) noexcept(noexcept(
         left.id == right.id && left.compatibility == right.compatibility &&
@@ -379,7 +425,7 @@ struct ThemeDefinition final {
                left.accent_ramp == right.accent_ramp &&
                left.overlay_shadow == right.overlay_shadow &&
                left.high_contrast_overlay_shadow == right.high_contrast_overlay_shadow &&
-               left.rules == right.rules;
+               left.rules == right.rules && left.window_backdrop == right.window_backdrop;
     }
 };
 

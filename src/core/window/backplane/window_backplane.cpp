@@ -33,11 +33,12 @@ Window::EngineBackplane Window::engine_backplane(Point raster_origin, DeviceExte
     const std::shared_ptr<PartRaster> made = PartRaster::create(region.extent, scale);
     if (!made || theme_ == nullptr) return lent;
     const PartRasterView image = (*made).view();
-    // The window's backplane material, as the presentation paints it.
+    // The window's backplane base for its grant, as the presentation
+    // paints it.
     ControlVisualContext context;
     context.surface = active_ ? ControlSurfaceState::normal : ControlSurfaceState::deactivated;
     context.high_contrast = presentation_settings_.high_contrast;
-    const SurfaceMaterial& material = (*theme_).resolve(ControlVisualRole::window, context).material;
+    const SurfaceMaterial& material = backplane_base(context);
     engine_parts_.bake_backplane_material(material, client_size_, region, &image_resources(), image,
                                           paint_leases_completed_);
     if (engine_parts_.patterns_waiting()) arm_engine_idle();

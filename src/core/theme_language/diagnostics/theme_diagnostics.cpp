@@ -51,6 +51,7 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::unit_not_admitted:
     case DiagnosticCode::value_form_not_admitted:
     case DiagnosticCode::keyword_unknown:
+    case DiagnosticCode::too_many_layers:
     case DiagnosticCode::expression_invalid:
     case DiagnosticCode::variable_undefined:
     case DiagnosticCode::variable_cycle:
@@ -66,13 +67,20 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::selector_too_long:
     case DiagnosticCode::too_many_custom_properties:
     case DiagnosticCode::substitution_too_long:
+    case DiagnosticCode::lowered_sheet_too_large:
     case DiagnosticCode::reserved_input_set:
     case DiagnosticCode::not_yet_built:
         return DiagnosticSeverity::error;
     case DiagnosticCode::unknown_property:
+    case DiagnosticCode::unknown_primitive:
+    case DiagnosticCode::unknown_function:
     case DiagnosticCode::unknown_at_rule:
     case DiagnosticCode::unknown_selector_name:
     case DiagnosticCode::property_not_admitted:
+    case DiagnosticCode::primitive_over_budget:
+    case DiagnosticCode::primitive_cost_unbounded:
+    case DiagnosticCode::needs_newer_engine:
+    case DiagnosticCode::keyword_from_newer_engine:
         return DiagnosticSeverity::warning;
     }
     // A value outside the enumeration is treated as the stricter class.
@@ -106,6 +114,7 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
     case DiagnosticCode::unit_not_admitted: return "unit_not_admitted";
     case DiagnosticCode::value_form_not_admitted: return "value_form_not_admitted";
     case DiagnosticCode::keyword_unknown: return "keyword_unknown";
+    case DiagnosticCode::too_many_layers: return "too_many_layers";
     case DiagnosticCode::expression_invalid: return "expression_invalid";
     case DiagnosticCode::variable_undefined: return "variable_undefined";
     case DiagnosticCode::variable_cycle: return "variable_cycle";
@@ -121,12 +130,19 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
     case DiagnosticCode::selector_too_long: return "selector_too_long";
     case DiagnosticCode::too_many_custom_properties: return "too_many_custom_properties";
     case DiagnosticCode::substitution_too_long: return "substitution_too_long";
+    case DiagnosticCode::lowered_sheet_too_large: return "lowered_sheet_too_large";
     case DiagnosticCode::reserved_input_set: return "reserved_input_set";
     case DiagnosticCode::not_yet_built: return "not_yet_built";
     case DiagnosticCode::unknown_property: return "unknown_property";
+    case DiagnosticCode::unknown_primitive: return "unknown_primitive";
+    case DiagnosticCode::unknown_function: return "unknown_function";
     case DiagnosticCode::unknown_at_rule: return "unknown_at_rule";
     case DiagnosticCode::unknown_selector_name: return "unknown_selector_name";
     case DiagnosticCode::property_not_admitted: return "property_not_admitted";
+    case DiagnosticCode::primitive_over_budget: return "primitive_over_budget";
+    case DiagnosticCode::primitive_cost_unbounded: return "primitive_cost_unbounded";
+    case DiagnosticCode::needs_newer_engine: return "needs_newer_engine";
+    case DiagnosticCode::keyword_from_newer_engine: return "keyword_from_newer_engine";
     }
     return "unknown";
 }
@@ -160,6 +176,14 @@ void ThemeDiagnosticList::add(ThemeDiagnostic diagnostic) {
         records_.push_back(std::move(diagnostic));
     } else {
         ++dropped_;
+    }
+}
+
+void ThemeDiagnosticList::name_context(std::size_t first_record, std::string_view rule, std::string_view property) {
+    for (std::size_t index = first_record; index < records_.size(); ++index) {
+        ThemeDiagnostic& record = records_[index];
+        if (record.rule.empty()) record.rule = std::string(rule);
+        if (record.property.empty()) record.property = std::string(property);
     }
 }
 

@@ -3,6 +3,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The merge queue: each merge group runs every required check, under the
+  # same names, on its temporary gh-readonly-queue/main/... branch, whose
+  # commit main then becomes. It publishes nothing and saves no Actions cache
+  # (its branch's caches reach no other ref); the push to main that follows
+  # carries its validation, receipts and programs tests.
+  merge_group:
   # The daily full run on main reuses nothing: every native job validates
   # afresh, and the programs, Sanitizers and docs jobs build and test
   # everything. It is the backstop for what a push to main carries from the
@@ -47,6 +53,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_ci_promote.py
           python3 -B -m unittest discover -s tools -p test_ci_sanitizer_seed.py
           python3 -B -m unittest discover -s tools -p test_publish_cache.py
+          python3 -B -m unittest discover -s tools -p test_readthedocs_build.py
           python3 -B -m unittest discover -s tools -p test_windows_toolchain.py
           python3 -B -m unittest discover -s tools -p test_skia_archive.py
           python3 -B -m unittest discover -s tools -p test_stack_frames.py
@@ -129,9 +136,10 @@ jobs:
       # One tree per job: a pull_request run takes its workflow files from the
       # test merge commit (refs/pull/N/merge), so the job checks out that same
       # commit (the default ref), never the head alone, whose older tree may
-      # lack tools main's workflow calls. A push checks out the pushed commit.
-      # The whole history, so a pull request's changed paths are taken from its
-      # merge base (tools/change_selection.py).
+      # lack tools main's workflow calls. A push or a merge group checks out
+      # its own commit. The whole history, so a pull request's or a merge
+      # group's changed paths are taken from its merge base
+      # (tools/change_selection.py).
       - uses: actions/checkout@v4
         with:
           path: gui_forms
@@ -139,10 +147,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      # A push to main has the tree of the up-to-date pull request it merges,
-      # whose run passed this job on the tests its changed paths can affect
-      # (owner's choice, 2026-10-23: the sanitizers need to run only on new
-      # code). The job then carries that run's receipt, builds and tests
+      # A push to main is the commit of the merge group that tested it (or,
+      # merged without the queue, has the tree of the up-to-date pull request
+      # it merges), whose run passed this job on the tests its changed paths
+      # can affect (owner's choice, 2026-10-23: the sanitizers need to run
+      # only on new code). A merge group with its pull request's tree carries
+      # that run's receipt the same way. The job then carries that run's receipt, builds and tests
       # nothing, and passes under its own name (tools/ci_tree_receipt.py). The
       # daily schedule looks up nothing and runs the whole suite, the backstop
       # for tools/change_selection.py.
@@ -170,7 +180,7 @@ jobs:
         if: steps.receipt.outputs.reused != 'true'
         run: sh gui_forms/tools/install_linux_ci_packages.sh toolkit "$RUNNER_TEMP/apt-archives"
       - uses: actions/cache/save@v4
-        if: github.event_name != 'pull_request' && steps.linux-packages.outputs.cache-hit != 'true' && steps.receipt.outputs.reused != 'true'
+        if: github.event_name != 'pull_request' && github.event_name != 'merge_group' && steps.linux-packages.outputs.cache-hit != 'true' && steps.receipt.outputs.reused != 'true'
         with:
           path: ${{ runner.temp }}/apt-archives
           key: ${{ steps.linux-packages.outputs.cache-primary-key }}
@@ -243,12 +253,13 @@ jobs:
         run: python gui_forms/tools/ci_sanitizer_seed.py restore --artifact-id "${{ steps.seed.outputs.artifact-id }}"
       # A pull request builds and runs only the tests its changed paths can
       # affect (the areas of tools/test_areas.json; every test when it touches
-      # CMake, the toolchain, the core headers or this workflow). A push to
-      # main runs the whole suite.
+      # CMake, the toolchain, the core headers or this workflow); a merge
+      # group does the same from the main commit it extends. A push to main
+      # that carried no receipt runs the whole suite.
       - name: Build and test under the sanitizers
         if: steps.receipt.outputs.reused != 'true'
         env:
-          CHANGED_FROM: ${{ github.event.pull_request.base.sha }}
+          CHANGED_FROM: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           ccache --zero-stats
           selection=""

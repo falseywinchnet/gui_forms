@@ -49,6 +49,13 @@ protected:
 private:
     [[nodiscard]] std::string metrics_text() const;
     std::string title_;
+    // The counters as the card last painted them, and its accessible value.
+    // Hosts keep a published tree until the window's semantic generation
+    // changes, so a value read live at each query (it changes with every
+    // paint) would reach them a paint late or never. A paint that changes
+    // this text invalidates semantics, which advances the generation; until
+    // the first paint it is empty.
+    std::string painted_metrics_;
     BasicControlStyle style_;
     double accent_width_{5.0};
 };

@@ -406,9 +406,9 @@ refined in P1):
 | E5xx limit | error | `sheet_too_large`, `too_many_rules`, `too_many_declarations`, `nesting_too_deep`, `string_too_long`, `too_many_imports`, `expression_over_budget`, `too_many_variable_combinations`, and the derived limits of section 6 |
 | E6xx package | error | `manifest_invalid`, `sheet_hash_mismatch`, `import_not_installed`, `import_hash_mismatch`, `import_cycle`, `published_value_invalid` |
 | E7xx reserved | error | `reserved_input_set` |
-| W1xx unknown name | warning | `unknown_property`, `unknown_primitive`, `unknown_function`, `unknown_at_rule` (W104, P2), `unknown_media_feature`, `unknown_selector_name`, `property_not_admitted`; numbered W101 to W107 in this order |
+| W1xx unknown name | warning | `unknown_property`, `unknown_primitive`, `unknown_function`, `unknown_at_rule` (W104, P2), `unknown_media_feature`, `unknown_selector_name`, `property_not_admitted`; numbered W101 to W107 in this order; then `primitive_over_budget` W108 and `primitive_cost_unbounded` W109 (P5) |
 | W2xx colour | warning | `literal_colour_unremappable` |
-| W3xx version | warning | `needs_newer_engine` (the sheet or a rule), `keyword_from_newer_engine` |
+| W3xx version | warning | `needs_newer_engine` (the sheet or a rule), `keyword_from_newer_engine`; W301 and W302 |
 | W4xx inline | warning | `inline_with_theme`, once per window (E1) |
 
 The engine's own `RuleDiagnosticKind`s still run after T3 (the engine
@@ -632,6 +632,74 @@ the first end-to-end compile: a sheet in, a `Theme` out, through
 theme compiles to equal `ThemeRuleSheet` records, and the parts it draws
 hash equal. 1 PR.
 
+*Done in one PR:*
+- **The compiler** (`compiler/`, internal, E3) runs the stages in order
+  and lowers each style rule once: its selectors, then its `primitive`
+  declarations (the last usable one selects the primitive, so a parameter
+  may be written before it), then its other declarations. Within a rule
+  the later declaration of a property wins, in its place, with no
+  diagnostic. Each expanded selector gets one copy of the rule's records,
+  labelled with the selector list as written (clipped to 64 bytes); a
+  rule left with nothing to declare gives no rule. A given specificity
+  (EC2) is set only where CSS's differs from the engine's own count.
+  The first error refuses the sheet, which is then empty.
+- **Properties.** A parameter is written by its registered name in
+  kebab-case: a number takes a plain number or px, or an expression (its
+  fallback the parameter's default; `param()` of a colour or a choice is
+  E402); a colour takes a colour or a named colour; a choice takes its
+  keyword in kebab-case, matched in any case (`shape: cap-start`).
+  `opacity` (a number or a percentage, 0 to 1), `scale` (one number or
+  percentage, or `none`; one per axis is E405) and `translate` (one or two
+  px lengths, or `none`; a percentage or a depth is E405) become one-state
+  machines reached at once; out-of-range values are E403, not clamped as
+  CSS clamps opacity, so a refusal is never silent. `mix-blend-mode`
+  lowers to `blend`; CSS's other modes are E405. `isolation` is accepted
+  and adds nothing. `initial` is the default (the built-in recipe for
+  `primitive`, `built-in` naming it too); `inherit` is E402 until P8;
+  `unset`, `revert` and `revert-layer` are E405. An expression reading an
+  input in a presentational property is E405 until motion (P7). An
+  unknown name in `state()` or `param()` stays E401 (P4's question): the
+  states are the engine's fixed vocabulary and the parameters the rule's
+  own primitive's, so an unknown one is a mistake in the sheet, not a name
+  from a newer engine.
+- **Refused until their phases** (E999): `!important` (P9), `@import`
+  (P10), `@media` and `@keyframes` (P7), and the properties of P6 to P8:
+  the `background`, `border`, `outline`, `mask`, `transition` and
+  `animation` families, `box-shadow`, `text-shadow`, `filter`,
+  `backdrop-filter`, `surface-finish`, `glow`, `glow-placement`, `color`
+  and `font`.
+- **Warnings.** An unknown property is W101 and a known CSS property the
+  language leaves out W107 (a table of layout, typography and geometry
+  properties, and the `column`, `flex`, `font`, `grid`, `inset`, `margin`,
+  `overflow`, `overscroll`, `padding`, `scroll`, `text-decoration` and
+  `transform` families); neither value is read. A parameter with no
+  `primitive` in its rule is W101. An unknown primitive is W102 and its
+  parameters are dropped with it, silently. A generic function as a value
+  is W103. The engine's budget refusals take their own codes,
+  `primitive_over_budget` W108 and `primitive_cost_unbounded` W109,
+  appended to the W1xx row. A role the primitive cannot paint is E402
+  (R2-08).
+- **Engine versions.** When the declared engine (the manifest's, P9;
+  until then the caller's) is newer than the running one, W301 is reported
+  once (detail `major.minor`), a keyword the running engine lacks is W302
+  and dropped, and the sheet is handed to the engine at the running
+  version, so the rest applies (B3, R2-07). Otherwise the declared version
+  is kept.
+- **Lowered size** (a new derived limit, `lowered_sheet_too_large` E513,
+  for owner confirmation): the records a sheet lowers to count at most
+  16 MiB, estimated as 64 bytes a record plus the bytes of its strings and
+  16 a program instruction, the selectors (P3) included. Without it a
+  selector list expanding into 10,000 rules, each copying a long stable ID
+  or 64 expression declarations, would build gigabytes from a 1 MiB sheet.
+- Gate: the sheet `tests/theme_language/theme_compiler_tests.cpp` writes
+  equals its hand-built `ThemeRuleSheet` (a bulge with an expression
+  reading the pointer and a custom property, colours, a blend and a static
+  opacity; a hover rule with a later-wins parameter, a scale and a
+  translation; a material with a recipe and a pill shape), and the two
+  themes' windows draw identical part rasters, offsets and groups at rest,
+  hot at two pointer positions, and away. Every sheet the tests compile
+  also compiles in the engine with no diagnostic.
+
 **P6. Authored materials (engine change EC1) and their CSS.** The engine
 first: a rule's material fields cascade one by one, as parameters do, and
 the material primitive bakes the material assembled from the winning
@@ -641,6 +709,140 @@ of CSS_COVERAGE §1 to §3, §5, §7 to §11 and §14 `color`, with the
 shorthands. Gate: a fixture per row; for each, a sheet and the equivalent
 C++ material bake to identical pixels; the material cache's counters show
 one bake per distinct assembly. 3 PRs.
+
+*P6a, the engine (EC1), done:*
+- **Fields.** A `ThemeRule` carries `materials`, a list of
+  `MaterialDeclaration`s, each one `MaterialField` and its value:
+  `background_colour`, `fills` (the image layers), `fill_blend_modes`,
+  `shadows`, `glows`, the border's twelve longhands (each edge's style,
+  width and colour), `keylines`, the four corners (`corner_top_left` to
+  `corner_bottom_left`, in CSS's order), `colour_filter`, `drop_shadow`,
+  `filter_blur`, `finish` and `mask`. The fields are CSS's longhands, so
+  each cascades as CSS cascades it. The border cascades by CSS longhand, so that `border-color` in one rule and `border-width`
+  in another combine as CSS has them: the compiler (P6b) lowers `border`
+  and its shorthands to the longhands. The fills are two fields (owner
+  C6, 2026-10-26), CSS's `background-color` and `background-image`,
+  which combine across rules as CSS combines them: the colour layer
+  under the image layers, composed at assembly. The floor's bottom layer,
+  when solid, is its colour and its other layers its image layers; a
+  colour of alpha 0 adds no layer, and with no layer at all the fill is
+  one transparent solid. `fill_blend_modes` is `background-blend-mode`:
+  the modes in CSS's order (the top image layer's first), repeated over
+  the image layers; the colour layer keeps normal.
+- **Corners.** Each corner cascades on its own, as `border-top-left-radius`
+  does; the compiler lowers `border-radius` to the four. At assembly each
+  corner is its declaration's, else the floor's. Four equal corners are
+  `corner_radius` alone; unequal ones are `corner_radii`, with
+  `corner_radius` the smallest, which the built-in path rounds every
+  corner by.
+- **`initial`** (`MaterialDeclaration::initial`) keeps the floor's value
+  and still wins over the rules beneath it.
+- **Percentage radii** (R2-11): a corner marked `relative` is a
+  fraction of the box's shorter side, resolved when the material is
+  assembled for a part.
+- **Checking.** Each field is checked alone, written into the default
+  material, by `valid_surface_material`; one no material admits is the new
+  engine diagnostic `material_field_invalid`, and a second declaration of
+  a field in one rule is `duplicate_declaration`. Fields count as
+  declarations, so a rule of fields alone is not empty.
+- **Cascade.** Each field cascades on its own over every matching rule,
+  whatever primitive the rule selects (`Resolution::materials`, the
+  winning declaration of each field). Fields change a part only where its
+  primitive draws a theme material.
+- **Assembly.** The floor is the material of the recipe the primitive
+  names, for the part's state. `assemble_material` writes the winning
+  fields over it. The edges assemble together: four equal edges are one
+  uniform border, which keeps a dash and rounded corners; unequal ones are
+  single edges, which a material admits only with square corners. Each
+  edge starts as the floor's (an edge the floor lacks has the default
+  border's width and colour and is not drawn), takes its declared style,
+  width and colour, and is drawn unless its style is none or its width 0.
+  An
+  assembly no material admits (eight keylines and a finish, say) is
+  refused by the primitive and drawn by the built-in recipe, the refusal
+  counted, as any refusal is.
+- **Cache.** A keyed part keeps its assembly on its record
+  (`AssembledPartMaterial`), assembled again only when its identity
+  changes: the compiled rules' serial and the winning declarations'
+  addresses, the floor by value (a recipe may be replaced and another
+  occupy its address), and the box's shorter side. A copy of compiled rules takes a new serial; a move
+  keeps it. A part without a key assembles at each paint.
+  `engine_material_assemblies` counts assemblies.
+- **The family recipe.** The material primitive's `recipe` gains a last
+  choice, `family`, the part's own recipe family, and it is the default:
+  a material rule naming no recipe now keeps its part's own recipe as its
+  floor, not the button's (owner C5, 2026-10-26).
+  `EnginePrimitive::theme_material` takes the part's family for it. The
+  engine version is 0.3.
+- **Implicit material** (owner C7, 2026-10-26; built in P6b): a rule
+  that declares material fields and no `primitive` selects `material`.
+- Gate: `gui_forms_engine_authored_material_tests`. A part with fields
+  from two rules bakes the same pixels as the same material written into
+  the theme's recipe in C++, in two states; a colour and image layers
+  set in different rules, with the colour's rule the less and then the
+  more specific, bake as the same layers written in C++. A repaint assembles and bakes
+  nothing; a state change assembles and bakes once. The checks, the
+  per-field cascade, the edge assembly, the serials, the family default and
+  the refused assembly are tested too.
+
+*P6b, the CSS of fills, borders, radii and shadows, done:*
+- **The lowering** (`src/core/theme_language/material/`) reads a material
+  property's value into a result record (`MaterialLowering`): the fields
+  it sets, or the problem the compiler reports. Each CSS longhand is one
+  field, so a shorthand sets several, and within a rule the later
+  declaration of a field wins, whichever property set it. A shorthand's
+  omitted part is `initial` (the floor's value), the language's reading of
+  CSS's initial value. `initial` on any of them resets each field it sets.
+- **Fills** (§1, §7): `background-color`; `background-image` with
+  `linear-`, `radial-` and `conic-gradient()` and their `repeating-`
+  forms, up to 8 layers (E407 `too_many_layers` past them), CSS's first
+  layer on top; `background` with a colour (transparent when it names
+  none) and images; `background-blend-mode`. A layer's position, size,
+  repeat, attachment, origin and clip, and image resources, are P6c's
+  (E999). A colour hint, a `none` among other layers, a three- or
+  four-value position and CSS's blend modes the engine lacks are E405;
+  `currentcolor` and `em` wait for P8 (E999).
+- **Authored gradients** (`AuthoredGradient`, engine): a gradient as
+  written, resolved as CSS places it for the part's box: the stops placed
+  by CSS's fixup and clipped to the drawn range, sides and corners, the
+  four radial extents for circles and ellipses, positions and radii as a
+  fraction of the box plus logical units, repeating periods (a radial
+  one rotated to begin at its centre), CSS's average colour for a period
+  of no length. Coincident stops (CSS's hard stops) are 2^-20 apart, which
+  the engine's stops require: under a tenth of a device pixel on a
+  gradient shorter than 100,000 device pixels. A gradient the same for
+  every box is resolved when the sheet compiles, in normalized
+  coordinates or a CSS angle, exactly the layer C++ writes; the others
+  (a corner, a circle, a length) when the material is assembled, in
+  logical units. The assembly keys on the box only where a field reads
+  it (`material_fields_read_box`), so a resize assembles nothing new
+  otherwise.
+- **Borders** (§2): `border`, the four edges' shorthands, `border-style`,
+  `border-width` and `border-color` (one to four values) and the twelve
+  longhands; `thin`, `medium` and `thick` are 1, 3 and 5 px; `none` and
+  `hidden` draw no line. `double`, `groove` and `ridge` are P6c's keyline
+  pairs (E999); `inset` and `outset` are E405.
+- **Radii** (§2): `border-radius` (one to four) and the four corners'
+  longhands; a percentage is a fraction of the shorter side (R2-11);
+  elliptical radii are E405.
+- **Shadows** (§3): `box-shadow`, `none` or up to 4, `inset` admitted,
+  CSS's first on top; a shadow without a colour waits for `currentcolor`
+  (E999).
+- **Implicit material** (owner C7): a rule with material fields and no
+  `primitive` selects `material`.
+- Gate: `gui_forms_theme_material_css_tests`. Each row (the fill forms,
+  the blend mode, a uniform, a dashed and rounded, single-edge and
+  four-value border, per-corner and percentage radii, outer and inset
+  shadows) compiles from a sheet and bakes the pixels of the same
+  material written in C++, which differ from the floor's. The gradient
+  resolution, the lowering of each property and 28 refusals are tested
+  too.
+
+*P6c, still to build:* §5 filters, §8 finish, §9 glow, §10 image layers
+(the manifest's resources bound to the engine's images, with
+`background-size`, `-repeat` and `-position`), §11 masks, `border-image`,
+`double`, `groove` and `ridge` as keyline pairs, and §14's `color`,
+`outline` and `text-shadow`, which need an engine carrier.
 
 **P7. Motion.** `transition`, the timing functions, delays, `@keyframes`,
 `animation`, ambient loops, and the state-machine grouping. Gate: a fixture

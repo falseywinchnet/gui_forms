@@ -212,7 +212,7 @@ their first compile, so keep the code portable and say so in the PR.
 - Commit in logical steps. End every commit message with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Push to `origin` (GitHub) and open a pull request with
-  `gh pr create --repo falseywinchnet/gui_forms --base <the branch named in your task>`.
+  `gh pr create --repo malkuth-software/gui_forms --base <the branch named in your task>`.
   Never push to `main`, and never merge by hand: a ready PR lands through
   auto-merge (see "Merging" below).
 - PR description: plain English. What the control does, what it does not do

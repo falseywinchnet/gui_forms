@@ -7,9 +7,10 @@ name: State-machine gate
 #
 # Scopes: a pull request checks the translation units its C and C++ changes
 # can affect (check_state_machines.py --changed-from), and passes at once when
-# it changes none; a push to main does the same against the commit it
-# replaced. The daily schedule (native.yml's cron) and a manual run check the
-# whole tree, as does any change to the checker itself.
+# it changes none; a merge group does the same against the main commit it
+# extends, and a push to main against the commit it replaced. The daily
+# schedule (native.yml's cron) and a manual run check the whole tree, as does
+# any change to the checker itself.
 #
 # One host (Linux, the cheapest) with the shared engine and no native host
 # or Skia: it compiles the core, controls, demo, tests, audio, the stx
@@ -18,6 +19,9 @@ name: State-machine gate
 # compiles.
 on:
   pull_request:
+  # The merge queue's required check runs on each merge group's temporary
+  # branch, under the same name.
+  merge_group:
   push:
     branches: [main]
   schedule:
@@ -38,7 +42,7 @@ jobs:
     steps:
       # The whole history, so the changed paths are taken from the merge base
       # (tools/change_selection.py). A pull request checks out its test merge
-      # commit; a push its own commit.
+      # commit; a merge group or a push its own commit.
       - uses: actions/checkout@v4
         with:
           path: gui_forms
@@ -49,13 +53,13 @@ jobs:
       # The checker's own fixtures (rules, tuning, the changed-code scope).
       - name: Test the checker
         run: python3 -B -m unittest discover -s gui_forms/tools -p test_state_machines.py
-      # A pull request compares with its base, a push to main with the commit
-      # it replaced. The schedule, a manual run and a push without a usable
+      # A pull request compares with its base, a merge group with the main
+      # commit it extends, a push to main with the commit it replaced. The schedule, a manual run and a push without a usable
       # base check the whole tree, as does a change to the checker itself.
       - name: Find the changed C and C++ files
         id: scope
         env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: |
           scope=full
           if [ "$GITHUB_EVENT_NAME" != schedule ] && [ -n "$BASE" ] && git -C gui_forms cat-file -e "$BASE^{commit}" 2>/dev/null; then
@@ -98,7 +102,7 @@ jobs:
       - name: Check the state machines
         if: steps.scope.outputs.scope != 'none'
         env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           SCOPE: ${{ steps.scope.outputs.scope }}
         run: |
           changed=""
