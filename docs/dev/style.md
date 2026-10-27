@@ -2,7 +2,7 @@
 
 GUI.Forms sources follow one house style: an orthodox, explicitly spelled
 subset of C++20 in which types, ownership, mutation and execution order are
-visible at the point of use. The complete style, and its canonical text, is
+visible at the point of use. The canonical text of the complete style is
 [`HOUSE_STYLE.md`](https://github.com/malkuth-software/notes/blob/main/HOUSE_STYLE.md)
 on the `main` branch of the project's notes repository. Its sections are
 ordered by importance, most important first. Read it in full before writing
