@@ -5695,6 +5695,18 @@
       ]
     },
     {
+      "id": "folder_browser_dialog",
+      "type": "FolderBrowserDialog",
+      "kind": "component",
+      "interactions": []
+    },
+    {
+      "id": "color_dialog",
+      "type": "ColorDialog",
+      "kind": "component",
+      "interactions": []
+    },
+    {
       "id": "tool_tip",
       "type": "ToolTip",
       "kind": "component",

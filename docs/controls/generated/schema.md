@@ -2696,6 +2696,14 @@ Properties beyond every control's: none.
 |---|---|
 | `closed` | `DialogResult` |
 
+## `folder_browser_dialog` (FolderBrowserDialog, component)
+
+Interactions: none.
+
+## `color_dialog` (ColorDialog, component)
+
+Interactions: none.
+
 ## `tool_tip` (ToolTip, component)
 
 | Interaction | Payload |

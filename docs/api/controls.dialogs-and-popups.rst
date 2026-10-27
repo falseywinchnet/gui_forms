@@ -19,6 +19,10 @@ Anchored popups, tooltips, owned dialogs and the host's file and colour dialogs.
      - A message dialog of pages: heading, text, icon, buttons, choices, details and progress.
    * - :cpp:class:`ThreadExceptionDialog <gui_forms::ThreadExceptionDialog>`
      - The dialog for an exception the application did not handle.
+   * - :cpp:class:`FolderBrowserDialog <gui_forms::FolderBrowserDialog>`
+     - The host's dialog for choosing a folder.
+   * - :cpp:class:`ColorDialog <gui_forms::ColorDialog>`
+     - The host's dialog for choosing a color.
    * - :cpp:class:`ToolTip <gui_forms::ToolTip>`
      - A provider of short help text that pops up when the pointer rests on a control or the control receives keyboard focus.
    * - :cpp:class:`RibbonToolTip <gui_forms::RibbonToolTip>`
@@ -33,6 +37,8 @@ Anchored popups, tooltips, owned dialogs and the host's file and colour dialogs.
    generated/gui_forms.FontDialog
    generated/gui_forms.TaskDialog
    generated/gui_forms.ThreadExceptionDialog
+   generated/gui_forms.FolderBrowserDialog
+   generated/gui_forms.ColorDialog
    generated/gui_forms.ToolTip
    generated/gui_forms.RibbonToolTip
    generated/gui_forms.SaveFileDialog

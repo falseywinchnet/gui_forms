@@ -631,6 +631,8 @@ add_library(gui_forms_controls STATIC
     src/controls/file_dialog/file_dialog_types.cpp
     src/controls/open_file_dialog/open_file_dialog.cpp
     src/controls/save_file_dialog/save_file_dialog.cpp
+    src/controls/color_dialog/color_dialog.cpp
+    src/controls/folder_browser_dialog/folder_browser_dialog.cpp
     src/controls/thread_exception_dialog/thread_exception_dialog.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
@@ -2971,6 +2973,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_save_file_dialog_tests tests/save_file_dialog_tests.cpp)
     target_link_libraries(gui_forms_save_file_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_save_file_dialog_tests COMMAND gui_forms_save_file_dialog_tests)
+    add_executable(gui_forms_color_dialog_tests tests/color_dialog_tests.cpp)
+    target_link_libraries(gui_forms_color_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_color_dialog_tests COMMAND gui_forms_color_dialog_tests)
+    add_executable(gui_forms_folder_browser_dialog_tests tests/folder_browser_dialog_tests.cpp)
+    target_link_libraries(gui_forms_folder_browser_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_folder_browser_dialog_tests COMMAND gui_forms_folder_browser_dialog_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)
