@@ -1,5 +1,5 @@
 // Stage T5, phase C6's renderer-neutral gate
-// (planning/stages/T5-compositor/PLAN.md §4.3 and §5 C6): the window's
+// (notes:planning/stages/T5-compositor/PLAN.md §4.3 and §5 C6): the window's
 // renderer replays the backplane plane's whole command list into the
 // backplane image glass samples, behind the same borrow.
 //

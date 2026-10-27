@@ -8,11 +8,13 @@ own build.
 
 ## Code style (mandatory)
 
-All first-party C++ and Objective-C++ in this repository follows
-`planning/PROGRAMMING_HOUSE_STYLE.md`, a verbatim copy of
-`programming-house-style.md` in `falseywinchnet/EpistemicGPT`; change both
-together. Read it in full before writing or changing code. One line per
-section, so a skim still covers all eleven:
+All first-party C++ and Objective-C++ in this repository follows the house
+style, `HOUSE_STYLE.md` on the `main` branch of `malkuth-software/notes`
+(https://github.com/malkuth-software/notes/blob/main/HOUSE_STYLE.md). Its
+canonical text is still `programming-house-style.md` in
+`falseywinchnet/EpistemicGPT`; change both together. Read it in full before
+writing or changing code. One line per section, so a skim still covers all
+eleven:
 
 1. **Types and values:** spell types; separate confusable quantities (byte
    offsets and character positions, identities and indices) with wrapper
@@ -97,16 +99,26 @@ naming still need review against the full document.
 
 ## Forward programme (read before starting new work)
 
+Plans, stage briefs, measurements, experiments, decision records and working
+notes are not kept in this repository. They live on the `gui_forms` branch of
+`malkuth-software/notes` (https://github.com/malkuth-software/notes/tree/gui_forms),
+under `planning/`, `results/`, `experiments/`, `decisions/` and `docs-notes/`
+(the former `docs/notes/`). A code comment that cites `notes:<path>` means
+`<path>` on that branch. Record new plans, gate measurements and evidence
+there, not here.
+
 The current programme (articulated controls, one theme engine, the design
 language, accessibility verification, the C ABI, the C# sibling and the
-visual tools) is defined in `planning/FORWARD_PROGRAMME.md`, with the visual
-rules in `planning/DESIGN_LANGUAGE_SPECIFICATION.md`. Find your stage there,
-start it only once its dependencies' gates are recorded, and record your own
-gate's measurement. Open owner decisions are listed in both files; do not
-assume them. Each stage has a working brief in `planning/stages/` (why, what,
-how, current code, house-style points, open decisions and lessons from the
-owner's discussions); read `planning/stages/README.md` and your stage's
-brief before starting. A readable stage board for sibling threads is published at
+visual tools) is defined in `planning/FORWARD_PROGRAMME.md` on that branch,
+with the visual rules in `planning/DESIGN_LANGUAGE_SPECIFICATION.md`. Find
+your stage there, start it only once its dependencies' gates are recorded,
+and record your own gate's measurement. Open owner decisions are listed in
+both files; do not assume them. Each stage has a working brief in
+`planning/stages/` on that branch (why, what, how, current code, house-style
+points, open decisions and lessons from the owner's discussions); read
+`planning/stages/README.md` and your stage's brief before starting. What is
+left before 0.5 is in `planning/ROADMAP_TO_0.5.md`. A readable stage board for
+sibling threads is published at
 https://claude.ai/artifact/D9d2SUvkiKQETiVnmwnEt4 (read it with the Artifact
 tool); the planning files are authoritative where they differ.
 
@@ -199,8 +211,8 @@ The public ABI may begin as disciplined portable C++ for the spike, but no
 compiler-specific type may be assumed to be the eventual stable C ABI.
 
 Cross-project consumption is negotiated through
-`docs/notes/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`. GUI.Forms records its reply and
-evidence there; Orchestrator reconciles the canonical program contract. Do not
+`docs-notes/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` on the notes `gui_forms`
+branch. GUI.Forms records its reply and evidence there; Orchestrator reconciles the canonical program contract. Do not
 freeze an ABI merely because the current frontend experiment calls it.
 
 ## Agent ownership during the initial parallel build
@@ -319,7 +331,7 @@ deterministic boundary fixtures before measurements. `--verify-only` runs those
 algorithm fixtures without timing; omit PNG arguments in that mode.
 `--greedy-only` measures only phrase-boundary queries while retaining all
 insertion and expiration work. `--radix` selects the eager-maxima comparison.
-See `results/2026-10-20-zlib/phase-three/match-index/RADIX.md` for invariants and
+See `notes:results/2026-10-20-zlib/phase-three/match-index/RADIX.md` for invariants and
 the distinction between index memory and the total streaming encoder budget.
 
 The random-maintenance variant additionally selects `--inline-radix
@@ -327,7 +339,7 @@ The random-maintenance variant additionally selects `--inline-radix
 fixed random seeds at 128 KiB and 1 MiB; `--random-only` skips other synthetic
 cases. `--assembly` retains compiler assembly, and `--restrict-index` applies
 the same disjoint-index contract to both compared kernels. See
-`results/2026-10-20-zlib/phase-three/match-index/RANDOM_REFACTOR.md` for results
+`notes:results/2026-10-20-zlib/phase-three/match-index/RANDOM_REFACTOR.md` for results
 and limitations. Use `--greedy-only` to reproduce its query schedule.
 
 ## Owned PNG: remote phase-5b experiments
@@ -344,16 +356,21 @@ other mirror/build operation. Oracle pins and file hashes are checked before
 compiling. The sanitizer comparison uses portable-C libpng; the benchmark
 uses its NEON implementation on arm64. Neither is a production dependency
 change. Full-suite sanitizer verification still uses `tools/ci_build.py`. The recorded
-helper supplies its logical workspace layout on the hashed M4 mirror:
+helper, `notes:results/2026-10-19-zlib/png/full-suite-driver.sh`, supplies its
+logical workspace layout on the hashed M4 mirror. Copy it into `build/` of this
+checkout first; it runs from the checkout's root:
 
 ```sh
-/Users/ultimussecundai/.local/bin/m4build -- sh results/2026-10-19-zlib/png/full-suite-driver.sh
+/Users/ultimussecundai/.local/bin/m4build -- sh build/full-suite-driver.sh
 ```
 
 ## PNG CRC suitability experiment
 
 The standalone comparison is first-party experimental code, not a new runtime
-library dependency. It compiles the existing pinned upstream zlib both natively
+library dependency. It is kept at `notes:experiments/png-crc-suitability/`;
+`run.py` finds this checkout two directories above itself, so copy that
+directory to `experiments/png-crc-suitability/` in a checkout before running
+it. It compiles the existing pinned upstream zlib both natively
 and with its ARM CRC opcode path disabled, verifies complete CRCs under
 sanitizers, and compares chunk costs and whole PNG decoding. Run it after
 `validate_png.py` has generated the workload directory:
@@ -365,7 +382,7 @@ sanitizers, and compares chunk costs and whole PNG decoding. Run it after
 Keep performance trials sequential with builds, fuzzing and suite execution.
 Inspect assembly before crediting the degree-261 quartet with register-resident
 state; source arrays alone do not establish that allocation. See
-`experiments/png-crc-suitability/README.md` for provenance and measurement limits.
+`notes:experiments/png-crc-suitability/README.md` for provenance and measurement limits.
 
 Repeat the CRC experiment with `--baseline-isa` and a separate output directory
 to measure baseline Armv8-A candidate code without Apple-target three-input XOR

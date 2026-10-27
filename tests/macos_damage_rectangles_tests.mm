@@ -29,7 +29,7 @@ extern char** environ;
 // cached display of the view (the host's raster). AppKit coalesces the
 // host's per-rectangle display requests, so what it copies to the screen is
 // reported as measured, not assumed. The record is
-// results/2026-10-25-dp-gate-macos.
+// notes:results/2026-10-25-dp-gate-macos.
 //
 // Then becoming visible again: after a change made while hidden, the first
 // visible frame repaints that change only, and with nothing changed it

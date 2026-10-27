@@ -1,4 +1,4 @@
-// Stage T5, phase C2's gate (planning/stages/T5-compositor/PLAN.md §5 C2):
+// Stage T5, phase C2's gate (notes:planning/stages/T5-compositor/PLAN.md §5 C2):
 // a GUI.Forms window on the Windows host, declared non-opaque, through each
 // grant its machine allows, read off the composed screen.
 //

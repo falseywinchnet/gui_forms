@@ -2,7 +2,7 @@
 
 This tool measures a reference face and a candidate substitute, and compares
 them under the tolerance of the mapping's class. It is the measurement behind
-stage F's gate (`planning/stages/F-font-substitution/README.md`, owner
+stage F's gate ([`planning/stages/F-font-substitution/README.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/stages/F-font-substitution/README.md), owner
 decisions 8 and 9 of 2026-10-23).
 
 The reference is always our own engine. Both faces go through the same
@@ -100,7 +100,7 @@ exception must still fail its criterion and stay within its limit. On
 Windows, an installed reference whose SHA-256 matches its snapshot is
 measured again and must reproduce the snapshot. To re-measure after a
 change to the table, the engine or the corpus, rerun the snapshot command for
-each row of `results/2026-10-23-f-font-substitution`. Review the differences
+each row of [`results/2026-10-23-f-font-substitution`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-23-f-font-substitution). Review the differences
 before committing them.
 
 ## Rules

@@ -107,7 +107,7 @@ RibbonGroupLayout layout_of(RibbonGroupSize size, std::size_t rows = 3U) {
     return layout;
 }
 
-// WordPad's Home tab (results/2026-10-14-ribbon-scaling-observation/), with
+// WordPad's Home tab (notes:results/2026-10-14-ribbon-scaling-observation/), with
 // WordPad's authored policy as far as decision 6 allows: no label-drop
 // layout; each group goes from its largest layout to its button, in the
 // order observed (Insert, Editing, Paragraph, Clipboard, Font).
@@ -532,7 +532,7 @@ void wordpad_ladders() {
     tabs.push_back(wordpad_home(true));
     tabs.push_back(wordpad_view());
     Fixture fixture = make_fixture(std::move(tabs), {1400.0, 300.0}, metrics);
-    // The observed WordPad Home ladder (results/2026-10-14-ribbon-scaling-
+    // The observed WordPad Home ladder (notes:results/2026-10-14-ribbon-scaling-
     // observation/README.md): the label drop is excluded by decision 6 and is
     // the one expected difference.
     struct Observed final {

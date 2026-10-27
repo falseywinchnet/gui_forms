@@ -1,4 +1,4 @@
-// Stage T5, phase C3's gate (planning/stages/T5-compositor/PLAN.md §5 C3):
+// Stage T5, phase C3's gate (notes:planning/stages/T5-compositor/PLAN.md §5 C3):
 // a GUI.Forms window on the macOS host, declared non-opaque, through each
 // grant, read back from AppKit and off the composed screen.
 //

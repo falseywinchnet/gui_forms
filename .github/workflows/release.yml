@@ -316,7 +316,7 @@ jobs:
             .build/native-${{ matrix.platform }}/skia
           key: ${{ steps.dependencies.outputs.cache-primary-key }}
       # The saved cache is this build's working set, not every generation up
-      # to CCACHE_MAXSIZE (planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1).
+      # to CCACHE_MAXSIZE (notes:planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1).
       # The programs build compiles everything, so the set is complete.
       - name: Keep only the compiler cache entries this build used
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.objects.outputs.cache-hit != 'true'

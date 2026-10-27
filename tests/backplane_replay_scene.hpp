@@ -15,7 +15,7 @@
 #include <vector>
 
 // The backplane replay through a host's CPU raster (stage T5, phase C6;
-// planning/stages/T5-compositor/PLAN.md §4.3 and §5 C6): the window's
+// notes:planning/stages/T5-compositor/PLAN.md §4.3 and §5 C6): the window's
 // renderer replays the backplane plane, text included, into the image glass
 // samples. windows_backplane_replay_tests runs it through the Windows DIB
 // painter and backplane_replay_identity_tests through the Skia raster,

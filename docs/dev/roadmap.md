@@ -2,7 +2,7 @@
 
 GUI.Forms is pre-1.0. This page says what is done, what is being worked on
 now, and what has to be true before the API is declared stable. It is a
-summary of the planning documents in the repository's `planning/` directory,
+summary of the planning documents in the [`planning/`](https://github.com/malkuth-software/notes/tree/gui_forms/planning) directory of the project's notes repository,
 which remain the detailed source; where they disagree with the code, the code
 and its tests are the authority.
 
@@ -36,7 +36,7 @@ details are under [Done and tested](#done-and-tested).
   native host advertises the capability.
 - **Font substitution**. Families that applications ask for map to
   bundled faces with matching or nearest metrics, measured on every host
-  (`results/2026-10-23-f-font-substitution`).
+  ([`results/2026-10-23-f-font-substitution`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-23-f-font-substitution)).
 - **Articulated controls**. Every control is built from named parts
   with states and public geometry, described by one schema that the C++ API,
   form documents, themes and the visual tools share.
@@ -57,7 +57,7 @@ details are under [Done and tested](#done-and-tested).
   transitions are on main. Motion, colour and text roles, inline styles,
   packages and imports, custom properties and the stage gate remain.
 - **The default theme**, in light and dark, following the
-  design-language specification (`planning/DESIGN_LANGUAGE_SPECIFICATION.md`)
+  design-language specification ([`planning/DESIGN_LANGUAGE_SPECIFICATION.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/DESIGN_LANGUAGE_SPECIFICATION.md))
   (not started; its design is decided).
 - **Windows-familiar themes** beside it (not started).
 - **Compositor cooperation:** transparency, glass and behind-window materials
@@ -99,7 +99,7 @@ details are under [Done and tested](#done-and-tested).
   callback conformance tests against the installed SDK.
 
 What is left before 0.5, stage by stage, with dependencies, open owner
-decisions and parked work, is listed in `planning/ROADMAP_TO_0.5.md`.
+decisions and parked work, is listed in [`planning/ROADMAP_TO_0.5.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/ROADMAP_TO_0.5.md).
 
 ## 0.6 Bindings
 
@@ -134,7 +134,7 @@ The API is declared stable only when all of the following hold:
   of materials ship with every artefact.
 
 The full plan, with a measured gate for each stage, is
-`planning/FORWARD_PROGRAMME.md`.
+[`planning/FORWARD_PROGRAMME.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/FORWARD_PROGRAMME.md).
 
 Future note, not a stage: distribution near 1.0 is expected to move to
 rolling releases with pinnable caches, likely hosted off GitHub.
@@ -170,7 +170,7 @@ gates as their own rows. "Done" means the deliverable exists and a test in
 | Coherent latest-state presentation | Separate content, rendered and presented revisions; one paint lease, one coalesced wake and one deferred follow-up per window; exact presentation receipts; owner-callback failure restores the previous chunks | done |
 | Pressure, input and stall conformance | Under 100 mutations per frame, nested paints, resize during replay, occlusion, backend faults and owner retirement: one queued drain, latest-state rendering and a return to idle; input deferred outside the paint lease with a fixed bound | in progress: the deterministic gates pass; a native wall-clock soak remains |
 | Atomic candidate raster | Replay into a private candidate raster and publish it only after every backend command succeeds, keeping the last presented raster across allocation, renderer and upload faults | in progress: an opt-in Windows transactional frame store exists; default hosts replay into the live raster |
-| Damage-preserving painting | Painting and presenting each damage rectangle instead of their bounding box | done: every host paints the rectangle set (paint contract version 2), and live frames follow one frame sequence; the gate is recorded on Windows, X11 and macOS (`results/2026-10-25-dp-gate-macos`), where AppKit copies the union of the set over unchanged pixels, accepted by the owner; paint edges snap to whole device pixels |
+| Damage-preserving painting | Painting and presenting each damage rectangle instead of their bounding box | done: every host paints the rectangle set (paint contract version 2), and live frames follow one frame sequence; the gate is recorded on Windows, X11 and macOS ([`results/2026-10-25-dp-gate-macos`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-25-dp-gate-macos)), where AppKit copies the union of the set over unchanged pixels, accepted by the owner; paint edges snap to whole device pixels |
 | Presentation availability record | Publishing the mandatory paint-contract version and optional host extensions (partial present, zero-copy import, presentation fences) | done: `Window::presentation_availability()` reports contract version 2 (partial present is now part of the contract), the extensions and the live paint lease; no host offers zero-copy import or fences yet |
 | API stability (1.0) | The conditions listed under "Before 1.0" below | planned |
 

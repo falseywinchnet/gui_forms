@@ -8,7 +8,7 @@
 
 namespace gui_forms {
 
-// Shared types of the theme engine (stage T2, planning/stages/T2-engine-core/
+// Shared types of the theme engine (stage T2, notes:planning/stages/T2-engine-core/
 // PLAN.md). The engine rasterizes parts with first-party kernels into
 // premultiplied RGBA8 pixels and gives identical bytes on every host.
 

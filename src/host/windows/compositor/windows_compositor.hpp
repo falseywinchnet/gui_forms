@@ -7,7 +7,7 @@
 
 // The Windows compositor adapter (stage T5, phase C2): what DWM offers a
 // window, and the grant applied to it. The routes are the ones measured in
-// planning/stages/T5-compositor/MEASUREMENTS.md (C2):
+// notes:planning/stages/T5-compositor/MEASUREMENTS.md (C2):
 // - every non-opaque backdrop enables the client's premultiplied alpha
 //   with DwmEnableBlurBehindWindow and an empty blur region, which shows
 //   what lies behind the window and keeps the native caption;

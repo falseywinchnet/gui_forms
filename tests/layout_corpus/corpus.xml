@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- The layout fixture corpus (planning/stages/L-layout/PLAN.md section 6).
+<!-- The layout fixture corpus (notes:planning/stages/L-layout/PLAN.md section 6).
      Every fixture is laid out at every left-to-right profile. The
      direction="rtl" profiles lay the root out right to left (HTML's dir
      attribute; GUI.Forms' LayoutDirection) and apply only to the fixtures

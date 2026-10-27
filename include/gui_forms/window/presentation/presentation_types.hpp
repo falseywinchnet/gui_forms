@@ -104,7 +104,7 @@ struct PaintLeaseSnapshot final {
     bool dirty_after_render{};
 };
 
-// The presentation availability record (stage DP; planning/
+// The presentation availability record (stage DP; notes:planning/
 // PAINT_PIPELINE_AVAILABILITY.md, M11h-P4 / M12-P4). The baseline contract
 // (coherent latest-state presentation: mutation may outpace rendering and
 // rendering may outpace presentation, with no unbounded queue and no

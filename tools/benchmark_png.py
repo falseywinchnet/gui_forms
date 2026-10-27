@@ -18,7 +18,7 @@ def main() -> None:
     parser.add_argument('--zlib', type=Path, required=True)
     parser.add_argument('--workloads', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--baseline', type=Path, default=ROOT / 'results/2026-10-19-zlib/png/non-crc-optimization/baseline-png_decoder.cpp.txt')
+    parser.add_argument('--baseline', type=Path, default=ROOT / 'tests/image/png_benchmark_baseline_decoder.cpp.txt')
     args = parser.parse_args()
     png = args.libpng.resolve()
     zlib = args.zlib.resolve()

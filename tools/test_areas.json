@@ -25,7 +25,7 @@
   {"area": "controls", "pattern": "."}
  ],
  "path_rules": [
-  {"paths": ["planning/", "decisions/", "results/", "experiments/", "docs/", "packaging/", "benchmarks/",
+  {"paths": ["docs/", "packaging/", "benchmarks/",
              "sdrsharp_reflection_system/", "*.md", "LICENSE", ".gitignore", ".gitattributes"],
    "areas": []},
   {"paths": ["CMakeLists.txt", "cmake/", "third_party/", ".github/", "assets/", "include/gui_forms/",

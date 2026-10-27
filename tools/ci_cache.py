@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keep the Actions cache to what the next run restores (planning/BUILD_SIZE_PLAN_2026-10-23.md).
+"""Keep the Actions cache to what the next run restores (notes:planning/BUILD_SIZE_PLAN_2026-10-23.md).
 
 `evict` runs before a cache save on main. It removes every ccache entry
 this job neither created nor hit, so the saved cache is the current tree's

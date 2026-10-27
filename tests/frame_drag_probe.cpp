@@ -1,7 +1,7 @@
 // Stage DK phase W0 measurement probe (decision 12): how often a native host
 // moves a window when the framework sets its frame once per pointer move.
 // Not a ctest: it puts two windows on the desktop, so it runs only when the
-// owner asks for a measurement (results/2026-10-18-dk-w0-capture-drag/).
+// owner asks for a measurement (notes:results/2026-10-18-dk-w0-capture-drag/).
 //
 //   gui_forms_frame_drag_probe            scripted: 120 frame requests at the
 //                                         timer's 16 ms cadence, then exits

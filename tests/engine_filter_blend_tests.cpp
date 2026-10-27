@@ -1,4 +1,4 @@
-// E9.6, filters and blend (planning/stages/T2-engine-core/CSS_COVERAGE.md,
+// E9.6, filters and blend (notes:planning/stages/T2-engine-core/CSS_COVERAGE.md,
 // rows 6 to 8): the colour matrix and its CSS factories, the material's
 // part filters (the colour filter, the drop shadow and the blur), glass's
 // recipe colour filter on its backdrop, fill blend modes, and the rule

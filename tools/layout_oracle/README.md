@@ -1,7 +1,7 @@
 # Layout oracle
 
 Chromium as a test oracle for GUI.Forms layout (stage L,
-`planning/stages/L-layout/PLAN.md` section 6). Chromium never runs inside
+[`planning/stages/L-layout/PLAN.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/stages/L-layout/PLAN.md) section 6). Chromium never runs inside
 GUI.Forms, at import or at run time (L README, owner decision 2). It runs
 only here: when a fixture is written, and in the `layout-oracle` CI job.
 

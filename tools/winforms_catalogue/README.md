@@ -66,9 +66,11 @@ missing until their exact generated facade behavior is projected and measured.
 #   System.Windows.Forms.Primitives, and the Microsoft.WindowsDesktop.App.Ref
 #   .nupkg of that version from nuget.org.
 python3 -I tools/winforms_catalogue/read_obsolete.py   --package ref-8.0.32.nupkg --package ref-9.0.21.nupkg --package ref-10.0.13.nupkg   --output obsolete.tsv
-cp planning/generated/WINFORMS_API_CATALOGUE.tsv previous.tsv
-python3 -I tools/winforms_catalogue/generate_catalogue.py   --forms-api 8.0=api-8.0.txt --forms-api 8.0=primitives-8.0.txt   --forms-api 9.0=api-9.0.txt --forms-api 9.0=primitives-9.0.txt   --forms-api 10.0=api-10.0.txt --forms-api 10.0=primitives-10.0.txt   --obsolete obsolete.tsv --drawing-rows previous.tsv   --output planning/generated/WINFORMS_API_CATALOGUE.tsv   --summary planning/WINFORMS_API_CATALOGUE.md
+# NOTES is a checkout of the gui_forms branch of malkuth-software/notes.
+cp "$NOTES/planning/generated/WINFORMS_API_CATALOGUE.tsv" previous.tsv
+python3 -I tools/winforms_catalogue/generate_catalogue.py   --forms-api 8.0=api-8.0.txt --forms-api 8.0=primitives-8.0.txt   --forms-api 9.0=api-9.0.txt --forms-api 9.0=primitives-9.0.txt   --forms-api 10.0=api-10.0.txt --forms-api 10.0=primitives-10.0.txt   --obsolete obsolete.tsv --drawing-rows previous.tsv   --output "$NOTES/planning/generated/WINFORMS_API_CATALOGUE.tsv"   --summary "$NOTES/planning/WINFORMS_API_CATALOGUE.md"
 ```
 
-The full TSV is intentionally generated and checked in: it is the inspectable
+The full TSV is intentionally generated and checked in to the notes
+repository's `gui_forms` branch: it is the inspectable
 member-level backlog. The summary contains counts and the policy boundary.

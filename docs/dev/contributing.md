@@ -29,7 +29,7 @@ Boundary tests run under `ctest`, so a violation fails before review.
 
 ## Code style
 
-The project follows `planning/PROGRAMMING_HOUSE_STYLE.md`, which can be
+The project follows the house style, [`HOUSE_STYLE.md`](https://github.com/malkuth-software/notes/blob/main/HOUSE_STYLE.md), which can be
 summarised as: spell the type, name the behaviour, write in execution order.
 In practice:
 
@@ -128,8 +128,8 @@ is.
 
 Performance claims follow the same rule. Nothing is called fast or
 lightweight without the workload and the measurement being recorded, and
-negative results are kept. Measurements live under `results/` and
-`experiments/`; see [Evidence](evidence).
+negative results are kept. Measurements and experiment reports are kept in
+the project's notes repository; see [Evidence](evidence).
 
 ## Documentation
 
@@ -137,8 +137,8 @@ User documentation is this Sphinx site under `docs/`, built with
 `sphinx-build -W`; see `docs/README.md` for how to build it locally. Write in
 the present tense for a user of the library. Control pages are generated
 from `manifests/controls.json` and the headers; add a control there, not in
-the generated files. Architecture decisions are ADRs in `decisions/`,
-rendered under [Architecture decisions](decisions).
+the generated files. Architecture decisions are ADRs in `docs/dev/adr/`,
+listed under [Architecture decisions](decisions).
 
 ## Workflow
 

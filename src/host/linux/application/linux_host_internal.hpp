@@ -21,7 +21,7 @@ class NativeWindow;
 // x11_windowing.cpp). The X server's desktop is in device pixels and this
 // host runs at scale 1, so desktop logical units are pixels. Window
 // positions are requests a window manager may adjust; XWayland's handling is
-// measured, not assumed (planning/stages/DK-docking/PLAN.md, W0).
+// measured, not assumed (notes:planning/stages/DK-docking/PLAN.md, W0).
 class X11Windowing final : public HostWindowing {
 public:
   explicit X11Windowing(Runtime &runtime);

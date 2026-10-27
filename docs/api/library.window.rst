@@ -1008,7 +1008,7 @@ Functions, constants and aliases
 
 .. cpp:var:: constexpr std::uint32_t paint_contract_version
 
-   The presentation availability record (stage DP; planning/ PAINT_PIPELINE_AVAILABILITY.md, M11h-P4 / M12-P4). The baseline contract (coherent latest-state presentation: mutation may outpace rendering and rendering may outpace presentation, with no unbounded queue and no incomplete frame visible) is reported as a version, never as a capability: a host that cannot meet it fails attachment. Only optional extensions are reported as available or not, and only truthfully. Version 2 (2026-10-13) adds damage-preserving partial present to the contract: the host presents the bounded rectangle set it paints, not their union. Value: ``2U``.
+   The presentation availability record (stage DP; notes:planning/ PAINT_PIPELINE_AVAILABILITY.md, M11h-P4 / M12-P4). The baseline contract (coherent latest-state presentation: mutation may outpace rendering and rendering may outpace presentation, with no unbounded queue and no incomplete frame visible) is reported as a version, never as a capability: a host that cannot meet it fails attachment. Only optional extensions are reported as available or not, and only truthfully. Version 2 (2026-10-13) adds damage-preserving partial present to the contract: the host presents the bounded rectangle set it paints, not their union. Value: ``2U``.
 
 .. cpp:namespace:: gui_forms
 

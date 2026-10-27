@@ -728,7 +728,7 @@ Types
 
    .. cpp:member:: std::string_view evidence
 
-      The differential reports that justify the class, relative to the repository root; empty for a generic name.
+      The differential reports that justify the class, relative to the root of the gui_forms branch of malkuth-software/notes (the measurement records moved there from this repository); empty for a generic name.
 
 .. cpp:namespace:: gui_drawing
 

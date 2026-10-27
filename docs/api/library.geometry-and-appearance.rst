@@ -267,7 +267,7 @@ Types
    * - :cpp:class:`ThemeTypographyTokens <gui_forms::ThemeTypographyTokens>`
      - ThemeTypographyTokens defines role-aware control, field, caption, heading, title, and monospace font recipes.
    * - :cpp:class:`ThemeWindowBackdrop <gui_forms::ThemeWindowBackdrop>`
-     - The theme's window backdrop (stage T5, owner decision T5-Q8, option 1): what a window showing the theme asks the compositor for, and the base its backplane is drawn from over each backdrop the window may be granted (planning/stages/T5-compositor/PLAN.md §4.1).
+     - The theme's window backdrop (stage T5, owner decision T5-Q8, option 1): what a window showing the theme asks the compositor for, and the base its backplane is drawn from over each backdrop the window may be granted (notes:planning/stages/T5-compositor/PLAN.md §4.1).
 
 .. cpp:namespace:: gui_forms
 
@@ -3814,7 +3814,7 @@ Types
 
    ``#include <gui_forms/theme/types/theme_types.hpp>``
 
-   The theme's window backdrop (stage T5, owner decision T5-Q8, option 1): what a window showing the theme asks the compositor for, and the base its backplane is drawn from over each backdrop the window may be granted (planning/stages/T5-compositor/PLAN.md §4.1).
+   The theme's window backdrop (stage T5, owner decision T5-Q8, option 1): what a window showing the theme asks the compositor for, and the base its backplane is drawn from over each backdrop the window may be granted (notes:planning/stages/T5-compositor/PLAN.md §4.1).
 
 
    .. rubric:: Methods

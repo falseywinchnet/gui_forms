@@ -368,7 +368,7 @@ public:
     [[nodiscard]] Event<bool>& active_changed() noexcept {
         return active_changed_;
     }
-    // Compositor cooperation (stage T5, planning/stages/T5-compositor/
+    // Compositor cooperation (stage T5, notes:planning/stages/T5-compositor/
     // PLAN.md §2). Declares, before a host attaches, that this window may
     // be presented non-opaque (owner decision T5-Q4);
     // ApplicationWindowOptions::non_opaque does it for an application

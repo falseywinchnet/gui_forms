@@ -148,7 +148,7 @@ in both with one cache, and requires byte-identical executables. It then
 edits one source file, one header and one compiler option, and fails unless
 each causes misses. `.github/workflows/cache-proof.yml` runs it weekly on
 Linux x64 and on demand. Recorded run, LLVM 22.1.8 on an Apple M4 Mac mini
-(`experiments/llvm22-platform-contract/cache-proof-summary.json`):
+([`experiments/llvm22-platform-contract/cache-proof-summary.json`](https://github.com/malkuth-software/notes/blob/gui_forms/experiments/llvm22-platform-contract/cache-proof-summary.json)):
 
 | Step | Change | Missed compilations | Build time |
 |---|---|---:|---:|

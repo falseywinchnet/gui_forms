@@ -1,9 +1,0 @@
-implementation,workload,bytes,level,compressed,median_mib_s,min_mib_s,max_mib_s,work_units,paired_owned_speed_ratio
-owned,png-filtered,2871280,0,2871726,7670.856,7407.288,7780.460,14303970,2.237
-upstream,png-filtered,2871280,0,2871506,3424.315,3367.001,3458.225,0,2.237
-owned,png-filtered,2871280,1,864490,192.587,107.947,196.102,32198225,1.003
-upstream,png-filtered,2871280,1,861160,193.857,135.622,196.584,0,1.003
-owned,png-filtered,2871280,6,773350,18.384,17.028,23.865,71967897,0.838
-upstream,png-filtered,2871280,6,774494,28.372,20.110,28.485,0,0.838
-owned,png-filtered,2871280,9,755547,2.994,2.732,3.826,566041577,0.768
-upstream,png-filtered,2871280,9,757021,4.088,3.448,4.981,0,0.768
