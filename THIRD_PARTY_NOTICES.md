@@ -31,8 +31,8 @@ source files carry "Copyright (C) 1996-2025".)
 |---|---|---|---|---|---|
 | GUI.Forms | this release | MIT | all | `licenses/GUIForms.txt` | `LICENSE` |
 | threadpool_atomic_fast (the owner's thread pool) | falseywinchnet/backend `6eb51f84` | MIT | all (in `libgui_forms_threading`) | `licenses/threadpool_atomic_fast.txt` | `threadpool_atomic_fast-LICENSE.txt` |
-| HarfBuzz | 14.6.0, `c7a7457b` | HarfBuzz licence ("Old MIT") | all | `licenses/HarfBuzz.txt` | `HarfBuzz-COPYING.txt` |
-| FreeType | 2.14.2, `f4205da1` | FreeType License (FTL), elected from FTL/GPLv2 | all | `licenses/FreeType-FTL.txt` | `FreeType-FTL.txt` |
+| HarfBuzz | 14.6.0, `c7a7457b` | HarfBuzz licence ("Old MIT") | all (the `--features all` SDK also installs the static library and headers) | `licenses/HarfBuzz.txt` | `HarfBuzz-COPYING.txt` |
+| FreeType | 2.14.2, `f4205da1` | FreeType License (FTL), elected from FTL/GPLv2 | all (the `--features all` SDK also installs the static library and headers) | `licenses/FreeType-FTL.txt` | `FreeType-FTL.txt` |
 | SheenBidi | 2.9.0, `829d9991` | Apache-2.0 | all | `licenses/SheenBidi.txt` | `SheenBidi-LICENSE.txt` |
 | stx_zlib (the owned zlib codec) | in this repository | MIT; the zlib License notices of the puff-derived inflate and the zlib-informed deflate are retained | all | `licenses/stx_zlib.txt`, `licenses/stx_zlib-puff.txt` and `licenses/stx_zlib-zlib.txt` | `stx_zlib-LICENSE.txt`, `stx_zlib-LICENSE-puff.txt` and `stx_zlib-LICENSE-zlib.txt` (and `share/licenses/stx_zlib/`) |
 | stx_png (the owned PNG codec) | in this repository | MIT | all | `licenses/stx_png.txt` | `stx_png-LICENSE.txt` (and `share/licenses/stx_png/`) |

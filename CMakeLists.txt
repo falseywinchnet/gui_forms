@@ -59,6 +59,7 @@ option(GUI_FORMS_BUILD_TEXT_RASTER_PROFILE_PROBE "Build the diagnostic text rast
 option(GUI_FORMS_BUILD_TEXT_ENGINE_BENCHMARK "Build the shared text engine cost benchmark" OFF)
 option(GUI_FORMS_BUILD_PREPARED_TEXT "Build the development prepared-text service" OFF)
 option(GUI_FORMS_BUILD_TEXT_MASKS "Build the development logical text-mask service" OFF)
+option(GUI_FORMS_INSTALL_TEXT_STACK "Install and export the pinned FreeType and HarfBuzz (cmake/TextStackExport.cmake)" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS "Instrument private text shaping phases" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE "Record private run directions for geometry comparison" OFF)
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
@@ -332,6 +333,10 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
     set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
     set(FT_ENABLE_ERROR_STRINGS OFF CACHE BOOL "" FORCE)
+    # Neither subproject's own install rules are used (EXCLUDE_FROM_ALL keeps
+    # them out of the install); skipping them also keeps their export sets
+    # from claiming freetype, which cmake/TextStackExport.cmake exports.
+    set(SKIP_INSTALL_ALL ON)
     add_subdirectory("${GUI_FORMS_FREETYPE_ROOT}"
                      "${CMAKE_CURRENT_BINARY_DIR}/third_party/freetype"
                      EXCLUDE_FROM_ALL)
@@ -359,6 +364,7 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     add_subdirectory("${GUI_FORMS_HARFBUZZ_ROOT}"
                      "${CMAKE_CURRENT_BINARY_DIR}/third_party/harfbuzz"
                      EXCLUDE_FROM_ALL)
+    unset(SKIP_INSTALL_ALL)
 
     add_library(gui_forms_bidi STATIC third_party/sheenbidi/Source/SheenBidi.c)
     target_include_directories(gui_forms_bidi PUBLIC third_party/sheenbidi/Headers)
@@ -4136,6 +4142,7 @@ if(TARGET gui_forms_application)
 endif()
 
 include(cmake/ApplicationText.cmake)
+include(cmake/TextStackExport.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
