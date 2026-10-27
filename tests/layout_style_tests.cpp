@@ -504,8 +504,32 @@ void test_template_areas_are_rectangles_in_written_order() {
 // -- the corpus -------------------------------------------------------------------
 
 // Every `style="..."` attribute of the corpus's fixtures (the L0 reader's
-// declarations and the flex and grid ones its fixtures already write) reads
+// declarations and the flex, grid and block ones its fixtures write) reads
 // without a diagnostic. The fixtures use no character references in styles.
+// `font-size`, `line-height` and `direction` are not layout values: the
+// corpus harness takes them out before the reader sees the style (they set
+// a block flow panel's strut and a control's layout direction), and so does
+// this sweep.
+std::string without_harness_declarations(std::string_view style) {
+    std::string kept;
+    std::size_t start = 0U;
+    while (start <= style.size()) {
+        std::size_t end = style.find(';', start);
+        if (end == std::string_view::npos) end = style.size();
+        const std::string_view declaration = style.substr(start, end - start);
+        start = end + 1U;
+        const std::size_t name_start = declaration.find_first_not_of(" \t\n");
+        const std::string_view rest =
+            name_start == std::string_view::npos ? std::string_view{} : declaration.substr(name_start);
+        const bool harness = rest.starts_with("font-size") || rest.starts_with("line-height") ||
+                             rest.starts_with("direction");
+        if (harness || rest.empty()) continue;
+        kept.append(declaration);
+        kept.push_back(';');
+    }
+    return kept;
+}
+
 void test_corpus_styles_read_cleanly(const std::filesystem::path& corpus) {
     LayoutStyleReader reader;
     ThemeDiagnosticList diagnostics;
@@ -522,10 +546,11 @@ void test_corpus_styles_read_cleanly(const std::filesystem::path& corpus) {
             require(end != std::string::npos, entry.path().string() + ": an unclosed style attribute");
             const std::string_view style_text = std::string_view(text).substr(start, end - start);
             require(style_text.find('&') == std::string_view::npos, entry.path().string() + ": a reference in a style");
+            const std::string layout_text = without_harness_declarations(style_text);
             diagnostics.clear();
             LayoutStyle style{};
             const StyleReadOutcome outcome =
-                reader.read_inline_style(ThemeSource{"inline:corpus", style_text}, style, diagnostics);
+                reader.read_inline_style(ThemeSource{"inline:corpus", layout_text}, style, diagnostics);
             require(outcome == StyleReadOutcome::applied && diagnostics.records().empty(),
                     entry.path().string() + ": \"" + std::string(style_text) + "\"" + describe_diagnostics(diagnostics));
             ++styles;

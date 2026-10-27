@@ -305,8 +305,16 @@ gui_forms::Control
       **measure_generation** : ``std::uint64_t``, read-only
          Advances whenever this control becomes measure-dirty; a cache entry stored under an earlier generation is never answered.
 
-      **layout_direction** : ``LayoutDirection``
-         The authored inline direction, ``inherit`` by default (stage L, PLAN section 4). Setting it invalidates this subtree's arrangement.
+      **layout_direction** : ``LayoutDirection``, default ``LayoutDirection::inherit``
+         The inline direction the control lays its children out in;
+         :cpp:enumerator:`LayoutDirection::inherit <gui_forms::LayoutDirection::inherit>` takes the parent's, and a control with no
+         parent is left to right. Right to left mirrors docking, anchoring and
+         requested bounds, as Windows Forms' ``RightToLeftLayout``: the layout is
+         computed left to right and mirrored about the control's viewport, so
+         :cpp:enumerator:`DockStyle::left <gui_forms::DockStyle::left>` docks at the right, an anchor to the left keeps the
+         distance to the right edge, a requested x is measured from the right
+         edge, and padding and margins mirror too. The CSS containers keep their
+         own start and end model.
 
       **effective_layout_direction** : ``LayoutDirection``, read-only
          The direction this control lays out in: its own when not ``inherit``, otherwise the nearest ancestor's, and left to right at a root.
@@ -409,6 +417,8 @@ gui_forms::Control
         - Scales an authored font's size and letter spacing by :cpp:func:`effective_text_scale <gui_forms::Control::effective_text_scale>`.
       * - :cpp:func:`resolve_text_layout_utf8 <gui_forms::Control::resolve_text_layout_utf8>`
         - Resolves an already-effective FontSpec (normally from effective_font) through the attached terminal provider without applying text scale a second time.
+      * - :cpp:func:`fill_line_break_opportunities_utf8 <gui_forms::Control::fill_line_break_opportunities_utf8>`
+        - The attached window's line-break opportunities (Window::fill_line_break_opportunities_utf8), or the estimate while detached.
       * - :cpp:func:`snap_text_baseline <gui_forms::Control::snap_text_baseline>`
         -  
       * - :cpp:func:`clear_theme_override <gui_forms::Control::clear_theme_override>`
@@ -1058,9 +1068,19 @@ gui_forms::Control
 
    .. cpp:function:: LayoutDirection layout_direction() const noexcept
 
-      The authored inline direction, ``inherit`` by default (stage L, PLAN section 4). Setting it invalidates this subtree's arrangement.
+      The inline direction the control lays its children out in;
+      :cpp:enumerator:`LayoutDirection::inherit <gui_forms::LayoutDirection::inherit>` takes the parent's, and a control with no
+      parent is left to right. Right to left mirrors docking, anchoring and
+      requested bounds, as Windows Forms' ``RightToLeftLayout``: the layout is
+      computed left to right and mirrored about the control's viewport, so
+      :cpp:enumerator:`DockStyle::left <gui_forms::DockStyle::left>` docks at the right, an anchor to the left keeps the
+      distance to the right edge, a requested x is measured from the right
+      edge, and padding and margins mirror too. The CSS containers keep their
+      own start and end model.
 
    .. cpp:function:: void set_layout_direction(LayoutDirection direction)
+
+      Sets :cpp:func:`layout_direction <gui_forms::Control::layout_direction>`; see the property's description above.
 
    .. cpp:function:: LayoutDirection effective_layout_direction() const noexcept
 
@@ -1212,6 +1232,10 @@ gui_forms::Control
    .. cpp:function:: ResolvedTextLayout resolve_text_layout_utf8(std::string_view utf8, FontSpec effective) const
 
       Resolves an already-effective FontSpec (normally from effective_font) through the attached terminal provider without applying text scale a second time.
+
+   .. cpp:function:: TextResolutionStatus fill_line_break_opportunities_utf8(std::string_view utf8, std::span<LineBreakOpportunity> opportunities) const
+
+      The attached window's line-break opportunities (Window::fill_line_break_opportunities_utf8), or the estimate while detached.
 
    .. cpp:function:: double snap_text_baseline(double logical_baseline) const noexcept
 
@@ -1408,11 +1432,21 @@ gui_forms::Control
       container that places its own children calls ``arrange_self`` and
       ``set_child_layout`` instead.
 
+   .. cpp:function:: virtual std::optional<double> first_baseline(double width)
+
+      The baselines a layout container aligns this control by (stage L, PLAN.md section 12.3): its first and last line boxes' baselines, as offsets from the top of its border box when laid out at :cpp:func:`width <gui_forms::Control::width>`. None means it has no line box; the container then synthesizes one from the border box, as CSS does. The defaults answer none. Text that lays out in lines (TextBlock) and the CSS containers override them. Flex and grid alignment use the first baseline; an inline item in BlockPanel uses the last, as an inline-block does.
+
+   .. cpp:function:: virtual std::optional<double> last_baseline(double width)
+
    .. cpp:function:: virtual bool size_depends_on_content() const noexcept
 
       Layout boundaries (stage L, PLAN section 3.3). A descendant's measure dirtiness marks an ancestor for measure only while the ancestor's size can depend on it: while the ancestor's own measure reads its children (size_depends_on_content) or its parent sizes it from its measure (sizes_children_from_content). The first ancestor for which neither holds is a layout boundary: it is marked for arrange only, and nothing above it is marked. Both default to true, which keeps every existing control's measure propagation unchanged; a container overrides them only when it can state the answer for every configuration.
 
    .. cpp:function:: virtual bool sizes_children_from_content() const noexcept
+
+   .. cpp:function:: virtual bool measures_children_in_arrange() const noexcept
+
+      Whether this container's arrange asks each child the content questions its algorithm needs (min-content, max-content, a height at a definite width) rather than the at-most question the window's measure pass would ask. When true, the window's pass leaves a measure-dirty direct child to its arrange: the child's dirtiness has already emptied its cache, and measuring it against the parent's available size too would cost a second callback whose answer nothing reads (stage L, PLAN section 5: one item's text change costs one callback). False by default, which keeps every existing container's measure pass unchanged.
 
    .. cpp:function:: virtual void on_paint(Painter& painter, Rect local_damage)
 
@@ -1589,6 +1623,20 @@ gui_forms::Control
       Publish a parent-owned arranged slot without destroying the child's authored/requested bounds. Every retained layout family uses this seam; it is protected because application absolute positioning is expressed through requested bounds or a public layout control.
 
    .. cpp:function:: void set_child_layout_collapsed(const Ptr& child, bool collapsed)
+
+      *Protected.*
+
+   .. cpp:function:: void note_containing_block(const Control& child, const Control& ancestor)
+
+      *Protected.*
+
+      Containing blocks of absolutely positioned children (stage L, phase L5; PLAN sections 2.5 and 3.3). A container reports each such child's resolution (the window records containing_block_not_parent once per change), registers the controls whose arrangement moves its children's containing block (an empty list withdraws it), and reports a direct child whose positioning changed, so that the containers that resolved through it arrange again. Each does nothing while detached.
+
+   .. cpp:function:: void set_containing_block_dependencies(std::span<const RuntimeId> watched)
+
+      *Protected.*
+
+   .. cpp:function:: void notify_positioning_changed(const Control& child)
 
       *Protected.*
 

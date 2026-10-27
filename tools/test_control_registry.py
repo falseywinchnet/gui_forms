@@ -165,6 +165,30 @@ class ValidatorTests(unittest.TestCase):
         self.assertIn("single sentence", joined)
         self.assertIn("doc must be 'api/generated/gui_forms.Widget.rst'", joined)
 
+    def test_windows_forms_name_is_loaded_and_checked(self) -> None:
+        loaded: cr.ControlRecord = cr.ControlRecord.from_mapping(
+            _record(winforms="Widgetry", windows_forms_name="Widgetry"), 0)
+        self.assertEqual(loaded.windows_forms_name, "Widgetry")
+        with self.assertRaises(cr.RegistryError):
+            cr.ControlRecord.from_mapping(_record(windows_forms_name=3), 0)
+        with tempfile.TemporaryDirectory() as temporary:
+            include: Path = self._include(temporary)
+            self.assertEqual(cr.validate(self._registry(_record(winforms="Widgetry", windows_forms_name="Widgetry")),
+                                         include), [])
+            _write(include, "gui_forms/controls/other/other.hpp", "namespace gui_forms {\nclass Other final : public Control {\n};\n}\n")
+            problems: list[str] = cr.validate(
+                self._registry(
+                    _record(winforms="Other", windows_forms_name="Other"),
+                    _record(id="other", type="Other", header="gui_forms/controls/other/other.hpp",
+                            doc="api/generated/gui_forms.Other.rst", winforms="Box", windows_forms_name="Widget-1"),
+                ),
+                include,
+            )
+        joined: str = "\n".join(problems)
+        self.assertIn("is also a registry type", joined)
+        self.assertIn("not a C++ identifier", joined)
+        self.assertIn("must be the record's winforms counterpart ('Box')", joined)
+
     def test_header_must_exist_and_declare_type(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             include: Path = self._include(temporary)

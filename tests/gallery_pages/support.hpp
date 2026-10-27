@@ -5,6 +5,7 @@
 #include "gui_forms/gui_forms.hpp"
 #include "headless_host.hpp"
 
+#include <cmath>
 #include <cstdlib>
 #include <chrono>
 #include <iostream>

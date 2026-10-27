@@ -15,6 +15,7 @@
 #include "gui_forms/paint_framebuffer.hpp"
 #include "gui_forms/host/compositor/window_backdrop.hpp"
 #include "gui_forms/host/cursor_interaction/cursor_interaction.hpp"
+#include "gui_forms/layout/diagnostics/layout_diagnostics.hpp"
 #include "gui_forms/resources.hpp"
 #include "gui_forms/scheduler.hpp"
 #include "gui_forms/window/presentation/presentation_types.hpp"
@@ -29,6 +30,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -334,6 +336,11 @@ public:
     }
     [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
         std::string_view utf8, FontSpec effective_font) const;
+    // The installed provider's line-break opportunities
+    // (TextMetricsProvider::fill_line_break_opportunities_utf8), or the
+    // estimate without one.
+    [[nodiscard]] TextResolutionStatus fill_line_break_opportunities_utf8(
+        std::string_view utf8, std::span<LineBreakOpportunity> opportunities) const;
     [[nodiscard]] Event<const PresentationSettings&>& presentation_changed() noexcept {
         return presentation_changed_;
     }
@@ -735,6 +742,30 @@ public:
     [[nodiscard]] std::optional<double> published_value(std::string_view name) const;
     Metrics& metrics() noexcept { return metrics_; }
     void reset_activity_metrics() noexcept { metrics_.reset_activity(); }
+    // Nonfatal layout diagnostics (stage L, phase L5; PLAN section 2.5), in
+    // the order the layout passes recorded them: at most
+    // maximum_layout_diagnostics, the later ones counted in
+    // dropped_layout_diagnostics(). Clearing empties both. The span is
+    // valid until the next layout pass or clear.
+    [[nodiscard]] std::span<const LayoutDiagnostic> layout_diagnostics() const& noexcept {
+        return layout_diagnostics_;
+    }
+    [[nodiscard]] std::span<const LayoutDiagnostic> layout_diagnostics() const&& = delete;
+    [[nodiscard]] std::uint64_t dropped_layout_diagnostics() const noexcept { return dropped_layout_diagnostics_; }
+    void clear_layout_diagnostics() noexcept;
+    // Containing-block dependencies (PLAN section 3.3), for inspection: how
+    // many containers resolved an absolutely positioned child's containing
+    // block through `watched` (the block's control, or one between it and
+    // the container), the number of controls watched, and how many times a
+    // watched control over maximum_containing_block_dependents marked its
+    // whole subtree for arrange instead.
+    [[nodiscard]] std::size_t containing_block_dependent_count(RuntimeId watched) const noexcept;
+    [[nodiscard]] std::size_t containing_block_watch_count() const noexcept {
+        return containing_block_watches_.size();
+    }
+    [[nodiscard]] std::uint64_t containing_block_subtree_arranges() const noexcept {
+        return containing_block_subtree_arranges_;
+    }
     // Captures the committed retained visual state without exposing a renderer
     // or native host object. Layout is brought to its ordinary read barrier;
     // painting is never forced, so display_chunk_current truthfully reports
@@ -1124,6 +1155,27 @@ private:
     [[nodiscard]] bool has_any_runnable_layout_dirty() const noexcept;
     [[nodiscard]] bool has_popup_layout_dirty() const noexcept;
     void note_suspended_layout_request(Control& control) noexcept;
+    // Containing blocks of absolutely positioned children (stage L, phase
+    // L5; PLAN sections 2.5 and 3.3). A container that placed such children
+    // registers the controls whose arrangement moves their containing block
+    // relative to it; an empty list withdraws it. When a watched control's
+    // arranged bounds change in an arrange pass, or its positioning changes
+    // (mark_containing_block_dependents), each container watching it is
+    // marked for arrange: it is below the watched control, so the same
+    // top-down pass arranges it. Entries go when their control leaves the
+    // window.
+    void set_containing_block_dependencies(Control& dependent, std::span<const RuntimeId> watched);
+    void mark_containing_block_dependents(Control& watched);
+    void mark_subtree_arrange(Control& control) noexcept;
+    // Removes `dependent` from the watch of `watched`; a watch left with no
+    // dependent, and not overflowed, goes.
+    void withdraw_containing_block_dependent(RuntimeId watched, RuntimeId dependent) noexcept;
+    void erase_containing_block_entries(RuntimeId control) noexcept;
+    // Records containing_block_not_parent when `child`'s containing block
+    // resolved to `ancestor` and that is not its last resolution; a
+    // resolution to its parent is remembered and not recorded.
+    void note_containing_block(const Control& child, const Control& ancestor);
+    void record_layout_diagnostic(LayoutDiagnostic diagnostic);
     // Marks the ancestors of a control whose layout became dirty, up to and
     // including the first layout boundary (Control::size_depends_on_content):
     // measure and arrange below the boundary, arrange only at it.
@@ -1330,6 +1382,27 @@ private:
     // last, so Control::measure_for_layout counts one control's measure
     // callbacks per pass, and calls between passes apart from either.
     std::uint64_t layout_pass_sequence_{1U};
+    // Layout diagnostics and containing-block dependencies (stage L, phase
+    // L5). A watch's dependents are the containers that registered it, by
+    // identity with an observing reference (find_runtime_control walks the
+    // tree); a container's path is the watches it registered, for removing
+    // it. An overflowed watch keeps no further dependents and marks its
+    // subtree for arrange instead, until it leaves the window.
+    struct ContainingBlockDependent final {
+        RuntimeId id{};
+        Control::WeakPtr control{};
+    };
+    struct ContainingBlockWatch final {
+        std::vector<ContainingBlockDependent> dependents{};
+        bool overflowed{};
+    };
+    std::unordered_map<std::uint64_t, ContainingBlockWatch> containing_block_watches_{};
+    std::unordered_map<std::uint64_t, std::vector<RuntimeId>> containing_block_paths_{};
+    // Each absolutely positioned child's last containing block resolution.
+    std::unordered_map<std::uint64_t, RuntimeId> containing_block_resolutions_{};
+    std::uint64_t containing_block_subtree_arranges_{};
+    std::vector<LayoutDiagnostic> layout_diagnostics_{};
+    std::uint64_t dropped_layout_diagnostics_{};
     bool in_paint_{};
     std::uint64_t content_revision_{1U};
     std::uint64_t rendered_revision_{};

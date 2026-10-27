@@ -21,8 +21,9 @@ namespace {
 // 1/64 logical px, rounded, so that a last-bit difference between hosts in
 // layout arithmetic does not change the trace; colours, images, text and
 // fonts are written exactly. The expected table was recorded on the
-// commit before the engine entry point (main at 13d1c7e0) and is checked on
-// every CI platform. GUI_FORMS_GALLERY_TRACE_PRINT=1 prints the observed
+// commit before the engine entry point (main at 13d1c7e0), re-recorded only
+// under the rule above the table, and is checked on every CI platform.
+// GUI_FORMS_GALLERY_TRACE_PRINT=1 prints the observed
 // table instead of checking it, and GUI_FORMS_GALLERY_TRACE_DIR=<directory>
 // writes each page's trace to <directory>/<page>.trace.
 //
@@ -307,56 +308,97 @@ struct PageDigest final {
     std::uint64_t hash;
 };
 
-// Recorded on main at 13d1c7e0, before the theme engine's entry point.
-// typography-and-inspection's entry is main's trace with the RuntimeId the
-// specimen has when this test runs first (#1274 rather than #19747); the
-// two traces differ in that number alone. The ThreadExceptionDialog, OpenFileDialog
-// and SaveFileDialog lines on dialogs-and-host-services added controls, which
-// states-and-diagnostics counts and which moved that RuntimeId, so the three
-// pages were recorded again. The ListView insertion-mark toggle on
-// checked-collections adds one more, the FolderBrowserDialog and
-// ColorDialog lines two more, which also move the dialogs page's later rows
-// down, and the Splitter specimen on dock-and-anchor eight more (1241
-// controls, #1274): against main's traces before them,
-// states-and-diagnostics and typography-and-inspection differ in those
-// numbers and three layout generations alone.
-constexpr std::array<PageDigest, 29> expected_digests{{
-    {"basics", 0x6d537a7173ffd432ULL},
-    {"values", 0x9262ff950cdb0bbaULL},
-    {"retained-rows", 0x9bbee6d9253d9bf5ULL},
-    {"instrument", 0x4faf0166389a9972ULL},
-    {"control-spectrum", 0x86ab365e6716538bULL},
-    {"ranges-and-progress", 0x76a87838f40755cbULL},
-    {"containers-and-focus", 0x74609a23b162e4bfULL},
-    {"animation-laboratory", 0x2b0eba60f2b03985ULL},
-    {"states-and-diagnostics", 0xd29ea10b8a1fe8cfULL},
-    {"text-and-input", 0xf5ae22834f148beeULL},
-    {"collections-and-popups", 0xdcfb5edee24a4d9eULL},
-    {"values-and-spinners", 0xc6d61a2832ad4bdbULL},
-    {"images-and-drawing", 0xf8f9a366ee67d9d5ULL},
-    {"tabs-and-pages", 0x488570d26e0bff2cULL},
-    {"checked-collections", 0xc0a2d081ee38a7c8ULL},
-    {"timing-and-tooltips", 0xd0fb86834e684081ULL},
-    {"dates-and-calendar", 0xc5c53d69a0faf9b8ULL},
-    {"dialogs-and-host-services", 0xeb98198551dedbadULL},
-    {"retained-layout-panels", 0x61d01430a35f8421ULL},
-    {"dock-and-anchor", 0xdc273117963d8adeULL},
-    {"commands-and-menus", 0x4dcd03ef20ba7517ULL},
-    {"tree-and-object-views", 0x29921b544adcdd83ULL},
-    {"choices-and-sections", 0x611f380c46897bf9ULL},
-    {"value-editors", 0x752c80a9872cae43ULL},
-    {"responsive-layouts", 0xa5fe70ebb0d4051eULL},
-    {"anchored-popups", 0x53eef5309813b41aULL},
-    {"live-surfaces", 0x5d366debbc32b5ffULL},
-    {"typography-and-inspection", 0xb6b720437d2ba688ULL},
-    {"semantic-feedback", 0x819d5ed9aa229adaULL},
+// Recorded on main at 13d1c7e0, before the theme engine's entry point, and
+// re-recorded when stage L, phase L3 added the css-layout-panels page.
+//
+// Re-recording is allowed only when the page-by-page trace diffs
+// (GUI_FORMS_GALLERY_TRACE_DIR, before and after) show intended changes
+// alone, and the pull request's body must list them. L3's diffs: the new
+// page; on every page the navigation sidebar's new entry, its taller paper
+// and its scroll; on states-and-diagnostics the live control count and the
+// paint chunks reused; on typography-and-inspection the inspected
+// specimen's RuntimeId, its generation and the control count. Nothing else
+// changed. Phase L4's grid specimens changed css-layout-panels, and the
+// same counts on states-and-diagnostics and typography-and-inspection;
+// phase L5's block specimens (and the page header's BlockPanel entry)
+// did the same. Phase L6's `layout_direction` property added a row to
+// values-and-spinners' property grid (its editor two controls more), and
+// so the same counts on states-and-diagnostics and
+// typography-and-inspection.
+// The owner's container rename (FlexPanel, GridPanel, BlockPanel,
+// FlowLayoutPanelCompat, TableLayoutPanelCompat) changed every page's
+// navigation sidebar (the layout pages' order and the compatibility page's
+// new title), the layout pages' group captions and the compatibility
+// page's header; nothing else.
+//
+// Main's ThreadExceptionDialog, OpenFileDialog and SaveFileDialog lines on
+// dialogs-and-host-services, and its TabControl images on tabs-and-pages,
+// were recorded on main as well; with L3 rebased onto them, those two
+// pages, states-and-diagnostics (1247 controls) and
+// typography-and-inspection were recorded again, and every other page kept
+// L3's digest.
+//
+// Main's ListView insertion-mark toggle on checked-collections adds one
+// control: merged with main, against L8a's traces only
+// states-and-diagnostics (1285 controls) and typography-and-inspection
+// (#1318) differ, in those numbers alone, and were recorded again.
+// Main's FolderBrowserDialog and ColorDialog rows on
+// dialogs-and-host-services add two more: merged again, that page (the
+// two rows, and the later rows moved down), states-and-diagnostics (1287
+// controls) and typography-and-inspection (#1320 and two layout
+// generations) differ and were recorded again; no other page moved.
+// Main's Splitter specimen on dock-and-anchor adds eight more: merged
+// again, that page (the Splitter group's caption and the page header's
+// Splitter entry), states-and-diagnostics (1295 controls) and
+// typography-and-inspection (#1328 and one layout generation) differ and
+// were recorded again; no other page moved.
+//
+// Each later phase, rebased onto those main pages, recorded again the
+// pages whose digests the combination moved: the counts on
+// states-and-diagnostics and the RuntimeId on typography-and-inspection,
+// and, where the phase had recorded every page, the two main pages too.
+//
+// typography-and-inspection's entry is the trace with the RuntimeId the
+// specimen has when this test runs first (#1328 since L8a on main); the digest
+// changes whenever a page made before it makes a control more or less.
+constexpr std::array<PageDigest, 30> expected_digests{{
+    {"basics", 0x8ad3bd64955e6995ULL},
+    {"values", 0xb658b77505725da9ULL},
+    {"retained-rows", 0x025f72c7edad0514ULL},
+    {"instrument", 0x485187a50551e836ULL},
+    {"control-spectrum", 0xc1b6c7fbf50a9d0cULL},
+    {"ranges-and-progress", 0x2a06ace770e13138ULL},
+    {"containers-and-focus", 0x4bd8a3f439f8078cULL},
+    {"animation-laboratory", 0xd22492f193fdb022ULL},
+    {"states-and-diagnostics", 0x414816db6ff9a681ULL},
+    {"text-and-input", 0x6cea6c153578579dULL},
+    {"collections-and-popups", 0x5b75d7735fed6b79ULL},
+    {"values-and-spinners", 0x53974a1f042eaa19ULL},
+    {"images-and-drawing", 0xec142154440ee5c6ULL},
+    {"tabs-and-pages", 0x3cc40071993be32fULL},
+    {"checked-collections", 0xbcc8dc7a616e1b8fULL},
+    {"timing-and-tooltips", 0x99f306d142ff03deULL},
+    {"dates-and-calendar", 0x6f1eb88a51fed7cfULL},
+    {"dialogs-and-host-services", 0x8dedb342fa21371eULL},
+    {"css-layout-panels", 0x13ab5d90ddefe752ULL},
+    {"retained-layout-panels", 0x9468a4553545fddeULL},
+    {"dock-and-anchor", 0x746764bb743113cfULL},
+    {"commands-and-menus", 0xeefd420533055ee2ULL},
+    {"tree-and-object-views", 0x805651f12056426eULL},
+    {"choices-and-sections", 0x4e79ecf5a4a5e0c8ULL},
+    {"value-editors", 0x389978daaff76da8ULL},
+    {"responsive-layouts", 0x3f60bc621cdf06c9ULL},
+    {"anchored-popups", 0x898b0bfbbfdcc181ULL},
+    {"live-surfaces", 0xf100f9eb79b7356eULL},
+    {"typography-and-inspection", 0x6513f6614af56254ULL},
+    {"semantic-feedback", 0x52902fede7280d09ULL},
 }};
 
 // live-surfaces names the platform's native live-surface pixel format.
 #if defined(_WIN32)
-constexpr std::uint64_t live_surfaces_digest = 0x5d366debbc32b5ffULL;
+constexpr std::uint64_t live_surfaces_digest = 0xf100f9eb79b7356eULL;
 #else
-constexpr std::uint64_t live_surfaces_digest = 0xc98130cb78ec491fULL;
+constexpr std::uint64_t live_surfaces_digest = 0xa14da949c725746eULL;
 #endif
 
 std::uint64_t expected_digest(std::string_view page) {

@@ -18,7 +18,7 @@ gui_forms::Panel
    panel scrolls them when they do not fit. The user does not interact with the
    panel itself: it takes no focus and has no input of its own beyond its
    scroll bars. Use a :cpp:class:`GroupBox <gui_forms::GroupBox>` when the group needs a visible caption, a
-   :cpp:class:`FlowLayoutPanel <gui_forms::FlowLayoutPanel>` or :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>` to arrange children automatically,
+   :cpp:class:`FlexPanel <gui_forms::FlexPanel>` or :cpp:class:`GridPanel <gui_forms::GridPanel>` to arrange children automatically,
    and a :cpp:class:`MaterialPanel <gui_forms::MaterialPanel>` to paint a custom gradient, image or shadow.
 
    *Status:* stable. *Windows Forms counterpart:* ``Panel``.
@@ -83,11 +83,11 @@ gui_forms::Panel
       :cpp:class:`MaterialPanel <gui_forms::MaterialPanel>`
          A panel that paints a :cpp:class:`SurfaceMaterial <gui_forms::SurfaceMaterial>` of your own.
 
-      :cpp:class:`FlowLayoutPanel <gui_forms::FlowLayoutPanel>`
-         Arranges children in rows or columns.
+      :cpp:class:`FlexPanel <gui_forms::FlexPanel>`
+         Arranges children in wrapping rows or columns.
 
-      :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>`
-         Arranges children in a grid of cells.
+      :cpp:class:`GridPanel <gui_forms::GridPanel>`
+         Arranges children in a grid of tracks and areas.
 
       :cpp:class:`ScrollableControl <gui_forms::ScrollableControl>`
          The scrolling behaviour every panel inherits.

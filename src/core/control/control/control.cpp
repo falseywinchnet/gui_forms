@@ -140,6 +140,15 @@ std::shared_ptr<const PropertyEnumDescriptor> auto_size_mode_property_enum_impl(
     return value;
 }
 
+std::shared_ptr<const PropertyEnumDescriptor> layout_direction_property_enum_impl() {
+    static const std::shared_ptr<const gui_forms::PropertyEnumDescriptor> value = std::make_shared<const PropertyEnumDescriptor>(
+        PropertyEnumDescriptor{
+            "layout_direction",
+            {{"inherit", 0}, {"left_to_right", 1}, {"right_to_left", 2}},
+            false});
+    return value;
+}
+
 BindingValue current_enum_property_value_impl(
     std::shared_ptr<const PropertyEnumDescriptor> enumeration,
     std::int64_t value) {
@@ -248,6 +257,14 @@ Rect take_dock_slot(DockStyle dock, double width, double height, Rect& remaining
     return slot;
 }
 
+// `bounds` mirrored about the vertical centre line of `frame`: right to
+// left layout is computed left to right and mirrored once, at output.
+Rect mirror_horizontally(Rect bounds, Rect frame) noexcept {
+    Rect mirrored = bounds;
+    mirrored.x = frame.x + frame.width - (bounds.x - frame.x) - bounds.width;
+    return mirrored;
+}
+
 } // namespace
 
 std::shared_ptr<const PropertyEnumDescriptor>
@@ -263,6 +280,11 @@ Control::anchor_styles_property_enum() {
 std::shared_ptr<const PropertyEnumDescriptor>
 Control::auto_size_mode_property_enum() {
     return auto_size_mode_property_enum_impl();
+}
+
+std::shared_ptr<const PropertyEnumDescriptor>
+Control::layout_direction_property_enum() {
+    return layout_direction_property_enum_impl();
 }
 
 BindingValue Control::current_enum_property_value(
@@ -523,6 +545,22 @@ Control::Control(StableId stable_id)
         RegisteredPropertyGetter<RegisteredProperty::auto_size_mode>{this},
         RegisteredPropertySetter<RegisteredProperty::auto_size_mode>{this});
 
+    PropertyDescriptor layout_direction;
+    layout_direction.name = "layout_direction";
+    layout_direction.kind = BindingValueKind::enumeration;
+    layout_direction.category = "Layout";
+    layout_direction.description =
+        "Inline direction of child layout: inherited, left to right, or mirrored right to left.";
+    layout_direction.default_value = BindingValue{PropertyEnumValue{
+        "layout_direction", "inherit", 0}};
+    layout_direction.invalidation_effects = Dirty::arrange | Dirty::paint |
+        Dirty::hit_test | Dirty::semantics | Dirty::accessibility;
+    layout_direction.enumeration = layout_direction_property_enum();
+    define_structural_property(
+        std::move(layout_direction),
+        RegisteredPropertyGetter<RegisteredProperty::layout_direction>{this},
+        RegisteredPropertySetter<RegisteredProperty::layout_direction>{this});
+
     PropertyDescriptor tab_index;
     tab_index.name = "tab_index";
     tab_index.kind = BindingValueKind::unsigned_integer;
@@ -631,6 +669,14 @@ ResolvedTextLayout Control::resolve_text_layout_utf8(
     return window_ != nullptr
         ? (*window_).resolve_text_layout_utf8(utf8, effective)
         : estimate_text_layout_utf8(utf8, effective);
+}
+
+TextResolutionStatus Control::fill_line_break_opportunities_utf8(
+    std::string_view utf8, std::span<LineBreakOpportunity> opportunities) const {
+    if (window_ == nullptr) return estimate_line_break_opportunities_utf8(utf8, opportunities);
+    const TextResolutionStatus status =
+        (*window_).fill_line_break_opportunities_utf8(utf8, opportunities);
+    return status;
 }
 
 double Control::snap_text_baseline(double logical_baseline) const noexcept {
@@ -1473,6 +1519,29 @@ void Control::set_child_layout(const Ptr& child, Rect bounds) {
              ancestor = (*ancestor).parent()) {
             (*ancestor).subtree_dirty_ |= effects;
         }
+    }
+}
+
+void Control::note_containing_block(const Control& child, const Control& ancestor) {
+    if (window_ != nullptr) (*window_).note_containing_block(child, ancestor);
+}
+
+void Control::set_containing_block_dependencies(std::span<const RuntimeId> watched) {
+    if (window_ != nullptr) (*window_).set_containing_block_dependencies(*this, watched);
+}
+
+void Control::notify_positioning_changed(const Control& child) {
+    if (window_ == nullptr) return;
+    // The child places its own absolute children against a new box, and
+    // the containers that resolved through it re-resolve. The window marks
+    // below the child, which it needs mutable; the child is found among
+    // this control's own children (a positioning change is rare, so the
+    // search is not per pass).
+    for (const Ptr& candidate : children_) {
+        if (candidate.get() != &child) continue;
+        (*candidate).invalidate(Dirty::arrange);
+        (*window_).mark_containing_block_dependents(*candidate);
+        return;
     }
 }
 
@@ -2347,6 +2416,16 @@ Size Control::measure_for_layout(const LayoutConstraint& constraint) {
     return measured;
 }
 
+std::optional<double> Control::first_baseline(double width) {
+    static_cast<void>(width);
+    return std::nullopt;
+}
+
+std::optional<double> Control::last_baseline(double width) {
+    static_cast<void>(width);
+    return std::nullopt;
+}
+
 Size Control::measure_intrinsic(const LayoutConstraint& constraint) {
     const Size available = measure_available_size(constraint);
     Size measured = measure(available);
@@ -2362,6 +2441,8 @@ Size Control::measure_intrinsic(const LayoutConstraint& constraint) {
 bool Control::size_depends_on_content() const noexcept { return true; }
 
 bool Control::sizes_children_from_content() const noexcept { return true; }
+
+bool Control::measures_children_in_arrange() const noexcept { return false; }
 
 void Control::set_layout_direction(LayoutDirection direction) {
     require_mutable();
@@ -2403,6 +2484,11 @@ void Control::arrange(Rect final_bounds) {
         std::max(0.0, viewport.width - padding_.left - padding_.right),
         std::max(0.0, viewport.height - padding_.top - padding_.bottom)};
     Rect remaining = client;
+    // In a right-to-left parent the dock and anchor layout is computed left
+    // to right and mirrored about the viewport, padding included: dock
+    // left docks right, anchor left anchors right, and a requested x is
+    // measured from the right edge (Windows Forms' RightToLeftLayout).
+    const bool mirrored = effective_layout_direction() == LayoutDirection::right_to_left;
     // The retained vector is painter order: backmost first, topmost last.
     // Dock consumes that reverse public z-order (backmost to topmost), matching
     // Forms semantics while leaving index zero consistently topmost for public
@@ -2432,7 +2518,7 @@ void Control::arrange(Rect final_bounds) {
                    ? (*child).requested_bounds_.height : desired.height);
         const Rect slot = take_dock_slot((*child).dock_, width, height, remaining);
         (*child).anchor_reference_.reset();
-        set_child_layout(child, slot);
+        set_child_layout(child, mirrored ? mirror_horizontally(slot, viewport) : slot);
     }
 
     for (const Ptr& child : retained) {
@@ -2463,10 +2549,10 @@ void Control::arrange(Rect final_bounds) {
             (*child).anchor_reference_ = AnchorReference{
                 authored, client};
         }
-        set_child_layout(
-            child, anchored_bounds((*(*child).anchor_reference_).bounds,
-                                   (*(*child).anchor_reference_).client,
-                                   client, (*child).anchor_));
+        const Rect anchored = anchored_bounds((*(*child).anchor_reference_).bounds,
+                                              (*(*child).anchor_reference_).client, client,
+                                              (*child).anchor_);
+        set_child_layout(child, mirrored ? mirror_horizontally(anchored, viewport) : anchored);
     }
 }
 

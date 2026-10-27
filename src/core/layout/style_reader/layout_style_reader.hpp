@@ -52,11 +52,10 @@ enum class StyleReadOutcome : std::uint8_t {
     refused,
 };
 
-// The most tracks one grid-template-columns or -rows value may expand to
-// (PLAN section 5). grid-template-areas' rows are explicit tracks too, so
-// it may write at most this many; its columns are bounded by the longest
-// string the tokenizer admits (maximum_string_bytes, so 2,048 cells).
-inline constexpr std::size_t maximum_grid_tracks = 10'000U;
+// The track limit is gui_forms::maximum_grid_tracks (layout_style.hpp).
+// grid-template-areas' rows are explicit tracks too, so it may write at
+// most that many; its columns are bounded by the longest string the
+// tokenizer admits (maximum_string_bytes, so 2,048 cells).
 
 // One named cell of a grid-template-areas value, as read: its name borrows
 // the source text for the read.

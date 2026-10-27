@@ -44,6 +44,63 @@ ResolvedTextLayout estimate_text_layout_utf8(
     return result;
 }
 
+namespace {
+
+[[nodiscard]] bool line_space(char character) noexcept {
+    return character == ' ' || character == '\t';
+}
+
+[[nodiscard]] bool continuation_byte(char character) noexcept {
+    return (static_cast<unsigned char>(character) & 0xc0U) == 0x80U;
+}
+
+} // namespace
+
+TextResolutionStatus estimate_line_break_opportunities_utf8(
+    std::string_view utf8, std::span<LineBreakOpportunity> opportunities) noexcept {
+    if (opportunities.size() != utf8.size() || !validate_utf8(utf8).valid()) {
+        return TextResolutionStatus::invalid_request;
+    }
+    const std::size_t size = utf8.size();
+    for (std::size_t index = 0U; index < size; ++index) {
+        const char current = utf8[index];
+        const bool last = index + 1U == size;
+        const char next = last ? '\0' : utf8[index + 1U];
+        LineBreakOpportunity opportunity = LineBreakOpportunity::prohibited;
+        if (last) {
+            opportunity = LineBreakOpportunity::mandatory;
+        } else if (continuation_byte(next)) {
+            opportunity = LineBreakOpportunity::inside_character;
+        } else if (current == '\n' || (current == '\r' && next != '\n')) {
+            opportunity = LineBreakOpportunity::mandatory;
+        } else if (line_space(current) && !line_space(next) && next != '\n' && next != '\r') {
+            opportunity = LineBreakOpportunity::allowed;
+        }
+        opportunities[index] = opportunity;
+    }
+    return TextResolutionStatus::estimated;
+}
+
+TextResolutionStatus TextMetricsProvider::fill_line_break_opportunities_utf8(
+    std::string_view utf8, std::span<LineBreakOpportunity> opportunities) {
+    return estimate_line_break_opportunities_utf8(utf8, opportunities);
+}
+
+LineBoxMetrics line_box_metrics(const ResolvedTextLayout& primary,
+                                std::optional<double> used_line_height) noexcept {
+    FontVerticalMetrics design{primary.ascent, primary.descent, primary.line_gap, 0.0};
+    if (primary.design_metrics) design = *primary.design_metrics;
+    const double ascent = std::round(design.ascent);
+    const double descent = std::round(design.descent);
+    const double gap = std::round(design.line_gap);
+    LineBoxMetrics metrics{};
+    metrics.height = used_line_height ? *used_line_height : ascent + descent + gap;
+    const double leading = metrics.height - (ascent + descent);
+    metrics.baseline = ascent + std::floor(leading * 0.5);
+    metrics.x_height = design.x_height;
+    return metrics;
+}
+
 double snap_text_baseline(double logical_baseline,
                           double device_scale) noexcept {
     if (!std::isfinite(logical_baseline) || !std::isfinite(device_scale) ||

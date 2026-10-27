@@ -2,8 +2,8 @@
 
 namespace gui_forms::gallery::pages {
 
-// Owner of the Retained Layout Panels page: four FlowLayoutPanel directions
-// and one mixed-track TableLayoutPanel. The two range controls inside the
+// Owner of the Retained Layout Panels page: four FlowLayoutPanelCompat directions
+// and one mixed-track TableLayoutPanelCompat. The two range controls inside the
 // table share one application-owned Value<double>, and the table's check box
 // binds a Value<bool>; the page observes those values, never the controls.
 class LayoutPanelsPage final : public gui_forms::Component {
@@ -32,7 +32,7 @@ private:
     void build_flow_cards(const std::shared_ptr<Surface>& page) {
         std::shared_ptr<LayoutGroup> flow_group = group(
             "gallery.layout.flow.group",
-            "FlowLayoutPanel · four directions · wrap · physical margins · FlowBreak",
+            "FlowLayoutPanelCompat · four directions · wrap · physical margins · FlowBreak",
             {930.0, 218.0});
         (*page).add_at(flow_group, {24.0, 92.0, 930.0, 218.0});
         constexpr std::array<std::pair<FlowDirection, std::string_view>, 4> directions{{
@@ -47,7 +47,7 @@ private:
                 std::string(directions[index].second), {210.0, 156.0});
             (*flow_group).add_at(card, {18.0 + static_cast<double>(index) * 224.0,
                                         40.0, 210.0, 156.0});
-            std::shared_ptr<FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(
+            std::shared_ptr<FlowLayoutPanelCompat> flow = make_control<FlowLayoutPanelCompat>(
                 StableId("gallery.layout.flow." + std::to_string(index)));
             (*flow).set_accessible_name(std::string(directions[index].second) +
                                         " flow layout");
@@ -79,10 +79,10 @@ private:
     void build_table(const std::shared_ptr<Surface>& page) {
         std::shared_ptr<LayoutGroup> table_group = group(
             "gallery.layout.table.group",
-            "TableLayoutPanel · absolute + auto + weighted percent tracks · spans + automatic placement",
+            "TableLayoutPanelCompat · absolute + auto + weighted percent tracks · spans + automatic placement",
             {930.0, 292.0});
         (*page).add_at(table_group, {24.0, 330.0, 930.0, 292.0});
-        table_ = make_control<TableLayoutPanel>(StableId("gallery.layout.table"));
+        table_ = make_control<TableLayoutPanelCompat>(StableId("gallery.layout.table"));
         (*table_).set_accessible_name("Mixed-track table layout specimen");
         (*table_).set_padding({6.0, 6.0, 6.0, 6.0});
         (*table_).set_column_count(4U);
@@ -172,7 +172,7 @@ private:
             : "Percent · 1 share cleared · the check box binds a Value<bool>; authored bounds never become the parent-assigned slot.");
     }
 
-    std::shared_ptr<TableLayoutPanel> table_;
+    std::shared_ptr<TableLayoutPanelCompat> table_;
     std::shared_ptr<Label> note_;
     Value<double> table_share_{68.0};
     Value<bool> percent_one_{true};

@@ -19,7 +19,7 @@ gui_forms::ScaledPanel
    proportional position and size as the panel is resized. Use it for fixed
    compositions, such as a diagram, an instrument face or a mock screen, that
    must keep their proportions without per-child anchors. Use a
-   :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>` instead when children must keep their natural size, and
+   :cpp:class:`GridPanel <gui_forms::GridPanel>` instead when children must keep their natural size, and
    :cpp:class:`ScaledGroupBox <gui_forms::ScaledGroupBox>` for the same layout inside a captioned frame.
 
    *Status:* stable.
@@ -69,7 +69,7 @@ gui_forms::ScaledPanel
       :cpp:class:`Panel <gui_forms::Panel>`
          Absolute placement with Dock and Anchor.
 
-      :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>`
+      :cpp:class:`GridPanel <gui_forms::GridPanel>`
          A grid of rows and columns that keeps natural sizes.
 
    .. rubric:: Notes

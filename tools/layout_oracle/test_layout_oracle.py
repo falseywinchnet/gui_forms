@@ -77,10 +77,12 @@ class ComparisonTests(unittest.TestCase):
 
 class BoxFileTests(unittest.TestCase):
     def test_write_then_read_round_trips(self) -> None:
-        profiles = (corpus.Profile(320, 240, 1.0), corpus.Profile(800, 600, 2.0))
+        profiles = (corpus.Profile(320, 240, 1.0), corpus.Profile(800, 600, 2.0),
+                    corpus.Profile(320, 240, 1.0, "rtl"))
         boxes = {
             profiles[0].key: {"root": corpus.Box(0, 0, 320, 240), "a": corpus.Box(1.5, 2, 3, 4)},
             profiles[1].key: {"root": corpus.Box(0, 0, 800, 600), "a": corpus.Box(1.5, 2, 3, 4)},
+            profiles[2].key: {"root": corpus.Box(0, 0, 320, 240), "a": corpus.Box(315.5, 2, 3, 4)},
         }
         with tempfile.TemporaryDirectory() as scratch:
             path = Path(scratch) / "group" / "fixture.xml"
@@ -89,6 +91,16 @@ class BoxFileTests(unittest.TestCase):
             attributes, read = corpus.read_box_file(path)
         self.assertEqual(attributes["fixture"], "group/fixture")
         self.assertEqual(read, boxes)
+        self.assertEqual(profiles[2].key, "320x240@1/rtl")
+
+    def test_unknown_direction_is_refused(self) -> None:
+        text = ('<layout-reference><profile viewport="10x10" scale="1" direction="up">'
+                '</profile></layout-reference>')
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "bad.xml"
+            path.write_text(text, encoding="utf-8")
+            with self.assertRaises(corpus.CorpusError):
+                corpus.read_box_file(path)
 
     def test_repeated_node_is_refused(self) -> None:
         text = ('<layout-reference><profile viewport="10x10" scale="1">'
@@ -113,7 +125,31 @@ class CorpusTests(unittest.TestCase):
             self.assertEqual(attributes["fixture"], fixture.name)
             self.assertEqual(attributes["chromium"],
                              json.loads((Path(fetch_chromium.PIN)).read_text())["version"])
-            self.assertEqual(sorted(boxes), sorted(profile.key for profile in checked_in.profiles))
+            self.assertEqual(sorted(boxes),
+                             sorted(profile.key for profile in checked_in.profiles_for(fixture)))
+
+    def test_right_to_left_profiles_apply_to_bidirectional_fixtures_only(self) -> None:
+        checked_in = corpus.read_corpus(CORPUS)
+        left_to_right = [profile for profile in checked_in.profiles if profile.direction == "ltr"]
+        right_to_left = [profile for profile in checked_in.profiles if profile.direction == "rtl"]
+        self.assertEqual(len(left_to_right), 8)
+        self.assertEqual(len(right_to_left), 8)
+        plain = corpus.Fixture("f", Path("f.html"), False, {}, False)
+        marked = corpus.Fixture("f", Path("f.html"), False, {}, True)
+        self.assertEqual(checked_in.profiles_for(plain), tuple(left_to_right))
+        self.assertEqual(len(checked_in.profiles_for(marked)), 16)
+
+    def test_bidirectional_fixtures_depend_on_the_direction(self) -> None:
+        # A fixture is marked bidirectional only when Chromium lays it out
+        # differently right to left at some profile.
+        checked_in = corpus.read_corpus(CORPUS)
+        for fixture in checked_in.fixtures:
+            if not fixture.bidirectional:
+                continue
+            _, boxes = corpus.read_box_file(checked_in.reference_path(fixture))
+            mirrored = [profile.key for profile in checked_in.profiles
+                        if profile.direction == "ltr" and boxes[profile.key] != boxes[profile.key + "/rtl"]]
+            self.assertTrue(mirrored, fixture.name)
 
     def test_fixture_rules_are_enforced(self) -> None:
         with tempfile.TemporaryDirectory() as scratch:
@@ -126,7 +162,7 @@ class CorpusTests(unittest.TestCase):
                             'data-gf-expected-difference=" "></div>', encoding="utf-8")
             with self.assertRaises(corpus.CorpusError):
                 corpus.read_fixture("f", path)
-            path.write_text('<div data-gf-id="r" data-gf-kind="flow-layout-panel">'
+            path.write_text('<div data-gf-id="r" data-gf-kind="flow-layout-panel-compat">'
                             '<div data-gf-id="t" data-gf-kind="label">text</div></div>',
                             encoding="utf-8")
             self.assertTrue(corpus.read_fixture("f", path).is_text)

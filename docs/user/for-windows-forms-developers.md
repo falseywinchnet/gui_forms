@@ -105,7 +105,7 @@ controls but play the role of the Forms type.
 | `Control` | [`Control`](../api/generated/gui_forms.Control.rst) | core | |
 | `DateTimePicker` | [`DateTimePicker`](../api/generated/gui_forms.DateTimePicker.rst) | stable | Calendar or spin presentation. |
 | `ErrorProvider` | [`ErrorProvider`](../api/generated/gui_forms.ErrorProvider.rst) | stable | |
-| `FlowLayoutPanel` | [`FlowLayoutPanel`](../api/generated/gui_forms.FlowLayoutPanel.rst) | stable | |
+| `FlowLayoutPanel` | [`FlowLayoutPanelCompat`](../api/generated/gui_forms.FlowLayoutPanelCompat.rst) | stable | Imported by its Windows Forms name; use `FlexPanel` for new work |
 | `Form` | [`Window`](../api/generated/gui_forms.Window.rst) | core | Presented by `Application::run`. |
 | `GroupBox` | [`GroupBox`](../api/generated/gui_forms.GroupBox.rst) | stable | |
 | `HelpProvider` | [`HelpProvider`](../api/generated/gui_forms.HelpProvider.rst) | stable | |
@@ -128,7 +128,7 @@ controls but play the role of the Forms type.
 | `SplitterPanel` | [`SplitterPanel`](../api/generated/gui_forms.SplitterPanel.rst) | stable | |
 | `TabControl` | [`TabControl`](../api/generated/gui_forms.TabControl.rst) | stable | |
 | `TabPage` | [`TabPage`](../api/generated/gui_forms.TabPage.rst) | stable | |
-| `TableLayoutPanel` | [`TableLayoutPanel`](../api/generated/gui_forms.TableLayoutPanel.rst) | stable | |
+| `TableLayoutPanel` | [`TableLayoutPanelCompat`](../api/generated/gui_forms.TableLayoutPanelCompat.rst) | stable | Imported by its Windows Forms name; use `GridPanel` for new work |
 | `TextBox` | [`TextBox`](../api/generated/gui_forms.TextBox.rst) | stable | Single-line or multiline; password character; auto-complete from a custom list (`AutoCompleteMode`, `AutoCompleteCustomSource`). |
 | `Timer` | [`Timer`](../api/generated/gui_forms.Timer.rst) | stable | |
 | `ToolStrip` | [`CommandBar`](../api/generated/gui_forms.CommandBar.rst) | provisional | A row of command buttons built from a replaceable item list. |

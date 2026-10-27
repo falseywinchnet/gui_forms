@@ -442,6 +442,11 @@ public:
     // second time.
     [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
         std::string_view utf8, FontSpec effective) const;
+    // The attached window's line-break opportunities
+    // (Window::fill_line_break_opportunities_utf8), or the estimate while
+    // detached.
+    [[nodiscard]] TextResolutionStatus fill_line_break_opportunities_utf8(
+        std::string_view utf8, std::span<LineBreakOpportunity> opportunities) const;
     [[nodiscard]] double snap_text_baseline(double logical_baseline) const noexcept;
     [[nodiscard]] const Theme& effective_theme() const noexcept;
     // The attached window's key map (Window::key_map), or the PC
@@ -685,6 +690,16 @@ public:
     // thread only. The window's own measure pass calls this too, so a
     // container's later query under the same constraint is a hit.
     [[nodiscard]] Size measure_for_layout(const LayoutConstraint& constraint);
+    // The baselines a layout container aligns this control by (stage L,
+    // PLAN.md section 12.3): its first and last line boxes' baselines, as
+    // offsets from the top of its border box when laid out at `width`. None
+    // means it has no line box; the container then synthesizes one from the
+    // border box, as CSS does. The defaults answer none. Text that lays out
+    // in lines (TextBlock) and the CSS containers override them. Flex and
+    // grid alignment use the first baseline; an inline item in BlockPanel
+    // uses the last, as an inline-block does.
+    [[nodiscard]] virtual std::optional<double> first_baseline(double width);
+    [[nodiscard]] virtual std::optional<double> last_baseline(double width);
     // Advances whenever this control becomes measure-dirty; a cache entry
     // stored under an earlier generation is never answered.
     [[nodiscard]] std::uint64_t measure_generation() const noexcept {
@@ -701,6 +716,17 @@ public:
     // only when it can state the answer for every configuration.
     [[nodiscard]] virtual bool size_depends_on_content() const noexcept;
     [[nodiscard]] virtual bool sizes_children_from_content() const noexcept;
+    // Whether this container's arrange asks each child the content
+    // questions its algorithm needs (min-content, max-content, a height at
+    // a definite width) rather than the at-most question the window's
+    // measure pass would ask. When true, the window's pass leaves a
+    // measure-dirty direct child to its arrange: the child's dirtiness has
+    // already emptied its cache, and measuring it against the parent's
+    // available size too would cost a second callback whose answer nothing
+    // reads (stage L, PLAN section 5: one item's text change costs one
+    // callback). False by default, which keeps every existing container's
+    // measure pass unchanged.
+    [[nodiscard]] virtual bool measures_children_in_arrange() const noexcept;
     // The authored inline direction, `inherit` by default (stage L, PLAN
     // section 4). Setting it invalidates this subtree's arrangement.
     [[nodiscard]] LayoutDirection layout_direction() const noexcept {
@@ -863,6 +889,16 @@ protected:
     // through requested bounds or a public layout control.
     void set_child_layout(const Ptr& child, Rect bounds);
     void set_child_layout_collapsed(const Ptr& child, bool collapsed);
+    // Containing blocks of absolutely positioned children (stage L, phase
+    // L5; PLAN sections 2.5 and 3.3). A container reports each such child's
+    // resolution (the window records containing_block_not_parent once per
+    // change), registers the controls whose arrangement moves its children's
+    // containing block (an empty list withdraws it), and reports a direct
+    // child whose positioning changed, so that the containers that resolved
+    // through it arrange again. Each does nothing while detached.
+    void note_containing_block(const Control& child, const Control& ancestor);
+    void set_containing_block_dependencies(std::span<const RuntimeId> watched);
+    void notify_positioning_changed(const Control& child);
     // Custom retained layout controls establish their own child slots after
     // arranging only themselves. Calling the public base arrange would also
     // run the default Dock/Anchor engine and create competing layout owners.
@@ -973,6 +1009,8 @@ private:
         anchor_styles_property_enum();
     [[nodiscard]] static std::shared_ptr<const PropertyEnumDescriptor>
         auto_size_mode_property_enum();
+    [[nodiscard]] static std::shared_ptr<const PropertyEnumDescriptor>
+        layout_direction_property_enum();
     [[nodiscard]] static BindingValue current_enum_property_value(
         std::shared_ptr<const PropertyEnumDescriptor> enumeration,
         std::int64_t value);
@@ -1110,6 +1148,7 @@ private:
         dock,
         anchor,
         auto_size_mode,
+        layout_direction,
         tab_index,
         tab_stop,
         allow_drop,
@@ -1162,6 +1201,11 @@ private:
                 return Control::current_enum_property_value(
                     Control::auto_size_mode_property_enum(),
                     static_cast<std::int64_t>((*control).auto_size_mode_));
+            } else if constexpr (
+                Property == RegisteredProperty::layout_direction) {
+                return Control::current_enum_property_value(
+                    Control::layout_direction_property_enum(),
+                    static_cast<std::int64_t>((*control).layout_direction_));
             } else if constexpr (Property == RegisteredProperty::tab_index) {
                 return BindingValue{static_cast<std::uint64_t>(
                     (*control).tab_index_)};
@@ -1240,6 +1284,10 @@ private:
             } else if constexpr (
                 Property == RegisteredProperty::auto_size_mode) {
                 (*control).set_auto_size_mode(static_cast<AutoSizeMode>(
+                    std::get<PropertyEnumValue>(value).value));
+            } else if constexpr (
+                Property == RegisteredProperty::layout_direction) {
+                (*control).set_layout_direction(static_cast<LayoutDirection>(
                     std::get<PropertyEnumValue>(value).value));
             } else if constexpr (Property == RegisteredProperty::tab_index) {
                 const std::uint64_t index = std::get<std::uint64_t>(value);

@@ -92,7 +92,7 @@ private:
 };
 
 void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
-    std::shared_ptr<gui_forms::TableLayoutPanel> root = make_control<TableLayoutPanel>(StableId("root"));
+    std::shared_ptr<gui_forms::TableLayoutPanelCompat> root = make_control<TableLayoutPanelCompat>(StableId("root"));
     (*root).set_column_count(1U);
     (*root).set_row_count(1U);
     (*root).set_column_style(0U, {TableSizeMode::percent, 1.0});
@@ -387,7 +387,7 @@ void test_context_menu_scroll_and_validation_bounds() {
 }
 
 void test_menu_strip_retained_switching_commands_and_semantics() {
-    std::shared_ptr<gui_forms::TableLayoutPanel> root = make_control<TableLayoutPanel>(StableId("menustrip.root"));
+    std::shared_ptr<gui_forms::TableLayoutPanelCompat> root = make_control<TableLayoutPanelCompat>(StableId("menustrip.root"));
     (*root).set_column_count(1U);
     (*root).set_row_count(2U);
     (*root).set_column_style(0U, {TableSizeMode::percent, 1.0});

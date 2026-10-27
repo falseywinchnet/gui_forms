@@ -7,7 +7,7 @@ minimum, tracks that have a collapse priority give way one at a time, lowest
 priority first, until the rest fit. Use it for application shells, toolbars
 and status bars that must degrade in a predictable way on small windows, and
 nest a vertical panel inside a horizontal one to build a grid. Use a
-`TableLayoutPanel` instead when nothing should ever collapse, and a
+`GridPanel` instead when nothing should ever collapse, and a
 `CommandOverflowPanel` for a command row whose groups move into a menu.
 
 Parameters
@@ -72,9 +72,9 @@ clear_track_focus_fallback
 
 See Also
 --------
-TableLayoutPanel : A grid of tracks that never collapse.
+GridPanel : A grid of tracks that never collapse.
 CommandOverflowPanel : A command row whose groups collapse into a menu.
-FlowLayoutPanel : Items one after another with wrapping.
+FlexPanel : Items one after another with wrapping.
 
 Notes
 -----
@@ -105,7 +105,7 @@ Visible children are assigned to tracks in child order: a child put in a
 track with `set_child_track` uses it, and any other child takes the next
 track that no child was explicitly put in. Inside its track, after its
 margins, a child keeps its preferred size, but never more than the track, and
-Dock and Anchor place it as in a `TableLayoutPanel` cell. A visible child left
+Dock and Anchor place it as in a `TableLayoutPanelCompat` cell. A visible child left
 over when there are no free tracks gets no new slot from the panel: it keeps
 the slot it last had or, if it never had one, its requested bounds.
 

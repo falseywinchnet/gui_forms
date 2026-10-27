@@ -43,6 +43,7 @@ void test_live_surfaces(gui_forms::Window& window);
 void test_typography_and_inspection(gui_forms::Window& window);
 void test_semantic_feedback(gui_forms::Window& window);
 void test_retained_layout_panels(gui_forms::Window& window);
+void test_css_layout_panels(gui_forms::Window& window);
 void test_control_spectrum(gui_forms::Window& window);
 
 } // namespace gallery_pages_tests

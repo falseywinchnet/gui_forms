@@ -87,6 +87,7 @@ void populate_page_body(std::string_view page_id,
     else if (page_id == "dates-and-calendar") add_dates_and_calendar(body, context);
     else if (page_id == "dialogs-and-host-services") add_dialogs_and_host_services(body, context);
     else if (page_id == "retained-layout-panels") add_layout_panels(body, context);
+    else if (page_id == "css-layout-panels") add_css_layout_panels(body, context);
     else if (page_id == "dock-and-anchor") add_dock_and_anchor(body, context);
     else if (page_id == "commands-and-menus") add_commands_and_menus(body, context);
     else if (page_id == "tree-and-object-views") add_tree_and_object_views(body, context);

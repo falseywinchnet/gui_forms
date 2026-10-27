@@ -87,6 +87,7 @@ void test_registry_pages_gallery() {
     test_typography_and_inspection(window);
     test_semantic_feedback(window);
     test_retained_layout_panels(window);
+    test_css_layout_panels(window);
     test_control_spectrum(window);
 }
 

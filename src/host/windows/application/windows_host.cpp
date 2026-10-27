@@ -1449,6 +1449,14 @@ public:
         return (*text_engine_).resolve(text, font);
     }
 
+    // Line breaking reads no face, so it is exact before the faces load.
+    TextResolutionStatus fill_line_break_opportunities_utf8(
+        std::string_view text, std::span<LineBreakOpportunity> opportunities) override {
+        const TextResolutionStatus status =
+            text::HarfBuzzFontEngine::fill_line_break_opportunities_utf8(text, opportunities);
+        return status;
+    }
+
     // Registers the bundled faces in a private engine. Faces share their
     // bytes with every other painter given the same set.
     [[nodiscard]] bool bundled_fonts_ready() const noexcept { return bundled_fonts_ready_; }

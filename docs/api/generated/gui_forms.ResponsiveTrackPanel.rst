@@ -20,7 +20,7 @@ gui_forms::ResponsiveTrackPanel
    priority first, until the rest fit. Use it for application shells, toolbars
    and status bars that must degrade in a predictable way on small windows, and
    nest a vertical panel inside a horizontal one to build a grid. Use a
-   :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>` instead when nothing should ever collapse, and a
+   :cpp:class:`GridPanel <gui_forms::GridPanel>` instead when nothing should ever collapse, and a
    :cpp:class:`CommandOverflowPanel <gui_forms::CommandOverflowPanel>` for a command row whose groups move into a menu.
 
    *Status:* provisional.
@@ -91,13 +91,13 @@ gui_forms::ResponsiveTrackPanel
 
    .. seealso::
 
-      :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>`
+      :cpp:class:`GridPanel <gui_forms::GridPanel>`
          A grid of tracks that never collapse.
 
       :cpp:class:`CommandOverflowPanel <gui_forms::CommandOverflowPanel>`
          A command row whose groups collapse into a menu.
 
-      :cpp:class:`FlowLayoutPanel <gui_forms::FlowLayoutPanel>`
+      :cpp:class:`FlexPanel <gui_forms::FlexPanel>`
          Items one after another with wrapping.
 
    .. rubric:: Notes
@@ -129,7 +129,7 @@ gui_forms::ResponsiveTrackPanel
    track with :cpp:func:`set_child_track <gui_forms::ResponsiveTrackPanel::set_child_track>` uses it, and any other child takes the next
    track that no child was explicitly put in. Inside its track, after its
    margins, a child keeps its preferred size, but never more than the track, and
-   Dock and Anchor place it as in a :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>` cell. A visible child left
+   Dock and Anchor place it as in a :cpp:class:`TableLayoutPanelCompat <gui_forms::TableLayoutPanelCompat>` cell. A visible child left
    over when there are no free tracks gets no new slot from the panel: it keeps
    the slot it last had or, if it never had one, its requested bounds.
 

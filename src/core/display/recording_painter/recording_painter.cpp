@@ -280,6 +280,14 @@ ResolvedTextLayout RecordingPainter::resolve_text_layout_utf8(
         : estimate_text_layout_utf8(text, font);
 }
 
+TextResolutionStatus RecordingPainter::fill_line_break_opportunities_utf8(
+    std::string_view text, std::span<LineBreakOpportunity> opportunities) {
+    if (text_metrics_ == nullptr) return estimate_line_break_opportunities_utf8(text, opportunities);
+    const TextResolutionStatus status =
+        (*text_metrics_).fill_line_break_opportunities_utf8(text, opportunities);
+    return status;
+}
+
 void RecordingPainter::draw_image(ImageId image, Rect destination, double opacity) {
     DisplayCommand command;
     command.operation = DisplayOperation::draw_image;

@@ -6,7 +6,7 @@ stretches the design space over its own bounds, so each child keeps its
 proportional position and size as the panel is resized. Use it for fixed
 compositions, such as a diagram, an instrument face or a mock screen, that
 must keep their proportions without per-child anchors. Use a
-`TableLayoutPanel` instead when children must keep their natural size, and
+`GridPanel` instead when children must keep their natural size, and
 `ScaledGroupBox` for the same layout inside a captioned frame.
 
 Parameters
@@ -45,7 +45,7 @@ See Also
 --------
 ScaledGroupBox : The same scaled layout inside a captioned group box.
 Panel : Absolute placement with Dock and Anchor.
-TableLayoutPanel : A grid of rows and columns that keeps natural sizes.
+GridPanel : A grid of rows and columns that keeps natural sizes.
 
 Notes
 -----

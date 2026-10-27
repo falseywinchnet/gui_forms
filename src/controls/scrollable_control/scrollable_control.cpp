@@ -294,13 +294,16 @@ void ScrollableControl::arrange(Rect final_bounds) {
     if (auto_scroll_) adjust_scrollbars(true);
     Control::arrange(final_bounds);
     if (scroll_position_ == Point{}) return;
+    // Right to left, the base arrange mirrored the slots, so scrolling the
+    // logical content toward the left moves them to the right.
+    const bool mirrored = effective_layout_direction() == LayoutDirection::right_to_left;
     for (const Control::Ptr& child : children()) {
         if (!child || !(*child).is_alive() || !(*child).visible() ||
             (*child).dock() != DockStyle::none) continue;
         // The base arrange just assigned the unscrolled slot; offset that, not
         // the committed bounds, which still carry the previous scroll offset.
         Rect bounds = (*child).pending_layout_bounds();
-        bounds.x -= scroll_position_.x;
+        bounds.x += mirrored ? scroll_position_.x : -scroll_position_.x;
         bounds.y -= scroll_position_.y;
         set_child_layout(child, bounds);
     }
@@ -375,9 +378,17 @@ void ScrollableControl::set_display_rect_location(Point location) {
 Point ScrollableControl::scroll_to_control(const Control& control) const {
     Rect bounds;
     if (attached() && control.attached()) {
-        bounds = rectangle_from_window(control.rectangle_to_window(
+        const Rect local = rectangle_from_window(control.rectangle_to_window(
             {0.0, 0.0, control.committed_arranged_bounds().width,
              control.committed_arranged_bounds().height}));
+        bounds = local;
+        if (effective_layout_direction() == LayoutDirection::right_to_left) {
+            // Right to left, the content was mirrored about the viewport:
+            // its logical place, which the scroll offset moves, is the
+            // mirror image.
+            const Rect viewport = effective_viewport_rectangle();
+            bounds.x = 2.0 * viewport.x + viewport.width - local.x - local.width;
+        }
         bounds.x += scroll_position_.x;
         bounds.y += scroll_position_.y;
     } else {

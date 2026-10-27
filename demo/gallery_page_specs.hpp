@@ -36,7 +36,7 @@ inline constexpr std::string_view body_id_prefix = "gallery.body.";
 
 // Compiled-DML pages first (their content is declared in gallery.dml), then the
 // pages migrated from the retired Complete Showcase in their former order.
-inline constexpr std::array<GalleryPageSpec, 29> gallery_pages {{
+inline constexpr std::array<GalleryPageSpec, 30> gallery_pages {{
     {"basics", "Basic controls",
      "Compiled-DML form grid over public Button, CheckBox, RadioButton, LinkLabel and Label instances plus a composed UserControl lifecycle card.",
      false, "Information display"},
@@ -91,8 +91,11 @@ inline constexpr std::array<GalleryPageSpec, 29> gallery_pages {{
     {"dialogs-and-host-services", "Dialogs and host services",
      "Owned host dialogs, clipboard, monitor and sound services through public Window seams.",
      false, "Dialogs and popups"},
-    {"retained-layout-panels", "Retained layout panels",
-     "FlowLayoutPanel and TableLayoutPanel with retained cell policy.",
+    {"css-layout-panels", "CSS layout panels",
+     "FlexPanel, GridPanel, BlockPanel: CSS containers over retained children.",
+     false, "Layout"},
+    {"retained-layout-panels", "Compatibility layout panels",
+     "For Windows Forms migration: FlowLayoutPanelCompat and TableLayoutPanelCompat; use FlexPanel and GridPanel for new work.",
      false, "Layout"},
     {"dock-and-anchor", "Dock and anchor",
      "Dock and Anchor layout policy on public Panel and Button instances.",

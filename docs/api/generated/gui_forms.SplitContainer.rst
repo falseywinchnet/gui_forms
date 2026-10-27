@@ -192,7 +192,7 @@ gui_forms::SplitContainer
       :cpp:class:`MasterDetailView <gui_forms::MasterDetailView>`
          A list and its details that become one pane on narrow windows.
 
-      :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>`
+      :cpp:class:`GridPanel <gui_forms::GridPanel>`
          Fixed rows and columns without a draggable seam.
 
    .. rubric:: Notes
