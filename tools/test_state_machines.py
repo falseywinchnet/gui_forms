@@ -403,9 +403,11 @@ int b(E e) {
             (root / "src").mkdir()
             (root / "tools").mkdir()
             (root / "docs").mkdir()
+            (root / ".github/workflows").mkdir(parents=True)
             (root / "src" / "a.cpp").write_text("int a() { return 0; }\n", encoding="utf-8")
             (root / "src" / "gone.cpp").write_text("int gone() { return 0; }\n", encoding="utf-8")
             (root / "tools" / "check_state_machines.py").write_text("# checker\n", encoding="utf-8")
+            (root / ".github/workflows/state-machines.yml").write_text("# gate\n", encoding="utf-8")
             (root / "docs" / "notes.md").write_text("notes\n", encoding="utf-8")
             git(root, "add", "-A")
             git(root, "commit", "-q", "-m", "base")
@@ -419,6 +421,8 @@ int b(E e) {
             (root / "src" / "gone.cpp").unlink()
             git(root, "commit", "-q", "-am", "code")
             self.assertEqual(hunt.changed_sources(root, "base"), ["src/a.cpp"])
+            (root / ".github/workflows/state-machines.yml").write_text("# tuned gate\n", encoding="utf-8")
+            self.assertIsNone(hunt.changed_sources(root, "base"))
             # A change to the checker can change any verdict: the whole tree.
             (root / "tools" / "check_state_machines.py").write_text("# tuned checker\n", encoding="utf-8")
             self.assertIsNone(hunt.changed_sources(root, "base"))
@@ -449,6 +453,21 @@ int b(E e) {
                                      hunt.Finding("a", 3, "F2", "core", ""), hunt.Finding("a", 4, "OK", "core", "")]
         self.assertEqual(hunt.gate_failures(found), 2)
         self.assertIn("tools/check_state_machines.py", hunt.CHECKER_FILES)
+        self.assertIn(".github/workflows/state-machines.yml", hunt.CHECKER_FILES)
+
+    def test_workflow_keeps_checker_failure_through_tee(self) -> None:
+        root: Path = Path(__file__).resolve().parents[1]
+        workflow: str = (root / ".github/workflows/state-machines.yml").read_text(encoding="utf-8")
+        step: str = workflow.split("- name: Check the state machines\n", 1)[1].split("- name: Show the findings\n", 1)[0]
+        self.assertIn("shell: bash", step)
+        self.assertLess(step.index("set -o pipefail"), step.index("| tee state-machines.txt"))
+        with tempfile.TemporaryDirectory() as directory:
+            output: Path = Path(directory) / "findings.txt"
+            command: str = "set -o pipefail\npython3 -c 'print(\"finding\"); raise SystemExit(1)' | tee '" + str(output) + "'"
+            completed: subprocess.CompletedProcess[str] = subprocess.run(
+                ["bash", "-c", command], capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(completed.returncode, 1)
+            self.assertEqual(output.read_text(encoding="utf-8"), "finding\n")
 
     def test_areas_follow_ownership(self) -> None:
         self.assertEqual(hunt.area_of("src/controls/ribbon/ribbon.cpp"), "controls")

@@ -108,7 +108,8 @@ AREAS: tuple[tuple[str, str], ...] = (
     ("tools/", "tools"),
 )
 # A change to one of these can change any verdict: the changed-code scope becomes the full tree.
-CHECKER_FILES: tuple[str, ...] = ("tools/check_state_machines.py", "tools/check_house_style.py")
+CHECKER_FILES: tuple[str, ...] = ("tools/check_state_machines.py", "tools/check_house_style.py",
+                                 ".github/workflows/state-machines.yml")
 GATE_RULES: tuple[str, ...] = ("F1", "F2")
 HEADER_SUFFIXES: tuple[str, ...] = (".hpp", ".hh", ".h", ".inc")
 INCLUDE: re.Pattern[str] = re.compile(r'#\s*include\s*[<"]([^>"]+)[>"]')

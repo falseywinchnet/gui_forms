@@ -102,10 +102,12 @@ jobs:
             -DGUI_FORMS_ENABLE_LINUX_HOST=OFF -DGUI_FORMS_ENABLE_SKIA=OFF -DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON
       - name: Check the state machines
         if: steps.scope.outputs.scope != 'none'
+        shell: bash
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           SCOPE: ${{ steps.scope.outputs.scope }}
         run: |
+          set -o pipefail
           changed=""
           if [ "$SCOPE" = changed ]; then
             changed="--changed-from $BASE"
