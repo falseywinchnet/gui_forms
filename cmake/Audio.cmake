@@ -2,6 +2,14 @@ include(FetchContent)
 include(GNUInstallDirs)
 find_package(Threads REQUIRED)
 get_filename_component(_gui_audio_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+# A source SDK archive (tools/package_sdk.py) carries the pinned miniaudio tree
+# at third_party/miniaudio, so the archive configures without fetching it; the
+# header and decoder digests below still apply. An explicit
+# FETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO keeps precedence.
+if(NOT DEFINED FETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO AND
+   EXISTS "${_gui_audio_root}/third_party/miniaudio/miniaudio.h")
+    set(FETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO "${_gui_audio_root}/third_party/miniaudio")
+endif()
 FetchContent_Declare(gui_forms_miniaudio
     GIT_REPOSITORY https://github.com/mackron/miniaudio.git
     GIT_TAG f40cf03f80cdb7e741d43e53b7e706e8c1394bcf

@@ -131,42 +131,73 @@ consumer built with different settings is not binary compatible.
 Nothing from Skia, AppKit, Win32 or X11 appears in the installed headers;
 those remain private adapters inside the `Application` library.
 
-### The release SDK archives
+## The source SDK
 
-Each tested release also publishes this installed prefix for every platform,
-built from the same tree as the release's programs and listed in its
-`SHA256SUMS.txt`:
+Each tested release publishes one platform-neutral source SDK,
+`gui-forms-sdk-<version>-source.tar.gz`, listed in its `SHA256SUMS.txt`. It
+holds one directory, `gui-forms-sdk-<version>/`, containing:
 
-| Platform | Asset |
-|---|---|
-| macOS arm64 | `gui-forms-sdk-<version>-macos-arm64.tar.gz` |
-| Windows x64 | `gui-forms-sdk-<version>-windows-x64.zip` |
-| Linux x64 | `gui-forms-sdk-<version>-linux-x64.tar.gz` |
-| Linux arm64 | `gui-forms-sdk-<version>-linux-arm64.tar.gz` |
+- the release commit's tree, as `git archive` writes it;
+- the pinned third-party sources the build would otherwise fetch, each at
+  the path its fetch script or CMake file reads first, so configuring from
+  the archive fetches none of them:
 
-Each archive holds one directory, `gui-forms-sdk-<version>-<platform>/`, laid
-out as the table above with `lib/` as the library directory, plus:
+  | Path | Source | Pinned in |
+  |---|---|---|
+  | `third_party/harfbuzz/` | HarfBuzz (without its `test/` and `perf/` data, which no GUI.Forms build reads) | `third_party/fetch_text_stack.sh` |
+  | `third_party/freetype/` | FreeType | `third_party/fetch_text_stack.sh` |
+  | `third_party/libunibreak/` | libunibreak | `third_party/fetch_linebreak.sh` |
+  | `third_party/miniaudio/` | miniaudio | `cmake/Audio.cmake` |
 
-- `cmake/llvm22.cmake`, the toolchain file (the same file is also under
-  `lib/cmake/GUIForms/`);
-- on macOS, `llvm-runtime/`, the LLVM 22 libc++ runtime prefix the SDK was
-  built against, with its licences under `llvm-runtime/share/licenses/`.
+- `SDK_MANIFEST.json`, which names the build entry point (`"build":
+  "tools/build_sdk.py"`) and the top directory. It also gives each vendored
+  source's path, upstream, pinned commit and tree digest, and lists what a
+  build still downloads (`network_inputs`) or needs installed
+  (`prebuilt_inputs`).
 
-Unpack it and pass the directory as the prefix and its toolchain file as the
-toolchain. On macOS, point `GUI_FORMS_LLVM_RUNTIME` at its `llvm-runtime/`
-first:
+The archive carries no Git metadata and no build output. Build and install
+GUI.Forms for your host from it:
 
 ```sh
-tar -xzf gui-forms-sdk-<version>-<platform>.tar.gz
-SDK="$PWD/gui-forms-sdk-<version>-<platform>"
-export GUI_FORMS_LLVM_RUNTIME="$SDK/llvm-runtime"   # macOS only
-cmake -S my-app -B build-my-app -G Ninja -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_PREFIX_PATH="$SDK" -DCMAKE_TOOLCHAIN_FILE="$SDK/cmake/llvm22.cmake"
+tar -xzf gui-forms-sdk-<version>-source.tar.gz
+cd gui-forms-sdk-<version>
+python3 tools/build_sdk.py --target <platform> --prefix "$HOME/gui-forms-sdk"
 ```
 
-The compiler requirement is unchanged: the consumer still builds with LLVM
-22.1 (on Windows, in the MSYS2 CLANG64 environment), as in
-[Prerequisites](#prerequisites).
+`<platform>` is one of `macos-arm64`, `windows-x64`, `linux-x64` and
+`linux-arm64`. Only the platform of the machine running the build is
+accepted until per-target cross-compile toolchains exist.
+
+`build_sdk.py` runs the target's own preparation: on macOS and Linux it
+fetches and builds the pinned CPU Skia. It then configures the toolkit with
+the options CI uses, minus the tests and the demonstration programs, builds
+it with `--jobs` jobs in `--work` (default `.build/sdk-<platform>`), and
+installs it into `--prefix`. The [Prerequisites](#prerequisites) still apply,
+including `GUI_FORMS_LLVM_RUNTIME` on macOS. Consume the installed prefix
+as in [Verify the installation](#verify-the-installation).
+
+### What a source build still downloads
+
+| Input | Platforms | From |
+|---|---|---|
+| Skia source at the pin in `third_party/fetch_skia_cpu.sh` (about 176 MB in 12,278 files, so not vendored) | macOS, Linux | skia.googlesource.com (mirror github.com/google/skia), by `fetch_skia_cpu.sh` |
+| Skia's own FreeType, pinned in the same script (about 11 MB) | macOS, Linux | chromium.googlesource.com (mirror github.com/freetype/freetype) |
+| gn and ninja binaries | macOS | Skia's `bin/fetch-gn` and `bin/fetch-ninja`; Linux uses the system `gn` and `ninja` |
+| The LLVM 22.1.8 source tarball, digest pinned in `tools/macos_runtime_manifest.py` | macOS, once | github.com/llvm/llvm-project releases, by `tools/build_macos_runtimes.py`, to build the macOS 14 runtime |
+
+Windows builds without Skia at this release, so it downloads nothing. On
+every platform the toolchain itself (LLVM 22.1, CMake, Ninja, Git and
+Python) is installed as in [Prerequisites](#prerequisites), not shipped.
+
+A fully offline build therefore needs only the installed toolchain on
+Windows. On macOS and Linux it also needs, before `build_sdk.py` runs:
+
+- a Git checkout of Skia at its pin in `third_party/skia/`;
+- Skia's FreeType at its pin in `third_party/skia/third_party/externals/freetype/`;
+- `gn` and `ninja`.
+
+On macOS, an already built `GUI_FORMS_LLVM_RUNTIME` prefix is also needed.
+`fetch_skia_cpu.sh` fetches only a pin its checkout lacks.
 
 ## Verify the installation
 
