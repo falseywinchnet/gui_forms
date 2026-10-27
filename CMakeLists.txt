@@ -2179,14 +2179,16 @@ if(GUI_FORMS_BUILD_TESTS)
         set_tests_properties(gui_forms_application_native_tests PROPERTIES TIMEOUT 30)
         if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST)
             # Stage T5, phase C2's gate: a non-opaque window on the Windows
-            # host through each grant, read off the composed screen.
+            # host through each grant, read off the composed screen. Serial,
+            # as on Linux and macOS: another test's window over the sampled
+            # points changes the composed colour.
             add_executable(gui_forms_windows_compositor_tests tests/windows_compositor_tests.cpp)
             target_compile_definitions(gui_forms_windows_compositor_tests PRIVATE
                 WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
             target_link_libraries(gui_forms_windows_compositor_tests PRIVATE gui_forms_application dwmapi
                 runtimeobject)
             add_test(NAME gui_forms_windows_compositor_tests COMMAND gui_forms_windows_compositor_tests)
-            set_tests_properties(gui_forms_windows_compositor_tests PROPERTIES TIMEOUT 60)
+            set_tests_properties(gui_forms_windows_compositor_tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
         endif()
         if(GUI_FORMS_ENABLE_LINUX_HOST)
             # Stage T5, phase C4's gate: a non-opaque window under Xvfb with no
@@ -2310,12 +2312,14 @@ if(GUI_FORMS_BUILD_TESTS)
         # Stage T5, phase C2's measurement: what DWM composes from a
         # premultiplied client through each documented route. Prints JSON
         # lines (kept in CI's LastTest.log evidence); fails only when it
-        # cannot make its windows or read the screen.
+        # cannot make its windows or read the screen. Serial: it reads the
+        # composed screen too.
         add_executable(gui_forms_windows_compositor_probe tests/windows_compositor_probe.cpp)
         target_compile_definitions(gui_forms_windows_compositor_probe PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
         target_link_libraries(gui_forms_windows_compositor_probe PRIVATE dwmapi runtimeobject)
         add_test(NAME gui_forms_windows_compositor_probe COMMAND gui_forms_windows_compositor_probe)
+        set_tests_properties(gui_forms_windows_compositor_probe PROPERTIES RUN_SERIAL TRUE)
         add_executable(gui_forms_windows_content_pixels_tests tests/windows_content_pixels_tests.cpp)
         target_compile_definitions(gui_forms_windows_content_pixels_tests PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
