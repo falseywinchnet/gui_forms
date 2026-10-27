@@ -309,6 +309,9 @@ void apply_material_declaration(const MaterialDeclaration& declaration, SurfaceM
     case MaterialField::corner_bottom_right:
     case MaterialField::corner_bottom_left:
     case MaterialField::count: return;
+    // A value outside the enumeration names no field: nothing is written,
+    // as for the composed fields above.
+    default: return;
     }
 }
 
