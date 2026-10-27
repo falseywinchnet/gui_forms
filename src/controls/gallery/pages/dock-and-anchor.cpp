@@ -1,10 +1,14 @@
 #include "pages.hpp"
 
+#include <cmath>
+#include <string>
+
 namespace gui_forms::gallery::pages {
 
 // Owner of the Dock and Anchor page: a padded dock canvas whose edges are
 // hidden and re-ordered at runtime, and an anchor canvas whose parent slot is
-// rebased live. The two toggles are page state kept here, not on the
+// rebased live, and the Windows Forms Splitter docked after a pane it
+// resizes. The two toggles are page state kept here, not on the
 // controls; the shell status line is reached through the shared context.
 class DockAndAnchorPage final : public gui_forms::Component {
 public:
@@ -20,6 +24,7 @@ public:
                        {26.0, 52.0, 920.0, 24.0});
         build_dock(page);
         build_anchor(page);
+        build_splitter(page);
         on((*toggle_left_).clicked(), *this, &DockAndAnchorPage::on_toggle_left);
         on((*swap_top_).clicked(), *this, &DockAndAnchorPage::on_swap_top);
         on((*resize_).clicked(), *this, &DockAndAnchorPage::on_resize);
@@ -131,6 +136,54 @@ private:
         (*anchor_group_).add_at(note, {758.0, 104.0, 150.0, 104.0});
     }
 
+    // The Windows Forms Splitter facade: a left-docked pane, the splitter
+    // docked after it, and a fill pane; dragging the bar resizes the pane.
+    void build_splitter(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> splitter_group = group(
+            "gallery.splitter.group",
+            "Splitter · docked after a pane · MinSize and MinExtra · live resize",
+            {930.0, 190.0});
+        (*page).add_at(splitter_group, {24.0, 646.0, 930.0, 190.0});
+        std::shared_ptr<Panel> canvas = make_control<Panel>(StableId("gallery.splitter.canvas"));
+        (*canvas).set_accessible_name("Splitter specimen");
+        (*canvas).set_background(Color::rgba(247, 249, 251));
+        (*canvas).set_border_style(BorderStyle::line);
+        (*splitter_group).add_at(canvas, {18.0, 38.0, 610.0, 130.0});
+        std::shared_ptr<Panel> folders = make_control<Panel>(StableId("gallery.splitter.folders"));
+        (*folders).set_background(Color::rgba(225, 235, 243));
+        (*folders).set_dock(DockStyle::left);
+        (*folders).set_requested_bounds({0.0, 0.0, 160.0, 0.0});
+        std::shared_ptr<Label> folders_title = label("gallery.splitter.folders.title", "Folders",
+                                                     11.0, 700, shell_blue_dark);
+        (*folders_title).set_requested_bounds({8.0, 8.0, 120.0, 20.0});
+        (*folders).add_child(folders_title);
+        splitter_ = make_control<Splitter>(StableId("gallery.splitter"));
+        (*splitter_).set_accessible_name("Folders and files splitter");
+        (*splitter_).set_requested_bounds({0.0, 0.0, 4.0, 0.0});
+        (*splitter_).set_min_size(80.0);
+        (*splitter_).set_min_extra(120.0);
+        std::shared_ptr<Panel> files = make_control<Panel>(StableId("gallery.splitter.files"));
+        (*files).set_background(paper);
+        (*files).set_dock(DockStyle::fill);
+        std::shared_ptr<Label> files_title = label("gallery.splitter.files.title", "Files",
+                                                   11.0, 700, shell_blue_dark);
+        (*files_title).set_requested_bounds({8.0, 8.0, 120.0, 20.0});
+        (*files).add_child(files_title);
+        // Child order is dock order: the pane, then the splitter at its
+        // edge, then the fill.
+        (*canvas).add_child(folders);
+        (*canvas).add_child(splitter_);
+        (*canvas).add_child(files);
+        std::shared_ptr<Label> note = label(
+            "gallery.splitter.note",
+            "The bar resizes the docked control before it. New code uses SplitContainer; Splitter keeps Windows Forms forms working.",
+            11.0, 600, green);
+        (*note).set_text_wrapping(TextWrapping::word);
+        (*note).set_vertical_alignment(VerticalAlignment::near);
+        (*splitter_group).add_at(note, {652.0, 52.0, 238.0, 100.0});
+        on((*splitter_).splitter_moved(), *this, &DockAndAnchorPage::on_splitter_moved);
+    }
+
     void report(const std::string& text) {
         const std::shared_ptr<PageContext> context = context_.lock();
         if (context && (*context).status) (*(*context).status).set_text(text);
@@ -171,6 +224,11 @@ private:
                          : "Anchor · parent restored from retained design slot");
     }
 
+    void on_splitter_moved(const SplitterMoveEvent& move) {
+        const long width = std::lround(move.split_position);
+        report("Splitter · Folders is " + std::to_string(width) + " wide");
+    }
+
     std::weak_ptr<PageContext> context_;
     std::shared_ptr<Panel> dock_canvas_;
     std::shared_ptr<Button> left_;
@@ -181,6 +239,7 @@ private:
     std::shared_ptr<LayoutGroup> anchor_group_;
     std::shared_ptr<Panel> anchor_canvas_;
     std::shared_ptr<Button> resize_;
+    std::shared_ptr<Splitter> splitter_;
     bool top_b_front_{};
     bool expanded_{};
 };

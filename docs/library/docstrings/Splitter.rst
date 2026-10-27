@@ -1,0 +1,83 @@
+A bar docked after a docked control that resizes it by dragging.
+
+A splitter is the Windows Forms `Splitter`, kept as a migration facade over
+the dock layout (owner decision, 2026-10-25). Dock a control at an edge,
+dock the splitter at the same edge after it, and dock the rest to fill:
+dragging the bar resizes the control. New code uses `SplitContainer`, which
+owns both panes and adds keyboard input, collapse and fixed panes.
+
+The splitter's target is found from the layout, as Windows Forms finds it:
+the visible sibling docked at the same edge whose far side touches the
+splitter's near side. A left or right splitter sets its target's requested
+width; a top or bottom one its height. The resize is live: the layout runs
+as the pointer moves.
+
+Parameters
+----------
+stable_id
+    Identity of the splitter, unique within its window. A new splitter is
+    docked left and three units across.
+
+Properties
+----------
+min_size : default 25
+    The least extent the target keeps. Throws `std::invalid_argument` for a
+    negative or non-finite value.
+min_extra : default 25
+    The least extent left for the rest of the dock area, the fill. Refused as
+    `min_size` is.
+split_position
+    The target's width or height, or none when the splitter has no target
+    (Windows Forms reports -1). Setting it resizes the target within the
+    limits; without a target it does nothing.
+target
+    The control the splitter resizes, or null.
+
+Events
+------
+splitter_moving
+    The user is dragging the bar. The event carries the pointer in the
+    parent's coordinates and the target's proposed extent, which a handler
+    may change; the result is clamped to the limits again.
+splitter_moved
+    The drag ended, with the extent the target took.
+
+See Also
+--------
+SplitContainer : Two panes and a splitter in one control.
+
+Notes
+-----
+The limits are `min_size` and the extent that leaves `min_extra` once the
+parent's other children docked along the same axis have their extents. A
+splitter docked none or fill, or one without a target, ignores the pointer.
+
+The bar is painted by role as a face plate of the panel family: hot under
+the pointer, pressed while dragging. It takes no focus, as in Windows Forms,
+so Escape does not cancel a drag. It is published to accessibility as a
+separator whose value is the split position, with increment, decrement (10
+units) and set-value actions.
+
+Unlike Windows Forms, which draws a preview line and moves the target on
+release, the target follows the pointer during the drag.
+
+Examples
+--------
+A folder pane beside a file pane:
+
+.. code-block:: cpp
+
+   std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+   std::shared_ptr<gf::Panel> folders = gf::make_control<gf::Panel>(gf::StableId("doc.folders"));
+   (*folders).set_dock(gf::DockStyle::left);
+   (*folders).set_requested_bounds({0.0, 0.0, 160.0, 0.0});
+   std::shared_ptr<gf::Splitter> splitter = gf::make_control<gf::Splitter>(gf::StableId("doc.splitter"));
+   (*splitter).set_min_size(80.0);
+   std::shared_ptr<gf::Panel> files = gf::make_control<gf::Panel>(gf::StableId("doc.files"));
+   (*files).set_dock(gf::DockStyle::fill);
+   (*root).add_child(folders);    // child order is dock order
+   (*root).add_child(splitter);
+   (*root).add_child(files);
+   gf::Window window(root, {640.0, 400.0});
+   window.perform_layout();
+   (*splitter).set_split_position(200.0);   // folders is 200 wide

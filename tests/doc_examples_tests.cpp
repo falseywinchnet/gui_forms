@@ -3290,6 +3290,25 @@ void example() {
 }
 }  // namespace doc_example_SplitContainer_2
 
+namespace doc_example_Splitter_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    std::shared_ptr<gf::Panel> folders = gf::make_control<gf::Panel>(gf::StableId("doc.folders"));
+    (*folders).set_dock(gf::DockStyle::left);
+    (*folders).set_requested_bounds({0.0, 0.0, 160.0, 0.0});
+    std::shared_ptr<gf::Splitter> splitter = gf::make_control<gf::Splitter>(gf::StableId("doc.splitter"));
+    (*splitter).set_min_size(80.0);
+    std::shared_ptr<gf::Panel> files = gf::make_control<gf::Panel>(gf::StableId("doc.files"));
+    (*files).set_dock(gf::DockStyle::fill);
+    (*root).add_child(folders);    // child order is dock order
+    (*root).add_child(splitter);
+    (*root).add_child(files);
+    gf::Window window(root, {640.0, 400.0});
+    window.perform_layout();
+    (*splitter).set_split_position(200.0);   // folders is 200 wide
+}
+}  // namespace doc_example_Splitter_1
+
 namespace doc_example_SplitterPanel_1 {
 void example() {
     std::shared_ptr<gf::SplitContainer> split =
@@ -4368,6 +4387,7 @@ int main() {
     failures += run("SemanticFeedback example 2", &doc_example_SemanticFeedback_2::example);
     failures += run("SplitContainer example 1", &doc_example_SplitContainer_1::example);
     failures += run("SplitContainer example 2", &doc_example_SplitContainer_2::example);
+    failures += run("Splitter example 1", &doc_example_Splitter_1::example);
     failures += run("SplitterPanel example 1", &doc_example_SplitterPanel_1::example);
     failures += run("StableId example 1", &doc_example_StableId_1::example);
     failures += run("StableId example 2", &doc_example_StableId_2::example);

@@ -668,6 +668,7 @@ add_library(gui_forms_controls STATIC
     src/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.cpp
     src/controls/scrollable_control/container_control/split_container/splitter_grip.cpp
     src/controls/scrollable_control/container_control/split_container/split_container.cpp
+    src/controls/splitter/splitter.cpp
     src/controls/panel/date_time_picker/date_time_utilities.cpp
     src/controls/panel/date_time_picker/calendar_grid/calendar_grid.cpp
     src/controls/panel/date_time_picker/date_time_value/date_time_value.cpp
@@ -1189,6 +1190,11 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     if(TARGET X11::Xcursor)
         set(GUI_FORMS_XCURSOR_AVAILABLE ON)
     endif()
+    # Stage T5 (owner decision T5-Q9): XFixes follows the compositing
+    # manager's selection and XRender names the ARGB visual's alpha.
+    if(NOT TARGET X11::Xfixes OR NOT TARGET X11::Xrender)
+        message(FATAL_ERROR "The Linux X11 host requires libXfixes and libXrender")
+    endif()
     add_library(gui_forms_host_linux STATIC
         src/host/linux/application/linux_host.cpp
         src/host/linux/application/x11_windowing.cpp
@@ -1198,9 +1204,11 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
         src/host/linux/services/linux_services.cpp
         src/host/linux/services/x11_tray_icons.cpp
         src/host/linux/services/linux_drag_drop.cpp
-        src/host/linux/services/linux_dialogs.cpp)
+        src/host/linux/services/linux_dialogs.cpp
+        src/host/linux/compositor/x11_compositor.cpp)
     set_target_properties(gui_forms_host_linux PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_link_libraries(gui_forms_host_linux PUBLIC gui_forms_core gui_forms_controls gui_forms_skia PRIVATE X11::X11 PkgConfig::GUI_FORMS_ATK)
+    target_link_libraries(gui_forms_host_linux PUBLIC gui_forms_core gui_forms_controls gui_forms_skia
+        PRIVATE X11::X11 X11::Xfixes X11::Xrender PkgConfig::GUI_FORMS_ATK)
     if(GUI_FORMS_XCURSOR_AVAILABLE)
         target_link_libraries(gui_forms_host_linux PUBLIC X11::Xcursor)
         target_compile_definitions(gui_forms_host_linux PRIVATE GUI_FORMS_HAS_XCURSOR=1)
@@ -1214,7 +1222,7 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     target_compile_definitions(gui_forms_application PRIVATE GUI_FORMS_APPLICATION_LINUX=1)
     target_link_libraries(gui_forms_application PRIVATE
         "-Wl,--whole-archive" gui_forms_core gui_drawing_core gui_forms_controls gui_forms_host_linux gui_forms_skia
-        "-Wl,--no-whole-archive" X11::X11)
+        "-Wl,--no-whole-archive" X11::X11 X11::Xfixes X11::Xrender)
     if(GUI_FORMS_XCURSOR_AVAILABLE)
         target_link_libraries(gui_forms_application PRIVATE X11::Xcursor)
     endif()
@@ -2180,6 +2188,15 @@ if(GUI_FORMS_BUILD_TESTS)
             add_test(NAME gui_forms_windows_compositor_tests COMMAND gui_forms_windows_compositor_tests)
             set_tests_properties(gui_forms_windows_compositor_tests PROPERTIES TIMEOUT 60)
         endif()
+        if(GUI_FORMS_ENABLE_LINUX_HOST)
+            # Stage T5, phase C4's gate: a non-opaque window under Xvfb with no
+            # compositing manager, then with xcompmgr started, stopped and
+            # started again. Serial: it starts a compositor for the display.
+            add_executable(gui_forms_linux_compositor_tests tests/linux_compositor_tests.cpp)
+            target_link_libraries(gui_forms_linux_compositor_tests PRIVATE gui_forms_application X11::X11)
+            add_test(NAME gui_forms_linux_compositor_tests COMMAND gui_forms_linux_compositor_tests)
+            set_tests_properties(gui_forms_linux_compositor_tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+        endif()
         if(GUI_FORMS_ENABLE_MACOS_HOST)
             # Stage T5, phase C3's gate: a non-opaque window over a green
             # backdrop, read back from AppKit and off the composed screen.
@@ -3020,6 +3037,9 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_split_container_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_split_container_tests
              COMMAND gui_forms_split_container_tests)
+    add_executable(gui_forms_splitter_tests tests/splitter_tests.cpp)
+    target_link_libraries(gui_forms_splitter_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_splitter_tests COMMAND gui_forms_splitter_tests)
 
     add_executable(gui_forms_layout_contract_tests
         tests/layout_contract_tests.cpp

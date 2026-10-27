@@ -67,7 +67,7 @@ NOTICES_NAME: str = "THIRD_PARTY_NOTICES.md"
 # The title every GNU GPL, LGPL and AGPL text begins with; a package carries
 # none of them.
 GPL_TITLE: re.Pattern[str] = re.compile(r"GNU (LESSER |LIBRARY |AFFERO )?GENERAL PUBLIC LICENSE")
-LINUX_FALLBACK_DEPENDS: str = "libc6, libx11-6, libxcursor1, libatk1.0-0t64 | libatk1.0-0, libatk-bridge2.0-0t64 | libatk-bridge2.0-0"
+LINUX_FALLBACK_DEPENDS: str = "libc6, libx11-6, libxcursor1, libxfixes3, libxrender1, libatk1.0-0t64 | libatk1.0-0, libatk-bridge2.0-0t64 | libatk-bridge2.0-0"
 
 
 def check_package_notices(root: Path, platform: str, licenses: dict[str, Any], font_notices: list[str]) -> None:

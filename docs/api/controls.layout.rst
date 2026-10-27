@@ -33,6 +33,8 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
      - Two panels separated by a seam that the user drags to share the space between them.
    * - :cpp:class:`SplitterPanel <gui_forms::SplitterPanel>`
      - One of the two panes of a :cpp:class:`SplitContainer <gui_forms::SplitContainer>`, which holds that pane's content.
+   * - :cpp:class:`Splitter <gui_forms::Splitter>`
+     - A bar docked after a docked control that resizes it by dragging.
    * - :cpp:class:`CommandOverflowPanel <gui_forms::CommandOverflowPanel>`
      - A horizontal row of command groups that hides whole groups, in an order you set, when the row is too narrow.
    * - :cpp:class:`MasterDetailView <gui_forms::MasterDetailView>`
@@ -52,6 +54,7 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
    generated/gui_forms.ScaledPanel
    generated/gui_forms.SplitContainer
    generated/gui_forms.SplitterPanel
+   generated/gui_forms.Splitter
    generated/gui_forms.CommandOverflowPanel
    generated/gui_forms.MasterDetailView
 
@@ -134,6 +137,12 @@ Related types
      -  
    * - :cpp:class:`SplitSeamSnapshot <gui_forms::SplitSeamSnapshot>`
      -  
+   * - :cpp:class:`Splitter::Parts <gui_forms::Splitter::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`Splitter::States <gui_forms::Splitter::States>`
+     -  
+   * - :cpp:class:`SplitterMoveEvent <gui_forms::SplitterMoveEvent>`
+     - A move of a Splitter by the user.
    * - :cpp:class:`SplitterPanel::Parts <gui_forms::SplitterPanel::Parts>`
      - Stage T1 anatomy, as dot members: the scrollable parts and the face.
    * - :cpp:class:`TableLayoutCellPosition <gui_forms::TableLayoutCellPosition>`
@@ -957,6 +966,48 @@ Related types
       Default: ``{1.0}``.
 
    .. cpp:member:: bool transition_active
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Splitter::Parts final
+
+   ``#include <gui_forms/controls/splitter/splitter.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Splitter::States final
+
+   ``#include <gui_forms/controls/splitter/splitter.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: SplitterMoveEvent final
+
+   ``#include <gui_forms/controls/splitter/splitter.hpp>``
+
+   A move of a Splitter by the user. ``pointer`` is the pointer in the parent's coordinates. In splitter_moving, ``split_position`` is the target's proposed extent, which a handler may change (it is clamped again to the limits); in splitter_moved it is the extent the target took.
+
+   .. cpp:member:: Point pointer
+
+   .. cpp:member:: double split_position
 
 .. cpp:namespace:: gui_forms
 

@@ -327,7 +327,16 @@ given document:
 - text is written in ASCII. Characters above 0x7E are `\uN?` (a signed
   16-bit value, with surrogate pairs for characters beyond the BMP), and
   `\`, `{` and `}` are escaped;
-- a link is a `HYPERLINK` field.
+- a link is a `HYPERLINK` field; its quoted target escapes `"` and `\` with
+  a backslash, as field codes do, and the reader unescapes them;
+- every paragraph carries an ignorable `{\*\stxblock ...}` group with the
+  block's exact fields: `\stxkind`, `\stxlevel`, `\stxquote`,
+  `\stxmarker`, `\stxordinal`, and `\stxstart` on the first paragraph of
+  each code block. The reader prefers them to styles, outline levels and
+  lists, so rule 2 holds where RTF cannot state a field (an arbitrary
+  ordinal, a quoted heading or code block); other programs skip the group,
+  as RTF requires for `\*` destinations (RT3, 2026-10-26);
+- a code block is one Code-style paragraph per line.
 
 ## 7. Round trips, losses and failures
 

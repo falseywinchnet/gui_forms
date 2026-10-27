@@ -86,11 +86,11 @@ jobs:
             rtf2md_markdown) clang++ $flags -Istx_rtf2md/include -Istx_rtf2md/src stx_rtf2md/fuzz/markdown_round_trip_fuzz.cpp \
                    stx_rtf2md/src/document.cpp stx_rtf2md/src/limits.cpp stx_rtf2md/src/text_scan.cpp \
                    stx_rtf2md/src/markdown_inline.cpp stx_rtf2md/src/markdown_reader.cpp stx_rtf2md/src/markdown_writer.cpp \
-                   stx_rtf2md/src/rtf_reader.cpp -o smoke ;;
+                   stx_rtf2md/src/rtf_reader.cpp stx_rtf2md/src/rtf_writer.cpp -o smoke ;;
             rtf2md_rtf) clang++ $flags -Istx_rtf2md/include -Istx_rtf2md/src stx_rtf2md/fuzz/rtf_read_fuzz.cpp \
                    stx_rtf2md/src/document.cpp stx_rtf2md/src/limits.cpp stx_rtf2md/src/text_scan.cpp \
                    stx_rtf2md/src/markdown_inline.cpp stx_rtf2md/src/markdown_reader.cpp stx_rtf2md/src/markdown_writer.cpp \
-                   stx_rtf2md/src/rtf_reader.cpp -o smoke ;;
+                   stx_rtf2md/src/rtf_reader.cpp stx_rtf2md/src/rtf_writer.cpp -o smoke ;;
             conv) clang++ $flags -Istx_conv/include stx_conv/fuzz/conv_fuzz.cpp stx_conv/src/plan.cpp stx_conv/src/profile.cpp stx_conv/src/image.cpp -o smoke ;;
             png_decode) clang++ $flags -Istx_png/include fuzz/png_decode_fuzz.cpp stx_png/src/decoder.cpp stx_png/src/encoder.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp stx_zlib/src/deflate.cpp -o smoke ;;
           esac

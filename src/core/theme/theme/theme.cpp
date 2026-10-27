@@ -1132,6 +1132,8 @@ AnatomyStateSet visual_context_states(ControlVisualContext context) noexcept {
     case ControlSurfaceState::normal:
     case ControlSurfaceState::disabled:
     case ControlSurfaceState::count: break;
+    // A value outside the enumeration adds no state.
+    default: break;
     }
     if (context.surface == ControlSurfaceState::disabled) {
         states.insert(AnatomyState::disabled);
@@ -1172,6 +1174,9 @@ void apply_recipe_fields(const CompiledThemeRules::RecipeResolution& fields, Con
             break;
         case RecipeOutlineStyle::solid: recipe.authored_focus_outline = true; break;
         case RecipeOutlineStyle::none: recipe.focus_width = 0.0; break;
+        // A value outside the enumeration, which the rules refuse
+        // (recipe_field_invalid), keeps the floor's outline.
+        default: break;
         }
     }
     const RecipeDeclaration* const colour = set_recipe_field(fields, RecipeField::outline_colour);
