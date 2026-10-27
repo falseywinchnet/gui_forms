@@ -5,7 +5,8 @@ Workflow job dependencies are the test gate: this runs only after every
 platform built, tested, packaged and smoke-launched its programs. It
 
   1. checks the packages-<platform>.json receipts against the artifacts and
-     the manifest's required platforms (tools/package_programs.py);
+     the manifest's required platforms (tools/package_programs.py), and that
+     every receipt's platform also left its SDK archive (tools/package_sdk.py);
   2. creates tag v<version> at exactly the tested commit through the API, or
      verifies an existing tag names that commit;
   3. creates a DRAFT release titled "GUI.Forms <version>", uploads every
@@ -86,6 +87,16 @@ def expected_artifacts(receipts: dict[str, dict[str, Any]]) -> list[str]:
     return sorted(names)
 
 
+def expected_sdk_archives(receipts: dict[str, dict[str, Any]], version: str) -> list[str]:
+    """One SDK archive per platform that packaged programs (tools/package_sdk.py's names)."""
+    from package_sdk import sdk_archive_name
+    names: list[str] = []
+    platform: str
+    for platform in sorted(receipts):
+        names.append(sdk_archive_name(version, platform))
+    return names
+
+
 def check_required(manifest: Any, receipts: dict[str, dict[str, Any]]) -> None:
     for program in manifest.programs:
         if not program.enabled:
@@ -112,6 +123,11 @@ def release_notes(version: str, sha: str, repository: str, receipts: dict[str, d
                              f"`{artifacts['archive']}` | `{artifacts.get('installer', '-')}` |")
             elif program.get("target"):
                 skipped.append(f"{program['display_name']} on {PLATFORM_LABELS.get(platform, platform)}: {program['reason']}")
+    lines += ["", "## SDK", "", "The installed GUI.Forms SDK, for building against the release with "
+              "`find_package(GUIForms CONFIG)` (docs/user/install.md):", "",
+              "| Platform | Archive |", "|---|---|"]
+    for platform, name in zip(sorted(receipts), expected_sdk_archives(receipts, version)):
+        lines.append(f"| {PLATFORM_LABELS.get(platform, platform)} | `{name}` |")
     lines += ["", "`SHA256SUMS.txt` lists every download's digest."]
     if skipped:
         lines += ["", "Not in this release:", ""] + [f"- {item}" for item in skipped]
@@ -148,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from package_programs import load_manifest
+    from package_sdk import check_archive, sdk_archive_name
     from publication_version import validate
 
     repository, sha = os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_SHA"]
@@ -165,10 +182,13 @@ def main(argv: list[str] | None = None) -> int:
     expected = expected_artifacts(receipts)
     if not expected:
         raise ValueError("the receipts list no packaged program on any platform")
+    expected += expected_sdk_archives(receipts, version)
     files = [args.artifacts / name for name in expected]
     missing = [path.name for path in files if not path.is_file()]
     if missing:
-        raise ValueError("artifacts named by the receipts are missing: " + ", ".join(missing))
+        raise ValueError("artifacts the receipts call for are missing: " + ", ".join(missing))
+    for platform in sorted(receipts):
+        check_archive(args.artifacts / sdk_archive_name(version, platform), version, platform)
     unexpected = sorted(path.name for path in args.artifacts.iterdir()
                         if path.is_file() and path.name not in expected and path.name != "SHA256SUMS.txt"
                         and not re.fullmatch(RECEIPT_PATTERN, path.name))
