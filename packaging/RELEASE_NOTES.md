@@ -140,6 +140,12 @@ mail mockup.
 ### Release pipeline
 - As in 0.1, each program is built, tested, packaged and smoke-launched on
   macOS, Windows and Linux runners before anything is uploaded.
+- Each release now also carries the installed SDK for every platform,
+  `gui-forms-sdk-<version>-<platform>.tar.gz` (`.zip` on Windows), built
+  from the same tested tree as the programs and listed in `SHA256SUMS.txt`.
+  It holds the headers, libraries, CMake package, `cmake/llvm22.cmake`, the
+  licences and, on macOS, the LLVM runtime as `llvm-runtime/` (see
+  docs/user/install.md, "The release SDK archives").
 
 ## Known limits
 

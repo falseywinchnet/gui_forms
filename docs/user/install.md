@@ -131,6 +131,43 @@ consumer built with different settings is not binary compatible.
 Nothing from Skia, AppKit, Win32 or X11 appears in the installed headers;
 those remain private adapters inside the `Application` library.
 
+### The release SDK archives
+
+Each tested release also publishes this installed prefix for every platform,
+built from the same tree as the release's programs and listed in its
+`SHA256SUMS.txt`:
+
+| Platform | Asset |
+|---|---|
+| macOS arm64 | `gui-forms-sdk-<version>-macos-arm64.tar.gz` |
+| Windows x64 | `gui-forms-sdk-<version>-windows-x64.zip` |
+| Linux x64 | `gui-forms-sdk-<version>-linux-x64.tar.gz` |
+| Linux arm64 | `gui-forms-sdk-<version>-linux-arm64.tar.gz` |
+
+Each archive holds one directory, `gui-forms-sdk-<version>-<platform>/`, laid
+out as the table above with `lib/` as the library directory, plus:
+
+- `cmake/llvm22.cmake`, the toolchain file (the same file is also under
+  `lib/cmake/GUIForms/`);
+- on macOS, `llvm-runtime/`, the LLVM 22 libc++ runtime prefix the SDK was
+  built against, with its licences under `llvm-runtime/share/licenses/`.
+
+Unpack it and pass the directory as the prefix and its toolchain file as the
+toolchain. On macOS, point `GUI_FORMS_LLVM_RUNTIME` at its `llvm-runtime/`
+first:
+
+```sh
+tar -xzf gui-forms-sdk-<version>-<platform>.tar.gz
+SDK="$PWD/gui-forms-sdk-<version>-<platform>"
+export GUI_FORMS_LLVM_RUNTIME="$SDK/llvm-runtime"   # macOS only
+cmake -S my-app -B build-my-app -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_PREFIX_PATH="$SDK" -DCMAKE_TOOLCHAIN_FILE="$SDK/cmake/llvm22.cmake"
+```
+
+The compiler requirement is unchanged: the consumer still builds with LLVM
+22.1 (on Windows, in the MSYS2 CLANG64 environment), as in
+[Prerequisites](#prerequisites).
+
 ## Verify the installation
 
 The repository ships standalone consumer examples that use only the installed
