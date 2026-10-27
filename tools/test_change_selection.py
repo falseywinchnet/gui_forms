@@ -71,7 +71,7 @@ class CheckedInRuleTests(unittest.TestCase):
     def test_documentation_and_planning_are_read_by_no_test(self) -> None:
         path: str
         for path in ('docs/dev/roadmap.md', 'docs/dev/contributing.md', 'packaging/RELEASE_NOTES.md',
-                     'README.md', 'AGENTS.md', 'docs/dev/adr/ADR-001.md', 'benchmarks/x.md'):
+                     'README.md', 'AGENTS.md', 'docs/dev/decisions.md', 'benchmarks/x.md'):
             self.assertEqual(self.areas(path), (), path)
 
     def test_a_new_top_level_directory_selects_every_test(self) -> None:

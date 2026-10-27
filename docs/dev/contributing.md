@@ -137,8 +137,8 @@ User documentation is this Sphinx site under `docs/`, built with
 `sphinx-build -W`; see `docs/README.md` for how to build it locally. Write in
 the present tense for a user of the library. Control pages are generated
 from `manifests/controls.json` and the headers; add a control there, not in
-the generated files. Architecture decisions are ADRs in `docs/dev/adr/`,
-listed under [Architecture decisions](decisions).
+the generated files. Architecture decisions are ADRs in the notes
+repository, listed under [Architecture decisions](decisions).
 
 ## Workflow
 

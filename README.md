@@ -11,7 +11,7 @@ runs the same control tree on macOS, Windows and Linux.
 Windows hosts are native; the Linux X11 host is opt-in. GUI.Forms is CPU-only
 by design and has no GPU backend. Text is drawn by one HarfBuzz/FreeType
 engine from bundled fonts, so the same string renders identically on every
-platform ([ADR-004](docs/dev/adr/ADR-004.md)).**
+platform ([ADR-004](https://github.com/malkuth-software/notes/blob/gui_forms/decisions/ADR-004-one-text-rasterization-engine.md)).**
 
 ## First window
 
@@ -299,10 +299,10 @@ in CI.
   control, its WinForms counterpart and a one-line description.
 - [API reference](https://gui-forms.readthedocs.io/en/latest/api/index.html): every public type, member and
   enumeration, generated from the headers.
-- [`docs/dev/adr/`](docs/dev/adr/): architecture decision records.
 - [`malkuth-software/notes`, branch `gui_forms`](https://github.com/malkuth-software/notes/tree/gui_forms):
-  plans, stage briefs, measurements, experiments and working notes, kept as
-  records rather than user documentation.
+  architecture decision records, plans, stage briefs, measurements,
+  experiments and working notes, kept as records rather than user
+  documentation.
 
 ## Project boundaries
 
