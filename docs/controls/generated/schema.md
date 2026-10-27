@@ -609,6 +609,7 @@ Properties beyond every control's: none.
 | `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `insertion_mark` | drop |  | drop_accepted |
+| `label_editor` | well | `text_box` |  |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
@@ -658,6 +659,8 @@ Properties beyond every control's: none.
 | `item_checked` | `ListViewItemCheck` |
 | `column_click` | `ListViewColumnClick` |
 | `column_width_changed` | `ListViewColumnWidthChange` |
+| `before_label_edit` | `ListViewLabelEdit`, by reference |
+| `after_label_edit` | `ListViewLabelEdit`, by reference |
 
 ## `tree_list_view` (TreeListView, control)
 

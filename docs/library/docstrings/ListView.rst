@@ -14,7 +14,8 @@ Parameters
 stable_id
     Identity of the view, unique within its window. Its scroll bars are
     child controls named ``<stable_id>.vertical_scroll_bar`` and
-    ``<stable_id>.horizontal_scroll_bar``.
+    ``<stable_id>.horizontal_scroll_bar``; the label editor, made on the
+    view's first label edit, is ``<stable_id>.label_editor``.
 
 Properties
 ----------
@@ -78,6 +79,14 @@ draw_mode : default ``ItemDrawMode::normal``
 insertion_mark : default none
     Where the insertion mark stands, as an item's index and whether the mark
     is after it, or none. See `show_insertion_mark`.
+label_edit : default ``false``
+    Whether the user may edit items' labels in place (Windows Forms'
+    `LabelEdit`): F2 on the focused item begins an edit. Turning it off
+    cancels an edit in progress.
+label_edit_index
+    The item in edit, or none.
+label_editor
+    The `TextBox` of a label edit, or null before the view's first edit.
 realized_items
     The visible items' parts and states, in paint order.
 realized_sub_items
@@ -118,6 +127,15 @@ column_click
 column_width_changed
     Raised when a divider drag ends with a new width, or `set_column_width`
     changes one.
+before_label_edit
+    Raised before an item enters label edit, with its index and ID and no
+    label. A handler may cancel, and the item stays out of edit.
+after_label_edit
+    Raised once for each ended label edit, after the editor has closed, with
+    the edited text as the label, or no label when the edit was cancelled. A
+    handler may cancel to refuse the text, and the item keeps its text;
+    otherwise the label becomes an ordinary item's text. In virtual mode the
+    handler stores the label in the application's data.
 
 Methods
 -------
@@ -154,6 +172,17 @@ sort_items
     `std::logic_error` in virtual mode.
 item_index_at
     The item under a point in window coordinates, or none.
+begin_label_edit
+    Puts an item in label edit (Windows Forms' `ListViewItem.BeginEdit`),
+    after committing any other edit: raises `before_label_edit`, scrolls the
+    item into view and places the editor, with the item's text selected,
+    over its ``text`` part. Returns false when `label_edit` is off, the view
+    does not show the item, or a handler cancelled or changed the items.
+    Throws `std::out_of_range` for an index past the end.
+end_label_edit
+    Commits the edit in progress, if any.
+cancel_label_edit
+    Cancels the edit in progress, if any.
 show_insertion_mark
     Shows the insertion mark, the bar an application shows in the gap where
     a dragged item would drop: before or after an item, which is above or
@@ -181,7 +210,7 @@ Notes
 Items are records, not child controls, and every part is painted through the
 by-role paint path (`paint_part`). The view publishes ``region``, ``well``,
 ``header``, ``vertical_scroll_bar``, ``horizontal_scroll_bar``,
-``scroll_corner`` and ``focus``. Three item systems describe the visible
+``scroll_corner``, ``focus``, ``insertion_mark`` and ``label_editor``. Three item systems describe the visible
 items: ``item`` (``cell``, ``item_face``, ``check_well``, ``check``,
 ``icon``, ``text`` and ``cell_focus``, with the states selected, hot,
 current, checked, disabled and focus_visible), ``sub_item`` (``sub_item_cell``
@@ -208,6 +237,13 @@ Space toggles its selection; Control and A selects everything; Enter
 activates. Typing the first letters of an item's text selects the next
 matching item; virtual views do not search yet.
 
+With `label_edit` on, F2 begins editing the focused item's label in a
+`TextBox` over its text. Enter, a press elsewhere in the view, or focus
+leaving the editor commits the edit; Escape cancels it. Replacing or
+sorting the items, a new virtual source or `refresh_virtual_items` cancels
+an edit once the change is made. Scrolling keeps the edit: the editor
+follows its item, at no size while the item is out of view.
+
 In the details view the control publishes the accessibility role `table`,
 with the item count and the column count; in the other views it publishes
 `list`. It is `multiselectable` while `multi_select` is on. In the details
@@ -219,9 +255,10 @@ sub-item text. In the other views the items are `list_item`, or
 The select action selects an item; press activates it, or toggles a
 check-box item.
 
-Not supported yet: groups, the tile view, label editing, item tooltips,
-hot-tracking activation, column reordering,
-type-ahead in virtual mode, and wrapping large-icon labels over two lines.
+Not supported yet: groups, the tile view, item tooltips, hot-tracking
+activation, column reordering, type-ahead in virtual mode, wrapping
+large-icon labels over two lines, and beginning a label edit with a slow
+second click on the focused item.
 
 Examples
 --------

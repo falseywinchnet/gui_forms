@@ -3,6 +3,7 @@
 #include "../collection_control_utilities.hpp"
 #include "../details_columns.hpp"
 
+#include "gui_forms/controls/panel/text_box/text_box.hpp"
 #include "gui_forms/controls/range_control/scroll_bar/h_scroll_bar/h_scroll_bar.hpp"
 #include "gui_forms/controls/range_control/scroll_bar/v_scroll_bar/v_scroll_bar.hpp"
 #include "gui_forms/delegate.hpp"
@@ -278,6 +279,11 @@ void ListView::set_items(std::vector<ListViewItem> items) {
     ++model_revision_;
     insertion_mark_.reset();
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+    // An edit in progress is cancelled once the items have changed.
+    if (label_edit_index_) {
+        cancel_label_edit();
+        if (!is_alive()) return;
+    }
     if (selection_changed) publish_selection();
 }
 
@@ -295,6 +301,11 @@ void ListView::reset_after_model_change(std::size_t count) {
     ++model_revision_;
     insertion_mark_.reset();
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+    // An edit in progress is cancelled once the items have changed.
+    if (label_edit_index_) {
+        cancel_label_edit();
+        if (!is_alive()) return;
+    }
     if (selection_changed) publish_selection();
 }
 
@@ -600,7 +611,9 @@ void ListView::set_top_line(std::size_t line) {
     top_item_ = item;
     hot_index_.reset();
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
-    sync_scroll_bars(layout());
+    const Layout scrolled = layout();
+    place_label_editor(scrolled);
+    sync_scroll_bars(scrolled);
 }
 
 void ListView::scroll_lines(std::ptrdiff_t lines) {
@@ -618,6 +631,7 @@ void ListView::set_horizontal_offset(double offset) {
     const Layout placed = layout();
     horizontal_offset_ = placed.horizontal_offset;
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
+    place_label_editor(placed);
     sync_scroll_bars(placed);
 }
 
@@ -728,6 +742,11 @@ void ListView::sort_items(std::size_t column, ListViewSortOrder order) {
     ++model_revision_;
     insertion_mark_.reset();
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
+    // An edit in progress is cancelled once the items have changed.
+    if (label_edit_index_) {
+        cancel_label_edit();
+        if (!is_alive()) return;
+    }
     if (moved) publish_selection();
 }
 
@@ -787,6 +806,7 @@ void ListView::set_font(FontSpec font) {
     if (!valid_font_spec(font)) throw std::invalid_argument("ListView font specification is invalid");
     if (font_ == font) return;
     font_ = font;
+    if (label_editor_) (*label_editor_).set_font(font_);
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
@@ -1114,6 +1134,7 @@ void ListView::arrange(Rect final_bounds) {
     // Keep the stored scroll within the new bounds.
     top_item_ = std::min(top_item_, placed.top_line * placed.per_line);
     horizontal_offset_ = placed.horizontal_offset;
+    place_label_editor(placed);
     sync_scroll_bars(placed);
 }
 
@@ -1521,6 +1542,14 @@ void ListView::on_pointer(PointerEvent& event) {
             return;
         }
     }
+    if (event.action == PointerAction::down && label_edit_index_) {
+        // A press in the view commits the edit, then is handled against the
+        // view as the commit's handlers left it.
+        end_label_edit();
+        if (!is_alive() || label_edit_index_) return;
+        on_pointer(event);
+        return;
+    }
     const Layout placed = layout();
     if (event.action == PointerAction::leave) {
         if (hot_index_ || hot_column_) {
@@ -1633,6 +1662,20 @@ std::optional<std::size_t> ListView::navigation_target(std::uint32_t key, std::s
     return std::nullopt;
 }
 
+void ListView::on_key_preview(KeyEvent& event) {
+    // Keys for a label edit in progress, before the editor sees them.
+    if (!label_edit_index_ || event.action != KeyAction::down) return;
+    if (event.physical_key == PhysicalKey::escape) {
+        cancel_label_edit();
+        event.handled = true;
+        return;
+    }
+    if (event.physical_key == PhysicalKey::enter) {
+        end_label_edit();
+        event.handled = true;
+    }
+}
+
 void ListView::on_key(KeyEvent& event) {
     if (!focused_ || !effectively_enabled() || event.action != KeyAction::down) return;
     if (event.physical_key == PhysicalKey::escape && resizing_column_) {
@@ -1648,6 +1691,11 @@ void ListView::on_key(KeyEvent& event) {
                          has_modifier(event.modifiers, Modifier::meta);
     const bool shift = has_modifier(event.modifiers, Modifier::shift);
     const std::size_t from = std::min(focused_index_.value_or(0U), placed.shown_count - 1U);
+    if (event.physical_key == PhysicalKey::f2 && label_edit_ && focused_index_) {
+        static_cast<void>(begin_label_edit(*focused_index_));
+        event.handled = true;
+        return;
+    }
     if (event.physical_key == PhysicalKey::a && control && !shift) {
         select_all();
         event.handled = true;
@@ -1737,6 +1785,147 @@ void ListView::on_focus_changed(bool focused) {
         focused_index_ = first < selected_.size() ? first : top_index();
     }
     invalidate(Dirty::paint | Dirty::semantics);
+}
+
+// -- label editing -------------------------------------------------------------
+
+void ListView::set_label_edit(bool enabled) {
+    require_mutable();
+    if (label_edit_ == enabled) return;
+    label_edit_ = enabled;
+    if (!enabled) cancel_label_edit();
+}
+
+// The editor covers the item's text part, as item_parts places it for the
+// item's view; a scrolled-out item's editor keeps the focus at no size until
+// the item is shown again.
+Rect ListView::label_editor_bounds(const Layout& placed) const {
+    if (!label_edit_index_ || *label_edit_index_ >= placed.shown_count) return {};
+    const ItemParts parts = item_parts(placed, *label_edit_index_, placed.viewport);
+    return parts.text.bounds;
+}
+
+void ListView::place_label_editor(const Layout& placed) {
+    if (!label_editor_ || !label_edit_index_) return;
+    set_child_layout(label_editor_, label_editor_bounds(placed));
+}
+
+// The editor is made on the view's first edit, so that a view which is never
+// edited carries no TextBox.
+void ListView::create_label_editor() {
+    const std::string prefix(stable_id().value());
+    label_editor_ = make_control<TextBox>(StableId(prefix + ".label_editor"));
+    TextBox& editor = *label_editor_;
+    editor.set_border_style(BorderStyle::none);
+    editor.set_font(font_);
+    add_child(label_editor_);
+    set_child_layout_collapsed(label_editor_, true);
+    label_editor_focus_ = editor.focus_observed().subscribe(
+        *this, Delegate<bool>::bind<ListView, &ListView::on_label_editor_focus>(*this));
+}
+
+ListViewLabelEdit ListView::label_edit_event(std::optional<std::string> label) const {
+    ListViewLabelEdit event;
+    event.list_id = std::string(stable_id().value());
+    event.index = label_edit_index_.value_or(0U);
+    event.item_id = label_edit_item_id_;
+    event.label = std::move(label);
+    return event;
+}
+
+bool ListView::begin_label_edit(std::size_t index) {
+    require_mutable();
+    if (index >= item_count()) throw std::out_of_range("ListView item index is past the end");
+    if (!label_edit_) return false;
+    if (label_edit_index_ && *label_edit_index_ == index) return true;
+    const Control::Ptr lifetime = shared_from_this();
+    if (label_edit_index_) {
+        end_label_edit();
+        // The commit's handlers may change or end the view, or begin an edit.
+        if (!is_alive() || !label_edit_ || index >= item_count()) return false;
+        if (label_edit_index_) return *label_edit_index_ == index;
+    }
+    if (index >= layout().shown_count) return false;
+    ListViewItem scratch;
+    const std::string item_id = item_at(index, scratch).stable_id;
+    ListViewLabelEdit request;
+    request.list_id = std::string(stable_id().value());
+    request.index = index;
+    request.item_id = item_id;
+    before_label_edit_.emit(request);
+    if (request.cancel || !is_alive() || !label_edit_ || label_edit_index_) return false;
+    // A handler may have changed the items: the edit begins only on the item
+    // it was asked for, still shown at `index`.
+    if (index >= item_count() || index >= layout().shown_count) return false;
+    const ListViewItem& item = item_at(index, scratch);
+    if (item.stable_id != item_id) return false;
+    std::string text = item.text;
+    ensure_visible(index);
+    if (!label_editor_) create_label_editor();
+    label_edit_index_ = index;
+    label_edit_item_id_ = item_id;
+    TextBox& editor = *label_editor_;
+    editor.set_text(std::move(text));
+    set_child_layout_collapsed(label_editor_, false);
+    place_label_editor(layout());
+    invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+    Window* const host = window();
+    if (host != nullptr) static_cast<void>((*host).request_focus(label_editor_));
+    // Focus handlers may end the edit or the view.
+    if (!is_alive() || !label_edit_index_ || *label_edit_index_ != index) return false;
+    editor.select_all();
+    return true;
+}
+
+void ListView::end_label_edit() {
+    if (!label_edit_index_ || closing_label_editor_) return;
+    const Control::Ptr lifetime = shared_from_this();
+    const std::string label((*label_editor_).text());
+    const std::string item_id = label_edit_item_id_;
+    ListViewLabelEdit ended = label_edit_event(label);
+    close_label_editor();
+    if (!is_alive()) return;
+    after_label_edit_.emit(ended);
+    if (!is_alive() || ended.cancel) return;
+    if (source_) {
+        // The application stored the label; the view retrieves it again.
+        invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+        return;
+    }
+    // The label goes to the item with the edited ID, wherever a handler has
+    // moved it; an item a handler removed takes nothing.
+    const std::optional<std::size_t> at = index_of(item_id);
+    if (!at || items_[*at].text == label) return;
+    items_[*at].text = label;
+    invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void ListView::cancel_label_edit() {
+    if (!label_edit_index_ || closing_label_editor_) return;
+    const Control::Ptr lifetime = shared_from_this();
+    ListViewLabelEdit ended = label_edit_event(std::nullopt);
+    close_label_editor();
+    if (!is_alive()) return;
+    after_label_edit_.emit(ended);
+}
+
+void ListView::close_label_editor() {
+    closing_label_editor_ = true;
+    Window* const host = window();
+    const bool editor_focused = host != nullptr && label_editor_ && (*host).focused_control() == label_editor_;
+    label_edit_index_.reset();
+    label_edit_item_id_.clear();
+    if (editor_focused) static_cast<void>((*host).request_focus(shared_from_this()));
+    if (label_editor_) set_child_layout_collapsed(label_editor_, true);
+    closing_label_editor_ = false;
+    invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void ListView::on_label_editor_focus(bool focused) {
+    if (focused || !label_edit_index_ || closing_label_editor_ || !is_alive()) return;
+    // Focus left the editor for another control: the user has moved on, and
+    // the edit commits.
+    end_label_edit();
 }
 
 // -- semantics -----------------------------------------------------------------
@@ -1902,7 +2091,7 @@ namespace {
 
 constexpr std::array<AnatomyState, 1> insertion_mark_states{{AnatomyState::drop_accepted}};
 
-constexpr std::array<PartField<ListView::Parts>, 8> list_view_part_fields{{
+constexpr std::array<PartField<ListView::Parts>, 9> list_view_part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &ListView::Parts::region},
     {.declaration = {.name = "well", .role = PartRole::well, .composed_from = {}},
@@ -1923,6 +2112,8 @@ constexpr std::array<PartField<ListView::Parts>, 8> list_view_part_fields{{
     {.declaration = {.name = "insertion_mark", .role = PartRole::drop, .composed_from = {},
                      .states = insertion_mark_states},
      .member = &ListView::Parts::insertion_mark},
+    {.declaration = {.name = "label_editor", .role = PartRole::well, .composed_from = "text_box"},
+     .member = &ListView::Parts::label_editor},
 }};
 
 constexpr std::array<PartField<ListView::ItemParts>, 7> list_view_item_part_fields{{
@@ -1987,7 +2178,7 @@ constexpr std::array<CustomStateDeclaration, 2> list_view_column_custom_states{{
     {.name = "sorted_descending"},
 }};
 
-constexpr std::array<PartDeclaration, 8> list_view_parts = part_declarations(list_view_part_fields);
+constexpr std::array<PartDeclaration, 9> list_view_parts = part_declarations(list_view_part_fields);
 constexpr std::array<PartDeclaration, 7> list_view_item_parts = part_declarations(list_view_item_part_fields);
 constexpr std::array<AnatomyState, 6> list_view_item_states = state_declarations(list_view_item_state_fields);
 constexpr std::array<PartDeclaration, 2> list_view_sub_item_parts =
@@ -2039,6 +2230,7 @@ void ListView::publish_part_geometry(std::span<PartGeometry> geometry) const {
     record.focus = PartGeometry::from_bounds(placed.well);
     record.insertion_mark = PartGeometry::from_bounds(insertion_mark_bounds(placed));
     if (record.insertion_mark.present) record.insertion_mark.states.insert(AnatomyState::drop_accepted);
+    record.label_editor = PartGeometry::from_bounds(label_editor_bounds(placed));
     write_parts(anatomy(), list_view_part_fields, record, geometry);
 }
 
@@ -2218,7 +2410,7 @@ std::vector<ListView::Column> ListView::realized_columns() const {
 namespace {
 
 // The events ListView adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 7> list_view_interactions{{
+constexpr std::array<InteractionDeclaration, 9> list_view_interactions{{
     {.name = "draw_item_content", .payload = "ItemContentPaint", .mutable_payload = true},
     {.name = "selection_changed", .payload = "ListViewSelectionChange", .mutable_payload = false},
     {.name = "item_activated", .payload = "ListViewItemActivation", .mutable_payload = false},
@@ -2226,6 +2418,8 @@ constexpr std::array<InteractionDeclaration, 7> list_view_interactions{{
     {.name = "item_checked", .payload = "ListViewItemCheck", .mutable_payload = false},
     {.name = "column_click", .payload = "ListViewColumnClick", .mutable_payload = false},
     {.name = "column_width_changed", .payload = "ListViewColumnWidthChange", .mutable_payload = false},
+    {.name = "before_label_edit", .payload = "ListViewLabelEdit", .mutable_payload = true},
+    {.name = "after_label_edit", .payload = "ListViewLabelEdit", .mutable_payload = true},
 }};
 
 } // namespace
