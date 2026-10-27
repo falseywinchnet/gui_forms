@@ -74,7 +74,7 @@ public:
                                                      theme_language::ThemeDiagnosticList& diagnostics);
 
 private:
-    // Scratch storage, reused from read to read (house style section 5).
+    // Scratch storage, reused from read to read (house style section 1).
     theme_language::ThemeTokenBuffer tokens_{};
     theme_language::LineStartTable lines_{};
     // One declaration's value: the positions in tokens_ of its tokens other

@@ -406,7 +406,7 @@ void SheetTokenizer::run() {
     }
 }
 
-// The encoding pass (house style §3: validate the whole buffer before the
+// The encoding pass (house style §8: validate the whole buffer before the
 // kernel): one diagnostic per run of ill-formed UTF-8 bytes and per NUL.
 void report_encoding_defects(const ThemeSource& source, const LineStartTable& lines,
                              ThemeDiagnosticList& diagnostics) {

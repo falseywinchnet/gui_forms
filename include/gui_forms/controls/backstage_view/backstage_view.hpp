@@ -152,7 +152,7 @@ private:
     [[nodiscard]] AnatomyStateSet item_states(std::size_t item) const;
     // An item's text as authored, mnemonic marker included: its own, or its
     // Command's when it has none. A borrow of the argument (or of its
-    // Command's state): temporaries are refused (house style §5).
+    // Command's state): temporaries are refused (house style §1).
     [[nodiscard]] static const std::string& authored_text(const BackstageItemSpec& item) noexcept;
     static const std::string& authored_text(BackstageItemSpec&& item) = delete;
     [[nodiscard]] std::string item_text(const BackstageItemSpec& item) const;

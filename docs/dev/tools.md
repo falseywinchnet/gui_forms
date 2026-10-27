@@ -45,12 +45,12 @@ template_harness, checked out beside this repository at the commit
 
 `tools/check_lifetime_rules.py`
 : The borrow and foreign-type checks the `house-style` job runs (house style
-  sections 5 and 9). Heuristics over masked source, like the spelling
+  sections 1 and 2). Heuristics over masked source, like the spelling
   scanner; they do not check destruction order.
   `python3 -B tools/check_lifetime_rules.py tests/semantic_tests.cpp`
 
 `tools/check_state_machines.py`
-: The state-machine checker (house style sections 1 and 9). With
+: The state-machine checker (house style sections 2 and 3). With
   `--build-dir`, it runs the compiler's switch warnings over a configured
   ninja tree. The `state-machine-gate` CI job
   (`.github/workflows/state-machines.yml`) runs it with `--gate`, which

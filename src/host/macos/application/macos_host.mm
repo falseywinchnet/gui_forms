@@ -1744,7 +1744,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     return element;
 }
 
-// Main-queue work without Objective-C blocks (house style section 2, owner
+// Main-queue work without Objective-C blocks (house style section 9, owner
 // decision V2-1). Each posting allocates one named context on the heap and
 // passes it to dispatch_async_f with a named dispatch_function_t; the
 // function adopts the context (std::unique_ptr) and so deletes it whether or

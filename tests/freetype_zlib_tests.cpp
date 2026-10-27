@@ -23,7 +23,7 @@ void release(FT_Memory, void* block) { std::free(block); }
 void* reallocate(FT_Memory, long, long size, void* block) {
     return std::realloc(block, static_cast<std::size_t>(size));
 }
-// The callbacks take FreeType's declared types (house style §9).
+// The callbacks take FreeType's declared types (house style §2).
 static_assert(std::is_same_v<decltype(&allocate), FT_Alloc_Func>);
 static_assert(std::is_same_v<decltype(&release), FT_Free_Func>);
 static_assert(std::is_same_v<decltype(&reallocate), FT_Realloc_Func>);

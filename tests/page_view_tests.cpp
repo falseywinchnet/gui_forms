@@ -46,7 +46,7 @@ std::string selected_id(const PageSet& pages) {
 }
 
 // Borrows from `nodes`: the pointer is valid while that vector lives. The
-// deleted overload refuses a temporary (house style section 5).
+// deleted overload refuses a temporary (house style section 1).
 const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::string_view id) {
     for (const SemanticNode& node : nodes) {
         if (node.stable_id == id) return &node;

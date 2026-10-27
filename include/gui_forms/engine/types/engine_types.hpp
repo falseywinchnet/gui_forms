@@ -34,7 +34,7 @@ struct EngineVersion final {
 inline constexpr EngineVersion current_engine_version{0, 3};
 
 // Device pixels per logical unit. Kept apart from plain doubles so that a
-// logical length is never passed where a scale is meant (house style §1).
+// logical length is never passed where a scale is meant (house style §3).
 struct DeviceScale final {
     double value{1.0};
 

@@ -53,7 +53,7 @@ Related types
    * - :cpp:class:`BlockFlowItemResult <gui_forms::BlockFlowItemResult>`
      - One item's result.
    * - :cpp:class:`BlockFlowLayoutWorkspace <gui_forms::BlockFlowLayoutWorkspace>`
-     - Caller-owned storage solve_block_flow fills, reused from layout to layout (house style section 5): ``items`` has one record per input item, in input order; ``lines`` the line boxes in order.
+     - Caller-owned storage solve_block_flow fills, reused from layout to layout (house style section 1): ``items`` has one record per input item, in input order; ``lines`` the line boxes in order.
    * - :cpp:class:`BlockFlowLine <gui_forms::BlockFlowLine>`
      - One line box, its items being items[first, first + count).
    * - :cpp:class:`BoxAlignment <gui_forms::BoxAlignment>`
@@ -95,7 +95,7 @@ Related types
    * - :cpp:class:`FlexItemStyle <gui_forms::FlexItemStyle>`
      -  
    * - :cpp:class:`FlexLayoutWorkspace <gui_forms::FlexLayoutWorkspace>`
-     - Caller-owned storage both calls fill, reused from layout to layout (house style section 5): ``items`` has one record per input item, in input order; ``order`` the input positions in (order, position) order; ``lines`` the lines in order.
+     - Caller-owned storage both calls fill, reused from layout to layout (house style section 1): ``items`` has one record per input item, in input order; ``order`` the input positions in (order, position) order; ``lines`` the lines in order.
    * - :cpp:class:`FlexLine <gui_forms::FlexLine>`
      - One flex line, its items being order[first, first + count).
    * - :cpp:class:`FlexMargin <gui_forms::FlexMargin>`
@@ -119,7 +119,7 @@ Related types
    * - :cpp:class:`GridItemStyle <gui_forms::GridItemStyle>`
      -  
    * - :cpp:class:`GridLayoutWorkspace <gui_forms::GridLayoutWorkspace>`
-     - Caller-owned storage the four calls fill, reused from layout to layout (house style section 5): ``items`` has one record per input item, in input order; ``columns`` and ``rows`` the tracks of the implicit grid in line order.
+     - Caller-owned storage the four calls fill, reused from layout to layout (house style section 1): ``items`` has one record per input item, in input order; ``columns`` and ``rows`` the tracks of the implicit grid in line order.
    * - :cpp:class:`GridLayoutWorkspace::AxisPlacement <gui_forms::GridLayoutWorkspace::AxisPlacement>`
      - One item's placement on one axis during auto-placement: its start line (zero for the explicit grid's first line, negative before it), its span, and whether its lines fixed it.
    * - :cpp:class:`GridLayoutWorkspace::TrackFunction <gui_forms::GridLayoutWorkspace::TrackFunction>`
@@ -433,7 +433,7 @@ Related types
 
    ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
 
-   Caller-owned storage solve_block_flow fills, reused from layout to layout (house style section 5): :cpp:func:`items <gui_forms::BlockFlowLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`lines <gui_forms::BlockFlowLayoutWorkspace::lines>` the line boxes in order. Its storage grows only when the item or line count does.
+   Caller-owned storage solve_block_flow fills, reused from layout to layout (house style section 1): :cpp:func:`items <gui_forms::BlockFlowLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`lines <gui_forms::BlockFlowLayoutWorkspace::lines>` the line boxes in order. Its storage grows only when the item or line count does.
 
 
    .. rubric:: Properties
@@ -913,7 +913,7 @@ Related types
 
    ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
 
-   Caller-owned storage both calls fill, reused from layout to layout (house style section 5): :cpp:func:`items <gui_forms::FlexLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`order <gui_forms::FlexLayoutWorkspace::order>` the input positions in (order, position) order; :cpp:func:`lines <gui_forms::FlexLayoutWorkspace::lines>` the lines in order. Its storage grows only when the item count does.
+   Caller-owned storage both calls fill, reused from layout to layout (house style section 1): :cpp:func:`items <gui_forms::FlexLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`order <gui_forms::FlexLayoutWorkspace::order>` the input positions in (order, position) order; :cpp:func:`lines <gui_forms::FlexLayoutWorkspace::lines>` the lines in order. Its storage grows only when the item count does.
 
 
    .. rubric:: Properties
@@ -1175,7 +1175,7 @@ Related types
 
    ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
 
-   Caller-owned storage the four calls fill, reused from layout to layout (house style section 5): :cpp:func:`items <gui_forms::GridLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`columns <gui_forms::GridLayoutWorkspace::columns>` and :cpp:func:`rows <gui_forms::GridLayoutWorkspace::rows>` the tracks of the implicit grid in line order. Its storage grows only when the item or track count does.
+   Caller-owned storage the four calls fill, reused from layout to layout (house style section 1): :cpp:func:`items <gui_forms::GridLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`columns <gui_forms::GridLayoutWorkspace::columns>` and :cpp:func:`rows <gui_forms::GridLayoutWorkspace::rows>` the tracks of the implicit grid in line order. Its storage grows only when the item or track count does.
 
 
    .. rubric:: Properties

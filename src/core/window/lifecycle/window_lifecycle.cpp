@@ -66,7 +66,7 @@ Window::~Window() {
     paint_wake_handler_ = {};
     paint_wake_pending_ = false;
     abandon_deferred_input();
-    // Teardown order (house style §6): the controls are told everything
+    // Teardown order (house style §4): the controls are told everything
     // (popups closing, capture and focus revoked, the tree detached) while
     // the dispatcher still accepts work, and the dispatcher is shut down
     // only after them, which cancels whatever they posted. If a host shut it
