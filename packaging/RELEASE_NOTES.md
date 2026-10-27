@@ -140,12 +140,13 @@ mail mockup.
 ### Release pipeline
 - As in 0.1, each program is built, tested, packaged and smoke-launched on
   macOS, Windows and Linux runners before anything is uploaded.
-- Each release now also carries the installed SDK for every platform,
-  `gui-forms-sdk-<version>-<platform>.tar.gz` (`.zip` on Windows), built
-  from the same tested tree as the programs and listed in `SHA256SUMS.txt`.
-  It holds the headers, libraries, CMake package, `cmake/llvm22.cmake`, the
-  licences and, on macOS, the LLVM runtime as `llvm-runtime/` (see
-  docs/user/install.md, "The release SDK archives").
+- Each release now also carries the source SDK,
+  `gui-forms-sdk-<version>-source.tar.gz`, listed in `SHA256SUMS.txt`. It
+  holds the release commit's tree, the pinned HarfBuzz, FreeType,
+  libunibreak and miniaudio sources, and `SDK_MANIFEST.json`. Build GUI.Forms
+  for your own platform with `tools/build_sdk.py --target <platform> --prefix
+  <dir>` (see docs/user/install.md, "The source SDK"). It replaces the four
+  per-platform binary SDK archives that briefly accompanied 0.2 releases.
 
 ## Known limits
 

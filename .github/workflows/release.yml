@@ -74,6 +74,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_publication_version.py
           python3 -B -m unittest discover -s tools -p test_package_programs.py
           python3 -B -m unittest discover -s tools -p test_package_sdk.py
+          python3 -B -m unittest discover -s tools -p test_build_sdk.py
           python3 -B -m unittest discover -s tools -p test_prune_cache_releases.py
           python3 -B -m unittest discover -s tools -p test_release_tests.py
       - name: Select one tested publication version
@@ -385,12 +386,13 @@ jobs:
           else
             python gui_forms/tools/smoke_package.py --platform "${{ matrix.platform }}" --dist dist --build-dir "$BUILD_DIR" --install
           fi
-      # The SDK comes from this tested tree: promoted main runs skip the native
-      # jobs' build, so only this job always has an installable tree.
-      - name: Package the SDK
+      # The source SDK is platform-neutral, so one leg writes it: this tested
+      # commit's tree plus the pinned sources the build above configured from.
+      - name: Package the source SDK
+        if: matrix.platform == 'linux-x64'
         run: |
-          python gui_forms/tools/package_sdk.py --platform "${{ matrix.platform }}" --build-dir "$BUILD_DIR" \
-            --version "$RELEASE_VERSION" --out dist
+          python gui_forms/tools/package_sdk.py --version "$RELEASE_VERSION" --revision "${{ github.sha }}" --out dist \
+            --checkout "miniaudio=$BUILD_DIR/_deps/gui_forms_miniaudio-src" --fetch-missing
       - uses: actions/upload-artifact@v4
         with:
           name: gui-forms-programs-${{ matrix.platform }}

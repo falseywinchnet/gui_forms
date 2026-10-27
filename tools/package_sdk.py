@@ -1,278 +1,449 @@
 #!/usr/bin/env python3
-"""Archive the installed GUI.Forms SDK for one platform.
+"""Archive the GUI.Forms source SDK: the release's tree plus its pinned third-party sources.
 
-Installs the configured build directory into a staging prefix named after the
-archive's top directory, adds what a consumer needs beside the installed
-package, checks the shape, and writes one deterministic archive into --out:
+One platform-neutral archive, gui-forms-sdk-<version>-source.tar.gz, from
+which a consumer builds GUI.Forms for its own host with tools/build_sdk.py:
 
-  gui-forms-sdk-<version>-<platform>.tar.gz   macOS and Linux
-  gui-forms-sdk-<version>-<platform>.zip      Windows
+  gui-forms-sdk-<version>/
+    ...                         the release commit's tree (git archive)
+    third_party/harfbuzz/       HarfBuzz at fetch_text_stack.sh's pin (test/ and perf/ left out)
+    third_party/freetype/       FreeType at fetch_text_stack.sh's pin
+    third_party/libunibreak/    libunibreak at fetch_linebreak.sh's pin
+    third_party/miniaudio/      miniaudio at cmake/Audio.cmake's pin
+    SDK_MANIFEST.json           the build entry point, every vendored source with
+                                its pin and tree digest, and what a build still
+                                downloads (network_inputs) or needs installed
+                                (prebuilt_inputs)
 
-  gui-forms-sdk-<version>-<platform>/
-    include/gui_forms/            public headers
-    lib/                          libraries (Windows DLLs are in bin/)
-    lib/cmake/GUIForms/           GUIFormsConfig.cmake, the version file, the exported targets
-    cmake/llvm22.cmake            the toolchain file every consumer passes
-    share/GUIForms/fonts/         the bundled fonts, with a native host
-    share/licenses/GUIForms/      LICENSE, THIRD_PARTY_NOTICES.md and the third-party licences
-    llvm-runtime/                 macOS only: the LLVM 22 libc++ runtime for GUI_FORMS_LLVM_RUNTIME
+Each vendored source sits at the in-tree path its fetch script or CMake file
+reads first, so configuring from the archive fetches none of them. Pins are
+read from those files, never repeated here. The archive is reproducible:
+entries in name order, one fixed time, no owner.
 
-tools/publish_tested_release.py expects one archive per platform under
-sdk_archive_name() and lists it in SHA256SUMS.txt. --check reads an existing
-archive and checks its shape without installing anything.
+tools/publish_tested_release.py expects the archive under sdk_archive_name()
+and lists it in SHA256SUMS.txt. --check reads an existing archive and checks
+its shape and every vendored digest.
 """
 from __future__ import annotations
 
 import argparse
 import gzip
-import os
-import shutil
+import hashlib
+import io
+import json
+import re
 import subprocess
 import sys
 import tarfile
 import tempfile
-import zipfile
-from pathlib import Path
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+from typing import Any
 
 ROOT: Path = Path(__file__).resolve().parents[1]
-TOOLCHAIN_FILE: Path = ROOT / "cmake/llvm22.cmake"
-PLATFORMS: tuple[str, ...] = ("macos-arm64", "windows-x64", "linux-x64", "linux-arm64")
-ZIP_PLATFORMS: tuple[str, ...] = ("windows-x64",)
-MACOS_PLATFORM: str = "macos-arm64"
-RUNTIME_DIRECTORY: str = "llvm-runtime"
-# Files every SDK archive carries, relative to its top directory. The package
-# configuration is what find_package(GUIForms CONFIG) reads; the toolchain
-# file appears twice: where the package installs it and where the source
-# tree keeps it, so the documented -DCMAKE_TOOLCHAIN_FILE=<root>/cmake/llvm22.cmake
-# works for an archive as for a checkout.
-REQUIRED_FILES: tuple[str, ...] = (
-    "lib/cmake/GUIForms/GUIFormsConfig.cmake",
-    "lib/cmake/GUIForms/GUIFormsConfigVersion.cmake",
-    "lib/cmake/GUIForms/GUIFormsTargets.cmake",
-    "lib/cmake/GUIForms/llvm22.cmake",
-    "cmake/llvm22.cmake",
-    "share/licenses/GUIForms/LICENSE",
-    "share/licenses/GUIForms/THIRD_PARTY_NOTICES.md",
-)
-REQUIRED_DIRECTORY_PREFIXES: tuple[str, ...] = ("include/gui_forms/",)
-# The macOS runtime prefix tools/build_macos_runtimes.py installs: three
-# shared libraries, the configured libc++ headers and their licences.
-MACOS_RUNTIME_FILES: tuple[str, ...] = (
-    RUNTIME_DIRECTORY + "/lib/libc++.1.dylib",
-    RUNTIME_DIRECTORY + "/include/c++/v1/__config_site",
-    RUNTIME_DIRECTORY + "/share/licenses/llvm-runtimes/libcxx-LICENSE.TXT",
-)
-# Every member of an archive gets this time stamp, owner and group, so two
-# packagings of the same install are byte-identical. 1980-01-01 is the
-# earliest time a zip entry can record.
+MANIFEST_NAME: str = "SDK_MANIFEST.json"
+MANIFEST_SCHEMA: int = 1
+BUILD_ENTRY: str = "tools/build_sdk.py"
+# Every entry gets this time stamp and no owner, so two packagings of the same
+# commit and pins are byte-identical (1980-01-01, as zip's earliest time).
 ARCHIVE_EPOCH: int = 315532800
-ZIP_DATE_TIME: tuple[int, int, int, int, int, int] = (1980, 1, 1, 0, 0, 0)
+# What an archive may never carry: a Git directory or anything a build writes.
+FORBIDDEN_COMPONENTS: frozenset[str] = frozenset({".git", ".build", "CMakeFiles"})
+FORBIDDEN_NAMES: frozenset[str] = frozenset({"CMakeCache.txt", "build.ninja", "install_manifest.txt"})
+FORBIDDEN_SUFFIXES: frozenset[str] = frozenset({".o", ".obj", ".a", ".lib", ".dll", ".exe", ".dylib", ".so", ".pdb"})
+REVISION_PATTERN: str = r"[0-9a-f]{40}"
 
 
-def sdk_directory_name(version: str, platform: str) -> str:
-    """The archive's single top directory, and the staged install prefix."""
-    return "gui-forms-sdk-" + version + "-" + platform
+@dataclass(frozen=True)
+class VendoredSource:
+    """One pinned third-party source the archive carries.
 
-
-def sdk_archive_name(version: str, platform: str) -> str:
-    """The release asset name of one platform's SDK archive."""
-    if platform not in PLATFORMS:
-        raise ValueError("unknown platform " + platform)
-    suffix: str = ".zip" if platform in ZIP_PLATFORMS else ".tar.gz"
-    return sdk_directory_name(version, platform) + suffix
-
-
-def required_members(platform: str) -> tuple[str, ...]:
-    """The files one platform's archive must hold, relative to its top directory."""
-    if platform == MACOS_PLATFORM:
-        return REQUIRED_FILES + MACOS_RUNTIME_FILES
-    return REQUIRED_FILES
-
-
-def check_member_names(names: list[str], version: str, platform: str) -> None:
-    """Raise ValueError unless names (archive members, files only) have the SDK's shape.
-
-    Every member lies under the one top directory, no member escapes it, and
-    the required files and directories are present.
+    path is where the build reads it, relative to the top directory;
+    pin_file and pin_pattern locate its pinned commit (the pattern's one
+    group); excluded lists path prefixes inside the source left out because
+    no GUI.Forms build reads them.
     """
-    top: str = sdk_directory_name(version, platform) + "/"
-    relative: set[str] = set()
     name: str
-    for name in names:
-        if not name.startswith(top):
-            raise ValueError(f"{name} is outside the top directory {top}")
-        inner: str = name[len(top):]
-        if inner.startswith("/") or ".." in inner.split("/"):
-            raise ValueError(f"{name} escapes the top directory")
-        relative.add(inner)
-    missing: list[str] = []
-    required: str
-    for required in required_members(platform):
-        if required not in relative:
-            missing.append(required)
-    prefix: str
-    for prefix in REQUIRED_DIRECTORY_PREFIXES:
-        if not any(entry.startswith(prefix) for entry in relative):
-            missing.append(prefix)
-    if missing:
-        raise ValueError("the SDK archive lacks " + ", ".join(missing))
+    path: str
+    upstream: str
+    pin_file: str
+    pin_pattern: str
+    licence: str
+    excluded: tuple[str, ...]
 
 
-def archive_file_names(archive: Path) -> list[str]:
-    """The names of the regular files and links in a .zip or .tar.gz archive."""
-    names: list[str] = []
-    if archive.name.endswith(".zip"):
-        with zipfile.ZipFile(archive) as compressed:
-            info: zipfile.ZipInfo
-            for info in compressed.infolist():
-                if not info.is_dir():
-                    names.append(info.filename)
-        return names
-    with tarfile.open(archive, "r:gz") as tar:
-        member: tarfile.TarInfo
-        for member in tar.getmembers():
-            if not member.isdir():
-                names.append(member.name)
-    return names
+VENDORED: tuple[VendoredSource, ...] = (
+    VendoredSource("harfbuzz", "third_party/harfbuzz", "https://github.com/harfbuzz/harfbuzz.git",
+                   "third_party/fetch_text_stack.sh", r"^harfbuzz_revision=(" + REVISION_PATTERN + r")$",
+                   "COPYING", ("test/", "perf/")),
+    VendoredSource("freetype", "third_party/freetype", "https://gitlab.freedesktop.org/freetype/freetype.git",
+                   "third_party/fetch_text_stack.sh", r"^freetype_revision=(" + REVISION_PATTERN + r")$",
+                   "LICENSE.TXT", ()),
+    VendoredSource("libunibreak", "third_party/libunibreak", "https://github.com/adah1972/libunibreak.git",
+                   "third_party/fetch_linebreak.sh", r"^revision=(" + REVISION_PATTERN + r")$",
+                   "LICENCE", ()),
+    VendoredSource("miniaudio", "third_party/miniaudio", "https://github.com/mackron/miniaudio.git",
+                   "cmake/Audio.cmake", r"^\s*GIT_TAG (" + REVISION_PATTERN + r")$",
+                   "LICENSE", ()),
+)
 
 
-def check_archive(archive: Path, version: str, platform: str) -> None:
-    """Raise ValueError unless archive is this platform's SDK archive, by name and shape."""
-    expected: str = sdk_archive_name(version, platform)
-    if archive.name != expected:
-        raise ValueError(f"{archive.name} is not named {expected}")
-    check_member_names(archive_file_names(archive), version, platform)
+@dataclass
+class Entry:
+    """One archive member: a regular file (data) or a symbolic link (link)."""
+    data: bytes | None
+    link: str | None
+    executable: bool
 
 
-def stage_tree(top: Path) -> list[Path]:
-    """Every file, link and directory under top, parents before children, in name order."""
-    entries: list[Path] = []
-    path: Path
-    for path in sorted(top.rglob("*"), key=Path.as_posix):
-        entries.append(path)
+def sdk_directory_name(version: str) -> str:
+    """The archive's single top directory."""
+    return "gui-forms-sdk-" + version
+
+
+def sdk_archive_name(version: str) -> str:
+    """The release asset name of the source SDK."""
+    return sdk_directory_name(version) + "-source.tar.gz"
+
+
+def pinned_revision(root: Path, source: VendoredSource) -> str:
+    """source's pinned commit, read from its pin file under root."""
+    text: str = (root / source.pin_file).read_text(encoding="utf-8")
+    pins: list[str] = re.findall(source.pin_pattern, text, re.MULTILINE)
+    if len(pins) != 1:
+        raise ValueError(f"{source.pin_file} pins {source.name} {len(pins)} times, not once")
+    return pins[0]
+
+
+def script_pin(root: Path, script: str, variable: str) -> str:
+    """The commit a fetch script pins as <variable>=<commit>."""
+    text: str = (root / script).read_text(encoding="utf-8")
+    pins: list[str] = re.findall(r"^" + variable + r"=(" + REVISION_PATTERN + r")$", text, re.MULTILINE)
+    if len(pins) != 1:
+        raise ValueError(f"{script} pins {variable} {len(pins)} times, not once")
+    return pins[0]
+
+
+def is_build_output(relative: str) -> bool:
+    """Whether a path inside the top directory is a Git directory or build output."""
+    parts: tuple[str, ...] = PurePosixPath(relative).parts
+    part: str
+    for part in parts:
+        if part in FORBIDDEN_COMPONENTS:
+            return True
+    name: str = parts[-1]
+    return name in FORBIDDEN_NAMES or PurePosixPath(name).suffix in FORBIDDEN_SUFFIXES
+
+
+def read_tar_members(tar: tarfile.TarFile, where: str) -> dict[str, Entry]:
+    """The files and links of an open tar, by name; directories left out."""
+    entries: dict[str, Entry] = {}
+    member: tarfile.TarInfo
+    for member in tar.getmembers():
+        if member.isdir():
+            continue
+        if member.issym():
+            entries[member.name] = Entry(None, member.linkname, False)
+            continue
+        if not member.isfile():
+            raise ValueError(f"{where}: {member.name} is neither a file nor a link")
+        stream: Any = tar.extractfile(member)
+        entries[member.name] = Entry(stream.read(), None, bool(member.mode & 0o111))
     return entries
 
 
-def write_tar_gz(top: Path, archive: Path) -> None:
-    """Write top into archive as a gzip tar rooted at top's name, links kept as links."""
+def git_tree(checkout: Path, revision: str) -> dict[str, Entry]:
+    """The files and links of revision in the Git checkout, by path.
+
+    Reads `git archive`, so the result is the commit's tree whatever the
+    checkout's working files are; submodules are not included.
+    """
+    completed: subprocess.CompletedProcess[bytes] = subprocess.run(
+        ["git", "-C", str(checkout), "archive", "--format=tar", revision], check=True, capture_output=True)
+    with tarfile.open(fileobj=io.BytesIO(completed.stdout), mode="r:") as tar:
+        return read_tar_members(tar, f"{checkout} {revision}")
+
+
+def tree_digest(entries: dict[str, Entry]) -> str:
+    """SHA-256 over every path, kind, executable bit and content of entries, in path order."""
+    digest: Any = hashlib.sha256()
+    path: str
+    for path in sorted(entries):
+        entry: Entry = entries[path]
+        digest.update(path.encode("utf-8") + b"\0")
+        if entry.link is not None:
+            digest.update(b"link\0" + entry.link.encode("utf-8") + b"\0")
+        else:
+            digest.update(b"file\0" + (b"x" if entry.executable else b"-") + b"\0")
+            digest.update(hashlib.sha256(entry.data or b"").digest())
+    return digest.hexdigest()
+
+
+def without_excluded(entries: dict[str, Entry], excluded: tuple[str, ...]) -> dict[str, Entry]:
+    """entries less those under any excluded prefix."""
+    kept: dict[str, Entry] = {}
+    path: str
+    for path in entries:
+        if not path.startswith(excluded):
+            kept[path] = entries[path]
+    return kept
+
+
+def network_inputs(root: Path) -> list[dict[str, Any]]:
+    """What a source build still downloads, by platform, with each pin."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from macos_runtime_manifest import SOURCE_SHA256, VERSION
+    return [
+        {"name": "skia", "platforms": ["macos-arm64", "linux-x64", "linux-arm64"],
+         "fetched_by": "third_party/fetch_skia_cpu.sh", "path": "third_party/skia",
+         "upstream": "https://skia.googlesource.com/skia.git", "mirror": "https://github.com/google/skia.git",
+         "revision": script_pin(root, "third_party/fetch_skia_cpu.sh", "skia_revision"),
+         "note": "the CPU renderer's source, built by build_skia_cpu.sh or build_skia_cpu_linux.sh; "
+                 "about 176 MB in 12,278 files, so it is not vendored"},
+        {"name": "skia-freetype", "platforms": ["macos-arm64", "linux-x64", "linux-arm64"],
+         "fetched_by": "third_party/fetch_skia_cpu.sh", "path": "third_party/skia/third_party/externals/freetype",
+         "upstream": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git",
+         "mirror": "https://github.com/freetype/freetype.git",
+         "revision": script_pin(root, "third_party/fetch_skia_cpu.sh", "freetype_revision"),
+         "note": "Skia's own FreeType, about 11 MB"},
+        {"name": "skia-gn-ninja", "platforms": ["macos-arm64"],
+         "fetched_by": "third_party/skia/bin/fetch-gn and bin/fetch-ninja (run by fetch_skia_cpu.sh)",
+         "note": "prebuilt gn and ninja binaries Skia's scripts download; Linux uses the system gn and ninja "
+                 "(GUI_FORMS_SYSTEM_BUILD_TOOLS=1)"},
+        {"name": "llvm-runtimes-source", "platforms": ["macos-arm64"],
+         "fetched_by": "tools/build_macos_runtimes.py",
+         "upstream": "https://github.com/llvm/llvm-project/releases/download/llvmorg-" + VERSION +
+                     "/llvm-project-" + VERSION + ".src.tar.xz",
+         "sha256": SOURCE_SHA256,
+         "note": "only to build the macOS 14 libc++ runtime once (GUI_FORMS_LLVM_RUNTIME)"},
+    ]
+
+
+PREBUILT_INPUTS: tuple[dict[str, Any], ...] = (
+    {"name": "llvm-22.1-toolchain", "platforms": ["macos-arm64", "windows-x64", "linux-x64", "linux-arm64"],
+     "source": "macOS: Homebrew llvm@22; Linux: apt.llvm.org clang-22; Windows: MSYS2 CLANG64 with the "
+               "packages in tools/windows_toolchain.json",
+     "note": "cmake/llvm22.cmake requires LLVM 22.1; CMake 3.25 or newer, Ninja, Git and Python 3.12 or "
+             "newer are installed beside it"},
+    {"name": "skia-windows-archive", "platforms": ["windows-x64"],
+     "source": "none at this commit",
+     "note": "Windows builds without Skia today (GUI_FORMS_ENABLE_SKIA=OFF); the pinned prebuilt Windows "
+             "Skia archive of stage SK (tools/skia_archive.py) is not yet required"},
+)
+
+
+def manifest(root: Path, version: str, revision: str, vendored: list[dict[str, Any]]) -> dict[str, Any]:
+    """The SDK_MANIFEST.json record."""
+    return {"schema": MANIFEST_SCHEMA, "version": version, "revision": revision,
+            "top_directory": sdk_directory_name(version), "build": BUILD_ENTRY,
+            "third_party": vendored, "network_inputs": network_inputs(root),
+            "prebuilt_inputs": list(PREBUILT_INPUTS)}
+
+
+def has_commit(checkout: Path, revision: str) -> bool:
+    """Whether checkout is a Git repository holding revision."""
+    if not checkout.is_dir():
+        return False
+    completed: subprocess.CompletedProcess[bytes] = subprocess.run(
+        ["git", "-C", str(checkout), "cat-file", "-e", revision + "^{commit}"], capture_output=True)
+    return completed.returncode == 0
+
+
+def fetch_pin(source: VendoredSource, revision: str, work: Path) -> Path:
+    """A new shallow Git repository under work holding source's pinned revision from its upstream."""
+    checkout: Path = work / source.name
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    subprocess.run(["git", "-C", str(checkout), "fetch", "-q", "--depth=1", source.upstream, revision], check=True)
+    return checkout
+
+
+def collect(root: Path, version: str, revision: str, checkouts: dict[str, Path],
+            fetch_work: Path | None = None) -> dict[str, Entry]:
+    """Every member of the archive, by its full name under the top directory.
+
+    A vendored source is read from checkouts[name], else from its in-tree
+    path; when neither holds its pin, fetch_work (if given) receives a
+    shallow fetch of the pin from its upstream, else ValueError is raised.
+    """
+    top: str = sdk_directory_name(version)
+    tree: dict[str, Entry] = git_tree(root, revision)
+    members: dict[str, Entry] = {}
+    path: str
+    for path in tree:
+        members[top + "/" + path] = tree[path]
+    vendored: list[dict[str, Any]] = []
+    source: VendoredSource
+    for source in VENDORED:
+        pin: str = pinned_revision(root, source)
+        checkout: Path = checkouts.get(source.name, root / source.path)
+        if not has_commit(checkout, pin):
+            if fetch_work is None:
+                raise ValueError(f"{checkout} does not hold {source.name}'s pin {pin}; pass --checkout "
+                                 "or --fetch-missing")
+            checkout = fetch_pin(source, pin, fetch_work)
+        entries: dict[str, Entry] = without_excluded(git_tree(checkout, pin), source.excluded)
+        if source.licence not in entries:
+            raise ValueError(f"{source.name} at {pin} has no {source.licence}")
+        inner: str
+        for inner in entries:
+            name: str = top + "/" + source.path + "/" + inner
+            if name in members:
+                raise ValueError(f"{name} is in the release tree and in {source.name}")
+            members[name] = entries[inner]
+        vendored.append({"name": source.name, "path": source.path, "upstream": source.upstream,
+                         "revision": pin, "pinned_in": source.pin_file,
+                         "licence": source.path + "/" + source.licence,
+                         "excluded": list(source.excluded), "files": len(entries),
+                         "tree_sha256": tree_digest(entries)})
+    record: dict[str, Any] = manifest(root, version, revision, vendored)
+    text: str = json.dumps(record, indent=2, sort_keys=True) + "\n"
+    members[top + "/" + MANIFEST_NAME] = Entry(text.encode("utf-8"), None, False)
+    return members
+
+
+def write_archive(members: dict[str, Entry], archive: Path) -> None:
+    """Write members, in name order, as a reproducible gzip tar."""
+    archive.unlink(missing_ok=True)
     with archive.open("wb") as raw:
         with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0, compresslevel=9) as compressed:
             with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as tar:
-                paths: list[Path] = [top] + stage_tree(top)
-                path: Path
-                for path in paths:
-                    name: str = top.name
-                    if path != top:
-                        name = top.name + "/" + path.relative_to(top).as_posix()
-                    info: tarfile.TarInfo = tar.gettarinfo(str(path), arcname=name)
+                name: str
+                for name in sorted(members):
+                    entry: Entry = members[name]
+                    info: tarfile.TarInfo = tarfile.TarInfo(name)
                     info.mtime = ARCHIVE_EPOCH
                     info.uid = 0
                     info.gid = 0
                     info.uname = ""
                     info.gname = ""
-                    if info.isfile():
-                        with path.open("rb") as stream:
-                            tar.addfile(info, stream)
-                    else:
+                    if entry.link is not None:
+                        info.type = tarfile.SYMTYPE
+                        info.linkname = entry.link
+                        info.mode = 0o777
                         tar.addfile(info)
+                        continue
+                    data: bytes = entry.data or b""
+                    info.size = len(data)
+                    info.mode = 0o755 if entry.executable else 0o644
+                    tar.addfile(info, io.BytesIO(data))
 
 
-def write_zip(top: Path, archive: Path) -> None:
-    """Write top's files into archive as a deflated zip rooted at top's name."""
-    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as compressed:
-        path: Path
-        for path in stage_tree(top):
-            if path.is_symlink():
-                raise ValueError(f"{path} is a link, which a Windows SDK zip does not carry")
-            if not path.is_file():
-                continue
-            info: zipfile.ZipInfo = zipfile.ZipInfo(top.name + "/" + path.relative_to(top).as_posix(), ZIP_DATE_TIME)
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = (0o100644 | (path.stat().st_mode & 0o111)) << 16
-            with path.open("rb") as stream:
-                compressed.writestr(info, stream.read(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+def read_archive(archive: Path) -> dict[str, Entry]:
+    """The members of a written archive, by name (directories left out)."""
+    with tarfile.open(archive, "r:gz") as tar:
+        return read_tar_members(tar, archive.name)
 
 
-def write_archive(top: Path, archive: Path) -> None:
-    """Write the staged top directory into archive; the suffix chooses the format."""
-    archive.unlink(missing_ok=True)
-    if archive.name.endswith(".zip"):
-        write_zip(top, archive)
-    else:
-        write_tar_gz(top, archive)
+def check_members(members: dict[str, Entry], version: str) -> dict[str, Any]:
+    """Raise ValueError unless members have the source SDK's shape; the parsed manifest.
 
-
-def add_consumer_files(top: Path, platform: str, runtime: Path | None) -> None:
-    """Add the top-level toolchain file and, on macOS, the LLVM runtime to a staged install.
-
-    The installed lib/cmake/GUIForms/llvm22.cmake must equal the source tree's;
-    the runtime prefix is copied whole, its links kept as links.
+    Every member lies under the one top directory and none is a Git
+    directory or build output; CMakeLists.txt, the build entry point, the
+    toolchain file and the manifest are present; the manifest lists exactly
+    the vendored sources, and each is present with its recorded tree digest.
     """
-    installed: Path = top / "lib/cmake/GUIForms/llvm22.cmake"
-    if not installed.is_file() or installed.read_bytes() != TOOLCHAIN_FILE.read_bytes():
-        raise RuntimeError(f"{installed} is missing or differs from {TOOLCHAIN_FILE}")
-    toolchain: Path = top / "cmake/llvm22.cmake"
-    toolchain.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(TOOLCHAIN_FILE, toolchain)
-    if platform != MACOS_PLATFORM:
-        return
-    if runtime is None or not (runtime / "include/c++/v1/__config_site").is_file():
-        raise RuntimeError("the macOS SDK needs --runtime, the LLVM runtime prefix (GUI_FORMS_LLVM_RUNTIME)")
-    shutil.copytree(runtime, top / RUNTIME_DIRECTORY, symlinks=True)
-
-
-def check_staged_tree(top: Path, version: str, platform: str) -> None:
-    """Raise unless the staged tree has the SDK's shape and its notices pass."""
+    top: str = sdk_directory_name(version) + "/"
+    name: str
+    for name in members:
+        if not name.startswith(top):
+            raise ValueError(f"{name} is outside the top directory {top}")
+        inner: str = name[len(top):]
+        if inner.startswith("/") or ".." in inner.split("/"):
+            raise ValueError(f"{name} escapes the top directory")
+        if is_build_output(inner):
+            raise ValueError(f"{name} is a Git directory or build output")
+    required: str
+    for required in ("CMakeLists.txt", BUILD_ENTRY, "cmake/llvm22.cmake", MANIFEST_NAME):
+        if top + required not in members:
+            raise ValueError("the source SDK lacks " + required)
+    record: dict[str, Any] = json.loads((members[top + MANIFEST_NAME].data or b"").decode("utf-8"))
+    if record.get("top_directory") != sdk_directory_name(version) or record.get("build") != BUILD_ENTRY:
+        raise ValueError(f"{MANIFEST_NAME} names another top directory or build entry point")
     names: list[str] = []
-    path: Path
-    for path in stage_tree(top):
-        if path.is_file() or path.is_symlink():
-            names.append(top.name + "/" + path.relative_to(top).as_posix())
-    check_member_names(names, version, platform)
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from ci_build import check_installed_notices, check_windows_sdk_imports
-    check_installed_notices(top)
-    if platform == "windows-x64":
-        check_windows_sdk_imports(top)
+    source: dict[str, Any]
+    for source in record.get("third_party", []):
+        names.append(source["name"])
+        prefix: str = top + source["path"] + "/"
+        entries: dict[str, Entry] = {}
+        for name in members:
+            if name.startswith(prefix):
+                entries[name[len(prefix):]] = members[name]
+        if not entries:
+            raise ValueError(f"{source['name']} is absent from {source['path']}")
+        if tree_digest(entries) != source["tree_sha256"]:
+            raise ValueError(f"{source['name']} at {source['path']} differs from its recorded digest")
+    expected: list[str] = []
+    vendored: VendoredSource
+    for vendored in VENDORED:
+        expected.append(vendored.name)
+    if names != expected:
+        raise ValueError(f"{MANIFEST_NAME} lists {names}, not {expected}")
+    return record
 
 
-def package(build_dir: Path, version: str, platform: str, out: Path, runtime: Path | None) -> Path:
-    """Install build_dir, stage the SDK, check it and write its archive into out; the archive."""
+def check_archive(archive: Path, version: str) -> dict[str, Any]:
+    """Raise ValueError unless archive is this version's source SDK, by name and shape; its manifest."""
+    expected: str = sdk_archive_name(version)
+    if archive.name != expected:
+        raise ValueError(f"{archive.name} is not named {expected}")
+    return check_members(read_archive(archive), version)
+
+
+def package(root: Path, version: str, revision: str, out: Path, checkouts: dict[str, Path],
+            fetch_missing: bool = False) -> Path:
+    """Collect, check and write the source SDK of revision into out; the archive.
+
+    fetch_missing lets collect fetch a pin no local checkout holds.
+    """
     out.mkdir(parents=True, exist_ok=True)
-    archive: Path = out / sdk_archive_name(version, platform)
-    with tempfile.TemporaryDirectory(prefix="gui-forms-sdk-") as directory:
-        top: Path = Path(directory) / sdk_directory_name(version, platform)
-        subprocess.run(["cmake", "--install", str(build_dir), "--prefix", str(top)], check=True)
-        add_consumer_files(top, platform, runtime)
-        check_staged_tree(top, version, platform)
-        write_archive(top, archive)
-    check_archive(archive, version, platform)
-    print(f"{archive.name}: {archive.stat().st_size} bytes", flush=True)
+    archive: Path = out / sdk_archive_name(version)
+    with tempfile.TemporaryDirectory(prefix="gui-forms-sdk-sources-") as directory:
+        fetch_work: Path | None = Path(directory) if fetch_missing else None
+        members: dict[str, Entry] = collect(root, version, revision, checkouts, fetch_work)
+    check_members(members, version)
+    write_archive(members, archive)
+    check_archive(archive, version)
+    print(f"{archive.name}: {archive.stat().st_size} bytes, {len(members)} files", flush=True)
     return archive
+
+
+def parse_checkouts(values: list[str]) -> dict[str, Path]:
+    """--checkout name=path arguments as a map; names must be vendored sources."""
+    known: set[str] = set()
+    source: VendoredSource
+    for source in VENDORED:
+        known.add(source.name)
+    checkouts: dict[str, Path] = {}
+    value: str
+    for value in values:
+        parts: tuple[str, str, str] = value.partition("=")
+        if not parts[1] or parts[0] not in known:
+            raise ValueError(f"--checkout {value}: expected one of {sorted(known)}=<path>")
+        checkouts[parts[0]] = Path(parts[2])
+    return checkouts
 
 
 def main(argv: list[str] | None = None) -> int:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--platform", choices=PLATFORMS, required=True)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--build-dir", type=Path, help="the configured, built tree to install")
+    parser.add_argument("--revision", default="HEAD", help="the release commit (default HEAD)")
     parser.add_argument("--out", type=Path, default=Path("dist"))
-    parser.add_argument("--runtime", type=Path, default=None,
-                        help="macOS: the LLVM runtime prefix (default: $GUI_FORMS_LLVM_RUNTIME)")
+    parser.add_argument("--checkout", action="append", default=[],
+                        help="name=path: a Git checkout holding a vendored source's pin, when it is "
+                             "not at its in-tree path (CI passes miniaudio's FetchContent clone)")
+    parser.add_argument("--fetch-missing", action="store_true",
+                        help="shallow-fetch from its upstream any pin no local checkout holds")
     parser.add_argument("--check", type=Path, default=None,
-                        help="check this existing archive's name and shape; install nothing")
+                        help="check this existing archive's name, shape and digests; write nothing")
     args: argparse.Namespace = parser.parse_args(argv)
     if args.check is not None:
-        check_archive(args.check, args.version, args.platform)
-        print(f"{args.check.name}: SDK shape checked", flush=True)
+        check_archive(args.check, args.version)
+        print(f"{args.check.name}: source SDK shape and digests checked", flush=True)
         return 0
-    if args.build_dir is None:
-        parser.error("--build-dir is required unless --check is given")
-    runtime: Path | None = args.runtime
-    if runtime is None and os.environ.get("GUI_FORMS_LLVM_RUNTIME"):
-        runtime = Path(os.environ["GUI_FORMS_LLVM_RUNTIME"])
-    package(args.build_dir, args.version, args.platform, args.out, runtime)
+    revision: str = subprocess.run(["git", "-C", str(ROOT), "rev-parse", args.revision + "^{commit}"],
+                                   check=True, capture_output=True, text=True).stdout.strip()
+    package(ROOT, args.version, revision, args.out, parse_checkouts(args.checkout), args.fetch_missing)
     return 0
 
 
