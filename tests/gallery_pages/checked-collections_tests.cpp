@@ -59,6 +59,18 @@ void test_checked_collections(gui_forms::Window& window) {
             "the gallery toggle shows the insertion mark before the third row");
     (*mark).perform_click();
     require(!(*list_view).insertion_mark().has_value(), "the gallery toggle clears the insertion mark");
+
+    // F2's label edit, opened through its public entry point for the same
+    // reason. The edits leave the task's text as it was.
+    require((*list_view).label_edit() && (*list_view).begin_label_edit(0U) &&
+                window.dispatch_text({"Discarded"}) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
+                (*status).text() == "ListView rename of task.anatomy cancelled",
+            "Escape cancels the gallery ListView's rename and the page reports it");
+    require((*list_view).begin_label_edit(0U) && window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                (*status).text() == "ListView item task.anatomy renamed to Publish item anatomy" &&
+                (*list_view).items()[0].text == "Publish item anatomy",
+            "Enter commits the gallery ListView's label and the page reports it");
 }
 
 } // namespace gallery_pages_tests

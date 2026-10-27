@@ -329,6 +329,11 @@ void read_step(GateContext& gate) {
     case WindowBackdrop::opaque:
         if (green) fail(gate, "an opaque window shows nothing behind it");
         break;
+    default:
+        // Every WindowBackdrop is listed above. A value outside them is no
+        // grant the window gives, so there is no screen reading to judge; the
+        // step checks below still compare the grant with the step.
+        break;
     }
     if (gate.step == GateStep::material) {
         const bool materials =

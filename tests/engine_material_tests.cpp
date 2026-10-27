@@ -875,6 +875,16 @@ void image_fills() {
     require(anchored.pixel(8U, 8U) == tiled.pixel(10U, 10U), "the anchored tiling runs back to the box's corner");
     hashes.push_back(raster_hash(anchored));
 
+    // One tile alone (E9.6, CSS `no-repeat`): the offset tile's first
+    // tile, at units (1, 2) to (5, 6), and nothing around it.
+    SurfaceMaterial single_tile = offset_tile;
+    single_tile.fills.back().image_mode = MaterialImageMode::single;
+    const TestRaster single = draw(single_tile, Size{16.0, 16.0}, 1.0, &registry);
+    require(single.pixel(9U, 10U) == offset.pixel(9U, 10U) && single.pixel(12U, 13U) == offset.pixel(12U, 13U),
+            "a single image is drawn where its tile lies");
+    require(single.pixel(13U, 10U)[3] == 0U && single.pixel(9U, 14U)[3] == 0U && single.pixel(8U, 8U)[3] == 0U,
+            "and nothing beyond its tile");
+
     if (print_mode()) {
         for (std::size_t index = 0U; index < hashes.size(); ++index) {
             std::cout << "    {\"" << image_cases[index].name << "\", 0x" << std::hex << hashes[index] << std::dec

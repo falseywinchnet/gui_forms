@@ -558,6 +558,22 @@ void example() {
 }
 }  // namespace doc_example_ColorCommand_1
 
+namespace doc_example_ColorDialog_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    gf::ColorDialog dialog;
+    dialog.set_color(gf::Color::rgba(0x27U, 0x74U, 0xB8U));
+    const gf::DialogResult result = dialog.show_dialog(window);
+    if (result == gf::DialogResult::ok) {
+        const gf::Color accent = dialog.color();
+        static_cast<void>(accent);
+    } else if (result == gf::DialogResult::none) {
+        // Without a host, dialog.status().error is gf::HostServiceError::unsupported.
+    }
+}
+}  // namespace doc_example_ColorDialog_1
+
 namespace doc_example_ColorValueEditor_1 {
 void example() {
     std::shared_ptr<gf::ColorValueEditor> tint =
@@ -1603,6 +1619,22 @@ void example() {
     // fixed stays 20 wide; narrow becomes 30 wide and wide 50 wide
 }
 }  // namespace doc_example_FlowLayoutPanel_2
+
+namespace doc_example_FolderBrowserDialog_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    gf::FolderBrowserDialog dialog;
+    dialog.set_description("Choose where the exports go");
+    const gf::DialogResult result = dialog.show_dialog(window);
+    if (result == gf::DialogResult::ok) {
+        const std::string& folder = dialog.selected_path();
+        static_cast<void>(folder);
+    } else if (result == gf::DialogResult::none) {
+        // Without a host, dialog.status().error is gf::HostServiceError::unsupported.
+    }
+}
+}  // namespace doc_example_FolderBrowserDialog_1
 
 namespace doc_example_FontCommand_1 {
 void example() {
@@ -3086,6 +3118,25 @@ void example() {
 }
 }  // namespace doc_example_SplitContainer_2
 
+namespace doc_example_Splitter_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    std::shared_ptr<gf::Panel> folders = gf::make_control<gf::Panel>(gf::StableId("doc.folders"));
+    (*folders).set_dock(gf::DockStyle::left);
+    (*folders).set_requested_bounds({0.0, 0.0, 160.0, 0.0});
+    std::shared_ptr<gf::Splitter> splitter = gf::make_control<gf::Splitter>(gf::StableId("doc.splitter"));
+    (*splitter).set_min_size(80.0);
+    std::shared_ptr<gf::Panel> files = gf::make_control<gf::Panel>(gf::StableId("doc.files"));
+    (*files).set_dock(gf::DockStyle::fill);
+    (*root).add_child(folders);    // child order is dock order
+    (*root).add_child(splitter);
+    (*root).add_child(files);
+    gf::Window window(root, {640.0, 400.0});
+    window.perform_layout();
+    (*splitter).set_split_position(200.0);   // folders is 200 wide
+}
+}  // namespace doc_example_Splitter_1
+
 namespace doc_example_SplitterPanel_1 {
 void example() {
     std::shared_ptr<gf::SplitContainer> split =
@@ -3997,6 +4048,7 @@ int main() {
     failures += run("ChoiceGroup example 1", &doc_example_ChoiceGroup_1::example);
     failures += run("ChoiceGroup example 2", &doc_example_ChoiceGroup_2::example);
     failures += run("ColorCommand example 1", &doc_example_ColorCommand_1::example);
+    failures += run("ColorDialog example 1", &doc_example_ColorDialog_1::example);
     failures += run("ColorValueEditor example 1", &doc_example_ColorValueEditor_1::example);
     failures += run("ColorValueEditor example 2", &doc_example_ColorValueEditor_2::example);
     failures += run("ComboBox example 1", &doc_example_ComboBox_1::example);
@@ -4043,6 +4095,7 @@ int main() {
     failures += run("FlagsValueEditor example 2", &doc_example_FlagsValueEditor_2::example);
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
+    failures += run("FolderBrowserDialog example 1", &doc_example_FolderBrowserDialog_1::example);
     failures += run("FontCommand example 1", &doc_example_FontCommand_1::example);
     failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
     failures += run("GalleryCommand example 1", &doc_example_GalleryCommand_1::example);
@@ -4117,6 +4170,7 @@ int main() {
     failures += run("SemanticFeedback example 2", &doc_example_SemanticFeedback_2::example);
     failures += run("SplitContainer example 1", &doc_example_SplitContainer_1::example);
     failures += run("SplitContainer example 2", &doc_example_SplitContainer_2::example);
+    failures += run("Splitter example 1", &doc_example_Splitter_1::example);
     failures += run("SplitterPanel example 1", &doc_example_SplitterPanel_1::example);
     failures += run("StableId example 1", &doc_example_StableId_1::example);
     failures += run("StableId example 2", &doc_example_StableId_2::example);

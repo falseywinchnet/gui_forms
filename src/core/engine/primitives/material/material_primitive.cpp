@@ -14,6 +14,7 @@
 #include "gui_forms/theme/types/theme_types.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -621,9 +622,20 @@ MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget
 
 // Each image fill's lent variant and where its pixels show, by fill index:
 // for destination column x and row y, the variant's byte at rows[y] +
-// columns[x]. `variant` is null for a fill that is not an image, or whose
+// columns[x], or none where either is outside_offset (beyond a single
+// image's tile). `variant` is null for a fill that is not an image, or whose
 // variant was not lent or whose maps could not be stored (it then draws
 // nothing). Borrowed from the target for the bake.
+// The offset of a column or row that shows no image.
+constexpr std::size_t outside_offset = std::numeric_limits<std::size_t>::max();
+
+// A variant pixel index as a byte offset at `stride` bytes per index.
+std::size_t image_offset(std::uint32_t index, std::size_t stride) noexcept {
+    if (index == outside_image) return outside_offset;
+    const std::size_t offset = static_cast<std::size_t>(index) * stride;
+    return offset;
+}
+
 struct MaterialImageLayer final {
     const PartRaster* variant{};
     std::vector<std::size_t> columns;
@@ -691,14 +703,14 @@ void map_image(const MaterialFillLayer& layer, std::size_t index, Rect box, doub
         map_image_variant(across, wanted.extent.width, wanted.fixed[0], wanted.fixed[2], extent.width, map);
         mapped.columns.resize(map.size());
         for (std::size_t column = 0U; column < map.size(); ++column) {
-            mapped.columns[column] = static_cast<std::size_t>(map[column]) * part_raster_bytes_per_pixel;
+            mapped.columns[column] = image_offset(map[column], part_raster_bytes_per_pixel);
         }
         const ImageAxisPlacement down =
             image_placement_down(layer, box.y, box.height, scale, layer.image_pixel_size.height);
         map_image_variant(down, wanted.extent.height, wanted.fixed[1], wanted.fixed[3], extent.height, map);
         mapped.rows.resize(map.size());
         for (std::size_t row = 0U; row < map.size(); ++row) {
-            mapped.rows[row] = static_cast<std::size_t>(map[row]) * variant.row_bytes();
+            mapped.rows[row] = image_offset(map[row], variant.row_bytes());
         }
         mapped.variant = &variant;
     } catch (const std::bad_alloc&) {
@@ -929,6 +941,7 @@ Unit fill_colour(const ResolvedFill& fill, const MaterialImages& images, std::si
     case MaterialFillKind::image: {
         const MaterialImageLayer& layer = images.layers[fill.image];
         if (layer.variant == nullptr) return Unit{};
+        if (layer.rows[y] == outside_offset || layer.columns[x] == outside_offset) return Unit{};
         const std::span<const std::uint8_t> pixels = (*layer.variant).pixels();
         const std::size_t at = layer.rows[y] + layer.columns[x];
         // The variant's bytes to [0, 1], weighted by coverage and opacity.

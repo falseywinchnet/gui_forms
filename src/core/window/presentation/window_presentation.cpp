@@ -107,6 +107,9 @@ bool copy_framebuffer_bgra(PaintFramebuffer& framebuffer, std::vector<std::byte>
 void Window::set_framebuffer_painter(Painter* const painter) {
     require_ui_thread("set_framebuffer_painter");
     framebuffer_painter_ = painter;
+    // The backplane replay's framebuffer belongs to the previous renderer.
+    backplane_framebuffer_.reset();
+    backplane_framebuffer_scale_ = 0.0;
 }
 
 // Four stages: validate the request; record the subtree's planes into one

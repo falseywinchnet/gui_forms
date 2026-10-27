@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/anatomy/types/anatomy_types.hpp"
+#include "gui_forms/engine/authored_gradient/authored_gradient.hpp"
 #include "gui_forms/engine/engine_expression/engine_expression.hpp"
 #include "gui_forms/engine/motion_value/motion_value.hpp"
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
@@ -300,15 +301,63 @@ struct AmbientEffect final {
     }
 };
 
+// An image layer's size (T3 P6d, CSS `background-size`), applied when the
+// material is assembled. The engine keeps an image's proportions, so one
+// length sets the size:
+// - natural: the image's own size, its layer's image_scale as written
+//   (CSS `auto`);
+// - width or height: `length` across or down, a fraction of the box's
+//   side plus logical units, the other side in proportion;
+// - cover and contain: the smallest size that covers the box and the
+//   largest that fits in it;
+// - stretch: the box (CSS `100% 100%`, MaterialImageMode::stretch).
+enum class MaterialImageSizing : std::uint8_t { natural, width, height, cover, contain, stretch };
+
+struct MaterialImageSize final {
+    MaterialImageSizing sizing{MaterialImageSizing::natural};
+    BoxLength length{};
+    friend constexpr bool operator==(const MaterialImageSize& left, const MaterialImageSize& right) noexcept {
+        return left.sizing == right.sizing && left.length == right.length;
+    }
+};
+
+// An image layer's position (CSS `background-position`): each axis's
+// fraction is the layer's image_anchor, of the room the box leaves around
+// one tile, and its units its image_offset.
+struct MaterialImagePosition final {
+    BoxLength across{};
+    BoxLength down{};
+    friend constexpr bool operator==(const MaterialImagePosition& left, const MaterialImagePosition& right) noexcept {
+        return left.across == right.across && left.down == right.down;
+    }
+};
+
+// An image layer's repetition (CSS `background-repeat`): tiled, or one
+// tile alone (MaterialImageMode::single).
+enum class MaterialImageRepeat : std::uint8_t { repeat, no_repeat };
+
+// How a drawn edge's line is made (T3 P6e, CSS `border-style`): one line
+// in its MaterialBorderStyle, or, drawn as two keylines on the edge in
+// place of the border (each edge's pair in CSS's order, top first, the
+// outer line first, so a later edge's line covers an earlier one's in the
+// corner square they share):
+// - double_line: two lines each a third of the width, a third apart;
+// - groove and ridge: two halves, one in the edge's colour and one in its
+//   shade (each colour channel halved, rounded down): a groove's outer
+//   half is the shade on the top and left edges and the colour on the
+//   bottom and right, and a ridge's the reverse.
+enum class MaterialEdgeLines : std::uint8_t { single, double_line, groove, ridge };
+
 // The material fields a rule may set (T3 engine change EC1, owner R2-02).
 // Each cascades on its own, as a parameter does: a part's material is the
 // recipe material its primitive draws (the cascade's floor), with each
 // field the winning matching rule sets in its place. The fields are
 // SurfaceMaterial's, split where CSS's longhands are, so that each
 // cascades as CSS cascades it:
-// - the fills are CSS's background-color, background-image and
-//   background-blend-mode (owner C6, 2026-10-26: they combine across
-//   rules, the colour under the image layers);
+// - the fills are CSS's background-color, background-image,
+//   background-blend-mode, background-position, background-size and
+//   background-repeat (owner C6, 2026-10-26: they combine across rules,
+//   the colour under the image layers);
 // - the border is its twelve longhands, each edge's style, width and
 //   colour, in that order, the edges in CSS's order (`border` sets all
 //   twelve);
@@ -318,8 +367,12 @@ enum class MaterialField : std::uint8_t {
     background_colour,
     fills,
     fill_blend_modes,
+    fill_positions,
+    fill_sizes,
+    fill_repeats,
     shadows,
     glows,
+    glow_placements,
     border_top_style,
     border_top_width,
     border_top_colour,
@@ -332,6 +385,7 @@ enum class MaterialField : std::uint8_t {
     border_left_style,
     border_left_width,
     border_left_colour,
+    border_image,
     keylines,
     corner_top_left,
     corner_top_right,
@@ -353,18 +407,30 @@ inline constexpr std::size_t material_field_count = static_cast<std::size_t>(Mat
 // names are read; the others stay empty:
 // - background_colour: `colour`, a solid layer under the image layers;
 // - fills: the image layers (gradients, images, patterns), bottom first,
-//   at most SurfaceMaterial::maximum_fill_layers, empty for none;
+//   at most SurfaceMaterial::maximum_fill_layers, empty for none; and
+//   `gradients`, empty, or one per layer: a gradient as a sheet wrote it
+//   (T3 P6b), resolved for the part's box when the material is assembled,
+//   in place of its layer; an entry of kind `solid` keeps its layer as
+//   written;
 // - fill_blend_modes: `blend_modes`, in CSS's order (the top image
 //   layer's first), repeated over the image layers as CSS repeats a short
 //   list; empty for normal;
+// - fill_positions, fill_sizes, fill_repeats: `image_positions`,
+//   `image_sizes`, `image_repeats`, in the same order and repeated the
+//   same way, read by the image fills (not a nine-patch) among the image
+//   layers: a gradient layer covers the box;
 // - shadows, glows, keylines: the lists;
-// - an edge's style: `border_style`, empty for none (CSS's `none`); its
-//   width: `number`, 0 for none; its colour: `colour`;
+// - glow_placements: `glow_placements`, in the glows' order, repeated
+//   over them as CSS repeats a short list (`glow-placement`);
+// - an edge's style: `border_style`, empty for none (CSS's `none`), and
+//   `edge_lines`; its width: `number`, 0 for none; its colour: `colour`;
+// - border_image: `border_image`, a nine-patch image fill, empty for none;
 // - a corner: `number`, its radius in logical units, or, with `relative`,
 //   a fraction of the box's shorter side (CSS's percentage, R2-11),
 //   resolved when the material is assembled for a part;
 // - colour_filter: `colour_filter`; drop_shadow: `drop_shadow`, empty for
-//   none; mask: `mask`, empty for none;
+//   none; mask: `mask`, empty for none, and `gradients`, empty or one
+//   entry, the mask's authored gradient as for a fill layer;
 // - filter_blur and finish: `number`.
 // `initial`, set, is CSS's `initial`: the field keeps the floor's value,
 // and the declaration still wins over those beneath it; its value members
@@ -373,10 +439,17 @@ struct MaterialDeclaration final {
     MaterialField field{MaterialField::fills};
     bool initial{};
     std::vector<MaterialFillLayer> fills{};
+    std::vector<AuthoredGradient> gradients{};
     std::vector<MaterialBlendMode> blend_modes{};
+    std::vector<MaterialImagePosition> image_positions{};
+    std::vector<MaterialImageSize> image_sizes{};
+    std::vector<MaterialImageRepeat> image_repeats{};
     std::vector<MaterialShadow> shadows{};
     std::vector<MaterialGlow> glows{};
+    std::vector<MaterialGlowPlacement> glow_placements{};
     std::optional<MaterialBorderStyle> border_style{};
+    MaterialEdgeLines edge_lines{MaterialEdgeLines::single};
+    std::optional<MaterialFillLayer> border_image{};
     Color colour{};
     std::vector<MaterialKeyline> keylines{};
     double number{};
@@ -387,8 +460,12 @@ struct MaterialDeclaration final {
 
     friend bool operator==(const MaterialDeclaration& left, const MaterialDeclaration& right) noexcept {
         return left.field == right.field && left.initial == right.initial && left.fills == right.fills &&
-               left.blend_modes == right.blend_modes && left.shadows == right.shadows &&
-               left.glows == right.glows && left.border_style == right.border_style &&
+               left.gradients == right.gradients && left.blend_modes == right.blend_modes &&
+               left.image_positions == right.image_positions && left.image_sizes == right.image_sizes &&
+               left.image_repeats == right.image_repeats && left.shadows == right.shadows &&
+               left.glows == right.glows && left.glow_placements == right.glow_placements &&
+               left.border_style == right.border_style && left.edge_lines == right.edge_lines &&
+               left.border_image == right.border_image &&
                left.colour == right.colour && left.keylines == right.keylines &&
                left.number == right.number && left.relative == right.relative &&
                left.colour_filter == right.colour_filter && left.drop_shadow == right.drop_shadow &&
@@ -402,14 +479,18 @@ struct MaterialDeclaration final {
 // declaration keeps the floor's value. The fills are composed when any
 // fill field is declared: the colour layer (the declared colour, else the
 // floor's bottom layer when it is solid) under the image layers (the
-// declared ones, else the floor's others), which take the declared blend
-// modes; a colour of alpha 0 adds no layer, and with no layer at all the
-// fill is one transparent solid. More than
+// declared ones, each authored gradient resolved for `box`, else the
+// floor's others), which take the declared blend modes, and whose image
+// fills take the declared sizes (resolved for `box`), then repetitions,
+// then positions; a colour of alpha 0 adds no layer, and with no layer at
+// all the fill is one transparent solid. More than
 // SurfaceMaterial::maximum_fill_layers is no material. The corners are
 // composed when any is declared: each is its declaration's, else the
 // floor's (its corner_radii's, else its corner_radius); four equal corners
 // are corner_radius alone, and others corner_radii, with corner_radius the
-// smallest (the built-in path rounds every corner by it). The border's
+// smallest (the built-in path rounds every corner by it). The glows take
+// the declared placements; a mask's authored gradient is resolved for
+// `box`. The border's
 // edges are assembled
 // together when any of their fields is declared: each starts as the
 // floor's (its single edge, else its uniform border; an edge the floor
@@ -418,12 +499,94 @@ struct MaterialDeclaration final {
 // its style is none or its width 0. Four equal edges are drawn as one
 // uniform border, which keeps a dash and rounded corners, and unequal ones
 // as single edges, which a material admits only with square corners
-// (valid_surface_material). Relative corners are
-// resolved against `shorter_side`, the box's shorter side in logical
-// units.
+// (valid_surface_material); an edge drawn as two lines (MaterialEdgeLines)
+// is not a border edge but its two keylines, after the declared ones. A
+// border image is the top fill layer, and the border (its edges and their
+// lines) is not drawn, as CSS draws a border image in place of the
+// border's style. `box` is the part's box in logical units: relative
+// corners are fractions of its shorter side.
 void assemble_material(const SurfaceMaterial& floor,
-                       const std::array<const MaterialDeclaration*, material_field_count>& fields,
-                       double shorter_side, SurfaceMaterial& material);
+                       const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
+                       SurfaceMaterial& material);
+
+// Whether assembling `fields` reads the part's box: a relative corner, an
+// authored gradient, of a fill or the mask, other than a fixed one
+// (authored_gradient_fixed), or an image size of the box (a fraction of
+// its side, cover or contain).
+[[nodiscard]] bool material_fields_read_box(
+    const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept;
+
+// The fields of a control's own recipe (ControlVisualRecipe) beside its
+// material that a rule may set (T3 P6f; design language §2, §3 and §14).
+// They are the control's, not a part's: a rule naming a part or a role
+// sets none (RuleDiagnosticKind::recipe_field_on_part). They cascade as
+// the material fields do, each on its own, from every matching rule, over
+// the theme's built-in recipe for the control's role and state (the floor,
+// Theme::resolve); a field no rule sets keeps the floor's value.
+enum class RecipeField : std::uint8_t {
+    // CSS `color`: the recipe's text colour.
+    text,
+    // CSS `outline-style`, `outline-color`, `outline-width` and
+    // `outline-offset`: the focus ring, drawn while the control shows
+    // focus.
+    outline_style,
+    outline_colour,
+    outline_width,
+    outline_offset,
+    // CSS `text-shadow`: the shadow under the recipe's text (data only
+    // until the text stage draws it).
+    text_shadow,
+    count,
+};
+
+inline constexpr std::size_t recipe_field_count = static_cast<std::size_t>(RecipeField::count);
+
+// The field's snake_case name, as diagnostics name it; empty for `count`.
+[[nodiscard]] std::string_view recipe_field_name(RecipeField field) noexcept;
+
+// How the focus ring is drawn (CSS `outline-style`): the theme's own ring
+// inside the control's bounds (CSS's `auto`), an outline outside them,
+// offset by the outline offset (CSS's `solid`), or none (a width of 0).
+enum class RecipeOutlineStyle : std::uint8_t { ring, solid, none };
+
+// What a recipe admits (valid_recipe): an outline at most 16 logical units
+// wide, offset at most 64 either way; a text shadow offset at most 16 on
+// each axis and blurred by at most 8.
+inline constexpr double maximum_recipe_outline_width = 16.0;
+inline constexpr double maximum_recipe_outline_offset = 64.0;
+inline constexpr double maximum_text_shadow_blur = 8.0;
+inline constexpr double maximum_text_shadow_offset = 16.0;
+
+// One recipe field's declared value. `initial` is CSS's `initial`: the
+// floor's value, and the declaration still wins over those beneath it; its
+// value members are not read. Otherwise, by field:
+// - text and outline_colour: `colour`;
+// - outline_style: `outline_style`;
+// - outline_width (0 to maximum_recipe_outline_width) and outline_offset
+//   (within ±maximum_recipe_outline_offset): `number`, in logical units;
+// - text_shadow: `shadowed`, false for none; its `shadow_offset`,
+//   `shadow_blur` (the shadows' blur-radius convention) and `colour`.
+struct RecipeDeclaration final {
+    RecipeField field{RecipeField::text};
+    bool initial{};
+    Color colour{};
+    double number{};
+    RecipeOutlineStyle outline_style{RecipeOutlineStyle::ring};
+    bool shadowed{};
+    Point shadow_offset{};
+    double shadow_blur{};
+
+    friend bool operator==(const RecipeDeclaration& left, const RecipeDeclaration& right) noexcept {
+        return left.field == right.field && left.initial == right.initial && left.colour == right.colour &&
+               left.number == right.number && left.outline_style == right.outline_style &&
+               left.shadowed == right.shadowed && left.shadow_offset == right.shadow_offset &&
+               left.shadow_blur == right.shadow_blur;
+    }
+};
+
+// Whether `declaration` is one a recipe admits: a field below `count`, and
+// a finite value within its field's range.
+[[nodiscard]] bool recipe_declaration_admitted(const RecipeDeclaration& declaration) noexcept;
 
 // One rule. `label` names it in diagnostics (T3: its source position).
 // `requires_engine`, when set, is the engine version the rule needs, in
@@ -433,7 +596,9 @@ void assemble_material(const SurfaceMaterial& floor,
 // part's primitive), and the ambient effect of the last matching rule that
 // declares one. Its material fields (EC1) cascade the same way, each on
 // its own, from every matching rule, whatever primitive it selects: they
-// change a part only where its primitive draws a theme material.
+// change a part only where its primitive draws a theme material. Its
+// recipe fields (RecipeField) cascade the same way for the control as a
+// whole.
 //
 // `specificity`, when set, is the rule's specificity in place of the one
 // its selector gives (T3 engine change EC2): a rule expanded from CSS's
@@ -450,12 +615,14 @@ struct ThemeRule final {
     std::vector<PropertyTransition> transitions{};
     std::optional<AmbientEffect> ambient{};
     std::vector<MaterialDeclaration> materials{};
+    std::vector<RecipeDeclaration> recipe_fields{};
 
     friend bool operator==(const ThemeRule& left, const ThemeRule& right) noexcept {
         return left.label == right.label && left.level == right.level && left.selector == right.selector &&
                left.specificity == right.specificity && left.declarations == right.declarations &&
                left.requires_engine == right.requires_engine && left.transitions == right.transitions &&
-               left.ambient == right.ambient && left.materials == right.materials;
+               left.ambient == right.ambient && left.materials == right.materials &&
+               left.recipe_fields == right.recipe_fields;
     }
 };
 
@@ -553,6 +720,12 @@ enum class RuleDiagnosticKind : std::uint8_t {
     // A material field whose value no material admits
     // (valid_surface_material), such as a ninth fill or a negative radius.
     material_field_invalid,
+    // A recipe field the recipe does not admit
+    // (recipe_declaration_admitted), such as an outline 20 units wide.
+    recipe_field_invalid,
+    // A recipe field in a rule whose selector names a part or a role: the
+    // recipe's fields are the control's, so the field is dropped.
+    recipe_field_on_part,
 };
 
 [[nodiscard]] std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept;
@@ -688,6 +861,20 @@ public:
         bool materials_authored{};
     };
 
+    // The winning declaration of each recipe field (RecipeField) of the
+    // rules matching a control, by the field's position, or null where no
+    // matching rule sets it; they belong to the compiled rules. `authored`
+    // is whether any is set.
+    struct RecipeResolution final {
+        std::array<const RecipeDeclaration*, recipe_field_count> fields{};
+        bool authored{};
+    };
+
+    // The recipe fields' cascade for a control: `facts` name no part and
+    // the region role. Linear in the number of rules, and at once when no
+    // rule sets a recipe field.
+    [[nodiscard]] RecipeResolution resolve_recipe_fields(const PartFacts& facts) const noexcept;
+
     // The cascade for one part: the winning primitive declaration, then
     // each of that primitive's parameters from the winning declaration of
     // it among the matching rules that select the same primitive, else its
@@ -734,6 +921,8 @@ private:
         std::optional<PartBlend> blend{};
         // Checked material fields, at most one per field.
         std::vector<MaterialDeclaration> materials{};
+        // Checked recipe fields, at most one per field.
+        std::vector<RecipeDeclaration> recipe_fields{};
     };
 
     // Compiles `sheet`'s rules into `result` at their authored levels, or,
@@ -761,6 +950,11 @@ private:
                               CompiledRule& compiled);
     // The winning material fields of the matching rules into `result`.
     void resolve_materials(const PartFacts& facts, Resolution& result) const noexcept;
+    // A rule's recipe fields, checked; a defect, a second declaration of
+    // one field, or a selector naming a part or a role drops it with a
+    // diagnostic.
+    static void add_recipe_fields(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
+                                  CompiledRule& compiled);
 
     [[nodiscard]] static bool matches(const CompiledRule& rule, const PartFacts& facts) noexcept;
 
@@ -771,6 +965,8 @@ private:
     std::vector<std::string> published_values_{};
     std::size_t built_in_rules_{};
     std::uint64_t serial_{};
+    // Whether any rule sets a recipe field (resolve_recipe_fields).
+    bool recipe_fields_set_{};
 };
 
 // The engine's built-in rules (E7), compiled below every theme's: the

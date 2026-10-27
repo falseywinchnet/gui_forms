@@ -1419,7 +1419,8 @@
         {"name": "horizontal_scroll_bar", "role": "track", "composed_from": "h_scroll_bar", "states": []},
         {"name": "scroll_corner", "role": "face", "composed_from": null, "states": []},
         {"name": "focus", "role": "focus", "composed_from": null, "states": []},
-        {"name": "insertion_mark", "role": "drop", "composed_from": null, "states": ["drop_accepted"]}
+        {"name": "insertion_mark", "role": "drop", "composed_from": null, "states": ["drop_accepted"]},
+        {"name": "label_editor", "role": "well", "composed_from": "text_box", "states": []}
       ],
       "states": ["normal", "enabled", "disabled", "focused", "focus_visible"],
       "custom_states": [],
@@ -1496,12 +1497,15 @@
         {"name": "focus_observed", "payload": "bool", "mutable_payload": false},
         {"name": "arranged_bounds_changed", "payload": "Rect", "mutable_payload": false},
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
+        {"name": "draw_item_content", "payload": "ItemContentPaint", "mutable_payload": true},
         {"name": "selection_changed", "payload": "ListViewSelectionChange", "mutable_payload": false},
         {"name": "item_activated", "payload": "ListViewItemActivation", "mutable_payload": false},
         {"name": "item_checking", "payload": "ListViewItemCheck", "mutable_payload": true},
         {"name": "item_checked", "payload": "ListViewItemCheck", "mutable_payload": false},
         {"name": "column_click", "payload": "ListViewColumnClick", "mutable_payload": false},
-        {"name": "column_width_changed", "payload": "ListViewColumnWidthChange", "mutable_payload": false}
+        {"name": "column_width_changed", "payload": "ListViewColumnWidthChange", "mutable_payload": false},
+        {"name": "before_label_edit", "payload": "ListViewLabelEdit", "mutable_payload": true},
+        {"name": "after_label_edit", "payload": "ListViewLabelEdit", "mutable_payload": true}
       ]
     },
     {
@@ -3399,6 +3403,7 @@
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
         {"name": "scroll", "payload": "ScrollEvent", "mutable_payload": true},
         {"name": "auto_validate_changed", "payload": "AutoValidate", "mutable_payload": false},
+        {"name": "draw_item_content", "payload": "ItemContentPaint", "mutable_payload": true},
         {"name": "selected_index_changed", "payload": "TabSelectionChange", "mutable_payload": false}
       ]
     },
@@ -3476,6 +3481,7 @@
         {"name": "focus_observed", "payload": "bool", "mutable_payload": false},
         {"name": "arranged_bounds_changed", "payload": "Rect", "mutable_payload": false},
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
+        {"name": "draw_item_content", "payload": "ItemContentPaint", "mutable_payload": true},
         {"name": "page_invoked", "payload": "PageInvocation", "mutable_payload": false},
         {"name": "page_close_requested", "payload": "PageCloseRequest", "mutable_payload": true},
         {"name": "page_pin_requested", "payload": "PagePinRequest", "mutable_payload": true},
@@ -4221,6 +4227,57 @@
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
         {"name": "scroll", "payload": "ScrollEvent", "mutable_payload": true},
         {"name": "auto_validate_changed", "payload": "AutoValidate", "mutable_payload": false}
+      ]
+    },
+    {
+      "id": "splitter",
+      "type": "Splitter",
+      "kind": "control",
+      "parts": [
+        {"name": "region", "role": "region", "composed_from": null, "states": []},
+        {"name": "face", "role": "face", "composed_from": null, "states": []}
+      ],
+      "states": ["normal", "hot", "pressed", "captured", "enabled", "disabled"],
+      "custom_states": [],
+      "item_systems": [],
+      "properties": [
+        {"name": "accessible_description", "kind": "text", "category": "Accessibility", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "accessible_name", "kind": "text", "category": "Accessibility", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "allow_drop", "kind": "boolean", "category": "Behavior", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "anchor", "kind": "enumeration", "category": "Layout", "enumeration": "anchor_styles", "choices": ["none", "top", "bottom", "left", "right"], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "auto_scroll_offset", "kind": "point", "category": "Layout", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "auto_size", "kind": "boolean", "category": "Layout", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": true, "nullable": false, "serialization": "visible"},
+        {"name": "auto_size_mode", "kind": "enumeration", "category": "Layout", "enumeration": "auto_size_mode", "choices": ["grow_and_shrink", "grow_only"], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "bounds", "kind": "rectangle", "category": "Layout", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "causes_validation", "kind": "boolean", "category": "Behavior", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": true, "nullable": false, "serialization": "visible"},
+        {"name": "dock", "kind": "enumeration", "category": "Layout", "enumeration": "dock_style", "choices": ["none", "top", "bottom", "left", "right", "fill"], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "enabled", "kind": "boolean", "category": "Behavior", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": true, "nullable": false, "serialization": "visible"},
+        {"name": "hit_test_transparent", "kind": "boolean", "category": "Behavior", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "margin", "kind": "insets", "category": "Layout", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "maximum_size", "kind": "size", "category": "Layout", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "minimum_size", "kind": "size", "category": "Layout", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "name", "kind": "text", "category": "Design", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": true, "nullable": false, "serialization": "visible"},
+        {"name": "padding", "kind": "insets", "category": "Layout", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "tab_index", "kind": "unsigned_integer", "category": "Behavior", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "tab_stop", "kind": "boolean", "category": "Behavior", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": false, "nullable": false, "serialization": "visible"},
+        {"name": "visible", "kind": "boolean", "category": "Behavior", "enumeration": null, "choices": [], "readable": true, "writable": true, "bindable": true, "nullable": false, "serialization": "visible"}
+      ],
+      "interactions": [
+        {"name": "name_changed", "payload": "std::string", "mutable_payload": false},
+        {"name": "visible_changed", "payload": "bool", "mutable_payload": false},
+        {"name": "enabled_changed", "payload": "bool", "mutable_payload": false},
+        {"name": "auto_size_changed", "payload": "bool", "mutable_payload": false},
+        {"name": "causes_validation_changed", "payload": "bool", "mutable_payload": false},
+        {"name": "validating", "payload": "ControlValidationEvent", "mutable_payload": true},
+        {"name": "validated", "payload": "", "mutable_payload": false},
+        {"name": "initialization_completed", "payload": "Dirty, bool", "mutable_payload": false},
+        {"name": "pointer_observed", "payload": "PointerEvent", "mutable_payload": false},
+        {"name": "pointer_preview_observed", "payload": "PointerEvent", "mutable_payload": false},
+        {"name": "focus_observed", "payload": "bool", "mutable_payload": false},
+        {"name": "arranged_bounds_changed", "payload": "Rect", "mutable_payload": false},
+        {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
+        {"name": "splitter_moving", "payload": "SplitterMoveEvent", "mutable_payload": true},
+        {"name": "splitter_moved", "payload": "SplitterMoveEvent", "mutable_payload": false}
       ]
     },
     {
@@ -5690,6 +5747,18 @@
       "interactions": [
         {"name": "closed", "payload": "DialogResult", "mutable_payload": false}
       ]
+    },
+    {
+      "id": "folder_browser_dialog",
+      "type": "FolderBrowserDialog",
+      "kind": "component",
+      "interactions": []
+    },
+    {
+      "id": "color_dialog",
+      "type": "ColorDialog",
+      "kind": "component",
+      "interactions": []
     },
     {
       "id": "tool_tip",

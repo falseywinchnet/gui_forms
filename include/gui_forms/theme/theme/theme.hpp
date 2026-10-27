@@ -13,6 +13,8 @@
 
 namespace gui_forms {
 
+class Control;
+
 class Theme final {
 public:
     // Validates `definition` and makes a theme holding its own copy, with
@@ -31,6 +33,19 @@ public:
     }
     [[nodiscard]] const ControlVisualRecipe& resolve(
         ControlVisualRole role, ControlVisualContext context) const noexcept;
+    // `control`'s recipe for `role` in `context` (T3 P6f): the recipe above
+    // (the floor) with the recipe fields (RecipeField) of the theme's rules
+    // that match the control in `states` in place. The rules are matched
+    // with no part and the region role. In forced high contrast, or where
+    // the fields make no valid recipe, it is the floor. The first form's
+    // states are `context`'s: normal; enabled or disabled; hot, pressed,
+    // pending, invalid or deactivated by the surface state; selected;
+    // focused and focus_visible when focused; preselect when defaulted.
+    // Copies the floor when a field is set (see ResolvedControlRecipe).
+    [[nodiscard]] ResolvedControlRecipe resolve(const Control& control, ControlVisualRole role,
+                                                ControlVisualContext context) const;
+    [[nodiscard]] ResolvedControlRecipe resolve(const Control& control, ControlVisualRole role,
+                                                ControlVisualContext context, AnatomyStateSet states) const;
     [[nodiscard]] const ThemeDefinition& definition() const noexcept {
         return definition_;
     }

@@ -456,6 +456,12 @@ void place_layout(FixtureBuilder& builder) {
     std::shared_ptr<SplitterPanel> splitter_panel = builder.place(
         make_control<SplitterPanel>(StableId("splitter_panel")), 30.0);
     (*splitter_panel).set_accessible_name("Splitter panel");
+    // Undocked, the splitter has no target and is an inert bar that does not
+    // repaint under the pointer.
+    std::shared_ptr<Splitter> splitter = builder.place(
+        make_control<Splitter>(StableId("splitter")), 8.0);
+    (*splitter).set_dock(DockStyle::none);
+    (*splitter).set_accessible_name("Splitter");
     std::shared_ptr<CommandOverflowPanel> overflow = builder.place(
         make_control<CommandOverflowPanel>(StableId("command_overflow_panel")), 30.0);
     (*overflow).set_accessible_name("Overflow");
@@ -669,11 +675,11 @@ void observe_effects(StockControlFixture& fixture) {
 }
 
 void omit_components(FixtureBuilder& builder) {
-    const std::array<const char*, 13> components{
+    const std::array<const char*, 15> components{
         "timer", "background_worker", "notify_icon", "thread_exception_dialog",
         "image_list", "error_provider", "help_provider",
         "semantic_feedback", "binding", "binding_source", "binding_context", "open_file_dialog",
-        "save_file_dialog"};
+        "save_file_dialog", "folder_browser_dialog", "color_dialog"};
     for (const char* identifier : components) {
         builder.omit(identifier, "component without a place in the control tree");
     }
