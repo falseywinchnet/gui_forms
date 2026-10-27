@@ -144,6 +144,7 @@ message saying which build provides it.
 | `Audio` | `GUIForms::Audio` | `GUI_FORMS_BUILD_AUDIO` (on in CI and in `build_sdk.py`) |
 | `TextMasks` | `GUIForms::TextMasks` | `GUI_FORMS_BUILD_TEXT_MASKS` with a native host (`build_sdk.py --features all`) |
 | `AudioLoopTransport` | `GUIForms::AudioLoopTransport` | `GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT` with audio (`build_sdk.py --features all`) |
+| `FreeType`, `HarfBuzz` | `GUIForms::FreeType`, `GUIForms::HarfBuzz` | `GUI_FORMS_INSTALL_TEXT_STACK` with the text engine (`build_sdk.py --features all`) |
 
 `TextMasks` is an interface on `Application`, which already contains the
 text-mask service. Link it beside `Application`, never beside `Core`; see
@@ -160,6 +161,25 @@ That `Audio` carries the `GUI_FORMS_AUDIO_LOOP_TRANSPORT` definition, which
 ```cmake
 find_package(GUIForms 0.2 CONFIG REQUIRED COMPONENTS Application TextMasks Audio AudioLoopTransport)
 target_link_libraries(my_app PRIVATE GUIForms::Application GUIForms::TextMasks GUIForms::AudioLoopTransport)
+```
+
+`FreeType` and `HarfBuzz` are the pinned FreeType 2.14.2 and HarfBuzz 14.6.0
+that GUI.Forms' text engine links, for a product that calls them directly.
+They install as the static libraries GUI.Forms builds, with its options:
+FreeType without zlib, so it refuses gzip-compressed fonts, and HarfBuzz with
+its FreeType functions (`hb-ft.h`). Their headers keep the upstream layouts,
+`include/freetype2/` and `include/harfbuzz/`, and each target puts its
+directory on the include path, so `#include <ft2build.h>` and
+`#include <hb.h>` work. `GUIForms::HarfBuzz` links `GUIForms::FreeType`.
+GUI.Forms' own libraries hold their own copies, so pass no FreeType or
+HarfBuzz object between them and your code. The licences are
+`FreeType-FTL.txt` and `HarfBuzz-COPYING.txt` in `share/licenses/GUIForms/`.
+FreeType's licence asks a product that ships it to credit it in its
+documentation; `THIRD_PARTY_NOTICES.md` there carries the credit.
+
+```cmake
+find_package(GUIForms 0.2 CONFIG REQUIRED COMPONENTS FreeType HarfBuzz)
+target_link_libraries(my_compositor PRIVATE GUIForms::HarfBuzz GUIForms::FreeType)
 ```
 
 ## The source SDK
@@ -218,8 +238,9 @@ as in [Verify the installation](#verify-the-installation).
 
 `all`
 : The default set, plus every optional component a product may link:
-  `TextMasks` (`GUI_FORMS_BUILD_TEXT_MASKS`) and `AudioLoopTransport`
-  (`GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT`). One such install serves every
+  `TextMasks` (`GUI_FORMS_BUILD_TEXT_MASKS`), `AudioLoopTransport`
+  (`GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT`), and `FreeType` and `HarfBuzz`
+  (`GUI_FORMS_INSTALL_TEXT_STACK`). One such install serves every
   product; template_harness's lockstep build uses it.
 
 The prepared-text service (`GUI_FORMS_BUILD_PREPARED_TEXT`) is in neither

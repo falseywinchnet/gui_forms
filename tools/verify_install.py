@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 
 # The components tools/build_sdk.py --features all adds to the default SDK.
-FEATURE_COMPONENTS: tuple[str, ...] = ("TextMasks", "AudioLoopTransport")
+FEATURE_COMPONENTS: tuple[str, ...] = ("TextMasks", "AudioLoopTransport", "FreeType", "HarfBuzz")
 
 
 def run(command: list[str], expected_success: bool = True) -> str:

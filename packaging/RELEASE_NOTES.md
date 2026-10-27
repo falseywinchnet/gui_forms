@@ -159,6 +159,10 @@ mail mockup.
   install as the `TextMasks` and `AudioLoopTransport` package components
   (`find_package(GUIForms COMPONENTS TextMasks AudioLoopTransport)`). Before,
   installing them was refused. The default set is unchanged.
+  It also installs the pinned FreeType and HarfBuzz that the text engine
+  links, as static libraries with their headers and licences, exported as
+  the `FreeType` and `HarfBuzz` components (`GUIForms::FreeType`,
+  `GUIForms::HarfBuzz`), for products that call them directly.
 
 ## Known limits
 
