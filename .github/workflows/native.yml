@@ -24,7 +24,7 @@ on:
         type: boolean
         default: false
       package_windows_toolchain:
-        description: Install and package a new Windows toolchain when none is published for tools/windows_toolchain.json
+        description: Install and package a new Windows toolchain when none is published for the harness's windows_toolchain.json
         type: boolean
         default: false
 permissions:
@@ -40,21 +40,29 @@ concurrency:
 jobs:
   house-style:
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: gui_forms
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: gui_forms
+      # template_harness beside gui_forms, at the commit gui_forms/harness.lock
+      # pins: the shared CI tools and checkers (docs/building/template-harness.md).
+      - uses: ./gui_forms/.github/actions/harness-checkout
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
+      # The pinned harness's own tests (the checkers, the reuse, cache and
+      # toolchain tools GUI.Forms moved there), then the forwarding shims at
+      # the old tool paths: template_harness has no CI of its own yet.
+      - name: Check the pinned harness and the shims that reach it
+        run: |
+          python3 -B -m unittest discover -s ../template_harness/harness -p "test_*.py"
+          python3 -B -m unittest discover -s tools -p test_harness_shims.py
       - name: Check scanner fixtures and corrected authoring scope
         run: |
-          python3 -B -m unittest discover -s tools -p test_house_style.py
-          python3 -B -m unittest discover -s tools -p test_macos_runtime_manifest.py
-          python3 -B -m unittest discover -s tools -p test_ci_reuse.py
-          python3 -B -m unittest discover -s tools -p test_ci_promote.py
-          python3 -B -m unittest discover -s tools -p test_ci_sanitizer_seed.py
-          python3 -B -m unittest discover -s tools -p test_publish_cache.py
           python3 -B -m unittest discover -s tools -p test_readthedocs_build.py
-          python3 -B -m unittest discover -s tools -p test_windows_toolchain.py
           python3 -B -m unittest discover -s tools -p test_skia_archive.py
           python3 -B -m unittest discover -s tools -p test_stack_frames.py
           python3 -B -m unittest discover -s tools -p test_control_registry.py
@@ -65,17 +73,11 @@ jobs:
           python3 tools/control_schema.py render --check
           python3 -B -m unittest discover -s tools -p test_generate_library_docs.py
           python3 tools/generate_library_docs.py --check
-          python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv stx_rtf2md fuzz
-          python3 -B -m unittest discover -s tools -p test_lifetime_rules.py
-          python3 -B -m unittest discover -s tools -p test_state_machines.py
+          python3 -B ../template_harness/harness/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv stx_rtf2md fuzz
           python3 -B -m unittest discover -s tools -p test_ci_build.py
           python3 -B -m unittest discover -s tools -p test_engine_gate.py
-          python3 -B -m unittest discover -s tools -p test_ci_cache.py
-          python3 -B -m unittest discover -s tools -p test_ci_tree_receipt.py
-          python3 -B -m unittest discover -s tools -p test_change_selection.py
-          python3 -B -m unittest discover -s tools -p test_native_tests.py
           python3 -B -m unittest discover -s tools/layout_oracle -p test_layout_oracle.py
-          python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv stx_rtf2md fuzz
+          python3 -B ../template_harness/harness/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv stx_rtf2md fuzz
   # The site depends only on the tree (docs/requirements.txt pins its
   # toolchain), so a tree an earlier run of this repository built passes
   # without building it again (tools/ci_tree_receipt.py); the job still
@@ -84,6 +86,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: gui_forms
+      # template_harness beside gui_forms, at the commit gui_forms/harness.lock
+      # pins: the shared CI tools and checkers (docs/building/template-harness.md).
+      - uses: ./gui_forms/.github/actions/harness-checkout
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -92,18 +99,19 @@ jobs:
         if: github.event_name != 'schedule'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 tools/ci_tree_receipt.py lookup --kind docs --job docs
+        run: python3 template_harness/harness/ci_tree_receipt.py lookup --kind docs --job docs
       - name: Install the documentation toolchain
         if: steps.receipt.outputs.reused != 'true'
-        run: python3 -m pip install -r docs/requirements.txt
+        run: python3 -m pip install -r gui_forms/docs/requirements.txt
       - name: Build the documentation site with warnings as errors
         if: steps.receipt.outputs.reused != 'true'
+        working-directory: gui_forms
         run: sphinx-build -W --keep-going -b html docs docs/_build/html
       - uses: actions/upload-artifact@v4
         if: steps.receipt.outputs.reused != 'true'
         with:
           name: gui-forms-docs-html
-          path: docs/_build/html
+          path: gui_forms/docs/_build/html
           retention-days: 30
       # A job that reused a build records the run it carried.
       - name: Record this tree's documentation build
@@ -111,7 +119,7 @@ jobs:
         env:
           CARRIED: ${{ steps.receipt.outputs.producer-run }}
           COVERAGE: ${{ steps.receipt.outputs.coverage }}
-        run: python3 tools/ci_tree_receipt.py write --kind docs --out .ci/tree-receipt ${CARRIED:+--carried-from "$CARRIED" --coverage "$COVERAGE"}
+        run: python3 template_harness/harness/ci_tree_receipt.py write --kind docs --out .ci/tree-receipt ${CARRIED:+--carried-from "$CARRIED" --coverage "$COVERAGE"}
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.record.outputs.artifact }}
@@ -144,6 +152,9 @@ jobs:
         with:
           path: gui_forms
           fetch-depth: 0
+      # template_harness beside gui_forms, at the commit gui_forms/harness.lock
+      # pins: the shared CI tools and checkers (docs/building/template-harness.md).
+      - uses: ./gui_forms/.github/actions/harness-checkout
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -161,10 +172,10 @@ jobs:
         if: github.event_name != 'schedule'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python gui_forms/tools/ci_tree_receipt.py lookup --kind sanitize --job "Sanitizers (Linux, ASan + UBSan + LSan)"
+        run: python template_harness/harness/ci_tree_receipt.py lookup --kind sanitize --job "Sanitizers (Linux, ASan + UBSan + LSan)"
       # The Ubuntu mirror is sometimes slow (7-11 minutes for 30 MB), so the
       # downloaded Ubuntu packages are kept in an Actions cache, refreshed once
-      # per runner image; only main saves it (tools/install_linux_ci_packages.sh).
+      # per runner image; only main saves it (harness/install_linux_ci_packages.sh).
       - name: Name the Linux package cache
         if: steps.receipt.outputs.reused != 'true'
         id: linux-image
@@ -174,11 +185,11 @@ jobs:
         id: linux-packages
         with:
           path: ${{ runner.temp }}/apt-archives
-          key: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-${{ steps.linux-image.outputs.image }}
-          restore-keys: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-
+          key: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('template_harness/harness/install_linux_ci_packages.sh', 'template_harness/projects/gui_forms.toml') }}-${{ steps.linux-image.outputs.image }}
+          restore-keys: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('template_harness/harness/install_linux_ci_packages.sh', 'template_harness/projects/gui_forms.toml') }}-
       - name: Install Linux dependencies
         if: steps.receipt.outputs.reused != 'true'
-        run: sh gui_forms/tools/install_linux_ci_packages.sh toolkit "$RUNNER_TEMP/apt-archives"
+        run: sh template_harness/harness/install_linux_ci_packages.sh toolkit "$RUNNER_TEMP/apt-archives"
       - uses: actions/cache/save@v4
         if: github.event_name != 'pull_request' && github.event_name != 'merge_group' && steps.linux-packages.outputs.cache-hit != 'true' && steps.receipt.outputs.reused != 'true'
         with:
@@ -237,7 +248,7 @@ jobs:
         if: steps.debug-info.outputs.mode == 'lines' && steps.receipt.outputs.reused != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python gui_forms/tools/ci_sanitizer_seed.py find
+        run: python template_harness/harness/ci_sanitizer_seed.py find
       - uses: actions/download-artifact@v4
         if: steps.seed.outputs.seeded == 'true' && steps.receipt.outputs.reused != 'true'
         with:
@@ -250,7 +261,7 @@ jobs:
         if: steps.seed.outputs.seeded == 'true' && steps.receipt.outputs.reused != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python gui_forms/tools/ci_sanitizer_seed.py restore --artifact-id "${{ steps.seed.outputs.artifact-id }}"
+        run: python template_harness/harness/ci_sanitizer_seed.py restore --artifact-id "${{ steps.seed.outputs.artifact-id }}"
       # A pull request builds and runs only the tests its changed paths can
       # affect (the areas of tools/test_areas.json; every test when it touches
       # CMake, the toolchain, the core headers or this workflow); a merge
@@ -288,7 +299,7 @@ jobs:
         env:
           CARRIED: ${{ steps.receipt.outputs.producer-run }}
           COVERAGE: ${{ steps.receipt.outputs.coverage }}
-        run: python gui_forms/tools/ci_tree_receipt.py write --kind sanitize --out .ci/tree-receipt --build-record .build/native-linux-x64/gui-forms-sanitize.record.json ${CARRIED:+--carried-from "$CARRIED" --coverage "$COVERAGE"}
+        run: python template_harness/harness/ci_tree_receipt.py write --kind sanitize --out .ci/tree-receipt --build-record .build/native-linux-x64/gui-forms-sanitize.record.json ${CARRIED:+--carried-from "$CARRIED" --coverage "$COVERAGE"}
       - uses: actions/upload-artifact@v4
         if: success()
         with:
@@ -297,7 +308,7 @@ jobs:
           retention-days: 30
       - name: Pack the sanitizer objects as the next run's seed
         if: success() && steps.debug-info.outputs.mode == 'lines' && steps.receipt.outputs.reused != 'true'
-        run: python gui_forms/tools/ci_sanitizer_seed.py pack
+        run: python template_harness/harness/ci_sanitizer_seed.py pack
       - uses: actions/upload-artifact@v4
         if: success() && steps.debug-info.outputs.mode == 'lines' && steps.receipt.outputs.reused != 'true'
         with:
@@ -313,7 +324,7 @@ jobs:
       # that carried no pull request's receipt.
       - name: Keep only the compiler cache entries this build used
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.receipt.outputs.reused != 'true'
-        run: python gui_forms/tools/ci_cache.py evict --since "$GUI_FORMS_JOB_START"
+        run: python template_harness/harness/ci_cache.py evict --since "$GUI_FORMS_JOB_START"
       - uses: actions/cache/save@v4
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.receipt.outputs.reused != 'true'
         with:
@@ -387,11 +398,15 @@ jobs:
       identity: ${{ steps.plan.outputs.identity }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: gui_forms
+      # The archive's identity reads the toolchain pin from the harness.
+      - uses: ./gui_forms/.github/actions/harness-checkout
       - name: Decide whether the Windows CPU Skia archive must be built
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 -B tools/skia_archive.py plan --platform windows-x64
+        run: python3 -B gui_forms/tools/skia_archive.py plan --platform windows-x64
 
   # The job always runs. When the plan finds an archive of this identity, it
   # is a no-op on Ubuntu. A skipped job here would make GitHub skip, or report
@@ -417,6 +432,8 @@ jobs:
         if: needs.skia-windows-x64-plan.outputs.build == 'true'
         with:
           path: gui_forms
+      - uses: ./gui_forms/.github/actions/harness-checkout
+        if: needs.skia-windows-x64-plan.outputs.build == 'true'
       - uses: actions/setup-python@v5
         if: needs.skia-windows-x64-plan.outputs.build == 'true'
         id: toolchain-python
@@ -429,7 +446,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
-        run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/windows_toolchain.py restore'
+        run: '"$TOOLCHAIN_PYTHON" template_harness/harness/windows_toolchain.py restore'
       # Natively with the pinned CLANG64 toolchain (BGRA, the profile's
       # spelled-out order); then packed, and compiled against and run from a
       # fresh extraction. The log prints the build's own time.
@@ -589,7 +606,10 @@ jobs:
       actions: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: gui_forms
+      - uses: ./gui_forms/.github/actions/harness-checkout
       - name: Delete superseded cache generations
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 -B tools/ci_cache.py prune --ref refs/heads/main --apply
+        run: python3 -B template_harness/harness/ci_cache.py prune --ref refs/heads/main --apply

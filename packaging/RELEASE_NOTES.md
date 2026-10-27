@@ -137,6 +137,13 @@ mail mockup.
 - `TextMaskLimit` gains `cache_entries`. The mask cache's entry count had
   been reported as `metadata_bytes`.
 
+### Build and CI
+- GUI.Forms builds through template_harness. The shared CI tools (reuse,
+  compiler caches, the Windows toolchain, the checkers) moved to
+  [malkuth-software/template_harness](https://github.com/malkuth-software/template_harness),
+  pinned by `harness.lock`; their old `tools/` paths forward to it (see
+  docs/building/template-harness.md).
+
 ### Release pipeline
 - As in 0.1, each program is built, tested, packaged and smoke-launched on
   macOS, Windows and Linux runners before anything is uploaded.

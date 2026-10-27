@@ -211,7 +211,7 @@ def network_inputs(root: Path) -> list[dict[str, Any]]:
          "note": "prebuilt gn and ninja binaries Skia's scripts download; Linux uses the system gn and ninja "
                  "(GUI_FORMS_SYSTEM_BUILD_TOOLS=1)"},
         {"name": "llvm-runtimes-source", "platforms": ["macos-arm64"],
-         "fetched_by": "tools/build_macos_runtimes.py",
+         "fetched_by": "template_harness harness/build_macos_runtimes.py (the commit harness.lock pins)",
          "upstream": "https://github.com/llvm/llvm-project/releases/download/llvmorg-" + VERSION +
                      "/llvm-project-" + VERSION + ".src.tar.xz",
          "sha256": SOURCE_SHA256,
@@ -222,7 +222,7 @@ def network_inputs(root: Path) -> list[dict[str, Any]]:
 PREBUILT_INPUTS: tuple[dict[str, Any], ...] = (
     {"name": "llvm-22.1-toolchain", "platforms": ["macos-arm64", "windows-x64", "linux-x64", "linux-arm64"],
      "source": "macOS: Homebrew llvm@22; Linux: apt.llvm.org clang-22; Windows: MSYS2 CLANG64 with the "
-               "packages in tools/windows_toolchain.json",
+               "packages in template_harness harness/windows_toolchain.json (the commit harness.lock pins)",
      "note": "cmake/llvm22.cmake requires LLVM 22.1; CMake 3.25 or newer, Ninja, Git and Python 3.12 or "
              "newer are installed beside it"},
     {"name": "skia-windows-archive", "platforms": ["windows-x64"],

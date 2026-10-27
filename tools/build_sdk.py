@@ -8,8 +8,10 @@ The build entry point of the source SDK (SDK_MANIFEST.json's "build"):
 It runs the target's own preparation (on macOS and Linux, fetching and
 building the pinned CPU Skia; on Windows nothing more), configures the
 toolkit without tests or the demonstration programs, builds it and installs
-it into --prefix. The configure options are tools/ci_build.py's, imported
-rather than copied, so a consumer's SDK is the build CI tests;
+it into --prefix. The configure options are the ones tools/ci_build.py
+configures CI with (tools/toolkit_configure.py, imported rather than
+copied, and free of template_harness, which a source SDK does not carry), so
+a consumer's SDK is the build CI tests;
 test_build_sdk.py checks the two stay equal.
 
 In a source SDK archive the text sources and miniaudio are already in place
@@ -31,7 +33,7 @@ from pathlib import Path
 ROOT: Path = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-import ci_build  # noqa: E402  (after the path insert above)
+import toolkit_configure  # noqa: E402  (after the path insert above)
 
 TARGETS: tuple[str, ...] = ("macos-arm64", "windows-x64", "linux-x64", "linux-arm64")
 # The ci_build.py host name of each target.
@@ -78,7 +80,7 @@ def configure_command(target: str, source: Path, toolkit: Path, skia_out: Path, 
     """The configure of target's SDK: ci_build.py's options with tests and programs off."""
     host: str = TARGET_HOSTS[target]
     return ["cmake", "-S", str(source), "-B", str(toolkit), "-G", "Ninja",
-            *ci_build.toolkit_options(source, prefix, False, False), *ci_build.host_options(host, skia_out)]
+            *toolkit_configure.toolkit_options(source, prefix, False, False), *toolkit_configure.host_options(host, skia_out)]
 
 
 def build(target: str, prefix: Path, jobs: int, work: Path) -> None:
@@ -88,10 +90,10 @@ def build(target: str, prefix: Path, jobs: int, work: Path) -> None:
     toolkit: Path = work / "gui-forms"
     skia_out: Path = work / "skia"
     os.environ["BUILD_JOBS"] = str(jobs)
-    ci_build.prepare_host(host, ROOT, skia_out, not vendored_sources_present(ROOT))
-    ci_build.run(*configure_command(target, ROOT, toolkit, skia_out, prefix))
-    ci_build.run("cmake", "--build", toolkit, "--parallel", jobs)
-    ci_build.run("cmake", "--install", toolkit)
+    toolkit_configure.prepare_host(host, ROOT, skia_out, not vendored_sources_present(ROOT))
+    toolkit_configure.run(*configure_command(target, ROOT, toolkit, skia_out, prefix))
+    toolkit_configure.run("cmake", "--build", toolkit, "--parallel", jobs)
+    toolkit_configure.run("cmake", "--install", toolkit)
     print(f"GUI.Forms SDK for {target} installed in {prefix}", flush=True)
 
 

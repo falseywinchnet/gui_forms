@@ -109,6 +109,15 @@ PLATFORM_INPUTS: dict[str, tuple[str, ...]] = {
 # headers shares with the archive's build. GUI.Forms stores BGRA8
 # premultiplied sRGB on every platform (stage SK); all four shifts are
 # spelled out rather than left to Skia's platform default.
+# The Windows toolchain pin moved to template_harness, beside SOURCE
+# (harness.lock pins the commit), with the same bytes. The identity still
+# names these inputs by their old GUI.Forms paths, so moving them left every
+# archive's identity unchanged; a later change to the harness's copies (a
+# harness.lock bump) changes the identity, as a change here did.
+MOVED_INPUTS: dict[str, str] = {
+    'tools/windows_toolchain.json': 'template_harness/harness/windows_toolchain.json',
+    'tools/windows_toolchain_release.json': 'template_harness/harness/windows_toolchain_release.json',
+}
 PLATFORM_DEFINES: dict[str, tuple[str, ...]] = {
     'windows-x64': ('SK_B32_SHIFT=0', 'SK_G32_SHIFT=8', 'SK_R32_SHIFT=16', 'SK_A32_SHIFT=24'),
 }
@@ -159,6 +168,13 @@ def skia_revision(source: Path) -> str:
     return found.group(1)
 
 
+def input_path(relative: str, source: Path) -> Path:
+    """Where an identity input named relative is read: under source, or beside it when it moved."""
+    if relative in MOVED_INPUTS:
+        return source.parent / MOVED_INPUTS[relative]
+    return source / relative
+
+
 def input_digests(platform: str, source: Path) -> dict[str, str]:
     require_platform(platform)
     digests: dict[str, str] = {}
@@ -166,7 +182,7 @@ def input_digests(platform: str, source: Path) -> dict[str, str]:
     for relative in COMMON_INPUTS + PLATFORM_INPUTS[platform]:
         # Line endings are normalised so that a checkout's conversion does
         # not change the identity.
-        data: bytes = (source / relative).read_bytes().replace(b'\r\n', b'\n')
+        data: bytes = input_path(relative, source).read_bytes().replace(b'\r\n', b'\n')
         digests[relative] = hashlib.sha256(data).hexdigest()
     return digests
 

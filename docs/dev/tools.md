@@ -4,6 +4,13 @@ The scripts and programs under `tools/` that a contributor runs. Commands run
 from the repository root. Each Python script prints its full options with
 `--help`.
 
+The shared CI tools and the checkers (`check_house_style.py`,
+`check_lifetime_rules.py`, `check_state_machines.py`, `windows_toolchain.py`,
+the `ci_*.py` tools and the rest that `tools/harness_link.py` lists) live in
+template_harness, checked out beside this repository at the commit
+`harness.lock` pins. Their `tools/` paths below are forwarding shims to it:
+[GUI.Forms builds through template_harness](../building/template-harness.md).
+
 ## Documentation and the control registry
 
 `tools/control_registry.py`
