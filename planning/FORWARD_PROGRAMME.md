@@ -79,6 +79,14 @@ H  HTML import + WYSIWYG layout designer ─ needs L, T3                │
 V  WYSIWYG theme designer ─────────────── needs T4, D core ───────────┘
 ```
 
+State on 2026-10-27 (main tagged `checkpoint-2026-10-27`): 0.2 Verified
+shipped as v0.2.0. A, F, T1, T2, Z and DP are complete. T3 is in progress
+(P1 to P7a on main; P7b next), as are T5 (C0 to C6 on main; C7 next), L (the
+box gate recorded and L8a on main; L8b parked) and W. SK is paused by the
+owner before SK1b. T4, FD and C have not started. The stage index in
+`planning/stages/README.md` carries each stage's status, and
+`planning/ROADMAP_TO_0.5.md` lists what is left before 0.5.
+
 State on 2026-10-23: A, T1 and T2 are complete (T2 sealed with its gate
 identical on four hosts, `results/2026-10-23-t2-engine-gate`), and so is Z
 below; F is in progress. T1 to T4 are the spine; T3, T5, L and C are unblocked.
@@ -137,8 +145,8 @@ through that API.
 
 ### F. Font substitution
 
-Status (2026-10-23): in progress: F1 tool, faces and table merged or merging;
-F4 gate pending. Its gate declares 0.2.
+Status (2026-10-27): complete. Its gate is recorded in
+`results/2026-10-23-f-font-substitution`, and it declared 0.2.
 
 Applications, Windows Forms programs and web pages request families GUI.Forms
 does not bundle (Segoe UI, Tahoma, Microsoft Sans Serif, Arial, Helvetica,
