@@ -400,11 +400,16 @@ jobs:
           fi
       # The source SDK is platform-neutral, so one leg writes it: this tested
       # commit's tree plus the pinned sources the build above configured from.
+      # In the push to main that runs the native jobs, each of them has
+      # published its platform's build-<sha> compiler cache before the release
+      # this SDK joins, so the manifest names that release (--compiler-cache).
       - name: Package the source SDK
         if: matrix.platform == 'linux-x64'
+        env:
+          COMPILER_CACHE: ${{ inputs.from_native && github.event_name == 'push' && github.ref == 'refs/heads/main' && '--compiler-cache' || '' }}
         run: |
           python gui_forms/tools/package_sdk.py --version "$RELEASE_VERSION" --revision "${{ github.sha }}" --out dist \
-            --checkout "miniaudio=$BUILD_DIR/_deps/gui_forms_miniaudio-src" --fetch-missing
+            --checkout "miniaudio=$BUILD_DIR/_deps/gui_forms_miniaudio-src" --fetch-missing $COMPILER_CACHE
       - uses: actions/upload-artifact@v4
         with:
           name: gui-forms-programs-${{ matrix.platform }}

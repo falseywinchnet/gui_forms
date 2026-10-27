@@ -11,14 +11,23 @@ which a consumer builds GUI.Forms for its own host with tools/build_sdk.py:
     third_party/libunibreak/    libunibreak at fetch_linebreak.sh's pin
     third_party/miniaudio/      miniaudio at cmake/Audio.cmake's pin
     SDK_MANIFEST.json           the build entry point, every vendored source with
-                                its pin and tree digest, and what a build still
+                                its pin and tree digest, what a build still
                                 downloads (network_inputs) or needs installed
-                                (prebuilt_inputs)
+                                (prebuilt_inputs), and the compiler-cache
+                                release built from the same tree (compiler_cache)
 
 Each vendored source sits at the in-tree path its fetch script or CMake file
 reads first, so configuring from the archive fetches none of them. Pins are
 read from those files, never repeated here. The archive is reproducible:
 entries in name order, one fixed time, no owner.
+
+compiler_cache names the build-<revision> pre-release whose per-platform
+ccache archives CI compiled from this tree, and the layout a build must use
+to hit them. Each platform's native job of the push to main that tested the
+revision publishes its archive there as soon as it passes, and the release
+that carries this SDK is published only after all four have passed, so a
+release packaged in that run (--compiler-cache) has all four. A packaging
+outside that run (a tag build) cannot promise them, and records release null.
 
 tools/publish_tested_release.py expects the archive under sdk_archive_name()
 and lists it in SHA256SUMS.txt. --check reads an existing archive and checks
@@ -44,6 +53,11 @@ ROOT: Path = Path(__file__).resolve().parents[1]
 MANIFEST_NAME: str = "SDK_MANIFEST.json"
 MANIFEST_SCHEMA: int = 1
 BUILD_ENTRY: str = "tools/build_sdk.py"
+# The compiler-cache pre-release of a revision, and its per-platform asset
+# (template_harness harness/publish_cache.py with projects/gui_forms.toml).
+CACHE_RELEASE_PREFIX: str = "build-"
+CACHE_ASSET_PATTERN: str = "gui-forms-cache-{platform}.tar.gz"
+CACHE_PLATFORMS: tuple[str, ...] = ("macos-arm64", "windows-x64", "linux-x64", "linux-arm64")
 # Every entry gets this time stamp and no owner, so two packagings of the same
 # commit and pins are byte-identical (1980-01-01, as zip's earliest time).
 ARCHIVE_EPOCH: int = 315532800
@@ -232,12 +246,33 @@ PREBUILT_INPUTS: tuple[dict[str, Any], ...] = (
 )
 
 
-def manifest(root: Path, version: str, revision: str, vendored: list[dict[str, Any]]) -> dict[str, Any]:
+def compiler_cache(revision: str, published: bool) -> dict[str, Any]:
+    """The manifest's compiler_cache record: the build-<revision> pre-release when this packaging runs in the
+    push to main that publishes it (published), else release null."""
+    release: str | None = CACHE_RELEASE_PREFIX + revision if published else None
+    note: str = ("published by each platform's native job of the push to main that tested this revision, "
+                 "before this release; the source stays authoritative, so a missing or mismatched archive "
+                 "only means compiling more")
+    if not published:
+        note = "this SDK was packaged outside the push to main that publishes the revision's compiler caches"
+    return {"release": release, "asset": CACHE_ASSET_PATTERN, "platforms": list(CACHE_PLATFORMS),
+            "contents": ".ccache/ (CCACHE_DIR) and cache-manifest.json, for extraction into the workspace",
+            "layout": {"ccache_basedir": "the workspace", "source": "gui_forms",
+                       "work": ".build/native-{platform}",
+                       "note": "unpack the SDK's top directory as <workspace>/gui_forms and run build_sdk.py "
+                               "with --work <workspace>/.build/native-<platform>, CCACHE_BASEDIR=<workspace> "
+                               "and CCACHE_COMPILERCHECK=content, as CI compiles"},
+            "note": note}
+
+
+def manifest(root: Path, version: str, revision: str, vendored: list[dict[str, Any]],
+             published_cache: bool = False) -> dict[str, Any]:
     """The SDK_MANIFEST.json record."""
     return {"schema": MANIFEST_SCHEMA, "version": version, "revision": revision,
             "top_directory": sdk_directory_name(version), "build": BUILD_ENTRY,
             "third_party": vendored, "network_inputs": network_inputs(root),
-            "prebuilt_inputs": list(PREBUILT_INPUTS)}
+            "prebuilt_inputs": list(PREBUILT_INPUTS),
+            "compiler_cache": compiler_cache(revision, published_cache)}
 
 
 def has_commit(checkout: Path, revision: str) -> bool:
@@ -258,12 +293,14 @@ def fetch_pin(source: VendoredSource, revision: str, work: Path) -> Path:
 
 
 def collect(root: Path, version: str, revision: str, checkouts: dict[str, Path],
-            fetch_work: Path | None = None) -> dict[str, Entry]:
+            fetch_work: Path | None = None, published_cache: bool = False) -> dict[str, Entry]:
     """Every member of the archive, by its full name under the top directory.
 
     A vendored source is read from checkouts[name], else from its in-tree
     path; when neither holds its pin, fetch_work (if given) receives a
     shallow fetch of the pin from its upstream, else ValueError is raised.
+    published_cache: this packaging runs where the revision's compiler caches
+    are published (manifest's compiler_cache).
     """
     top: str = sdk_directory_name(version)
     tree: dict[str, Entry] = git_tree(root, revision)
@@ -295,7 +332,7 @@ def collect(root: Path, version: str, revision: str, checkouts: dict[str, Path],
                          "licence": source.path + "/" + source.licence,
                          "excluded": list(source.excluded), "files": len(entries),
                          "tree_sha256": tree_digest(entries)})
-    record: dict[str, Any] = manifest(root, version, revision, vendored)
+    record: dict[str, Any] = manifest(root, version, revision, vendored, published_cache)
     text: str = json.dumps(record, indent=2, sort_keys=True) + "\n"
     members[top + "/" + MANIFEST_NAME] = Entry(text.encode("utf-8"), None, False)
     return members
@@ -359,6 +396,9 @@ def check_members(members: dict[str, Entry], version: str) -> dict[str, Any]:
     record: dict[str, Any] = json.loads((members[top + MANIFEST_NAME].data or b"").decode("utf-8"))
     if record.get("top_directory") != sdk_directory_name(version) or record.get("build") != BUILD_ENTRY:
         raise ValueError(f"{MANIFEST_NAME} names another top directory or build entry point")
+    cache: Any = record.get("compiler_cache")
+    if type(cache) is not dict or cache.get("release") not in (None, CACHE_RELEASE_PREFIX + str(record.get("revision"))):
+        raise ValueError(f"{MANIFEST_NAME}'s compiler_cache must name build-<revision> or release null")
     names: list[str] = []
     source: dict[str, Any]
     for source in record.get("third_party", []):
@@ -390,16 +430,17 @@ def check_archive(archive: Path, version: str) -> dict[str, Any]:
 
 
 def package(root: Path, version: str, revision: str, out: Path, checkouts: dict[str, Path],
-            fetch_missing: bool = False) -> Path:
+            fetch_missing: bool = False, published_cache: bool = False) -> Path:
     """Collect, check and write the source SDK of revision into out; the archive.
 
-    fetch_missing lets collect fetch a pin no local checkout holds.
+    fetch_missing lets collect fetch a pin no local checkout holds;
+    published_cache records the revision's compiler-cache release.
     """
     out.mkdir(parents=True, exist_ok=True)
     archive: Path = out / sdk_archive_name(version)
     with tempfile.TemporaryDirectory(prefix="gui-forms-sdk-sources-") as directory:
         fetch_work: Path | None = Path(directory) if fetch_missing else None
-        members: dict[str, Entry] = collect(root, version, revision, checkouts, fetch_work)
+        members: dict[str, Entry] = collect(root, version, revision, checkouts, fetch_work, published_cache)
     check_members(members, version)
     write_archive(members, archive)
     check_archive(archive, version)
@@ -434,6 +475,9 @@ def main(argv: list[str] | None = None) -> int:
                              "not at its in-tree path (CI passes miniaudio's FetchContent clone)")
     parser.add_argument("--fetch-missing", action="store_true",
                         help="shallow-fetch from its upstream any pin no local checkout holds")
+    parser.add_argument("--compiler-cache", action="store_true",
+                        help="this run is the push to main whose native jobs publish build-<revision>; "
+                             "record that release in the manifest (else compiler_cache.release is null)")
     parser.add_argument("--check", type=Path, default=None,
                         help="check this existing archive's name, shape and digests; write nothing")
     args: argparse.Namespace = parser.parse_args(argv)
@@ -443,7 +487,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     revision: str = subprocess.run(["git", "-C", str(ROOT), "rev-parse", args.revision + "^{commit}"],
                                    check=True, capture_output=True, text=True).stdout.strip()
-    package(ROOT, args.version, revision, args.out, parse_checkouts(args.checkout), args.fetch_missing)
+    package(ROOT, args.version, revision, args.out, parse_checkouts(args.checkout), args.fetch_missing,
+            args.compiler_cache)
     return 0
 
 
