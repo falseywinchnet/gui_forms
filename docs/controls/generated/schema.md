@@ -1994,6 +1994,22 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `auto_validate_changed` | `AutoValidate` |
 
+## `splitter` (Splitter, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `face` | face |  |  |
+
+States: `normal`, `hot`, `pressed`, `captured`, `enabled`, `disabled`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `splitter_moving` | `SplitterMoveEvent`, by reference |
+| `splitter_moved` | `SplitterMoveEvent` |
+
 ## `command_overflow_panel` (CommandOverflowPanel, control)
 
 | Part | Role | Reuses | Own states |
