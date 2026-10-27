@@ -7,7 +7,9 @@ test selection, sanitizer options, build records) are template_harness's
 harness/ci_build_steps.py, reached through tools/harness_link.py (the
 harness beside this checkout, at the commit harness.lock pins). File Manager
 imports configure_tree, sanitizer_options and SANITIZER_LINK_FLAGS from
-this module, so they stay importable here.
+this module, so they stay importable here. The configure options and the
+host preparation are tools/toolkit_configure.py's, which the source SDK's
+tools/build_sdk.py also uses without the harness.
 """
 from __future__ import annotations
 import argparse
@@ -22,10 +24,11 @@ import harness_link  # noqa: F401  (puts the harness's tools on sys.path)
 import change_selection
 from ci_build_steps import (BUILT_EVERYTHING, BUILT_NOTHING, BUILT_SELECTED, DEBUG_INFO_FLAGS,  # noqa: F401
                             DEBUG_INFO_VARIABLE, SANITIZER_FLAGS, SANITIZER_LINK_FLAGS, build_record_path,
-                            changed_tests_listing, configure_tree, ctest_selection, debug_info_mode,
-                            pinned_checkouts_current, run, sanitizer_options, selected_test_targets,
-                            test_listing, write_build_record)
+                            changed_tests_listing, configure_tree, ctest_selection, debug_info_mode, run,
+                            sanitizer_options, selected_test_targets, test_listing, write_build_record)
 import native_tests
+from toolkit_configure import (HOST_OPTION_NAMES, fetch_line_break, fetch_text_stack,  # noqa: F401
+                               host_options, prepare_host, toolkit_options)
 
 ROOT: Path = Path(__file__).resolve().parents[2]
 
@@ -92,34 +95,6 @@ def gallery_enabled(flag: bool, environ: dict[str, str]) -> bool:
     return value in ('1', 'true', 'on', 'yes')
 
 
-def fetch_text_stack(script: Path) -> None:
-    if pinned_checkouts_current(script):
-        print(f'{script.name}: every checkout is at its pinned commit', flush=True)
-        return
-    run('sh', script)
-
-
-# fetch_linebreak.sh pins its one checkout as revision=<commit>.
-LINE_BREAK_PIN_PATTERN: re.Pattern[str] = re.compile(r'^revision=([0-9a-f]{40})$', re.MULTILINE)
-
-
-def fetch_line_break(script: Path) -> None:
-    """Fetch libunibreak, which the text engine links (owner, 2026-10-26).
-
-    Skipped, as fetch_text_stack is, when the checkout is already at the
-    pinned commit; the script would only re-run `git checkout --detach`.
-    """
-    pins: list[str] = LINE_BREAK_PIN_PATTERN.findall(script.read_text(encoding='utf-8'))
-    checkout: Path = script.parent / 'libunibreak'
-    if len(pins) == 1 and (checkout / '.git').exists():
-        completed: subprocess.CompletedProcess[str] = subprocess.run(
-            ['git', '-C', str(checkout), 'rev-parse', 'HEAD'], capture_output=True, text=True)
-        if completed.returncode == 0 and completed.stdout.strip() == pins[0]:
-            print(f'{script.name}: the checkout is at its pinned commit', flush=True)
-            return
-    run('sh', script)
-
-
 def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False,
                   sanitize: bool = False, tests: str = '', test_jobs: int = 1,
                   debug_info: str = 'lines', skip_labels: str = '', changed_from: str = '') -> None:
@@ -152,38 +127,15 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
             write_build_record(toolkit, BUILT_NOTHING, reason)
             return
     options: list[str] = []
-    gallery_option: str = 'ON' if gallery else 'OFF'
     miniaudio: Path = toolkit / '_deps/gui_forms_miniaudio-src'
     if (miniaudio / 'miniaudio.h').is_file():
         # Source was restored from the pinned dependency cache. Audio.cmake
         # checks both decoder/header digests before compiling it. A missing
         # FetchContent stamp must not discard and clone these same bytes again.
         options.append(f'-DFETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO={miniaudio}')
-    hosts: dict[str, str] = {'WINDOWS': 'windows', 'MACOS': 'macos', 'LINUX': 'linux'}
-    name: str
-    for name in hosts:
-        enabled: str = 'OFF'
-        if hosts[name] == host:
-            enabled = 'ON'
-        options.append(f'-DGUI_FORMS_ENABLE_{name}_HOST={enabled}')
-    if host == 'windows':
-        # ADR-004: the Win32 host draws text with the shared HarfBuzz/FreeType engine.
-        fetch_text_stack(ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
-        fetch_line_break(ROOT / 'gui_forms/third_party/fetch_linebreak.sh')
-        options.extend(['-DGUI_FORMS_ENABLE_SKIA=OFF', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON'])
-    else:
-        if host == 'linux':
-            os.environ['GUI_FORMS_SYSTEM_BUILD_TOOLS'] = '1'
-        run('sh', ROOT / 'gui_forms/third_party/fetch_skia_cpu.sh')
-        fetch_text_stack(ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
-        fetch_line_break(ROOT / 'gui_forms/third_party/fetch_linebreak.sh')
-        skia_out: Path = build / 'skia'
-        if host == 'linux':
-            run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu_linux.sh', skia_out)
-        else:
-            run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu.sh', skia_out)
-        options.extend(['-DGUI_FORMS_ENABLE_SKIA=ON', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON',
-                        '-DGUI_FORMS_SKIA_PREBUILT=ON', f'-DGUI_FORMS_SKIA_OUT={skia_out}'])
+    skia_out: Path = build / 'skia'
+    prepare_host(host, ROOT / 'gui_forms', skia_out, True)
+    options.extend(host_options(host, skia_out))
     timeout: str = '120'
     if sanitize:
         sanitizer_cmake: list[str]
@@ -195,11 +147,7 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         timeout = '900'
     configure: list[str] = [
         'cmake', '-S', str(ROOT / 'gui_forms'), '-B', str(toolkit), '-G', 'Ninja',
-        '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_LIBDIR=lib',
-        '-DCMAKE_TOOLCHAIN_FILE=' + str(ROOT / 'gui_forms/cmake/llvm22.cmake'),
-        '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', f'-DGUI_FORMS_BUILD_GALLERY={gallery_option}',
-        '-DGUI_FORMS_BUILD_TESTS=ON', '-DGUI_FORMS_BUILD_AUDIO=ON',
-        '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options]
+        *toolkit_options(ROOT / 'gui_forms', sdk, gallery, True), *options]
     configure_tree(toolkit, configure)
     # A narrowed run builds only what its tests read, not every program in the tree.
     selection: list[str] = ctest_selection(tests, skip_labels)

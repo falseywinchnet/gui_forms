@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""Build and install the GUI.Forms SDK from this tree for one target.
+
+The build entry point of the source SDK (SDK_MANIFEST.json's "build"):
+
+  python3 tools/build_sdk.py --target <platform> --prefix <dir> [--jobs N] [--work <dir>]
+
+It runs the target's own preparation (on macOS and Linux, fetching and
+building the pinned CPU Skia; on Windows nothing more), configures the
+toolkit without tests or the demonstration programs, builds it and installs
+it into --prefix. The configure options are the ones tools/ci_build.py
+configures CI with (tools/toolkit_configure.py, imported rather than
+copied, and free of template_harness, which a source SDK does not carry), so
+a consumer's SDK is the build CI tests;
+test_build_sdk.py checks the two stay equal.
+
+In a source SDK archive the text sources and miniaudio are already in place
+(SDK_MANIFEST.json lists them) and are not fetched; in a Git checkout they
+are fetched as ci_build.py fetches them. --target names the platform to
+build for; only the host's platform is admitted until per-target toolchains
+exist.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import platform as host_platform
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT: Path = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
+import toolkit_configure  # noqa: E402  (after the path insert above)
+
+TARGETS: tuple[str, ...] = ("macos-arm64", "windows-x64", "linux-x64", "linux-arm64")
+# The ci_build.py host name of each target.
+TARGET_HOSTS: dict[str, str] = {"macos-arm64": "macos", "windows-x64": "windows",
+                                "linux-x64": "linux", "linux-arm64": "linux"}
+MANIFEST_NAME: str = "SDK_MANIFEST.json"
+
+
+def host_target() -> str:
+    """The target platform of the machine this runs on."""
+    systems: dict[str, str] = {"Darwin": "macos", "Linux": "linux", "Windows": "windows"}
+    system: str = systems.get(host_platform.system(), host_platform.system().lower())
+    if system.startswith(("mingw", "msys", "cygwin")):
+        system = "windows"
+    architecture: str = "x64"
+    if host_platform.machine().lower() in ("arm64", "aarch64"):
+        architecture = "arm64"
+    return system + "-" + architecture
+
+
+def check_target(target: str, host: str) -> None:
+    """Raise ValueError unless target can be built on host (only the host's own platform today)."""
+    if target not in TARGETS:
+        raise ValueError(f"unknown target {target}; the targets are {', '.join(TARGETS)}")
+    if target != host:
+        raise ValueError(f"cannot build {target} on this {host} host: build_sdk.py builds only for the "
+                         "host's own platform until per-target cross-compile toolchains exist")
+
+
+def vendored_sources_present(source: Path) -> bool:
+    """Whether source is a source SDK whose manifest's vendored sources are all in place."""
+    manifest: Path = source / MANIFEST_NAME
+    if not manifest.is_file():
+        return False
+    record: dict = json.loads(manifest.read_text(encoding="utf-8"))
+    entry: dict
+    for entry in record.get("third_party", []):
+        if not (source / entry["path"]).is_dir():
+            raise RuntimeError(f"{MANIFEST_NAME} lists {entry['path']}, which is missing")
+    return True
+
+
+def configure_command(target: str, source: Path, toolkit: Path, skia_out: Path, prefix: Path) -> list[str]:
+    """The configure of target's SDK: ci_build.py's options with tests and programs off."""
+    host: str = TARGET_HOSTS[target]
+    return ["cmake", "-S", str(source), "-B", str(toolkit), "-G", "Ninja",
+            *toolkit_configure.toolkit_options(source, prefix, False, False), *toolkit_configure.host_options(host, skia_out)]
+
+
+def build(target: str, prefix: Path, jobs: int, work: Path) -> None:
+    """Prepare, configure, build and install target's SDK into prefix, using work for the build trees."""
+    host: str = TARGET_HOSTS[target]
+    work.mkdir(parents=True, exist_ok=True)
+    toolkit: Path = work / "gui-forms"
+    skia_out: Path = work / "skia"
+    os.environ["BUILD_JOBS"] = str(jobs)
+    toolkit_configure.prepare_host(host, ROOT, skia_out, not vendored_sources_present(ROOT))
+    toolkit_configure.run(*configure_command(target, ROOT, toolkit, skia_out, prefix))
+    toolkit_configure.run("cmake", "--build", toolkit, "--parallel", jobs)
+    toolkit_configure.run("cmake", "--install", toolkit)
+    print(f"GUI.Forms SDK for {target} installed in {prefix}", flush=True)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--target", required=True, help="the platform to build for: " + ", ".join(TARGETS))
+    parser.add_argument("--prefix", type=Path, required=True, help="where to install the SDK")
+    parser.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
+    parser.add_argument("--work", type=Path, default=None,
+                        help="the build directory (default: .build/sdk-<target> in this tree)")
+    args: argparse.Namespace = parser.parse_args(argv)
+    if args.jobs < 1:
+        parser.error("--jobs must be positive")
+    try:
+        check_target(args.target, host_target())
+    except ValueError as error:
+        parser.error(str(error))
+    work: Path = args.work if args.work is not None else ROOT / ".build" / ("sdk-" + args.target)
+    try:
+        build(args.target, args.prefix.resolve(), args.jobs, work.resolve())
+    except subprocess.CalledProcessError as error:
+        print(f"build_sdk.py: a step failed: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

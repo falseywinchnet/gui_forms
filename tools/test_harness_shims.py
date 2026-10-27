@@ -106,6 +106,14 @@ class MissingHarnessTests(unittest.TestCase):
         self.assertIn(harness_link.pinned_commit(), completed.stderr)
         self.assertRegex(harness_link.pinned_commit(), '^[0-9a-f]{40}$')
 
+    def test_the_source_sdk_build_entry_needs_no_harness(self) -> None:
+        # A source SDK archive carries tools/ but no template_harness.
+        shutil.copy2(TOOLS / 'build_sdk.py', self.tools)
+        shutil.copy2(TOOLS / 'toolkit_configure.py', self.tools)
+        completed: subprocess.CompletedProcess[str] = run_python([str(self.tools / 'build_sdk.py'), '--help'])
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn('usage:', completed.stdout)
+
     @unittest.skipUnless(shutil.which('sh') is not None, 'needs sh')
     def test_the_package_shim_names_the_pinned_commit(self) -> None:
         completed: subprocess.CompletedProcess[str] = subprocess.run(

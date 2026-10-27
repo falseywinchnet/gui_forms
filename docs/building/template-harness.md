@@ -8,7 +8,9 @@ package installer, and the house-style, lifetime and state-machine checkers.
 GUI.Forms keeps its own build driver (`tools/ci_build.py`), its packaging
 (`tools/package_programs.py` and the SDK tools), `tools/stack_frames.py`,
 its LeakSanitizer suppressions (`tools/sanitizer/lsan.supp`) and the tests
-of those files.
+of those files. The configure options and host preparation are
+`tools/toolkit_configure.py`, which needs no harness: the source SDK's
+`tools/build_sdk.py` builds with it in an archive that carries none.
 
 ## The pin and the layout
 

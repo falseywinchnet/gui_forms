@@ -1,229 +1,257 @@
-"""The SDK archive has one name and one shape per platform, and the release expects it."""
+"""The source SDK archive carries the release tree and the pinned sources, reproducibly."""
 from __future__ import annotations
 
 import contextlib
 import io
 import os
-import tarfile
+import subprocess
 import tempfile
 import unittest
-import zipfile
 from pathlib import Path
 from typing import Any
 
-import package_programs as pp
 import package_sdk as sdk
 import publish_tested_release as publish
 
 VERSION: str = "0.2.1"
+GIT_ENVIRONMENT: dict[str, str] = {
+    "GIT_AUTHOR_NAME": "fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+    "GIT_COMMITTER_NAME": "fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+    "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z", "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z",
+    "GIT_CONFIG_NOSYSTEM": "1",
+}
 
 
-def write_file(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+def git(directory: Path, *arguments: str) -> str:
+    environment: dict[str, str] = dict(os.environ)
+    environment.update(GIT_ENVIRONMENT)
+    completed: subprocess.CompletedProcess[str] = subprocess.run(
+        ["git", "-C", str(directory), "-c", "core.autocrlf=false", *arguments],
+        check=True, capture_output=True, text=True, env=environment)
+    return completed.stdout.strip()
 
 
-def make_install(top: Path) -> None:
-    """A staged install with what cmake --install leaves, before add_consumer_files."""
-    write_file(top / "include/gui_forms/application.hpp", "#pragma once\n")
-    write_file(top / "lib/cmake/GUIForms/GUIFormsConfig.cmake", "# config\n")
-    write_file(top / "lib/cmake/GUIForms/GUIFormsConfigVersion.cmake", "# version\n")
-    write_file(top / "lib/cmake/GUIForms/GUIFormsTargets.cmake", "# targets\n")
-    (top / "lib/cmake/GUIForms/llvm22.cmake").write_bytes(sdk.TOOLCHAIN_FILE.read_bytes())
-    write_file(top / "share/licenses/GUIForms/LICENSE", "MIT License\n")
-    write_file(top / "share/licenses/GUIForms/THIRD_PARTY_NOTICES.md", pp.FREETYPE_CREDIT + "\n")
+def make_repository(directory: Path, files: dict[str, str]) -> str:
+    """A Git repository at directory holding files in one commit; the commit."""
+    directory.mkdir(parents=True, exist_ok=True)
+    git(directory, "init", "-q")
+    name: str
+    for name in files:
+        path: Path = directory / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(files[name].encode("utf-8"))
+    git(directory, "add", "-A")
+    git(directory, "commit", "-q", "-m", "fixture")
+    return git(directory, "rev-parse", "HEAD")
 
 
-def make_runtime(prefix: Path) -> None:
-    """A macOS LLVM runtime prefix with the files package_sdk checks."""
-    write_file(prefix / "lib/libc++.1.dylib", "dylib\n")
-    write_file(prefix / "include/c++/v1/__config_site", "// configured\n")
-    write_file(prefix / "include/c++/v1/vector", "// vector\n")
-    write_file(prefix / "share/licenses/llvm-runtimes/libcxx-LICENSE.TXT", "Apache-2.0 WITH LLVM-exception\n")
+class Fixture:
+    """A release tree whose pin files name four fixture upstream repositories.
+
+    harfbuzz, freetype and libunibreak are checked out at their in-tree
+    paths (ignored by the release tree); miniaudio is elsewhere, as CI's
+    FetchContent clone is, and reached through checkouts.
+    """
+
+    def __init__(self, base: Path) -> None:
+        self.root: Path = base / "gui_forms"
+        third_party: Path = self.root / "third_party"
+        self.revisions: dict[str, str] = {
+            "harfbuzz": make_repository(third_party / "harfbuzz", {
+                "COPYING": "HarfBuzz licence\n", "CMakeLists.txt": "# harfbuzz\n", "src/hb.cc": "// hb\n",
+                "test/shape/big.txt": "test data\n", "perf/bench.cc": "// perf\n"}),
+            "freetype": make_repository(third_party / "freetype", {
+                "LICENSE.TXT": "FreeType licence\n", "CMakeLists.txt": "# freetype\n"}),
+            "libunibreak": make_repository(third_party / "libunibreak", {
+                "LICENCE": "zlib licence\n", "src/linebreak.c": "/* lb */\n"}),
+            "miniaudio": make_repository(base / "deps/miniaudio-src", {
+                "LICENSE": "MIT-0\n", "miniaudio.h": "/* ma */\n", "extras/stb_vorbis.c": "/* v */\n"}),
+        }
+        self.checkouts: dict[str, Path] = {"miniaudio": base / "deps/miniaudio-src"}
+        self.revision: str = make_repository(self.root, {
+            "CMakeLists.txt": "cmake_minimum_required(VERSION 3.25)\n",
+            "tools/build_sdk.py": "# entry point\n",
+            "cmake/llvm22.cmake": "# toolchain\n",
+            "cmake/Audio.cmake": "FetchContent_Declare(gui_forms_miniaudio\n    GIT_TAG "
+                                 + self.revisions["miniaudio"] + "\n)\n",
+            "third_party/.gitignore": "/harfbuzz/\n/freetype/\n/libunibreak/\n/miniaudio/\n",
+            "third_party/fetch_text_stack.sh": "harfbuzz_revision=" + self.revisions["harfbuzz"] + "\n"
+                                               "freetype_revision=" + self.revisions["freetype"] + "\n",
+            "third_party/fetch_linebreak.sh": "revision=" + self.revisions["libunibreak"] + "\n",
+            "third_party/fetch_skia_cpu.sh": "skia_revision=" + "a" * 40 + "\nfreetype_revision=" + "b" * 40 + "\n",
+        })
+
+    def package(self, out: Path) -> Path:
+        with contextlib.redirect_stdout(io.StringIO()):
+            return sdk.package(self.root, VERSION, self.revision, out, self.checkouts)
 
 
-def make_sdk(root: Path, platform: str) -> Path:
-    """A complete staged SDK for platform under root; its top directory."""
-    top: Path = root / sdk.sdk_directory_name(VERSION, platform)
-    make_install(top)
-    runtime: Path | None = None
-    if platform == sdk.MACOS_PLATFORM:
-        runtime = root / "runtime"
-        make_runtime(runtime)
-    sdk.add_consumer_files(top, platform, runtime)
-    return top
+class SourceArchiveTests(unittest.TestCase):
+    # One fixture and archive for the class: building the Git fixtures is
+    # most of the cost, and no test changes them (tampering writes copies).
+    directory: tempfile.TemporaryDirectory[str]
+    base: Path
+    fixture: Fixture
+    archive: Path
+    top: str
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.directory = tempfile.TemporaryDirectory()
+        cls.base = Path(cls.directory.name)
+        cls.fixture = Fixture(cls.base)
+        cls.archive = cls.fixture.package(cls.base / "dist")
+        cls.top = sdk.sdk_directory_name(VERSION) + "/"
 
-class NameTests(unittest.TestCase):
-    def test_archive_names_per_platform(self) -> None:
-        self.assertEqual(sdk.sdk_archive_name(VERSION, "macos-arm64"), "gui-forms-sdk-0.2.1-macos-arm64.tar.gz")
-        self.assertEqual(sdk.sdk_archive_name(VERSION, "windows-x64"), "gui-forms-sdk-0.2.1-windows-x64.zip")
-        self.assertEqual(sdk.sdk_archive_name(VERSION, "linux-x64"), "gui-forms-sdk-0.2.1-linux-x64.tar.gz")
-        self.assertEqual(sdk.sdk_archive_name(VERSION, "linux-arm64"), "gui-forms-sdk-0.2.1-linux-arm64.tar.gz")
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.directory.cleanup()
 
-    def test_platforms_match_the_program_packager(self) -> None:
-        self.assertEqual(sdk.PLATFORMS, pp.PLATFORMS)
-
-    def test_unknown_platform_is_rejected(self) -> None:
-        with self.assertRaises(ValueError):
-            sdk.sdk_archive_name(VERSION, "windows-arm64")
-
-
-class ArchiveShapeTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.directory: tempfile.TemporaryDirectory[str] = tempfile.TemporaryDirectory()
-        self.root: Path = Path(self.directory.name)
-
-    def tearDown(self) -> None:
-        self.directory.cleanup()
-
-    def archive(self, platform: str, folder: str = "dist") -> Path:
-        top: Path = make_sdk(self.root / ("stage-" + folder), platform)
-        out: Path = self.root / folder
-        out.mkdir(exist_ok=True)
-        path: Path = out / sdk.sdk_archive_name(VERSION, platform)
-        sdk.write_archive(top, path)
+    def rewrite(self, members: dict[str, sdk.Entry]) -> Path:
+        path: Path = self.base / ("tampered-" + self.id().rpartition(".")[2]) / sdk.sdk_archive_name(VERSION)
+        path.parent.mkdir(exist_ok=True)
+        sdk.write_archive(members, path)
         return path
 
-    def test_every_platform_archive_has_the_shape(self) -> None:
-        platform: str
-        for platform in sdk.PLATFORMS:
-            with self.subTest(platform=platform):
-                path: Path = self.archive(platform)
-                sdk.check_archive(path, VERSION, platform)
-                names: list[str] = sdk.archive_file_names(path)
-                top: str = sdk.sdk_directory_name(VERSION, platform) + "/"
-                self.assertIn(top + "cmake/llvm22.cmake", names)
-                self.assertIn(top + "lib/cmake/GUIForms/GUIFormsConfig.cmake", names)
-                self.assertIn(top + "share/licenses/GUIForms/THIRD_PARTY_NOTICES.md", names)
-                self.assertEqual(platform == "macos-arm64", top + "llvm-runtime/lib/libc++.1.dylib" in names)
-                self.assertEqual(platform == "windows-x64", zipfile.is_zipfile(path))
+    def test_names(self) -> None:
+        self.assertEqual(sdk.sdk_archive_name(VERSION), "gui-forms-sdk-0.2.1-source.tar.gz")
+        self.assertEqual(sdk.sdk_directory_name(VERSION), "gui-forms-sdk-0.2.1")
+        self.assertEqual(self.archive.name, "gui-forms-sdk-0.2.1-source.tar.gz")
 
-    def test_the_zip_and_tar_carry_the_same_files(self) -> None:
-        zip_names: list[str] = sdk.archive_file_names(self.archive("windows-x64"))
-        tar_names: list[str] = sdk.archive_file_names(self.archive("linux-x64"))
-        self.assertEqual(sorted(name.split("/", 1)[1] for name in zip_names),
-                         sorted(name.split("/", 1)[1] for name in tar_names))
+    def test_the_archive_holds_the_tree_and_each_pinned_source_in_place(self) -> None:
+        members: dict[str, sdk.Entry] = sdk.read_archive(self.archive)
+        name: str
+        for name in ("CMakeLists.txt", "tools/build_sdk.py", "SDK_MANIFEST.json",
+                     "third_party/harfbuzz/src/hb.cc", "third_party/freetype/LICENSE.TXT",
+                     "third_party/libunibreak/src/linebreak.c", "third_party/miniaudio/miniaudio.h"):
+            self.assertIn(self.top + name, members)
+        self.assertNotIn(self.top + "third_party/harfbuzz/test/shape/big.txt", members)
+        self.assertNotIn(self.top + "third_party/harfbuzz/perf/bench.cc", members)
+        for name in members:
+            self.assertTrue(name.startswith(self.top))
+            self.assertNotIn("/.git/", name)
 
-    def test_archives_are_reproducible(self) -> None:
-        platform: str
-        for platform in ("windows-x64", "linux-x64"):
-            with self.subTest(platform=platform):
-                first: Path = self.archive(platform, "first")
-                second: Path = self.archive(platform, "second")
-                self.assertEqual(first.read_bytes(), second.read_bytes())
+    def test_the_manifest_names_the_entry_point_paths_and_pins(self) -> None:
+        record: dict[str, Any] = sdk.check_archive(self.archive, VERSION)
+        self.assertEqual(record["build"], "tools/build_sdk.py")
+        self.assertEqual(record["top_directory"], "gui-forms-sdk-0.2.1")
+        self.assertEqual(record["revision"], self.fixture.revision)
+        paths: dict[str, str] = {}
+        revisions: dict[str, str] = {}
+        source: dict[str, Any]
+        for source in record["third_party"]:
+            paths[source["name"]] = source["path"]
+            revisions[source["name"]] = source["revision"]
+        self.assertEqual(paths, {"harfbuzz": "third_party/harfbuzz", "freetype": "third_party/freetype",
+                                 "libunibreak": "third_party/libunibreak", "miniaudio": "third_party/miniaudio"})
+        self.assertEqual(revisions, self.fixture.revisions)
+        network: list[str] = []
+        for source in record["network_inputs"]:
+            network.append(source["name"])
+        self.assertIn("skia", network)
+        self.assertEqual(record["network_inputs"][0]["revision"], "a" * 40)
+        self.assertTrue(record["prebuilt_inputs"])
 
-    def test_tar_members_have_no_owner_or_time(self) -> None:
-        with tarfile.open(self.archive("linux-x64"), "r:gz") as tar:
-            member: tarfile.TarInfo
-            for member in tar.getmembers():
-                self.assertEqual((member.uid, member.gid, member.uname, member.gname), (0, 0, "", ""))
-                self.assertEqual(member.mtime, sdk.ARCHIVE_EPOCH)
-
-    def test_tar_keeps_library_links(self) -> None:
-        top: Path = make_sdk(self.root / "stage", "linux-x64")
-        write_file(top / "lib/libgui_forms_threading.so.0", "library\n")
-        try:
-            os.symlink("libgui_forms_threading.so.0", top / "lib/libgui_forms_threading.so")
-        except OSError:
-            self.skipTest("this host cannot create symbolic links")
-        path: Path = self.root / sdk.sdk_archive_name(VERSION, "linux-x64")
-        sdk.write_archive(top, path)
-        with tarfile.open(path, "r:gz") as tar:
-            link: tarfile.TarInfo = tar.getmember(top.name + "/lib/libgui_forms_threading.so")
-            self.assertTrue(link.issym())
-            self.assertEqual(link.linkname, "libgui_forms_threading.so.0")
-
-    def test_a_missing_package_file_is_rejected(self) -> None:
-        top: Path = make_sdk(self.root / "stage", "linux-x64")
-        (top / "lib/cmake/GUIForms/GUIFormsConfigVersion.cmake").unlink()
-        path: Path = self.root / sdk.sdk_archive_name(VERSION, "linux-x64")
-        sdk.write_archive(top, path)
-        with self.assertRaisesRegex(ValueError, "GUIFormsConfigVersion.cmake"):
-            sdk.check_archive(path, VERSION, "linux-x64")
-
-    def test_missing_headers_are_rejected(self) -> None:
-        top: Path = make_sdk(self.root / "stage", "windows-x64")
-        (top / "include/gui_forms/application.hpp").unlink()
-        path: Path = self.root / sdk.sdk_archive_name(VERSION, "windows-x64")
-        sdk.write_archive(top, path)
-        with self.assertRaisesRegex(ValueError, "include/gui_forms/"):
-            sdk.check_archive(path, VERSION, "windows-x64")
-
-    def test_a_member_outside_the_top_directory_is_rejected(self) -> None:
-        path: Path = self.archive("windows-x64")
-        with zipfile.ZipFile(path, "a") as compressed:
-            compressed.writestr("stray.txt", "outside\n")
-        with self.assertRaisesRegex(ValueError, "outside the top directory"):
-            sdk.check_archive(path, VERSION, "windows-x64")
-
-    def test_another_version_or_platform_is_rejected(self) -> None:
-        path: Path = self.archive("linux-x64")
-        with self.assertRaisesRegex(ValueError, "is not named"):
-            sdk.check_archive(path, "0.2.2", "linux-x64")
-        with self.assertRaisesRegex(ValueError, "is not named"):
-            sdk.check_archive(path, VERSION, "linux-arm64")
+    def test_the_archive_is_reproducible(self) -> None:
+        again: Path = self.fixture.package(self.base / "again")
+        self.assertEqual(self.archive.read_bytes(), again.read_bytes())
 
     def test_check_command_reads_an_archive(self) -> None:
-        path: Path = self.archive("linux-arm64")
         with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(sdk.main(["--platform", "linux-arm64", "--version", VERSION, "--check", str(path)]), 0)
+            self.assertEqual(sdk.main(["--version", VERSION, "--check", str(self.archive)]), 0)
+
+    def test_a_changed_vendored_file_is_rejected(self) -> None:
+        members: dict[str, sdk.Entry] = sdk.read_archive(self.archive)
+        members[self.top + "third_party/freetype/CMakeLists.txt"] = sdk.Entry(b"# changed\n", None, False)
+        with self.assertRaisesRegex(ValueError, "freetype .* differs from its recorded digest"):
+            sdk.check_archive(self.rewrite(members), VERSION)
+
+    def test_a_missing_vendored_source_is_rejected(self) -> None:
+        members: dict[str, sdk.Entry] = {}
+        archived: dict[str, sdk.Entry] = sdk.read_archive(self.archive)
+        name: str
+        for name in archived:
+            if "/third_party/libunibreak/" not in name:
+                members[name] = archived[name]
+        with self.assertRaisesRegex(ValueError, "libunibreak is absent"):
+            sdk.check_archive(self.rewrite(members), VERSION)
+
+    def test_missing_cmakelists_is_rejected(self) -> None:
+        members: dict[str, sdk.Entry] = sdk.read_archive(self.archive)
+        del members[self.top + "CMakeLists.txt"]
+        with self.assertRaisesRegex(ValueError, "lacks CMakeLists.txt"):
+            sdk.check_archive(self.rewrite(members), VERSION)
+
+    def test_git_directories_and_build_output_are_rejected(self) -> None:
+        name: str
+        for name in (".git/HEAD", "third_party/harfbuzz/.git/config", ".build/native/build.ninja",
+                     "src/core/object.o", "CMakeCache.txt"):
+            with self.subTest(name=name):
+                members: dict[str, sdk.Entry] = sdk.read_archive(self.archive)
+                members[self.top + name] = sdk.Entry(b"x", None, False)
+                with self.assertRaisesRegex(ValueError, "Git directory or build output"):
+                    sdk.check_archive(self.rewrite(members), VERSION)
+
+    def test_a_member_outside_the_top_directory_is_rejected(self) -> None:
+        members: dict[str, sdk.Entry] = sdk.read_archive(self.archive)
+        members["stray.txt"] = sdk.Entry(b"x", None, False)
+        with self.assertRaisesRegex(ValueError, "outside the top directory"):
+            sdk.check_archive(self.rewrite(members), VERSION)
+
+    def test_another_version_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "is not named"):
+            sdk.check_archive(self.archive, "0.2.2")
+
+    def test_a_checkout_without_the_pin_is_refused(self) -> None:
+        other: Path = self.base / "other-miniaudio"
+        make_repository(other, {"LICENSE": "other\n"})
+        with self.assertRaisesRegex(ValueError, "does not hold miniaudio's pin"):
+            sdk.package(self.fixture.root, VERSION, self.fixture.revision, self.base / "refused",
+                        {"miniaudio": other})
+
+    def test_a_missing_pin_is_fetched_from_its_upstream(self) -> None:
+        upstream: Path = self.fixture.checkouts["miniaudio"]
+        source: sdk.VendoredSource = sdk.VendoredSource(
+            "miniaudio", "third_party/miniaudio", upstream.as_uri(), "cmake/Audio.cmake", "", "LICENSE", ())
+        work: Path = self.base / "fetch-work"
+        work.mkdir(exist_ok=True)
+        fetched: Path = sdk.fetch_pin(source, self.fixture.revisions["miniaudio"], work)
+        self.assertTrue(sdk.has_commit(fetched, self.fixture.revisions["miniaudio"]))
+        self.assertEqual(sdk.tree_digest(sdk.git_tree(fetched, self.fixture.revisions["miniaudio"])),
+                         sdk.tree_digest(sdk.git_tree(upstream, self.fixture.revisions["miniaudio"])))
+
+    def test_checkout_arguments_name_vendored_sources(self) -> None:
+        self.assertEqual(sdk.parse_checkouts(["miniaudio=/tmp/m"]), {"miniaudio": Path("/tmp/m")})
+        with self.assertRaises(ValueError):
+            sdk.parse_checkouts(["skia=/tmp/s"])
 
 
-class StagingTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.directory: tempfile.TemporaryDirectory[str] = tempfile.TemporaryDirectory()
-        self.root: Path = Path(self.directory.name)
+class PinTests(unittest.TestCase):
+    def test_every_vendored_pin_is_read_from_the_real_tree(self) -> None:
+        source: sdk.VendoredSource
+        for source in sdk.VENDORED:
+            with self.subTest(source=source.name):
+                self.assertRegex(sdk.pinned_revision(sdk.ROOT, source), r"^[0-9a-f]{40}$")
 
-    def tearDown(self) -> None:
-        self.directory.cleanup()
-
-    def test_macos_needs_the_runtime(self) -> None:
-        top: Path = self.root / sdk.sdk_directory_name(VERSION, "macos-arm64")
-        make_install(top)
-        with self.assertRaisesRegex(RuntimeError, "--runtime"):
-            sdk.add_consumer_files(top, "macos-arm64", None)
-
-    def test_macos_runtime_is_copied_whole(self) -> None:
-        top: Path = make_sdk(self.root, "macos-arm64")
-        self.assertTrue((top / "llvm-runtime/include/c++/v1/vector").is_file())
-        self.assertEqual((top / "cmake/llvm22.cmake").read_bytes(), sdk.TOOLCHAIN_FILE.read_bytes())
-
-    def test_an_installed_toolchain_that_differs_is_rejected(self) -> None:
-        top: Path = self.root / sdk.sdk_directory_name(VERSION, "linux-x64")
-        make_install(top)
-        write_file(top / "lib/cmake/GUIForms/llvm22.cmake", "# another toolchain\n")
-        with self.assertRaisesRegex(RuntimeError, "differs"):
-            sdk.add_consumer_files(top, "linux-x64", None)
-
-    def test_staged_notices_are_checked(self) -> None:
-        top: Path = make_sdk(self.root, "linux-x64")
-        with contextlib.redirect_stdout(io.StringIO()):
-            sdk.check_staged_tree(top, VERSION, "linux-x64")
-        write_file(top / "share/licenses/GUIForms/extra.txt", "GNU GENERAL PUBLIC LICENSE\n")
-        with self.assertRaisesRegex(RuntimeError, "General Public License"):
-            sdk.check_staged_tree(top, VERSION, "linux-x64")
+    def test_the_real_network_inputs_name_their_pins(self) -> None:
+        inputs: list[dict[str, Any]] = sdk.network_inputs(sdk.ROOT)
+        self.assertEqual(inputs[0]["name"], "skia")
+        self.assertRegex(inputs[0]["revision"], r"^[0-9a-f]{40}$")
+        self.assertRegex(inputs[1]["revision"], r"^[0-9a-f]{40}$")
 
 
 class ReleaseTests(unittest.TestCase):
-    def receipts(self) -> dict[str, dict[str, Any]]:
+    def test_the_release_expects_one_source_archive(self) -> None:
+        self.assertEqual(publish.expected_sdk_archive(VERSION), "gui-forms-sdk-0.2.1-source.tar.gz")
+
+    def test_the_release_notes_name_the_source_sdk(self) -> None:
         program: dict[str, Any] = {"id": "gallery", "display_name": "GUI.Forms Gallery", "status": "packaged",
                                    "artifacts": {"archive": "gallery.zip"}}
-        return {"windows-x64": {"programs": [program]}, "linux-x64": {"programs": []},
-                "macos-arm64": {"programs": [program]}}
-
-    def test_the_release_expects_one_sdk_per_platform(self) -> None:
-        self.assertEqual(publish.expected_sdk_archives(self.receipts(), VERSION), [
-            "gui-forms-sdk-0.2.1-linux-x64.tar.gz",
-            "gui-forms-sdk-0.2.1-macos-arm64.tar.gz",
-            "gui-forms-sdk-0.2.1-windows-x64.zip",
-        ])
-
-    def test_the_release_notes_list_the_sdk(self) -> None:
-        notes: str = publish.release_notes(VERSION, "0" * 40, "malkuth-software/gui_forms", self.receipts(), [])
+        notes: str = publish.release_notes(VERSION, "0" * 40, "malkuth-software/gui_forms",
+                                           {"windows-x64": {"programs": [program]}}, [])
         self.assertIn("## SDK", notes)
-        self.assertIn("| Windows x64 | `gui-forms-sdk-0.2.1-windows-x64.zip` |", notes)
-        self.assertIn("`gui-forms-sdk-0.2.1-linux-x64.tar.gz`", notes)
+        self.assertIn("`gui-forms-sdk-0.2.1-source.tar.gz`", notes)
+        self.assertIn("tools/build_sdk.py --target", notes)
 
 
 if __name__ == "__main__":

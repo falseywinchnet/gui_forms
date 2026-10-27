@@ -47,9 +47,9 @@ Each program is published for four platforms:
 File names follow `gui-forms-<program>-<version>-<platform>`, for example
 `gui-forms-gallery-0.1.9-windows-x64.zip`. Each release also carries
 `SHA256SUMS.txt`, the test and smoke receipts the pipeline produced, and
-one SDK archive per platform, `gui-forms-sdk-<version>-<platform>`, for
-building your own application against it (see
-[The release SDK archives](install.md#the-release-sdk-archives)).
+the source SDK, `gui-forms-sdk-<version>-source.tar.gz`, from which you build
+GUI.Forms for your own platform (see
+[The source SDK](install.md#the-source-sdk)).
 
 ## Platform notes
 
