@@ -187,7 +187,9 @@ MOVED_PAGES: dict[str, str] = {
     **{f"concepts/{page}": f"user/{page}" for page in USER_GUIDE_PAGES},
     **{f"api/{area}": f"api/library.{area}" for area in LIBRARY_AREAS},
     **{f"api/{category}-controls": f"api/controls.{category}" for category in CONTROL_CATEGORIES},
-    **{f"project/adr/ADR-{number}": f"dev/adr/ADR-{number}" for number in DECISION_RECORDS},
+    # The records moved to the notes repository; dev/decisions links to each.
+    **{f"project/adr/ADR-{number}": "dev/decisions" for number in DECISION_RECORDS},
+    **{f"dev/adr/ADR-{number}": "dev/decisions" for number in DECISION_RECORDS},
 }
 
 REDIRECT_PAGE: str = """<!DOCTYPE html>

@@ -27,6 +27,10 @@ on that branch.
   design language. When this site's [Roadmap](roadmap) summarises a gate, the
   full statement is in one of these files.
 
+[`decisions/`](https://github.com/malkuth-software/notes/tree/gui_forms/decisions)
+: The architecture decision records, listed under
+  [Architecture decisions](decisions).
+
 [`docs-notes/`](https://github.com/malkuth-software/notes/tree/gui_forms/docs-notes)
 : Dated working notes: interface negotiations, proposals, audits and
   development records.
@@ -34,10 +38,6 @@ on that branch.
 `manifests/`
 : In this repository: machine-readable consumption snapshots for downstream
   projects, with artefact digests and the commands that produced them.
-
-`docs/dev/adr/`
-: In this repository: the architecture decision records, rendered under
-  [Architecture decisions](decisions).
 
 ## How to read a claim
 
