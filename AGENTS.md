@@ -9,12 +9,12 @@ own build.
 ## Code style (mandatory)
 
 All first-party C++ and Objective-C++ in this repository follows the house
-style, `HOUSE_STYLE.md` on the `main` branch of `malkuth-software/notes`
-(https://github.com/malkuth-software/notes/blob/main/HOUSE_STYLE.md). Its
-canonical text is still `programming-house-style.md` in
-`falseywinchnet/EpistemicGPT`; change both together. Read it in full before
-writing or changing code. One line per section, in its order (most important
-first, the owner's 2026-10-27 ranking), so a skim still covers all eleven:
+style. Its canonical text is `HOUSE_STYLE.md` on the `main` branch of
+`malkuth-software/notes`
+(https://github.com/malkuth-software/notes/blob/main/HOUSE_STYLE.md). Read it
+in full before writing or changing code. One line per section, in its order
+(most important first, the owner's 2026-10-27 ranking), so a skim still covers
+all eleven:
 
 1. **Memory use:** every datum has an owner and a lifetime; allocate before
    repeated processing and reuse; transfer ownership explicitly; raw
