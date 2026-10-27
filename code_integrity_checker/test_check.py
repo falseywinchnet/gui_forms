@@ -11,7 +11,13 @@ import check
 
 
 def rules(source: str) -> list[str]:
-    return [finding.rule for finding in check.inspect("sample.cpp", source)]
+    """The rules of the candidates raised: those no recognized guard protects."""
+    return [finding.rule for finding in check.inspect("sample.cpp", source) if not finding.guard]
+
+
+def guards(source: str) -> list[str]:
+    """The guard of every candidate, raised or not."""
+    return [finding.guard for finding in check.inspect("sample.cpp", source)]
 
 
 class IntegrityShapeTests(unittest.TestCase):
@@ -123,6 +129,116 @@ class IntegrityShapeTests(unittest.TestCase):
         self.assertEqual(rules(source), [])
 
 
+class GuardTests(unittest.TestCase):
+    def test_dominating_validation_is_listed_apart(self) -> None:
+        source = "int length(Buffer& values) { if (values.size() > INT_MAX) return -1; return static_cast<int>(values.size()); }"
+        self.assertEqual(guards(source), ["dominating_validation"])
+
+    def test_division_form_bound_guards_a_product(self) -> None:
+        source = """bool grow(size_t wanted, size_t across) {
+            if (across != 0 && wanted > maximum_cells / across) return false;
+            cells.resize(wanted * across);
+            return true;
+        }"""
+        self.assertEqual(guards(source), ["dominating_validation"])
+
+    def test_an_emptiness_test_is_not_a_bound(self) -> None:
+        source = "int length(Buffer& values) { if (values.empty()) return 0; return static_cast<int>(values.size()); }"
+        self.assertEqual(rules(source), ["I05"])
+
+    def test_a_validation_that_does_not_exit_is_not_a_guard(self) -> None:
+        source = "void make(size_t width, size_t height) { if (width > 4096) log(width); storage.resize(width * height); }"
+        self.assertEqual(rules(source), ["I06"])
+
+    def test_checked_arithmetic_helper(self) -> None:
+        source = """void make(size_t width, size_t height) {
+            size_t bytes = 0;
+            if (__builtin_mul_overflow(width, height, &bytes)) return;
+            storage.resize(width * height);
+        }"""
+        self.assertEqual(guards(source), ["checked_arithmetic"])
+
+    def test_named_failure_admission(self) -> None:
+        source = "void shape(std::string_view line) { work.admit(line.size()); add(line.data(), static_cast<int>(line.size())); }"
+        self.assertEqual(guards(source), ["named_failure"])
+
+    def test_empty_exit_guards_an_endpoint(self) -> None:
+        source = "void scan(Buffer& values) { if (values.empty()) return; consume(values.data() + values.size()); }"
+        self.assertEqual(guards(source), ["dominating_validation"])
+
+    def test_literal_extents_fit(self) -> None:
+        array = "void read() { std::array<float, 8192> block{}; fill(block.data(), static_cast<int>(block.size())); }"
+        vector = "void read() { std::vector<char> bytes(128); fill(bytes.data(), static_cast<int>(bytes.size())); }"
+        self.assertEqual(guards(array), [])
+        self.assertEqual(guards(vector), [])
+
+    def test_standard_view_endpoint_is_valid_when_empty(self) -> None:
+        source = "bool parse(std::string_view text) { const char* end = text.data() + text.size(); return end != nullptr; }"
+        self.assertEqual(guards(source), [])
+
+
+class ReviewTests(unittest.TestCase):
+    def run_checker(self, source: str, reviews: dict[str, object] | None) -> tuple[int, list[dict[str, object]]]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "example.cpp"
+            path.write_text(source, encoding="utf-8")
+            review_path = root / "reviews.json"
+            if reviews is not None:
+                review_path.write_text(json.dumps(reviews), encoding="utf-8")
+            report = root / "report.json"
+            # Relative to the run directory, so a recorded path matches across runs.
+            command = [sys.executable, "-B", str(Path(check.__file__).resolve()), path.name, "--json", str(report),
+                       "--reviews", str(review_path), "--gate"]
+            completed = subprocess.run(command, capture_output=True, text=True, check=False, cwd=root)
+            data = json.loads(report.read_text(encoding="utf-8")) if report.exists() else []
+            return completed.returncode, data
+
+    def test_reviewed_candidate_passes_the_gate(self) -> None:
+        source = "void make(size_t width, size_t height) {\n    storage.resize(width * height);\n}\n"
+        status, data = self.run_checker(source, None)
+        self.assertEqual(status, 1)
+        reviews = {"reviews": [{"path": data[0]["path"], "rule": "I06", "evidence": data[0]["evidence"],
+                                "decision": "guarded", "guard": "dominating_validation",
+                                "reason": "callers bound both sides", "trap_candidate": True}]}
+        status, data = self.run_checker(source, reviews)
+        self.assertEqual(status, 0)
+        self.assertEqual(data[0]["status"], "reviewed")
+        self.assertEqual(data[0]["decision"], "guarded")
+        self.assertTrue(data[0]["trap_candidate"])
+
+    def test_edited_line_is_raised_again(self) -> None:
+        source = "void make(size_t width, size_t height) {\n    storage.resize(width * height);\n}\n"
+        status, data = self.run_checker(source, None)
+        reviews = {"reviews": [{"path": data[0]["path"], "rule": "I06", "evidence": data[0]["evidence"],
+                                "decision": "false_shape"}]}
+        edited = "void make(size_t width, size_t depth) {\n    storage.resize(width * depth);\n}\n"
+        status, data = self.run_checker(edited, reviews)
+        self.assertEqual(status, 1)
+        self.assertEqual(data[0]["status"], "raised")
+
+    def test_ignored_scope_passes_the_gate(self) -> None:
+        source = "void make(size_t width, size_t height) {\n    storage.resize(width * height);\n}\n"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder = root / "skia"
+            folder.mkdir()
+            (folder / "raster.cpp").write_text(source, encoding="utf-8")
+            review_path = root / "reviews.json"
+            scope = str(folder).replace("\\", "/") + "/"
+            review_path.write_text(json.dumps({"ignored_scopes": [scope]}), encoding="utf-8")
+            command = [sys.executable, "-B", str(Path(check.__file__)), str(folder), "--reviews", str(review_path),
+                       "--gate"]
+            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            self.assertEqual(completed.returncode, 0)
+            self.assertIn("1 ignored", completed.stdout)
+
+    def test_unknown_decision_is_an_error(self) -> None:
+        status, _ = self.run_checker("void make() {}\n", {"reviews": [{"path": "x.cpp", "rule": "I06",
+                                                                      "evidence": "x", "decision": "accepted"}]})
+        self.assertEqual(status, 2)
+
+
 class CommandTests(unittest.TestCase):
     def test_json_report_and_gate_status(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -135,7 +251,8 @@ class CommandTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 1)
             data = json.loads(report.read_text(encoding="utf-8"))
             self.assertEqual(data[0]["rule"], "I07")
-            self.assertEqual(data[0]["house_style"], "§5")
+            self.assertEqual(data[0]["house_style"], "§1")
+            self.assertEqual(data[0]["status"], "raised")
             self.assertEqual(data[0]["house_style_status"], "invariant_not_evident_in_source")
 
     def test_empty_selection_is_not_a_pass(self) -> None:
