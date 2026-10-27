@@ -1081,6 +1081,76 @@ void test_restore_corrupt() {
     }
 }
 
+// Identity exhaustion. A layout file cannot carry next_id or a node ID past
+// dock_identity_limit, so the count cannot wrap to the null ID; a layout
+// whose count has reached the limit restores and round-trips, and an edit
+// that needs a new ID is refused with identities_exhausted.
+const char* const exhausted_xml =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    "<dock_layout format=\"2\" application_version=\"0\" next_id=\"4294967294\">\n"
+    "  <main_site>\n"
+    "    <split id=\"4294967293\" axis=\"horizontal\" ratio=\"0.25\">\n"
+    "      <tool_stack id=\"2\" selected=\"0\"><panel id=\"tools.solution\"/></tool_stack>\n"
+    "      <document_area id=\"1\"/>\n"
+    "    </split>\n"
+    "  </main_site>\n"
+    "  <panel_record id=\"tools.solution\" kind=\"tool\" last=\"docked\"/>\n"
+    "</dock_layout>\n";
+
+void test_identity_limit() {
+    require(gui_forms::dock_identity_limit == 4294967294U, "the limit is one below the largest count");
+    const std::array<const char*, 4> beyond{{
+        "<dock_layout format=\"2\" next_id=\"4294967295\"><main_site><document_area id=\"1\"/>"
+        "</main_site></dock_layout>",
+        "<dock_layout format=\"2\" next_id=\"2\"><main_site><document_area id=\"4294967295\"/>"
+        "</main_site></dock_layout>",
+        "<dock_layout format=\"2\" next_id=\"2\"><main_site><document_area id=\"4294967294\"/>"
+        "</main_site></dock_layout>",
+        "<dock_layout format=\"2\" next_id=\"4294967295\"><main_site><split id=\"4294967295\" "
+        "axis=\"horizontal\" ratio=\"0.5\"><document_area id=\"1\"/><tool_stack id=\"3\">"
+        "<panel id=\"tools.output\"/></tool_stack></split></main_site></dock_layout>",
+    }};
+    for (std::size_t index = 0; index < beyond.size(); ++index) {
+        DockLayout layout{};
+        register_standard(layout);
+        show_standard(layout);
+        const DockLayoutState before = layout.state();
+        const DockRestoreResult result = layout.restore_xml(beyond[index], DockRestoreOptions{});
+        const bool kept = result.status == DockRestoreStatus::kept_current && layout.state() == before;
+        if (!kept || !has_diagnostic(result, DockRestoreDiagnosticKind::invalid_value)) {
+            std::cerr << "FAIL: identity fixture " << index << " was not refused as invalid\n";
+            print_diagnostics(result);
+            ++failures;
+        }
+    }
+
+    DockLayout layout{};
+    register_standard(layout);
+    const DockRestoreResult result = layout.restore_xml(exhausted_xml, DockRestoreOptions{});
+    print_diagnostics(result);
+    require(result.status == DockRestoreStatus::restored, "a layout at the limit restores");
+    require(layout.state().next_id == gui_forms::dock_identity_limit, "next ID at the limit");
+    require(static_cast<bool>(layout.check_invariants()), "an exhausted layout is valid");
+    require_refused(layout, DockEdit::show(panel("tools.output")), DockRefusalReason::identities_exhausted,
+                    DockRefusalLayer::model, "a new stack needs an ID");
+    require_refused(layout, DockEdit::float_subject(subject("tools.solution"), Rect{0.0, 0.0, 100.0, 100.0}, ""),
+                    DockRefusalReason::identities_exhausted, DockRefusalLayer::model, "a new stack and site");
+    require_refused(layout,
+                    DockEdit::dock_beside(DockSubject::of_stack(DockNodeId{2}), layout.document_area(),
+                                          DockSide::right),
+                    DockRefusalReason::identities_exhausted, DockRefusalLayer::model, "a new split needs an ID");
+    require(static_cast<bool>(apply_one(layout, DockEdit::set_ratio(DockNodeId{4294967293U}, 0.5))),
+            "an edit that needs no new ID still applies");
+    require(layout.state().next_id == gui_forms::dock_identity_limit, "refusals leave the count at the limit");
+    const DockLayoutWriteResult first = layout.write_xml();
+    require(static_cast<bool>(first), "an exhausted layout writes");
+    DockLayout restored{};
+    register_standard(restored);
+    const DockRestoreResult again = restored.restore_xml(first.text, DockRestoreOptions{});
+    require(again.status == DockRestoreStatus::restored && restored.state() == layout.state(),
+            "an exhausted layout round-trips");
+}
+
 // A main site with two document areas is refused, and the diagnostic names
 // what is wrong: not "no document area" but not exactly one.
 void test_restore_two_document_areas() {
@@ -1403,6 +1473,7 @@ int main() {
     test_restore_newer_format();
     test_unknown_fields_kept();
     test_restore_corrupt();
+    test_identity_limit();
     test_restore_two_document_areas();
     test_restore_application_upgrade();
     test_lazy_creation_report();
