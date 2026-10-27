@@ -82,7 +82,11 @@ Control::Ptr Splitter::target() const {
         case DockStyle::top: adjacent = touches(bounds.y + bounds.height, own.y); break;
         case DockStyle::bottom: adjacent = touches(bounds.y, own.y + own.height); break;
         case DockStyle::none:
-        case DockStyle::fill: break;
+        case DockStyle::fill:
+        default:
+            // Only the four edges have an adjacent sibling; none and fill
+            // returned above, and any other value is no edge either.
+            break;
         }
         if (adjacent) return sibling;
     }
