@@ -1,6 +1,6 @@
 {
-  "about": "Recorded decisions for code_integrity_checker/check.py. A finding that matches an entry (path, rule and evidence line) is listed as reviewed and never raised again; edit the line and it is raised afresh. trap_candidate marks sites a trap might already stop (the owner's 'maps to trap' class, undecided). ignored_scopes are skipped: the Skia renderer and its C ABI (owner, phase C).",
-  "ignored_scopes": [
+  "about": "Recorded decisions for code_integrity_checker/check.py. A finding that matches an entry (path, rule and evidence line) is listed as reviewed and never raised again; edit the line and it is raised afresh. excluded_scopes are never read: the Skia renderer and its C ABI, which are being replaced.",
+  "excluded_scopes": [
     "src/render/skia/",
     "src/abi/drawing_skia_c_api.cpp"
   ],
@@ -12,7 +12,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "rows and columns are the realized (visible) window's counts, bounded by the viewport",
-      "trap_candidate": true,
       "reviewed": "2026-10-27"
     },
     {
@@ -22,7 +21,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "callers pass PartRaster extents (glass_primitive.cpp:171, material_primitive.cpp:1249); PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-      "trap_candidate": true,
       "reviewed": "2026-10-27"
     },
     {
@@ -32,7 +30,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "the comment above states it: the registry bounds image sides and PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-      "trap_candidate": true,
       "reviewed": "2026-10-27"
     },
     {
@@ -42,7 +39,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "set.count <= maximum_octaves (a std::array extent); width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-      "trap_candidate": true,
       "reviewed": "2026-10-27"
     },
     {
@@ -52,7 +48,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "set.count <= maximum_octaves (a std::array extent); width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-      "trap_candidate": true,
       "reviewed": "2026-10-27"
     },
     {
@@ -62,7 +57,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "set.count <= maximum_octaves (a std::array extent); height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-      "trap_candidate": true,
       "reviewed": "2026-10-27"
     },
     {
@@ -72,7 +66,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "set.count <= maximum_octaves (a std::array extent); height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-      "trap_candidate": true,
       "reviewed": "2026-10-27"
     },
     {
@@ -82,7 +75,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "fresco_blooms is a constant; inputs.width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-      "trap_candidate": true,
       "reviewed": "2026-10-27"
     },
     {
@@ -92,7 +84,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "fresco_blooms is a constant; inputs.height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-      "trap_candidate": true,
       "reviewed": "2026-10-27"
     },
     {
@@ -102,7 +93,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "total = counted_before + repeated * copies is refused above maximum_grid_tracks (line 1129); both factors are at most maximum_grid_tracks, as the comment states",
-      "trap_candidate": false,
       "reviewed": "2026-10-27"
     },
     {
@@ -112,7 +102,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "native was sized from an int count (line 1035), so its size fits int",
-      "trap_candidate": false,
       "reviewed": "2026-10-27"
     },
     {
@@ -122,7 +111,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "native was sized from an int count (line 1035), so its size fits int",
-      "trap_candidate": false,
       "reviewed": "2026-10-27"
     },
     {
@@ -131,7 +119,6 @@
       "evidence": "static_cast<int>(targets.size()));",
       "decision": "false_shape",
       "reason": "targets holds three atoms, built in the lines above",
-      "trap_candidate": false,
       "reviewed": "2026-10-27"
     },
     {
@@ -140,7 +127,6 @@
       "evidence": "static_cast<int>(target_id.size()), target_id.data(),",
       "decision": "defect",
       "reason": "trace output: a stable ID longer than INT_MAX gives a negative %.*s precision, and printf then reads the string_view past its end; low severity (needs a 2 GiB ID, trace builds only); fix by clamping the precision",
-      "trap_candidate": true,
       "reviewed": "2026-10-27"
     },
     {
@@ -150,7 +136,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "NotifyIcon refuses text above HostServices::maximum_tray_tooltip_bytes before it reaches the host (src/controls/notify_icon/notify_icon.cpp:90)",
-      "trap_candidate": false,
       "reviewed": "2026-10-27"
     },
     {
@@ -160,7 +145,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "NotifyIcon refuses text above HostServices::maximum_tray_tooltip_bytes before it reaches the host (src/controls/notify_icon/notify_icon.cpp:90)",
-      "trap_candidate": false,
       "reviewed": "2026-10-27"
     },
     {
@@ -170,7 +154,6 @@
       "decision": "guarded",
       "guard": "dominating_validation",
       "reason": "the shaping entry refuses input above limits.input_bytes or INT_MAX (line 863)",
-      "trap_candidate": false,
       "reviewed": "2026-10-27"
     }
   ]

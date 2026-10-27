@@ -2,8 +2,9 @@ name: Code integrity
 # Report mode for code_integrity_checker/check.py (Phase E, E1): every
 # candidate is printed, and the job fails only on a raised one, a candidate
 # that no recognized guard protects and no decision in
-# code_integrity_checker/reviews.json covers. Guarded, reviewed and ignored
-# (Skia) candidates are listed apart. The full report is kept as an artifact.
+# code_integrity_checker/reviews.json covers. Guarded and reviewed candidates
+# are listed apart; the Skia paths reviews.json excludes are not read. The full
+# report is kept as an artifact.
 #
 # A text scan of include/ and src/ on one Linux host: no build is needed.
 on:

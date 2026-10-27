@@ -200,12 +200,12 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(status, 1)
         reviews = {"reviews": [{"path": data[0]["path"], "rule": "I06", "evidence": data[0]["evidence"],
                                 "decision": "guarded", "guard": "dominating_validation",
-                                "reason": "callers bound both sides", "trap_candidate": True}]}
+                                "reason": "callers bound both sides"}]}
         status, data = self.run_checker(source, reviews)
         self.assertEqual(status, 0)
         self.assertEqual(data[0]["status"], "reviewed")
         self.assertEqual(data[0]["decision"], "guarded")
-        self.assertTrue(data[0]["trap_candidate"])
+        self.assertEqual(data[0]["reason"], "callers bound both sides")
 
     def test_edited_line_is_raised_again(self) -> None:
         source = "void make(size_t width, size_t height) {\n    storage.resize(width * height);\n}\n"
@@ -217,21 +217,33 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertEqual(data[0]["status"], "raised")
 
-    def test_ignored_scope_passes_the_gate(self) -> None:
+    def test_excluded_scope_is_not_read(self) -> None:
         source = "void make(size_t width, size_t height) {\n    storage.resize(width * height);\n}\n"
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            folder = root / "skia"
-            folder.mkdir()
-            (folder / "raster.cpp").write_text(source, encoding="utf-8")
+            (root / "skia").mkdir()
+            (root / "skia" / "raster.cpp").write_text(source, encoding="utf-8")
+            (root / "core").mkdir()
+            (root / "core" / "plain.cpp").write_text("void plain() {}\n", encoding="utf-8")
             review_path = root / "reviews.json"
-            scope = str(folder).replace("\\", "/") + "/"
-            review_path.write_text(json.dumps({"ignored_scopes": [scope]}), encoding="utf-8")
-            command = [sys.executable, "-B", str(Path(check.__file__)), str(folder), "--reviews", str(review_path),
-                       "--gate"]
-            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            review_path.write_text(json.dumps({"excluded_scopes": ["skia/"]}), encoding="utf-8")
+            command = [sys.executable, "-B", str(Path(check.__file__).resolve()), "skia", "core",
+                       "--reviews", str(review_path), "--gate"]
+            completed = subprocess.run(command, capture_output=True, text=True, check=False, cwd=root)
             self.assertEqual(completed.returncode, 0)
-            self.assertIn("1 ignored", completed.stdout)
+            self.assertIn("1 files (1 excluded), 0 candidates", completed.stdout)
+
+    def test_only_excluded_files_is_an_empty_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "skia").mkdir()
+            (root / "skia" / "raster.cpp").write_text("void raster() {}\n", encoding="utf-8")
+            review_path = root / "reviews.json"
+            review_path.write_text(json.dumps({"excluded_scopes": ["skia/"]}), encoding="utf-8")
+            command = [sys.executable, "-B", str(Path(check.__file__).resolve()), "skia", "--reviews", str(review_path)]
+            completed = subprocess.run(command, capture_output=True, text=True, check=False, cwd=root)
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("No C or C++ files selected", completed.stderr)
 
     def test_unknown_decision_is_an_error(self) -> None:
         status, _ = self.run_checker("void make() {}\n", {"reviews": [{"path": "x.cpp", "rule": "I06",

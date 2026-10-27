@@ -1,96 +1,5 @@
 [
   {
-    "path": "src/abi/drawing_skia_c_api.cpp",
-    "line": 182,
-    "rule": "I05",
-    "evidence": "CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()),",
-    "related_line": null,
-    "guard": "dominating_validation",
-    "title": "size narrowed without a visible bound",
-    "house_style": "\u00a73, \u00a71",
-    "house_style_status": "invariant_not_evident_in_source",
-    "review": "Check representability before conversion; keep capacity and live count distinct.",
-    "status": "ignored"
-  },
-  {
-    "path": "src/abi/drawing_skia_c_api.cpp",
-    "line": 187,
-    "rule": "I05",
-    "evidence": "static_cast<int>(value.size()), result.data(),",
-    "related_line": null,
-    "guard": "dominating_validation",
-    "title": "size narrowed without a visible bound",
-    "house_style": "\u00a73, \u00a71",
-    "house_style_status": "invariant_not_evident_in_source",
-    "review": "Check representability before conversion; keep capacity and live count distinct.",
-    "status": "ignored"
-  },
-  {
-    "path": "src/abi/drawing_skia_c_api.cpp",
-    "line": 195,
-    "rule": "I05",
-    "evidence": "CP_UTF8, 0, value.data(), static_cast<int>(value.size()),",
-    "related_line": null,
-    "guard": "",
-    "title": "size narrowed without a visible bound",
-    "house_style": "\u00a73, \u00a71",
-    "house_style_status": "invariant_not_evident_in_source",
-    "review": "Check representability before conversion; keep capacity and live count distinct.",
-    "status": "ignored"
-  },
-  {
-    "path": "src/abi/drawing_skia_c_api.cpp",
-    "line": 201,
-    "rule": "I05",
-    "evidence": "CP_UTF8, 0, value.data(), static_cast<int>(value.size()),",
-    "related_line": null,
-    "guard": "",
-    "title": "size narrowed without a visible bound",
-    "house_style": "\u00a73, \u00a71",
-    "house_style_status": "invariant_not_evident_in_source",
-    "review": "Check representability before conversion; keep capacity and live count distinct.",
-    "status": "ignored"
-  },
-  {
-    "path": "src/abi/drawing_skia_c_api.cpp",
-    "line": 280,
-    "rule": "I05",
-    "evidence": "static_cast<int>(requested.size()), TRUE) == CSTR_EQUAL;",
-    "related_line": null,
-    "guard": "dominating_validation",
-    "title": "size narrowed without a visible bound",
-    "house_style": "\u00a73, \u00a71",
-    "house_style_status": "invariant_not_evident_in_source",
-    "review": "Check representability before conversion; keep capacity and live count distinct.",
-    "status": "ignored"
-  },
-  {
-    "path": "src/abi/drawing_skia_c_api.cpp",
-    "line": 335,
-    "rule": "I05",
-    "evidence": "static_cast<int>(family.size()), family.data(),",
-    "related_line": null,
-    "guard": "",
-    "title": "size narrowed without a visible bound",
-    "house_style": "\u00a73, \u00a71",
-    "house_style_status": "invariant_not_evident_in_source",
-    "review": "Check representability before conversion; keep capacity and live count distinct.",
-    "status": "ignored"
-  },
-  {
-    "path": "src/abi/drawing_skia_c_api.cpp",
-    "line": 342,
-    "rule": "I05",
-    "evidence": "static_cast<int>(selected.size()), selected.data(),",
-    "related_line": null,
-    "guard": "",
-    "title": "size narrowed without a visible bound",
-    "house_style": "\u00a73, \u00a71",
-    "house_style_status": "invariant_not_evident_in_source",
-    "review": "Check representability before conversion; keep capacity and live count distinct.",
-    "status": "ignored"
-  },
-  {
     "path": "src/controls/data_grid_view/data_grid_view_parts.cpp",
     "line": 965,
     "rule": "I06",
@@ -103,8 +12,7 @@
     "review": "Check the whole shape calculation before allocation or copy.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "rows and columns are the realized (visible) window's counts, bounded by the viewport",
-    "trap_candidate": true
+    "reason": "rows and columns are the realized (visible) window's counts, bounded by the viewport"
   },
   {
     "path": "src/core/drawing/bitmap/bitmap.cpp",
@@ -132,8 +40,7 @@
     "review": "Check the whole shape calculation before allocation or copy.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "callers pass PartRaster extents (glass_primitive.cpp:171, material_primitive.cpp:1249); PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-    "trap_candidate": true
+    "reason": "callers pass PartRaster extents (glass_primitive.cpp:171, material_primitive.cpp:1249); PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)"
   },
   {
     "path": "src/core/engine/primitives/material/image_variant.cpp",
@@ -148,8 +55,7 @@
     "review": "Check the whole shape calculation before allocation or copy.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "the comment above states it: the registry bounds image sides and PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-    "trap_candidate": true
+    "reason": "the comment above states it: the registry bounds image sides and PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)"
   },
   {
     "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
@@ -164,8 +70,7 @@
     "review": "Check the whole shape calculation before allocation or copy.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "set.count <= maximum_octaves (a std::array extent); width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-    "trap_candidate": true
+    "reason": "set.count <= maximum_octaves (a std::array extent); width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)"
   },
   {
     "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
@@ -180,8 +85,7 @@
     "review": "Check the whole shape calculation before allocation or copy.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "set.count <= maximum_octaves (a std::array extent); width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-    "trap_candidate": true
+    "reason": "set.count <= maximum_octaves (a std::array extent); width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)"
   },
   {
     "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
@@ -196,8 +100,7 @@
     "review": "Check the whole shape calculation before allocation or copy.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "set.count <= maximum_octaves (a std::array extent); height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-    "trap_candidate": true
+    "reason": "set.count <= maximum_octaves (a std::array extent); height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)"
   },
   {
     "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
@@ -212,8 +115,7 @@
     "review": "Check the whole shape calculation before allocation or copy.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "set.count <= maximum_octaves (a std::array extent); height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-    "trap_candidate": true
+    "reason": "set.count <= maximum_octaves (a std::array extent); height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)"
   },
   {
     "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
@@ -228,8 +130,7 @@
     "review": "Check the whole shape calculation before allocation or copy.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "fresco_blooms is a constant; inputs.width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-    "trap_candidate": true
+    "reason": "fresco_blooms is a constant; inputs.width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)"
   },
   {
     "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
@@ -244,8 +145,7 @@
     "review": "Check the whole shape calculation before allocation or copy.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "fresco_blooms is a constant; inputs.height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
-    "trap_candidate": true
+    "reason": "fresco_blooms is a constant; inputs.height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)"
   },
   {
     "path": "src/core/layout/grid_solver/grid_solver.cpp",
@@ -273,8 +173,7 @@
     "review": "Check the whole shape calculation before allocation or copy.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "total = counted_before + repeated * copies is refused above maximum_grid_tracks (line 1129); both factors are at most maximum_grid_tracks, as the comment states",
-    "trap_candidate": false
+    "reason": "total = counted_before + repeated * copies is refused above maximum_grid_tracks (line 1129); both factors are at most maximum_grid_tracks, as the comment states"
   },
   {
     "path": "src/core/theme_language/selector/theme_selector.cpp",
@@ -315,8 +214,7 @@
     "review": "Check representability before conversion; keep capacity and live count distinct.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "native was sized from an int count (line 1035), so its size fits int",
-    "trap_candidate": false
+    "reason": "native was sized from an int count (line 1035), so its size fits int"
   },
   {
     "path": "src/host/linux/accessibility/linux_accessibility.cpp",
@@ -331,8 +229,7 @@
     "review": "Check representability before conversion; keep capacity and live count distinct.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "native was sized from an int count (line 1035), so its size fits int",
-    "trap_candidate": false
+    "reason": "native was sized from an int count (line 1035), so its size fits int"
   },
   {
     "path": "src/host/linux/accessibility/linux_accessibility.cpp",
@@ -360,8 +257,7 @@
     "review": "Check representability before conversion; keep capacity and live count distinct.",
     "status": "reviewed",
     "decision": "false_shape",
-    "reason": "targets holds three atoms, built in the lines above",
-    "trap_candidate": false
+    "reason": "targets holds three atoms, built in the lines above"
   },
   {
     "path": "src/host/linux/services/linux_services.cpp",
@@ -467,8 +363,7 @@
     "review": "Check representability before conversion; keep capacity and live count distinct.",
     "status": "reviewed",
     "decision": "defect",
-    "reason": "trace output: a stable ID longer than INT_MAX gives a negative %.*s precision, and printf then reads the string_view past its end; low severity (needs a 2 GiB ID, trace builds only); fix by clamping the precision",
-    "trap_candidate": true
+    "reason": "trace output: a stable ID longer than INT_MAX gives a negative %.*s precision, and printf then reads the string_view past its end; low severity (needs a 2 GiB ID, trace builds only); fix by clamping the precision"
   },
   {
     "path": "src/host/windows/raster/dib_frame_store.cpp",
@@ -496,8 +391,7 @@
     "review": "Check representability before conversion; keep capacity and live count distinct.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "NotifyIcon refuses text above HostServices::maximum_tray_tooltip_bytes before it reaches the host (src/controls/notify_icon/notify_icon.cpp:90)",
-    "trap_candidate": false
+    "reason": "NotifyIcon refuses text above HostServices::maximum_tray_tooltip_bytes before it reaches the host (src/controls/notify_icon/notify_icon.cpp:90)"
   },
   {
     "path": "src/host/windows/services/windows_notify_icons.cpp",
@@ -512,21 +406,7 @@
     "review": "Check representability before conversion; keep capacity and live count distinct.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "NotifyIcon refuses text above HostServices::maximum_tray_tooltip_bytes before it reaches the host (src/controls/notify_icon/notify_icon.cpp:90)",
-    "trap_candidate": false
-  },
-  {
-    "path": "src/render/skia/raster/skia_raster.cpp",
-    "line": 320,
-    "rule": "I05",
-    "evidence": "const int expected = text_clip_base + static_cast<int>(text_clips.size()) - 1;",
-    "related_line": null,
-    "guard": "",
-    "title": "size narrowed without a visible bound",
-    "house_style": "\u00a73, \u00a71",
-    "house_style_status": "invariant_not_evident_in_source",
-    "review": "Check representability before conversion; keep capacity and live count distinct.",
-    "status": "ignored"
+    "reason": "NotifyIcon refuses text above HostServices::maximum_tray_tooltip_bytes before it reaches the host (src/controls/notify_icon/notify_icon.cpp:90)"
   },
   {
     "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
@@ -541,8 +421,7 @@
     "review": "Check representability before conversion; keep capacity and live count distinct.",
     "status": "reviewed",
     "decision": "guarded",
-    "reason": "the shaping entry refuses input above limits.input_bytes or INT_MAX (line 863)",
-    "trap_candidate": false
+    "reason": "the shaping entry refuses input above limits.input_bytes or INT_MAX (line 863)"
   },
   {
     "path": "src/render/text/text_mask/text_mask_shape.cpp",

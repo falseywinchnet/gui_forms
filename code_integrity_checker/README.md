@@ -40,7 +40,8 @@ Every candidate ends in one status:
 | raised | Nothing explains it yet. It needs a review. |
 | guarded | A guard the checker recognizes protects it. It is listed apart. |
 | reviewed | A decision recorded in `reviews.json` covers it. |
-| ignored | It lies in a scope `reviews.json` excludes: the Skia renderer and its C ABI (owner, phase C). |
+
+Files under an `excluded_scopes` entry of `reviews.json` are not read at all: the Skia renderer and its C ABI, which are being replaced. A scope is a path relative to the run directory, a directory ending in `/` or one file. The summary line counts the excluded files.
 
 The checker recognizes three guards:
 
@@ -50,9 +51,7 @@ The checker recognizes three guards:
 | `dominating_validation` | An `if` that bounds an operand with a comparison and then leaves (`return`, `throw`, `break`, `continue`), or a limit constant (`numeric_limits`, `SIZE_MAX`, `INT_MAX`). An emptiness test is not a bound. |
 | `named_failure` | A call that admits or charges the operand and fails by name (`admit`, `charge*`, `require*`, `validate*`, `check*`). |
 
-A fourth guard, `trap`, is reserved for the owner's "maps to trap" class: sites that a trap already stops. It is not detected yet. Its definition waits for the owner and for the stx_skia sibling's list. Until then, a review marks such a site with `trap_candidate`.
-
-`reviews.json` records a decision for each candidate a person has read: `defect`, `guarded` (with the guard and where it lives, when it is outside the function) or `false_shape`. A decision matches a finding by path, rule and evidence line. Editing the line raises the finding again, so a stale decision cannot hide new code.
+`reviews.json` records a decision for each candidate a person has read: `defect`, `guarded` (with the guard and where it lives, when it is outside the function) or `false_shape` (with a one-line reason naming the shape, so a rule can learn it if it recurs). A decision matches a finding by path, rule and evidence line. Editing the line raises the finding again, so a stale decision cannot hide new code.
 
 `--gate` fails only on raised candidates. CI runs it over `include` and `src` (`.github/workflows/code-integrity.yml`). A new candidate therefore fails the job until it is guarded in code or reviewed in `reviews.json`, while reviewed and guarded sites stay listed.
 

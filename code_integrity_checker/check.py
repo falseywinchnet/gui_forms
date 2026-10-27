@@ -9,8 +9,10 @@ Every candidate ends in one status:
 - raised: nothing explains it yet; it needs a review;
 - guarded: a guard the checker recognizes protects it (GUARDS below);
 - reviewed: a recorded decision in reviews.json covers it (defect, guarded or
-  false_shape), so it is not raised again;
-- ignored: it lies in a scope reviews.json excludes (Skia).
+  false_shape), so it is not raised again.
+
+Paths under a scope reviews.json excludes (the Skia renderer and its C ABI,
+which are being replaced) are not read at all.
 
 The gate fails only on raised candidates, so a reviewed scope stays clean while
 new code is checked.
@@ -71,10 +73,6 @@ GUARDS = {
     # An earlier call admits or charges the operand and fails by name
     # (admit, charge, require, validate, check).
     "named_failure": "an earlier named admission fails for an operand out of range",
-    # Not detected yet: the owner's "maps to trap" class (a site a trap
-    # already stops). Reviews may record it; detection waits for the owner's
-    # definition and the stx_skia sibling's list.
-    "trap": "a trap stops the site before the uncertain value is used",
 }
 REVIEW_DECISIONS = ("defect", "guarded", "false_shape")
 DEFAULT_REVIEWS = Path(__file__).resolve().parent / "reviews.json"
@@ -107,12 +105,12 @@ class Review:
     decision: str
     guard: str
     reason: str
-    trap_candidate: bool
 
 
 @dataclass(frozen=True)
 class Reviews:
-    ignored_scopes: tuple[str, ...]
+    # Path prefixes (a directory ending in "/") or files never read.
+    excluded_scopes: tuple[str, ...]
     entries: tuple[Review, ...]
 
 
@@ -508,17 +506,25 @@ def load_reviews(path: Path | None) -> Reviews:
         if item["rule"] not in RULES:
             raise ValueError(f"{path}: unknown rule {item['rule']!r} for {item['path']}")
         entries.append(Review(normalized_path(item["path"]), item["rule"], normalized_evidence(item["evidence"]),
-                              decision, guard, item.get("reason", ""), bool(item.get("trap_candidate", False))))
-    scopes = tuple(normalized_path(scope) for scope in data.get("ignored_scopes", []))
+                              decision, guard, item.get("reason", "")))
+    scopes = tuple(normalized_path(scope) for scope in data.get("excluded_scopes", []))
     return Reviews(scopes, tuple(entries))
 
 
+def excluded(path: Path, scopes: tuple[str, ...]) -> bool:
+    """Whether a selected file lies in an excluded scope: the scope itself, or under a scope directory."""
+    text = normalized_path(path.as_posix())
+    scope: str
+    for scope in scopes:
+        directory = scope.rstrip("/") + "/"
+        if text == scope.rstrip("/") or text.startswith(directory):
+            return True
+    return False
+
+
 def classify(finding: Finding, reviews: Reviews) -> tuple[str, Review | None]:
-    """The finding's status (ignored, reviewed, guarded or raised) and the review that decided it."""
+    """The finding's status (reviewed, guarded or raised) and the review that decided it."""
     path = normalized_path(finding.path)
-    for scope in reviews.ignored_scopes:
-        if path == scope or path.startswith(scope.rstrip("/") + "/") or (scope.endswith("/") and path.startswith(scope)):
-            return "ignored", None
     key = (path, finding.rule, normalized_evidence(finding.evidence))
     for review in reviews.entries:
         if (review.path, review.rule, review.evidence) == key:
@@ -533,21 +539,22 @@ def main() -> int:
     parser.add_argument("paths", nargs="+", help="explicit C/C++ files or directories")
     parser.add_argument("--json", type=Path, help="write the complete structured report")
     parser.add_argument("--reviews", type=Path, default=DEFAULT_REVIEWS,
-                        help="recorded decisions and ignored scopes (default: reviews.json beside this script)")
+                        help="recorded decisions and excluded scopes (default: reviews.json beside this script)")
     parser.add_argument("--gate", action="store_true",
-                        help="fail on raised candidates: those neither guarded, reviewed nor ignored")
+                        help="fail on raised candidates: those neither guarded nor reviewed")
     arguments = parser.parse_args()
     try:
-        paths = collect(arguments.paths)
+        selected = collect(arguments.paths)
         reviews = load_reviews(arguments.reviews)
     except (FileNotFoundError, ValueError, KeyError) as error:
         parser.error(str(error))
+    paths: list[Path] = [path for path in selected if not excluded(path, reviews.excluded_scopes)]
     if not paths:
         parser.error("No C or C++ files selected; empty scope is not a pass.")
     findings: list[Finding] = []
     for path in paths:
         findings.extend(inspect(path.as_posix(), path.read_text(encoding="utf-8-sig", errors="replace")))
-    counts: dict[str, int] = {"raised": 0, "guarded": 0, "reviewed": 0, "ignored": 0}
+    counts: dict[str, int] = {"raised": 0, "guarded": 0, "reviewed": 0}
     records: list[dict[str, object]] = []
     apart: list[str] = []
     for finding in findings:
@@ -558,7 +565,6 @@ def main() -> int:
         if review is not None:
             record["decision"] = review.decision
             record["reason"] = review.reason
-            record["trap_candidate"] = review.trap_candidate
             if review.guard:
                 record["guard"] = review.guard
         records.append(record)
@@ -572,11 +578,11 @@ def main() -> int:
             detail = finding.guard if status == "guarded" else (review.decision if review is not None else "")
             apart.append(f"  {status:8} {detail:22} {finding.path}:{finding.line}: {finding.rule}")
     if apart:
-        print("Listed apart (guarded, reviewed or ignored):")
+        print("Listed apart (guarded or reviewed):")
         for line in apart:
             print(line)
-    print(f"code integrity: {len(paths)} files, {len(findings)} candidates: {counts['raised']} raised, "
-          f"{counts['guarded']} guarded, {counts['reviewed']} reviewed, {counts['ignored']} ignored")
+    print(f"code integrity: {len(paths)} files ({len(selected) - len(paths)} excluded), {len(findings)} candidates: "
+          f"{counts['raised']} raised, {counts['guarded']} guarded, {counts['reviewed']} reviewed")
     if arguments.json is not None:
         arguments.json.parent.mkdir(parents=True, exist_ok=True)
         arguments.json.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
