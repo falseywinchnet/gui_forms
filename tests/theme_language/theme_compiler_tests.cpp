@@ -414,7 +414,7 @@ void test_properties() {
             "parameters before the primitive belong to it; initial is the default; px is a number");
     const ThemeRule choice = only_rule("#a { primitive: material; recipe: initial; shape: CAP-START }");
     require(choice.declarations.size() == 3U &&
-                choice.declarations[1] == RuleDeclaration::choice_value("recipe", "button") &&
+                choice.declarations[1] == RuleDeclaration::choice_value("recipe", "family") &&
                 choice.declarations[2] == RuleDeclaration::choice_value("shape", "cap_start"),
             "a choice's initial is its default; keywords match in any case");
     const ThemeRule named = only_rule("#a { primitive: bulge; light-colour: transparent }");
@@ -468,8 +468,8 @@ void test_refusals() {
         {"@import \"x\"; #a { opacity: 1 }", DiagnosticCode::not_yet_built, "@import"},
         {"#a { opacity: 1 } @media (min-width: 1px) { #a { opacity: 1 } }", DiagnosticCode::not_yet_built, "@media"},
         {"@keyframes k { from { opacity: 0 } }", DiagnosticCode::not_yet_built, "@keyframes"},
-        {"#a { background-color: red }", DiagnosticCode::not_yet_built, "background-color"},
-        {"#a { border-top-left-radius: 2px }", DiagnosticCode::not_yet_built, "border"},
+        {"#a { background-size: 2px }", DiagnosticCode::not_yet_built, "background-size"},
+        {"#a { border-image: none }", DiagnosticCode::not_yet_built, "border"},
         {"#a { transition: opacity 1s }", DiagnosticCode::not_yet_built, "transition"},
         {"#a { color: red }", DiagnosticCode::not_yet_built, "color"},
         {"#a { font: ui }", DiagnosticCode::not_yet_built, "font"},

@@ -51,6 +51,10 @@ Window::Window(Control::Ptr root, Size client_size,
         throw std::logic_error("GUI.Forms window root may not be disposed");
     }
     attach_subtree(root_, {});
+    // The theme's backdrop request (stage T5) until the application makes
+    // its own. Undeclared, the window is granted `opaque` whatever it asks.
+    backdrop_request_ = (*theme_).definition().window_backdrop.request;
+    refresh_backdrop();
     const Rect initial_damage{0.0, 0.0, client_size_.width, client_size_.height};
     add_damage_all_planes(initial_damage);
     metrics_.record_dirty_mark(initial_damage.area());
@@ -168,6 +172,15 @@ void Window::set_presentation_settings(PresentationSettings settings) {
         throw std::invalid_argument(
             "GUI.Forms text scale must be finite and between 0.5 and 4.0");
     }
+    if (settings.double_click_milliseconds == 0U ||
+        settings.double_click_milliseconds > maximum_double_click_milliseconds) {
+        throw std::invalid_argument(
+            "GUI.Forms double-click interval must be between 1 and 5000 milliseconds");
+    }
+    if (settings.double_click_origin != SettingOrigin::default_value &&
+        settings.double_click_origin != SettingOrigin::host) {
+        throw std::invalid_argument("GUI.Forms double-click origin is not a SettingOrigin");
+    }
     if (presentation_settings_ == settings) {
         return;
     }
@@ -177,6 +190,8 @@ void Window::set_presentation_settings(PresentationSettings settings) {
         settings.reduced_motion && !presentation_settings_.reduced_motion;
     const bool ambient_switched_off =
         !settings.ambient_motion && presentation_settings_.ambient_motion;
+    const bool transparency_switched =
+        settings.reduced_transparency != presentation_settings_.reduced_transparency;
     presentation_settings_ = settings;
     // Transient overlays own geometry resolved for the opening text metrics.
     // A text-scale transition dismisses them deterministically; reopening
@@ -200,6 +215,9 @@ void Window::set_presentation_settings(PresentationSettings settings) {
     // part repaints above, at its pose; one resuming is repainted too, and
     // its paint starts its effect again.
     if (ambient_switched_off) motion_clock_.stop_ambient(false);
+    // Reduced transparency (stage T5, PLAN.md §4.5): glass draws flattened,
+    // so every part that sampled the backplane is baked again.
+    if (transparency_switched) damage_backplane_readers(nullptr);
     presentation_changed_.emit(presentation_settings_);
     // High contrast and reduced transparency withdraw a backdrop (stage T5).
     refresh_backdrop();
@@ -220,6 +238,13 @@ void Window::apply_theme(const std::shared_ptr<const Theme>& theme) {
     engine_parts_.invalidate_rasters();
     // The window's backplane material may differ (E9-B).
     damage_backplane_readers(nullptr);
+    // A window following its theme's backdrop request takes the new
+    // theme's, and its grant is resolved again before theme_changed is
+    // raised, so handlers see the grant the theme brings.
+    if (!application_backdrop_request_) {
+        backdrop_request_ = (*theme_).definition().window_backdrop.request;
+        refresh_backdrop();
+    }
     // Themes include structural spacing/geometry/type tokens as well as paint
     // recipes, so replacement must remeasure and re-hit-test inherited content.
     mark_subtree_dirty(*root_, invalidation::conservative_subtree);

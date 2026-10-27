@@ -42,8 +42,8 @@ class GlassPrimitive final : public EnginePrimitive {
 public:
     [[nodiscard]] const PrimitiveDescriptor& descriptor() const noexcept override;
     [[nodiscard]] PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept override;
-    [[nodiscard]] std::optional<ControlVisualRole> theme_material(
-        const PrimitiveParameterBlock& parameters) const noexcept override;
+    [[nodiscard]] std::optional<ControlVisualRole> theme_material(const PrimitiveParameterBlock& parameters,
+                                                                  ControlVisualRole family) const noexcept override;
     [[nodiscard]] std::optional<std::uint32_t> backplane_margin(const PrimitiveParameterBlock& parameters,
                                                                 DeviceScale scale) const noexcept override;
 

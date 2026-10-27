@@ -338,13 +338,18 @@ struct PageDigest final {
 // typography-and-inspection were recorded again, and every other page kept
 // L3's digest.
 //
+// Main's ListView insertion-mark toggle on checked-collections adds one
+// control: merged with main, against L8a's traces only
+// states-and-diagnostics (1285 controls) and typography-and-inspection
+// (#1318) differ, in those numbers alone, and were recorded again.
+//
 // Each later phase, rebased onto those main pages, recorded again the
 // pages whose digests the combination moved: the counts on
 // states-and-diagnostics and the RuntimeId on typography-and-inspection,
 // and, where the phase had recorded every page, the two main pages too.
 //
 // typography-and-inspection's entry is the trace with the RuntimeId the
-// specimen has when this test runs first (#1317 since L8a on main); the digest
+// specimen has when this test runs first (#1318 since L8a on main); the digest
 // changes whenever a page made before it makes a control more or less.
 constexpr std::array<PageDigest, 30> expected_digests{{
     {"basics", 0x8ad3bd64955e6995ULL},
@@ -355,7 +360,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"ranges-and-progress", 0x2a06ace770e13138ULL},
     {"containers-and-focus", 0x4bd8a3f439f8078cULL},
     {"animation-laboratory", 0xd22492f193fdb022ULL},
-    {"states-and-diagnostics", 0x1223886a1399df43ULL},
+    {"states-and-diagnostics", 0x714aa18db081595aULL},
     {"text-and-input", 0x6cea6c153578579dULL},
     {"collections-and-popups", 0x5b75d7735fed6b79ULL},
     {"values-and-spinners", 0x53974a1f042eaa19ULL},
@@ -375,7 +380,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"responsive-layouts", 0x3f60bc621cdf06c9ULL},
     {"anchored-popups", 0x898b0bfbbfdcc181ULL},
     {"live-surfaces", 0xf100f9eb79b7356eULL},
-    {"typography-and-inspection", 0x20f818876c5de4cfULL},
+    {"typography-and-inspection", 0xc35b22ec79ebe357ULL},
     {"semantic-feedback", 0x52902fede7280d09ULL},
 }};
 

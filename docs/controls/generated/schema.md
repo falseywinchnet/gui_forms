@@ -44,7 +44,7 @@ Semantic node fields: `position_in_set`, `set_size`, `has_popup`, `controlled_pa
 
 ## Engine
 
-Theme engine 0.2 (T2): the primitives a theme's rules may select, the atoms each declares against, and its cost. Cascade levels, lowest first: `built_in`, `theme_sheet`, `class_rule`, `stable_id_rule`, `inline_style`, `forced_high_contrast`.
+Theme engine 0.3 (T2): the primitives a theme's rules may select, the atoms each declares against, and its cost. Cascade levels, lowest first: `built_in`, `theme_sheet`, `class_rule`, `stable_id_rule`, `inline_style`, `forced_high_contrast`.
 
 | Primitive | Since | Paints | Reads | Cost per device pixel | Parameters |
 |---|---|---|---|---|---|
@@ -623,6 +623,7 @@ Properties beyond every control's: none.
 | `horizontal_scroll_bar` | track | `h_scroll_bar` |  |
 | `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
+| `insertion_mark` | drop |  | drop_accepted |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
