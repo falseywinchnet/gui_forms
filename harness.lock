@@ -1,0 +1,7 @@
+# The template_harness commit GUI.Forms builds with (owner decision 2).
+# CI checks it out beside this checkout (<workspace>/template_harness); locally:
+#   python3 template_harness/harness/lock.py --lock gui_forms/harness.lock checkout template_harness
+# and `lock.py bump [--to REF]` moves the pin. docs/building/template-harness.md.
+[harness]
+repository = "malkuth-software/template_harness"
+commit = "0047da231c9465143437c550f265b05fb64d2fcf"

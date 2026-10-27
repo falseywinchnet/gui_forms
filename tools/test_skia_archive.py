@@ -26,7 +26,7 @@ def make_source(source: Path) -> None:
                b'#!/bin/sh\nskia_revision=2a9b593bab4b2fd019fa494c8d401ff1fab0b883\n')
     relative: str
     for relative in skia_archive.COMMON_INPUTS[1:] + skia_archive.PLATFORM_INPUTS[PLATFORM]:
-        write_file(source / relative, ('fixture ' + relative + '\n').encode('utf-8'))
+        write_file(skia_archive.input_path(relative, source), ('fixture ' + relative + '\n').encode('utf-8'))
 
 
 def make_skia(skia_root: Path, skia_out: Path) -> None:
@@ -74,7 +74,7 @@ class IdentityTests(Fixture):
         before: str = skia_archive.identity(PLATFORM, self.source)
         relative: str
         for relative in skia_archive.COMMON_INPUTS + skia_archive.PLATFORM_INPUTS[PLATFORM]:
-            path: Path = self.source / relative
+            path: Path = skia_archive.input_path(relative, self.source)
             original: bytes = path.read_bytes()
             path.write_bytes(original + b'# changed\n')
             self.assertNotEqual(skia_archive.identity(PLATFORM, self.source), before, relative)

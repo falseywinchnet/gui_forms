@@ -228,6 +228,8 @@ miss is an ordinary compilation. [Fast, reproducible builds](fast-builds) explai
 the whole method (the pinned configuration, exact reuse of tested trees and
 the published caches), and [Reusing CI caches](reusing-ci-caches) covers the
 archive layout, the manifest, restoring a cache and copying the method.
+The CI tools that do this live in template_harness, pinned by `harness.lock`
+([GUI.Forms builds through template_harness](template-harness)).
 
 ## Dependency boundaries
 
@@ -242,4 +244,5 @@ A change that violates one of these fails `ctest` before it reaches review.
 
 fast-builds
 reusing-ci-caches
+template-harness
 ```
