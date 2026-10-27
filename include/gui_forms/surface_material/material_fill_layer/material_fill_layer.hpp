@@ -37,8 +37,12 @@ enum class MaterialFillKind : std::uint8_t {
     // A built-in pattern generated per display scale (E10): `procedural`.
     procedural,
 };
+// How an image fill covers its box: stretched over it; tiled from one tile
+// (image_scale, image_anchor, image_offset); as a nine-patch; or `single`,
+// that one tile alone, placed as a tile is, with nothing around it (E9.6,
+// CSS `background-repeat: no-repeat`).
 enum class MaterialImageMode : std::uint8_t {
-    stretch, tile, nine_patch,
+    stretch, tile, nine_patch, single,
 };
 enum class MaterialCoordinateSpace : std::uint8_t {
     normalized, logical,
@@ -72,8 +76,8 @@ struct MaterialFillLayer final {
     // around one tile (fractions in [0, 1] across and down, as CSS
     // percentages: 0 the box's left or top, 1 a tile flush with its right
     // or bottom) plus `image_offset` in logical units, and the tiling runs
-    // on from there both ways. Read in tile mode only: a stretched image
-    // and a nine-patch cover the box.
+    // on from there both ways. Read in tile and single modes only: a
+    // stretched image and a nine-patch cover the box.
     Point image_anchor{};
     Point image_offset{};
     double period_degrees{360.0};

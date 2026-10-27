@@ -221,6 +221,7 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/custom_properties/theme_custom_properties.cpp
     src/core/theme_language/value/theme_value.cpp
     src/core/theme_language/material/theme_material_lowering.cpp
+    src/core/theme_language/motion/theme_motion_lowering.cpp
     src/core/theme_language/compiler/theme_compiler.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
@@ -2453,6 +2454,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_authored_material_tests tests/engine_authored_material_tests.cpp)
     target_link_libraries(gui_forms_engine_authored_material_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_authored_material_tests COMMAND gui_forms_engine_authored_material_tests)
+    add_executable(gui_forms_engine_recipe_field_tests tests/engine_recipe_field_tests.cpp)
+    target_link_libraries(gui_forms_engine_recipe_field_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_recipe_field_tests COMMAND gui_forms_engine_recipe_field_tests)
     add_executable(gui_forms_engine_procedural_tests tests/engine_procedural_tests.cpp)
     target_link_libraries(gui_forms_engine_procedural_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_procedural_tests COMMAND gui_forms_engine_procedural_tests)
@@ -2626,6 +2630,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_material_css_tests tests/theme_language/theme_material_css_tests.cpp)
     target_link_libraries(gui_forms_theme_material_css_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_theme_material_css_tests COMMAND gui_forms_theme_material_css_tests)
+    add_executable(gui_forms_theme_motion_css_tests tests/theme_language/theme_motion_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_motion_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_motion_css_tests COMMAND gui_forms_theme_motion_css_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)

@@ -189,7 +189,7 @@ ImageVariantRequest image_variant_request(const MaterialFillLayer& fill, const s
     request.scale = DeviceScale{scale};
     const ImageAxisPlacement across = image_placement_across(fill, box.x, box.width, scale, fill.image_pixel_size.width);
     const ImageAxisPlacement down = image_placement_down(fill, box.y, box.height, scale, fill.image_pixel_size.height);
-    if (fill.image_mode == MaterialImageMode::tile) {
+    if (fill.image_mode == MaterialImageMode::tile || fill.image_mode == MaterialImageMode::single) {
         request.extent = DeviceExtent{variant_length(across.tile_length), variant_length(down.tile_length)};
         return request;
     }
@@ -218,6 +218,18 @@ void map_image_variant(const ImageAxisPlacement& placement, const std::uint32_t 
             const double along = static_cast<double>(output) + 0.5 - placement.tile_origin;
             const double within = along - tile * std::floor(along / tile);
             const double index = std::clamp(std::floor(within * pixels / tile), 0.0, pixels - 1.0);
+            map[output] = static_cast<std::uint32_t>(index);
+        }
+        return;
+    }
+    if (placement.mode == MaterialImageMode::single) {
+        // Only the centres within the one tile show it.
+        const double tile = placement.tile_length;
+        for (std::uint32_t output = 0U; output < outputs; ++output) {
+            map[output] = outside_image;
+            const double along = static_cast<double>(output) + 0.5 - placement.tile_origin;
+            if (!(tile > 0.0) || along < 0.0 || along >= tile) continue;
+            const double index = std::clamp(std::floor(along * pixels / tile), 0.0, pixels - 1.0);
             map[output] = static_cast<std::uint32_t>(index);
         }
         return;

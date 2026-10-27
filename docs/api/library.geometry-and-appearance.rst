@@ -40,6 +40,8 @@ Types
      - A checked transition: an engine property, or the parameter at ``parameter``.
    * - :cpp:class:`CompiledThemeRules::PartFacts <gui_forms::CompiledThemeRules::PartFacts>`
      - What a part is: the facts its selectors are matched against.
+   * - :cpp:class:`CompiledThemeRules::RecipeResolution <gui_forms::CompiledThemeRules::RecipeResolution>`
+     - The winning declaration of each recipe field (RecipeField) of the rules matching a control, by the field's position, or null where no matching rule sets it; they belong to the compiled rules.
    * - :cpp:class:`CompiledThemeRules::Resolution <gui_forms::CompiledThemeRules::Resolution>`
      -  
    * - :cpp:class:`ConnectedControlSeam <gui_forms::ConnectedControlSeam>`
@@ -55,7 +57,7 @@ Types
    * - :cpp:class:`ControlStateRecipes <gui_forms::ControlStateRecipes>`
      -  
    * - :cpp:class:`ControlTextShadow <gui_forms::ControlTextShadow>`
-     -  
+     - A text shadow (E9.6, CSS ``text-shadow``): the text's glyphs, moved by ``offset`` logical units (each axis within ±maximum_text_shadow_offset), blurred by ``blur_radius`` (the shadows' blur-radius convention, 0 to maximum_text_shadow_blur; both limits are the theme rules') and drawn in ``color`` under the glyphs.
    * - :cpp:class:`ControlVisualContext <gui_forms::ControlVisualContext>`
      - ControlVisualContext selects a role recipe from surface state plus selected, focused, defaulted, and high-contrast axes.
    * - :cpp:class:`ControlVisualRecipe <gui_forms::ControlVisualRecipe>`
@@ -132,6 +134,10 @@ Types
      - MaterialFillLayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity.
    * - :cpp:class:`MaterialGlow <gui_forms::MaterialGlow>`
      - A soft coloured emission of the material's box (E9-C): the box grown by ``spread`` on every side and blurred by ``blur_radius`` (σ = blur_radius / 2, as a shadow's), centred on the box.
+   * - :cpp:class:`MaterialImagePosition <gui_forms::MaterialImagePosition>`
+     - An image layer's position (CSS ``background-position``): each axis's fraction is the layer's image_anchor, of the room the box leaves around one tile, and its units its image_offset.
+   * - :cpp:class:`MaterialImageSize <gui_forms::MaterialImageSize>`
+     -  
    * - :cpp:class:`MaterialKeyline <gui_forms::MaterialKeyline>`
      - One ordered physical keyline.
    * - :cpp:class:`MaterialShadow <gui_forms::MaterialShadow>`
@@ -212,8 +218,12 @@ Types
      - A transition on one resolved property: ``opacity``, or a number parameter of the rule's primitive that the primitive declares animated (such as the bulge's amplitude), so that its frames never remake the part's preparation.
    * - :cpp:class:`RasterCacheStatistics <gui_forms::RasterCacheStatistics>`
      - The raster cache's counters, for instrumentation.
+   * - :cpp:class:`RecipeDeclaration <gui_forms::RecipeDeclaration>`
+     - One recipe field's declared value.
    * - :cpp:class:`Rect <gui_forms::Rect>`
      - Rect is a half-open logical rectangle with finite/empty checks, containment, exact intersection, and bounding union operations.
+   * - :cpp:class:`ResolvedControlRecipe <gui_forms::ResolvedControlRecipe>`
+     - A control's recipe for one role and state (T3 P6f): the theme's built-in recipe (the floor, Theme::resolve(role, context), borrowed from the theme) or, when the theme's rules set a recipe field for the control (RecipeField), the floor's copy with those fields in place, which this value owns.
    * - :cpp:class:`RetainedDrawCache <gui_forms::RetainedDrawCache>`
      -  
    * - :cpp:class:`RetainedDrawMemo <gui_forms::RetainedDrawMemo>`
@@ -545,6 +555,10 @@ Types
 
       The position of the published value ``name``, or none when the sheet does not read it.
 
+   .. cpp:function:: RecipeResolution resolve_recipe_fields(const PartFacts& facts) const noexcept
+
+      The recipe fields' cascade for a control: ``facts`` name no part and the region role. Linear in the number of rules, and at once when no rule sets a recipe field.
+
    .. cpp:function:: Resolution resolve(const PartFacts& facts) const noexcept
 
       The cascade for one part: the winning primitive declaration, then each of that primitive's parameters from the winning declaration of it among the matching rules that select the same primitive, else its declared default; and each material field from its winning declaration among all the matching rules. Linear in the number of rules; tables are small, and a theme with no rules returns at once.
@@ -606,6 +620,18 @@ Types
       Default: ``{PartRole::region}``.
 
    .. cpp:member:: AnatomyStateSet states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CompiledThemeRules::RecipeResolution final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   The winning declaration of each recipe field (RecipeField) of the rules matching a control, by the field's position, or null where no matching rule sets it; they belong to the compiled rules. ``authored`` is whether any is set.
+
+   .. cpp:member:: std::array<const RecipeDeclaration*, recipe_field_count> fields
+
+   .. cpp:member:: bool authored
 
 .. cpp:namespace:: gui_forms
 
@@ -770,6 +796,8 @@ Types
 .. cpp:struct:: ControlTextShadow final
 
    ``#include <gui_forms/theme/types/theme_types.hpp>``
+
+   A text shadow (E9.6, CSS ``text-shadow``): the text's glyphs, moved by ``offset`` logical units (each axis within ±maximum_text_shadow_offset), blurred by ``blur_radius`` (the shadows' blur-radius convention, 0 to maximum_text_shadow_blur; both limits are the theme rules') and drawn in ``color`` under the glyphs. Data only in T2: the theme carries it, and the text stage (M4/M9) draws it, with a first-party blur so that it is the same on every host.
 
    .. cpp:member:: Point offset
 
@@ -1715,7 +1743,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One material field a rule sets and its value. Only the members ``field`` names are read; the others stay empty: - background_colour: ``colour``, a solid layer under the image layers; - fills: the image layers (gradients, images, patterns), bottom first, at most SurfaceMaterial::maximum_fill_layers, empty for none; and ``gradients``, empty, or one per layer: a gradient as a sheet wrote it (T3 P6b), resolved for the part's box when the material is assembled, in place of its layer; an entry of kind ``solid`` keeps its layer as written; - fill_blend_modes: ``blend_modes``, in CSS's order (the top image layer's first), repeated over the image layers as CSS repeats a short list; empty for normal; - shadows, glows, keylines: the lists; - an edge's style: ``border_style``, empty for none (CSS's ``none``); its width: ``number``, 0 for none; its colour: ``colour``; - a corner: ``number``, its radius in logical units, or, with ``relative``, a fraction of the box's shorter side (CSS's percentage, R2-11), resolved when the material is assembled for a part; - colour_filter: ``colour_filter``; drop_shadow: ``drop_shadow``, empty for none; mask: ``mask``, empty for none; - filter_blur and finish: ``number``. ``initial``, set, is CSS's ``initial``: the field keeps the floor's value, and the declaration still wins over those beneath it; its value members are not read.
+   One material field a rule sets and its value. Only the members ``field`` names are read; the others stay empty: - background_colour: ``colour``, a solid layer under the image layers; - fills: the image layers (gradients, images, patterns), bottom first, at most SurfaceMaterial::maximum_fill_layers, empty for none; and ``gradients``, empty, or one per layer: a gradient as a sheet wrote it (T3 P6b), resolved for the part's box when the material is assembled, in place of its layer; an entry of kind ``solid`` keeps its layer as written; - fill_blend_modes: ``blend_modes``, in CSS's order (the top image layer's first), repeated over the image layers as CSS repeats a short list; empty for normal; - fill_positions, fill_sizes, fill_repeats: ``image_positions``, ``image_sizes``, ``image_repeats``, in the same order and repeated the same way, read by the image fills (not a nine-patch) among the image layers: a gradient layer covers the box; - shadows, glows, keylines: the lists; - glow_placements: ``glow_placements``, in the glows' order, repeated over them as CSS repeats a short list (``glow-placement``); - an edge's style: ``border_style``, empty for none (CSS's ``none``), and ``edge_lines``; its width: ``number``, 0 for none; its colour: ``colour``; - border_image: ``border_image``, a nine-patch image fill, empty for none; - a corner: ``number``, its radius in logical units, or, with ``relative``, a fraction of the box's shorter side (CSS's percentage, R2-11), resolved when the material is assembled for a part; - colour_filter: ``colour_filter``; drop_shadow: ``drop_shadow``, empty for none; mask: ``mask``, empty for none, and ``gradients``, empty or one entry, the mask's authored gradient as for a fill layer; - filter_blur and finish: ``number``. ``initial``, set, is CSS's ``initial``: the field keeps the floor's value, and the declaration still wins over those beneath it; its value members are not read.
 
    .. cpp:member:: MaterialField field
 
@@ -1729,11 +1757,25 @@ Types
 
    .. cpp:member:: std::vector<MaterialBlendMode> blend_modes
 
+   .. cpp:member:: std::vector<MaterialImagePosition> image_positions
+
+   .. cpp:member:: std::vector<MaterialImageSize> image_sizes
+
+   .. cpp:member:: std::vector<MaterialImageRepeat> image_repeats
+
    .. cpp:member:: std::vector<MaterialShadow> shadows
 
    .. cpp:member:: std::vector<MaterialGlow> glows
 
+   .. cpp:member:: std::vector<MaterialGlowPlacement> glow_placements
+
    .. cpp:member:: std::optional<MaterialBorderStyle> border_style
+
+   .. cpp:member:: MaterialEdgeLines edge_lines
+
+      Default: ``{MaterialEdgeLines::single}``.
+
+   .. cpp:member:: std::optional<MaterialFillLayer> border_image
 
    .. cpp:member:: Color colour
 
@@ -1892,7 +1934,7 @@ Types
 
    .. cpp:member:: Point image_anchor
 
-      A tiled image's position (E9.6, CSS ``background-position``): one tile's top-left corner lies at ``image_anchor`` of the room the box leaves around one tile (fractions in [0, 1] across and down, as CSS percentages: 0 the box's left or top, 1 a tile flush with its right or bottom) plus ``image_offset`` in logical units, and the tiling runs on from there both ways. Read in tile mode only: a stretched image and a nine-patch cover the box.
+      A tiled image's position (E9.6, CSS ``background-position``): one tile's top-left corner lies at ``image_anchor`` of the room the box leaves around one tile (fractions in [0, 1] across and down, as CSS percentages: 0 the box's left or top, 1 a tile flush with its right or bottom) plus ``image_offset`` in logical units, and the tiling runs on from there both ways. Read in tile and single modes only: a stretched image and a nine-patch cover the box.
 
    .. cpp:member:: Point image_offset
 
@@ -1929,6 +1971,30 @@ Types
    .. cpp:member:: MaterialGlowPlacement placement
 
       Default: ``{MaterialGlowPlacement::under}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaterialImagePosition final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   An image layer's position (CSS ``background-position``): each axis's fraction is the layer's image_anchor, of the room the box leaves around one tile, and its units its image_offset.
+
+   .. cpp:member:: BoxLength across
+
+   .. cpp:member:: BoxLength down
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaterialImageSize final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:member:: MaterialImageSizing sizing
+
+      Default: ``{MaterialImageSizing::natural}``.
+
+   .. cpp:member:: BoxLength length
 
 .. cpp:namespace:: gui_forms
 
@@ -3051,6 +3117,34 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RecipeDeclaration final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   One recipe field's declared value. ``initial`` is CSS's ``initial``: the floor's value, and the declaration still wins over those beneath it; its value members are not read. Otherwise, by field: - text and outline_colour: ``colour``; - outline_style: ``outline_style``; - outline_width (0 to maximum_recipe_outline_width) and outline_offset (within ±maximum_recipe_outline_offset): ``number``, in logical units; - text_shadow: ``shadowed``, false for none; its ``shadow_offset``, ``shadow_blur`` (the shadows' blur-radius convention) and ``colour``.
+
+   .. cpp:member:: RecipeField field
+
+      Default: ``{RecipeField::text}``.
+
+   .. cpp:member:: bool initial
+
+   .. cpp:member:: Color colour
+
+   .. cpp:member:: double number
+
+   .. cpp:member:: RecipeOutlineStyle outline_style
+
+      Default: ``{RecipeOutlineStyle::ring}``.
+
+   .. cpp:member:: bool shadowed
+
+   .. cpp:member:: Point shadow_offset
+
+   .. cpp:member:: double shadow_blur
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: Rect
 
    ``#include <gui_forms/types/geometry/geometry.hpp>``
@@ -3092,6 +3186,30 @@ Types
    .. cpp:member:: double width
 
    .. cpp:member:: double height
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: ResolvedControlRecipe final
+
+   ``#include <gui_forms/theme/types/theme_types.hpp>``
+
+   A control's recipe for one role and state (T3 P6f): the theme's built-in recipe (the floor, Theme::resolve(role, context), borrowed from the theme) or, when the theme's rules set a recipe field for the control (RecipeField), the floor's copy with those fields in place, which this value owns. The copy is made only then, so a theme whose rules set no recipe field costs nothing. A value for one paint or measurement: it borrows the theme, so it is not kept past the theme's use. ``recipe()`` borrows from the value, so it is read from a named value and never from a temporary.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit ResolvedControlRecipe(const ControlVisualRecipe& floor) noexcept
+
+   .. cpp:function:: ResolvedControlRecipe(const ControlVisualRecipe& floor, ControlVisualRecipe&& authored) noexcept
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: const ControlVisualRecipe& recipe() const& noexcept
+
+   .. cpp:function:: bool authored() const noexcept
+
+      Whether a rule's recipe field changed the floor.
 
 .. cpp:namespace:: gui_forms
 
@@ -3355,6 +3473,14 @@ Types
 
       Bounds role/state indices and chooses ordinary, selected, high-contrast, or high-contrast-selected recipe deterministically.
 
+   .. cpp:function:: ResolvedControlRecipe resolve(const Control& control, ControlVisualRole role, ControlVisualContext context) const
+
+      Bounds role/state indices and chooses ordinary, selected, high-contrast, or high-contrast-selected recipe deterministically.
+
+   .. cpp:function:: ResolvedControlRecipe resolve(const Control& control, ControlVisualRole role, ControlVisualContext context, AnatomyStateSet states) const
+
+      Bounds role/state indices and chooses ordinary, selected, high-contrast, or high-contrast-selected recipe deterministically.
+
    .. cpp:function:: Color accent(AccentIndex index) const noexcept
 
       The ramp colour for an accent index; an index past the end of the ramp wraps around it.
@@ -3558,7 +3684,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one. Its material fields (EC1) cascade the same way, each on its own, from every matching rule, whatever primitive it selects: they change a part only where its primitive draws a theme material. ``specificity``, when set, is the rule's specificity in place of the one its selector gives (T3 engine change EC2): a rule expanded from CSS's ``:is()`` takes its most specific argument's. A class or stable-ID rule with a given specificity then needs a class or an ID in it rather than in its selector; an inline style still needs its selector's stable ID.
+   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one. Its material fields (EC1) cascade the same way, each on its own, from every matching rule, whatever primitive it selects: they change a part only where its primitive draws a theme material. Its recipe fields (RecipeField) cascade the same way for the control as a whole. ``specificity``, when set, is the rule's specificity in place of the one its selector gives (T3 engine change EC2): a rule expanded from CSS's ``:is()`` takes its most specific argument's. A class or stable-ID rule with a given specificity then needs a class or an ID in it rather than in its selector; an inline style still needs its selector's stable ID.
 
    .. cpp:member:: std::string label
 
@@ -3579,6 +3705,8 @@ Types
    .. cpp:member:: std::optional<AmbientEffect> ambient
 
    .. cpp:member:: std::vector<MaterialDeclaration> materials
+
+   .. cpp:member:: std::vector<RecipeDeclaration> recipe_fields
 
 .. cpp:namespace:: gui_forms
 
@@ -4090,6 +4218,20 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: MaterialEdgeLines
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: single
+
+   .. cpp:enumerator:: double_line
+
+   .. cpp:enumerator:: groove
+
+   .. cpp:enumerator:: ridge
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: MaterialField
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
@@ -4100,9 +4242,17 @@ Enumerations
 
    .. cpp:enumerator:: fill_blend_modes
 
+   .. cpp:enumerator:: fill_positions
+
+   .. cpp:enumerator:: fill_sizes
+
+   .. cpp:enumerator:: fill_repeats
+
    .. cpp:enumerator:: shadows
 
    .. cpp:enumerator:: glows
+
+   .. cpp:enumerator:: glow_placements
 
    .. cpp:enumerator:: border_top_style
 
@@ -4127,6 +4277,8 @@ Enumerations
    .. cpp:enumerator:: border_left_width
 
    .. cpp:enumerator:: border_left_colour
+
+   .. cpp:enumerator:: border_image
 
    .. cpp:enumerator:: keylines
 
@@ -4189,6 +4341,36 @@ Enumerations
    .. cpp:enumerator:: tile
 
    .. cpp:enumerator:: nine_patch
+
+   .. cpp:enumerator:: single
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MaterialImageRepeat
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: repeat
+
+   .. cpp:enumerator:: no_repeat
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MaterialImageSizing
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: natural
+
+   .. cpp:enumerator:: width
+
+   .. cpp:enumerator:: height
+
+   .. cpp:enumerator:: cover
+
+   .. cpp:enumerator:: contain
+
+   .. cpp:enumerator:: stretch
 
 .. cpp:namespace:: gui_forms
 
@@ -4552,6 +4734,38 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: RecipeField
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: text
+
+   .. cpp:enumerator:: outline_style
+
+   .. cpp:enumerator:: outline_colour
+
+   .. cpp:enumerator:: outline_width
+
+   .. cpp:enumerator:: outline_offset
+
+   .. cpp:enumerator:: text_shadow
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RecipeOutlineStyle
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: ring
+
+   .. cpp:enumerator:: solid
+
+   .. cpp:enumerator:: none
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: RegistrationOutcome
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -4645,6 +4859,10 @@ Enumerations
    .. cpp:enumerator:: published_value_invalid
 
    .. cpp:enumerator:: material_field_invalid
+
+   .. cpp:enumerator:: recipe_field_invalid
+
+   .. cpp:enumerator:: recipe_field_on_part
 
 .. cpp:namespace:: gui_forms
 
@@ -5013,11 +5231,19 @@ Functions, constants and aliases
 
 .. cpp:function:: void assemble_material(const SurfaceMaterial& floor, const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box, SurfaceMaterial& material)
 
-   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value. The fills are composed when any fill field is declared: the colour layer (the declared colour, else the floor's bottom layer when it is solid) under the image layers (the declared ones, each authored gradient resolved for ``box``, else the floor's others), which take the declared blend modes; a colour of alpha 0 adds no layer, and with no layer at all the fill is one transparent solid. More than SurfaceMaterial::maximum_fill_layers is no material. The corners are composed when any is declared: each is its declaration's, else the floor's (its corner_radii's, else its corner_radius); four equal corners are corner_radius alone, and others corner_radii, with corner_radius the smallest (the built-in path rounds every corner by it). The border's edges are assembled together when any of their fields is declared: each starts as the floor's (its single edge, else its uniform border; an edge the floor lacks has the default MaterialBorder's width and colour and is not drawn), takes its declared style, width and colour, and is drawn unless its style is none or its width 0. Four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material). ``box`` is the part's box in logical units: relative corners are fractions of its shorter side.
+   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value. The fills are composed when any fill field is declared: the colour layer (the declared colour, else the floor's bottom layer when it is solid) under the image layers (the declared ones, each authored gradient resolved for ``box``, else the floor's others), which take the declared blend modes, and whose image fills take the declared sizes (resolved for ``box``), then repetitions, then positions; a colour of alpha 0 adds no layer, and with no layer at all the fill is one transparent solid. More than SurfaceMaterial::maximum_fill_layers is no material. The corners are composed when any is declared: each is its declaration's, else the floor's (its corner_radii's, else its corner_radius); four equal corners are corner_radius alone, and others corner_radii, with corner_radius the smallest (the built-in path rounds every corner by it). The glows take the declared placements; a mask's authored gradient is resolved for ``box``. The border's edges are assembled together when any of their fields is declared: each starts as the floor's (its single edge, else its uniform border; an edge the floor lacks has the default MaterialBorder's width and colour and is not drawn), takes its declared style, width and colour, and is drawn unless its style is none or its width 0. Four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material); an edge drawn as two lines (MaterialEdgeLines) is not a border edge but its two keylines, after the declared ones. A border image is the top fill layer, and the border (its edges and their lines) is not drawn, as CSS draws a border image in place of the border's style. ``box`` is the part's box in logical units: relative corners are fractions of its shorter side.
 
 .. cpp:function:: bool material_fields_read_box(const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept
 
-   Whether assembling ``fields`` reads the part's box: a relative corner or an authored gradient other than a fixed one (authored_gradient_fixed).
+   Whether assembling ``fields`` reads the part's box: a relative corner, an authored gradient, of a fill or the mask, other than a fixed one (authored_gradient_fixed), or an image size of the box (a fraction of its side, cover or contain).
+
+.. cpp:function:: std::string_view recipe_field_name(RecipeField field) noexcept
+
+   The field's snake_case name, as diagnostics name it; empty for ``count``.
+
+.. cpp:function:: bool recipe_declaration_admitted(const RecipeDeclaration& declaration) noexcept
+
+   Whether ``declaration`` is one a recipe admits: a field below ``count``, and a finite value within its field's range.
 
 .. cpp:function:: std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept
 
@@ -5088,6 +5314,26 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t material_field_count
 
    Value: ``static_cast<std::size_t>(MaterialField::count)``.
+
+.. cpp:var:: constexpr std::size_t recipe_field_count
+
+   Value: ``static_cast<std::size_t>(RecipeField::count)``.
+
+.. cpp:var:: constexpr double maximum_recipe_outline_width
+
+   What a recipe admits (valid_recipe): an outline at most 16 logical units wide, offset at most 64 either way; a text shadow offset at most 16 on each axis and blurred by at most 8. Value: ``16.0``.
+
+.. cpp:var:: constexpr double maximum_recipe_outline_offset
+
+   Value: ``64.0``.
+
+.. cpp:var:: constexpr double maximum_text_shadow_blur
+
+   Value: ``8.0``.
+
+.. cpp:var:: constexpr double maximum_text_shadow_offset
+
+   Value: ``16.0``.
 
 .. cpp:var:: constexpr std::uint32_t maximum_operations_per_device_pixel
 
@@ -5278,14 +5524,6 @@ Functions, constants and aliases
 .. cpp:function:: inline std::vector<MaterialShadow> provisional_overlay_shadow()
 
    The overlay shadow (owner decision RB-37, design language 12.9; the E4 level of 3.4 scaled to small overlays): a soft shadow cast down and right, away from the one upper-left light, by surfaces that really overlap content (tooltips, popups, menus). The ``shadow`` part role paints it around the casting surface. Two layers, in the units of MaterialShadow (blur is a CSS blur radius): a wide soft layer and a close contact layer, each offset right by at most half its drop (3.3). Provisional starting tokens until the default theme (stage T4) owns them.
-
-.. cpp:var:: constexpr double maximum_text_shadow_blur
-
-   A text shadow (E9.6, CSS ``text-shadow``): the text's glyphs, moved by ``offset`` logical units, blurred by ``blur_radius`` (the shadows' blur-radius convention, 0 to maximum_text_shadow_blur) and drawn in ``color`` under the glyphs. Data only in T2: the theme carries it, and the text stage (M4/M9) draws it, with a first-party blur so that it is the same on every host. Value: ``8.0``.
-
-.. cpp:var:: constexpr double maximum_text_shadow_offset
-
-   Value: ``16.0``.
 
 .. cpp:var:: constexpr std::size_t control_visual_role_count
 
