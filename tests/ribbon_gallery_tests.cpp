@@ -77,7 +77,7 @@ Point centre(const Control& control, Rect local) {
 }
 
 // A borrow into `items`, which must outlive it: temporaries are refused
-// (house style §5).
+// (house style §1).
 const RibbonGallery::Item* find_item(const std::vector<RibbonGallery::Item>& items, std::string_view id) {
     for (const RibbonGallery::Item& item : items) {
         if (item.stable_id == id) return &item;

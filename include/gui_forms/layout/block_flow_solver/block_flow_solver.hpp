@@ -151,7 +151,7 @@ enum class BlockFlowSolveOutcome : std::uint8_t {
 };
 
 // Caller-owned storage solve_block_flow fills, reused from layout to layout
-// (house style section 5): `items` has one record per input item, in input
+// (house style section 1): `items` has one record per input item, in input
 // order; `lines` the line boxes in order. Its storage grows only when the
 // item or line count does.
 class BlockFlowLayoutWorkspace final {

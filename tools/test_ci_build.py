@@ -98,7 +98,7 @@ class LeakSuppressionTests(unittest.TestCase):
     def test_no_function_rule_can_match_a_first_party_frame(self) -> None:
         # A rule suppresses a leak when it matches any frame of the allocation
         # stack, so a system function pattern that also occurs in first-party
-        # source would hide our leaks there (house style section 5: never
+        # source would hide our leaks there (house style section 1: never
         # suppress a GUI.Forms leak). Comments count too: the check is textual.
         suppressions: str = (CHECKOUT / 'tools/sanitizer/lsan.supp').read_text(encoding='utf-8')
         rules: list[str] = function_rules(suppressions)

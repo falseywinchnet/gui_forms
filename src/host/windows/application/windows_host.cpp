@@ -431,7 +431,7 @@ bool apply_system_cursor(CursorKind kind) noexcept {
     return applied;
 }
 
-// Shcore's entry point, typed from its declaration (house style section 9).
+// Shcore's entry point, typed from its declaration (house style section 2).
 using GetDpiForMonitorFunction = decltype(&::GetDpiForMonitor);
 
 GetDpiForMonitorFunction load_get_dpi_for_monitor() noexcept {

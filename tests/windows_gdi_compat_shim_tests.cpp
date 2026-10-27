@@ -14,7 +14,7 @@ namespace {
 
 // The shim exports user32's and gdi32's own names and signatures, so each
 // entry-point type comes from that function's declaration (house style
-// section 9).
+// section 2).
 using ShimGetDC = decltype(&::GetDC);
 using ShimReleaseDC = decltype(&::ReleaseDC);
 using ShimBitBlt = decltype(&::BitBlt);

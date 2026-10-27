@@ -13,25 +13,10 @@ style, `HOUSE_STYLE.md` on the `main` branch of `malkuth-software/notes`
 (https://github.com/malkuth-software/notes/blob/main/HOUSE_STYLE.md). Its
 canonical text is still `programming-house-style.md` in
 `falseywinchnet/EpistemicGPT`; change both together. Read it in full before
-writing or changing code. One line per section, so a skim still covers all
-eleven:
+writing or changing code. One line per section, in its order (most important
+first, the owner's 2026-10-27 ranking), so a skim still covers all eleven:
 
-1. **Types and values:** spell types; separate confusable quantities (byte
-   offsets and character positions, identities and indices) with wrapper
-   types; one numeric precision per computation; named record fields, enums
-   and explicit initialization; state array shape and capacity versus live
-   length.
-2. **Statements and expressions:** write in execution order; no lambdas or
-   anonymous callbacks; one recognizable operation per expression; calculate,
-   then return; break chains that hide types, state or allocation.
-3. **Repeated kernels:** choose mode and implementation before the loop;
-   handle empty inputs and edges apart from the interior; validate whole
-   buffers up front; no per-element allocation, logging, locking or
-   callbacks; numerical shortcuts only within stated error bounds.
-4. **Procedures and data:** state inputs, outputs and permitted mutation;
-   fill caller-supplied storage for bulk work; name intermediate forms; state
-   overlap rules.
-5. **Memory use:** every datum has an owner and a lifetime; allocate before
+1. **Memory use:** every datum has an owner and a lifetime; allocate before
    repeated processing and reuse; transfer ownership explicitly; raw
    addresses only at boundaries; name storage operations (fill, reserve,
    reset, clear, release) precisely; check size arithmetic; keep borrows
@@ -39,31 +24,46 @@ eleven:
    its rvalue overload; declare a borrower after what it borrows); memory
    errors and undefined behaviour are defects in tests too, checked by
    sanitizer runs of the whole suite.
-6. **Objects and authority:** parents own children and back links only
-   observe; cross authority boundaries through named capabilities; define
-   the fallback when an owner disappears (reject stale identities, stop
-   revoked callbacks).
-7. **Admitted abstractions:** standard algorithms with named predicates;
-   templates for declared choices; virtual dispatch and type erasure only
-   where runtime variation is required; no universal callable frameworks or
-   speculative portability layers.
-8. **Callbacks and execution:** named targets with explicit context; specify
-   event order, reentrancy and revocation; name asynchronous work,
-   completion, cancellation and shutdown; one execution context per piece of
-   mutable state.
-9. **Failure and foreign interfaces:** say what a failure leaves behind;
+2. **Failure and foreign interfaces:** say what a failure leaves behind;
    validate before mutating; explicit results for expected alternatives and
    exceptions only at subsystem boundaries; switches and state machines keep
    a default that reaches one fallback; foreign interfaces state types,
    counts, ownership and errors, and take entry-point types from their
    declarations, never retyped by hand.
-10. **C++ spelling:** no `auto`, trailing returns or structured bindings;
-    `(*pointer).member` instead of `->`; no lambdas; hand-written comparisons
-    (no `= default`); no coroutines or ranges pipelines.
-11. **Source layout and comments:** meaningful source boundaries with the
+3. **Types and values:** spell types; separate confusable quantities (byte
+   offsets and character positions, identities and indices) with wrapper
+   types; one numeric precision per computation; named record fields, enums
+   and explicit initialization; state array shape and capacity versus live
+   length.
+4. **Objects and authority:** parents own children and back links only
+   observe; cross authority boundaries through named capabilities; define
+   the fallback when an owner disappears (reject stale identities, stop
+   revoked callbacks).
+5. **Callbacks and execution:** named targets with explicit context; specify
+   event order, reentrancy and revocation; name asynchronous work,
+   completion, cancellation and shutdown; one execution context per piece of
+   mutable state.
+6. **Procedures and data:** state inputs, outputs and permitted mutation;
+   fill caller-supplied storage for bulk work; name intermediate forms; state
+   overlap rules.
+7. **Admitted abstractions:** standard algorithms with named predicates;
+   templates for declared choices; virtual dispatch and type erasure only
+   where runtime variation is required; no universal callable frameworks or
+   speculative portability layers.
+8. **Repeated kernels:** choose mode and implementation before the loop;
+   handle empty inputs and edges apart from the interior; validate whole
+   buffers up front; no per-element allocation, logging, locking or
+   callbacks; numerical shortcuts only within stated error bounds.
+9. **Statements and expressions:** write in execution order; no lambdas or
+   anonymous callbacks; one recognizable operation per expression; calculate,
+   then return; break chains that hide types, state or allocation.
+10. **Source layout and comments:** meaningful source boundaries with the
     main sequence easy to find; no accessors or wrappers that add no
     invariant; explain non-obvious dimensions, lifetimes and surprising
     operations; remove stale comments.
+11. **C++ spelling:** no `auto`, trailing returns or structured bindings;
+    `(*pointer).member` instead of `->`; no lambdas; hand-written comparisons
+    (no `= default`); no coroutines or ranges pipelines.
 
 Match the surrounding code's naming and comment density.
 

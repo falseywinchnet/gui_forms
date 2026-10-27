@@ -104,7 +104,7 @@ struct XmlElement final {
 
     // The attribute with this name, or null. The pointer borrows from this
     // element and is invalidated by any change to attributes. A temporary
-    // element is refused (house style section 5): its attributes end with
+    // element is refused (house style section 1): its attributes end with
     // the statement.
     [[nodiscard]] const XmlAttribute* find_attribute(std::string_view attribute_name) const& noexcept;
     const XmlAttribute* find_attribute(std::string_view attribute_name) const&& = delete;

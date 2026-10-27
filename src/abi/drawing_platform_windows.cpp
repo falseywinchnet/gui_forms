@@ -47,7 +47,7 @@ std::uint8_t composite_channel(std::uint8_t foreground,
 struct CompatibilityUser32 final {
     // The compatibility shim exports user32's own names and signatures, so
     // the entry-point types come from user32's declarations (house style
-    // section 9).
+    // section 2).
     using GetDc = decltype(&::GetDC);
     using ReleaseDc = decltype(&::ReleaseDC);
     using GetClientBounds = decltype(&::GetClientRect);

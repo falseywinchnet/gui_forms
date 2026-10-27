@@ -1,5 +1,5 @@
 name: State-machine gate
-# House style section 9 for new code (owner, 2026-10-23): fails on any F1
+# House style section 2 for new code (owner, 2026-10-23): fails on any F1
 # (switch without a default, not in the compliant form) or F2 (a default
 # that hides enumerators without a stated reason) in the translation units a
 # change can affect. template_harness's harness/check_state_machines.py

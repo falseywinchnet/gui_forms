@@ -32,7 +32,7 @@ namespace gui_forms {
 // device desktop units, as they always were; HostWindowing::query_monitors
 // returns the same monitors in logical units.
 //
-// The two spaces are different types (house style section 1, owner decision
+// The two spaces are different types (house style section 3, owner decision
 // V3-1), so a device point cannot be passed where a logical one is meant.
 // Neither converts implicitly from or to Point; the functions below are the
 // conversions, and `Point{p.x, p.y}` spells a deliberate change of view

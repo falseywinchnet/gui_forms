@@ -226,7 +226,7 @@ void validate_command(const RibbonCommandSpec& command, std::unordered_set<std::
 
 } // namespace
 
-// Validates the whole definition before anything changes (house style §9)
+// Validates the whole definition before anything changes (house style §2)
 // and prepares what set_tabs commits: each tab's set and every group's
 // layouts, authored (validated) or generated. Throws std::invalid_argument.
 Ribbon::PreparedTabs Ribbon::prepare_tabs(const std::vector<RibbonTabSpec>& tabs,

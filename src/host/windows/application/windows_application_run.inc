@@ -60,7 +60,7 @@ std::vector<HostMonitor> device_monitors() {
     return monitors;
 }
 
-// dwmapi.dll's entry point, typed from its declaration (house style section 9).
+// dwmapi.dll's entry point, typed from its declaration (house style section 2).
 using DwmGetWindowAttributeFunction = decltype(&::DwmGetWindowAttribute);
 
 // The visible window bounds without the invisible resize borders Windows 10

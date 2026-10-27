@@ -125,7 +125,7 @@ jobs:
           name: ${{ steps.record.outputs.artifact }}
           path: .ci/tree-receipt/receipt.json
           retention-days: 30
-  # House style section 5: memory errors and undefined behaviour are defects,
+  # House style section 1: memory errors and undefined behaviour are defects,
   # tests included. The suite (on a pull request, the tests its changes can
   # affect) runs under AddressSanitizer, UndefinedBehaviorSanitizer and
   # LeakSanitizer; any report stops its test and fails the job. Make it a

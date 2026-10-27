@@ -981,7 +981,7 @@ Types
 
    ``#include <gui_forms/engine/types/engine_types.hpp>``
 
-   Device pixels per logical unit. Kept apart from plain doubles so that a logical length is never passed where a scale is meant (house style §1).
+   Device pixels per logical unit. Kept apart from plain doubles so that a logical length is never passed where a scale is meant (house style §3).
 
    .. cpp:member:: double value
 

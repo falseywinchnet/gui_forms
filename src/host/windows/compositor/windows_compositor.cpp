@@ -10,7 +10,7 @@ namespace gui_forms::host::detail {
 namespace {
 
 // dwmapi.dll's entry points, typed from their declarations (house style
-// section 9) and loaded once. A missing library or entry point leaves its
+// section 2) and loaded once. A missing library or entry point leaves its
 // pointer null.
 using DwmIsCompositionEnabledFunction = decltype(&::DwmIsCompositionEnabled);
 using DwmEnableBlurBehindWindowFunction = decltype(&::DwmEnableBlurBehindWindow);

@@ -89,7 +89,7 @@ struct ThemeNumber final {
 };
 
 // Caller-owned storage the tokenizer fills; reused from sheet to sheet
-// (house style §4, §5). `tokens` in order cover the sheet's bytes; numbers
+// (house style §1, §6). `tokens` in order cover the sheet's bytes; numbers
 // are in the order of their tokens. A sheet of n bytes has at most n tokens,
 // so the tokenizer reserves that capacity before its loop and never grows
 // the storage while it runs.
