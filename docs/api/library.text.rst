@@ -44,6 +44,8 @@ Types
      - FontFallbackRequest supplies the primary and attempted faces, missing scalar cluster, language, and script without ownership transfer.
    * - :cpp:class:`FontFallbackResolver <gui_forms::FontFallbackResolver>`
      - FontFallbackResolver is the policy boundary that selects bounded coverage for a missing scalar cluster without consulting the host implicitly.
+   * - :cpp:class:`FontVerticalMetrics <gui_forms::FontVerticalMetrics>`
+     - A face's vertical design metrics at a size, in logical pixels: its ascender, descender (positive below the baseline) and line gap from the face's tables, scaled by size over units per em and not rounded.
    * - :cpp:class:`GlyphId <gui_forms::GlyphId>`
      - GlyphId is the ordered font-local glyph identity.
    * - :cpp:class:`GlyphPlacement <gui_forms::GlyphPlacement>`
@@ -54,6 +56,8 @@ Types
      -  
    * - :cpp:class:`LayoutAuthority <gui_forms::LayoutAuthority>`
      -  
+   * - :cpp:class:`LineBoxMetrics <gui_forms::LineBoxMetrics>`
+     - One line box of CSS text in a primary face (CSS 2.1 section 10.8 with ``line-height: normal`` as browsers compute it): its height, its baseline from its top, and the face's x-height.
    * - :cpp:class:`OpenTypeTag <gui_forms::OpenTypeTag>`
      - OpenTypeTag stores one big-endian four-byte script or feature tag.
    * - :cpp:class:`PreparedFontSource <gui_forms::PreparedFontSource>`
@@ -417,6 +421,24 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: FontVerticalMetrics final
+
+   ``#include <gui_forms/typography/types/typography_types.hpp>``
+
+   A face's vertical design metrics at a size, in logical pixels: its ascender, descender (positive below the baseline) and line gap from the face's tables, scaled by size over units per em and not rounded. CSS's ``line-height: normal`` rounds each to a whole pixel and sums them, where ResolvedTextLayout's ascent and descent are already rounded outward.
+
+   .. cpp:member:: double ascent
+
+   .. cpp:member:: double descent
+
+   .. cpp:member:: double line_gap
+
+   .. cpp:member:: double x_height
+
+      The height of a lowercase x (OS/2 sxHeight), or zero when the face does not record one.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: GlyphId final
 
    ``#include <gui_forms/text_shaping/types/text_shaping_types.hpp>``
@@ -508,6 +530,20 @@ Types
       Process-wide nonreused session identity, with checked exhaustion.
 
    .. cpp:member:: std::uint64_t epoch
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: LineBoxMetrics final
+
+   ``#include <gui_forms/typography/types/typography_types.hpp>``
+
+   One line box of CSS text in a primary face (CSS 2.1 section 10.8 with ``line-height: normal`` as browsers compute it): its height, its baseline from its top, and the face's x-height.
+
+   .. cpp:member:: double height
+
+   .. cpp:member:: double baseline
+
+   .. cpp:member:: double x_height
 
 .. cpp:namespace:: gui_forms
 
@@ -922,6 +958,10 @@ Types
    .. cpp:member:: double line_gap
 
       The preferred primary face's line gap at this size: what its line height, rounded to whole pixels, adds to its rounded ascent and descent, never negative. A line box is the larger of the logical height and ascent + descent + line_gap, for TextBox and prepared text alike.
+
+   .. cpp:member:: std::optional<FontVerticalMetrics> design_metrics
+
+      The preferred primary face's design metrics at this size, when the terminal engine reads them; an estimate has none.
 
    .. cpp:member:: std::string primary_family
 
@@ -1416,6 +1456,10 @@ Types
 
    .. cpp:function:: virtual ResolvedTextLayout resolve_text_layout_utf8(std::string_view utf8, FontSpec effective_font) = 0
 
+   .. cpp:function:: virtual TextResolutionStatus fill_line_break_opportunities_utf8(std::string_view utf8, std::span<LineBreakOpportunity> opportunities)
+
+      Fills ``opportunities``, whose size must equal utf8.size(), with the line-break opportunity after each byte. Line breaking depends on the text only, not on a font. Returns invalid_request, with ``opportunities`` unchanged, for invalid UTF-8 or a size mismatch. The default is estimate_line_break_opportunities_utf8; the bundled text engine answers UAX #14's opportunities and returns exact.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: template <typename Position> TextRange final
@@ -1777,6 +1821,20 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: LineBreakOpportunity
+
+   ``#include <gui_forms/typography/types/typography_types.hpp>``
+
+   .. cpp:enumerator:: prohibited
+
+   .. cpp:enumerator:: allowed
+
+   .. cpp:enumerator:: mandatory
+
+   .. cpp:enumerator:: inside_character
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PreparedRasterProfile
 
    ``#include <gui_forms/prepared_text/types/prepared_text_types.hpp>``
@@ -2112,9 +2170,17 @@ Functions, constants and aliases
 
 .. cpp:function:: const char* text_resolution_status_name(TextResolutionStatus status) noexcept
 
+.. cpp:function:: TextResolutionStatus estimate_line_break_opportunities_utf8(std::string_view utf8, std::span<LineBreakOpportunity> opportunities) noexcept
+
+   Deterministic renderer-free line breaking: a line may end after a run of spaces or tabs and must end after a line feed, or a carriage return not followed by one. Returns estimated, or invalid_request with ``opportunities`` unchanged as TextMetricsProvider's query does.
+
 .. cpp:function:: ResolvedTextLayout estimate_text_layout_utf8(std::string_view utf8, FontSpec effective_font) noexcept
 
    Deterministic renderer-free fallback. It is explicitly labelled estimated; callers must not report it as a resolved bundled face or a raster metric.
+
+.. cpp:function:: LineBoxMetrics line_box_metrics(const ResolvedTextLayout& primary, std::optional<double> used_line_height) noexcept
+
+   The line box of ``primary`` (a resolution of any text in the used font). The face's ascent, descent and line gap are each rounded to a whole logical pixel; ``normal`` (no used_line_height) is their sum. The leading (the gap, or a used line height's excess over the rounded ascent and descent, negative when it is less) goes half above the text, rounded down, and the rest below: Chromium's rounding, measured against Chrome 155 from 12 to 21 px (planning/stages/L-layout/PLAN.md section 12.5). Without design metrics (an estimate) it uses the resolution's ascent, descent and line gap.
 
 .. cpp:function:: double snap_text_baseline(double logical_baseline, double device_scale) noexcept
 

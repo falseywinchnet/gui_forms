@@ -35,7 +35,7 @@ constexpr Color line = Color::rgba(119, 140, 171);
 constexpr Color graphite = Color::rgba(75, 84, 89);
 
 struct ProductRefs final {
-    std::shared_ptr<TableLayoutPanel> shell;
+    std::shared_ptr<TableLayoutPanelCompat> shell;
     Control::Ptr title_band;
     Control::Ptr ribbon_band;
     Control::Ptr navigation_band;
@@ -550,7 +550,7 @@ std::shared_ptr<CriteriaSurfacePanel> make_criteria_surface(ProductRefs& refs) {
     }
     (*rack).set_modules(std::move(modules));
 
-    std::shared_ptr<gui_forms::TableLayoutPanel> actions = make_control<TableLayoutPanel>(
+    std::shared_ptr<gui_forms::TableLayoutPanelCompat> actions = make_control<TableLayoutPanelCompat>(
         StableId("fm.criteria.actions"));
     (*actions).set_accessible_name("Predicate rack actions");
     (*actions).set_column_count(2);
@@ -636,7 +636,7 @@ std::shared_ptr<CriteriaSurfacePanel> make_criteria_surface(ProductRefs& refs) {
     return surface;
 }
 
-std::shared_ptr<FlowLayoutPanel> make_palette_surface(ProductRefs& refs) {
+std::shared_ptr<FlowLayoutPanelCompat> make_palette_surface(ProductRefs& refs) {
     struct PaletteSpec final {
         const char* id;
         const char* name;
@@ -658,7 +658,7 @@ std::shared_ptr<FlowLayoutPanel> make_palette_surface(ProductRefs& refs) {
         {"iris", "Iris", Color::rgba(55, 55, 135), Color::rgba(121, 102, 215), Color::rgba(201, 188, 255)},
         {"phosphor", "Phosphor", Color::rgba(25, 64, 48), Color::rgba(64, 166, 102), Color::rgba(191, 244, 115)},
     };
-    std::shared_ptr<gui_forms::FlowLayoutPanel> surface = std::make_shared<FlowLayoutPanel>(
+    std::shared_ptr<gui_forms::FlowLayoutPanelCompat> surface = std::make_shared<FlowLayoutPanelCompat>(
         StableId("fm.review.palettes"));
     (*surface).set_padding({14.0, 14.0, 14.0, 14.0});
     (*surface).set_wrap_contents(true);
@@ -762,7 +762,7 @@ std::shared_ptr<MasterDetailView> make_dna_surface(ProductRefs& refs) {
     view_layout.splitter_hit_width = 9.0;
     (*view).set_master_detail_layout(view_layout);
 
-    std::shared_ptr<gui_forms::FlowLayoutPanel> master = std::make_shared<FlowLayoutPanel>(
+    std::shared_ptr<gui_forms::FlowLayoutPanelCompat> master = std::make_shared<FlowLayoutPanelCompat>(
         StableId("fm.review.dna.master"));
     (*master).set_flow_direction(FlowDirection::top_down);
     (*master).set_wrap_contents(false);
@@ -783,7 +783,7 @@ std::shared_ptr<MasterDetailView> make_dna_surface(ProductRefs& refs) {
         refs.dna_decisions.push_back(card);
     }
 
-    std::shared_ptr<gui_forms::TableLayoutPanel> detail = std::make_shared<TableLayoutPanel>(
+    std::shared_ptr<gui_forms::TableLayoutPanelCompat> detail = std::make_shared<TableLayoutPanelCompat>(
         StableId("fm.review.dna.detail"));
     (*detail).set_column_count(1U);
     (*detail).set_row_count(4U);
@@ -991,7 +991,7 @@ std::shared_ptr<SplitContainer> make_workspace(ProductRefs& refs) {
     std::shared_ptr<Panel> search = make_search_surface(refs);
     (*search).set_dock(DockStyle::fill);
     (*surface_host).add_child(search);
-    std::shared_ptr<FlowLayoutPanel> palettes = make_palette_surface(refs);
+    std::shared_ptr<FlowLayoutPanelCompat> palettes = make_palette_surface(refs);
     (*palettes).set_dock(DockStyle::fill);
     (*surface_host).add_child(palettes);
     std::shared_ptr<MasterDetailView> dna = make_dna_surface(refs);
@@ -2691,7 +2691,7 @@ public:
           selection_split_(refs.selection_split) {}
 
     void operator()(Rect bounds) const {
-        const std::shared_ptr<TableLayoutPanel> layout = shell_.lock();
+        const std::shared_ptr<TableLayoutPanelCompat> layout = shell_.lock();
         if (!layout) return;
         const double text_scale = (*layout).effective_text_scale();
         const bool show_title = bounds.height >= 240.0 * text_scale;
@@ -2730,7 +2730,7 @@ private:
         (*band).set_visible(visible);
     }
 
-    std::weak_ptr<TableLayoutPanel> shell_;
+    std::weak_ptr<TableLayoutPanelCompat> shell_;
     std::weak_ptr<Control> title_;
     std::weak_ptr<Control> ribbon_;
     std::weak_ptr<Control> navigation_;
@@ -2741,10 +2741,10 @@ private:
 
 struct PresentationAccommodation final {
     ProductAccommodation accommodation;
-    std::weak_ptr<TableLayoutPanel> shell;
+    std::weak_ptr<TableLayoutPanelCompat> shell;
 
     void operator()(const PresentationSettings&) const {
-        const std::shared_ptr<TableLayoutPanel> layout = shell.lock();
+        const std::shared_ptr<TableLayoutPanelCompat> layout = shell.lock();
         if (layout) accommodation((*layout).committed_arranged_bounds());
     }
 };
@@ -3761,7 +3761,7 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
 std::unique_ptr<gui_forms::Window> make_product_window() {
     using namespace gui_forms;
     ProductRefs refs;
-    std::shared_ptr<gui_forms::TableLayoutPanel> root = std::make_shared<TableLayoutPanel>(StableId("fm.window.primary"));
+    std::shared_ptr<gui_forms::TableLayoutPanelCompat> root = std::make_shared<TableLayoutPanelCompat>(StableId("fm.window.primary"));
     refs.shell = root;
     (*root).set_column_count(1);
     (*root).set_row_count(6);

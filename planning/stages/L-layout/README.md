@@ -1,8 +1,11 @@
 # Stage L: real dynamic layout (flex, grid, flow)
 
 Release: 0.4 Flexible. Depends on: T1. Unblocks FD, D and H. Status
-2026-10-25: plan accepted ([`PLAN.md`](PLAN.md)); interview round 001
-answered (below); L0 next. T1's gate is recorded
+2026-10-26: phases L0 to L7 built; the box gate is recorded
+(`results/2026-10-26-l-layout-gate`), with the text-scale dimension not yet
+exercised. L8a (the `TextBlock` leaf, the baseline contract and the strut
+from the font) built; L8b, the text corpus, next. Plan accepted
+2026-10-25 ([`PLAN.md`](PLAN.md)); interview round 001 answered (below). T1's gate is recorded
 (`results/2026-10-13-t1-anatomy-gate`). Authority: `planning/FORWARD_PROGRAMME.md` §4 L.
 
 Read [the shared brief](../README.md) first.
@@ -142,6 +145,123 @@ recommendation; questions 6 and 10 do not.
 its hash is verified before use. Each is unpacked into its own new, empty
 directory outside the repository, and its paths are passed as arguments.
 Nothing else is downloaded.
+
+## Decisions in force
+
+**Container names** (owner, 2026-10-26):
+- The Windows Forms-exact containers become `FlowLayoutPanelCompat` and
+  `TableLayoutPanelCompat`, and keep their own algorithms (below).
+- The CSS containers are named after their CSS models, as panels:
+  `FlexLayoutPanel` becomes `FlexPanel`, `GridLayoutPanel` becomes
+  `GridPanel`, and `BlockFlowPanel` becomes `BlockPanel`. The owner's
+  reason: "if they're going to be used as panels, i suggest panels so that
+  they're not confused with the property". (These supersede the shorter
+  `Flex`, `Grid` and `Block` first proposed.)
+- The plain names `FlowLayoutPanel` and `TableLayoutPanel` go away.
+- When a Windows Forms design or form document names `FlowLayoutPanel` or
+  `TableLayoutPanel`, the importer maps it to the `Compat` container, so
+  old layouts render the same.
+- The purpose, in the owner's words: "the point would be to discourage the
+  use in general by adding Compat". So:
+  - the `Compat` containers' docs open by saying they exist for Windows
+    Forms migration, and point to `FlexPanel` and `GridPanel` for new work;
+  - the Gallery shows them in a clearly labelled compatibility group, not
+    beside `FlexPanel` and `GridPanel`;
+  - form documents and the interface builder offer `FlexPanel` and
+    `GridPanel` first.
+- The importer's table is the registry's `windows_forms_name` field
+  (`manifests/controls.json`, checked by `tools/control_registry.py`;
+  coordinator, 2026-10-26): `FlowLayoutPanel` and `TableLayoutPanel` map to
+  the `Compat` records. The C# facade keeps the Windows Forms names.
+- The solvers' helper types keep their algorithm names (`FlexItemLayout`,
+  `GridItemLayout`, `BlockFlowItemLayout`, `block_flow_solver`), and the
+  historical records under `results/` and `planning/` keep the old
+  container names: they are history, not stale names to fix.
+
+**The Windows Forms containers are not rebased on the solvers**
+(coordinator, 2026-10-25, applying L-Q2's condition "wherever their
+existing tests pass unchanged"). Neither container can be rebased without
+changing what its tests pin. Both keep their own algorithm, gain a reused
+workspace in place of their per-pass and per-line vectors, and adopt
+`LayoutDirection` (phase L6).
+
+`FlowLayoutPanel` differs from CSS flex in four behaviours:
+1. A forced break (`set_flow_break`) ends a line even with `wrap_contents`
+   off. Pinned by `test_flow_direction_break_visibility_and_resize`.
+2. A single line takes the panel's whole cross extent, while several lines
+   pack at the start at their content's extent. Pinned by
+   `test_flow_alignment_projects_relational_flex_geometry` and L0's
+   recorded corpus differences.
+3. Items grow (`set_flex_grow`) only when arranged; a measure reports the
+   content without growth. Pinned by
+   `test_flow_alignment_projects_relational_flex_geometry` and
+   `test_flow_auto_size_mode_preserves_authored_extent`.
+4. With `wrap_contents` off, main-axis alignment still applies within the
+   panel's width. Pinned by
+   `test_flow_alignment_projects_relational_flex_geometry`.
+
+Matching them would need four Windows-Forms-only modes inside the CSS flex
+solver.
+
+`TableLayoutPanel` has two gaps:
+1. Its `Percent` styles are weights over the space left after the
+   `Absolute` and `AutoSize` tracks, not percentages of the panel. An `fr`
+   track would only approximate them.
+2. Its distribution of a spanning item's size over `AutoSize` tracks is
+   not CSS Grid's intrinsic sizing (section 11.5).
+
+Both gaps are pinned by `test_table_mixed_tracks_spans_and_lookup` and
+`test_table_growth_hidden_children_and_fixed_overflow` (all in
+`tests/layout_panel_tests.cpp`).
+
+**Right-to-left layout is full mirroring** (owner, 2026-10-26, option 1),
+as Windows Forms' `RightToLeftLayout`. In a parent whose effective
+`LayoutDirection` is right to left:
+- a child's requested x is measured from the right edge;
+- `Dock` left docks right, and `Anchor` left anchors right;
+- `FlowLayoutPanelCompat` and `TableLayoutPanelCompat` start at the right;
+- the CSS containers keep their own start and end model.
+
+The layout is computed left to right and mirrored once, at output, about
+the parent's child viewport, so padding and margins mirror with it. Left
+to right changes nothing.
+
+**The gate's scope and the text fixtures** (owner, 2026-10-26, option 1):
+- L7's gate runs on the box fixtures. The fixtures whose boxes depend on
+  direction also run right to left, on both sides.
+- The text-scale dimension is recorded as "not yet exercised", never as
+  met or passed.
+- L8 adds the text fixtures with a new CSS-style text leaf: no inset,
+  CSS's `line-height: normal`, flowing inside `FlexPanel`, `GridPanel`
+  and `BlockPanel`. L8 also adds:
+  - the bundled engine in the corpus harness;
+  - first-baseline capture;
+  - the text-scale profiles.
+
+  It must meet L-Q9's tolerances: 0.51 px per edge and 1.0 px on the
+  baseline.
+- The leaf is named `TextBlock`, by the panels' rule of a name that
+  cannot be confused with a CSS property. The owner confirmed the name on
+  2026-10-26 ("textblock seems fine"). It is registered like any control:
+  the registry, schema, docs and the CSS layout panels Gallery page.
+- `Label` stays as it is.
+
+**Wrapping and the strut** (coordinator and owner, 2026-10-26):
+- The leaf wraps at the text engine's existing UAX #14 breaker, the
+  pinned libunibreak 8.0. No second breaker is written.
+- It reaches the breaker through `TextMetricsProvider`: a non-pure
+  virtual, `fill_line_break_opportunities_utf8`, whose default breaks at
+  white space and reports `estimated`. `HarfBuzzFontEngine` answers it
+  with libunibreak and reports `exact`.
+- libunibreak's admission widens from the text-mask profile to the text
+  engine (owner: "libunibreak is fine, can admit it"). It is fetched
+  wherever the HarfBuzz/FreeType sources are, and its conformance test
+  runs in the default text build
+  (`third_party/LIBUNIBREAK_INTAKE_2026-10-01.md`).
+- A `BlockPanel` with no strut set takes it from its font, scaled with
+  the text scale (option (a)).
+
+`PLAN.md` section 12 is L8's plan.
 
 ## Read first
 

@@ -1,0 +1,826 @@
+// GridPanel (stage L, phase L4): the core grid solver over child
+// controls. One layout gathers the visible children once into a reused
+// list, copies each child's placement record for the pass, and runs the
+// solver's four calls with the measurements between them: the items' width
+// contributions before the columns are sized, and their heights at their
+// column widths before the rows are. Measurements go through
+// measure_for_layout, so a child whose constraint is unchanged answers
+// from its cache, and an item stretched over fixed columns is asked only
+// its height.
+
+#include "gui_forms/controls/scrollable_control/container_control/grid_panel/grid_panel.hpp"
+
+#include "../../scrollable_anatomy.hpp"
+#include "../out_of_flow.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
+#include <unordered_set>
+#include <utility>
+
+namespace gui_forms {
+
+namespace {
+
+constexpr double unbounded = std::numeric_limits<double>::infinity();
+
+// A definite extent for a measure query, within what a constraint admits.
+AvailableExtent query_extent(double extent) noexcept {
+    const double bounded = std::clamp(extent, 0.0, practical_unbounded_extent);
+    return definite_extent(LogicalLength{bounded});
+}
+
+double resolve_gap(const LengthPercentage& gap, const GridAvailableExtent& basis) noexcept {
+    const double percentage = basis.kind == GridSizingKind::definite ? basis.extent * gap.percent / 100.0 : 0.0;
+    return gap.length.value() + percentage;
+}
+
+// A size property as a length with no percentage: what a contribution can
+// use before the item's grid area is known (a percentage of the area is
+// `auto` until then).
+bool plain_length(const SizeValue& value) noexcept {
+    return value.kind == SizeKind::length_percentage && value.value.percent == 0.0;
+}
+
+double plain_length_value(const SizeValue& value) noexcept {
+    return std::max(0.0, value.value.length.value());
+}
+
+// A control's own maximum: zero means none.
+double maximum_or_unbounded(double maximum) noexcept {
+    return maximum > 0.0 ? maximum : unbounded;
+}
+
+bool admitted_length(const LengthPercentage& value) noexcept {
+    const double length = value.length.value();
+    return std::isfinite(length) && std::isfinite(value.percent) && length >= 0.0 && value.percent >= 0.0;
+}
+
+bool admitted_content_alignment(LayoutAlignment alignment) noexcept {
+    return alignment != LayoutAlignment::automatic && alignment != LayoutAlignment::baseline &&
+           alignment <= LayoutAlignment::space_evenly;
+}
+
+bool admitted_items_alignment(LayoutAlignment alignment) noexcept {
+    switch (alignment) {
+    case LayoutAlignment::normal:
+    case LayoutAlignment::stretch:
+    case LayoutAlignment::start:
+    case LayoutAlignment::end:
+    case LayoutAlignment::flex_start:
+    case LayoutAlignment::flex_end:
+    case LayoutAlignment::center:
+    case LayoutAlignment::baseline:
+        return true;
+    case LayoutAlignment::automatic:
+    case LayoutAlignment::space_between:
+    case LayoutAlignment::space_around:
+    case LayoutAlignment::space_evenly:
+        return false;
+    }
+    return false;
+}
+
+bool admitted_self_alignment(LayoutAlignment alignment) noexcept {
+    return alignment == LayoutAlignment::automatic || admitted_items_alignment(alignment);
+}
+
+bool admitted_breadth(const TrackBreadth& breadth, bool maximum) noexcept {
+    switch (breadth.kind) {
+    case TrackBreadthKind::length_percentage:
+        return admitted_length(breadth.length);
+    case TrackBreadthKind::fraction: {
+        // `fr` is a maximum only (a lone `<n>fr` is minmax(auto, <n>fr)).
+        const double fraction = breadth.fraction.value();
+        return maximum && std::isfinite(fraction) && fraction >= 0.0;
+    }
+    case TrackBreadthKind::min_content:
+    case TrackBreadthKind::max_content:
+    case TrackBreadthKind::automatic:
+        return true;
+    }
+    return false;
+}
+
+bool admitted_track_size(const GridTrackSize& size) noexcept {
+    if (size.fit_content) return admitted_length(size.fit_content_limit);
+    return admitted_breadth(size.minimum, false) && admitted_breadth(size.maximum, true);
+}
+
+// CSS Grid's <fixed-size>: a fixed breadth at one end at least.
+bool fixed_track_size(const GridTrackSize& size) noexcept {
+    if (size.fit_content) return false;
+    return size.minimum.kind == TrackBreadthKind::length_percentage ||
+           size.maximum.kind == TrackBreadthKind::length_percentage;
+}
+
+bool admitted_track_sizes(std::span<const GridTrackSize> sizes) noexcept {
+    return std::all_of(sizes.begin(), sizes.end(), admitted_track_size);
+}
+
+bool admitted_track_list(const GridTrackList& list) noexcept {
+    const std::size_t counted = list.tracks.size() + list.auto_repeat_tracks.size();
+    if (counted > maximum_grid_tracks) return false;
+    if (!admitted_track_sizes(list.tracks) || !admitted_track_sizes(list.auto_repeat_tracks)) return false;
+    if (list.auto_repeat == AutoRepeatKind::none) {
+        return list.auto_repeat_tracks.empty() && list.auto_repeat_index == 0U;
+    }
+    if (list.auto_repeat > AutoRepeatKind::auto_fit || list.auto_repeat_tracks.empty()) return false;
+    if (list.auto_repeat_index > list.tracks.size()) return false;
+    // CSS's <auto-track-list>: with an automatic repeat, every track is
+    // fixed.
+    const bool repeated_fixed =
+        std::all_of(list.auto_repeat_tracks.begin(), list.auto_repeat_tracks.end(), fixed_track_size);
+    const bool others_fixed = std::all_of(list.tracks.begin(), list.tracks.end(), fixed_track_size);
+    return repeated_fixed && others_fixed;
+}
+
+bool admitted_template_areas(const GridTemplateAreas& areas) {
+    if (areas.rows == 0U || areas.columns == 0U) {
+        return areas.rows == 0U && areas.columns == 0U && areas.areas.empty();
+    }
+    if (areas.rows > maximum_grid_tracks || areas.columns > maximum_grid_tracks) return false;
+    std::unordered_set<std::string> names{};
+    names.reserve(areas.areas.size());
+    for (const GridNamedArea& area : areas.areas) {
+        if (area.name.empty() || !names.insert(area.name).second) return false;
+        if (area.row_start >= area.row_end || area.row_end > areas.rows) return false;
+        if (area.column_start >= area.column_end || area.column_end > areas.columns) return false;
+    }
+    return true;
+}
+
+// One line reference: a line number other than zero within the track
+// limit, a span of at least one within it, or an area's name.
+bool admitted_line(const GridLine& line) noexcept {
+    const std::int64_t limit = static_cast<std::int64_t>(maximum_grid_tracks);
+    const std::int64_t number = line.number;
+    switch (line.kind) {
+    case GridLineKind::automatic:
+        return true;
+    case GridLineKind::line:
+        return number != 0 && number >= -limit && number <= limit;
+    case GridLineKind::span:
+        return number >= 1 && number <= limit;
+    case GridLineKind::area:
+        return !line.area.empty();
+    }
+    return false;
+}
+
+// Width and height: auto or a length-percentage; a minimum also `auto`; a
+// maximum `none` instead. The solver reads no content keywords.
+bool admitted_size(const SizeValue& value, bool maximum) noexcept {
+    if (value.kind == SizeKind::length_percentage) return admitted_length(value.value);
+    if (value.kind == SizeKind::none) return maximum;
+    if (value.kind == SizeKind::automatic) return !maximum;
+    return false;
+}
+
+bool admitted_item_layout(const GridItemLayout& layout) noexcept {
+    const GridItemStyle& placement = layout.placement;
+    if (!admitted_line(placement.column_start) || !admitted_line(placement.column_end) ||
+        !admitted_line(placement.row_start) || !admitted_line(placement.row_end)) {
+        return false;
+    }
+    if (!admitted_self_alignment(layout.justify_self) || !admitted_self_alignment(layout.align_self)) return false;
+    return admitted_size(layout.width, false) && admitted_size(layout.height, false) &&
+           admitted_size(layout.min_width, false) && admitted_size(layout.min_height, false) &&
+           admitted_size(layout.max_width, true) && admitted_size(layout.max_height, true) &&
+           out_of_flow::admitted_positioning(layout.positioning);
+}
+
+// Whether every track of `range` has a fixed size at both ends against the
+// sizing extent: then the item's contributions do not change its column.
+bool fixed_tracks(std::span<const GridTrack> tracks, std::uint32_t first, std::uint32_t end, bool definite) noexcept {
+    for (std::uint32_t index = first; index < end; ++index) {
+        const GridTrackSize& size = tracks[index].sizing;
+        if (size.fit_content || size.minimum.kind != TrackBreadthKind::length_percentage ||
+            size.maximum.kind != TrackBreadthKind::length_percentage) {
+            return false;
+        }
+        if (!definite && (size.minimum.length.percent != 0.0 || size.maximum.length.percent != 0.0)) return false;
+    }
+    return true;
+}
+
+// Whether the item fills its area's width whatever its content (CSS Box
+// Alignment's stretch of an auto-sized item without auto margins).
+bool stretched_width(const GridItemLayout& layout, LayoutAlignment justify_items) noexcept {
+    if (layout.width.kind != SizeKind::automatic) return false;
+    if (layout.auto_margin.left || layout.auto_margin.right) return false;
+    const LayoutAlignment used = layout.justify_self == LayoutAlignment::automatic ? justify_items : layout.justify_self;
+    return used == LayoutAlignment::normal || used == LayoutAlignment::stretch;
+}
+
+// The item's own size bounds on one axis, as lengths: its min and max
+// properties where they are plain lengths, and its control's limits.
+struct ContentBounds final {
+    double minimum{};
+    double maximum{unbounded};
+};
+
+ContentBounds content_bounds(const SizeValue& minimum, const SizeValue& maximum, double control_minimum,
+                             double control_maximum) noexcept {
+    ContentBounds bounds{};
+    bounds.minimum = std::max(plain_length(minimum) ? plain_length_value(minimum) : 0.0, control_minimum);
+    bounds.maximum = std::min(plain_length(maximum) ? plain_length_value(maximum) : unbounded,
+                              maximum_or_unbounded(control_maximum));
+    return bounds;
+}
+
+double clamp_content(double size, const ContentBounds& bounds) noexcept {
+    const double limited = std::min(size, bounds.maximum);
+    return std::max(bounds.minimum, limited);
+}
+
+// The used min and max as the solver reads them: the item's own, with its
+// control's limits applied where its own is a plain length or `none`.
+SizeValue used_minimum(const SizeValue& minimum, double control_minimum) noexcept {
+    if (!plain_length(minimum) || control_minimum <= plain_length_value(minimum)) return minimum;
+    const SizeValue raised{SizeKind::length_percentage, LengthPercentage{LogicalLength{control_minimum}, 0.0}};
+    return raised;
+}
+
+SizeValue used_maximum(const SizeValue& maximum, double control_maximum) noexcept {
+    if (control_maximum <= 0.0) return maximum;
+    if (maximum.kind == SizeKind::none || (plain_length(maximum) && control_maximum < plain_length_value(maximum))) {
+        const SizeValue lowered{SizeKind::length_percentage, LengthPercentage{LogicalLength{control_maximum}, 0.0}};
+        return lowered;
+    }
+    return maximum;
+}
+
+const GridItemLayout default_item_layout{};
+
+constexpr ControlAnatomy grid_panel_anatomy{
+    .control_id = "grid_panel",
+    .parts = scrollable_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+GridPanel::GridPanel(StableId stable_id) : ContainerControl(std::move(stable_id)) {}
+
+void GridPanel::set_template_columns(const GridTrackList& tracks) {
+    require_mutable();
+    if (!admitted_track_list(tracks)) {
+        throw std::invalid_argument("GridPanel template columns hold a track list grids do not admit");
+    }
+    if (style_.template_columns == tracks) return;
+    style_.template_columns = tracks;
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_template_rows(const GridTrackList& tracks) {
+    require_mutable();
+    if (!admitted_track_list(tracks)) {
+        throw std::invalid_argument("GridPanel template rows hold a track list grids do not admit");
+    }
+    if (style_.template_rows == tracks) return;
+    style_.template_rows = tracks;
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_template_areas(const GridTemplateAreas& areas) {
+    require_mutable();
+    if (!admitted_template_areas(areas)) {
+        throw std::invalid_argument("GridPanel template areas must be distinct named rectangles within it");
+    }
+    if (style_.template_areas == areas) return;
+    style_.template_areas = areas;
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_auto_flow(GridAutoFlow flow) {
+    require_mutable();
+    if (flow > GridAutoFlow::column_dense) throw std::invalid_argument("GridPanel auto flow is unknown");
+    if (style_.auto_flow == flow) return;
+    style_.auto_flow = flow;
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_auto_columns(std::span<const GridTrackSize> sizes) {
+    require_mutable();
+    if (sizes.empty() || sizes.size() > maximum_grid_tracks || !admitted_track_sizes(sizes)) {
+        throw std::invalid_argument("GridPanel auto columns need one to 10000 admitted track sizes");
+    }
+    if (std::equal(sizes.begin(), sizes.end(), style_.auto_columns.begin(), style_.auto_columns.end())) return;
+    style_.auto_columns.assign(sizes.begin(), sizes.end());
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_auto_rows(std::span<const GridTrackSize> sizes) {
+    require_mutable();
+    if (sizes.empty() || sizes.size() > maximum_grid_tracks || !admitted_track_sizes(sizes)) {
+        throw std::invalid_argument("GridPanel auto rows need one to 10000 admitted track sizes");
+    }
+    if (std::equal(sizes.begin(), sizes.end(), style_.auto_rows.begin(), style_.auto_rows.end())) return;
+    style_.auto_rows.assign(sizes.begin(), sizes.end());
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_justify_content(LayoutAlignment alignment) {
+    require_mutable();
+    if (!admitted_content_alignment(alignment)) {
+        throw std::invalid_argument("GridPanel justify-content admits no such value");
+    }
+    if (justify_content_ == alignment) return;
+    justify_content_ = alignment;
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_align_content(LayoutAlignment alignment) {
+    require_mutable();
+    if (!admitted_content_alignment(alignment)) {
+        throw std::invalid_argument("GridPanel align-content admits no such value");
+    }
+    if (align_content_ == alignment) return;
+    align_content_ = alignment;
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_justify_items(LayoutAlignment alignment) {
+    require_mutable();
+    if (!admitted_items_alignment(alignment)) {
+        throw std::invalid_argument("GridPanel justify-items admits no such value");
+    }
+    if (justify_items_ == alignment) return;
+    justify_items_ = alignment;
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_align_items(LayoutAlignment alignment) {
+    require_mutable();
+    if (!admitted_items_alignment(alignment)) {
+        throw std::invalid_argument("GridPanel align-items admits no such value");
+    }
+    if (align_items_ == alignment) return;
+    align_items_ = alignment;
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_row_gap(LengthPercentage gap) {
+    require_mutable();
+    if (!admitted_length(gap)) throw std::invalid_argument("GridPanel row gap must be finite and nonnegative");
+    if (row_gap_ == gap) return;
+    row_gap_ = gap;
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_column_gap(LengthPercentage gap) {
+    require_mutable();
+    if (!admitted_length(gap)) {
+        throw std::invalid_argument("GridPanel column gap must be finite and nonnegative");
+    }
+    if (column_gap_ == gap) return;
+    column_gap_ = gap;
+    invalidate(invalidation::bounds);
+}
+
+void GridPanel::set_item_layout(const Control& child, const GridItemLayout& layout) {
+    require_mutable();
+    if (child.parent().get() != this || !child.is_alive()) {
+        throw std::invalid_argument("GridPanel item layout requires a live direct child");
+    }
+    if (!admitted_item_layout(layout)) {
+        throw std::invalid_argument("GridPanel item layout holds a value grid items do not admit");
+    }
+    const std::uint64_t id = child.runtime_id().value;
+    const ItemMap::iterator found = items_.find(id);
+    if (found != items_.end() && (*found).second.layout == layout) return;
+    if (found == items_.end() && layout == default_item_layout) return;
+    const bool was_positioned = record_for(child).positioning.position != PositionKind::static_position;
+    items_[id].layout = layout;
+    invalidate(invalidation::bounds);
+    // A child that becomes, or stops being, a positioned box changes the
+    // containing block of absolute children below it.
+    const bool positioned = layout.positioning.position != PositionKind::static_position;
+    if (positioned != was_positioned) notify_positioning_changed(child);
+}
+
+GridItemLayout GridPanel::item_layout(const Control& child) const {
+    if (child.parent().get() != this || !child.is_alive()) return default_item_layout;
+    const GridItemLayout layout = record_for(child);
+    return layout;
+}
+
+const GridItemLayout& GridPanel::record_for(const Control& child) const noexcept {
+    const ItemMap::const_iterator found = items_.find(child.runtime_id().value);
+    if (found == items_.end()) return default_item_layout;
+    return (*found).second.layout;
+}
+
+void GridPanel::forget_departed_children() {
+    ++pass_;
+    for (const Control::Ptr& child : children()) {
+        if (!child) continue;
+        const ItemMap::iterator found = items_.find((*child).runtime_id().value);
+        if (found != items_.end()) (*found).second.seen_pass = pass_;
+    }
+    ItemMap::iterator entry = items_.begin();
+    while (entry != items_.end()) {
+        if ((*entry).second.seen_pass != pass_) {
+            entry = items_.erase(entry);
+        } else {
+            ++entry;
+        }
+    }
+}
+
+void GridPanel::set_auto_size(bool auto_size) {
+    Control::set_auto_size(auto_size);
+}
+
+void GridPanel::gather_children() {
+    const std::span<const Control::Ptr> all = children();
+    children_.clear();
+    children_.reserve(all.size());
+    absolute_children_.clear();
+    for (const Control::Ptr& child : all) {
+        if (!child || !is_current_layout_child(child) || !(*child).visible()) continue;
+        if (record_for(*child).positioning.position == PositionKind::absolute) {
+            absolute_children_.push_back(child);
+            continue;
+        }
+        children_.push_back(child);
+    }
+}
+
+GridContainerInput GridPanel::container_input(const SolveRequest& request) const noexcept {
+    GridContainerInput container{};
+    container.justify_content = justify_content_;
+    container.align_content = align_content_;
+    container.justify_items = justify_items_;
+    container.align_items = align_items_;
+    container.column_gap = resolve_gap(column_gap_, request.width);
+    container.row_gap = resolve_gap(row_gap_, request.height);
+    container.width = request.width;
+    container.height = request.height;
+    const LayoutDirection direction = effective_layout_direction();
+    container.layout_direction = direction == LayoutDirection::right_to_left ? LayoutDirection::right_to_left
+                                                                             : LayoutDirection::left_to_right;
+    return container;
+}
+
+void GridPanel::resolve_item_inputs() {
+    const std::size_t count = children_.size();
+    // Sized first, so the pointers below are taken from settled storage;
+    // copy-assignment reuses each record's string capacity.
+    placements_.resize(count);
+    inputs_.resize(count);
+    for (std::size_t index = 0U; index < count; ++index) {
+        Control& child = *children_[index];
+        const GridItemLayout& layout = record_for(child);
+        placements_[index] = layout.placement;
+        GridItemInput& input = inputs_[index];
+        input = GridItemInput{};
+        input.placement = &placements_[index];
+        input.justify_self = layout.justify_self;
+        input.align_self = layout.align_self;
+        const Insets margin = child.margin();
+        input.margin.top = GridMargin{layout.auto_margin.top ? 0.0 : margin.top, layout.auto_margin.top};
+        input.margin.right = GridMargin{layout.auto_margin.right ? 0.0 : margin.right, layout.auto_margin.right};
+        input.margin.bottom = GridMargin{layout.auto_margin.bottom ? 0.0 : margin.bottom, layout.auto_margin.bottom};
+        input.margin.left = GridMargin{layout.auto_margin.left ? 0.0 : margin.left, layout.auto_margin.left};
+        const Size control_minimum = child.minimum_size();
+        const Size control_maximum = child.maximum_size();
+        input.width = layout.width;
+        input.height = layout.height;
+        input.min_width = used_minimum(layout.min_width, control_minimum.width);
+        input.min_height = used_minimum(layout.min_height, control_minimum.height);
+        input.max_width = used_maximum(layout.max_width, control_maximum.width);
+        input.max_height = used_maximum(layout.max_height, control_maximum.height);
+    }
+}
+
+void GridPanel::measure_column_contributions(const SolveRequest& request, const GridLayoutWorkspace& workspace) {
+    const std::size_t count = children_.size();
+    column_contributions_.resize(count);
+    const std::span<const GridItemResult> results = workspace.items();
+    const std::span<const GridTrack> columns = workspace.columns();
+    const bool definite = request.width.kind == GridSizingKind::definite;
+    for (std::size_t index = 0U; index < count; ++index) {
+        Control& child = *children_[index];
+        const GridItemLayout& layout = record_for(child);
+        GridItemContribution& contribution = column_contributions_[index];
+        contribution = GridItemContribution{};
+        const GridItemArea& area = results[index].area;
+        const bool fixed = fixed_tracks(columns, area.column_start, area.column_end, definite);
+        const bool definite_width = plain_length(layout.width);
+        // Fixed columns ignore contributions, and a stretched item takes
+        // its area whatever its content: nothing to measure.
+        if (fixed && !definite_width && stretched_width(layout, justify_items_)) continue;
+
+        const Insets margin = child.margin();
+        const double margins = (layout.auto_margin.left ? 0.0 : margin.left) +
+                               (layout.auto_margin.right ? 0.0 : margin.right);
+        const ContentBounds bounds = content_bounds(layout.min_width, layout.max_width, child.minimum_size().width,
+                                                    child.maximum_size().width);
+        double smallest = 0.0;
+        double largest = 0.0;
+        if (definite_width) {
+            smallest = plain_length_value(layout.width);
+            largest = smallest;
+        } else {
+            const LayoutConstraint minimum_constraint{min_content_extent(), max_content_extent()};
+            smallest = child.measure_for_layout(minimum_constraint).width;
+            if (!is_alive()) return;
+            const LayoutConstraint maximum_constraint{max_content_extent(), max_content_extent()};
+            largest = child.measure_for_layout(maximum_constraint).width;
+            if (!is_alive()) return;
+        }
+        contribution.min_content = clamp_content(smallest, bounds) + margins;
+        contribution.max_content = clamp_content(largest, bounds) + margins;
+        if (definite_width) {
+            // CSS Grid 12.3: with a definite preferred size, the minimum
+            // contribution is the min-content contribution.
+            contribution.minimum = contribution.min_content;
+        } else if (layout.min_width.kind == SizeKind::automatic) {
+            // CSS Grid 6.6's content-based minimum: the min-content size,
+            // within the maximum.
+            contribution.automatic_minimum = true;
+            contribution.minimum = contribution.min_content;
+        } else {
+            contribution.minimum = bounds.minimum + margins;
+        }
+    }
+}
+
+void GridPanel::measure_row_contributions(const GridContainerInput& container,
+                                                const GridLayoutWorkspace& workspace) {
+    const std::size_t count = children_.size();
+    row_contributions_.resize(count);
+    for (std::size_t index = 0U; index < count; ++index) {
+        Control& child = *children_[index];
+        const GridItemLayout& layout = record_for(child);
+        GridItemContribution& contribution = row_contributions_[index];
+        contribution = GridItemContribution{};
+        const Insets margin = child.margin();
+        const double margins = (layout.auto_margin.top ? 0.0 : margin.top) +
+                               (layout.auto_margin.bottom ? 0.0 : margin.bottom);
+        const ContentBounds bounds = content_bounds(layout.min_height, layout.max_height,
+                                                    child.minimum_size().height, child.maximum_size().height);
+        double height = 0.0;
+        const bool definite_height = plain_length(layout.height);
+        const double width =
+            grid_item_column_size(container, inputs_[index], column_contributions_[index], workspace, index);
+        if (definite_height) {
+            height = plain_length_value(layout.height);
+        } else {
+            const LayoutConstraint constraint{query_extent(width), max_content_extent()};
+            height = child.measure_for_layout(constraint).height;
+            if (!is_alive()) return;
+        }
+        // Its first baseline at its column size, for baseline alignment in
+        // its row.
+        const std::optional<double> baseline = child.first_baseline(width);
+        if (!is_alive()) return;
+        if (baseline) contribution.baseline = *baseline;
+        const double outer = clamp_content(height, bounds) + margins;
+        contribution.min_content = outer;
+        contribution.max_content = outer;
+        if (definite_height) {
+            contribution.minimum = outer;
+        } else if (layout.min_height.kind == SizeKind::automatic) {
+            contribution.automatic_minimum = true;
+            contribution.minimum = outer;
+        } else {
+            contribution.minimum = bounds.minimum + margins;
+        }
+    }
+}
+
+void GridPanel::publish_slots(const GridLayoutWorkspace& workspace, Size content_box) {
+    const LayoutDirection direction = effective_layout_direction();
+    const std::span<const GridItemResult> results = workspace.items();
+    const Insets inset = padding();
+    const Point offset = scroll_position();
+    arranged_ids_.clear();
+    arranged_ids_.reserve(children_.size());
+    for (std::size_t index = 0U; index < children_.size(); ++index) {
+        const Control::Ptr& child = children_[index];
+        arranged_ids_.push_back((*child).runtime_id());
+        if (index >= results.size() || !is_current_layout_child(child)) continue;
+        const Rect bounds = results[index].bounds;
+        const Point shift = relative_position_offset(record_for(*child).positioning, content_box, direction);
+        const Rect slot{inset.left + bounds.x - offset.x + shift.x, inset.top + bounds.y - offset.y + shift.y,
+                        bounds.width, bounds.height};
+        set_child_layout(child, slot);
+    }
+}
+
+GridPanel::SolveResult GridPanel::solve(const SolveRequest& request, GridLayoutWorkspace& workspace) {
+    gather_children();
+    const GridContainerInput container = container_input(request);
+    SolveResult result{};
+    if (children_.size() > maximum_grid_items) {
+        // Refused before any child is measured (PLAN section 5): the solver
+        // clears the workspace and no slot is published.
+        inputs_.resize(children_.size());
+        result.outcome = place_grid_items(style_, container, inputs_, workspace);
+        children_.clear();
+        return result;
+    }
+    resolve_item_inputs();
+    result.outcome = place_grid_items(style_, container, inputs_, workspace);
+    if (result.outcome != GridSolveOutcome::solved) {
+        children_.clear();
+        return result;
+    }
+    measure_column_contributions(request, workspace);
+    if (!is_alive()) return result;
+    result.outcome = size_grid_tracks(GridAxis::columns, container, inputs_, column_contributions_, workspace);
+    if (result.outcome != GridSolveOutcome::solved) return result;
+    const double width = request.width.kind == GridSizingKind::definite ? request.width.extent
+                                                                         : workspace.content_width();
+    if (request.columns_only) {
+        result.used = Size{width, 0.0};
+        return result;
+    }
+    measure_row_contributions(container, workspace);
+    if (!is_alive()) return result;
+    result.outcome = size_grid_tracks(GridAxis::rows, container, inputs_, row_contributions_, workspace);
+    if (result.outcome != GridSolveOutcome::solved) return result;
+    result.outcome = arrange_grid_items(container, inputs_, column_contributions_, row_contributions_, workspace);
+    if (result.outcome != GridSolveOutcome::solved) return result;
+    if (request.assign) publish_slots(workspace, Size{request.width.extent, request.height.extent});
+    const double height = request.height.kind == GridSizingKind::definite ? request.height.extent
+                                                                           : workspace.content_height();
+    result.used = Size{width, height};
+    return result;
+}
+
+Size GridPanel::measure_intrinsic(const LayoutConstraint& constraint) {
+    const Insets inset = padding();
+    const double horizontal_padding = inset.left + inset.right;
+    const double vertical_padding = inset.top + inset.bottom;
+    const Rect requested = requested_bounds();
+
+    // The border-box width: definite; filled or requested when the panel
+    // is not auto-sized; otherwise its columns under a min-content or
+    // max-content constraint (fit-content for at most).
+    SolveRequest columns{};
+    columns.columns_only = true;
+    columns.height = GridAvailableExtent{0.0, GridSizingKind::max_content};
+    double width = 0.0;
+    const AvailableExtentKind width_kind = constraint.width.kind;
+    if (width_kind == AvailableExtentKind::definite) {
+        width = constraint.width.extent.value();
+    } else if (width_kind == AvailableExtentKind::at_most && !auto_size()) {
+        const double available = constraint.width.extent.value();
+        width = requested.width > 0.0 ? std::min(requested.width, available) : available;
+    } else if (width_kind == AvailableExtentKind::min_content) {
+        columns.width = GridAvailableExtent{0.0, GridSizingKind::min_content};
+        width = solve(columns, workspace_).used.width + horizontal_padding;
+    } else if (width_kind == AvailableExtentKind::max_content) {
+        columns.width = GridAvailableExtent{0.0, GridSizingKind::max_content};
+        width = solve(columns, workspace_).used.width + horizontal_padding;
+    } else {
+        const double available = constraint.width.extent.value();
+        columns.width = GridAvailableExtent{0.0, GridSizingKind::max_content};
+        const double largest = solve(columns, workspace_).used.width + horizontal_padding;
+        if (!is_alive()) return {};
+        columns.width = GridAvailableExtent{0.0, GridSizingKind::min_content};
+        const double smallest = solve(columns, workspace_).used.width + horizontal_padding;
+        width = std::min(largest, std::max(smallest, available));
+    }
+    if (!is_alive()) return {};
+
+    double height = 0.0;
+    const AvailableExtentKind height_kind = constraint.height.kind;
+    if (height_kind == AvailableExtentKind::definite) {
+        height = constraint.height.extent.value();
+    } else if (height_kind == AvailableExtentKind::at_most && !auto_size()) {
+        const double available = constraint.height.extent.value();
+        height = requested.height > 0.0 ? std::min(requested.height, available) : available;
+    } else {
+        SolveRequest request{};
+        request.width = GridAvailableExtent{std::max(0.0, width - horizontal_padding), GridSizingKind::definite};
+        request.height = GridAvailableExtent{0.0, GridSizingKind::max_content};
+        const SolveResult solved = solve(request, workspace_);
+        if (!is_alive()) return {};
+        height = solved.used.height + vertical_padding;
+        if (height_kind == AvailableExtentKind::at_most) {
+            height = std::min(height, constraint.height.extent.value());
+        }
+    }
+    const Size minimum = minimum_size();
+    const Size maximum = maximum_size();
+    width = std::min(std::max(width, minimum.width), maximum_or_unbounded(maximum.width));
+    height = std::min(std::max(height, minimum.height), maximum_or_unbounded(maximum.height));
+    const Size measured{width, height};
+    return measured;
+}
+
+// Legacy measure(Size) callers (the Windows Forms containers, Dock/Anchor)
+// ask as an at-most constraint.
+Size GridPanel::measure(Size available) {
+    const double width = std::isfinite(available.width) ? available.width : practical_unbounded_extent;
+    const double height = std::isfinite(available.height) ? available.height : practical_unbounded_extent;
+    const Size bounded{std::clamp(width, 0.0, practical_unbounded_extent),
+                       std::clamp(height, 0.0, practical_unbounded_extent)};
+    const Size measured = measure_intrinsic(layout_constraint_at_most(bounded));
+    return measured;
+}
+
+void GridPanel::arrange(Rect final_bounds) {
+    arrange_self(final_bounds);
+    forget_departed_children();
+    const Insets inset = padding();
+    const Size client{final_bounds.width, final_bounds.height};
+    Size available = client;
+    // With auto_scroll, the bars a content overflow needs narrow the
+    // viewport; lay out against it until the two settle (at most three
+    // passes, as FlowLayoutPanelCompat).
+    if (auto_scroll()) {
+        for (int pass = 0; pass < 3; ++pass) {
+            SolveRequest request{};
+            request.width = GridAvailableExtent{std::max(0.0, available.width - inset.left - inset.right),
+                                                GridSizingKind::definite};
+            request.height = GridAvailableExtent{std::max(0.0, available.height - inset.top - inset.bottom),
+                                                 GridSizingKind::definite};
+            const SolveResult solved = solve(request, arranged_);
+            if (!is_alive()) return;
+            const Size extra = auto_scroll_margin();
+            const Size content{
+                std::max(arranged_.content_width(), solved.used.width) + inset.left + inset.right + extra.width,
+                std::max(arranged_.content_height(), solved.used.height) + inset.top + inset.bottom + extra.height};
+            arrange_scroll_viewport(client, content);
+            const Rect viewport = scroll_snapshot().viewport_rectangle;
+            const Size next{viewport.width, viewport.height};
+            if (next == available) break;
+            available = next;
+        }
+    } else {
+        arrange_scroll_viewport(client, client);
+    }
+    SolveRequest request{};
+    request.width =
+        GridAvailableExtent{std::max(0.0, available.width - inset.left - inset.right), GridSizingKind::definite};
+    request.height =
+        GridAvailableExtent{std::max(0.0, available.height - inset.top - inset.bottom), GridSizingKind::definite};
+    request.assign = true;
+    const SolveResult solved = solve(request, arranged_);
+    arranged_outcome_ = solved.outcome;
+    if (solved.outcome != GridSolveOutcome::solved) arranged_ids_.clear();
+    if (!is_alive()) return;
+    place_absolute_children(client);
+}
+
+void GridPanel::place_absolute_children(Size client) {
+    if (absolute_children_.empty()) {
+        if (registered_dependencies_) set_containing_block_dependencies({});
+        registered_dependencies_ = false;
+        return;
+    }
+    const out_of_flow::ContainingBlock block = out_of_flow::resolve_containing_block(*this);
+    out_of_flow::fill_dependency_path(*this, block, dependency_path_);
+    set_containing_block_dependencies(dependency_path_);
+    registered_dependencies_ = true;
+    out_of_flow::AbsoluteContainer container{};
+    container.padding = padding();
+    container.size = client;
+    container.scroll = scroll_position();
+    container.direction = effective_layout_direction();
+    for (const Control::Ptr& child : absolute_children_) {
+        if (!is_current_layout_child(child)) continue;
+        // The block holds its ancestor, so a measure callback that changes
+        // the tree leaves it readable; such a change is laid out by the
+        // next pass.
+        note_containing_block(*child, *block.ancestor);
+        const out_of_flow::AbsoluteItem item = out_of_flow::absolute_item(record_for(*child));
+        const Rect slot = out_of_flow::place_absolute_child(*child, item, block, container);
+        if (!is_alive()) return;
+        if (!is_current_layout_child(child)) continue;
+        set_child_layout(child, slot);
+    }
+}
+
+ItemPositioning GridPanel::item_positioning(const Control& child) const noexcept {
+    if (child.parent().get() != this) return ItemPositioning{};
+    return record_for(child).positioning;
+}
+
+bool GridPanel::measures_children_in_arrange() const noexcept {
+    return true;
+}
+
+SemanticDescriptor GridPanel::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.role = SemanticRole::group;
+    descriptor.name = accessible_name();
+    descriptor.description = accessible_description();
+    descriptor.exposed = !descriptor.name.empty() || !descriptor.description.empty();
+    return descriptor;
+}
+
+const ControlAnatomy& GridPanel::anatomy() const noexcept {
+    return grid_panel_anatomy;
+}
+
+} // namespace gui_forms

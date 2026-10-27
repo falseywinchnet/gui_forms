@@ -62,6 +62,7 @@ configuring any native build; CMake stops if they are absent:
 
 ```sh
 sh third_party/fetch_text_stack.sh
+sh third_party/fetch_linebreak.sh
 ```
 
 Then use the configure command for your platform.

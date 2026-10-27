@@ -32,6 +32,10 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`AbsoluteAxisInput <gui_forms::AbsoluteAxisInput>`
+     - One axis of an absolutely positioned box in its containing block's padding box: left and right with the width, or top and bottom with the height.
+   * - :cpp:class:`AbsoluteAxisResult <gui_forms::AbsoluteAxisResult>`
+     -  
    * - :cpp:class:`AccentIndex <gui_forms::AccentIndex>`
      - A position in the theme's accent ramp (design language §8.5; owner decision RB-22): the ordered colours a theme offers for telling sets of items apart, such as a ribbon's contextual tab sets.
    * - :cpp:class:`AnatomyStateSet <gui_forms::AnatomyStateSet>`
@@ -42,10 +46,22 @@ Related types
      - A margin or an inset: ``auto`` or a length-percentage, which may be negative.
    * - :cpp:class:`AvailableExtent <gui_forms::AvailableExtent>`
      - One axis of a layout constraint.
+   * - :cpp:class:`BlockFlowContainerInput <gui_forms::BlockFlowContainerInput>`
+     -  
+   * - :cpp:class:`BlockFlowItemInput <gui_forms::BlockFlowItemInput>`
+     - One item's inputs.
+   * - :cpp:class:`BlockFlowItemResult <gui_forms::BlockFlowItemResult>`
+     - One item's result.
+   * - :cpp:class:`BlockFlowLayoutWorkspace <gui_forms::BlockFlowLayoutWorkspace>`
+     - Caller-owned storage solve_block_flow fills, reused from layout to layout (house style section 5): ``items`` has one record per input item, in input order; ``lines`` the line boxes in order.
+   * - :cpp:class:`BlockFlowLine <gui_forms::BlockFlowLine>`
+     - One line box, its items being items[first, first + count).
    * - :cpp:class:`BoxAlignment <gui_forms::BoxAlignment>`
      - CSS Box Alignment's six properties, shared by flex and grid containers and their items.
    * - :cpp:class:`BoxSides <gui_forms::BoxSides>`
      - Top, right, bottom and left, CSS's shorthand order.
+   * - :cpp:class:`CollapsedMargin <gui_forms::CollapsedMargin>`
+     - A set of adjoining vertical margins (8.3.1): the largest positive margin and the most negative one; the collapsed margin is their sum.
    * - :cpp:class:`ComponentContainer <gui_forms::ComponentContainer>`
      - ComponentContainer owns a unique ordered set of shared components and disposes the captured ownership sequence exactly once.
    * - :cpp:class:`Control::Parts <gui_forms::Control::Parts>`
@@ -62,24 +78,62 @@ Related types
      - One application-defined finite state, as written in ``:state(name)``.
    * - :cpp:class:`CustomStateIndex <gui_forms::CustomStateIndex>`
      - Position of an application-defined state in its control type's declaration list.
+   * - :cpp:class:`FlexAvailableExtent <gui_forms::FlexAvailableExtent>`
+     - One axis of the container's content box: a definite extent, or indefinite (sized from the items: the main axis never wraps then).
+   * - :cpp:class:`FlexContainerInput <gui_forms::FlexContainerInput>`
+     -  
    * - :cpp:class:`FlexContainerStyle <gui_forms::FlexContainerStyle>`
      -  
    * - :cpp:class:`FlexFactor <gui_forms::FlexFactor>`
      - Flex factors and grid fractions are unitless and never added to lengths.
+   * - :cpp:class:`FlexItemCross <gui_forms::FlexItemCross>`
+     - One item's measurement for the second call, at its resolved main size.
+   * - :cpp:class:`FlexItemInput <gui_forms::FlexItemInput>`
+     - One item's inputs to both calls.
+   * - :cpp:class:`FlexItemResult <gui_forms::FlexItemResult>`
+     - One item's results.
    * - :cpp:class:`FlexItemStyle <gui_forms::FlexItemStyle>`
      -  
+   * - :cpp:class:`FlexLayoutWorkspace <gui_forms::FlexLayoutWorkspace>`
+     - Caller-owned storage both calls fill, reused from layout to layout (house style section 5): ``items`` has one record per input item, in input order; ``order`` the input positions in (order, position) order; ``lines`` the lines in order.
+   * - :cpp:class:`FlexLine <gui_forms::FlexLine>`
+     - One flex line, its items being order[first, first + count).
+   * - :cpp:class:`FlexMargin <gui_forms::FlexMargin>`
+     - One margin as the solver reads it: a resolved length, or ``auto``.
    * - :cpp:class:`FractionFactor <gui_forms::FractionFactor>`
+     -  
+   * - :cpp:class:`GridAvailableExtent <gui_forms::GridAvailableExtent>`
+     -  
+   * - :cpp:class:`GridContainerInput <gui_forms::GridContainerInput>`
      -  
    * - :cpp:class:`GridContainerStyle <gui_forms::GridContainerStyle>`
      -  
+   * - :cpp:class:`GridItemArea <gui_forms::GridItemArea>`
+     - One item's area in the implicit grid: zero-based, half-open track ranges.
+   * - :cpp:class:`GridItemContribution <gui_forms::GridItemContribution>`
+     - One item's contributions to the tracks of one axis, outer sizes (margins included).
+   * - :cpp:class:`GridItemInput <gui_forms::GridItemInput>`
+     - One item's inputs to every call.
+   * - :cpp:class:`GridItemResult <gui_forms::GridItemResult>`
+     -  
    * - :cpp:class:`GridItemStyle <gui_forms::GridItemStyle>`
+     -  
+   * - :cpp:class:`GridLayoutWorkspace <gui_forms::GridLayoutWorkspace>`
+     - Caller-owned storage the four calls fill, reused from layout to layout (house style section 5): ``items`` has one record per input item, in input order; ``columns`` and ``rows`` the tracks of the implicit grid in line order.
+   * - :cpp:class:`GridLayoutWorkspace::AxisPlacement <gui_forms::GridLayoutWorkspace::AxisPlacement>`
+     - One item's placement on one axis during auto-placement: its start line (zero for the explicit grid's first line, negative before it), its span, and whether its lines fixed it.
+   * - :cpp:class:`GridLayoutWorkspace::TrackFunction <gui_forms::GridLayoutWorkspace::TrackFunction>`
      -  
    * - :cpp:class:`GridLine <gui_forms::GridLine>`
      -  
+   * - :cpp:class:`GridMargin <gui_forms::GridMargin>`
+     - One margin as the solver reads it: a resolved length, or ``auto``.
    * - :cpp:class:`GridNamedArea <gui_forms::GridNamedArea>`
      - One named area of grid-template-areas, as zero-based half-open line ranges of the template's cells.
    * - :cpp:class:`GridTemplateAreas <gui_forms::GridTemplateAreas>`
      - grid-template-areas: its dimensions in cells and its areas in the order their first cells are written.
+   * - :cpp:class:`GridTrack <gui_forms::GridTrack>`
+     - One track of the implicit grid, in line order.
    * - :cpp:class:`GridTrackList <gui_forms::GridTrackList>`
      - A grid-template-columns or -rows value.
    * - :cpp:class:`GridTrackSize <gui_forms::GridTrackSize>`
@@ -88,18 +142,24 @@ Related types
      - One interaction.
    * - :cpp:class:`InteractionValidation <gui_forms::InteractionValidation>`
      - The result of validate_interactions: the first defect found and the index of the interaction it concerns, or none.
+   * - :cpp:class:`ItemPositioning <gui_forms::ItemPositioning>`
+     - An item's ``position`` and its insets, ``auto`` by default.
    * - :cpp:class:`ItemSystemDeclaration <gui_forms::ItemSystemDeclaration>`
      - One kind of repeated item a control paints (owner decision 5): a list row, a tree node, a details-view column header.
    * - :cpp:class:`ItemSystemIndex <gui_forms::ItemSystemIndex>`
      - Position of an item system in its control type's declaration list.
    * - :cpp:class:`LayoutConstraint <gui_forms::LayoutConstraint>`
      - A measure query on both axes.
+   * - :cpp:class:`LayoutDiagnostic <gui_forms::LayoutDiagnostic>`
+     -  
    * - :cpp:class:`LayoutStyle <gui_forms::LayoutStyle>`
      -  
    * - :cpp:class:`LayoutTransactionState <gui_forms::LayoutTransactionState>`
      - LayoutTransactionState exposes suspension depth, deferred work, and requested-versus-committed revisions without leaking a host layout engine.
    * - :cpp:class:`LengthPercentage <gui_forms::LengthPercentage>`
      - A length and a percentage of the box CSS names for the property, summed: ``24px`` is {24, 0}, ``50%`` is {0, 50}, ``calc(100% - 24px)`` is {-24, 100}.
+   * - :cpp:class:`LineStrut <gui_forms::LineStrut>`
+     - The strut every line box starts with (10.8.1): the container's ascent and descent above and below the baseline, as its font and line height give them, and the x-height ``vertical-align: middle`` aligns to.
    * - :cpp:class:`LogicalLength <gui_forms::LogicalLength>`
      - A layout length in logical units (device-independent pixels), the unit of every retained bound.
    * - :cpp:class:`MnemonicText <gui_forms::MnemonicText>`
@@ -126,6 +186,78 @@ Related types
      - StaticNode is an inert declarative node containing a registered type name, stable ID, and owned child descriptions.
    * - :cpp:class:`TrackBreadth <gui_forms::TrackBreadth>`
      -  
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: AbsoluteAxisInput final
+
+   ``#include <gui_forms/layout/positioning/positioning.hpp>``
+
+   One axis of an absolutely positioned box in its containing block's padding box: left and right with the width, or top and bottom with the height. Lengths are resolved by the caller; the insets keep ``auto``.
+
+   .. cpp:member:: double containing_extent
+
+   .. cpp:member:: AutoLengthPercentage start_inset
+
+      left or top, and right or bottom. Default: ``{true, {}}``.
+
+   .. cpp:member:: AutoLengthPercentage end_inset
+
+      Default: ``{true, {}}``.
+
+   .. cpp:member:: bool definite_size
+
+      The item's own size when it is definite.
+
+   .. cpp:member:: double size
+
+   .. cpp:member:: double content_minimum
+
+      The content's size range: for a width the min-content and max-content widths (shrink-to-fit takes a width between them); for a height the content's height at the used width, twice.
+
+   .. cpp:member:: double content_maximum
+
+   .. cpp:member:: double minimum
+
+      The used minimum and maximum (a minimum wins).
+
+   .. cpp:member:: double maximum
+
+      Default: ``{std::numeric_limits<double>::infinity()}``.
+
+   .. cpp:member:: double margin_start
+
+   .. cpp:member:: double margin_end
+
+   .. cpp:member:: bool auto_margin_start
+
+   .. cpp:member:: bool auto_margin_end
+
+   .. cpp:member:: double static_position
+
+      Where the box's start margin edge would be with both insets ``auto`` (its static position), or with static_from_end its end margin edge (the horizontal axis of a right-to-left container).
+
+   .. cpp:member:: bool static_from_end
+
+   .. cpp:member:: bool end_wins
+
+      The horizontal axis of a right-to-left containing block: an over-constrained box keeps its end inset, and auto margins too large to share leave the end one.
+
+   .. cpp:member:: bool vertical
+
+      The vertical axis: auto margins share what is left even when it is negative (10.6.4).
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: AbsoluteAxisResult final
+
+   ``#include <gui_forms/layout/positioning/positioning.hpp>``
+
+   .. cpp:member:: double position
+
+      The border box's start edge and size in the containing block.
+
+   .. cpp:member:: double size
 
 .. cpp:namespace:: gui_forms
 
@@ -213,6 +345,154 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: BlockFlowContainerInput final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   .. cpp:member:: double width
+
+      The content box's width the items are placed in.
+
+   .. cpp:member:: TextAlignment text_align
+
+      Default: ``{TextAlignment::start}``.
+
+   .. cpp:member:: LayoutDirection layout_direction
+
+      Left to right or right to left; ``inherit`` reads as left to right. Default: ``{LayoutDirection::left_to_right}``.
+
+   .. cpp:member:: LineStrut strut
+
+   .. cpp:member:: bool shares_leading_margin
+
+      Whether the container's top margin adjoins its first item's (8.3.1: it is not a formatting-context root and has no top padding). Then the margins before the first line box or nonempty block collapse through the container's top: they are published as leading_margin and the items are placed without them.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BlockFlowItemInput final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   One item's inputs.
+
+   .. cpp:member:: BlockFlowLevel level
+
+      Default: ``{BlockFlowLevel::block}``.
+
+   .. cpp:member:: double width
+
+      The used border-box size.
+
+   .. cpp:member:: double height
+
+   .. cpp:member:: BoxSides<double> margin
+
+      Resolved margins. A block item's ``auto`` left or right margin is flagged and its length ignored; vertical and inline-level ``auto`` margins are zero, as CSS computes them.
+
+   .. cpp:member:: bool auto_margin_left
+
+   .. cpp:member:: bool auto_margin_right
+
+   .. cpp:member:: CollapsedMargin leading_inner
+
+      A block item whose content shares this container's margins (a nested block flow container that is not a formatting-context root): the margins of its content collapsing through its top edge and through its bottom edge, its own margins excluded.
+
+   .. cpp:member:: CollapsedMargin trailing_inner
+
+   .. cpp:member:: bool collapses_through
+
+      Whether the item's top and bottom margins are adjoining (8.3.1: an empty block with zero height). Then leading_inner holds all of its content's margins and trailing_inner is empty.
+
+   .. cpp:member:: InlineVerticalAlignment vertical_align
+
+      Default: ``{InlineVerticalAlignment::baseline}``.
+
+   .. cpp:member:: double baseline
+
+      An inline item's baseline from the top of its border box (its last line box's, Control::last_baseline); NaN for none, in which case the solver synthesizes the bottom of its margin box. Block items ignore it. Default: ``{std::numeric_limits<double>::quiet_NaN()}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BlockFlowItemResult final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   One item's result.
+
+   .. cpp:member:: Rect bounds
+
+      The border box in the container's content box.
+
+   .. cpp:member:: std::uint32_t line
+
+      Its line, for an inline-level item; no_block_flow_line for a block.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: BlockFlowLayoutWorkspace final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   Caller-owned storage solve_block_flow fills, reused from layout to layout (house style section 5): :cpp:func:`items <gui_forms::BlockFlowLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`lines <gui_forms::BlockFlowLayoutWorkspace::lines>` the line boxes in order. Its storage grows only when the item or line count does.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const BlockFlowItemResult> items() const& noexcept
+
+   .. cpp:function:: std::span<const BlockFlowLine> lines() const& noexcept
+
+   .. cpp:function:: double content_height() const noexcept
+
+      The block end of the last line box or nonempty block, where the content ends before its trailing margins.
+
+   .. cpp:function:: CollapsedMargin leading_margin() const noexcept
+
+      The margins that collapsed through the container's top (empty unless the container shares its leading margin).
+
+   .. cpp:function:: CollapsedMargin trailing_margin() const noexcept
+
+      The margins after the content's end: the last block's bottom margin with whatever collapses with it. A container whose bottom margin adjoins them passes them on; any other adds their collapsed sum to its height.
+
+   .. cpp:function:: bool leading_open() const noexcept
+
+      Whether no line box or nonempty block closed the leading margins: with a shared leading margin, every item's margins are then in leading_margin and the container can collapse through.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void reserve(std::size_t count)
+
+      Reserves storage for ``count`` items and as many lines, so a later layout of at most that many allocates nothing.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BlockFlowLine final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   One line box, its items being items[first, first + count).
+
+   .. cpp:member:: std::uint32_t first
+
+   .. cpp:member:: std::uint32_t count
+
+   .. cpp:member:: double top
+
+   .. cpp:member:: double height
+
+   .. cpp:member:: double baseline
+
+      The baseline, from the line's top.
+
+   .. cpp:member:: double used_width
+
+      The items' margin boxes' summed width, and the inline offset text-align gave them, from the line's start edge.
+
+   .. cpp:member:: double offset
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: BoxAlignment final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -258,6 +538,34 @@ Related types
    .. cpp:member:: Value bottom
 
    .. cpp:member:: Value left
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CollapsedMargin final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   A set of adjoining vertical margins (8.3.1): the largest positive margin and the most negative one; the collapsed margin is their sum.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: double collapsed() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void adjoin(double margin) noexcept
+
+      Adjoins one more margin or set.
+
+   .. cpp:function:: void adjoin(const CollapsedMargin& other) noexcept
+
+   .. cpp:member:: double positive
+
+   .. cpp:member:: double negative
+
+      Zero or less.
 
 .. cpp:namespace:: gui_forms
 
@@ -409,6 +717,58 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: FlexAvailableExtent final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One axis of the container's content box: a definite extent, or indefinite (sized from the items: the main axis never wraps then).
+
+   .. cpp:member:: double extent
+
+   .. cpp:member:: bool definite
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexContainerInput final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   .. cpp:member:: FlexDirection direction
+
+      Default: ``{FlexDirection::row}``.
+
+   .. cpp:member:: FlexWrap wrap
+
+      Default: ``{FlexWrap::nowrap}``.
+
+   .. cpp:member:: LayoutAlignment justify_content
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment align_content
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment align_items
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: double row_gap
+
+      Resolved gaps: row_gap between lines of a row container and items of a column one; column_gap the other way.
+
+   .. cpp:member:: double column_gap
+
+   .. cpp:member:: FlexAvailableExtent width
+
+   .. cpp:member:: FlexAvailableExtent height
+
+   .. cpp:member:: LayoutDirection layout_direction
+
+      left_to_right or right_to_left (an ``inherit`` is resolved by the caller): mirrors the inline axis at output (PLAN section 4). Default: ``{LayoutDirection::left_to_right}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: FlexContainerStyle final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -441,6 +801,96 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: FlexItemCross final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One item's measurement for the second call, at its resolved main size.
+
+   .. cpp:member:: double hypothetical_cross
+
+      The cross size the item takes at its main size, before stretching.
+
+   .. cpp:member:: double baseline
+
+      Its first baseline, from the top of its border box; NaN for none, in which case the solver synthesizes one from the border box's bottom. Default: ``{std::numeric_limits<double>::quiet_NaN()}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexItemInput final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One item's inputs to both calls.
+
+   .. cpp:member:: FlexFactor grow
+
+      Default: ``{0.0}``.
+
+   .. cpp:member:: FlexFactor shrink
+
+      Default: ``{1.0}``.
+
+   .. cpp:member:: std::int32_t order
+
+   .. cpp:member:: double flex_base_size
+
+      The flex base size (CSS Flexbox 9.2.3), resolved by the caller.
+
+   .. cpp:member:: double minimum_main
+
+      The main size's resolved minimum, automatic minimum included, and its maximum (infinity for ``none``).
+
+   .. cpp:member:: double maximum_main
+
+      Default: ``{std::numeric_limits<double>::infinity()}``.
+
+   .. cpp:member:: double minimum_cross
+
+   .. cpp:member:: double maximum_cross
+
+      Default: ``{std::numeric_limits<double>::infinity()}``.
+
+   .. cpp:member:: BoxSides<FlexMargin> margin
+
+      Physical sides.
+
+   .. cpp:member:: LayoutAlignment align_self
+
+      ``auto`` takes the container's align-items. Default: ``{LayoutAlignment::automatic}``.
+
+   .. cpp:member:: bool definite_cross
+
+      Whether the item's cross size property is definite: such an item is never stretched.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexItemResult final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One item's results.
+
+   .. cpp:member:: double flex_base_size
+
+   .. cpp:member:: double hypothetical_main
+
+   .. cpp:member:: double main_size
+
+   .. cpp:member:: double cross_size
+
+   .. cpp:member:: Rect bounds
+
+      The item's border box in the container's content box.
+
+   .. cpp:member:: std::uint32_t line
+
+   .. cpp:member:: FlexFreezeReason freeze_reason
+
+      Default: ``{FlexFreezeReason::inflexible}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: FlexItemStyle final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -459,6 +909,70 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: FlexLayoutWorkspace final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   Caller-owned storage both calls fill, reused from layout to layout (house style section 5): :cpp:func:`items <gui_forms::FlexLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`order <gui_forms::FlexLayoutWorkspace::order>` the input positions in (order, position) order; :cpp:func:`lines <gui_forms::FlexLayoutWorkspace::lines>` the lines in order. Its storage grows only when the item count does.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const FlexItemResult> items() const& noexcept
+
+   .. cpp:function:: std::span<const FlexLine> lines() const& noexcept
+
+   .. cpp:function:: std::span<const std::uint32_t> order() const& noexcept
+
+   .. cpp:function:: double content_main() const noexcept
+
+      The content's extent: the longest line's main extent, and the lines' cross sizes with the gaps between them; filled by each call.
+
+   .. cpp:function:: double content_cross() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void reserve(std::size_t count)
+
+      Reserves storage for ``count`` items, so a later layout of at most that many allocates nothing.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexLine final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One flex line, its items being order[first, first + count).
+
+   .. cpp:member:: std::uint32_t first
+
+   .. cpp:member:: std::uint32_t count
+
+   .. cpp:member:: double main_extent
+
+      The sum of its items' outer main sizes and gaps.
+
+   .. cpp:member:: double cross_size
+
+   .. cpp:member:: double cross_position
+
+      Its cross-start edge, flow-relative (before reversal).
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlexMargin final
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   One margin as the solver reads it: a resolved length, or ``auto``.
+
+   .. cpp:member:: double length
+
+   .. cpp:member:: bool automatic
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:class:: FractionFactor final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -472,6 +986,54 @@ Related types
    .. rubric:: Properties
 
    .. cpp:function:: constexpr double value() const noexcept
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridAvailableExtent final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:member:: double extent
+
+   .. cpp:member:: GridSizingKind kind
+
+      Default: ``{GridSizingKind::max_content}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridContainerInput final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:member:: LayoutAlignment justify_content
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment align_content
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment justify_items
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: LayoutAlignment align_items
+
+      Default: ``{LayoutAlignment::normal}``.
+
+   .. cpp:member:: double column_gap
+
+      Resolved gaps: column_gap between columns, row_gap between rows.
+
+   .. cpp:member:: double row_gap
+
+   .. cpp:member:: GridAvailableExtent width
+
+   .. cpp:member:: GridAvailableExtent height
+
+   .. cpp:member:: LayoutDirection layout_direction
+
+      left_to_right or right_to_left (an ``inherit`` is resolved by the caller): mirrors the columns at output (PLAN section 4). Default: ``{LayoutDirection::left_to_right}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -499,6 +1061,102 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: GridItemArea final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One item's area in the implicit grid: zero-based, half-open track ranges.
+
+   .. cpp:member:: std::uint32_t column_start
+
+   .. cpp:member:: std::uint32_t column_end
+
+   .. cpp:member:: std::uint32_t row_start
+
+   .. cpp:member:: std::uint32_t row_end
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridItemContribution final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One item's contributions to the tracks of one axis, outer sizes (margins included). ``minimum`` is the item's minimum contribution (CSS Grid 12.3): its min-content contribution when its width or height is definite; the outer min-width or min-height when that is a length; otherwise ``automatic_minimum`` is set and ``minimum`` is the content-based minimum (CSS Grid 6.6), which the solver applies only where 6.6 does: when the item spans a track whose minimum is ``auto`` and, if it spans several, no flexible one.
+
+   .. cpp:member:: double minimum
+
+   .. cpp:member:: bool automatic_minimum
+
+   .. cpp:member:: double min_content
+
+   .. cpp:member:: double max_content
+
+   .. cpp:member:: double baseline
+
+      A row contribution's first baseline, from the top of the item's border box at its column size; NaN for none, in which case the solver synthesizes the border box's bottom (12.5 step 1). Column contributions ignore it. Default: ``{std::numeric_limits<double>::quiet_NaN()}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridItemInput final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One item's inputs to every call.
+
+   .. cpp:member:: const GridItemStyle* placement
+
+      The item's placement properties, borrowed for each call: the caller keeps the record alive and unchanged from the first call to the last.
+
+   .. cpp:member:: LayoutAlignment justify_self
+
+      ``auto`` takes the container's justify-items or align-items. Default: ``{LayoutAlignment::automatic}``.
+
+   .. cpp:member:: LayoutAlignment align_self
+
+      Default: ``{LayoutAlignment::automatic}``.
+
+   .. cpp:member:: BoxSides<GridMargin> margin
+
+      Physical sides.
+
+   .. cpp:member:: SizeValue width
+
+      The item's sizes; a percentage is of its grid area, resolved when the item is placed in it.
+
+   .. cpp:member:: SizeValue height
+
+   .. cpp:member:: SizeValue min_width
+
+   .. cpp:member:: SizeValue min_height
+
+   .. cpp:member:: SizeValue max_width
+
+      Default: ``{SizeKind::none, {}}``.
+
+   .. cpp:member:: SizeValue max_height
+
+      Default: ``{SizeKind::none, {}}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridItemResult final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:member:: GridItemArea area
+
+   .. cpp:member:: bool column_definite
+
+      Whether placement found the area from the item's lines (not by auto-placement), for inspection.
+
+   .. cpp:member:: bool row_definite
+
+   .. cpp:member:: Rect bounds
+
+      The item's border box in the container's content box.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: GridItemStyle final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -513,6 +1171,82 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: GridLayoutWorkspace final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   Caller-owned storage the four calls fill, reused from layout to layout (house style section 5): :cpp:func:`items <gui_forms::GridLayoutWorkspace::items>` has one record per input item, in input order; :cpp:func:`columns <gui_forms::GridLayoutWorkspace::columns>` and :cpp:func:`rows <gui_forms::GridLayoutWorkspace::rows>` the tracks of the implicit grid in line order. Its storage grows only when the item or track count does.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const GridItemResult> items() const& noexcept
+
+   .. cpp:function:: std::span<const GridTrack> columns() const& noexcept
+
+   .. cpp:function:: std::span<const GridTrack> rows() const& noexcept
+
+   .. cpp:function:: std::uint32_t leading_implicit_columns() const noexcept
+
+      How many implicit tracks precede the explicit grid on each axis (from negative or out-of-range lines).
+
+   .. cpp:function:: std::uint32_t leading_implicit_rows() const noexcept
+
+   .. cpp:function:: double content_width() const noexcept
+
+      The sized grid's extent on each axis: the tracks and their gaps.
+
+   .. cpp:function:: double content_height() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: double area_extent(std::size_t index, GridAxis axis) const noexcept
+
+      The extent of item ``index``'s area on ``axis``: its tracks' sizes and the gaps between them, once that axis is sized; zero before.
+
+   .. cpp:function:: void reserve(std::size_t count)
+
+      Reserves storage for ``count`` items, so a later layout of at most that many items (and as many tracks) allocates nothing.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridLayoutWorkspace::AxisPlacement final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One item's placement on one axis during auto-placement: its start line (zero for the explicit grid's first line, negative before it), its span, and whether its lines fixed it. Internal to the solver.
+
+   .. cpp:member:: std::int64_t start
+
+   .. cpp:member:: std::uint32_t span
+
+      Default: ``{1U}``.
+
+   .. cpp:member:: bool definite
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridLayoutWorkspace::TrackFunction final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:member:: Breadth minimum
+
+      Default: ``{Breadth::automatic}``.
+
+   .. cpp:member:: double minimum_value
+
+   .. cpp:member:: Breadth maximum
+
+      Default: ``{Breadth::automatic}``.
+
+   .. cpp:member:: double maximum_value
+
+      The fixed maximum, the fraction, or the fit-content() limit.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: GridLine final
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -524,6 +1258,18 @@ Related types
    .. cpp:member:: std::int32_t number
 
    .. cpp:member:: std::string area
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridMargin final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One margin as the solver reads it: a resolved length, or ``auto``.
+
+   .. cpp:member:: double length
+
+   .. cpp:member:: bool automatic
 
 .. cpp:namespace:: gui_forms
 
@@ -556,6 +1302,38 @@ Related types
    .. cpp:member:: std::uint32_t columns
 
    .. cpp:member:: std::vector<GridNamedArea> areas
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GridTrack final
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   One track of the implicit grid, in line order.
+
+   .. cpp:member:: GridTrackSize sizing
+
+      The sizing function it was given (from the template, ``repeat()``, or grid-auto-columns / -rows for an implicit track).
+
+   .. cpp:member:: double base
+
+      The track sizing algorithm's base size and growth limit (infinity while unbounded); ``size`` is the final base size.
+
+   .. cpp:member:: double growth_limit
+
+      Default: ``{std::numeric_limits<double>::infinity()}``.
+
+   .. cpp:member:: double size
+
+   .. cpp:member:: double position
+
+      Its start edge in the content box, after track alignment (columns flow-relative: before right-to-left mirroring).
+
+   .. cpp:member:: bool implicit
+
+   .. cpp:member:: bool collapsed
+
+      An empty ``auto-fit`` repetition: size zero, and its gaps collapse.
 
 .. cpp:namespace:: gui_forms
 
@@ -621,6 +1399,22 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ItemPositioning final
+
+   ``#include <gui_forms/layout/positioning/positioning.hpp>``
+
+   An item's ``position`` and its insets, ``auto`` by default. A positioned item (relative or absolute) is a containing block for its absolutely positioned descendants.
+
+   .. cpp:member:: PositionKind position
+
+      Default: ``{PositionKind::static_position}``.
+
+   .. cpp:member:: BoxSides<AutoLengthPercentage> inset
+
+      Default: ``{automatic_inset, automatic_inset, automatic_inset, automatic_inset}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ItemSystemDeclaration final
 
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
@@ -658,6 +1452,26 @@ Related types
    .. cpp:member:: AvailableExtent width
 
    .. cpp:member:: AvailableExtent height
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: LayoutDiagnostic final
+
+   ``#include <gui_forms/layout/diagnostics/layout_diagnostics.hpp>``
+
+   .. cpp:member:: LayoutDiagnosticSeverity severity
+
+      Default: ``{LayoutDiagnosticSeverity::warning}``.
+
+   .. cpp:member:: LayoutDiagnosticCode code
+
+      Default: ``{LayoutDiagnosticCode::containing_block_not_parent}``.
+
+   .. cpp:member:: std::string child
+
+      The stable identities of the child the pass placed and of the ancestor whose box it was placed in (the window's root control for its client area).
+
+   .. cpp:member:: std::string ancestor
 
 .. cpp:namespace:: gui_forms
 
@@ -748,6 +1562,20 @@ Related types
    .. cpp:member:: double percent
 
       Percent, not a fraction: 50 means half.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: LineStrut final
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   The strut every line box starts with (10.8.1): the container's ascent and descent above and below the baseline, as its font and line height give them, and the x-height ``vertical-align: middle`` aligns to. A zero strut is a point on the baseline (CSS's strut of a zero-size font).
+
+   .. cpp:member:: double ascent
+
+   .. cpp:member:: double descent
+
+   .. cpp:member:: double x_height
 
 .. cpp:namespace:: gui_forms
 
@@ -1162,6 +1990,36 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: BlockFlowIntrinsicKind
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   .. cpp:enumerator:: min_content
+
+   .. cpp:enumerator:: max_content
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: BlockFlowLevel
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   .. cpp:enumerator:: block
+
+   .. cpp:enumerator:: inline_level
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: BlockFlowSolveOutcome
+
+   ``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+   .. cpp:enumerator:: solved
+
+   .. cpp:enumerator:: refused_too_many_items
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: BoundsSpecified
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -1332,6 +2190,32 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: FlexFreezeReason
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   .. cpp:enumerator:: inflexible
+
+   .. cpp:enumerator:: minimum_violation
+
+   .. cpp:enumerator:: maximum_violation
+
+   .. cpp:enumerator:: flexed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: FlexSolveOutcome
+
+   ``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+   .. cpp:enumerator:: solved
+
+   .. cpp:enumerator:: refused_too_many_items
+
+   .. cpp:enumerator:: refused_mismatched_input
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: FlexWrap
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -1372,6 +2256,34 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: GridAxis
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:enumerator:: columns
+
+   .. cpp:enumerator:: rows
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: GridLayoutWorkspace::Breadth
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:enumerator:: fixed
+
+   .. cpp:enumerator:: min_content
+
+   .. cpp:enumerator:: max_content
+
+   .. cpp:enumerator:: automatic
+
+   .. cpp:enumerator:: fraction
+
+   .. cpp:enumerator:: fit_content
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: GridLineKind
 
    ``#include <gui_forms/layout/style/layout_style.hpp>``
@@ -1383,6 +2295,32 @@ Enumerations
    .. cpp:enumerator:: span
 
    .. cpp:enumerator:: area
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: GridSizingKind
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:enumerator:: definite
+
+   .. cpp:enumerator:: min_content
+
+   .. cpp:enumerator:: max_content
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: GridSolveOutcome
+
+   ``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+   .. cpp:enumerator:: solved
+
+   .. cpp:enumerator:: refused_too_many_items
+
+   .. cpp:enumerator:: refused_too_many_cells
+
+   .. cpp:enumerator:: refused_mismatched_input
 
 .. cpp:namespace:: gui_forms
 
@@ -1441,6 +2379,24 @@ Enumerations
    .. cpp:enumerator:: space_around
 
    .. cpp:enumerator:: space_evenly
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: LayoutDiagnosticCode
+
+   ``#include <gui_forms/layout/diagnostics/layout_diagnostics.hpp>``
+
+   .. cpp:enumerator:: containing_block_not_parent
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: LayoutDiagnosticSeverity
+
+   ``#include <gui_forms/layout/diagnostics/layout_diagnostics.hpp>``
+
+   .. cpp:enumerator:: warning
+
+   .. cpp:enumerator:: error
 
 .. cpp:namespace:: gui_forms
 
@@ -1752,6 +2708,118 @@ Functions, constants and aliases
 ``#include <gui_forms/control/static_tree/control_factory/control_factory.hpp>``
 
 .. cpp:function:: Control::Ptr build_static_tree(const StaticNode& node, const ControlFactory& factory)
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/block_flow_solver/block_flow_solver.hpp>``
+
+.. cpp:function:: BlockFlowSolveOutcome solve_block_flow(const BlockFlowContainerInput& container, std::span<const BlockFlowItemInput> items, BlockFlowLayoutWorkspace& workspace)
+
+   Lays the items out. ``items`` is borrowed for the call. On refusal the workspace is cleared.
+
+.. cpp:function:: double block_flow_intrinsic_width(std::span<const BlockFlowItemInput> items, BlockFlowIntrinsicKind kind) noexcept
+
+   The container's min-content or max-content width (CSS Sizing 3): the widest block item's margin box, and of each inline run the widest item (min-content, every item boundary being a break) or the items' sum (max-content). Each item's ``width`` is its contribution for that kind.
+
+.. cpp:var:: constexpr std::size_t maximum_block_flow_items
+
+   The most items one container lays out (PLAN section 5). Value: ``65'536U``.
+
+.. cpp:var:: constexpr std::uint32_t no_block_flow_line
+
+   Value: ``0xFFFF'FFFFU``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/diagnostics/layout_diagnostics.hpp>``
+
+.. cpp:function:: LayoutDiagnosticSeverity layout_diagnostic_severity(LayoutDiagnosticCode code) noexcept
+
+.. cpp:function:: std::string_view layout_diagnostic_code_name(LayoutDiagnosticCode code) noexcept
+
+   The code's snake_case name, such as ``containing_block_not_parent``.
+
+.. cpp:var:: constexpr std::size_t maximum_layout_diagnostics
+
+   The most records a window keeps; later ones are counted. Value: ``1000U``.
+
+.. cpp:var:: constexpr std::size_t maximum_containing_block_dependents
+
+   The most out-of-flow dependents one containing block keeps (PLAN section 3.3); above it the block arranges its whole subtree instead. Value: ``4'096U``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/flex_solver/flex_solver.hpp>``
+
+.. cpp:function:: FlexSolveOutcome resolve_flex_main_sizes(const FlexContainerInput& container, std::span<const FlexItemInput> items, FlexLayoutWorkspace& workspace)
+
+   The first call. Fills each item's flex_base_size, hypothetical_main, main_size, line and freeze_reason, the order and the lines, and content_main. ``items`` is borrowed for the call.
+
+.. cpp:function:: FlexSolveOutcome place_flex_items(const FlexContainerInput& container, std::span<const FlexItemInput> items, std::span<const FlexItemCross> crosses, FlexLayoutWorkspace& workspace)
+
+   The second call, after the first with the same container and items; ``crosses`` has one record per item. Fills each item's cross_size and bounds, the lines' cross sizes and positions, and content_cross.
+
+.. cpp:var:: constexpr std::size_t maximum_flex_items
+
+   The most items one container lays out (PLAN section 5). Value: ``65'536U``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/grid_solver/grid_solver.hpp>``
+
+.. cpp:function:: GridSolveOutcome place_grid_items(const GridContainerStyle& style, const GridContainerInput& container, std::span<const GridItemInput> items, GridLayoutWorkspace& workspace)
+
+   The first call. Fills the tracks (sizing functions, implicit and collapsed flags) and each item's area; ``style`` and ``items`` are borrowed for the call. Refuses more than maximum_grid_items items, and an implicit grid of more than maximum_grid_cells cells.
+
+.. cpp:function:: GridSolveOutcome size_grid_tracks(GridAxis axis, const GridContainerInput& container, std::span<const GridItemInput> items, std::span<const GridItemContribution> contributions, GridLayoutWorkspace& workspace)
+
+   The second and third calls: sizes the tracks of ``axis``, columns first, from one contribution per item on that axis. Fills each track's base, growth_limit and size, and the content extent.
+
+.. cpp:function:: double grid_item_column_size(const GridContainerInput& container, const GridItemInput& item, const GridItemContribution& column_contribution, const GridLayoutWorkspace& workspace, std::size_t index)
+
+   The border-box width item ``index`` takes in its column area, once the columns are sized: what arrange_grid_items will give it. The caller measures the item's height at this width for its row contributions.
+
+.. cpp:function:: GridSolveOutcome arrange_grid_items(const GridContainerInput& container, std::span<const GridItemInput> items, std::span<const GridItemContribution> column_contributions, std::span<const GridItemContribution> row_contributions, GridLayoutWorkspace& workspace)
+
+   The fourth call, with the contributions the sizing calls were given. Fills the tracks' positions and each item's bounds.
+
+.. cpp:var:: constexpr std::size_t maximum_grid_items
+
+   The most items one container lays out (PLAN section 5). Value: ``65'536U``.
+
+.. cpp:var:: constexpr std::size_t maximum_grid_cells
+
+   The most cells auto-placement's occupancy may cover, rows times columns of the implicit grid (PLAN section 5); above it nothing is laid out. Value: ``1'048'576U``.
+
+.. cpp:var:: constexpr std::size_t maximum_grid_repetitions
+
+   The most repetitions one ``repeat(auto-fill | auto-fit, ...)`` generates. Value: ``10'000U``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/positioning/positioning.hpp>``
+
+.. cpp:function:: Point relative_position_offset(const ItemPositioning& positioning, Size containing_block, LayoutDirection direction) noexcept
+
+   ``position: relative``'s offset (CSS 2.1 9.4.3), with percentages of the containing block's width and height. Of left and right, the start side wins when both are set (left for left to right, right for right to left); of top and bottom, top. A static or absolute item has none.
+
+.. cpp:function:: AbsoluteAxisResult resolve_absolute_axis(const AbsoluteAxisInput& input) noexcept
+
+.. cpp:function:: bool absolute_axis_reads_content(const AbsoluteAxisInput& input) noexcept
+
+   Whether the axis's size comes from the content: neither the item's own size nor both insets fix it. A caller measures the content only then.
+
+.. cpp:var:: constexpr AutoLengthPercentage automatic_inset
+
+   The inset ``auto``, every side's default. Value: ``{true, {}}``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/layout/style/layout_style.hpp>``
+
+.. cpp:var:: constexpr std::size_t maximum_grid_tracks
+
+   The most tracks one grid-template-columns or -rows value may expand to, ``repeat()`` counted, and the most sizes one grid-auto-columns or -rows value may list (PLAN section 5). Value: ``10'000U``.
 
 .. cpp:namespace:: gui_forms
 

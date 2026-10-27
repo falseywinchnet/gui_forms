@@ -1528,6 +1528,13 @@ ResolvedTextLayout SkiaRaster::resolve_text_layout_utf8(
     return (*impl_).text_engine.resolve(text, font_spec);
 }
 
+TextResolutionStatus SkiaRaster::fill_line_break_opportunities_utf8(
+    std::string_view text, std::span<LineBreakOpportunity> opportunities) {
+    const TextResolutionStatus status =
+        text::HarfBuzzFontEngine::fill_line_break_opportunities_utf8(text, opportunities);
+    return status;
+}
+
 void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {
     const Impl::ImageMap::const_iterator found = (*impl_).images.find(image.value);
     if (SkCanvas* canvas = (*impl_).canvas();

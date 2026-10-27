@@ -353,6 +353,27 @@ def fetch_text_stack(script: Path) -> None:
     run('sh', script)
 
 
+# fetch_linebreak.sh pins its one checkout as revision=<commit>.
+LINE_BREAK_PIN_PATTERN: re.Pattern[str] = re.compile(r'^revision=([0-9a-f]{40})$', re.MULTILINE)
+
+
+def fetch_line_break(script: Path) -> None:
+    """Fetch libunibreak, which the text engine links (owner, 2026-10-26).
+
+    Skipped, as fetch_text_stack is, when the checkout is already at the
+    pinned commit; the script would only re-run `git checkout --detach`.
+    """
+    pins: list[str] = LINE_BREAK_PIN_PATTERN.findall(script.read_text(encoding='utf-8'))
+    checkout: Path = script.parent / 'libunibreak'
+    if len(pins) == 1 and (checkout / '.git').exists():
+        completed: subprocess.CompletedProcess[str] = subprocess.run(
+            ['git', '-C', str(checkout), 'rev-parse', 'HEAD'], capture_output=True, text=True)
+        if completed.returncode == 0 and completed.stdout.strip() == pins[0]:
+            print(f'{script.name}: the checkout is at its pinned commit', flush=True)
+            return
+    run('sh', script)
+
+
 # Environment that changes what a first configure records (compilers,
 # launchers, and the macOS sanitizer and runtime flags).
 CONFIGURE_ENVIRONMENT: tuple[str, ...] = (
@@ -481,12 +502,14 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     if host == 'windows':
         # ADR-004: the Win32 host draws text with the shared HarfBuzz/FreeType engine.
         fetch_text_stack(ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
+        fetch_line_break(ROOT / 'gui_forms/third_party/fetch_linebreak.sh')
         options.extend(['-DGUI_FORMS_ENABLE_SKIA=OFF', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON'])
     else:
         if host == 'linux':
             os.environ['GUI_FORMS_SYSTEM_BUILD_TOOLS'] = '1'
         run('sh', ROOT / 'gui_forms/third_party/fetch_skia_cpu.sh')
         fetch_text_stack(ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
+        fetch_line_break(ROOT / 'gui_forms/third_party/fetch_linebreak.sh')
         skia_out: Path = build / 'skia'
         if host == 'linux':
             run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu_linux.sh', skia_out)

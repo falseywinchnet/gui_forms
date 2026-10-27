@@ -98,7 +98,7 @@ struct PresentationSettingHandler final {
 std::unique_ptr<gui_forms::Window> make_controller_window(
     gui_forms::Window* product) {
     using namespace gui_forms;
-    std::shared_ptr<gui_forms::FlowLayoutPanel> root = std::make_shared<FlowLayoutPanel>(StableId("demo.controller.window"));
+    std::shared_ptr<gui_forms::FlowLayoutPanelCompat> root = std::make_shared<FlowLayoutPanelCompat>(StableId("demo.controller.window"));
     (*root).set_flow_direction(FlowDirection::top_down);
     (*root).set_wrap_contents(false);
     (*root).set_padding({10,10,10,10});

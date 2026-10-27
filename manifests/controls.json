@@ -107,6 +107,17 @@
       "doc": "api/generated/gui_forms.Label.rst"
     },
     {
+      "id": "text_block",
+      "type": "TextBlock",
+      "header": "gui_forms/controls/text_block/text_block.hpp",
+      "category": "Information display",
+      "purpose": "CSS text leaf for the layout panels: white space collapsing, UAX #14 line breaking, line-height: normal or a set line height, text-align in both directions, no inset, and first and last baselines for flex, grid and block alignment.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "css-layout-panels",
+      "doc": "api/generated/gui_forms.TextBlock.rst"
+    },
+    {
       "id": "picture_box",
       "type": "PictureBox",
       "header": "gui_forms/controls/panel/picture_box/picture_box.hpp",
@@ -569,26 +580,61 @@
       "doc": "api/generated/gui_forms.TabPage.rst"
     },
     {
-      "id": "flow_layout_panel",
-      "type": "FlowLayoutPanel",
-      "header": "gui_forms/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.hpp",
+      "id": "flex_panel",
+      "type": "FlexPanel",
+      "header": "gui_forms/controls/scrollable_control/container_control/flex_panel/flex_panel.hpp",
       "category": "Layout",
-      "purpose": "Directional packing container with four flow directions, optional wrapping, bounded spacing, per-child margins, and stable flow breaks.",
-      "winforms": "FlowLayoutPanel",
+      "purpose": "CSS Flexbox container: rows or columns, wrapping lines, grow and shrink with frozen minimums and maximums, justify and align, auto margins, order and right-to-left mirroring.",
+      "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": "retained-layout-panels",
-      "doc": "api/generated/gui_forms.FlowLayoutPanel.rst"
+      "gallery_page": "css-layout-panels",
+      "doc": "api/generated/gui_forms.FlexPanel.rst"
     },
     {
-      "id": "table_layout_panel",
-      "type": "TableLayoutPanel",
-      "header": "gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp",
+      "id": "grid_panel",
+      "type": "GridPanel",
+      "header": "gui_forms/controls/scrollable_control/container_control/grid_panel/grid_panel.hpp",
       "category": "Layout",
-      "purpose": "Grid container with bounded rows and columns, absolute/percent/auto tracks, explicit or automatic placement, and row/column spans.",
-      "winforms": "TableLayoutPanel",
+      "purpose": "CSS Grid container: explicit and implicit tracks, line-based and automatic placement with dense packing, named areas, intrinsic, fixed and flexible track sizing, auto-fill and auto-fit repeats, gaps, box alignment with baselines, and right-to-left mirroring.",
+      "winforms": "GUI.Forms-only",
+      "status": "stable",
+      "gallery_page": "css-layout-panels",
+      "doc": "api/generated/gui_forms.GridPanel.rst"
+    },
+    {
+      "id": "block_panel",
+      "type": "BlockPanel",
+      "header": "gui_forms/controls/scrollable_control/container_control/block_panel/block_panel.hpp",
+      "category": "Layout",
+      "purpose": "CSS block formatting context: block items stacked with collapsing margins and auto horizontal margins, and runs of inline items broken into line boxes with text-align, a line strut and vertical-align, nested panels sharing margins, and right-to-left lines.",
+      "winforms": "GUI.Forms-only",
+      "status": "stable",
+      "gallery_page": "css-layout-panels",
+      "doc": "api/generated/gui_forms.BlockPanel.rst"
+    },
+    {
+      "id": "flow_layout_panel_compat",
+      "type": "FlowLayoutPanelCompat",
+      "header": "gui_forms/controls/scrollable_control/container_control/flow_layout_panel_compat/flow_layout_panel_compat.hpp",
+      "category": "Layout",
+      "purpose": "For Windows Forms migration, the Windows Forms FlowLayoutPanel: four flow directions, optional wrapping, bounded spacing, per-child margins and stable flow breaks; use FlexPanel for new work.",
+      "winforms": "FlowLayoutPanel",
+      "windows_forms_name": "FlowLayoutPanel",
       "status": "stable",
       "gallery_page": "retained-layout-panels",
-      "doc": "api/generated/gui_forms.TableLayoutPanel.rst"
+      "doc": "api/generated/gui_forms.FlowLayoutPanelCompat.rst"
+    },
+    {
+      "id": "table_layout_panel_compat",
+      "type": "TableLayoutPanelCompat",
+      "header": "gui_forms/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.hpp",
+      "category": "Layout",
+      "purpose": "For Windows Forms migration, the Windows Forms TableLayoutPanel: bounded rows and columns, absolute/percent/auto tracks, explicit or automatic placement and row/column spans; use GridPanel for new work.",
+      "winforms": "TableLayoutPanel",
+      "windows_forms_name": "TableLayoutPanel",
+      "status": "stable",
+      "gallery_page": "retained-layout-panels",
+      "doc": "api/generated/gui_forms.TableLayoutPanelCompat.rst"
     },
     {
       "id": "responsive_track_panel",

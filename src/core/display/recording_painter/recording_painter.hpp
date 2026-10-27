@@ -53,6 +53,8 @@ public:
 #endif
     [[nodiscard]] Size measure_text_utf8(std::string_view text,
                                          FontSpec font) override;
+    [[nodiscard]] TextResolutionStatus fill_line_break_opportunities_utf8(
+        std::string_view text, std::span<LineBreakOpportunity> opportunities) override;
     [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
         std::string_view text, FontSpec font) override;
     void draw_image(ImageId image, Rect destination, double opacity) override;

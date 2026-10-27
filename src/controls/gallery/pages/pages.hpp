@@ -26,6 +26,10 @@ void add_containers(const std::shared_ptr<Surface>& page,
 void add_layout_panels(const std::shared_ptr<Surface>& page,
                        const std::shared_ptr<PageContext>& context);
 
+// css-layout-panels
+void add_css_layout_panels(const std::shared_ptr<Surface>& page,
+                           const std::shared_ptr<PageContext>& context);
+
 // dock-and-anchor
 void add_dock_and_anchor(const std::shared_ptr<Surface>& page,
                          const std::shared_ptr<PageContext>& context);

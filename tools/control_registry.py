@@ -69,6 +69,11 @@ REQUIRED_FIELDS: tuple[str, ...] = (
     "gallery_page",
     "doc",
 )
+# `windows_forms_name`: the Windows Forms type name an importer maps to this
+# control when it differs from `type` (owner decision, 2026-10-26: an
+# imported FlowLayoutPanel becomes FlowLayoutPanelCompat). Every importer
+# reads this one table; a record without it is imported by its own name.
+OPTIONAL_FIELDS: tuple[str, ...] = ("windows_forms_name",)
 
 # Coverage rule roots: a header class counts as a public control/component type
 # when its base-class chain reaches one of these (the roots themselves are not
@@ -122,13 +127,14 @@ class ControlRecord:
     status: str
     gallery_page: str | None
     doc: str
+    windows_forms_name: str | None = None
 
     @staticmethod
     def from_mapping(raw: Mapping[str, object], index: int) -> ControlRecord:
         missing: list[str] = [field for field in REQUIRED_FIELDS if field not in raw]
         if missing:
             raise RegistryError(f"record {index}: missing field(s) {', '.join(missing)}")
-        extra: list[str] = sorted(set(raw) - set(REQUIRED_FIELDS))
+        extra: list[str] = sorted(set(raw) - set(REQUIRED_FIELDS) - set(OPTIONAL_FIELDS))
         if extra:
             raise RegistryError(f"record {index}: unknown field(s) {', '.join(extra)}")
         values: dict[str, object] = dict(raw)
@@ -139,6 +145,9 @@ class ControlRecord:
                     raise RegistryError(f"record {index}: gallery_page must be a string or null")
             elif not isinstance(value, str):
                 raise RegistryError(f"record {index}: {field} must be a string")
+        alias: object = values.get("windows_forms_name")
+        if alias is not None and not isinstance(alias, str):
+            raise RegistryError(f"record {index}: windows_forms_name must be a string")
         return ControlRecord(
             id=str(values["id"]),
             type=str(values["type"]),
@@ -149,6 +158,7 @@ class ControlRecord:
             status=str(values["status"]),
             gallery_page=values["gallery_page"] if values["gallery_page"] is None else str(values["gallery_page"]),
             doc=str(values["doc"]),
+            windows_forms_name=None if alias is None else str(alias),
         )
 
 
@@ -316,6 +326,8 @@ def validate(registry: Registry, include_root: Path = INCLUDE_ROOT) -> list[str]
     problems: list[str] = []
     seen_ids: dict[str, int] = {}
     seen_types: dict[str, int] = {}
+    seen_aliases: dict[str, int] = {}
+    all_types: set[str] = {record.type for record in registry.records}
     for index, record in enumerate(registry.records):
         label: str = f"record {index} ({record.type or record.id or '?'})"
         if not SNAKE_CASE.match(record.id):
@@ -343,6 +355,21 @@ def validate(registry: Registry, include_root: Path = INCLUDE_ROOT) -> list[str]
             problems.append(f"{label}: purpose must be a single sentence")
         if not record.winforms.strip():
             problems.append(f"{label}: winforms is empty (use 'GUI.Forms-only')")
+        alias: str | None = record.windows_forms_name
+        if alias is not None:
+            if not CPP_IDENTIFIER.match(alias):
+                problems.append(f"{label}: windows_forms_name '{alias}' is not a C++ identifier")
+            if alias == record.type:
+                problems.append(f"{label}: windows_forms_name '{alias}' is the type itself; leave it out")
+            elif alias in all_types:
+                problems.append(f"{label}: windows_forms_name '{alias}' is also a registry type, so an importer "
+                                "would have two targets")
+            if alias != record.winforms:
+                problems.append(f"{label}: windows_forms_name '{alias}' must be the record's winforms "
+                                f"counterpart ('{record.winforms}')")
+            if alias in seen_aliases:
+                problems.append(f"{label}: duplicate windows_forms_name '{alias}' (also record {seen_aliases[alias]})")
+            seen_aliases.setdefault(alias, index)
         expected_doc = f"api/generated/gui_forms.{record.type}.rst"
         if record.doc != expected_doc:
             problems.append(f"{label}: doc must be '{expected_doc}', got '{record.doc}'")

@@ -4,9 +4,11 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include FT_TRUETYPE_TABLES_H
 #include <hb-ft.h>
 #include <hb.h>
 #include <SheenBidi/SheenBidi.h>
+#include <linebreak.h>
 
 #include <algorithm>
 #include <array>
@@ -1077,6 +1079,66 @@ std::optional<PrimaryLineMetrics> HarfBuzzFontEngine::primary_line_metrics(const
     return std::nullopt;
 }
 
+namespace {
+
+// The face's design metrics at `font`'s size: FreeType's face ascender,
+// descender and height (from hhea, or OS/2's typographic values where hhea
+// has none) and OS/2's x-height, in font units, scaled by size over units
+// per em, unrounded. The gap is what the height adds to the ascender and
+// descender, never negative.
+FontVerticalMetrics design_line_metrics(FT_Face face, const FontSpec font) {
+    const double units_per_em = static_cast<double>((*face).units_per_EM);
+    FontVerticalMetrics result{};
+    if (units_per_em <= 0.0) return result;
+    const double scale = std::clamp(font.size, 1.0, 4096.0) / units_per_em;
+    const double ascent = static_cast<double>((*face).ascender);
+    const double descent = -static_cast<double>((*face).descender);
+    const double height = static_cast<double>((*face).height);
+    result.ascent = ascent * scale;
+    result.descent = descent * scale;
+    result.line_gap = std::max(0.0, height - ascent - descent) * scale;
+    const TT_OS2* const os2 = static_cast<const TT_OS2*>(FT_Get_Sfnt_Table(face, FT_SFNT_OS2));
+    if (os2 != nullptr && (*os2).version != 0xFFFFU && (*os2).version >= 2U) {
+        result.x_height = std::max(0.0, static_cast<double>((*os2).sxHeight) * scale);
+    }
+    return result;
+}
+
+[[nodiscard]] LineBreakOpportunity line_break_opportunity(unsigned char decision) noexcept {
+    switch (decision) {
+    case LINEBREAK_MUSTBREAK: return LineBreakOpportunity::mandatory;
+    case LINEBREAK_ALLOWBREAK: return LineBreakOpportunity::allowed;
+    case LINEBREAK_INSIDEACHAR: return LineBreakOpportunity::inside_character;
+    default: return LineBreakOpportunity::prohibited;
+    }
+}
+
+} // namespace
+
+TextResolutionStatus HarfBuzzFontEngine::fill_line_break_opportunities_utf8(
+    std::string_view utf8, std::span<LineBreakOpportunity> opportunities) noexcept {
+    if (opportunities.size() != utf8.size() || !validate_utf8(utf8).valid()) {
+        return TextResolutionStatus::invalid_request;
+    }
+    if (utf8.empty()) return TextResolutionStatus::exact;
+    // libunibreak writes one char per input byte. The caller's storage is
+    // one byte per entry, so it takes the decisions in place, and each is
+    // then read back as a byte and replaced by its opportunity.
+    static_assert(sizeof(LineBreakOpportunity) == sizeof(char));
+    char* const decisions = reinterpret_cast<char*>(opportunities.data());
+    const utf8_t* const source = reinterpret_cast<const utf8_t*>(utf8.data());
+    set_linebreaks_utf8(source, utf8.size(), "-strict", decisions);
+    const std::size_t size = utf8.size();
+    for (std::size_t index = 0U; index < size; ++index) {
+        const unsigned char decision = static_cast<unsigned char>(decisions[index]);
+        opportunities[index] = line_break_opportunity(decision);
+    }
+    // The end of the text ends its last line, whether or not it ends in a
+    // line terminator (libunibreak reports LINEBREAK_INDETERMINATE there).
+    opportunities[size - 1U] = LineBreakOpportunity::mandatory;
+    return TextResolutionStatus::exact;
+}
+
 ResolvedTextLayout HarfBuzzFontEngine::resolve(std::string_view utf8,
                                                FontSpec font) {
     ResolvedTextLayout result{};
@@ -1099,6 +1161,7 @@ ResolvedTextLayout HarfBuzzFontEngine::resolve(std::string_view utf8,
     // text uses (sized_line_metrics); the shaped height carries none.
     const Impl::Face& primary = *candidates.front();
     result.line_gap = sized_line_metrics(primary.face, primary.id, font).line_gap_device;
+    result.design_metrics = design_line_metrics(primary.face, font);
     result.missing_clusters = shaped.missing_clusters;
     result.status = shaped.missing_primary_face
         ? TextResolutionStatus::missing_primary_face

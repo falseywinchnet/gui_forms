@@ -8,15 +8,15 @@ void test_retained_layout_panels(gui_forms::Window& window) {
         FlowDirection::left_to_right, FlowDirection::right_to_left,
         FlowDirection::top_down, FlowDirection::bottom_up};
     for (std::size_t index = 0U; index < directions.size(); ++index) {
-        const std::shared_ptr<FlowLayoutPanel> flow =
-            std::dynamic_pointer_cast<FlowLayoutPanel>(window.find(
+        const std::shared_ptr<FlowLayoutPanelCompat> flow =
+            std::dynamic_pointer_cast<FlowLayoutPanelCompat>(window.find(
                 "gallery.layout.flow." + std::to_string(index)));
         require(flow && (*flow).flow_direction() == directions[index] &&
                     (*flow).children().size() == 5U,
-                "layout page must retain one public FlowLayoutPanel per direction");
+                "layout page must retain one public FlowLayoutPanelCompat per direction");
     }
-    const std::shared_ptr<FlowLayoutPanel> breaking =
-        std::dynamic_pointer_cast<FlowLayoutPanel>(window.find("gallery.layout.flow.0"));
+    const std::shared_ptr<FlowLayoutPanelCompat> breaking =
+        std::dynamic_pointer_cast<FlowLayoutPanelCompat>(window.find("gallery.layout.flow.0"));
     const Control::Ptr second_item = window.find("gallery.layout.flow.0.item.1");
     const Control::Ptr third_item = window.find("gallery.layout.flow.0.item.2");
     window.perform_layout();
@@ -26,8 +26,8 @@ void test_retained_layout_panels(gui_forms::Window& window) {
                 (*third_item).requested_bounds().x == 0.0,
             "a FlowBreak must start a new flow line without rewriting authored bounds");
 
-    const std::shared_ptr<TableLayoutPanel> table =
-        std::dynamic_pointer_cast<TableLayoutPanel>(window.find("gallery.layout.table"));
+    const std::shared_ptr<TableLayoutPanelCompat> table =
+        std::dynamic_pointer_cast<TableLayoutPanelCompat>(window.find("gallery.layout.table"));
     const Control::Ptr header = window.find("gallery.layout.table.header");
     const Control::Ptr span_note = window.find("gallery.layout.table.span");
     const Control::Ptr auto_placed = window.find("gallery.layout.table.auto.placed");

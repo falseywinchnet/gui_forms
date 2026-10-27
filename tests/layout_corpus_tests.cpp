@@ -6,18 +6,26 @@
 //
 //   gui_forms_layout_corpus_tests <corpus directory> [--native-out <dir>]
 //
-// For each fixture of corpus.xml and each profile, the fixture's HTML
-// fragment is read as XML, built into GUI.Forms controls, laid out in a
-// window of the profile's size and scale, and every element with a
+// For each fixture of corpus.xml and each profile that applies to it, the
+// fixture's HTML fragment is read as XML, built into GUI.Forms controls,
+// laid out in a window of the profile's size and scale (a right-to-left
+// profile, which applies only to a fixture marked bidirectional, sets the
+// root's LayoutDirection), and every element with a
 // data-gf-id is compared edge by edge with its reference box. A node over
 // tolerance fails the test unless the fixture records the difference with
 // data-gf-expected-difference="<reason>"; recorded differences are still
 // printed and counted. --native-out writes the native boxes in the
 // reference format, for tools/layout_oracle/compare.py's per-node report.
 //
-// The style reader here is deliberately small: it admits only the
-// declarations the existing containers can express, refuses everything
-// else by name, and is replaced by the layout value parser of phase L2.
+// The flow and table fixtures go through a deliberately small style reader
+// that admits only the declarations the Windows Forms containers can
+// express. Flex and grid fixtures (phases L3 and L4) are read whole by the
+// layout value reader of phase L2: a container's declarations become
+// FlexPanel or GridPanel properties, an item's its
+// FlexItemLayout or GridItemLayout, and every other declaration is refused
+// by name.
+
+#include "../src/core/layout/style_reader/layout_style_reader.hpp"
 
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/container_controls.hpp"
@@ -57,6 +65,14 @@ struct Profile final {
     std::uint32_t width{};
     std::uint32_t height{};
     double scale{1.0};
+    // The root's direction; right to left applies only to bidirectional
+    // fixtures.
+    LayoutDirection direction{LayoutDirection::left_to_right};
+};
+
+struct FixtureEntry final {
+    std::string name;
+    bool bidirectional{};
 };
 
 struct Tolerances final {
@@ -67,7 +83,7 @@ struct Tolerances final {
 struct Corpus final {
     std::vector<Profile> profiles;
     Tolerances tolerances;
-    std::vector<std::string> fixture_names;
+    std::vector<FixtureEntry> fixtures;
 };
 
 // One reference or native box in viewport coordinates, logical pixels.
@@ -151,17 +167,30 @@ Profile parse_profile(const XmlElement& element, const std::string& where) {
     profile.width = static_cast<std::uint32_t>(width);
     profile.height = static_cast<std::uint32_t>(height);
     profile.scale = scale;
+    const std::string* direction = attribute(element, "direction");
+    if (direction != nullptr) {
+        if (*direction == "rtl") {
+            profile.direction = LayoutDirection::right_to_left;
+        } else if (*direction != "ltr") {
+            fault(where, "profile direction " + *direction + " is not ltr or rtl");
+        }
+    }
     return profile;
 }
 
 bool same_profile(const Profile& left, const Profile& right) noexcept {
     return left.width == right.width && left.height == right.height &&
-           left.scale == right.scale;
+           left.scale == right.scale && left.direction == right.direction;
+}
+
+bool right_to_left(const Profile& profile) noexcept {
+    return profile.direction == LayoutDirection::right_to_left;
 }
 
 std::string profile_name(const Profile& profile) {
     std::ostringstream name;
     name << profile.width << 'x' << profile.height << '@' << profile.scale;
+    if (right_to_left(profile)) name << "/rtl";
     return name.str();
 }
 
@@ -186,13 +215,22 @@ Corpus read_corpus(const std::filesystem::path& root) {
                     (*name).find("..") != std::string::npos) {
                     fault(where, "a fixture name is missing or unsafe");
                 }
-                corpus.fixture_names.push_back(*name);
+                FixtureEntry entry;
+                entry.name = *name;
+                const std::string* marked = attribute(fixture, "bidirectional");
+                if (marked != nullptr) {
+                    if (*marked != "true" && *marked != "false") {
+                        fault(where, *name + ": bidirectional is true or false");
+                    }
+                    entry.bidirectional = *marked == "true";
+                }
+                corpus.fixtures.push_back(std::move(entry));
             }
         } else {
             fault(where, "unknown section <" + section.name + ">");
         }
     }
-    if (corpus.profiles.empty() || corpus.fixture_names.empty()) {
+    if (corpus.profiles.empty() || corpus.fixtures.empty()) {
         fault(where, "the corpus needs profiles and fixtures");
     }
     return corpus;
@@ -311,14 +349,20 @@ Insets parse_box_shorthand(std::string_view value, const std::string& where) {
 
 enum class FixtureKind : std::uint8_t {
     box,
-    flow_layout_panel,
-    table_layout_panel,
+    flow_layout_panel_compat,
+    table_layout_panel_compat,
+    flex_panel,
+    grid_panel,
+    block_panel,
 };
 
 FixtureKind parse_kind(const std::string& kind, const std::string& where) {
     if (kind == "box") return FixtureKind::box;
-    if (kind == "flow-layout-panel") return FixtureKind::flow_layout_panel;
-    if (kind == "table-layout-panel") return FixtureKind::table_layout_panel;
+    if (kind == "flow-layout-panel-compat") return FixtureKind::flow_layout_panel_compat;
+    if (kind == "table-layout-panel-compat") return FixtureKind::table_layout_panel_compat;
+    if (kind == "flex-panel") return FixtureKind::flex_panel;
+    if (kind == "grid-panel") return FixtureKind::grid_panel;
+    if (kind == "block-panel") return FixtureKind::block_panel;
     fault(where, "data-gf-kind \"" + kind + "\" is not built by the corpus harness yet");
 }
 
@@ -382,7 +426,7 @@ TableLayoutStyle parse_track(std::string_view component, const std::string& wher
     if (component.substr(0U, prefix.size()) == prefix && component.size() > prefix.size() + 3U &&
         component.substr(component.size() - 3U) == "fr)") {
         // minmax(0, Nfr) is the share of what is left after absolute and
-        // content-sized tracks, ignoring content: TableLayoutPanel's percent.
+        // content-sized tracks, ignoring content: TableLayoutPanelCompat's percent.
         style.size_mode = TableSizeMode::percent;
         style.size = parse_double(
             trimmed(component.substr(prefix.size(), component.size() - prefix.size() - 3U)),
@@ -418,7 +462,83 @@ struct ChildLayout final {
     std::optional<CellAlignment> align_self;
     bool explicit_width{};
     bool explicit_height{};
+    // Flex children: the whole item record.
+    FlexItemLayout flex_item;
+    // Grid children: the whole item record.
+    GridItemLayout grid_item;
+    // Block flow children: the whole item record.
+    BlockFlowItemLayout block_item;
 };
+
+// What the layout value reader may set on one element: the container and
+// item properties of its own kind and its parent's.
+struct ReaderRoles final {
+    bool flex_container{};
+    bool grid_container{};
+    bool flex_item{};
+    bool grid_item{};
+    bool block_container{};
+    bool block_item{};
+};
+
+bool reader_kind(FixtureKind kind) {
+    return kind == FixtureKind::flex_panel || kind == FixtureKind::grid_panel ||
+           kind == FixtureKind::block_panel;
+}
+
+// What a block flow panel's line boxes inherit from the fixture's text
+// declarations, which are not layout values: the corpus sets inline content
+// at `font-size: 0`, so a strut has no font metrics, and a `line-height`
+// in px then gives it half that above and half below the baseline.
+struct InheritedText final {
+    bool zero_font{};
+    // Negative for `normal`.
+    double line_height{-1.0};
+};
+
+// The text declarations taken out of an inline style before the layout
+// value reader sees it.
+struct TextDeclarations final {
+    std::optional<bool> zero_font;
+    std::optional<double> line_height;
+    std::optional<LayoutDirection> direction;
+};
+
+TextDeclarations take_text_declarations(std::string& style, const std::string& where) {
+    TextDeclarations taken;
+    std::string kept;
+    std::size_t start = 0U;
+    while (start <= style.size()) {
+        std::size_t end = style.find(';', start);
+        if (end == std::string::npos) end = style.size();
+        const std::string declaration = style.substr(start, end - start);
+        start = end + 1U;
+        const std::size_t colon = declaration.find(':');
+        const std::string_view name =
+            colon == std::string::npos ? std::string_view{} : trimmed(std::string_view(declaration).substr(0U, colon));
+        const std::string value =
+            colon == std::string::npos ? std::string{} : std::string(trimmed(std::string_view(declaration).substr(colon + 1U)));
+        if (name == "font-size") {
+            if (value != "0" && value != "0px") fault(where, "font-size is admitted only as 0 (the corpus's strut)");
+            taken.zero_font = true;
+        } else if (name == "line-height") {
+            taken.line_height = parse_length(value, where);
+        } else if (name == "direction") {
+            if (value == "rtl") {
+                taken.direction = LayoutDirection::right_to_left;
+            } else if (value == "ltr") {
+                taken.direction = LayoutDirection::left_to_right;
+            } else {
+                fault(where, "direction is ltr or rtl");
+            }
+        } else if (!trimmed(declaration).empty()) {
+            kept += declaration;
+            kept += ';';
+        }
+    }
+    style = kept;
+    return taken;
+}
 
 struct ContainerDefaults final {
     CellAlignment justify_items{CellAlignment::stretch};
@@ -466,7 +586,7 @@ public:
 
     Control::Ptr build(const XmlElement& root) {
         identities_.clear();
-        const BuiltElement built = build_element(root, std::nullopt);
+        const BuiltElement built = build_element(root, std::nullopt, InheritedText{});
         return built.control;
     }
 
@@ -478,7 +598,8 @@ public:
     std::span<const BuiltIdentity> identities() const&& = delete;
 
 private:
-    BuiltElement build_element(const XmlElement& element, std::optional<FixtureKind> parent_kind) {
+    BuiltElement build_element(const XmlElement& element, std::optional<FixtureKind> parent_kind,
+                               const InheritedText& inherited) {
         const std::string* identity = attribute(element, "data-gf-id");
         const std::string* kind_name = attribute(element, "data-gf-kind");
         if (identity == nullptr || kind_name == nullptr) {
@@ -494,29 +615,49 @@ private:
         identities_.push_back(BuiltIdentity{*identity, built.control});
 
         const std::string* style_text = attribute(element, "style");
+        std::string layout_style = style_text == nullptr ? std::string{} : *style_text;
+        const TextDeclarations text = take_text_declarations(layout_style, where);
+        const bool text_declared = text.zero_font || text.line_height || text.direction;
+        if (text_declared && kind != FixtureKind::block_panel) {
+            fault(where, "font-size, line-height and direction are built on a block-panel only");
+        }
+        InheritedText own = inherited;
+        if (text.zero_font) own.zero_font = true;
+        if (text.line_height) own.line_height = *text.line_height;
+        if (text.direction) control.set_layout_direction(*text.direction);
+        if (style_text != nullptr) style_text = &layout_style;
+        const bool reader_context = reader_kind(kind) || (parent_kind && reader_kind(*parent_kind));
+        if (reader_context) {
+            apply_reader_style(control, kind, parent_kind, style_text, built.layout, where);
+        }
+        if (kind == FixtureKind::block_panel && own.zero_font) {
+            const double half = own.line_height < 0.0 ? 0.0 : own.line_height / 2.0;
+            static_cast<BlockPanel&>(control).set_line_strut(LineStrut{half, half, 0.0});
+        }
         const std::vector<StyleDeclaration> declarations =
-            style_text == nullptr ? std::vector<StyleDeclaration>{} : read_style(*style_text, where);
+            style_text == nullptr || reader_context ? std::vector<StyleDeclaration>{}
+                                                    : read_style(*style_text, where);
         ContainerDefaults defaults;
         std::vector<TableLayoutStyle> columns;
         std::vector<TableLayoutStyle> rows;
         for (const StyleDeclaration& declaration : declarations) {
             const std::string declaration_where = where + " " + declaration.name;
             if (apply_common(control, declaration, built.layout, declaration_where)) continue;
-            if (kind == FixtureKind::flow_layout_panel &&
-                apply_flow(static_cast<FlowLayoutPanel&>(control), declaration,
+            if (kind == FixtureKind::flow_layout_panel_compat &&
+                apply_flow(static_cast<FlowLayoutPanelCompat&>(control), declaration,
                            declaration_where)) {
                 continue;
             }
-            if (kind == FixtureKind::table_layout_panel &&
-                apply_table(static_cast<TableLayoutPanel&>(control), declaration, defaults,
+            if (kind == FixtureKind::table_layout_panel_compat &&
+                apply_table(static_cast<TableLayoutPanelCompat&>(control), declaration, defaults,
                             columns, rows, declaration_where)) {
                 continue;
             }
-            if (parent_kind == FixtureKind::flow_layout_panel &&
+            if (parent_kind == FixtureKind::flow_layout_panel_compat &&
                 apply_flow_child(declaration, built.layout, declaration_where)) {
                 continue;
             }
-            if (parent_kind == FixtureKind::table_layout_panel &&
+            if (parent_kind == FixtureKind::table_layout_panel_compat &&
                 apply_table_child(declaration, built.layout, declaration_where)) {
                 continue;
             }
@@ -524,32 +665,294 @@ private:
                                          declaration.value + "\" is not admitted here");
         }
 
-        if (kind == FixtureKind::table_layout_panel) {
-            configure_table(static_cast<TableLayoutPanel&>(control), columns, rows, where);
+        if (kind == FixtureKind::table_layout_panel_compat) {
+            configure_table(static_cast<TableLayoutPanelCompat&>(control), columns, rows, where);
         }
         for (const XmlElement& child_element : element.children) {
-            const BuiltElement child = build_element(child_element, kind);
+            const BuiltElement child = build_element(child_element, kind, own);
             control.add_child(child.control);
-            if (kind == FixtureKind::flow_layout_panel && child.layout.flow_grow != 0.0) {
-                static_cast<FlowLayoutPanel&>(control).set_flex_grow(*child.control,
+            if (kind == FixtureKind::flow_layout_panel_compat && child.layout.flow_grow != 0.0) {
+                static_cast<FlowLayoutPanelCompat&>(control).set_flex_grow(*child.control,
                                                                      child.layout.flow_grow);
             }
-            if (kind == FixtureKind::table_layout_panel) {
-                place_table_child(static_cast<TableLayoutPanel&>(control), child, defaults,
+            if (kind == FixtureKind::table_layout_panel_compat) {
+                place_table_child(static_cast<TableLayoutPanelCompat&>(control), child, defaults,
                                   where);
+            }
+            if (kind == FixtureKind::flex_panel) {
+                static_cast<FlexPanel&>(control).set_item_layout(*child.control,
+                                                                       child.layout.flex_item);
+            }
+            if (kind == FixtureKind::grid_panel) {
+                try {
+                    static_cast<GridPanel&>(control).set_item_layout(*child.control,
+                                                                           child.layout.grid_item);
+                } catch (const std::invalid_argument& error) {
+                    fault(where, std::string("GridPanel refused an item layout: ") + error.what());
+                }
+            }
+            if (kind == FixtureKind::block_panel) {
+                if (child.layout.block_item.level == BlockFlowLevel::inline_level && !own.zero_font) {
+                    fault(where, "inline content needs font-size: 0 (the corpus's strut has no font metrics)");
+                }
+                try {
+                    static_cast<BlockPanel&>(control).set_item_layout(*child.control,
+                                                                          child.layout.block_item);
+                } catch (const std::invalid_argument& error) {
+                    fault(where, std::string("BlockPanel refused an item layout: ") + error.what());
+                }
             }
         }
         return built;
+    }
+
+    // A flex or grid container's, or a flex or grid item's, whole inline
+    // style through the layout value reader. On a fault the fixture is
+    // abandoned, so the partly configured control is never laid out.
+    void apply_reader_style(Control& control, FixtureKind kind, std::optional<FixtureKind> parent_kind,
+                            const std::string* style_text, ChildLayout& child, const std::string& where) {
+        LayoutStyle base{};
+        base.display = DisplayKind::block;
+        LayoutStyle style = base;
+        if (style_text != nullptr) {
+            diagnostics_.clear();
+            const gui_forms::theme_language::ThemeSource source{where, *style_text};
+            const gui_forms::layout_style::StyleReadOutcome outcome =
+                style_reader_.read_inline_style(source, style, diagnostics_);
+            if (outcome != gui_forms::layout_style::StyleReadOutcome::applied ||
+                !diagnostics_.records().empty()) {
+                std::string reported;
+                for (const gui_forms::theme_language::ThemeDiagnostic& diagnostic : diagnostics_.records()) {
+                    reported += " ";
+                    reported += gui_forms::theme_language::diagnostic_code_label(diagnostic.code);
+                    reported += " ";
+                    reported += diagnostic.property;
+                    reported += ": ";
+                    reported += diagnostic.detail;
+                }
+                fault(where, "the layout value reader reported" + reported);
+            }
+        }
+        ReaderRoles roles{};
+        roles.flex_container = kind == FixtureKind::flex_panel;
+        roles.grid_container = kind == FixtureKind::grid_panel;
+        roles.flex_item = parent_kind == FixtureKind::flex_panel;
+        roles.grid_item = parent_kind == FixtureKind::grid_panel;
+        roles.block_container = kind == FixtureKind::block_panel;
+        roles.block_item = parent_kind == FixtureKind::block_panel;
+        refuse_unbuilt_values(style, base, roles, where);
+
+        // Margins: a length, or `auto` on an item's side.
+        const BoxSides<AutoLengthPercentage>& margin = style.margin;
+        const BoxSides<bool> automatic{margin.top.automatic, margin.right.automatic, margin.bottom.automatic,
+                                       margin.left.automatic};
+        child.flex_item.auto_margin = automatic;
+        child.grid_item.auto_margin = automatic;
+        child.block_item.auto_margin = automatic;
+        Insets margins{};
+        margins.left = margin_length(margin.left, where);
+        margins.top = margin_length(margin.top, where);
+        margins.right = margin_length(margin.right, where);
+        margins.bottom = margin_length(margin.bottom, where);
+        control.set_margin(margins);
+        const BoxSides<LengthPercentage>& padding = style.padding;
+        if (padding.top.percent != 0.0 || padding.right.percent != 0.0 || padding.bottom.percent != 0.0 ||
+            padding.left.percent != 0.0) {
+            fault(where, "a percentage padding is not built by the corpus harness yet");
+        }
+        Insets paddings{};
+        paddings.left = padding.left.length.value();
+        paddings.top = padding.top.length.value();
+        paddings.right = padding.right.length.value();
+        paddings.bottom = padding.bottom.length.value();
+        control.set_padding(paddings);
+
+        if (roles.flex_container) {
+            FlexPanel& panel = static_cast<FlexPanel&>(control);
+            panel.set_flex_direction(style.flex.direction);
+            panel.set_flex_wrap(style.flex.wrap);
+            panel.set_justify_content(style.alignment.justify_content);
+            panel.set_align_content(style.alignment.align_content);
+            panel.set_align_items(style.alignment.align_items);
+            panel.set_row_gap(style.row_gap);
+            panel.set_column_gap(style.column_gap);
+        }
+        if (roles.grid_container) {
+            configure_grid(static_cast<GridPanel&>(control), style, where);
+        }
+        if (roles.block_container) {
+            static_cast<BlockPanel&>(control).set_text_align(style.text_align);
+        }
+        if (roles.block_item) {
+            BlockFlowItemLayout& layout = child.block_item;
+            layout.level = style.display == DisplayKind::inline_block ? BlockFlowLevel::inline_level
+                                                                      : BlockFlowLevel::block;
+            layout.width = style.width;
+            layout.height = style.height;
+            layout.min_width = style.min_width;
+            layout.min_height = style.min_height;
+            layout.max_width = style.max_width;
+            layout.max_height = style.max_height;
+            layout.vertical_align = style.vertical_align;
+            layout.positioning = ItemPositioning{style.position, style.inset};
+        }
+        if (roles.flex_item) {
+            FlexItemLayout& layout = child.flex_item;
+            layout.flex = style.flex_item;
+            layout.align_self = style.alignment.align_self;
+            layout.width = style.width;
+            layout.height = style.height;
+            layout.min_width = style.min_width;
+            layout.min_height = style.min_height;
+            layout.max_width = style.max_width;
+            layout.max_height = style.max_height;
+            layout.positioning = ItemPositioning{style.position, style.inset};
+        }
+        if (roles.grid_item) {
+            GridItemLayout& layout = child.grid_item;
+            layout.placement = style.grid_item;
+            layout.justify_self = style.alignment.justify_self;
+            layout.align_self = style.alignment.align_self;
+            layout.width = style.width;
+            layout.height = style.height;
+            layout.min_width = style.min_width;
+            layout.min_height = style.min_height;
+            layout.max_width = style.max_width;
+            layout.max_height = style.max_height;
+            layout.positioning = ItemPositioning{style.position, style.inset};
+        }
+    }
+
+    // A grid container's properties; a value the panel refuses abandons
+    // the fixture.
+    static void configure_grid(GridPanel& panel, const LayoutStyle& style, const std::string& where) {
+        try {
+            panel.set_template_columns(style.grid.template_columns);
+            panel.set_template_rows(style.grid.template_rows);
+            panel.set_template_areas(style.grid.template_areas);
+            panel.set_auto_flow(style.grid.auto_flow);
+            panel.set_auto_columns(style.grid.auto_columns);
+            panel.set_auto_rows(style.grid.auto_rows);
+            panel.set_justify_content(style.alignment.justify_content);
+            panel.set_align_content(style.alignment.align_content);
+            panel.set_justify_items(style.alignment.justify_items);
+            panel.set_align_items(style.alignment.align_items);
+            panel.set_row_gap(style.row_gap);
+            panel.set_column_gap(style.column_gap);
+        } catch (const std::invalid_argument& error) {
+            fault(where, std::string("GridPanel refused a container value: ") + error.what());
+        }
+    }
+
+    static double margin_length(const AutoLengthPercentage& side, const std::string& where) {
+        if (side.automatic) return 0.0;
+        if (side.value.percent != 0.0) fault(where, "a percentage margin is not built by the corpus harness yet");
+        return side.value.length.value();
+    }
+
+    // The values a flex or grid fixture may not use: those of a layout not
+    // built yet, and container or item values on an element that is not
+    // one.
+    static void refuse_unbuilt_values(const LayoutStyle& style, const LayoutStyle& base, const ReaderRoles& roles,
+                                      const std::string& where) {
+        if (!roles.block_container && style.text_align != base.text_align) {
+            fault(where, "text-align on an element that is not a block-panel");
+        }
+        if (!roles.block_item && style.vertical_align != base.vertical_align) {
+            fault(where, "vertical-align on an element that is not a block flow item");
+        }
+        const bool container = roles.flex_container || roles.grid_container;
+        const bool item = roles.flex_item || roles.grid_item || roles.block_item;
+        if (roles.flex_container && style.display != DisplayKind::flex) {
+            fault(where, "a flex-panel is display: flex");
+        }
+        if (roles.grid_container && style.display != DisplayKind::grid) {
+            fault(where, "a grid-panel is display: grid");
+        }
+        const bool inline_block = roles.block_item && style.display == DisplayKind::inline_block;
+        if (inline_block && (roles.flex_container || roles.grid_container)) {
+            fault(where, "inline-flex and inline-grid are not built by the corpus harness yet");
+        }
+        if (!container && style.display != DisplayKind::block && !inline_block) {
+            fault(where, "only a flex-panel or a grid-panel changes display, and a block flow "
+                         "item to inline-block");
+        }
+        if (!roles.flex_container && !(style.flex == base.flex)) {
+            fault(where, "flex container values on an element that is not one");
+        }
+        const bool grid_values = !(style.grid == base.grid) ||
+                                 style.alignment.justify_items != base.alignment.justify_items;
+        if (!roles.grid_container && grid_values) {
+            fault(where, "grid container values on an element that is not one");
+        }
+        const bool container_values = !(style.row_gap == base.row_gap) || !(style.column_gap == base.column_gap) ||
+                                      style.alignment.justify_content != base.alignment.justify_content ||
+                                      style.alignment.align_content != base.alignment.align_content ||
+                                      style.alignment.align_items != base.alignment.align_items;
+        if (!container && container_values) {
+            fault(where, "container values on an element that is not a container");
+        }
+        const bool sized = !(style.width == base.width) || !(style.height == base.height) ||
+                           !(style.min_width == base.min_width) || !(style.min_height == base.min_height) ||
+                           !(style.max_width == base.max_width) || !(style.max_height == base.max_height);
+        if (!item && (sized || style.alignment.align_self != base.alignment.align_self)) {
+            fault(where, "item values on an element that is not an item (the root fills the window)");
+        }
+        if (!roles.flex_item && !(style.flex_item == base.flex_item)) {
+            fault(where, "flex item values on an element that is not one");
+        }
+        const bool grid_item_values = !(style.grid_item == base.grid_item) ||
+                                      style.alignment.justify_self != base.alignment.justify_self;
+        if (!roles.grid_item && grid_item_values) {
+            fault(where, "grid item values on an element that is not one");
+        }
+        const bool positioned = style.position != base.position || !(style.inset == base.inset);
+        if (!item && positioned) fault(where, "position and insets on an element that is not an item");
+        // An absolute item with both insets `auto` on an axis is placed at
+        // its static position, which the containers take as the content
+        // box's start (a recorded limit), not CSS's in-flow position.
+        const BoxSides<AutoLengthPercentage>& inset = style.inset;
+        const bool static_axis = (inset.left.automatic && inset.right.automatic) ||
+                                 (inset.top.automatic && inset.bottom.automatic);
+        if (style.position == PositionKind::absolute && static_axis) {
+            fault(where, "an absolute item with both insets auto on an axis (its static position) is not compared");
+        }
+        // The containers take percentages of their content box, and an
+        // absolute item's containing block whole (recorded limits): CSS
+        // takes a grid item's area, and a block's height only when it is
+        // definite.
+        if (style.position == PositionKind::absolute && roles.grid_item && !(style.grid_item == base.grid_item)) {
+            fault(where, "grid placement on an absolute item is not built");
+        }
+        const bool percent_inset = inset.top.value.percent != 0.0 || inset.right.value.percent != 0.0 ||
+                                   inset.bottom.value.percent != 0.0 || inset.left.value.percent != 0.0;
+        const bool percent_vertical = inset.top.value.percent != 0.0 || inset.bottom.value.percent != 0.0;
+        if (style.position == PositionKind::relative && roles.grid_item && percent_inset) {
+            fault(where, "a relative grid item's percentage inset (of its grid area in CSS) is not built");
+        }
+        if (style.position == PositionKind::relative && roles.block_item && percent_vertical) {
+            fault(where, "a relative block flow item's vertical percentage inset is not built");
+        }
+        const BoxSides<AutoLengthPercentage>& margin = style.margin;
+        const bool automatic_margin =
+            margin.top.automatic || margin.right.automatic || margin.bottom.automatic || margin.left.automatic;
+        if (!item && automatic_margin) fault(where, "an auto margin outside a flex, grid or block flow container");
     }
 
     static Control::Ptr make_kind(FixtureKind kind, const std::string& identity) {
         switch (kind) {
         case FixtureKind::box:
             return make_control<Panel>(StableId(identity));
-        case FixtureKind::flow_layout_panel:
-            return make_control<FlowLayoutPanel>(StableId(identity));
-        case FixtureKind::table_layout_panel:
-            return make_control<TableLayoutPanel>(StableId(identity));
+        case FixtureKind::flow_layout_panel_compat:
+            return make_control<FlowLayoutPanelCompat>(StableId(identity));
+        case FixtureKind::table_layout_panel_compat:
+            return make_control<TableLayoutPanelCompat>(StableId(identity));
+        case FixtureKind::flex_panel:
+            return make_control<FlexPanel>(StableId(identity));
+        case FixtureKind::grid_panel:
+            return make_control<GridPanel>(StableId(identity));
+        case FixtureKind::block_panel:
+            return make_control<BlockPanel>(StableId(identity));
         }
         throw std::logic_error("unknown fixture kind");
     }
@@ -580,11 +983,11 @@ private:
         return false;
     }
 
-    static bool apply_flow(FlowLayoutPanel& flow, const StyleDeclaration& declaration,
+    static bool apply_flow(FlowLayoutPanelCompat& flow, const StyleDeclaration& declaration,
                            const std::string& where) {
         const std::string& value = declaration.value;
         if (declaration.name == "display") {
-            if (value != "flex") fault(where, "a flow-layout-panel is display: flex");
+            if (value != "flex") fault(where, "a flow-layout-panel-compat is display: flex");
             return true;
         }
         if (declaration.name == "flex-direction") {
@@ -598,7 +1001,7 @@ private:
         if (declaration.name == "flex-wrap") {
             if (value == "wrap") flow.set_wrap_contents(true);
             else if (value == "nowrap") flow.set_wrap_contents(false);
-            else fault(where, "FlowLayoutPanel has no " + value);
+            else fault(where, "FlowLayoutPanelCompat has no " + value);
             return true;
         }
         if (declaration.name == "justify-content") {
@@ -634,9 +1037,9 @@ private:
             return true;
         }
         if (declaration.name == "align-content") {
-            // FlowLayoutPanel packs its lines at the start.
+            // FlowLayoutPanelCompat packs its lines at the start.
             if (value != "flex-start" && value != "start") {
-                fault(where, "FlowLayoutPanel packs lines at the start only");
+                fault(where, "FlowLayoutPanelCompat packs lines at the start only");
             }
             return true;
         }
@@ -663,7 +1066,7 @@ private:
             }
             const std::vector<std::string> components = value_components(value);
             if (components.size() != 3U || components[1] != "0" || components[2] != "auto") {
-                fault(where, "FlowLayoutPanel admits flex: none or flex: <grow> 0 auto");
+                fault(where, "FlowLayoutPanelCompat admits flex: none or flex: <grow> 0 auto");
             }
             grow = parse_double(components[0], where);
             return true;
@@ -673,22 +1076,22 @@ private:
             return true;
         }
         if (declaration.name == "flex-shrink") {
-            if (value != "0") fault(where, "FlowLayoutPanel never shrinks items");
+            if (value != "0") fault(where, "FlowLayoutPanelCompat never shrinks items");
             return true;
         }
         if (declaration.name == "flex-basis") {
-            if (value != "auto") fault(where, "FlowLayoutPanel items have basis auto");
+            if (value != "auto") fault(where, "FlowLayoutPanelCompat items have basis auto");
             return true;
         }
         return false;
     }
 
-    static bool apply_table(TableLayoutPanel& table, const StyleDeclaration& declaration,
+    static bool apply_table(TableLayoutPanelCompat& table, const StyleDeclaration& declaration,
                             ContainerDefaults& defaults, std::vector<TableLayoutStyle>& columns,
                             std::vector<TableLayoutStyle>& rows, const std::string& where) {
         const std::string& value = declaration.value;
         if (declaration.name == "display") {
-            if (value != "grid") fault(where, "a table-layout-panel is display: grid");
+            if (value != "grid") fault(where, "a table-layout-panel-compat is display: grid");
             return true;
         }
         if (declaration.name == "grid-template-columns" || declaration.name == "grid-template-rows") {
@@ -717,18 +1120,18 @@ private:
             return true;
         }
         if (declaration.name == "justify-content" || declaration.name == "align-content") {
-            // TableLayoutPanel packs its tracks at the start; CSS's default
+            // TableLayoutPanelCompat packs its tracks at the start; CSS's default
             // (normal) stretches auto tracks into free space, which a
             // fixture records as a difference where it shows.
             if (value != "start" && value != "normal") {
-                fault(where, "TableLayoutPanel packs tracks at the start only");
+                fault(where, "TableLayoutPanelCompat packs tracks at the start only");
             }
             return true;
         }
         if (declaration.name == "grid-auto-flow") {
             if (value == "row") table.set_grow_style(TableLayoutGrowStyle::add_rows);
             else if (value == "column") table.set_grow_style(TableLayoutGrowStyle::add_columns);
-            else fault(where, "TableLayoutPanel grows by rows or columns only");
+            else fault(where, "TableLayoutPanelCompat grows by rows or columns only");
             return true;
         }
         return false;
@@ -755,9 +1158,9 @@ private:
         return false;
     }
 
-    static void configure_table(TableLayoutPanel& table, const std::vector<TableLayoutStyle>& columns,
+    static void configure_table(TableLayoutPanelCompat& table, const std::vector<TableLayoutStyle>& columns,
                                 const std::vector<TableLayoutStyle>& rows, const std::string& where) {
-        if (columns.empty()) fault(where, "a table-layout-panel needs grid-template-columns");
+        if (columns.empty()) fault(where, "a table-layout-panel-compat needs grid-template-columns");
         table.set_grow_style(TableLayoutGrowStyle::add_rows);
         table.set_column_count(columns.size());
         table.set_row_count(rows.empty() ? 1U : rows.size());
@@ -769,12 +1172,12 @@ private:
         }
     }
 
-    static void place_table_child(TableLayoutPanel& table, const BuiltElement& child,
+    static void place_table_child(TableLayoutPanelCompat& table, const BuiltElement& child,
                                   const ContainerDefaults& defaults, const std::string& where) {
         const ChildLayout& layout = child.layout;
         Control& control = *child.control;
         if (layout.column.start_line.has_value() != layout.row.start_line.has_value()) {
-            fault(where, "TableLayoutPanel places a child on both axes or neither");
+            fault(where, "TableLayoutPanelCompat places a child on both axes or neither");
         }
         if (layout.column.start_line) {
             table.set_cell_position(control, TableLayoutCellPosition{*layout.column.start_line - 1U,
@@ -790,6 +1193,9 @@ private:
 
     std::string fixture_name_;
     std::vector<BuiltIdentity> identities_;
+    // Reused for every flex and grid element of the fixture.
+    gui_forms::layout_style::LayoutStyleReader style_reader_;
+    gui_forms::theme_language::ThemeDiagnosticList diagnostics_;
 };
 
 // ---------------------------------------------------------------------------
@@ -828,6 +1234,7 @@ struct IdentityMatches final {
 };
 
 struct FixtureTally final {
+    std::uint64_t profiles{};
     std::uint64_t nodes{};
     std::uint64_t over_tolerance{};
     std::uint64_t recorded{};
@@ -849,8 +1256,9 @@ std::map<std::string, std::string> expected_differences(const XmlElement& elemen
 }
 
 bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
-                 const std::string& name, const std::optional<std::filesystem::path>& native_out,
+                 const FixtureEntry& entry, const std::optional<std::filesystem::path>& native_out,
                  FixtureTally& tally) {
+    const std::string& name = entry.name;
     const XmlElement fixture = read_document(corpus_root / "fixtures" / (name + ".html"));
     const std::vector<ProfileBoxes> references =
         read_boxes(corpus_root / "references" / (name + ".xml"));
@@ -862,6 +1270,8 @@ bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
            << "\">\n";
 
     for (const Profile& profile : corpus.profiles) {
+        if (right_to_left(profile) && !entry.bidirectional) continue;
+        ++tally.profiles;
         const std::vector<ProfileBoxes>::const_iterator reference = std::find_if(
             references.begin(), references.end(), ProfileMatches{profile});
         if (reference == references.end()) {
@@ -871,13 +1281,15 @@ bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
         }
         FixtureBuilder builder(name);
         const Control::Ptr root = builder.build(fixture);
+        if (right_to_left(profile)) (*root).set_layout_direction(LayoutDirection::right_to_left);
         const std::unique_ptr<Window> held_window = std::make_unique<Window>(
             root, Size{static_cast<double>(profile.width), static_cast<double>(profile.height)});
         Window& window = *held_window;
         window.set_scale(profile.scale);
         window.perform_layout();
         native << "  <profile viewport=\"" << profile.width << 'x' << profile.height
-               << "\" scale=\"" << format_number(profile.scale) << "\">\n";
+               << "\" scale=\"" << format_number(profile.scale) << '"'
+               << (right_to_left(profile) ? " direction=\"rtl\"" : "") << ">\n";
         const std::span<const BuiltIdentity> built = builder.identities();
         for (const BuiltIdentity& entry : built) {
             const Rect observed = (*entry.control).absolute_bounds();
@@ -948,20 +1360,22 @@ int main(int argument_count, char** arguments) {
         const Corpus corpus = read_corpus(corpus_root);
         bool passed = true;
         FixtureTally total;
-        for (const std::string& name : corpus.fixture_names) {
+        for (const FixtureEntry& entry : corpus.fixtures) {
             FixtureTally tally;
-            const bool fixture_passed = run_fixture(corpus_root, corpus, name, native_out, tally);
-            std::cout << name << ": " << tally.nodes << " nodes, largest edge difference "
+            const bool fixture_passed = run_fixture(corpus_root, corpus, entry, native_out, tally);
+            std::cout << entry.name << ": " << tally.profiles << " profiles, " << tally.nodes
+                      << " nodes, largest edge difference "
                       << tally.largest_edge << ", " << tally.over_tolerance
                       << " over tolerance, " << tally.recorded << " recorded\n";
             passed = passed && fixture_passed;
+            total.profiles += tally.profiles;
             total.nodes += tally.nodes;
             total.over_tolerance += tally.over_tolerance;
             total.recorded += tally.recorded;
             total.largest_edge = std::max(total.largest_edge, tally.largest_edge);
         }
-        std::cout << "corpus: " << corpus.fixture_names.size() << " fixtures, "
-                  << corpus.profiles.size() << " profiles, " << total.nodes << " nodes, "
+        std::cout << "corpus: " << corpus.fixtures.size() << " fixtures, "
+                  << total.profiles << " fixture profiles, " << total.nodes << " nodes, "
                   << total.over_tolerance << " over tolerance, " << total.recorded
                   << " recorded differences, largest edge difference " << total.largest_edge
                   << '\n';

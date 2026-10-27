@@ -12,7 +12,7 @@ typed records (`(*bar).parts().thumb`) and registers handlers through each type'
 (`(*button).clicked()`). An interaction's payload is the handler's argument types; *by
 reference* marks a payload the handler receives by mutable reference.
 
-Every control also has these properties: `accessible_description`, `accessible_name`, `allow_drop`, `anchor`, `auto_scroll_offset`, `auto_size`, `auto_size_mode`, `bounds`, `causes_validation`, `dock`, `enabled`, `hit_test_transparent`, `margin`, `maximum_size`, `minimum_size`, `name`, `padding`, `tab_index`, `tab_stop`, `visible`.
+Every control also has these properties: `accessible_description`, `accessible_name`, `allow_drop`, `anchor`, `auto_scroll_offset`, `auto_size`, `auto_size_mode`, `bounds`, `causes_validation`, `dock`, `enabled`, `hit_test_transparent`, `layout_direction`, `margin`, `maximum_size`, `minimum_size`, `name`, `padding`, `tab_index`, `tab_stop`, `visible`.
 
 Every control also raises these interactions: `name_changed`, `visible_changed`, `enabled_changed`, `auto_size_changed`, `causes_validation_changed`, `validating`, `validated`, `initialization_completed`, `pointer_observed`, `pointer_preview_observed`, `focus_observed`, `arranged_bounds_changed`, `help_requested`.
 
@@ -292,6 +292,21 @@ Properties beyond every control's: none.
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: `font` (font), `fore_color` (color), `maximum_lines` (unsigned_integer), `text` (text).
+
+| Interaction | Payload |
+|---|---|
+| `text_changed` | `std::string` |
+
+## `text_block` (TextBlock, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `text` | label |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: `font` (font), `fore_color` (color), `line_height` (number), `text` (text), `text_align` (enumeration).
 
 | Interaction | Payload |
 |---|---|
@@ -1832,7 +1847,7 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 
-## `flow_layout_panel` (FlowLayoutPanel, control)
+## `flex_panel` (FlexPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1858,7 +1873,85 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `auto_validate_changed` | `AutoValidate` |
 
-## `table_layout_panel` (TableLayoutPanel, control)
+## `grid_panel` (GridPanel, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `viewport` | region |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `scroll` | `ScrollEvent`, by reference |
+| `auto_validate_changed` | `AutoValidate` |
+
+## `block_panel` (BlockPanel, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `viewport` | region |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `scroll` | `ScrollEvent`, by reference |
+| `auto_validate_changed` | `AutoValidate` |
+
+## `flow_layout_panel_compat` (FlowLayoutPanelCompat, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `viewport` | region |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `scroll` | `ScrollEvent`, by reference |
+| `auto_validate_changed` | `AutoValidate` |
+
+## `table_layout_panel_compat` (TableLayoutPanelCompat, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|

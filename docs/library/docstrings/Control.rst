@@ -90,6 +90,16 @@ anchor : default ``AnchorStyles::top | AnchorStyles::left``
 auto_size_mode : default ``AutoSizeMode::grow_only``
     With `auto_size` on, whether measurement may shrink the control below
     its requested size (`AutoSizeMode::grow_and_shrink`) or only grow it.
+layout_direction : default ``LayoutDirection::inherit``
+    The inline direction the control lays its children out in;
+    `LayoutDirection::inherit` takes the parent's, and a control with no
+    parent is left to right. Right to left mirrors docking, anchoring and
+    requested bounds, as Windows Forms' `RightToLeftLayout`: the layout is
+    computed left to right and mirrored about the control's viewport, so
+    `DockStyle::left` docks at the right, an anchor to the left keeps the
+    distance to the right edge, a requested x is measured from the right
+    edge, and padding and margins mirror too. The CSS containers keep their
+    own start and end model.
 auto_scroll_offset
     An offset a scrolling parent uses when it scrolls this control into
     view.

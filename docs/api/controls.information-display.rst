@@ -13,6 +13,8 @@ Labels, images, progress and review cards.
 
    * - :cpp:class:`Label <gui_forms::Label>`
      - Read-only text that names, describes or reports something.
+   * - :cpp:class:`TextBlock <gui_forms::TextBlock>`
+     - Read-only text laid out as CSS lays out the text of a block, for use inside the layout panels.
    * - :cpp:class:`PictureBox <gui_forms::PictureBox>`
      - A box that displays one image from its window's image registry.
    * - :cpp:class:`ProgressBar <gui_forms::ProgressBar>`
@@ -24,6 +26,7 @@ Labels, images, progress and review cards.
    :hidden:
 
    generated/gui_forms.Label
+   generated/gui_forms.TextBlock
    generated/gui_forms.PictureBox
    generated/gui_forms.ProgressBar
    generated/gui_forms.ReviewCard
@@ -47,6 +50,8 @@ Related types
      - ProgressBarAnimationAppearance is the validated value object for stripe width, gap, angle, and opacity used by painter-neutral progress animation.
    * - :cpp:class:`ReviewRecord <gui_forms::ReviewRecord>`
      - ReviewRecord owns the stable author, timestamp, score/status, title, body, and metadata projected by ReviewCard.
+   * - :cpp:class:`TextBlock::Parts <gui_forms::TextBlock::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts); its states are Control's.
 
 .. cpp:namespace:: gui_forms
 
@@ -167,6 +172,18 @@ Related types
    .. cpp:member:: ReviewDisposition disposition
 
       Default: ``{ReviewDisposition::neutral}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TextBlock::Parts final
+
+   ``#include <gui_forms/controls/text_block/text_block.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts); its states are Control's. ``text`` is the box the lines fill: the content box's width and the lines' height, absent with no text.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry text
 
 Enumerations
 ------------
