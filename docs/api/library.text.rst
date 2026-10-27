@@ -2180,7 +2180,7 @@ Functions, constants and aliases
 
 .. cpp:function:: LineBoxMetrics line_box_metrics(const ResolvedTextLayout& primary, std::optional<double> used_line_height) noexcept
 
-   The line box of ``primary`` (a resolution of any text in the used font). The face's ascent, descent and line gap are each rounded to a whole logical pixel; ``normal`` (no used_line_height) is their sum. The leading (the gap, or a used line height's excess over the rounded ascent and descent, negative when it is less) goes half above the text, rounded down, and the rest below: Chromium's rounding, measured against Chrome 155 from 12 to 21 px (planning/stages/L-layout/PLAN.md section 12.5). Without design metrics (an estimate) it uses the resolution's ascent, descent and line gap.
+   The line box of ``primary`` (a resolution of any text in the used font). The face's ascent, descent and line gap are each rounded to a whole logical pixel; ``normal`` (no used_line_height) is their sum. The leading (the gap, or a used line height's excess over the rounded ascent and descent, negative when it is less) goes half above the text, rounded down, and the rest below: Chromium's rounding, measured against Chrome 155 from 12 to 21 px (notes:planning/stages/L-layout/PLAN.md section 12.5). Without design metrics (an estimate) it uses the resolution's ascent, descent and line gap.
 
 .. cpp:function:: double snap_text_baseline(double logical_baseline, double device_scale) noexcept
 

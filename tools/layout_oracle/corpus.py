@@ -1,6 +1,6 @@
 """The layout fixture corpus: its manifest, its box files and their comparison.
 
-The corpus lives in tests/layout_corpus/ (planning/stages/L-layout/PLAN.md
+The corpus lives in tests/layout_corpus/ (notes:planning/stages/L-layout/PLAN.md
 section 6.4):
 
 - corpus.xml, the manifest: the profiles, the tolerances, and the fixtures

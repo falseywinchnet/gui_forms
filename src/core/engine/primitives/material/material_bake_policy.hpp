@@ -52,7 +52,7 @@ struct BakeEffort final {
 // 4 ms bound of the reference machine (accepted by the owner, 2026-10-22)
 // at the weights below, which are those measurements scaled to whole
 // units, so that every material accepted or refused under that bound
-// keeps its outcome (planning/stages/T2-engine-core/README.md, "Bake
+// keeps its outcome (notes:planning/stages/T2-engine-core/README.md, "Bake
 // effort"). Change it here.
 inline constexpr BakeEffort maximum_material_bake_effort{20'000'000U};
 
@@ -105,7 +105,7 @@ struct MaterialEffortWeights final {
 // 2026-10-23 (gui_forms_engine_material_tests --measure: for each layer
 // kind, the median of nine bakes of a 256 × 256 destination at scale 1,
 // less the base material's, per pixel; seven runs; recorded in
-// planning/stages/T2-engine-core/README.md, "Bake costs on a quiet
+// notes:planning/stages/T2-engine-core/README.md, "Bake costs on a quiet
 // machine"), each median rounded up and scaled so that the least, a
 // gradient stop, is one unit. border_pattern is per pixel of a dashed ring
 // whose every pixel is on an arc, its dearest, and is charged per

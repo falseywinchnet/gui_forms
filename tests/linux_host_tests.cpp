@@ -475,7 +475,7 @@ void live_frame_sequence(Runtime &runtime) {
 // Stage DP gate on X11: two distant damaged rectangles paint their sum, not
 // their bounding box; the host copies exactly that rectangle set to the
 // window; and no pixel outside them changes, in the raster or on the X
-// server. The record is results/2026-10-25-dp-gate-x11.
+// server. The record is notes:results/2026-10-25-dp-gate-x11.
 class ColorBlock final : public Control {
 public:
   ColorBlock(StableId id, const Color color) : Control(std::move(id)), color_(color) {}

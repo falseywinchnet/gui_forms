@@ -1,4 +1,4 @@
-// Stage T5, phase C4's gate (planning/stages/T5-compositor/PLAN.md §5 C4):
+// Stage T5, phase C4's gate (notes:planning/stages/T5-compositor/PLAN.md §5 C4):
 // a GUI.Forms window on the X11 host, declared non-opaque, under Xvfb with
 // no compositing manager, then with xcompmgr running, stopped and started
 // again, read back from the X server.

@@ -11,7 +11,7 @@ runs the same control tree on macOS, Windows and Linux.
 Windows hosts are native; the Linux X11 host is opt-in. GUI.Forms is CPU-only
 by design and has no GPU backend. Text is drawn by one HarfBuzz/FreeType
 engine from bundled fonts, so the same string renders identically on every
-platform ([ADR-004](decisions/ADR-004-one-text-rasterization-engine.md)).**
+platform ([ADR-004](docs/dev/adr/ADR-004.md)).**
 
 ## First window
 
@@ -299,9 +299,10 @@ in CI.
   control, its WinForms counterpart and a one-line description.
 - [API reference](https://gui-forms.readthedocs.io/en/latest/api/index.html): every public type, member and
   enumeration, generated from the headers.
-- [`decisions/`](decisions/): architecture decision records.
-- [`planning/`](planning/): internal plans and working notes, kept as records
-  rather than user documentation.
+- [`docs/dev/adr/`](docs/dev/adr/): architecture decision records.
+- [`malkuth-software/notes`, branch `gui_forms`](https://github.com/malkuth-software/notes/tree/gui_forms):
+  plans, stage briefs, measurements, experiments and working notes, kept as
+  records rather than user documentation.
 
 ## Project boundaries
 
@@ -315,7 +316,7 @@ boundaries.
 ## Contributing
 
 CI ([`native.yml`](.github/workflows/native.yml)) must pass on every platform.
-C++ follows [`planning/PROGRAMMING_HOUSE_STYLE.md`](planning/PROGRAMMING_HOUSE_STYLE.md);
+C++ follows the house style, [`HOUSE_STYLE.md`](https://github.com/malkuth-software/notes/blob/main/HOUSE_STYLE.md);
 CI fails on any spelling finding from
 `python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis`,
 so run it before you push. Build the docs with `sphinx-build -W docs <out>` so

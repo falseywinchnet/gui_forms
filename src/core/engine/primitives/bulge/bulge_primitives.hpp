@@ -7,7 +7,7 @@
 namespace gui_forms::engine_primitives {
 
 // The ribbon button's cloth bulge, as the rendering reference specifies it
-// (planning/stages/T4-default-theme/RENDERING_REFERENCE.md §2 and §3; design
+// (notes:planning/stages/T4-default-theme/RENDERING_REFERENCE.md §2 and §3; design
 // language §3.5). The plane itself swells: a lit slope toward the upper-left
 // light, a shaded slope away from it and a faint crown, each a field
 // 1 − t^q over its own ellipse. There is no edge of any kind. `pressed`

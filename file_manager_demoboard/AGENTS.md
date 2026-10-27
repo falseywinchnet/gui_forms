@@ -21,7 +21,7 @@ Read, in order, before changing code or specifications:
 
 ## Code style
 
-Code here follows `../planning/PROGRAMMING_HOUSE_STYLE.md`, as everywhere in
+Code here follows the house style (`HOUSE_STYLE.md` in `malkuth-software/notes`), as everywhere in
 GUI.Forms; see "Code style (mandatory)" in the parent `../AGENTS.md`. The
 `house-style` CI job checks this directory.
 

@@ -8,7 +8,7 @@
 
 0.2 is the "Verified" series. Each item in it has a recorded gate: tests
 that measure it on every host it applies to (Windows x64, macOS arm64, Linux
-x64 and Linux arm64), and a record under `results/` saying what was
+x64 and Linux arm64), and a record under [`results/`](https://github.com/malkuth-software/notes/tree/gui_forms/results) saying what was
 measured. The demonstration programs are the same three as in 0.1: the
 control Gallery, the fixture-backed Explore preview and the Correspondence
 mail mockup.
@@ -68,7 +68,7 @@ mail mockup.
   and states in one schema (`manifests/control-schema.json`), and its parts
   publish their geometry. A test lays out every Gallery page and reads each
   part's geometry from it. When the gate was recorded, that covered 60 of 60
-  controls (`results/2026-10-13-t1-anatomy-gate`).
+  controls ([`results/2026-10-13-t1-anatomy-gate`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-13-t1-anatomy-gate)).
 
 ### Accessibility
 - Verified on every host through the platform's own accessibility API.
@@ -77,9 +77,9 @@ mail mockup.
   value and actions. Each control's default action is performed through the
   same API. Windows is read through MSAA and UI Automation, Linux through
   AT-SPI and macOS through AX. Windows gains a UI Automation provider.
-  Records: `results/2026-10-19-a-w1-msaa-gallery`,
-  `results/2026-10-20-a-w3-uia-gallery`,
-  `results/2026-10-20-a-l2-linux-gallery` and `results/2026-10-20-a-macos`.
+  Records: [`results/2026-10-19-a-w1-msaa-gallery`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-19-a-w1-msaa-gallery),
+  [`results/2026-10-20-a-w3-uia-gallery`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-20-a-w3-uia-gallery),
+  [`results/2026-10-20-a-l2-linux-gallery`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-20-a-l2-linux-gallery) and [`results/2026-10-20-a-macos`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-20-a-macos).
 - Text fields expose editable text ranges on every host (ATK Text, UI
   Automation TextPattern and the AppKit text attributes), each with client
   tests.
@@ -97,7 +97,7 @@ mail mockup.
     is within 5% of the reference face at every measured size.
 
   Every pair is measured against the Windows reference face on all four
-  hosts (`results/2026-10-23-f-font-substitution`).
+  hosts ([`results/2026-10-23-f-font-substitution`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-23-f-font-substitution)).
 - Four styles pass only under a named, measured exception:
   - Calibri bold italic: 2 of 90 line-break sets differ.
   - Arial bold: one advance differs (U+00B5).
@@ -126,7 +126,7 @@ mail mockup.
 ### Engine core
 - The engine core of the 0.3 theme engine is sealed. On all four hosts,
   144 primitive images and 308 feature-sample images were pixel-identical,
-  with no differences between hosts (`results/2026-10-23-t2-engine-gate`).
+  with no differences between hosts ([`results/2026-10-23-t2-engine-gate`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-23-t2-engine-gate)).
 - Baking work is held to an effort budget.
 - The idle checks count no frames once a window settles: an idle window
   draws nothing.

@@ -80,8 +80,6 @@ exclude_patterns = [
     "README.md",
     # Maintainer notes for the generated control indexes; not a user page.
     "controls/generated/README.md",
-    # Dated internal working notes moved out of the user tree (W2.4).
-    "notes/**",
     # Hand-written narratives and capture evidence read by
     # tools/generate_library_docs.py; not pages.
     "library/**",

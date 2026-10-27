@@ -214,7 +214,7 @@ Related types
    * - :cpp:class:`WindowFrameDrag <gui_forms::WindowFrameDrag>`
      - The framework's capture drag of one native window.
    * - :cpp:class:`WindowFrameDragStatistics <gui_forms::WindowFrameDragStatistics>`
-     - What a drag achieved, for the per-host measurement (results/).
+     - What a drag achieved, for the per-host measurement (notes:results/).
    * - :cpp:class:`WindowsApplicationOptions <gui_forms::host::WindowsApplicationOptions>`
      -  
    * - :cpp:class:`WindowsApplicationWindow <gui_forms::host::WindowsApplicationWindow>`
@@ -2412,7 +2412,7 @@ Related types
 
    ``#include <gui_forms/application/window_frame_drag/window_frame_drag.hpp>``
 
-   What a drag achieved, for the per-host measurement (results/). Timestamps are the caller's monotonic clock, in nanoseconds.
+   What a drag achieved, for the per-host measurement (notes:results/). Timestamps are the caller's monotonic clock, in nanoseconds.
 
 
    .. rubric:: Properties

@@ -52,7 +52,7 @@ enum class TableCellBorderStyle : std::uint8_t {
 // The Windows Forms table container: children in cells of column and row
 // tracks sized `Absolute`, `Percent` (weights over the space the other
 // tracks leave) or `AutoSize`. Its algorithm is its own, not the CSS grid
-// solver's (planning/stages/L-layout/README.md, "Decisions in force"). In
+// solver's (notes:planning/stages/L-layout/README.md, "Decisions in force"). In
 // a right-to-left effective layout direction the layout is computed left
 // to right and mirrored about the panel, padding, margins and the
 // placement in cells included: the first column is at the right edge.

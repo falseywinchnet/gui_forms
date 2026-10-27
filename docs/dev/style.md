@@ -2,10 +2,11 @@
 
 GUI.Forms sources follow one house style: an orthodox, explicitly spelled
 subset of C++20 in which types, ownership, mutation and execution order are
-visible at the point of use. The text below is the complete style, included
-from `planning/PROGRAMMING_HOUSE_STYLE.md`, itself a copy of
-`programming-house-style.md` in the `falseywinchnet/EpistemicGPT` repository;
-edit those files, not this page.
+visible at the point of use. The complete style is
+[`HOUSE_STYLE.md`](https://github.com/malkuth-software/notes/blob/main/HOUSE_STYLE.md) in the project's notes
+repository; its canonical text is `programming-house-style.md` in the
+`falseywinchnet/EpistemicGPT` repository. Read it in full before writing or
+changing code.
 
 Part of the style is checked mechanically. The `house-style` job in
 `.github/workflows/native.yml` runs `tools/check_house_style.py` over every
@@ -18,6 +19,3 @@ the same subset semantically over a build's compilation database; maintainers
 run it locally, CI does not (see [Repository tools](tools.md)). Everything
 else here, including ownership, lifetimes, failure states and kernel
 structure, is checked in review.
-
-```{include} ../../planning/PROGRAMMING_HOUSE_STYLE.md
-```

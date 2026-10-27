@@ -162,7 +162,7 @@ struct LineBoxMetrics final {
 // (the gap, or a used line height's excess over the rounded ascent and
 // descent, negative when it is less) goes half above the text, rounded
 // down, and the rest below: Chromium's rounding, measured against Chrome
-// 155 from 12 to 21 px (planning/stages/L-layout/PLAN.md section 12.5).
+// 155 from 12 to 21 px (notes:planning/stages/L-layout/PLAN.md section 12.5).
 // Without design metrics (an estimate) it uses the resolution's ascent,
 // descent and line gap.
 [[nodiscard]] LineBoxMetrics line_box_metrics(const ResolvedTextLayout& primary,

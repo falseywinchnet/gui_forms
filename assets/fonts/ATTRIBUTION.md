@@ -49,7 +49,7 @@ copied; the individual faces above carry the same styles.
 These faces are installed with the SDK's font directory. The hosts register
 only the two faces above for `FontRole::control`; the others are available to
 applications and to font substitution (Portsmouth Mono is the planned
-substitute for Consolas, `planning/stages/F-font-substitution/`).
+substitute for Consolas, [`planning/stages/F-font-substitution/`](https://github.com/malkuth-software/notes/tree/gui_forms/planning/stages/F-font-substitution)).
 
 The font-pack specimen also contains Carlito and Cousine at upstream commit
 and byte identity:
@@ -101,12 +101,12 @@ Noto Sans Arabic, Hebrew, Devanagari, Bengali and Gurmukhi are unmodified Noto P
 ## Font substitution faces (stage F)
 
 The owner approved these downloads on 2026-10-23 for stage F's substitution
-table (`planning/stages/F-font-substitution/`). Each file was downloaded into
+table ([`planning/stages/F-font-substitution/`](https://github.com/malkuth-software/notes/tree/gui_forms/planning/stages/F-font-substitution)). Each file was downloaded into
 its own empty directory and checked against the upstream size and git blob
 SHA-1 before use. Its SHA-256 is recorded below. The faces are byte-identical
 to upstream; only the Selawik files are renamed. The F1 metrics differential
 against the Windows reference faces is in
-`results/2026-10-23-f1-metrics-harness`.
+[`results/2026-10-23-f1-metrics-harness`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-23-f1-metrics-harness).
 
 **Arimo 1.33** is metric-compatible with Arial, and is the substitute for
 Arial, Helvetica and Microsoft Sans Serif.
@@ -174,6 +174,6 @@ heights at each gate size. They were measured on 2026-10-23 by
 `gui_forms_font_metrics_differential --snapshot` from the files in
 `C:\Windows\Fonts` of a Windows 11 machine. Each snapshot names its reference
 file by name, version, byte count and SHA-256; the hashes are also listed in
-`results/2026-10-23-f-font-substitution`. **No font data is included**: no
+[`results/2026-10-23-f-font-substitution`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-23-f-font-substitution). **No font data is included**: no
 outlines, glyph programs, tables or other bytes of any reference face are in
 the repository. The reference faces were read in place and never copied.

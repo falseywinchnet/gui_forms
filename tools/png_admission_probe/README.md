@@ -61,7 +61,7 @@ independent bitwise oracle; 24 added ancillary-chunk cases cover 0/1/2/255/256/
 257/4095/65536-byte payloads, all byte values and checksum rejection. The
 complete PNG registry suite passes on the renderer-neutral Windows build.
 
-Reviewed against `planning/PROGRAMMING_HOUSE_STYLE.md` in the program repository:
+Reviewed against [`planning/PROGRAMMING_HOUSE_STYLE.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/PROGRAMMING_HOUSE_STYLE.md) in the program repository:
 the changed production CRC helper/table, new checksum test function and its
 main registration, and this complete probe source, fixture generator and CMake
 file. Inputs, conversions and initial state are explicit; the probe owns bytes

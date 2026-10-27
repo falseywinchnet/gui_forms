@@ -14,7 +14,7 @@
 namespace gui_forms {
 
 // A block of text laid out as CSS lays out the text of a block (stage L,
-// phase L8; planning/stages/L-layout/PLAN.md section 12):
+// phase L8; notes:planning/stages/L-layout/PLAN.md section 12):
 // - white space collapses as `white-space: normal` collapses it;
 // - lines break at the window's line-break opportunities (UAX #14 with the
 //   bundled text engine, white space otherwise), and a word wider than the

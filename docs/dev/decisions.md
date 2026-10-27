@@ -1,10 +1,9 @@
 # Architecture decisions
 
-Significant decisions are recorded as numbered architecture decision records
-in the repository's `decisions/` directory. Each record states the context,
-the decision, its consequences and the options that lost. The pages below
-render those files directly; the files in `decisions/` remain the source of
-truth and are edited there.
+Significant decisions are recorded as numbered architecture decision records.
+Each record states the context, the decision, its consequences and the
+options that lost. The pages below are the records; they are edited in
+`docs/dev/adr/`.
 
 | ADR | Title | Status | Date |
 |---|---|---|---|

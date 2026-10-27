@@ -378,7 +378,7 @@ jobs:
         run: ccache --show-stats --verbose
       # The saved cache, and the consumer archive below, hold this build's
       # working set, not every generation up to CCACHE_MAXSIZE
-      # (planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1). On every event: a
+      # (notes:planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1). On every event: a
       # native job builds everything (no change selection), so the set is
       # complete, and the archive the programs job, a stacked pull request's
       # seed and a consumer download is about 25 MB instead of 600. Only after

@@ -68,7 +68,8 @@ struct FontSubstitution final {
     // own request, an alias's target, or empty for a generic name.
     std::string_view measured_as;
     // The differential reports that justify the class, relative to the
-    // repository root; empty for a generic name.
+    // root of the gui_forms branch of malkuth-software/notes (the measurement
+    // records moved there from this repository); empty for a generic name.
     std::string_view evidence;
 };
 

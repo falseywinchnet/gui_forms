@@ -1,6 +1,6 @@
 #pragma once
 // The X11 compositor adapter (stage T5, phase C4;
-// planning/stages/T5-compositor/PLAN.md §1.3 and MEASUREMENTS.md C4).
+// notes:planning/stages/T5-compositor/PLAN.md §1.3 and MEASUREMENTS.md C4).
 // Xlib, XFixes and XRender types stay here and in src/host/linux/.
 #include "gui_forms/host/compositor/window_backdrop.hpp"
 

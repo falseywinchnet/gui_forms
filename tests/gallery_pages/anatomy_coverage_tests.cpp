@@ -228,7 +228,7 @@ void inspect_control(const Control& control, std::vector<std::string>& seen_ids)
     if (!contains_id(seen_ids, id)) {
         seen_ids.push_back(id);
         // GUI_FORMS_ANATOMY_TABLE=1 prints the coverage table the T1 gate
-        // record keeps under results/.
+        // record keeps under notes:results/.
         const char* table = std::getenv("GUI_FORMS_ANATOMY_TABLE");
         if (table != nullptr && std::string_view(table) == "1") {
             print_anatomy_row(anatomy);

@@ -1,7 +1,7 @@
 #pragma once
 
 // The macOS compositor adapter (stage T5, phase C3;
-// planning/stages/T5-compositor/PLAN.md §1.2 and MEASUREMENTS.md C3).
+// notes:planning/stages/T5-compositor/PLAN.md §1.2 and MEASUREMENTS.md C3).
 // AppKit types stay here, inside src/host/macos/.
 
 #import <AppKit/AppKit.h>

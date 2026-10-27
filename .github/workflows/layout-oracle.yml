@@ -1,7 +1,7 @@
 name: Layout oracle
 # Regenerates the layout corpus references with the pinned Chromium headless
 # shell and checks that they still match the checked-in ones within one
-# LayoutUnit (planning/stages/L-layout/PLAN.md section 6.3; owner decisions
+# LayoutUnit (notes:planning/stages/L-layout/PLAN.md section 6.3; owner decisions
 # L-Q10 and L-Q11). Chromium is a test oracle only and never reaches
 # GUI.Forms. This job is not a required check; the corpus itself is tested on
 # every host by gui_forms_layout_corpus_tests without Chromium.

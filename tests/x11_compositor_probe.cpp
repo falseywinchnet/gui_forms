@@ -1,4 +1,4 @@
-// Stage T5, phase C4's measurement (planning/stages/T5-compositor/PLAN.md
+// Stage T5, phase C4's measurement (notes:planning/stages/T5-compositor/PLAN.md
 // §1.3 and §5 C4): what an X server and its compositing manager do with a
 // window whose pixels carry premultiplied alpha. Nothing of GUI.Forms is
 // used: the probe measures the platform, so that the host adapter is built

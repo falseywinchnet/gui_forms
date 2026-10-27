@@ -34,7 +34,7 @@ enum class FlowCrossAlignment : std::uint8_t {
 
 // The Windows Forms flow container: its children in lines along a flow
 // direction, wrapped, broken and aligned. Its algorithm is its own, not the
-// CSS flex solver's (planning/stages/L-layout/README.md, "Decisions in
+// CSS flex solver's (notes:planning/stages/L-layout/README.md, "Decisions in
 // force"). In a right-to-left effective layout direction the layout is
 // computed left to right and mirrored about the viewport, padding and
 // margins included: a `left_to_right` flow starts at the right edge.

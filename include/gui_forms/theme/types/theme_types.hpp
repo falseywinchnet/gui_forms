@@ -391,7 +391,7 @@ struct ThemeBackdropBase final {
 // The theme's window backdrop (stage T5, owner decision T5-Q8, option 1):
 // what a window showing the theme asks the compositor for, and the base its
 // backplane is drawn from over each backdrop the window may be granted
-// (planning/stages/T5-compositor/PLAN.md §4.1).
+// (notes:planning/stages/T5-compositor/PLAN.md §4.1).
 struct ThemeWindowBackdrop final {
     // The request a window makes while its application has made none
     // (Window::request_backdrop). Value-initialized: `opaque` alone, so a

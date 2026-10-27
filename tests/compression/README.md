@@ -53,7 +53,7 @@ with Python zlib 1.2.12 in raw/zlib framing, within the fuzzer's output cap.
 `tools/benchmark_inflate.py` builds the original owned implementation, current
 implementation and a compiler-vectorization-disabled ablation with the same
 release flags, each also timing pinned upstream zlib. See the
-[measurement record](../../results/2026-10-19-zlib/phase-two/optimization/README.md)
+[measurement record](https://github.com/malkuth-software/notes/blob/gui_forms/results/2026-10-19-zlib/phase-two/optimization/README.md)
 for limitations. On an M4 mirror, provide `--baseline` pointing to the exported
 `123f13cd` header/source; the runner verifies their hashes. The normal checkout
 can omit that option to read the same revision from Git.

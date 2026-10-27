@@ -52,7 +52,7 @@ enum class HostCapability : std::uint64_t {
     window_at_point = 1ULL << 26U,
     // Bringing one window to the front of the application's own windows.
     window_ordering = 1ULL << 27U,
-    // Compositor cooperation (stage T5, planning/stages/T5-compositor/
+    // Compositor cooperation (stage T5, notes:planning/stages/T5-compositor/
     // PLAN.md §2.1). Each is true only where the adapter implements it; what
     // the compositor allows now is the live CompositorState.
     // A window presented with per-pixel premultiplied alpha, whenever the

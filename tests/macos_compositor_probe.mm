@@ -1,4 +1,4 @@
-// Stage T5, phase C3's measurement (planning/stages/T5-compositor/PLAN.md
+// Stage T5, phase C3's measurement (notes:planning/stages/T5-compositor/PLAN.md
 // §1.2 and §5 C3): what the window server composes from a window whose
 // view draws premultiplied pixels with the copy blend mode, as the host
 // presents today, when the window is non-opaque and when a behind-window

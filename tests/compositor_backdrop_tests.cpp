@@ -1,5 +1,5 @@
 // Stage T5 phase C0: the portable compositor model, headless
-// (planning/stages/T5-compositor/PLAN.md §2 and §5 C0). Grant resolution
+// (notes:planning/stages/T5-compositor/PLAN.md §2 and §5 C0). Grant resolution
 // against every state, the window's request, grant and backdrop_changed
 // order, the host's compositor reports through the session, and byte-stable
 // headless traces of a declared and an undeclared window through a

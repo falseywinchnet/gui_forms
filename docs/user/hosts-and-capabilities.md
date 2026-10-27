@@ -56,7 +56,7 @@ The table reflects the bits each adapter currently advertises; read
 ## Compositor cooperation
 
 A window can ask the window system to show what lies behind it (stage T5,
-`planning/stages/T5-compositor/PLAN.md`). The request names a purpose, not
+[`planning/stages/T5-compositor/PLAN.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/stages/T5-compositor/PLAN.md)). The request names a purpose, not
 a platform material: `WindowBackdrop::opaque` (every window today),
 `transparent` (clear pixels show the desktop, unblurred),
 `window_material` and `transient_material` (the system's materials for a
@@ -99,7 +99,7 @@ transparency" is reduced transparency and is followed as it changes;
 with it on, AppKit draws every material as a solid colour. "Increase
 contrast" is not reported as high contrast. Clear pixels still receive
 the pointer: there is no click-through. The measurements behind this are
-in `planning/stages/T5-compositor/MEASUREMENTS.md`.
+in [`planning/stages/T5-compositor/MEASUREMENTS.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/stages/T5-compositor/MEASUREMENTS.md).
 
 **Windows.** The client's premultiplied alpha is shown through
 `DwmEnableBlurBehindWindow` with an empty region, which keeps the native
@@ -112,7 +112,7 @@ transparency effects off in Windows settings counts as reduced
 transparency. High contrast is read from the system. Both are followed
 as they change. Clear pixels still receive the pointer: there is no
 click-through. The measurements behind this are in
-`planning/stages/T5-compositor/MEASUREMENTS.md`.
+[`planning/stages/T5-compositor/MEASUREMENTS.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/stages/T5-compositor/MEASUREMENTS.md).
 
 **X11.** A window declared non-opaque is made with the screen's 32-bit
 TrueColor visual, whose spare byte XRender names as alpha; while
@@ -128,7 +128,7 @@ no system material (`window_material` and `transient_material` are
 to report, so `PresentationSettings` stay the application's. Clear pixels
 still receive the pointer. A server without the 32-bit visual leaves the
 window opaque (`host_unsupported`). The measurements behind this are in
-`planning/stages/T5-compositor/MEASUREMENTS.md`.
+[`planning/stages/T5-compositor/MEASUREMENTS.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/stages/T5-compositor/MEASUREMENTS.md).
 
 The headless reference host simulates these capabilities
 (`HeadlessApplication::simulate_compositor_state`).
@@ -238,7 +238,7 @@ Linux (X11)
   `gui_forms_linux_accessibility_gallery_tests` compares every Gallery page
   with the semantic tree (role, name, states, actions, values, children)
   and performs one default action per control type
-  (`results/2026-10-20-a-l2-linux-gallery`). A text box's text is published
+  ([`results/2026-10-20-a-l2-linux-gallery`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-20-a-l2-linux-gallery)). A text box's text is published
   whole; editable text ranges are not implemented.
   The CPU raster is presented through X11 images. There is no Wayland adapter;
   Wayland sessions run the X11 host through XWayland.
@@ -364,7 +364,7 @@ requests the window's frame, so other windows can follow the pointer, and
 `native_move_loop` on a host without window frames, the desktop pointer or
 pointer capture; the caller then starts the platform's move loop from a
 drag region. The drag's statistics say whether the host kept up; per-host
-measurements belong in `results/2026-10-18-dk-w0-capture-drag/`.
+measurements belong in [`results/2026-10-18-dk-w0-capture-drag/`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-18-dk-w0-capture-drag).
 
 ### Floating windows
 

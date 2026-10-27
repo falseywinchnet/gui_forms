@@ -94,7 +94,7 @@ add_subdirectory(stx_zlib)
 add_subdirectory(stx_png)
 add_subdirectory(stx_conv)
 # The rich-text library: one document model, the markdown-like dialect and
-# RTF (planning/stages/RT-rich-text/PLAN.md).
+# RTF (notes:planning/stages/RT-rich-text/PLAN.md).
 add_subdirectory(stx_rtf2md)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
@@ -2208,7 +2208,7 @@ if(GUI_FORMS_BUILD_TESTS)
             add_test(NAME gui_forms_macos_compositor_tests COMMAND gui_forms_macos_compositor_tests)
             set_tests_properties(gui_forms_macos_compositor_tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
         endif()
-        # Stage DK W0 measurement (results/2026-10-18-dk-w0-capture-drag/): it
+        # Stage DK W0 measurement (notes:results/2026-10-18-dk-w0-capture-drag/): it
         # puts windows on the desktop, so it is built but never run by ctest.
         add_executable(gui_forms_frame_drag_probe tests/frame_drag_probe.cpp)
         target_link_libraries(gui_forms_frame_drag_probe PRIVATE gui_forms_application)
@@ -3153,7 +3153,7 @@ if(GUI_FORMS_BUILD_TESTS)
              COMMAND gui_forms_layout_direction_tests)
 
     # The layout fixture corpus against checked-in Chromium references
-    # (planning/stages/L-layout/PLAN.md section 6). The corpus path on the
+    # (notes:planning/stages/L-layout/PLAN.md section 6). The corpus path on the
     # command line also selects this test when the corpus changes.
     add_executable(gui_forms_layout_corpus_tests
         tests/layout_corpus_tests.cpp
@@ -3681,7 +3681,7 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_macos_exposure_tests PRIVATE gui_forms_host_macos)
         add_test(NAME gui_forms_macos_exposure_tests COMMAND gui_forms_macos_exposure_tests)
 
-        # Stage DP gate on macOS (results/2026-10-25-dp-gate-macos).
+        # Stage DP gate on macOS (notes:results/2026-10-25-dp-gate-macos).
         add_executable(gui_forms_macos_damage_rectangles_tests tests/macos_damage_rectangles_tests.mm)
         target_compile_options(gui_forms_macos_damage_rectangles_tests PRIVATE -fobjc-arc)
         target_link_libraries(gui_forms_macos_damage_rectangles_tests PRIVATE gui_forms_host_macos)

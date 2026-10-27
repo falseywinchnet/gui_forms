@@ -308,7 +308,7 @@ jobs:
           compression-level: 0
           retention-days: 7
       # The saved cache is this build's working set, not every generation up
-      # to CCACHE_MAXSIZE (planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1). Main
+      # to CCACHE_MAXSIZE (notes:planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1). Main
       # saves it when it builds everything: the daily schedule, and a push
       # that carried no pull request's receipt.
       - name: Keep only the compiler cache entries this build used
@@ -483,7 +483,7 @@ jobs:
   # across hosts. Fails on any reference-image hash that differs between hosts,
   # any idle counter above zero, or any host without a manifest (a job that
   # reused a validation carries that run's manifest). The filled record is the
-  # t2-engine-gate-record artifact (results/2026-10-22-t2-engine-gate/).
+  # t2-engine-gate-record artifact (notes:results/2026-10-22-t2-engine-gate/).
   engine-gate:
     needs: [native-macos-arm64, native-linux-x64, native-linux-arm64, native-windows-x64]
     if: always() && !contains(needs.*.result, 'skipped') && !contains(needs.*.result, 'cancelled')
@@ -576,7 +576,7 @@ jobs:
 
   # After every job that saves a cache on a push to main: delete the entries
   # each new save superseded, keeping the newest of each family
-  # (tools/ci_cache.py prune; planning/BUILD_SIZE_PLAN_2026-10-23.md, step 2).
+  # (tools/ci_cache.py prune; notes:planning/BUILD_SIZE_PLAN_2026-10-23.md, step 2).
   # Runs when a saving job failed too, since the others saved. The only job
   # with actions: write.
   cache-prune:

@@ -1,5 +1,5 @@
 // The engine's join to the window's backdrop (stage T5, phase C5;
-// planning/stages/T5-compositor/PLAN.md §4.1, §4.2 and §4.5):
+// notes:planning/stages/T5-compositor/PLAN.md §4.1, §4.2 and §4.5):
 //
 // - the theme's window backdrop record (owner decision T5-Q8, option 1):
 //   its request, which a window makes until its application makes one, and

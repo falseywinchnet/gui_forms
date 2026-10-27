@@ -298,7 +298,7 @@ gui_forms::Window
       * - :cpp:func:`shares_resources_with <gui_forms::Window::shares_resources_with>`
         -  
       * - :cpp:func:`declare_non_opaque <gui_forms::Window::declare_non_opaque>`
-        - Compositor cooperation (stage T5, planning/stages/T5-compositor/ PLAN.md §2).
+        - Compositor cooperation (stage T5, notes:planning/stages/T5-compositor/ PLAN.md §2).
       * - :cpp:func:`request_backdrop <gui_forms::Window::request_backdrop>`
         - Asks for a backdrop (owner decisions T5-Q3 and T5-Q5) and returns the grant now in force: the request's first entry this window may be given under the host's state and its presentation settings, else ``opaque``, with the reason the preferred entry was or was not given.
       * - :cpp:func:`rebind_key_command <gui_forms::Window::rebind_key_command>`
@@ -947,7 +947,7 @@ gui_forms::Window
 
    .. cpp:function:: bool declare_non_opaque()
 
-      Compositor cooperation (stage T5, planning/stages/T5-compositor/ PLAN.md §2). Declares, before a host attaches, that this window may be presented non-opaque (owner decision T5-Q4); ApplicationWindowOptions::non_opaque does it for an application window. False, changing nothing, once a host session has been bound to the window: a host fixes what a native window can show when it creates it. UI thread.
+      Compositor cooperation (stage T5, notes:planning/stages/T5-compositor/ PLAN.md §2). Declares, before a host attaches, that this window may be presented non-opaque (owner decision T5-Q4); ApplicationWindowOptions::non_opaque does it for an application window. False, changing nothing, once a host session has been bound to the window: a host fixes what a native window can show when it creates it. UI thread.
 
    .. cpp:function:: WindowBackdropGrant request_backdrop(const WindowBackdropRequest& request)
 

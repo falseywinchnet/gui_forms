@@ -9,7 +9,7 @@ namespace gui_forms {
 
 // What a window shows behind its clear pixels (stage T5, owner decision
 // T5-Q1): a closed set of purposes, never platform names. Each host maps
-// them to its own mechanism (planning/stages/T5-compositor/PLAN.md §2.2).
+// them to its own mechanism (notes:planning/stages/T5-compositor/PLAN.md §2.2).
 enum class WindowBackdrop : std::uint8_t {
     // Today's window: every presented pixel is opaque. Always available.
     opaque,
