@@ -203,6 +203,8 @@ std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept {
     case RuleDiagnosticKind::blend_invalid: return "blend_invalid";
     case RuleDiagnosticKind::published_value_invalid: return "published_value_invalid";
     case RuleDiagnosticKind::material_field_invalid: return "material_field_invalid";
+    case RuleDiagnosticKind::recipe_field_invalid: return "recipe_field_invalid";
+    case RuleDiagnosticKind::recipe_field_on_part: return "recipe_field_on_part";
     }
     return {};
 }
@@ -215,8 +217,12 @@ constexpr std::array<std::string_view, material_field_count> material_field_name
     "background_colour",
     "fills",
     "fill_blend_modes",
+    "fill_positions",
+    "fill_sizes",
+    "fill_repeats",
     "shadows",
     "glows",
+    "glow_placements",
     "border_top_style",
     "border_top_width",
     "border_top_colour",
@@ -229,6 +235,7 @@ constexpr std::array<std::string_view, material_field_count> material_field_name
     "border_left_style",
     "border_left_width",
     "border_left_colour",
+    "border_image",
     "keylines",
     "corner_top_left",
     "corner_top_right",
@@ -283,6 +290,16 @@ void apply_material_declaration(const MaterialDeclaration& declaration, SurfaceM
     switch (declaration.field) {
     case MaterialField::shadows: material.shadows = declaration.shadows; return;
     case MaterialField::glows: material.glows = declaration.glows; return;
+    case MaterialField::glow_placements: {
+        // Over the glows already in place (assemble_material writes the
+        // glows first).
+        const std::vector<MaterialGlowPlacement>& placements = declaration.glow_placements;
+        if (placements.empty()) return;
+        for (std::size_t glow = 0U; glow < material.glows.size(); ++glow) {
+            material.glows[glow].placement = placements[glow % placements.size()];
+        }
+        return;
+    }
     case MaterialField::keylines: material.keylines = declaration.keylines; return;
     case MaterialField::colour_filter: material.colour_filter = declaration.colour_filter; return;
     case MaterialField::drop_shadow: material.drop_shadow = declaration.drop_shadow; return;
@@ -304,18 +321,27 @@ void apply_material_declaration(const MaterialDeclaration& declaration, SurfaceM
     case MaterialField::background_colour:
     case MaterialField::fills:
     case MaterialField::fill_blend_modes:
+    case MaterialField::fill_positions:
+    case MaterialField::fill_sizes:
+    case MaterialField::fill_repeats:
+    case MaterialField::border_image:
     case MaterialField::corner_top_left:
     case MaterialField::corner_top_right:
     case MaterialField::corner_bottom_right:
     case MaterialField::corner_bottom_left:
     case MaterialField::count: return;
+    // A value outside the enumeration names no field: nothing is written,
+    // as for the composed fields above.
+    default: return;
     }
 }
 
 bool fill_field(MaterialField field) noexcept {
-    const bool fill = field == MaterialField::background_colour || field == MaterialField::fills ||
-                      field == MaterialField::fill_blend_modes;
-    return fill;
+    const bool colour_or_layers = field == MaterialField::background_colour || field == MaterialField::fills ||
+                                  field == MaterialField::fill_blend_modes;
+    const bool placement = field == MaterialField::fill_positions || field == MaterialField::fill_sizes ||
+                           field == MaterialField::fill_repeats;
+    return colour_or_layers || placement;
 }
 
 bool corner_field(MaterialField field) noexcept {
@@ -338,8 +364,73 @@ const MaterialDeclaration* set_field(std::array<const MaterialDeclaration*, mate
 // The fills composed from the colour layer and the image layers, each the
 // declared one, else the floor's: its bottom layer when solid is its
 // colour, its others its image layers.
+// An image size's length along a side of `side` logical units.
+double sized_length(BoxLength length, double side) noexcept {
+    const double resolved = length.fraction * side + length.units;
+    return resolved;
+}
+
+// Sizes image fill `layer` by `size` for `box`, keeping its proportions:
+// its image_scale becomes the source pixels per logical unit of the size.
+void size_image(const MaterialImageSize& size, Size box, MaterialFillLayer& layer) noexcept {
+    const Size pixels = layer.image_pixel_size;
+    switch (size.sizing) {
+    case MaterialImageSizing::natural: return;
+    case MaterialImageSizing::stretch: layer.image_mode = MaterialImageMode::stretch; return;
+    case MaterialImageSizing::width:
+        layer.image_scale = pixels.width / sized_length(size.length, box.width);
+        break;
+    case MaterialImageSizing::height:
+        layer.image_scale = pixels.height / sized_length(size.length, box.height);
+        break;
+    case MaterialImageSizing::cover:
+    case MaterialImageSizing::contain: {
+        // The factor from the image's own size, its layer's scale as
+        // written, to the box's along each side.
+        const double across = box.width * layer.image_scale / pixels.width;
+        const double down = box.height * layer.image_scale / pixels.height;
+        const bool cover = size.sizing == MaterialImageSizing::cover;
+        const double factor = cover ? std::max(across, down) : std::min(across, down);
+        layer.image_scale = layer.image_scale / factor;
+        break;
+    }
+    }
+    // A sized image is tiled, unless repetition then makes it single.
+    if (layer.image_mode == MaterialImageMode::stretch) layer.image_mode = MaterialImageMode::tile;
+}
+
+// Places the image fills among `material`'s image layers, from
+// `images_first` up, by the declared sizes, repetitions and positions,
+// each list in CSS's order (the top layer's first) and repeated over the
+// image layers.
+void place_images(const MaterialDeclaration* sizes, const MaterialDeclaration* repeats,
+                  const MaterialDeclaration* positions, std::size_t images_first, Size box,
+                  SurfaceMaterial& material) noexcept {
+    const std::size_t image_count = material.fills.size() - images_first;
+    for (std::size_t from_top = 0U; from_top < image_count; ++from_top) {
+        MaterialFillLayer& layer = material.fills[material.fills.size() - 1U - from_top];
+        if (layer.kind != MaterialFillKind::image || layer.image_mode == MaterialImageMode::nine_patch) continue;
+        if (sizes != nullptr && !(*sizes).image_sizes.empty()) {
+            const std::vector<MaterialImageSize>& written = (*sizes).image_sizes;
+            size_image(written[from_top % written.size()], box, layer);
+        }
+        const bool tiled = layer.image_mode == MaterialImageMode::tile || layer.image_mode == MaterialImageMode::single;
+        if (repeats != nullptr && !(*repeats).image_repeats.empty() && tiled) {
+            const std::vector<MaterialImageRepeat>& written = (*repeats).image_repeats;
+            const bool alone = written[from_top % written.size()] == MaterialImageRepeat::no_repeat;
+            layer.image_mode = alone ? MaterialImageMode::single : MaterialImageMode::tile;
+        }
+        if (positions != nullptr && !(*positions).image_positions.empty()) {
+            const std::vector<MaterialImagePosition>& written = (*positions).image_positions;
+            const MaterialImagePosition& position = written[from_top % written.size()];
+            layer.image_anchor = Point{position.across.fraction, position.down.fraction};
+            layer.image_offset = Point{position.across.units, position.down.units};
+        }
+    }
+}
+
 void compose_fills(const SurfaceMaterial& floor,
-                   const std::array<const MaterialDeclaration*, material_field_count>& fields,
+                   const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
                    SurfaceMaterial& material) {
     const MaterialDeclaration* const colour = set_field(fields, MaterialField::background_colour);
     const MaterialDeclaration* const images = set_field(fields, MaterialField::fills);
@@ -355,6 +446,11 @@ void compose_fills(const SurfaceMaterial& floor,
     const std::size_t images_first = material.fills.size();
     if (images != nullptr) {
         material.fills.insert(material.fills.end(), (*images).fills.begin(), (*images).fills.end());
+        const std::vector<AuthoredGradient>& gradients = (*images).gradients;
+        for (std::size_t layer = 0U; layer < gradients.size(); ++layer) {
+            if (gradients[layer].kind == MaterialFillKind::solid) continue;
+            resolve_authored_gradient(gradients[layer], box, material.fills[images_first + layer]);
+        }
     } else {
         const std::vector<MaterialFillLayer>::const_iterator first =
             floor.fills.begin() + static_cast<std::ptrdiff_t>(floor_images_first);
@@ -369,6 +465,12 @@ void compose_fills(const SurfaceMaterial& floor,
             MaterialFillLayer& layer = material.fills[material.fills.size() - 1U - from_top];
             layer.blend = modes.empty() ? MaterialBlendMode::normal : modes[from_top % modes.size()];
         }
+    }
+    const MaterialDeclaration* const sizes = set_field(fields, MaterialField::fill_sizes);
+    const MaterialDeclaration* const repeats = set_field(fields, MaterialField::fill_repeats);
+    const MaterialDeclaration* const positions = set_field(fields, MaterialField::fill_positions);
+    if (sizes != nullptr || repeats != nullptr || positions != nullptr) {
+        place_images(sizes, repeats, positions, images_first, box, material);
     }
     if (material.fills.empty()) material.fills.push_back(MaterialFillLayer::solid(Color::rgba(0, 0, 0, 0)));
 }
@@ -417,6 +519,7 @@ bool edge_field(MaterialField field) noexcept {
 struct AssembledEdge final {
     bool drawn{};
     MaterialBorder border{};
+    MaterialEdgeLines lines{MaterialEdgeLines::single};
 };
 
 // Writes an edge field's value into `edge`: a style (none stops the edge
@@ -426,6 +529,7 @@ void apply_edge_declaration(const MaterialDeclaration& declaration, AssembledEdg
     if (part == 0U) {
         edge.drawn = declaration.border_style.has_value();
         if (declaration.border_style) edge.border.style = *declaration.border_style;
+        edge.lines = declaration.edge_lines;
         return;
     }
     if (part == 1U) {
@@ -442,8 +546,48 @@ std::optional<MaterialBorder> drawn_edge(const AssembledEdge& edge) {
     return edge.border;
 }
 
+// A colour with each channel halved, rounded down: a groove's or ridge's
+// shaded half.
+Color edge_shade(Color colour) noexcept {
+    const Color shade{static_cast<std::uint8_t>(colour.red / 2U), static_cast<std::uint8_t>(colour.green / 2U),
+                      static_cast<std::uint8_t>(colour.blue / 2U), colour.alpha};
+    return shade;
+}
+
+// Appends edge `edge`'s two lines (MaterialEdgeLines) for `border` to
+// `keylines`, the outer first.
+void append_edge_lines(MaterialEdge edge, const MaterialBorder& border, MaterialEdgeLines lines,
+                       std::vector<MaterialKeyline>& keylines) {
+    const double width = border.width;
+    MaterialKeyline outer{};
+    outer.edge = edge;
+    outer.color = border.color;
+    MaterialKeyline inner = outer;
+    if (lines == MaterialEdgeLines::double_line) {
+        outer.width = width / 3.0;
+        inner.width = width / 3.0;
+        inner.inset = width * 2.0 / 3.0;
+    } else {
+        outer.width = width / 2.0;
+        inner.width = width / 2.0;
+        inner.inset = width / 2.0;
+        const bool lit_side = edge == MaterialEdge::bottom || edge == MaterialEdge::right;
+        // A groove's outer half is shaded on the top and left; a ridge's on
+        // the bottom and right.
+        const bool outer_shaded = (lines == MaterialEdgeLines::groove) != lit_side;
+        if (outer_shaded) {
+            outer.color = edge_shade(border.color);
+        } else {
+            inner.color = edge_shade(border.color);
+        }
+    }
+    keylines.push_back(outer);
+    keylines.push_back(inner);
+}
+
 // Each edge from the floor's, then its declared fields; into `material`,
-// as one uniform border when the four are equal.
+// as one uniform border when the four are equal, and an edge of two lines
+// as its keylines.
 void assemble_edges(const SurfaceMaterial& floor,
                     const std::array<const MaterialDeclaration*, material_field_count>& fields,
                     SurfaceMaterial& material) {
@@ -462,6 +606,9 @@ void assemble_edges(const SurfaceMaterial& floor,
             if (declaration != nullptr && !(*declaration).initial) apply_edge_declaration(*declaration, edge);
         }
         drawn[edge_index] = drawn_edge(edge);
+        if (!drawn[edge_index] || edge.lines == MaterialEdgeLines::single) continue;
+        append_edge_lines(static_cast<MaterialEdge>(edge_index), *drawn[edge_index], edge.lines, material.keylines);
+        drawn[edge_index].reset();
     }
     const bool uniform = drawn[0] == drawn[1] && drawn[0] == drawn[2] && drawn[0] == drawn[3];
     if (uniform) {
@@ -476,12 +623,68 @@ void assemble_edges(const SurfaceMaterial& floor,
     material.border_edges.left = drawn[3];
 }
 
+// The box an authored gradient is resolved for when it is checked: a part's
+// own box may still refuse its assembly.
+constexpr Size sample_box{100.0, 100.0};
+
+// A position the image fills admit: anchors within [0, 1], offsets of at
+// most 4096 logical units (valid_surface_material's bounds).
+bool image_position_admitted(const MaterialImagePosition& position) noexcept {
+    const std::array<BoxLength, 2> axes{position.across, position.down};
+    for (const BoxLength axis : axes) {
+        const bool anchored = std::isfinite(axis.fraction) && axis.fraction >= 0.0 && axis.fraction <= 1.0;
+        const bool offset = std::isfinite(axis.units) && std::abs(axis.units) <= 4096.0;
+        if (!anchored || !offset) return false;
+    }
+    return true;
+}
+
+// A size of finite parts, a side's not negative and not zero for every box.
+// The image scale it makes is checked with the assembled material.
+bool image_size_admitted(const MaterialImageSize& size) noexcept {
+    const bool sided = size.sizing == MaterialImageSizing::width || size.sizing == MaterialImageSizing::height;
+    const BoxLength length = size.length;
+    if (!sided) {
+        const bool known = size.sizing == MaterialImageSizing::natural || size.sizing == MaterialImageSizing::cover ||
+                           size.sizing == MaterialImageSizing::contain || size.sizing == MaterialImageSizing::stretch;
+        return known && length == BoxLength{};
+    }
+    const bool finite_parts = std::isfinite(length.fraction) && std::isfinite(length.units);
+    const bool positive = length.fraction >= 0.0 && length.units >= 0.0 && (length.fraction > 0.0 || length.units > 0.0);
+    return finite_parts && positive;
+}
+
 // Whether `declaration`, alone over the default material, is a material:
 // an edge field over a drawn default edge, a relative corner as a fraction
-// of a unit side.
+// of a unit side, an authored gradient resolved for sample_box.
 bool material_declaration_admitted(const MaterialDeclaration& declaration) {
     SurfaceMaterial checked{};
     if (declaration.initial || declaration.field == MaterialField::background_colour) return true;
+    if (declaration.field == MaterialField::border_image) {
+        if (!declaration.border_image) return true;
+        if ((*declaration.border_image).image_mode != MaterialImageMode::nine_patch) return false;
+        checked.fills = {*declaration.border_image};
+        const bool admitted = valid_surface_material(checked);
+        return admitted;
+    }
+    if (declaration.field == MaterialField::fill_positions) {
+        for (const MaterialImagePosition& position : declaration.image_positions) {
+            if (!image_position_admitted(position)) return false;
+        }
+        return true;
+    }
+    if (declaration.field == MaterialField::fill_sizes) {
+        for (const MaterialImageSize& size : declaration.image_sizes) {
+            if (!image_size_admitted(size)) return false;
+        }
+        return true;
+    }
+    if (declaration.field == MaterialField::fill_repeats) {
+        for (const MaterialImageRepeat repeat : declaration.image_repeats) {
+            if (repeat != MaterialImageRepeat::repeat && repeat != MaterialImageRepeat::no_repeat) return false;
+        }
+        return true;
+    }
     if (declaration.field == MaterialField::fill_blend_modes) {
         for (const MaterialBlendMode mode : declaration.blend_modes) {
             if (static_cast<std::uint8_t>(mode) > static_cast<std::uint8_t>(MaterialBlendMode::screen)) return false;
@@ -495,7 +698,25 @@ bool material_declaration_admitted(const MaterialDeclaration& declaration) {
     }
     if (declaration.field == MaterialField::fills) {
         if (declaration.fills.empty()) return true;
+        const std::vector<AuthoredGradient>& gradients = declaration.gradients;
+        if (!gradients.empty() && gradients.size() != declaration.fills.size()) return false;
         checked.fills = declaration.fills;
+        for (std::size_t layer = 0U; layer < gradients.size(); ++layer) {
+            if (gradients[layer].kind == MaterialFillKind::solid) continue;
+            if (!valid_authored_gradient(gradients[layer])) return false;
+            resolve_authored_gradient(gradients[layer], sample_box, checked.fills[layer]);
+        }
+        const bool admitted = valid_surface_material(checked);
+        return admitted;
+    }
+    if (declaration.field == MaterialField::mask && !declaration.gradients.empty()) {
+        const AuthoredGradient& gradient = declaration.gradients.front();
+        if (declaration.gradients.size() != 1U || !declaration.mask) return false;
+        checked.mask = declaration.mask;
+        if (gradient.kind != MaterialFillKind::solid) {
+            if (!valid_authored_gradient(gradient)) return false;
+            resolve_authored_gradient(gradient, sample_box, *checked.mask);
+        }
         const bool admitted = valid_surface_material(checked);
         return admitted;
     }
@@ -504,6 +725,9 @@ bool material_declaration_admitted(const MaterialDeclaration& declaration) {
         const bool admitted = valid_surface_material(checked);
         return admitted;
     }
+    const bool lines_known =
+        static_cast<std::uint8_t>(declaration.edge_lines) <= static_cast<std::uint8_t>(MaterialEdgeLines::ridge);
+    if (!lines_known) return false;
     AssembledEdge edge{};
     edge.drawn = true;
     apply_edge_declaration(declaration, edge);
@@ -515,9 +739,33 @@ bool material_declaration_admitted(const MaterialDeclaration& declaration) {
 
 } // namespace
 
+bool material_fields_read_box(
+    const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept {
+    for (const MaterialDeclaration* const declaration : fields) {
+        if (declaration == nullptr || (*declaration).initial) continue;
+        if (corner_field((*declaration).field) && (*declaration).relative) return true;
+        if ((*declaration).field == MaterialField::fill_sizes) {
+            for (const MaterialImageSize& size : (*declaration).image_sizes) {
+                const bool proportional = size.sizing == MaterialImageSizing::cover ||
+                                          size.sizing == MaterialImageSizing::contain;
+                const bool sided = size.sizing == MaterialImageSizing::width ||
+                                   size.sizing == MaterialImageSizing::height;
+                if (proportional || (sided && size.length.fraction != 0.0)) return true;
+            }
+            continue;
+        }
+        const bool layers = (*declaration).field == MaterialField::fills || (*declaration).field == MaterialField::mask;
+        if (!layers) continue;
+        for (const AuthoredGradient& gradient : (*declaration).gradients) {
+            if (gradient.kind != MaterialFillKind::solid && !authored_gradient_fixed(gradient)) return true;
+        }
+    }
+    return false;
+}
+
 void assemble_material(const SurfaceMaterial& floor,
-                       const std::array<const MaterialDeclaration*, material_field_count>& fields,
-                       double shorter_side, SurfaceMaterial& material) {
+                       const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
+                       SurfaceMaterial& material) {
     material = floor;
     bool edges = false;
     bool fills = false;
@@ -536,11 +784,27 @@ void assemble_material(const SurfaceMaterial& floor,
             corners = true;
             continue;
         }
+        // The placements apply to the glows, assembled first.
+        if ((*declaration).field == MaterialField::glow_placements) continue;
         apply_material_declaration(*declaration, material);
     }
-    if (fills) compose_fills(floor, fields, material);
-    if (corners) compose_corners(floor, fields, shorter_side, material);
-    if (edges) assemble_edges(floor, fields, material);
+    const MaterialDeclaration* const placements = set_field(fields, MaterialField::glow_placements);
+    if (placements != nullptr) apply_material_declaration(*placements, material);
+    const MaterialDeclaration* const mask = set_field(fields, MaterialField::mask);
+    if (mask != nullptr && material.mask && !(*mask).gradients.empty() &&
+        (*mask).gradients.front().kind != MaterialFillKind::solid) {
+        resolve_authored_gradient((*mask).gradients.front(), box, *material.mask);
+    }
+    if (fills) compose_fills(floor, fields, box, material);
+    if (corners) compose_corners(floor, fields, std::min(box.width, box.height), material);
+    const MaterialDeclaration* const border_image = set_field(fields, MaterialField::border_image);
+    const bool framed = border_image != nullptr && (*border_image).border_image.has_value();
+    if (edges && !framed) assemble_edges(floor, fields, material);
+    if (!framed) return;
+    // The border image replaces the border's drawing.
+    material.fills.push_back(*(*border_image).border_image);
+    material.border.reset();
+    material.border_edges = MaterialBorderEdges{};
 }
 
 RuleDeclaration RuleDeclaration::primitive(std::string_view primitive_name) {
@@ -743,13 +1007,15 @@ void CompiledThemeRules::add_rules(CompiledThemeRules& result, const ThemeRuleSh
         add_transitions(result.diagnostics_, index, rule, compiled);
         add_ambient(result.diagnostics_, index, rule, compiled);
         add_materials(result.diagnostics_, index, rule, compiled);
+        add_recipe_fields(result.diagnostics_, index, rule, compiled);
         const bool declares = compiled.selects || !compiled.parameters.empty() || !compiled.transitions.empty() ||
                               compiled.ambient.has_value() || compiled.blend.has_value() ||
-                              !compiled.materials.empty();
+                              !compiled.materials.empty() || !compiled.recipe_fields.empty();
         if (!declares) {
             result.diagnostics_.push_back(diagnostic(RuleDiagnosticKind::rule_empty, index, rule, {}));
             continue;
         }
+        if (!compiled.recipe_fields.empty()) result.recipe_fields_set_ = true;
         result.rules_.push_back(std::move(compiled));
     }
 }
@@ -809,7 +1075,7 @@ void CompiledThemeRules::add_materials(std::vector<RuleDiagnostic>& diagnostics,
     }
 }
 
-// -- transitions and ambient effects (E7) ------------------------------------------
+// -- recipe fields (T3 P6f) ---------------------------------------------------------
 
 namespace {
 
@@ -817,6 +1083,76 @@ bool in_range(double value, double minimum, double maximum) noexcept {
     const bool inside = std::isfinite(value) && value >= minimum && value <= maximum;
     return inside;
 }
+
+constexpr std::array<std::string_view, recipe_field_count> recipe_field_names{
+    "text", "outline_style", "outline_colour", "outline_width", "outline_offset", "text_shadow",
+};
+
+} // namespace
+
+std::string_view recipe_field_name(RecipeField field) noexcept {
+    const std::size_t position = static_cast<std::size_t>(field);
+    if (position >= recipe_field_count) return {};
+    return recipe_field_names[position];
+}
+
+bool recipe_declaration_admitted(const RecipeDeclaration& declaration) noexcept {
+    switch (declaration.field) {
+    case RecipeField::text:
+    case RecipeField::outline_colour: return true;
+    case RecipeField::outline_style:
+        return declaration.outline_style == RecipeOutlineStyle::ring ||
+               declaration.outline_style == RecipeOutlineStyle::solid ||
+               declaration.outline_style == RecipeOutlineStyle::none;
+    case RecipeField::outline_width: return in_range(declaration.number, 0.0, maximum_recipe_outline_width);
+    case RecipeField::outline_offset:
+        return in_range(declaration.number, -maximum_recipe_outline_offset, maximum_recipe_outline_offset);
+    case RecipeField::text_shadow: {
+        if (!declaration.shadowed) return true;
+        const Point offset = declaration.shadow_offset;
+        const bool placed = in_range(offset.x, -maximum_text_shadow_offset, maximum_text_shadow_offset) &&
+                            in_range(offset.y, -maximum_text_shadow_offset, maximum_text_shadow_offset);
+        const bool blurred = in_range(declaration.shadow_blur, 0.0, maximum_text_shadow_blur);
+        return placed && blurred;
+    }
+    case RecipeField::count: break;
+    }
+    return false;
+}
+
+void CompiledThemeRules::add_recipe_fields(std::vector<RuleDiagnostic>& diagnostics, std::size_t index,
+                                           const ThemeRule& rule, CompiledRule& compiled) {
+    // The recipe's fields are the control's: a selector naming a part or a
+    // role sets none.
+    const bool on_part = !rule.selector.part.empty() || rule.selector.role.has_value();
+    std::array<bool, recipe_field_count> declared{};
+    for (const RecipeDeclaration& declaration : rule.recipe_fields) {
+        const std::size_t position = static_cast<std::size_t>(declaration.field);
+        const std::string_view name = recipe_field_name(declaration.field);
+        if (position >= recipe_field_count) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::recipe_field_invalid, index, rule, {}));
+            continue;
+        }
+        if (on_part) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::recipe_field_on_part, index, rule, name));
+            continue;
+        }
+        if (declared[position]) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::duplicate_declaration, index, rule, name));
+            continue;
+        }
+        if (!declaration.initial && !recipe_declaration_admitted(declaration)) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::recipe_field_invalid, index, rule, name));
+            continue;
+        }
+        declared[position] = true;
+        compiled.recipe_fields.push_back(declaration);
+    }
+}
+
+// -- transitions and ambient effects (E7) ------------------------------------------
+
+namespace {
 
 // Whether a state's stops (E9.6) are usable: none, or at most
 // maximum_motion_stops on a timed curve, offsets strictly increasing
@@ -949,7 +1285,8 @@ CompiledThemeRules::CompiledThemeRules(const CompiledThemeRules& other)
       diagnostics_(other.diagnostics_),
       published_values_(other.published_values_),
       built_in_rules_(other.built_in_rules_),
-      serial_(next_rules_serial()) {}
+      serial_(next_rules_serial()),
+      recipe_fields_set_(other.recipe_fields_set_) {}
 
 CompiledThemeRules& CompiledThemeRules::operator=(const CompiledThemeRules& other) {
     if (this == &other) return *this;
@@ -958,6 +1295,7 @@ CompiledThemeRules& CompiledThemeRules::operator=(const CompiledThemeRules& othe
     published_values_ = other.published_values_;
     built_in_rules_ = other.built_in_rules_;
     serial_ = next_rules_serial();
+    recipe_fields_set_ = other.recipe_fields_set_;
     return *this;
 }
 
@@ -1050,6 +1388,21 @@ void CompiledThemeRules::resolve_materials(const PartFacts& facts, Resolution& r
         }
         result.materials_authored = true;
     }
+}
+
+CompiledThemeRules::RecipeResolution CompiledThemeRules::resolve_recipe_fields(const PartFacts& facts) const noexcept {
+    RecipeResolution result{};
+    if (!recipe_fields_set_) return result;
+    // As for the material fields: the last matching declaration of each
+    // field wins, and a rule declares each field at most once.
+    for (const CompiledRule& rule : rules_) {
+        if (rule.recipe_fields.empty() || !matches(rule, facts)) continue;
+        for (const RecipeDeclaration& declaration : rule.recipe_fields) {
+            result.fields[static_cast<std::size_t>(declaration.field)] = &declaration;
+        }
+        result.authored = true;
+    }
+    return result;
 }
 
 void CompiledThemeRules::resolve_primitive(const PartFacts& facts, const CompiledRule& chosen,

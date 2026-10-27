@@ -106,6 +106,11 @@ gui_forms::ListView
       **font** : ``FontSpec``
          The font of item and header text.
 
+      **draw_mode** : ``ItemDrawMode``, default ``ItemDrawMode::normal``
+         With ``ItemDrawMode::owner_draw`` the application draws the items'
+         content (Windows Forms' ``OwnerDraw``): see :cpp:func:`draw_item_content <gui_forms::ListView::draw_item_content>`. Throws
+         ``std::invalid_argument`` for an unknown mode.
+
       **insertion_mark** : ``std::optional<ListViewInsertionMark>``, default none, read-only
          Where the insertion mark stands, as an item's index and whether the mark
          is after it, or none. See :cpp:func:`show_insertion_mark <gui_forms::ListView::show_insertion_mark>`.
@@ -133,6 +138,19 @@ gui_forms::ListView
          The visible column headers.
 
    :Events:
+
+      **draw_item_content** : ``Event<ItemContentPaint&>``
+         Raised while the view paints in the owner-draw mode, with an
+         :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>`: once for each painted item's own content (column 0,
+         its icon and text area) and, in the details view, once for each visible
+         sub-item cell (its column), in paint order (Windows Forms' ``DrawItem`` and
+         ``DrawSubItem``). The painter is clipped to the content rectangle; the
+         item's plate, check box and focus cue are already painted by role.
+         ``text`` and :cpp:func:`font <gui_forms::ListView::font>` are the default content's. Set ``draw_default`` to add
+         the default content. Column headers are not owner-drawn. A handler
+         paints only; one that changes the items, their order, the columns or
+         the view, or disposes the view, ends that paint, and the view is painted
+         again.
 
       **selection_changed** : ``Event<const ListViewSelectionChange&>``
          Raised after the set of selected items changes, by the user or the
@@ -285,11 +303,10 @@ gui_forms::ListView
    The select action selects an item; press activates it, or toggles a
    check-box item.
 
-   Not supported yet: groups, the tile view, owner drawing, item tooltips,
-   hot-tracking activation, column reordering, type-ahead in virtual mode,
-   wrapping large-icon labels over two lines, and beginning a label edit with
-   a slow second click on the focused item (the host does not report its
-   double-click interval).
+   Not supported yet: groups, the tile view, item tooltips, hot-tracking
+   activation, column reordering, type-ahead in virtual mode, wrapping
+   large-icon labels over two lines, and beginning a label edit with a slow
+   second click on the focused item.
 
    .. rubric:: Examples
 
@@ -457,6 +474,16 @@ gui_forms::ListView
 
       Sets :cpp:func:`font <gui_forms::ListView::font>`; see the property's description above.
 
+   .. cpp:function:: ItemDrawMode draw_mode() const noexcept
+
+      With ``ItemDrawMode::owner_draw`` the application draws the items'
+      content (Windows Forms' ``OwnerDraw``): see :cpp:func:`draw_item_content <gui_forms::ListView::draw_item_content>`. Throws
+      ``std::invalid_argument`` for an unknown mode.
+
+   .. cpp:function:: void set_draw_mode(ItemDrawMode mode)
+
+      Sets :cpp:func:`draw_mode <gui_forms::ListView::draw_mode>`; see the property's description above.
+
    .. cpp:function:: std::optional<ListViewInsertionMark> insertion_mark() const noexcept
 
       Where the insertion mark stands, as an item's index and whether the mark
@@ -496,6 +523,20 @@ gui_forms::ListView
 
 
    .. rubric:: Events
+
+   .. cpp:function:: Event<ItemContentPaint&>& draw_item_content() noexcept
+
+      Raised while the view paints in the owner-draw mode, with an
+      :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>`: once for each painted item's own content (column 0,
+      its icon and text area) and, in the details view, once for each visible
+      sub-item cell (its column), in paint order (Windows Forms' ``DrawItem`` and
+      ``DrawSubItem``). The painter is clipped to the content rectangle; the
+      item's plate, check box and focus cue are already painted by role.
+      ``text`` and :cpp:func:`font <gui_forms::ListView::font>` are the default content's. Set ``draw_default`` to add
+      the default content. Column headers are not owner-drawn. A handler
+      paints only; one that changes the items, their order, the columns or
+      the view, or disposes the view, ends that paint, and the view is painted
+      again.
 
    .. cpp:function:: Event<const ListViewSelectionChange&>& selection_changed() noexcept
 

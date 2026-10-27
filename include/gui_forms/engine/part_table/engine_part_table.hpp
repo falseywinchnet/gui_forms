@@ -124,11 +124,12 @@ struct CachedPartRaster final {
 //   by address within those rules (null for none);
 // - `floor`: a copy of the recipe material, compared by value, since the
 //   theme's recipe may be replaced and another may occupy its address;
-// - `shorter_side`: the box's shorter side, which relative corners read.
+// - `box`: the part's box size, for fields that read it
+//   (material_fields_read_box), else empty.
 struct AssembledPartMaterial final {
     std::uint64_t rules_serial{};
     std::array<const MaterialDeclaration*, material_field_count> fields{};
-    double shorter_side{};
+    Size box{};
     SurfaceMaterial floor{};
     SurfaceMaterial material{};
 };
@@ -362,15 +363,18 @@ struct RasterCacheStatistics final {
     std::size_t procedural_patterns{};
     std::size_t procedural_queued{};
     // The window's backplane images (E9-B, owner 2026-10-22): made, lent
-    // from those held, and held now; and the backplane commands their
-    // making skipped. The core bakes a backplane image from the window's
-    // backplane material and the backplane plane's engine part rasters
-    // alone (option 1), so text and other commands drawn in the backplane
-    // plane are absent from glass; each one is counted here every time an
-    // image is made over it.
+    // from those held, and held now; those of them the window's renderer
+    // replayed whole (stage T5, C6); and the backplane commands their
+    // making skipped. Without a renderer that replays, the core bakes a
+    // backplane image from the window's backplane material and the
+    // backplane plane's engine part rasters alone (option 1), so text and
+    // other commands drawn in the backplane plane are absent from glass;
+    // each one is counted here every time an image is made over it. A
+    // replayed image skips nothing.
     std::uint64_t backplane_bakes{};
     std::uint64_t backplane_hits{};
     std::size_t backplane_images{};
+    std::uint64_t backplane_replays{};
     std::uint64_t backplane_skipped_commands{};
     // Bakes whose image mask's variant was asked for and not lent (E9.6):
     // the part, or the backplane region, was drawn unmasked, as the
@@ -551,13 +555,14 @@ public:
     [[nodiscard]] std::shared_ptr<const PartRaster> held_backplane(const BackplaneRegion& region,
                                                                    std::uint64_t generation,
                                                                    std::uint64_t paint_sequence);
-    // Holds `image`, just made for `region` at `generation` with
-    // `skipped` backplane commands left out, within the shared budget
+    // Holds `image`, just made for `region` at `generation`, replayed
+    // whole (`replayed`) or with `skipped` backplane commands left out,
+    // within the shared budget
     // (least recently used evicted first; an image larger than the budget
     // is counted but not held). Allocation failure propagates as
     // std::bad_alloc and holds nothing.
     void hold_backplane(const BackplaneRegion& region, std::uint64_t generation,
-                        const std::shared_ptr<const PartRaster>& image, std::uint64_t skipped,
+                        const std::shared_ptr<const PartRaster>& image, std::uint64_t skipped, bool replayed,
                         std::uint64_t paint_sequence);
     // Draws the window's backplane `material` over `region` into `image`
     // (E9-B), for a window of `window_size` logical units whose images are

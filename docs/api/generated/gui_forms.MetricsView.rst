@@ -63,10 +63,12 @@ gui_forms::MetricsView
 
    .. rubric:: Notes
 
-   The view reads the counters when it paints and when its semantics are
-   queried, but it does not repaint by itself when they change. Refresh it
-   explicitly with ``invalidate``, for example from a :cpp:class:`Timer <gui_forms::Timer>`, as the second
-   example does.
+   The view reads the counters when it paints, but it does not repaint by
+   itself when they change. Refresh it explicitly with ``invalidate``, for example
+   from a :cpp:class:`Timer <gui_forms::Timer>`, as the second example does. Its accessible value is the text
+   it last painted, so an assistive client reads what the card shows; a paint
+   that changes it advances the window's semantic generation, and before the
+   first paint the value is empty.
 
    The view publishes the accessibility role ``group``, named by :cpp:func:`title <gui_forms::MetricsView::title>`, with the
    counters as its value. While it is not attached to a window, it shows

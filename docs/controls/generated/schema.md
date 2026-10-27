@@ -652,6 +652,7 @@ Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
+| `draw_item_content` | `ItemContentPaint`, by reference |
 | `selection_changed` | `ListViewSelectionChange` |
 | `item_activated` | `ListViewItemActivation` |
 | `item_checking` | `ListViewItemCheck`, by reference |
@@ -1592,6 +1593,7 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 | `auto_validate_changed` | `AutoValidate` |
+| `draw_item_content` | `ItemContentPaint`, by reference |
 | `selected_index_changed` | `TabSelectionChange` |
 
 ## `page_strip` (PageStrip, control)
@@ -1633,6 +1635,7 @@ Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
+| `draw_item_content` | `ItemContentPaint`, by reference |
 | `page_invoked` | `PageInvocation` |
 | `page_close_requested` | `PageCloseRequest`, by reference |
 | `page_pin_requested` | `PagePinRequest`, by reference |

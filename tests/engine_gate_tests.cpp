@@ -760,6 +760,7 @@ std::string_view image_mode_name(MaterialImageMode mode) {
     case MaterialImageMode::stretch: return "stretch";
     case MaterialImageMode::tile: return "tile";
     case MaterialImageMode::nine_patch: return "nine_patch";
+    case MaterialImageMode::single: return "single";
     }
     return {};
 }

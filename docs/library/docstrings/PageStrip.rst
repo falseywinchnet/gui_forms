@@ -75,6 +75,10 @@ image_list
     shows the image before its label. `set_image_list` throws
     `std::invalid_argument` for a disposed list or one that belongs to
     another window.
+draw_mode : default ``ItemDrawMode::normal``
+    With ``ItemDrawMode::owner_draw`` the application draws the tabs'
+    content: see `draw_item_content`. Throws `std::invalid_argument` for an
+    unknown mode.
 overflowing
     Whether the tabs do not all fit, so the scroll and list buttons (under
     ``shrink_then_list``, the list button) show.
@@ -98,6 +102,16 @@ page_list_items
 
 Events
 ------
+draw_item_content
+    Raised while the strip paints in the owner-draw mode (owner decision
+    W-Q6), once per painted tab that has an icon or a label, with an
+    `ItemContentPaint`: the tab's position, its page's ID, and its icon and
+    label area as the content rectangle, to which the painter is clipped.
+    The tab's plate, close button, pin, modified mark and focus cue stay
+    painted by role. Set `draw_default` to add the default content. A
+    handler paints only; one that changes the strip's pages, settings or
+    scroll position, or disposes it, ends that paint, and the strip is
+    painted again.
 page_invoked
     Raised when a tab is clicked, chosen with the keyboard, by its mnemonic,
     from the page list or through accessibility, after its page is selected
