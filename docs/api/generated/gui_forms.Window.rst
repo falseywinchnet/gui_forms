@@ -1317,7 +1317,7 @@ gui_forms::Window
 
    .. cpp:function:: void set_dispatch_wake_handler(std::function<void()> wake)
 
-      Host adapters install a thread-safe wake primitive. Installing a handler after work was queued immediately publishes one coalesced wake. The handler runs under the dispatcher's lock, on whichever thread posted: it may only signal (set a flag, post a message, write a pipe) and must never call back into the window. In return, once this call replaces or removes a handler, no wake through the old one is under way or to come, so its target may be destroyed.
+      Host adapters install a thread-safe wake primitive. Installing a handler after work was queued immediately publishes one coalesced wake. The handler runs under the dispatcher's lock, on whichever thread posted: it may only signal (set a flag, post a message, write a pipe) and must never call back into the window. In return, once this call replaces or removes a handler, no wake through the old one is under way or to come, so its target may be destroyed. A thread may post (begin_invoke, invoke) while holding locks of its own, so the lock order is the poster's locks, then the dispatcher's, then any the handler takes: the handler must take no lock that a posting thread may hold. The stock hosts' handlers take none of GUI.Forms' or the application's.
 
    .. cpp:function:: void set_paint_wake_handler(std::function<void()> wake)
 
