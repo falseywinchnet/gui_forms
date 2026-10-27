@@ -92,7 +92,10 @@ template_harness, checked out beside this repository at the commit
   that requests for missing CMake components fail. `--native` exercises the
   `Application` component, `--relocate` copies the SDK to a new prefix first,
   and `--toolchain` and `--runner` build the consumer with another CMake
-  toolchain and run its tests through an emulator.
+  toolchain and run its tests through an emulator. `--feature-components`
+  (with `--native`) also builds and runs `tests/installed_feature_consumer/`
+  against a `build_sdk.py --features all` prefix, through the `TextMasks` and
+  `AudioLoopTransport` components. Without it, those two must be rejected.
   `python3 tools/verify_install.py /path/to/prefix --native`
 
 `tools/package_programs.py`

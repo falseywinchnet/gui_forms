@@ -66,9 +66,9 @@ if(GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT)
     target_sources(gui_forms_audio PRIVATE
         "${_gui_audio_root}/src/audio/loop_transport/loop_transport.cpp"
         "${_gui_audio_root}/src/audio/loop_transport/scheduler.cpp")
-    target_compile_definitions(gui_forms_audio PUBLIC
-        $<BUILD_INTERFACE:GUI_FORMS_AUDIO_LOOP_TRANSPORT>)
-    install(CODE "message(FATAL_ERROR \"The development audio loop transport is not admitted for SDK installation\")")
+    # audio.hpp declares the loop transport only under this definition, and the
+    # installed library holds it, so installed consumers must see it too.
+    target_compile_definitions(gui_forms_audio PUBLIC GUI_FORMS_AUDIO_LOOP_TRANSPORT)
 endif()
 add_library(GUIForms::Audio ALIAS gui_forms_audio)
 set_target_properties(gui_forms_audio PROPERTIES EXPORT_NAME Audio)
@@ -113,6 +113,17 @@ if(GUI_FORMS_BUILD_TESTS)
     endif()
 endif()
 install(TARGETS gui_forms_audio EXPORT GUIFormsAudioTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if(GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT)
+    # The component a consumer names to require the loop transport: Audio built
+    # with it. It adds nothing to Audio's own usage requirements.
+    add_library(gui_forms_audio_loop_transport INTERFACE)
+    target_link_libraries(gui_forms_audio_loop_transport INTERFACE gui_forms_audio)
+    set_target_properties(gui_forms_audio_loop_transport PROPERTIES EXPORT_NAME AudioLoopTransport)
+    add_library(GUIForms::AudioLoopTransport ALIAS gui_forms_audio_loop_transport)
+    install(TARGETS gui_forms_audio_loop_transport EXPORT GUIFormsAudioTargets)
+    install(DIRECTORY "${_gui_audio_root}/include/gui_forms/audio/loop_transport"
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gui_forms/audio)
+endif()
 install(EXPORT GUIFormsAudioTargets NAMESPACE GUIForms:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES "${_gui_audio_root}/include/gui_forms/audio/audio.hpp" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gui_forms/audio)
 install(FILES "${gui_forms_miniaudio_SOURCE_DIR}/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME miniaudio-LICENSE.txt)
