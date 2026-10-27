@@ -215,6 +215,8 @@ enum class PositionWord : std::uint8_t { none, left, center, right, top, bottom 
     case PositionWord::bottom: return BoxLength{1.0, 0.0};
     case PositionWord::center:
     case PositionWord::none: break;
+    // A value outside the enumeration is centred, as `center` is.
+    default: break;
     }
     return BoxLength{0.5, 0.0};
 }
@@ -737,6 +739,9 @@ bool MaterialReader::read_gradient(std::size_t index, AuthoredGradient& gradient
     case MaterialFillKind::solid:
     case MaterialFillKind::image:
     case MaterialFillKind::procedural: break;
+    // A value outside the enumeration names no gradient function: nothing
+    // is read.
+    default: break;
     }
     if (!read) return false;
     const std::span<const ComponentRange> stop_arguments =
@@ -1474,6 +1479,9 @@ bool MaterialReader::read_colour_function(std::size_t function, FilterFunction k
     case FilterFunction::blur:
     case FilterFunction::drop_shadow:
     case FilterFunction::hue_rotate: break;
+    // A value outside the enumeration is no colour function: the matrix
+    // is left as it is.
+    default: break;
     }
     return true;
 }
@@ -2178,6 +2186,8 @@ void MaterialReader::lower(MaterialProperty property) {
     case MaterialProperty::outline_style: static_cast<void>(lower_outline_style()); return;
     case MaterialProperty::outline_width: static_cast<void>(lower_outline_width()); return;
     case MaterialProperty::text_shadow: static_cast<void>(lower_text_shadow()); return;
+    // A value outside the enumeration names no property: nothing is lowered.
+    default: return;
     }
 }
 
@@ -2279,6 +2289,8 @@ void material_property_fields(MaterialProperty property, std::vector<MaterialFie
     case MaterialProperty::outline_style:
     case MaterialProperty::outline_width:
     case MaterialProperty::text_shadow: return;
+    // A value outside the enumeration names no property: it sets no field.
+    default: return;
     }
 }
 

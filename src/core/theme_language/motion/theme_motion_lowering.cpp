@@ -561,6 +561,8 @@ MotionLoweringOutcome TransitionReader::lower(TransitionProperty property, Writt
     case TransitionProperty::duration: read = lower_times(false); break;
     case TransitionProperty::timing_function: read = lower_timings(); break;
     case TransitionProperty::delay: read = lower_times(true); break;
+    // A value outside the enumeration reads nothing: `read` stays false.
+    default: break;
     }
     if (!read) return dropped_ ? MotionLoweringOutcome::dropped : MotionLoweringOutcome::refused;
     written.token = start_;
@@ -614,6 +616,8 @@ bool curve_of(const TimingFunction& timing, FrameInterval duration, FrameInterva
         if (timing.kind == MotionKind::decay) curve = MotionCurve::decay(timing.constant);
         if (timing.kind == MotionKind::spring) curve = MotionCurve::spring(timing.constant, timing.overshoot);
         break;
+    // A value outside the enumeration keeps the caller's curve.
+    default: break;
     }
     if (delay != FrameInterval{}) curve = curve.delayed(delay);
     return true;
