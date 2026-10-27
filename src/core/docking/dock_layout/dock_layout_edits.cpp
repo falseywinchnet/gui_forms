@@ -154,21 +154,31 @@ private:
 
     // The table ---------------------------------------------------------
 
-    DockNodeId new_node_id() {
-        const DockNodeId id{state_.next_id};
+    // Assigns the next node or site ID to id. Once next_id has reached
+    // dock_identity_limit the edit is refused instead, and id and next_id
+    // are left as they were; the scratch state is then discarded.
+    DockRefusal new_node_id(DockNodeId& id) {
+        if (state_.next_id >= dock_identity_limit) {
+            return refuse(DockRefusalReason::identities_exhausted, DockRefusalLayer::model);
+        }
+        id = DockNodeId{state_.next_id};
         ++state_.next_id;
-        return id;
+        return accepted();
     }
 
-    DockNodeId add_stack(DockNodeKind kind, std::vector<DockPanelId> panels, std::uint32_t selected) {
+    // Inserts a new stack and assigns its ID to id, or refuses as
+    // new_node_id does, inserting nothing.
+    DockRefusal add_stack(DockNodeKind kind, std::vector<DockPanelId> panels, std::uint32_t selected,
+                          DockNodeId& id) {
         DockNode node{};
-        node.id = new_node_id();
+        const DockRefusal assigned = new_node_id(node.id);
+        if (is_refusal(assigned)) return assigned;
         node.kind = kind;
         node.panels = std::move(panels);
         node.selected = selected;
-        const DockNodeId id = node.id;
+        id = node.id;
         insert_dock_node(state_, std::move(node));
-        return id;
+        return accepted();
     }
 
     void erase_node(DockNodeId id) {
@@ -279,10 +289,15 @@ private:
 
     // Puts item beside target on side, in a new split; item takes ratio of
     // the split's span.
-    void attach_beside(DockNodeId target_id, DockSide side, double ratio, DockNodeId item) {
+    // Refuses, changing nothing, when no ID is left for the split.
+    DockRefusal attach_beside(DockNodeId target_id, DockSide side, double ratio, DockNodeId item) {
         const bool item_first = side_comes_first(side);
         const double split_ratio = item_first ? ratio : 1.0 - ratio;
-        attach_in_split(target_id, side, item, new_node_id(), split_ratio);
+        DockNodeId split_identity{};
+        const DockRefusal assigned = new_node_id(split_identity);
+        if (is_refusal(assigned)) return assigned;
+        attach_in_split(target_id, side, item, split_identity, split_ratio);
+        return accepted();
     }
 
     // Whether no node or floating site uses an identity that was assigned
@@ -455,7 +470,8 @@ private:
         } else {
             const DockNodeKind kind = stack_kind_for(subject.panel, region);
             std::vector<DockPanelId> panels{subject.panel};
-            item = add_stack(kind, std::move(panels), 0);
+            const DockRefusal added = add_stack(kind, std::move(panels), 0, item);
+            if (is_refusal(added)) return added;
         }
         const DockRefusal admitted = admit_stack(item, region);
         return admitted;
@@ -511,7 +527,8 @@ private:
             const DockNodeId content = (*find_dock_node(state_, target_id)).first;
             stack_id = content == DockNodeId{} ? DockNodeId{} : first_stack_in(content);
             if (stack_id == DockNodeId{}) {
-                stack_id = add_stack(DockNodeKind::document_stack, {}, 0);
+                const DockRefusal added = add_stack(DockNodeKind::document_stack, {}, 0, stack_id);
+                if (is_refusal(added)) return added;
                 DockNode& area = *find_dock_node(state_, target_id);
                 area.first = stack_id;
                 (*find_dock_node(state_, stack_id)).parent = target_id;
@@ -563,8 +580,8 @@ private:
         DockNodeId item{};
         const DockRefusal admitted = stack_for_region(subject, place.region, item);
         if (is_refusal(admitted)) return admitted;
-        attach_beside(target_id, side, ratio, item);
-        return accepted();
+        const DockRefusal attached = attach_beside(target_id, side, ratio, item);
+        return attached;
     }
 
     DockRefusal float_subject(const DockSubject& subject, Rect frame, const std::string& monitor_id) {
@@ -578,8 +595,11 @@ private:
         DockNodeId item{};
         const DockRefusal admitted = stack_for_region(subject, DockRegion::floating, item);
         if (is_refusal(admitted)) return admitted;
+        DockNodeId site_identity{};
+        const DockRefusal assigned = new_node_id(site_identity);
+        if (is_refusal(assigned)) return assigned;
         DockFloatingSite site{};
-        site.id = DockSiteId{new_node_id().value};
+        site.id = DockSiteId{site_identity.value};
         site.root = item;
         site.frame = frame;
         site.monitor_id = monitor_id;
@@ -655,8 +675,8 @@ private:
             return accepted();
         }
         const double ratio = valid_ratio(entry.ratio) ? entry.ratio : 0.25;
-        attach_beside(target, side, ratio, stack_id);
-        return accepted();
+        const DockRefusal attached = attach_beside(target, side, ratio, stack_id);
+        return attached;
     }
 
     DockRefusal hide(const DockPanelId& panel_id) {
@@ -749,7 +769,9 @@ private:
         }
         ensure_record(panel_id);
         std::vector<DockPanelId> panels{panel_id};
-        const DockNodeId stack_id = add_stack(DockNodeKind::tool_stack, std::move(panels), 0);
+        DockNodeId stack_id{};
+        const DockRefusal added = add_stack(DockNodeKind::tool_stack, std::move(panels), 0, stack_id);
+        if (is_refusal(added)) return added;
         const DockRefusal admitted = admit_stack(stack_id, DockRegion::auto_hidden);
         if (is_refusal(admitted)) return admitted;
         DockAutoHideEntry entry{};

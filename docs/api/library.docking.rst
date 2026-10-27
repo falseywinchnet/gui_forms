@@ -524,7 +524,7 @@ Related types
 
    .. cpp:member:: std::uint32_t next_id
 
-      The next node or site ID to assign; node and site IDs share one count. Default: ``{1}``.
+      The next node or site ID to assign; node and site IDs share one count. It never exceeds dock_identity_limit, and reaching it means the layout has no identity left to assign. Default: ``{1}``.
 
    .. cpp:member:: std::uint32_t application_version
 
@@ -1141,6 +1141,8 @@ Enumerations
 
    .. cpp:enumerator:: floating_site_limit
 
+   .. cpp:enumerator:: identities_exhausted
+
    .. cpp:enumerator:: not_root_level
 
    .. cpp:enumerator:: not_in_main_site
@@ -1357,6 +1359,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t dock_maximum_floating_sites
 
    The most floating sites a layout holds (DK decision 6). Value: ``32``.
+
+.. cpp:var:: constexpr std::uint32_t dock_identity_limit
+
+   Node and site IDs are below this value. An edit that needs a new ID once next_id has reached it is refused (identities_exhausted); IDs are never reused, so the count never wraps to the null ID. Value: ``0xFFFFFFFEU``.
 
 .. cpp:var:: constexpr std::uint32_t dock_append_index
 

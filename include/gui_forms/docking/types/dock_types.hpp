@@ -375,6 +375,8 @@ struct DockLayoutState final {
     std::vector<DockAutoHideEntry> auto_hidden{};
     std::vector<DockPanelRecord> panels{};
     // The next node or site ID to assign; node and site IDs share one count.
+    // It never exceeds dock_identity_limit, and reaching it means the layout
+    // has no identity left to assign.
     std::uint32_t next_id{1};
     // The application's own layout version, saved with the layout.
     std::uint32_t application_version{0};
@@ -397,6 +399,10 @@ struct DockLayoutState final {
 
 // The most floating sites a layout holds (DK decision 6).
 inline constexpr std::size_t dock_maximum_floating_sites = 32;
+// Node and site IDs are below this value. An edit that needs a new ID once
+// next_id has reached it is refused (identities_exhausted); IDs are never
+// reused, so the count never wraps to the null ID.
+inline constexpr std::uint32_t dock_identity_limit = 0xFFFFFFFEU;
 // An index meaning "after the last panel".
 inline constexpr std::uint32_t dock_append_index = 0xFFFFFFFFU;
 
@@ -518,6 +524,7 @@ enum class DockRefusalReason : std::uint8_t {
     invalid_frame,
     invalid_extent,
     floating_site_limit,
+    identities_exhausted,
     not_root_level,
     not_in_main_site,
     already_placed,

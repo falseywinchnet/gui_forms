@@ -232,6 +232,9 @@ private:
     }
 
     bool check_tables() {
+        if (state_.next_id == 0U || state_.next_id > dock_identity_limit) {
+            return fail("next_id is outside the identity range");
+        }
         for (std::size_t index = 0; index < state_.nodes.size(); ++index) {
             const DockNodeId id = state_.nodes[index].id;
             if (id.value == 0U || id.value >= state_.next_id) return fail(node_text(id) + " has an invalid ID");
