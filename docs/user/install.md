@@ -131,6 +131,37 @@ consumer built with different settings is not binary compatible.
 Nothing from Skia, AppKit, Win32 or X11 appears in the installed headers;
 those remain private adapters inside the `Application` library.
 
+### Package components
+
+`find_package(GUIForms CONFIG REQUIRED COMPONENTS ...)` accepts these
+components. A component the prefix lacks fails at configure time with a
+message saying which build provides it.
+
+| Component | Target | Installed when |
+|---|---|---|
+| `Core`, `Controls`, `Drawing`, `Threading` | `GUIForms::Core`, `::Controls`, `::Drawing`, `::Threading` | Always |
+| `Application` | `GUIForms::Application` | A native host is enabled |
+| `Audio` | `GUIForms::Audio` | `GUI_FORMS_BUILD_AUDIO` (on in CI and in `build_sdk.py`) |
+| `TextMasks` | `GUIForms::TextMasks` | `GUI_FORMS_BUILD_TEXT_MASKS` with a native host (`build_sdk.py --features all`) |
+| `AudioLoopTransport` | `GUIForms::AudioLoopTransport` | `GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT` with audio (`build_sdk.py --features all`) |
+
+`TextMasks` is an interface on `Application`, which already contains the
+text-mask service. Link it beside `Application`, never beside `Core`; see
+[Consume the SDK](consume-the-sdk). It installs `gui_forms/text_mask.hpp`
+and `gui_forms/text_mask/`. It also installs the prepared-text types, layout
+and service headers that the text-mask API includes for its vocabulary;
+the prepared-text service itself is not installed.
+
+`AudioLoopTransport` names an `Audio` library built with the loop transport.
+That `Audio` carries the `GUI_FORMS_AUDIO_LOOP_TRANSPORT` definition, which
+`audio.hpp` needs to declare the transport, and installs
+`gui_forms/audio/loop_transport/`.
+
+```cmake
+find_package(GUIForms 0.2 CONFIG REQUIRED COMPONENTS Application TextMasks Audio AudioLoopTransport)
+target_link_libraries(my_app PRIVATE GUIForms::Application GUIForms::TextMasks GUIForms::AudioLoopTransport)
+```
+
 ## The source SDK
 
 Each tested release publishes one platform-neutral source SDK,
@@ -177,6 +208,25 @@ it with `--jobs` jobs in `--work` (default `.build/sdk-<platform>`), and
 installs it into `--prefix`. The [Prerequisites](#prerequisites) still apply,
 including `GUI_FORMS_LLVM_RUNTIME` on macOS. Consume the installed prefix
 as in [Verify the installation](#verify-the-installation).
+
+`--features` chooses which optional components are built:
+
+`default`
+: The components CI builds and tests: `Core`, `Controls`, `Drawing`,
+  `Threading`, the host's `Application` with the HarfBuzz/FreeType text
+  engine, and `Audio` with the stx Vorbis decoder.
+
+`all`
+: The default set, plus every optional component a product may link:
+  `TextMasks` (`GUI_FORMS_BUILD_TEXT_MASKS`) and `AudioLoopTransport`
+  (`GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT`). One such install serves every
+  product; template_harness's lockstep build uses it.
+
+The prepared-text service (`GUI_FORMS_BUILD_PREPARED_TEXT`) is in neither
+set. It cannot be installed, and it changes `Application`'s declarations for
+every consumer. The probes, benchmarks, fuzzers and diagnostics build
+programs or change behaviour rather than adding a component, so they are left
+out as well.
 
 ### What a source build still downloads
 

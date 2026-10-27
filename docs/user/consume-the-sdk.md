@@ -76,12 +76,18 @@ target_link_libraries(my_forms PRIVATE GUIForms::Application audio_adapter)
 ## Development text targets
 
 `GUIForms::TextMasks` (the logical text-mask service) and
-`GUIForms::PreparedText` (the prepared-text service) are development-only.
-They are not package components, and installing a build configured with
-`GUI_FORMS_BUILD_TEXT_MASKS` or `GUI_FORMS_BUILD_PREPARED_TEXT` stops with an
-error. They exist only when your project adds the GUI.Forms source tree with
-`add_subdirectory` and turns those options on; both need
+`GUIForms::PreparedText` (the prepared-text service) both need
 `GUI_FORMS_ENABLE_HARFBUZZ_TEXT`.
+
+- `TextMasks` is the `TextMasks` package component of a native-host build
+  configured with `GUI_FORMS_BUILD_TEXT_MASKS`, such as
+  `tools/build_sdk.py --features all` (see
+  [Package components](install.md#package-components)). Installing a
+  hostless build with text masks stops with an error.
+- `PreparedText` stays development-only. It exists only when your project
+  adds the GUI.Forms source tree with `add_subdirectory` and turns
+  `GUI_FORMS_BUILD_PREPARED_TEXT` on, and installing such a build stops with
+  an error.
 
 They follow the linking rule. In a build with a native host, each is an
 interface target that links `GUIForms::Application` and nothing else; the

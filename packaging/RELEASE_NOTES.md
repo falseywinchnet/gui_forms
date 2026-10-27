@@ -154,6 +154,11 @@ mail mockup.
   for your own platform with `tools/build_sdk.py --target <platform> --prefix
   <dir>` (see docs/user/install.md, "The source SDK"). It replaces the four
   per-platform binary SDK archives that briefly accompanied 0.2 releases.
+- `tools/build_sdk.py --features all` builds one SDK that serves every
+  product. It adds the text masks and the audio loop transport, which now
+  install as the `TextMasks` and `AudioLoopTransport` package components
+  (`find_package(GUIForms COMPONENTS TextMasks AudioLoopTransport)`). Before,
+  installing them was refused. The default set is unchanged.
 
 ## Known limits
 

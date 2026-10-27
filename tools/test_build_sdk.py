@@ -79,6 +79,21 @@ class ConfigureOptionTests(unittest.TestCase):
                 self.assertEqual(sdk["GUI_FORMS_BUILD_GALLERY"], "OFF")
                 self.assertEqual(sdk["CMAKE_INSTALL_PREFIX"], str(build / "prefix"))
 
+    def test_all_features_add_only_the_optional_components(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            build: Path = Path(directory)
+            default: list[str] = build_sdk.configure_command(
+                "windows-x64", build_sdk.ROOT, build / "tree", build / "skia", build / "prefix")
+            every: list[str] = build_sdk.configure_command(
+                "windows-x64", build_sdk.ROOT, build / "tree", build / "skia", build / "prefix", "all")
+        self.assertEqual(every[:len(default)], default)
+        self.assertEqual(definitions(every[len(default):]), {
+            "GUI_FORMS_BUILD_TEXT_MASKS": "ON", "GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT": "ON"})
+        self.assertNotIn("-DGUI_FORMS_BUILD_PREPARED_TEXT=ON", every)
+
+    def test_the_default_features_add_nothing(self) -> None:
+        self.assertEqual(build_sdk.FEATURE_SETS["default"], ())
+
 
 class TargetTests(unittest.TestCase):
     def test_only_the_host_target_is_admitted(self) -> None:

@@ -28,6 +28,34 @@ endfunction()
 gui_forms_application_text(gui_forms_text_masks gui_forms_text_masks_impl TextMasks)
 gui_forms_application_text(gui_forms_prepared_text gui_forms_prepared_text_impl PreparedText)
 
+# With a native host the text masks are inside the Application library, and
+# GUIForms::TextMasks is an interface on it: that installs as the TextMasks
+# component with the text-mask headers. A hostless build's TextMasks carries
+# a static Core and the private text engine archives, which the SDK does not
+# ship, so installing it stays refused.
+if(TARGET gui_forms_text_masks AND TARGET gui_forms_application)
+    set_target_properties(gui_forms_text_masks PROPERTIES EXPORT_NAME TextMasks)
+    install(TARGETS gui_forms_text_masks EXPORT GUIFormsTextMasksTargets)
+    install(EXPORT GUIFormsTextMasksTargets
+            FILE GUIFormsTextMasksTargets.cmake
+            NAMESPACE GUIForms::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
+    install(FILES include/gui_forms/text_mask.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gui_forms)
+    install(DIRECTORY include/gui_forms/text_mask DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gui_forms)
+    # The text-mask API is written in the prepared-text vocabulary (font
+    # sources, encoded font leases, the wake target), so the headers
+    # text_mask_service.hpp includes install with it. The PreparedText
+    # service itself, its raster header and its umbrella header do not.
+    foreach(prepared_header IN ITEMS types/prepared_text_types.hpp layout/prepared_text_layout.hpp
+                                     service/prepared_text_service.hpp)
+        get_filename_component(prepared_directory "${prepared_header}" DIRECTORY)
+        install(FILES include/gui_forms/prepared_text/${prepared_header}
+                DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gui_forms/prepared_text/${prepared_directory})
+    endforeach()
+elseif(TARGET gui_forms_text_masks)
+    install(CODE "message(FATAL_ERROR \"The text masks install only with a native host (Application)\")")
+endif()
+
 if(TARGET gui_forms_application AND GUI_FORMS_BUILD_PREPARED_TEXT)
     target_compile_definitions(gui_forms_application PUBLIC
         $<BUILD_INTERFACE:GUI_FORMS_PREPARED_TEXT>)

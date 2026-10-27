@@ -775,12 +775,9 @@ set_target_properties(gui_drawing_core PROPERTIES EXPORT_NAME Drawing)
 if(GUI_FORMS_BUILD_PREPARED_TEXT)
     install(CODE "message(FATAL_ERROR \"The development prepared-text interface is not admitted for SDK installation\")")
 endif()
-if(GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT)
-    install(CODE "message(FATAL_ERROR \"The development audio loop transport is not admitted for SDK installation\")")
-endif()
-if(GUI_FORMS_BUILD_TEXT_MASKS)
-    install(CODE "message(FATAL_ERROR \"The development text-mask interface is not admitted for SDK installation\")")
-endif()
+# The audio loop transport and the text masks install as the AudioLoopTransport
+# and TextMasks components (cmake/Audio.cmake, cmake/ApplicationText.cmake),
+# with their headers; the main header install below leaves them to those files.
 install(TARGETS gui_forms_threading gui_forms_core gui_forms_controls gui_drawing_core
         EXPORT GUIFormsTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
