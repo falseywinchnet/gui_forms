@@ -394,6 +394,8 @@ void size_image(const MaterialImageSize& size, Size box, MaterialFillLayer& laye
         layer.image_scale = layer.image_scale / factor;
         break;
     }
+    // A value outside the enumeration sizes nothing: the scale as written.
+    default: break;
     }
     // A sized image is tiled, unless repetition then makes it single.
     if (layer.image_mode == MaterialImageMode::stretch) layer.image_mode = MaterialImageMode::tile;
@@ -1116,6 +1118,8 @@ bool recipe_declaration_admitted(const RecipeDeclaration& declaration) noexcept 
         return placed && blurred;
     }
     case RecipeField::count: break;
+    // A value outside the enumeration names no field, so it is invalid.
+    default: break;
     }
     return false;
 }

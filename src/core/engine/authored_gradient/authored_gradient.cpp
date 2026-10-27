@@ -219,6 +219,8 @@ double linear_angle(const AuthoredGradient& gradient, Size box) noexcept {
     case GradientCorner::bottom_left: return 180.0 + diagonal;
     case GradientCorner::top_left: return 360.0 - diagonal;
     case GradientCorner::none: break;
+    // A value outside the enumeration names no corner: the written angle.
+    default: break;
     }
     return gradient.angle_degrees;
 }
@@ -468,6 +470,8 @@ void resolve_authored_gradient(const AuthoredGradient& gradient, Size box, Mater
     case MaterialFillKind::solid:
     case MaterialFillKind::image:
     case MaterialFillKind::procedural: break;
+    // A value outside the enumeration is no gradient: the empty layer.
+    default: break;
     }
     layer = MaterialFillLayer{};
 }
