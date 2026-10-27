@@ -29,28 +29,28 @@ stage's brief, then the documents the brief lists under "Read first".
 Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 `tools/make_roadmap_svg.py`). Everything listed is before 1.0.
 
-| Stage | Brief | Release | Depends on (gates recorded) | Status 2026-10-23 |
+| Stage | Brief | Release | Depends on (gates recorded) | Status 2026-10-27 |
 |---|---|---|---|---|
 | A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | complete 2026-10-23: client tests read the whole Gallery through MSAA and UI Automation (`results/2026-10-19-a-w1-msaa-gallery`, `results/2026-10-20-a-w3-uia-gallery`), AT-SPI (`results/2026-10-20-a-l2-linux-gallery`) and AX (`results/2026-10-20-a-macos`); editable text ranges on all three hosts (#263, #271, #273); every native host advertises the capability (#277); the macOS AX client settles before it reads (#249, #266, #275) |
 | F | [Font substitution](F-font-substitution/README.md) | 0.2 Verified | none | complete 2026-10-23: gate recorded in `results/2026-10-23-f-font-substitution` (CI run 40049449883, all four native hosts); it declares 0.2. Earlier: plan accepted (brief decisions 4 to 17); F1 measurement tool `tools/font_metrics_differential`, first runs `results/2026-10-23-f1-metrics-harness`, engine against engine (Cousine and Tinos exact; Carlito and Arimo exact but for kerning and one glyph; Selawik nearest only; Tahoma Bold has no face within 5%); Arimo, Tinos and Selawik downloaded with approval, F3 adds them |
 | T1 | [Anatomy: articulated controls and one schema](T1-anatomy/README.md) | 0.2 Verified | none | complete 2026-10-13 (`results/2026-10-13-t1-anatomy-gate`): 60 of 60 controls; item systems, per-part states, interactions, schema export and one-name-three-spellings merged; owner signed off, and declared T1 sealed once the follow-on DP and host work (#80, #81) was in |
 | T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | sealed 2026-10-23 (`results/2026-10-23-t2-engine-gate/SEALED.md`; gate run 40027309396: 4 hosts, 144 images, 308 sample images, 77 features, 0 differences, 0 busy idle counters): E1 to E11 plus E7r, E9.6 and E10; bake costs measured on a quiet machine (#293) |
-| T3 | [Theme language front end](T3-theme-language/README.md) | 0.3 Themeable | T1, T2 | rounds 001 and 002 answered; plan awaits last review |
+| T3 | [Theme language front end](T3-theme-language/README.md) | 0.3 Themeable | T1, T2 | in progress: plan accepted ([PLAN.md](T3-theme-language/PLAN.md)); P1 to P7a on main (tokens and diagnostics, the syntax tree, selectors, values and expressions, the compiler, authored materials P6a to P6f, transitions P7a); owner decisions on the engine-version lower bound, spring() damping and P7b strict for now; P7b (motion) next, then P8 to P10, P12 and the gate P11 |
 | T4 | [Default theme and Windows-familiar themes](T4-default-theme/README.md) | 0.3 Themeable | T1, T2, T3 | design decided, build not started |
-| T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | plan accepted ([PLAN.md](T5-compositor/PLAN.md)), decisions T5-Q1 to T5-Q16 (2026-10-25), C0 next; reflection and full-fidelity glass moved here from T2 (owner decision 2026-10-23) |
-| L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | box gate recorded 2026-10-26 (`results/2026-10-26-l-layout-gate`): FlexPanel, GridPanel, BlockPanel and positioning, LayoutDirection with full mirroring in the Windows Forms containers; 181 fixtures, 17,440 nodes in both directions, 0 over tolerance, 160 recorded differences (compatibility containers only); text scale not yet exercised; L8 (text fixtures, the text leaf provisionally `TextBlock`) next |
+| T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | in progress: plan accepted ([PLAN.md](T5-compositor/PLAN.md)), decisions T5-Q1 to T5-Q16 (2026-10-25); C0 to C6 on main (the Windows, macOS and X11 adapters, the XWayland probe, the engine join C5, full-fidelity glass C6); C7 (reflection) next, then C8 (the stage gate) and a rerun of the Mac bench with an active-window probe; the Wayland direction remains an open owner concern |
+| L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | box gate recorded 2026-10-26 (`results/2026-10-26-l-layout-gate`): FlexPanel, GridPanel, BlockPanel and positioning, LayoutDirection with full mirroring in the Windows Forms containers; 181 fixtures, 17,440 nodes in both directions, 0 over tolerance, 160 recorded differences (compatibility containers only); L8a (the `TextBlock` leaf) and the resize fix (#360) on main; L8b (the text corpus) parked on `claude/l8b-text-corpus` |
 | FD | [Form documents](FD-form-documents/README.md) | 0.4 Flexible | T1, T3 | not started; format decided |
 | DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | complete 2026-10-25 (#320): rectangle sets painted on every host, paint contract version 2 (#59 to #78), X11 direct live frames (#80); gate records `results/2026-10-13-dp-gate-windows`, `results/2026-10-25-dp-gate-x11` and `results/2026-10-25-dp-gate-macos`; the owner accepted macOS's copy (AppKit's union over unchanged pixels) as recorded |
-| SK | [Universal Skia: one painter, one pixel format](SK-universal-skia/README.md) | 0.3 Themeable | none | owner decision 2026-10-26: Skia mandatory on every platform, DibPainter and CoreGraphicsRaster removed, BGRA8 premultiplied sRGB everywhere (corrected from RGBA the same day); brief written, SK1 (the build) next |
-| W | [Windows Forms control coverage (.NET 8+ only)](W-winforms-controls/README.md) | 0.4 Flexible to 0.6 Bindings | T4, or the by-role paint path (ruling 2026-10-14) | started 2026-10-14: catalogue regenerated from the official surface; by-role paint path in place |
+| SK | [Universal Skia: one painter, one pixel format](SK-universal-skia/README.md) | 0.3 Themeable | none | paused by the owner 2026-10-26, before SK1b: SK1a (the Windows CPU Skia archive, built and published by CI) on main with the CI fix #386; owner decision 2026-10-26: Skia mandatory on every platform, DibPainter and CoreGraphicsRaster removed, BGRA8 premultiplied sRGB everywhere; SK1b to SK5 wait for the owner; the move to `stx_skia` comes later |
+| W | [Windows Forms control coverage (.NET 8+ only)](W-winforms-controls/README.md) | 0.4 Flexible to 0.6 Bindings | T4, or the by-role paint path (ruling 2026-10-14) | in progress since 2026-10-14 under the by-role paint path; since v0.2.0: the Open, Save, FolderBrowser and Color dialogs, ThreadExceptionDialog, TabControl images, the DataGridView image column, the ListView insertion mark and label editing, content-only owner drawing and Splitter; open: MessageBox (parked on `claude/w-message-box`), the link role and column, menu letter mnemonics, the slow-click label edit, the RichTextBox run model and the remaining ListView and TabControl gaps |
 | R | [SDRSharp reflection](R-sdrsharp-reflection/README.md) | not on the public site | T4, F | last run 2026-08-10 |
 | C | [Stable installed C ABI](C-c-abi/README.md) | 0.5 ABI candidate | T1, T2 | experimental ABI 0.26, not installed |
 | S | [C# sibling: Windows Forms swap-in](S-csharp-swap-in/README.md) | 0.6 Bindings | R, C | not started |
 | RB | [Ribbon framework: study, interview, decisions, plan](RB-ribbon/README.md) | to be placed by its plan | none to start | complete 2026-10-14: study, interview round 001, 27 decisions and the plan, accepted by the owner; the ribbon is built in W (`RB-ribbon/PLAN.md`), phase 0 first |
 | DK | [Docking and windowing: study, interview, decisions, plan](DK-docking/README.md) | to be placed by its plan | none to start | started 2026-10-14 (admitted by the owner, matrix row 43): complete 2026-10-17: studies, interview round 001 (43 decisions, look studies published) and the plan, accepted by the owner; built in a DK window-layer stage (W0) and in W (`DK-docking/PLAN.md`) |
 | DG | [Diagram control: study, interview, decisions, plan](DG-diagram/README.md) | to be placed by its plan | none to start | started 2026-10-19 (matrix row 55): study written; the interview waits for the owner |
-| RT | [`stx_rtf2md`: the RTF and rich-markdown library](RT-rich-text/PLAN.md) | to be placed by its plan | none to start; W's `RichTextBox` depends on its RT1 | plan accepted 2026-10-26 (owner decisions in PLAN.md section 12; built by the SwiftEdit worker under W-Q1); RT1 (model and markdown), RT2 (reading RTF) and RT3 (writing RTF) in review; RT4 (SwiftEdit import) next |
-| Z | [Owned zlib replacement: study and threat model](Z-zlib/README.md) | 0.2 Verified (done; owner decision 2026-10-23) | none for study; owner acceptance before code | complete: stx_zlib and stx_png in production on every host, WIC decoding removed, FreeType built without zlib (GA record #240, `Z-zlib/GA_RECORD.md`); then stx_conv (CONV interpolation, the face-variant generator) and CNG (the native resource format, PNG kept for interchange; #270, #276) |
+| RT | [`stx_rtf2md`: the RTF and rich-markdown library](RT-rich-text/PLAN.md) | to be placed by its plan | none to start; W's `RichTextBox` depends on its RT1 | plan accepted 2026-10-26 (owner decisions in PLAN.md section 12; built by the SwiftEdit worker under W-Q1); RT1 (model and markdown), RT2 (reading RTF) and RT3 (writing RTF) on main; RT4 (SwiftEdit import) is SwiftEdit's |
+| Z | [Owned zlib replacement: study and threat model](Z-zlib/README.md) | 0.2 Verified (done; owner decision 2026-10-23) | none for study; owner acceptance before code | complete: stx_zlib and stx_png in production on every host, WIC decoding removed, FreeType built without zlib (GA record #240, `Z-zlib/GA_RECORD.md`); then stx_conv (CONV interpolation, the face-variant generator). CNG (#270, #276) was removed 2026-10-26 by owner decision: PNG is the only image codec |
 | D | [Interface builder](D-interface-builder/README.md) | 0.7 Designers | T3, L, FD | not started |
 | H | [HTML import and layout designer](H-html-import/README.md) | 0.7 Designers | L, T3 | earlier attempt discarded |
 | V | [Theme designer](V-theme-designer/README.md) | 0.7 Designers | T4, D core | not started |
@@ -60,18 +60,16 @@ A, F, T1 and DP could start at once. A and F run beside everything else. T1
 to T4 are the spine: almost every later stage reads the anatomy and the
 engine.
 
-**Where to pick up (2026-10-23).** A, T1, T2 and Z are complete: A's
-client tests read the Gallery through each host's own accessibility API and
-every native host advertises the capability; T2 is sealed with its gate
-identical on four hosts. **F, font substitution, is complete**: its gate is recorded in
-`results/2026-10-23-f-font-substitution`, so 0.2 Verified (A, F and T1) is
-complete. The next spine stage is
-**T3, the theme language front end**, now unblocked by T2; **T5** and **C**
-are also unblocked (T5 now carries reflection and full-fidelity glass), and
-**L** has been ready since T1. **W** continues under the by-role paint path
-(ruling 2026-10-14), and **DP** is complete (2026-10-25). Read `planning/stages/T2-engine-core/README.md` and its gate record
-before starting T3, T4, T5 or C, and `planning/stages/T1-anatomy/README.md`
-"Hand-off" before T3, L, FD or C.
+**Where to pick up (2026-10-27).** Main is tagged `checkpoint-2026-10-27`.
+0.2 Verified shipped as v0.2.0; A, F, T1, T2, Z and DP are complete. In
+progress: **T3** (P7b next), **T5** (C7 next), **L** (L8b parked) and **W**.
+**SK** is paused by the owner before SK1b. **T4**, **FD** and **C** have not
+started. The work left before 0.5, by release, with dependencies, open owner
+decisions and parked branches, is in
+[`planning/ROADMAP_TO_0.5.md`](../ROADMAP_TO_0.5.md); its first item is the
+integrity findings of #401. Read `planning/stages/T2-engine-core/README.md`
+and its gate record before starting T3, T4, T5 or C, and
+`planning/stages/T1-anatomy/README.md` "Hand-off" before T3, L, FD or C.
 
 When a stage starts or a gate is recorded, update the status column here, the
 stage brief's status line, and the stage board linked from `AGENTS.md`.
