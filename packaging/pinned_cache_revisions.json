@@ -15,6 +15,10 @@
     {
       "sha": "c90eacf36652e2c30a94201e6621f91b2026a865",
       "consumer": "File Manager (malkuth-software/file_manager dependencies.lock.json gui_forms.revision and release, sha256 per platform; also its gui_forms submodule); build-c90eacf3 was pruned before this pin"
+    },
+    {
+      "sha": "2fe26d8d1a830e82a1db5781c6e8a05c2a0df6d0",
+      "consumer": "File Manager (malkuth-software/file_manager dependencies.lock.json gui_forms.revision and release build-2fe26d8d..., sha256 per platform); the release exists"
     }
   ]
 }

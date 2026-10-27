@@ -73,13 +73,12 @@ struct ControlVisualContext final {
     }
 };
 // A text shadow (E9.6, CSS `text-shadow`): the text's glyphs, moved by
-// `offset` logical units, blurred by `blur_radius` (the shadows'
-// blur-radius convention, 0 to maximum_text_shadow_blur) and drawn in
+// `offset` logical units (each axis within ±maximum_text_shadow_offset),
+// blurred by `blur_radius` (the shadows' blur-radius convention, 0 to
+// maximum_text_shadow_blur; both limits are the theme rules') and drawn in
 // `color` under the glyphs. Data only in T2: the theme carries it, and the
 // text stage (M4/M9) draws it, with a first-party blur so that it is the
 // same on every host.
-inline constexpr double maximum_text_shadow_blur = 8.0;
-inline constexpr double maximum_text_shadow_offset = 16.0;
 struct ControlTextShadow final {
     Point offset{};
     double blur_radius{};
@@ -130,6 +129,37 @@ struct ControlVisualRecipe final {
                left.pressed_content_offset == right.pressed_content_offset &&
                left.text_shadow == right.text_shadow;
     }
+};
+
+// A control's recipe for one role and state (T3 P6f): the theme's built-in
+// recipe (the floor, Theme::resolve(role, context), borrowed from the
+// theme) or, when the theme's rules set a recipe field for the control
+// (RecipeField), the floor's copy with those fields in place, which this
+// value owns. The copy is made only then, so a theme whose rules set no
+// recipe field costs nothing. A value for one paint or measurement: it
+// borrows the theme, so it is not kept past the theme's use. `recipe()`
+// borrows from the value, so it is read from a named value and never from
+// a temporary.
+class ResolvedControlRecipe final {
+public:
+    explicit ResolvedControlRecipe(const ControlVisualRecipe& floor) noexcept : floor_(&floor) {}
+    ResolvedControlRecipe(const ControlVisualRecipe& floor, ControlVisualRecipe&& authored) noexcept
+        : floor_(&floor), authored_(std::move(authored)) {}
+    // The floor is borrowed, so it is never a temporary.
+    explicit ResolvedControlRecipe(const ControlVisualRecipe&& floor) = delete;
+    ResolvedControlRecipe(const ControlVisualRecipe&& floor, ControlVisualRecipe&& authored) = delete;
+
+    [[nodiscard]] const ControlVisualRecipe& recipe() const& noexcept {
+        if (authored_) return *authored_;
+        return *floor_;
+    }
+    const ControlVisualRecipe& recipe() const&& = delete;
+    // Whether a rule's recipe field changed the floor.
+    [[nodiscard]] bool authored() const noexcept { return authored_.has_value(); }
+
+private:
+    const ControlVisualRecipe* floor_;
+    std::optional<ControlVisualRecipe> authored_{};
 };
 
 inline constexpr std::size_t control_visual_role_count =

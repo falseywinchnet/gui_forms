@@ -396,6 +396,101 @@ void views_lay_out_items() {
             "the large-icon label sits under the icon's place");
 }
 
+// One owner-draw call as a handler saw it.
+struct ContentCall final {
+    std::size_t index{};
+    std::size_t column{};
+    std::string stable_id{};
+    Rect content{};
+    bool selected{};
+};
+
+// Draws a marker string into each item's content and records the call;
+// asks for the default content when `draw_default` is set.
+struct DrawContent final {
+    std::vector<ContentCall>* calls{};
+    bool draw_default{};
+    void operator()(ItemContentPaint& item) const {
+        (*calls).push_back({item.index, item.column, std::string(item.stable_id), item.content,
+                            item.states.contains(AnatomyState::selected)});
+        item.painter.draw_text_utf8({item.content.x, item.content.y}, "owner", item.font, item.text);
+        item.draw_default = draw_default;
+    }
+};
+
+// Replaces the view's items from inside its paint.
+struct ReplaceItems final {
+    ListView* view{};
+    std::size_t* calls{};
+    void operator()(ItemContentPaint&) const {
+        ++*calls;
+        (*view).set_items(sample_items(2U));
+    }
+};
+
+// Leaves and re-enters the owner-draw mode, so that the next paint covers
+// the whole view: a window paints only what changed.
+void repaint_owner_drawn(ListView& view) {
+    view.set_draw_mode(ItemDrawMode::normal);
+    view.set_draw_mode(ItemDrawMode::owner_draw);
+}
+
+// Content-only owner drawing (owner decision W-Q6): the application draws
+// each item's content and, in the details view, each sub-item cell; the
+// plate and focus cue stay by role, and draw_default adds the default
+// content.
+void owner_draw() {
+    std::shared_ptr<ListView> view = details_view(3U);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    require((*view).draw_mode() == ItemDrawMode::normal, "a view draws its own content by default");
+    bool refused = false;
+    try {
+        (*view).set_draw_mode(static_cast<ItemDrawMode>(9));
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused && (*view).draw_mode() == ItemDrawMode::normal, "an unknown draw mode is refused");
+
+    std::vector<ContentCall> calls;
+    SubscriptionToken drawing = (*view).draw_item_content().subscribe(DrawContent{&calls, false});
+    RecordingPainter normal;
+    static_cast<void>(window.paint(normal, {0.0, 0.0, 400.0, 240.0}));
+    require(calls.empty() && painted(normal, "Delta 0"), "the normal mode raises nothing");
+
+    (*view).set_draw_mode(ItemDrawMode::owner_draw);
+    (*view).set_selected(1U, true);
+    window.perform_layout();
+    RecordingPainter owner;
+    static_cast<void>(window.paint(owner, {0.0, 0.0, 400.0, 240.0}));
+    const std::vector<ListView::Item> items = (*view).realized_items();
+    require(calls.size() == 9U && calls[0].index == 0U && calls[0].column == 0U && calls[1].column == 1U &&
+                calls[2].column == 2U && calls[3].index == 1U && calls[3].stable_id == "item-1" && calls[3].selected,
+            "each row raises its content, then each visible sub-item, in paint order");
+    require(calls[0].content == items[0].parts.text.bounds, "a row's content is its icon and text area");
+    require(!painted(owner, "Delta 0") && !painted(owner, "1 KB") && painted(owner, "owner") && painted(owner, "Name"),
+            "owner-drawn rows show only what the handler drew; headers stay the view's");
+
+    drawing.disconnect();
+    calls.clear();
+    SubscriptionToken with_default = (*view).draw_item_content().subscribe(DrawContent{&calls, true});
+    repaint_owner_drawn(*view);
+    RecordingPainter both;
+    static_cast<void>(window.paint(both, {0.0, 0.0, 400.0, 240.0}));
+    require(painted(both, "owner") && painted(both, "Delta 0") && painted(both, "1 KB"),
+            "draw_default adds the default content after the handler's");
+    with_default.disconnect();
+
+    std::size_t replaced = 0U;
+    SubscriptionToken replacing = (*view).draw_item_content().subscribe(ReplaceItems{view.get(), &replaced});
+    repaint_owner_drawn(*view);
+    RecordingPainter interrupted;
+    static_cast<void>(window.paint(interrupted, {0.0, 0.0, 400.0, 240.0}));
+    require(replaced == 1U && (*view).item_count() == 2U,
+            "a handler that replaces the items ends that paint at once");
+    replacing.disconnect();
+}
+
 // The insertion mark (Windows Forms' InsertionMark): a drop-role bar in the
 // gap beside an item, across rows in the details and list views and
 // between cells in the icon views, cleared by any change to the items or
@@ -630,12 +725,14 @@ int main() {
     check_boxes();
     columns_click_sort_and_resize();
     views_lay_out_items();
+    owner_draw();
     insertion_mark();
     scrolling();
     virtual_mode();
     semantics();
     refusals();
-    std::cout << "ListView: parts, views, selection, keys, checks, columns, sorting, resizing, insertion mark, "
+    std::cout << "ListView: parts, views, selection, keys, checks, columns, sorting, resizing, owner drawing, "
+                 "insertion mark, "
                  "virtual mode, "
                  "scrolling, semantics and refusals passed\n";
     return 0;

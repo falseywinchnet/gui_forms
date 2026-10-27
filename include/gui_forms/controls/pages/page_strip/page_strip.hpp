@@ -5,6 +5,7 @@
 #include "gui_forms/event.hpp"
 #include "gui_forms/image_list.hpp"
 #include "gui_forms/pages.hpp"
+#include "gui_forms/theme/owner_draw/owner_draw.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -246,6 +247,20 @@ public:
     // a disposed list or one belonging to another window.
     [[nodiscard]] std::shared_ptr<ImageList> image_list() const noexcept { return image_list_; }
     void set_image_list(std::shared_ptr<ImageList> image_list);
+
+    // Content-only owner drawing (owner decision W-Q6; TabControl's
+    // OwnerDrawFixed with DrawItem). In ItemDrawMode::owner_draw the strip
+    // raises draw_item_content for each painted tab's content (its icon and
+    // label; index is the tab's position, stable_id the page's ID); the
+    // tab's plate, close button, pin, modified mark and focus cue stay
+    // painted by role, and a handler's draw_default adds the default
+    // content. A tab with neither icon nor label raises nothing. A handler
+    // that changes the strip's pages, settings or scroll position, or
+    // disposes it, ends that paint at once; the strip is painted again with
+    // the change. Throws std::invalid_argument for an unknown mode.
+    [[nodiscard]] ItemDrawMode draw_mode() const noexcept { return draw_mode_; }
+    void set_draw_mode(ItemDrawMode mode);
+    [[nodiscard]] Event<ItemContentPaint&>& draw_item_content() noexcept { return draw_item_content_; }
 
     // Scrolls so the page's tab is visible. False for a page not in the set.
     bool ensure_visible(const PageId& page);
@@ -629,7 +644,9 @@ private:
     [[nodiscard]] Point keyboard_menu_anchor(std::size_t position);
     void request_context_menu(std::size_t position, Point anchor, PageContextMenuCause cause);
     void on_secondary_button(PointerEvent& event, Hit hit);
-    void paint_tab(Painter& painter, PartPaint& part, std::size_t position, double scale);
+    // Paints one tab; false when an owner-draw handler changed what the
+    // layout was made from or disposed the strip, so that the paint stops.
+    [[nodiscard]] bool paint_tab(Painter& painter, PartPaint& part, std::size_t position, double scale);
 
     // -- page list --
     void prepare_list_commands();
@@ -642,6 +659,9 @@ private:
     void on_image_list_changed(const ImageListChange& change);
 
     PageSet* pages_{};
+    ItemDrawMode draw_mode_{ItemDrawMode::normal};
+    // The painted tab's page ID while owner-draw handlers run.
+    std::string paint_stable_id_{};
     PageStripPlacement placement_{PageStripPlacement::top};
     PageItemSizing item_sizing_{PageItemSizing::content};
     PageItemWidths item_widths_{};
@@ -692,6 +712,7 @@ private:
     SubscriptionToken list_changed_token_{};
     SubscriptionToken image_list_token_{};
     Event<const PageInvocation&> page_invoked_{};
+    Event<ItemContentPaint&> draw_item_content_{};
     Event<PageCloseRequest&> page_close_requested_{};
     Event<PagePinRequest&> page_pin_requested_{};
     Event<PageDragStart&> page_drag_started_{};

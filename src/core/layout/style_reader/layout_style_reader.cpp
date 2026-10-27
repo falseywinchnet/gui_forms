@@ -1766,6 +1766,8 @@ void append_size(std::string& text, const SizeValue& value) {
     case SizeKind::length_percentage:
         append_length_percentage(text, value.value);
         return;
+    default: // Not a SizeKind: no keyword names it, so nothing is written.
+        return;
     }
 }
 
@@ -1801,6 +1803,8 @@ void append_breadth(std::string& text, const TrackBreadth& breadth) {
         return;
     case TrackBreadthKind::length_percentage:
         append_length_percentage(text, breadth.length);
+        return;
+    default: // Not a TrackBreadthKind: no keyword names it, so nothing is written.
         return;
     }
 }
@@ -1892,6 +1896,8 @@ void append_grid_line(std::string& text, const GridLine& line) {
         return;
     case GridLineKind::area:
         text += line.area;
+        return;
+    default: // Not a GridLineKind: no keyword names it, so nothing is written.
         return;
     }
 }

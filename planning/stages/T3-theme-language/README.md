@@ -480,6 +480,46 @@ P9 and P10 are designed so that nothing assumes a later break: no
 version ranges, no per-version branches in the loader, and room for a
 compatibility module to register the constructs it restores.
 
+### Coordinator decisions on the rest of P6 (2026-10-26)
+
+- **D1, the recipe's own fields** (`color`, `outline` and
+  `outline-offset`, `text-shadow`). The engine resolves them per control,
+  from the rules that match that control, cached on its part record, with
+  `Theme::resolve` as the floor (EC1). T3 builds the engine side first.
+  In a second PR, T3 also moves the control call sites in
+  `src/controls` (about 40), and has permission for that PR only. That
+  diff is mechanical: with no rule matching, the behaviour is the same and
+  the goldens do not move.
+- **D2, `backdrop-filter`** (and the sheen's pointer gradient) is
+  deferred. Until then authors write `primitive: glass; blur: ...;
+  tint: ...`, and the sheen waits for P12.
+  - Stage H (the HTML import) will need `backdrop-filter`.
+  - Kept in view: once the glass takes a matrix parameter, its colour
+    functions compose into one matrix, as `filter`'s do.
+
+### Owner decision on `spring()` (2026-10-26)
+
+- **E1, `spring(<response>, <damping>)`.** The second argument is a
+  damping ratio ζ, as in SwiftUI's damping fraction. It converts to the
+  engine's overshoot as e^(−πζ/√(1−ζ²)); ζ = 1 is critically damped
+  (no overshoot). It is admitted from about 0.627 (an 8 % overshoot, the
+  engine's limit) to 1; anything outside is E403. `response` is the
+  engine's response time, 1/ω, written as a time.
+
+### Owner decision on a grouped animation's curve (2026-10-27)
+
+- **P7b, option 1, "strict for now".** The engine runs one curve per
+  state machine, and replays a state's entry value and stops only when
+  the machine's state changes. So an `animation` on a rule that refines a
+  transition's rule joins that transition's machine as a state. Its
+  duration, timing function and delay must then equal the host
+  transition's for that property; anything else is E405. An animation
+  with no host transition becomes a machine of its own, with its own
+  curve.
+- Relaxing this later (a per-state curve in the engine, or the host's
+  curve winning) turns an error into accepted sheets, so it breaks no
+  theme (compatibility policy above).
+
 ## Read first
 
 - `planning/DESIGN_LANGUAGE_SPECIFICATION.md` §1.2, §8.2, §9.6, §12.1 item 1,
