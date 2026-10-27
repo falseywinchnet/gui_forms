@@ -64,8 +64,16 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       publish: ${{ steps.version.outputs.publish }}
       matrix: ${{ steps.platforms.outputs.matrix }}
+    # gui_forms at gui_forms/ with template_harness beside it: the packaging
+    # tools import the harness's (tools/harness_link.py).
+    defaults:
+      run:
+        working-directory: gui_forms
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: gui_forms
+      - uses: ./gui_forms/.github/actions/harness-checkout
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -75,7 +83,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_package_programs.py
           python3 -B -m unittest discover -s tools -p test_package_sdk.py
           python3 -B -m unittest discover -s tools -p test_build_sdk.py
-          python3 -B -m unittest discover -s tools -p test_prune_cache_releases.py
+          python3 -B -m unittest discover -s ../template_harness/harness -p test_prune_cache_releases.py
           python3 -B -m unittest discover -s tools -p test_release_tests.py
       - name: Select one tested publication version
         id: version
