@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
 import subprocess
 import tempfile
@@ -155,6 +156,28 @@ class SourceArchiveTests(unittest.TestCase):
     def test_the_archive_is_reproducible(self) -> None:
         again: Path = self.fixture.package(self.base / "again")
         self.assertEqual(self.archive.read_bytes(), again.read_bytes())
+
+    def test_the_manifest_names_the_compiler_cache_only_where_it_is_published(self) -> None:
+        record: dict[str, Any] = sdk.check_archive(self.archive, VERSION)
+        self.assertIsNone(record["compiler_cache"]["release"])
+        with contextlib.redirect_stdout(io.StringIO()):
+            published: Path = sdk.package(self.fixture.root, VERSION, self.fixture.revision, self.base / "cached",
+                                          self.fixture.checkouts, published_cache=True)
+        cached: dict[str, Any] = sdk.check_archive(published, VERSION)["compiler_cache"]
+        self.assertEqual(cached["release"], "build-" + self.fixture.revision)
+        self.assertEqual(cached["asset"], "gui-forms-cache-{platform}.tar.gz")
+        self.assertEqual(sorted(cached["platforms"]), ["linux-arm64", "linux-x64", "macos-arm64", "windows-x64"])
+        self.assertEqual((cached["layout"]["source"], cached["layout"]["work"]),
+                         ("gui_forms", ".build/native-{platform}"))
+
+    def test_a_compiler_cache_of_another_revision_is_rejected(self) -> None:
+        members: dict[str, sdk.Entry] = sdk.read_archive(self.archive)
+        name: str = self.top + sdk.MANIFEST_NAME
+        record: dict[str, Any] = json.loads((members[name].data or b"").decode("utf-8"))
+        record["compiler_cache"]["release"] = "build-" + "0" * 40
+        members[name] = sdk.Entry((json.dumps(record) + "\n").encode("utf-8"), None, False)
+        with self.assertRaisesRegex(ValueError, "compiler_cache must name build-<revision>"):
+            sdk.check_archive(self.rewrite(members), VERSION)
 
     def test_check_command_reads_an_archive(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()):

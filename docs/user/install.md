@@ -153,7 +153,9 @@ holds one directory, `gui-forms-sdk-<version>/`, containing:
   "tools/build_sdk.py"`) and the top directory. It also gives each vendored
   source's path, upstream, pinned commit and tree digest, and lists what a
   build still downloads (`network_inputs`) or needs installed
-  (`prebuilt_inputs`).
+  (`prebuilt_inputs`). Its `revision` is the release commit, and
+  `compiler_cache` names that commit's compiler-cache pre-release (see
+  [Build with CI's compiler cache](#build-with-cis-compiler-cache)).
 
 The archive carries no Git metadata and no build output. Build and install
 GUI.Forms for your host from it:
@@ -198,6 +200,48 @@ Windows. On macOS and Linux it also needs, before `build_sdk.py` runs:
 
 On macOS, an already built `GUI_FORMS_LLVM_RUNTIME` prefix is also needed.
 `fetch_skia_cpu.sh` fetches only a pin its checkout lacks.
+
+### Build with CI's compiler cache
+
+CI compiles every tested commit, and each platform's native job of the push
+to main publishes its ccache directory in the commit's compiler-cache
+pre-release, `build-<commit>`, as `gui-forms-cache-<platform>.tar.gz`
+(`.ccache/` and `cache-manifest.json`). It does so as soon as that platform
+passes, and the release that carries the source SDK is published only after
+all four have passed. `SDK_MANIFEST.json` records it:
+
+```json
+"compiler_cache": {
+  "release": "build-<revision>",
+  "asset": "gui-forms-cache-{platform}.tar.gz",
+  "platforms": ["macos-arm64", "windows-x64", "linux-x64", "linux-arm64"],
+  "layout": {"ccache_basedir": "the workspace", "source": "gui_forms",
+             "work": ".build/native-{platform}", "note": "..."}
+}
+```
+
+`release` is `null` when the SDK was packaged outside that push (a tag
+build), which cannot promise the caches. A build from the SDK hits the cache
+only in CI's layout, with the same LLVM 22.1.8 toolchain:
+
+- the SDK's top directory unpacked as `<workspace>/gui_forms`;
+- the cache archive extracted into `<workspace>` (it creates `.ccache/`);
+- `CCACHE_DIR=<workspace>/.ccache`, `CCACHE_BASEDIR=<workspace>`,
+  `CCACHE_COMPILERCHECK=content`, and `ccache` as the compiler launcher
+  (`CMAKE_C_COMPILER_LAUNCHER` and `CMAKE_CXX_COMPILER_LAUNCHER`);
+- `python3 gui_forms/tools/build_sdk.py --target <platform> --prefix <dir>
+  --work <workspace>/.build/native-<platform>`, which compiles in
+  `.build/native-<platform>/gui-forms` (and Skia in `.build/native-<platform>/skia`),
+  as CI does;
+- the toolchain's own headers at CI's paths, since they lie outside the
+  workspace and their absolute paths are hashed: Homebrew's `llvm@22` on
+  macOS, `/usr/lib/llvm-22` on Linux, and on Windows the CLANG64 toolchain
+  extracted at `D:\a\_temp\msys64`, where CI's runners restore it.
+
+The cache only accelerates: the source stays authoritative, and a missing
+archive, a wrong digest or another layout just means compiling more, with
+the same result. Check the archive against the digest GitHub lists for the
+asset before extracting it.
 
 ## Verify the installation
 
