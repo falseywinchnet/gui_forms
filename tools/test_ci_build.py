@@ -140,6 +140,11 @@ class UnreadChanges:
     def any_path_read(self, changed: list[str], rules: object) -> bool:
         return False
 
+    def load_rules(self) -> list[object]:
+        """No rules: the real ones live in <workspace>/gui_forms, which a
+        checkout under another directory name does not have."""
+        return []
+
     def failing_changed_paths(self, root: Path, base: str) -> list[str]:
         raise RuntimeError('git failed')
 
@@ -151,13 +156,16 @@ class BuildRecordTests(unittest.TestCase):
         fake: UnreadChanges = UnreadChanges()
         original_changed: object = ci_build.change_selection.changed_paths
         original_read: object = ci_build.change_selection.any_path_read
+        original_rules: object = ci_build.change_selection.load_rules
         ci_build.change_selection.changed_paths = changed_paths
         ci_build.change_selection.any_path_read = fake.any_path_read
+        ci_build.change_selection.load_rules = fake.load_rules
         try:
             ci_build.build_toolkit('linux', build, build / 'sdk', 1, sanitize=True, changed_from='origin/main')
         finally:
             ci_build.change_selection.changed_paths = original_changed
             ci_build.change_selection.any_path_read = original_read
+            ci_build.change_selection.load_rules = original_rules
 
     def test_a_change_no_test_reads_records_that_nothing_was_built(self) -> None:
         with tempfile.TemporaryDirectory() as scratch:
