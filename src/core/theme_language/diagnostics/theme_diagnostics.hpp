@@ -62,10 +62,9 @@ enum class DiagnosticCode : std::uint16_t {
     // `:where()`, `:has()`, the structural ones, `::before` and the rest.
     pseudo_class_not_admitted = 303,
     attribute_selector_not_admitted = 304,
-    // E4xx values (B2: a bad value fails). 407, 411, 412 and 414
-    // (too_many_layers, keyframes_undefined, transition_invalid,
-    // variable_kind_mismatch) arrive with the phases that lower layers,
-    // motion and inline styles.
+    // E4xx values (B2: a bad value fails). 411, 412 and 414
+    // (keyframes_undefined, transition_invalid, variable_kind_mismatch)
+    // arrive with the phases that lower motion and inline styles.
     // A value whose tokens are not a component of the admitted forms.
     value_syntax = 401,
     // An operand or argument of the wrong kind: units that do not agree, a
@@ -81,6 +80,9 @@ enum class DiagnosticCode : std::uint16_t {
     // A keyword the property's position does not list, such as an unknown
     // choice of a primitive parameter (raised from P5, the lowering).
     keyword_unknown = 406,
+    // More layers than a material holds (SurfaceMaterial's
+    // maximum_fill_layers), from P6b.
+    too_many_layers = 407,
     // An expression the engine's compiler refuses (other than its budget).
     expression_invalid = 408,
     // A var() of a name no rule defines, with no fallback.

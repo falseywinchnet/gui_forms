@@ -309,11 +309,16 @@ struct PageDigest final {
 
 // Recorded on main at 13d1c7e0, before the theme engine's entry point.
 // typography-and-inspection's entry is main's trace with the RuntimeId the
-// specimen has when this test runs first (#1263 rather than #19747); the
+// specimen has when this test runs first (#1266 rather than #19747); the
 // two traces differ in that number alone. The ThreadExceptionDialog, OpenFileDialog
 // and SaveFileDialog lines on dialogs-and-host-services added controls, which
-// states-and-diagnostics counts (1230 controls) and which moved that
-// RuntimeId, so the three pages were recorded again.
+// states-and-diagnostics counts and which moved that RuntimeId, so the three
+// pages were recorded again. The ListView insertion-mark toggle on
+// checked-collections adds one more, and the FolderBrowserDialog and
+// ColorDialog lines two more (1233 controls, #1266), which also move the
+// dialogs page's later rows down: against main's traces before them,
+// states-and-diagnostics and typography-and-inspection differ in those
+// numbers and two layout generations alone.
 constexpr std::array<PageDigest, 29> expected_digests{{
     {"basics", 0x6d537a7173ffd432ULL},
     {"values", 0x9262ff950cdb0bbaULL},
@@ -323,7 +328,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"ranges-and-progress", 0x76a87838f40755cbULL},
     {"containers-and-focus", 0x74609a23b162e4bfULL},
     {"animation-laboratory", 0x2b0eba60f2b03985ULL},
-    {"states-and-diagnostics", 0x753ecd91867fbb4fULL},
+    {"states-and-diagnostics", 0x51a5bbff4ed217e0ULL},
     {"text-and-input", 0xf5ae22834f148beeULL},
     {"collections-and-popups", 0xdcfb5edee24a4d9eULL},
     {"values-and-spinners", 0xc6d61a2832ad4bdbULL},
@@ -332,7 +337,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"checked-collections", 0xc0a2d081ee38a7c8ULL},
     {"timing-and-tooltips", 0xd0fb86834e684081ULL},
     {"dates-and-calendar", 0xc5c53d69a0faf9b8ULL},
-    {"dialogs-and-host-services", 0xf9c2b090632b4c1aULL},
+    {"dialogs-and-host-services", 0xeb98198551dedbadULL},
     {"retained-layout-panels", 0x61d01430a35f8421ULL},
     {"dock-and-anchor", 0x8de690ba5f4749d3ULL},
     {"commands-and-menus", 0x4dcd03ef20ba7517ULL},
@@ -342,7 +347,7 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"responsive-layouts", 0xa5fe70ebb0d4051eULL},
     {"anchored-popups", 0x53eef5309813b41aULL},
     {"live-surfaces", 0x5d366debbc32b5ffULL},
-    {"typography-and-inspection", 0x786c3e668165b40bULL},
+    {"typography-and-inspection", 0x3fa83063b48efb03ULL},
     {"semantic-feedback", 0x819d5ed9aa229adaULL},
 }};
 

@@ -37,6 +37,8 @@ constexpr double large_cell_width = 80.0;
 constexpr double default_small_icon = 16.0;
 constexpr double default_large_icon = 32.0;
 constexpr double divider_reach = 4.0;
+// The insertion mark's thickness across its gap, at text scale 1.
+constexpr double insertion_thickness = 2.0;
 constexpr double horizontal_key_step = 16.0;
 constexpr double scroll_bar_extent = 17.0;
 constexpr std::ptrdiff_t wheel_lines = 3;
@@ -170,6 +172,7 @@ void ListView::set_view(ListViewView view) {
     if (view_ == view) return;
     view_ = view;
     hot_index_.reset();
+    ++model_revision_;
     hot_column_.reset();
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
@@ -195,6 +198,7 @@ void ListView::set_columns(std::vector<ListViewColumn> columns) {
     pressed_column_.reset();
     hot_column_.reset();
     columns_ = std::move(columns);
+    ++model_revision_;
     if (sort_column_ && *sort_column_ >= columns_.size()) {
         sort_column_.reset();
         sort_order_ = ListViewSortOrder::none;
@@ -271,6 +275,8 @@ void ListView::set_items(std::vector<ListViewItem> items) {
     focused_index_ = next_focus;
     anchor_index_ = next_anchor;
     hot_index_.reset();
+    ++model_revision_;
+    insertion_mark_.reset();
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
     if (selection_changed) publish_selection();
 }
@@ -286,6 +292,8 @@ void ListView::reset_after_model_change(std::size_t count) {
     if (focused_index_ && *focused_index_ >= count) focused_index_.reset();
     if (anchor_index_ && *anchor_index_ >= count) anchor_index_.reset();
     hot_index_.reset();
+    ++model_revision_;
+    insertion_mark_.reset();
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
     if (selection_changed) publish_selection();
 }
@@ -717,6 +725,8 @@ void ListView::sort_items(std::size_t column, ListViewSortOrder order) {
     if (focused_index_) focused_index_ = position_of[*focused_index_];
     if (anchor_index_) anchor_index_ = position_of[*anchor_index_];
     hot_index_.reset();
+    ++model_revision_;
+    insertion_mark_.reset();
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
     if (moved) publish_selection();
 }
@@ -760,6 +770,16 @@ void ListView::on_attached_to_window() {
         (large_images_ && !(*large_images_).belongs_to(*window()))) {
         throw std::logic_error("ListView cannot attach to a Window other than its ImageLists'");
     }
+}
+
+void ListView::set_draw_mode(ItemDrawMode mode) {
+    require_mutable();
+    if (mode != ItemDrawMode::normal && mode != ItemDrawMode::owner_draw) {
+        throw std::invalid_argument("ListView draw mode is invalid");
+    }
+    if (draw_mode_ == mode) return;
+    draw_mode_ = mode;
+    invalidate(Dirty::paint);
 }
 
 void ListView::set_font(FontSpec font) {
@@ -1135,7 +1155,15 @@ void ListView::paint_column(Painter& painter, const Layout& placed, std::size_t 
     // sign; painting the grip role would draw grip dots at every divider.
 }
 
-void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t index) {
+bool ListView::model_unchanged(std::uint64_t revision) const noexcept {
+    const bool unchanged = is_alive() && model_revision_ == revision;
+    return unchanged;
+}
+
+// The plate, the check box and the focus cue are painted by role in every
+// mode; the content (icon, text and sub-item text) is the application's in
+// the owner-draw mode, after the plate and before the focus cue.
+bool ListView::paint_item(Painter& painter, const Layout& placed, std::size_t index) {
     const ListViewItem& item = item_at(index, paint_item_);
     const Rect cell = item_bounds(placed, index);
     const ItemParts parts = item_parts(placed, index, cell);
@@ -1163,7 +1191,28 @@ void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
         }
         part.family = ControlVisualRole::selection;
     }
-    if (parts.icon.present && !item.image_key.empty()) {
+    const bool owner_drawn = draw_mode_ == ItemDrawMode::owner_draw;
+    bool default_content = true;
+    if (owner_drawn) {
+        // The handlers see the identity through the view's own copy, which
+        // stays valid for the whole raise even when one of them replaces
+        // the items.
+        paint_stable_id_ = item.stable_id;
+        const Rect content = parts.icon.present ? Rect::united(parts.icon.bounds, parts.text.bounds)
+                                                : parts.text.bounds;
+        ItemContentPaint request{.painter = painter,
+                                 .index = index,
+                                 .column = 0U,
+                                 .stable_id = paint_stable_id_,
+                                 .content = content,
+                                 .states = states,
+                                 .font = part.font,
+                                 .text = item_content_text(*this, ControlVisualRole::selection, states)};
+        const std::uint64_t revision = model_revision_;
+        default_content = raise_item_content_paint(draw_item_content_, request);
+        if (!model_unchanged(revision)) return false;
+    }
+    if (default_content && parts.icon.present && !item.image_key.empty()) {
         const std::shared_ptr<ImageList>& images =
             view_ == ListViewView::large_icon ? large_images_ : small_images_;
         const Window* const host = attached_window();
@@ -1180,10 +1229,12 @@ void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
     part.role = PartRole::content;
     part.bounds = parts.text.bounds;
     part.alignment = view_ == ListViewView::large_icon ? PartTextAlignment::center : PartTextAlignment::start;
-    details_detail::elide_to_width(painter, item.text, part.font, part.bounds.width, paint_text_);
-    part.text = paint_text_;
-    paint_part(painter, *this, part);
-    part.text = {};
+    if (default_content) {
+        details_detail::elide_to_width(painter, item.text, part.font, part.bounds.width, paint_text_);
+        part.text = paint_text_;
+        paint_part(painter, *this, part);
+        part.text = {};
+    }
     if (view_ == ListViewView::details) {
         AnatomyStateSet sub_states;
         if (states.contains(AnatomyState::selected)) sub_states.insert(AnatomyState::selected);
@@ -1194,6 +1245,20 @@ void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
             const Rect header = column_cell(placed, column);
             const Rect sub_cell{header.x, cell.y, header.width, cell.height};
             const SubItemParts sub = sub_item_parts(placed, index, column, sub_cell);
+            if (owner_drawn) {
+                ItemContentPaint request{.painter = painter,
+                                         .index = index,
+                                         .column = column,
+                                         .stable_id = paint_stable_id_,
+                                         .content = sub.sub_item_text.bounds,
+                                         .states = sub_states,
+                                         .font = part.font,
+                                         .text = item_content_text(*this, ControlVisualRole::selection, sub_states)};
+                const std::uint64_t revision = model_revision_;
+                const bool sub_default = raise_item_content_paint(draw_item_content_, request);
+                if (!model_unchanged(revision)) return false;
+                if (!sub_default) continue;
+            }
             part.bounds = sub.sub_item_text.bounds;
             part.alignment = text_alignment(columns_[column].alignment);
             details_detail::elide_to_width(painter, column_text(item, column), part.font, part.bounds.width,
@@ -1208,6 +1273,7 @@ void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
     part.role = PartRole::focus;
     part.bounds = parts.cell_focus.bounds;
     paint_part(painter, *this, part);
+    return true;
 }
 
 void ListView::on_paint(Painter& painter, Rect) {
@@ -1240,7 +1306,23 @@ void ListView::on_paint(Painter& painter, Rect) {
         painter.clip_rect(placed.viewport);
         const std::size_t end = end_realized(placed);
         for (std::size_t index = first_realized(placed); index < end; ++index) {
-            paint_item(painter, placed, index);
+            // An owner-draw handler that changed the model ends this paint;
+            // the change has already asked for the next one.
+            if (!paint_item(painter, placed, index)) {
+                painter.restore();
+                return;
+            }
+        }
+        const Rect mark = insertion_mark_bounds(placed);
+        if (!mark.empty()) {
+            // The drop role has no recipe of its own until T2: a button
+            // plate, as PageStrip's insertion mark.
+            PartPaint bar;
+            bar.family = ControlVisualRole::button;
+            bar.role = PartRole::drop;
+            bar.bounds = mark;
+            bar.states.insert(AnatomyState::drop_accepted);
+            paint_part(painter, *this, bar);
         }
         painter.restore();
     }
@@ -1311,6 +1393,81 @@ ListView::Hit ListView::hit_test(const Layout& placed, Point local) const {
         if (parts.check_well.present && parts.check_well.bounds.contains(local)) hit.zone = HitZone::check;
     }
     return hit;
+}
+
+// -- the insertion mark --------------------------------------------------------
+
+// The mark lies along the gap beside its item: across the top or bottom of
+// a details row or a list-view cell, down the left or right of an icon
+// view's cell, centred on the cell's edge and clipped to the viewport.
+Rect ListView::insertion_mark_bounds(const Layout& placed) const noexcept {
+    if (!insertion_mark_ || (*insertion_mark_).index >= placed.shown_count) return {};
+    const ListViewInsertionMark mark = *insertion_mark_;
+    const Rect cell = item_bounds(placed, mark.index);
+    const double thickness = insertion_thickness * placed.scale;
+    // The details and list views stack items down a line, so their gaps
+    // run between rows; the icon views' gaps run between cells of a row.
+    const bool between_rows = view_ == ListViewView::details || view_ == ListViewView::list;
+    Rect bar{};
+    if (between_rows) {
+        const double edge = mark.after ? cell.y + cell.height : cell.y;
+        bar = Rect{cell.x, edge - thickness * 0.5, cell.width, thickness};
+    } else {
+        const double edge = mark.after ? cell.x + cell.width : cell.x;
+        bar = Rect{edge - thickness * 0.5, cell.y, thickness, cell.height};
+    }
+    const Rect shown = Rect::intersection(bar, placed.viewport);
+    return shown;
+}
+
+bool ListView::show_insertion_mark(ListViewInsertionMark mark) {
+    require_mutable();
+    if (mark.index >= item_count()) {
+        clear_insertion_mark();
+        return false;
+    }
+    if (insertion_mark_ && *insertion_mark_ == mark) return true;
+    insertion_mark_ = mark;
+    invalidate(Dirty::paint);
+    return true;
+}
+
+void ListView::clear_insertion_mark() noexcept {
+    if (!insertion_mark_) return;
+    insertion_mark_.reset();
+    invalidate(Dirty::paint);
+}
+
+std::optional<ListViewInsertionMark> ListView::insertion_mark_at(Point window_point) const {
+    const Layout placed = layout();
+    if (placed.shown_count == 0U || placed.viewport.empty()) return std::nullopt;
+    const Rect absolute = absolute_bounds();
+    const Point local{window_point.x - absolute.x, window_point.y - absolute.y};
+    // The point is clamped into the viewport, so that a drag past an edge
+    // names the nearest item there.
+    const Rect area = placed.viewport;
+    const double across = std::clamp(local.x - area.x, 0.0, std::max(area.width - 1.0, 0.0));
+    const double down = std::clamp(local.y - area.y, 0.0, std::max(area.height - 1.0, 0.0));
+    std::size_t line = placed.top_line;
+    std::size_t position = 0U;
+    if (view_ == ListViewView::details) {
+        line += static_cast<std::size_t>(down / placed.row_height);
+    } else if (view_ == ListViewView::list) {
+        line += static_cast<std::size_t>(across / placed.cell.width);
+        position = static_cast<std::size_t>(down / placed.cell.height);
+    } else {
+        line += static_cast<std::size_t>(down / placed.cell.height);
+        position = static_cast<std::size_t>(across / placed.cell.width);
+    }
+    position = std::min(position, placed.per_line - 1U);
+    const std::size_t index = std::min(line * placed.per_line + position, placed.shown_count - 1U);
+    const Rect cell = item_bounds(placed, index);
+    const bool between_rows = view_ == ListViewView::details || view_ == ListViewView::list;
+    const Point clamped{area.x + across, area.y + down};
+    const bool after = between_rows ? clamped.y >= cell.y + cell.height * 0.5
+                                    : clamped.x >= cell.x + cell.width * 0.5;
+    const ListViewInsertionMark mark{index, after};
+    return mark;
 }
 
 std::optional<std::size_t> ListView::item_index_at(Point window_point) const {
@@ -1743,7 +1900,9 @@ bool ListView::on_semantic_child_action(std::string_view id, SemanticAction acti
 
 namespace {
 
-constexpr std::array<PartField<ListView::Parts>, 7> list_view_part_fields{{
+constexpr std::array<AnatomyState, 1> insertion_mark_states{{AnatomyState::drop_accepted}};
+
+constexpr std::array<PartField<ListView::Parts>, 8> list_view_part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &ListView::Parts::region},
     {.declaration = {.name = "well", .role = PartRole::well, .composed_from = {}},
@@ -1761,6 +1920,9 @@ constexpr std::array<PartField<ListView::Parts>, 7> list_view_part_fields{{
      .member = &ListView::Parts::scroll_corner},
     {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
      .member = &ListView::Parts::focus},
+    {.declaration = {.name = "insertion_mark", .role = PartRole::drop, .composed_from = {},
+                     .states = insertion_mark_states},
+     .member = &ListView::Parts::insertion_mark},
 }};
 
 constexpr std::array<PartField<ListView::ItemParts>, 7> list_view_item_part_fields{{
@@ -1825,7 +1987,7 @@ constexpr std::array<CustomStateDeclaration, 2> list_view_column_custom_states{{
     {.name = "sorted_descending"},
 }};
 
-constexpr std::array<PartDeclaration, 7> list_view_parts = part_declarations(list_view_part_fields);
+constexpr std::array<PartDeclaration, 8> list_view_parts = part_declarations(list_view_part_fields);
 constexpr std::array<PartDeclaration, 7> list_view_item_parts = part_declarations(list_view_item_part_fields);
 constexpr std::array<AnatomyState, 6> list_view_item_states = state_declarations(list_view_item_state_fields);
 constexpr std::array<PartDeclaration, 2> list_view_sub_item_parts =
@@ -1875,6 +2037,8 @@ void ListView::publish_part_geometry(std::span<PartGeometry> geometry) const {
     record.horizontal_scroll_bar = PartGeometry::from_bounds(placed.horizontal_bar);
     record.scroll_corner = PartGeometry::from_bounds(placed.corner);
     record.focus = PartGeometry::from_bounds(placed.well);
+    record.insertion_mark = PartGeometry::from_bounds(insertion_mark_bounds(placed));
+    if (record.insertion_mark.present) record.insertion_mark.states.insert(AnatomyState::drop_accepted);
     write_parts(anatomy(), list_view_part_fields, record, geometry);
 }
 
@@ -2054,7 +2218,8 @@ std::vector<ListView::Column> ListView::realized_columns() const {
 namespace {
 
 // The events ListView adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 6> list_view_interactions{{
+constexpr std::array<InteractionDeclaration, 7> list_view_interactions{{
+    {.name = "draw_item_content", .payload = "ItemContentPaint", .mutable_payload = true},
     {.name = "selection_changed", .payload = "ListViewSelectionChange", .mutable_payload = false},
     {.name = "item_activated", .payload = "ListViewItemActivation", .mutable_payload = false},
     {.name = "item_checking", .payload = "ListViewItemCheck", .mutable_payload = true},

@@ -422,6 +422,104 @@ Both are decided.
    between phases. Work stops only at an owner decision or a genuine
    blocker.
 
+### Confirmations answered by the owner (2026-10-26)
+
+Accepted as built:
+
+- **C1.** The derived limits E510 (at most 32 simple selectors in one
+  expanded selector) and E513 (at most 16 MiB of lowered records).
+- **C2.** A rule expanded from a selector list keeps the specificity
+  `:is()` gives it, and its cascade level follows that specificity.
+- **C3.** The engine's budget refusals keep their own warnings,
+  `primitive_over_budget` W108 and `primitive_cost_unbounded` W109,
+  appended to the W1xx row.
+- **C4.** A sheet that declares a newer engine loads at the running
+  version: what the running engine understands applies, and the rest is
+  dropped with a warning (W301, W302).
+- **C5.** The material primitive's default recipe is the part's own
+  family recipe (`family`; engine 0.3).
+- **C7.** A rule that declares material fields and no `primitive`
+  selects the `material` primitive.
+
+Reversed:
+
+- **C6.** `background-color` and `background-image` declared in
+  different rules combine as CSS combines them, the colour under the
+  image layers. They are separate cascaded fields, composed when the
+  material is assembled; they never cascade as one field.
+
+- **C8, engine versions** (answered 2026-10-26, corrected the same day:
+  "there's no such thing as an upper bound here. lower bounds only").
+  Versions are lower bounds only, since a theme states the features it
+  needs. The manifest's engine field is written `">=0.3"`; a bare number,
+  an upper bound or a range is an error. A running engine older than the
+  bound refuses the theme, with a diagnostic naming the version needed:
+  "this theme needs engine >= X.Y; upgrade to run it". Inside a sheet,
+  `@supports engine(major.minor) { ... }` also means "at least": each rule
+  inside lowers with that `requires_engine`, and on an older engine the
+  whole block is skipped, so a group never applies in part. `@supports
+  not engine(...)` holds the fallback rules, and `engine()` is the only
+  test admitted inside `@supports`. Built in P9/P10. The manifest's
+  bound is a hard requirement (owner, 2026-10-26): C4's load-and-warn
+  applies only inside an accepted theme, to `@supports engine(...)`
+  blocks and per-rule versions.
+
+### Owner decision: compatibility policy (2026-10-26, standing)
+
+- The language and the engine are made right by 1.0. After 1.0 there
+  are only bug fixes and added features, never a breaking change.
+- Versions are lower bounds only. The engine supports every theme
+  targeting 1.0 or later, always.
+- If anything is ever deprecated, a compatibility module restores the old
+  capability transparently. The engine detects an old construct it no
+  longer supports and errors with "please update your theme, or use this
+  compatibility plugin".
+- There are no upper bounds, ranges or migration modes.
+
+P9 and P10 are designed so that nothing assumes a later break: no
+version ranges, no per-version branches in the loader, and room for a
+compatibility module to register the constructs it restores.
+
+### Coordinator decisions on the rest of P6 (2026-10-26)
+
+- **D1, the recipe's own fields** (`color`, `outline` and
+  `outline-offset`, `text-shadow`). The engine resolves them per control,
+  from the rules that match that control, cached on its part record, with
+  `Theme::resolve` as the floor (EC1). T3 builds the engine side first.
+  In a second PR, T3 also moves the control call sites in
+  `src/controls` (about 40), and has permission for that PR only. That
+  diff is mechanical: with no rule matching, the behaviour is the same and
+  the goldens do not move.
+- **D2, `backdrop-filter`** (and the sheen's pointer gradient) is
+  deferred. Until then authors write `primitive: glass; blur: ...;
+  tint: ...`, and the sheen waits for P12.
+  - Stage H (the HTML import) will need `backdrop-filter`.
+  - Kept in view: once the glass takes a matrix parameter, its colour
+    functions compose into one matrix, as `filter`'s do.
+
+### Owner decision on `spring()` (2026-10-26)
+
+- **E1, `spring(<response>, <damping>)`.** The second argument is a
+  damping ratio ζ, as in SwiftUI's damping fraction. It converts to the
+  engine's overshoot as e^(−πζ/√(1−ζ²)); ζ = 1 is critically damped
+  (no overshoot). It is admitted from about 0.627 (an 8 % overshoot, the
+  engine's limit) to 1; anything outside is E403. `response` is the
+  engine's response time, 1/ω, written as a time.
+
+### Owner decision on a grouped animation's curve (2026-10-27)
+
+- **P7b, option 1, "strict for now".** The engine runs one curve per
+  state machine, and replays a state's entry value and stops only when
+  the machine's state changes. So an `animation` on a rule that refines a
+  transition's rule joins that transition's machine as a state. Its
+  duration, timing function and delay must then equal the host
+  transition's for that property; anything else is E405. An animation
+  with no host transition becomes a machine of its own, with its own
+  curve.
+- Relaxing this later (a per-state curve in the engine, or the host's
+  curve winning) turns an error into accepted sheets, so it breaks no
+  theme (compatibility policy above).
+
 ## Read first
 
 - `planning/DESIGN_LANGUAGE_SPECIFICATION.md` §1.2, §8.2, §9.6, §12.1 item 1,

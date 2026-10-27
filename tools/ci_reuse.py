@@ -54,7 +54,7 @@ def artifact_name(kind: str, identity: dict[str, Any]) -> str:
 def trusted_run(run: dict[str, Any], repository: str) -> bool:
     return (run.get('path') == '.github/workflows/native.yml'
             and run.get('head_repository', {}).get('full_name') == repository
-            and run.get('event') in ('push', 'pull_request', 'workflow_dispatch'))
+            and run.get('event') in ('push', 'merge_group', 'pull_request', 'workflow_dispatch'))
 
 
 def matching_receipt(receipt: dict[str, Any], identity: dict[str, Any], run_id: int) -> bool:

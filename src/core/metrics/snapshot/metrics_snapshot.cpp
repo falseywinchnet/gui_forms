@@ -126,9 +126,11 @@ std::string MetricsSnapshot::to_json() const {
            << "\"engine_ambient_frames\":" << engine_ambient_frames << ','
            << "\"engine_ambient_refusals\":" << engine_ambient_refusals << ','
            << "\"engine_primitive_refusals\":" << engine_primitive_refusals << ','
+           << "\"engine_material_assemblies\":" << engine_material_assemblies << ','
            << "\"paint_group_refusals\":" << paint_group_refusals << ','
            << "\"renderer_name\":\"" << escaped_json(renderer_name) << "\","
-           << "\"cpu_only\":" << (cpu_only ? "true" : "false")
+           << "\"cpu_only\":" << (cpu_only ? "true" : "false") << ','
+           << "\"backplane_replay\":" << (backplane_replay ? "true" : "false")
            << '}';
     return output.str();
 }

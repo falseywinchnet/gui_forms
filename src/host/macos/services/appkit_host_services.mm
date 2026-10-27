@@ -6,6 +6,7 @@
 #include "macos_host.hpp"
 #include "appkit_clipboard_image.hpp"
 #include "appkit_status_items.hpp"
+#include "../compositor/macos_compositor.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
 #include "../../../render/skia/raster/skia_raster.hpp"
 
@@ -295,6 +296,13 @@ protected:
             result.status.error = HostServiceError::backend_failure;
         }
         return result;
+    }
+
+    // The granted backdrop on this window (stage T5, C3).
+    HostServiceStatus apply_window_backdrop_impl(gui_forms::WindowBackdrop backdrop) override {
+        NSView* const raster = backdrop_view_;
+        const HostServiceStatus applied = gui_forms::host::detail::apply_macos_backdrop(raster, backdrop);
+        return applied;
     }
 
     HostServiceStatus set_cursor_impl(CursorKind cursor) override {
@@ -651,9 +659,24 @@ private:
     __strong NSPasteboard* pasteboard_{};
     bool cancel_dialogs_for_testing_{};
     std::unique_ptr<gui_forms::host::detail::AppKitStatusItems> status_items_;
+    // The raster view of the window these services belong to; weak, so a
+    // view that is gone applies nothing. Set once, by the view's init.
+    __weak NSView* backdrop_view_{};
+
+    friend void gui_forms::host::detail::bind_macos_backdrop_view(HostServices& services, NSView* raster);
 };
 
 } // namespace
+
+namespace gui_forms::host::detail {
+
+void bind_macos_backdrop_view(HostServices& services, NSView* raster) {
+    AppKitHostServices* const appkit = dynamic_cast<AppKitHostServices*>(&services);
+    if (appkit == nullptr) return;
+    (*appkit).backdrop_view_ = raster;
+}
+
+} // namespace gui_forms::host::detail
 
 namespace gui_forms::host {
 

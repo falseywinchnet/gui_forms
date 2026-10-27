@@ -9,7 +9,8 @@ advertised protocol surface; some native integrations are not advertised yet.
 
 ## The host protocol
 
-`HostCapabilities` carries `protocol_version` (currently 9), a `platform`
+`HostCapabilities` carries `protocol_version` (currently 10; one row per version in
+`host_protocol_revisions`), a `platform`
 string, a bit set of `HostCapability` flags and the host's keyboard-command
 defaults (`key_map`, below). `Application::capabilities()`
 returns the set for the host your program was linked against, before any
@@ -44,10 +45,10 @@ whole record for logs.
 | `screen_pointer` | the pointer's desktop position | yes | yes | yes |
 | `window_at_point` | the application's topmost window at a desktop point | yes | yes | yes |
 | `window_ordering` | bring a window to the front of the application's own windows | yes | yes | yes (the window manager may decline) |
-| `transparent_windows` | a window presented with per-pixel alpha when the compositor allows it | no | yes | yes (while a compositing manager runs) |
-| `window_backdrops` | a system material behind a transparent window | no | yes (Windows 11 22H2 and later) | no |
-| `compositor_notifications` | compositor and preference changes reported at run time | no | yes | yes |
-| `presentation_preferences` | the host's high contrast and reduced transparency fed to each window | no | yes | no |
+| `transparent_windows` | a window presented with per-pixel alpha when the compositor allows it | yes | yes | yes (while a compositing manager runs) |
+| `window_backdrops` | a system material behind a transparent window | yes | yes (Windows 11 22H2 and later) | no |
+| `compositor_notifications` | compositor and preference changes reported at run time | yes | yes | yes |
+| `presentation_preferences` | the host's high contrast and reduced transparency fed to each window | yes | yes | no |
 
 The table reflects the bits each adapter currently advertises; read
 `Application::capabilities()` rather than this page in code.
@@ -87,6 +88,19 @@ itself.
   the host's (`presentation_preferences`) or set by the application in
   `PresentationSettings`, withdraw every backdrop.
 
+**macOS.** A window declared non-opaque is made inside a container view
+holding an `NSVisualEffectView` behind the window's own view, so that a
+backdrop can change without moving that view. `transparent` makes the
+window non-opaque on a clear background; `window_material` shows the
+effect view at `underWindowBackground` and `transient_material` at
+`popover`, blending behind the window and following its active state.
+The window server always composites. The accessibility option "Reduce
+transparency" is reduced transparency and is followed as it changes;
+with it on, AppKit draws every material as a solid colour. "Increase
+contrast" is not reported as high contrast. Clear pixels still receive
+the pointer: there is no click-through. The measurements behind this are
+in `planning/stages/T5-compositor/MEASUREMENTS.md`.
+
 **Windows.** The client's premultiplied alpha is shown through
 `DwmEnableBlurBehindWindow` with an empty region, which keeps the native
 caption. `window_material` is Mica and `transient_material` is Acrylic,
@@ -101,9 +115,11 @@ click-through. The measurements behind this are in
 `planning/stages/T5-compositor/MEASUREMENTS.md`.
 
 **X11.** A window declared non-opaque is made with the screen's 32-bit
-TrueColor visual, whose spare byte XRender names as alpha, and its
-presented pixels carry the frame's premultiplied alpha. Whether a
-compositing manager runs is the owner of `_NET_WM_CM_S<screen>`, followed
+TrueColor visual, whose spare byte XRender names as alpha; while
+`transparent` is granted its presented pixels carry the frame's
+premultiplied alpha, and under `opaque` they are presented at alpha
+255. Whether a compositing manager runs is the owner of
+`_NET_WM_CM_S<screen>`, followed
 through XFixes as managers start and stop: without one the X server shows
 clear pixels as black, so the window is granted `opaque` with the reason
 `no_compositor`, and `transparent` again once a manager starts. X11 has
@@ -114,9 +130,31 @@ still receive the pointer. A server without the 32-bit visual leaves the
 window opaque (`host_unsupported`). The measurements behind this are in
 `planning/stages/T5-compositor/MEASUREMENTS.md`.
 
-The macOS host does not advertise these capabilities yet; it arrives
-with its phase of stage T5. The headless reference host simulates them
+The headless reference host simulates these capabilities
 (`HeadlessApplication::simulate_compositor_state`).
+
+## Input settings
+
+Every host reports the platform's double-click interval after a window
+attaches, and again when the system setting changes (`HostInputSettingsEvent`,
+protocol version 10). The window keeps it in its `PresentationSettings`, the
+record controls already read, as `double_click_milliseconds`. A control that
+must tell a slow second click from a double-click, such as a list starting a
+label edit, compares against it. `double_click_origin` says where the value
+came from: `SettingOrigin::host` for the platform's own setting, or
+`SettingOrigin::default_value` for GUI.Forms' stated default of 400 ms
+(`default_double_click_milliseconds`). The interval is a perceptual duration,
+between 1 and 5000 ms. A report changes only these two fields, so the
+application's own presentation settings stay as they are.
+
+| Host | Source | Refreshed |
+|---|---|---|
+| Windows | `GetDoubleClickTime` | on `WM_SETTINGCHANGE`, when the value moved |
+| macOS | `NSEvent.doubleClickInterval` | on each activation, when the value moved (AppKit posts no change notification, and the setting is changed in System Settings) |
+| Linux X11 | the XSETTINGS manager's `Net/DoubleClickTime` | on the manager's property change, a new manager, or the manager's exit; without a manager, the 400 ms default, reported as a default |
+| Headless | a fixed test value, 500 ms (`host::headless_double_click_milliseconds`) | never |
+
+The X11 host also counts its own clicks with this interval.
 
 ## Keyboard-command defaults
 

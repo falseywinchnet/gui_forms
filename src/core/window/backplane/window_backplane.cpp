@@ -1,18 +1,58 @@
 #include "gui_forms/window.hpp"
 
 #include "../../display/chunk/display_chunk.hpp"
+#include "../../display/replay/replay_display_chunk.hpp"
 #include "backplane_composite.hpp"
 
 #include "gui_forms/engine/part_raster/part_raster.hpp"
+#include "gui_forms/paint_framebuffer.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <vector>
 
-// The window's backplane image (E9-B; owner, 2026-10-22, option 1). See
-// backplane_composite.hpp.
+// The window's backplane image (E9-B; owner, 2026-10-22, option 1, and
+// stage T5's replay, C6). See backplane_composite.hpp.
 
 namespace gui_forms {
+namespace {
+
+// The direction of a copy between a part raster's rows (premultiplied
+// RGBA) and a framebuffer's (premultiplied, in its own channel order).
+enum class FramebufferCopy : std::uint8_t {
+    into_framebuffer,
+    from_framebuffer,
+};
+
+// Copies `rows` rows of `width` pixels between `image` and `framebuffer`,
+// swapping red and blue for a BGRA framebuffer. The caller has checked
+// that both hold at least that many rows of that many pixels; the two
+// buffers never overlap.
+void copy_framebuffer_rows(const PartRasterView& image, PaintFramebuffer& framebuffer, std::uint32_t width,
+                           std::uint32_t rows, FramebufferCopy direction) noexcept {
+    const std::span<std::byte> pixels = framebuffer.pixels();
+    const std::size_t framebuffer_row = framebuffer.row_bytes();
+    const bool swap = framebuffer.channel_order() == FramebufferChannelOrder::bgra;
+    const std::size_t row_length = static_cast<std::size_t>(width) * 4U;
+    for (std::size_t row = 0U; row < rows; ++row) {
+        std::uint8_t* const raster = image.pixels.data() + row * image.row_bytes;
+        std::uint8_t* const native = reinterpret_cast<std::uint8_t*>(pixels.data() + row * framebuffer_row);
+        std::uint8_t* const to = direction == FramebufferCopy::into_framebuffer ? native : raster;
+        const std::uint8_t* const from = direction == FramebufferCopy::into_framebuffer ? raster : native;
+        for (std::size_t lane = 0U; lane < row_length; lane += 4U) {
+            const std::uint8_t red = swap ? from[lane + 2U] : from[lane];
+            const std::uint8_t blue = swap ? from[lane] : from[lane + 2U];
+            to[lane] = red;
+            to[lane + 1U] = from[lane + 1U];
+            to[lane + 2U] = blue;
+            to[lane + 3U] = from[lane + 3U];
+        }
+    }
+}
+
+} // namespace
 
 Window::EngineBackplane Window::engine_backplane(Point raster_origin, DeviceExtent extent, DeviceScale scale,
                                                  std::uint32_t margin) {
@@ -33,23 +73,99 @@ Window::EngineBackplane Window::engine_backplane(Point raster_origin, DeviceExte
     const std::shared_ptr<PartRaster> made = PartRaster::create(region.extent, scale);
     if (!made || theme_ == nullptr) return lent;
     const PartRasterView image = (*made).view();
-    // The window's backplane material, as the presentation paints it.
+    // The window's backplane base for its grant, as the presentation
+    // paints it.
     ControlVisualContext context;
     context.surface = active_ ? ControlSurfaceState::normal : ControlSurfaceState::deactivated;
     context.high_contrast = presentation_settings_.high_contrast;
-    const SurfaceMaterial& material = (*theme_).resolve(ControlVisualRole::window, context).material;
+    const SurfaceMaterial& material = backplane_base(context);
     engine_parts_.bake_backplane_material(material, client_size_, region, &image_resources(), image,
                                           paint_leases_completed_);
     if (engine_parts_.patterns_waiting()) arm_engine_idle();
-    // Then the backplane plane's engine part rasters over it.
+    // Then the backplane plane over it: replayed whole by the window's
+    // renderer when it can (C6), else its engine part rasters alone.
     std::uint64_t skipped = 0U;
     const double width = static_cast<double>(region.extent.width) / scale.value;
     const double height = static_cast<double>(region.extent.height) / scale.value;
     const Rect covered{region.origin.x / scale.value, region.origin.y / scale.value, width, height};
-    if (root_) composite_backplane_subtree(root_, covered, region, image, skipped);
-    engine_parts_.hold_backplane(region, backplane_generation_, made, skipped, paint_leases_completed_);
+    const bool replayed = replay_backplane(covered, region, image);
+    if (!replayed && root_) composite_backplane_subtree(root_, covered, region, image, skipped);
+    metrics_.set_backplane_replay(replayed);
+    engine_parts_.hold_backplane(region, backplane_generation_, made, skipped, replayed, paint_leases_completed_);
     lent.image = made;
     return lent;
+}
+
+bool Window::replay_backplane(Rect covered, const BackplaneRegion& region, const PartRasterView& image) {
+    if (framebuffer_painter_ == nullptr || !root_) return false;
+    const DeviceExtent extent = region.extent;
+    if (extent.width == 0U || extent.height == 0U) return false;
+    const double scale = region.scale.value;
+    // A quarter pixel short of the extent, so that the framebuffer's
+    // rounding up to whole pixels gives the extent exactly whatever the
+    // scale's binary error.
+    const Size logical{(static_cast<double>(extent.width) - 0.25) / scale,
+                       (static_cast<double>(extent.height) - 0.25) / scale};
+    PaintFramebuffer* framebuffer = backplane_framebuffer_.get();
+    const bool reusable = framebuffer != nullptr && backplane_framebuffer_scale_ == scale &&
+                          (*framebuffer).width() == extent.width && (*framebuffer).height() == extent.height;
+    if (!reusable) {
+        backplane_framebuffer_.reset();
+        backplane_framebuffer_scale_ = 0.0;
+        backplane_framebuffer_ = (*framebuffer_painter_).create_framebuffer(logical, scale);
+        backplane_framebuffer_scale_ = scale;
+        framebuffer = backplane_framebuffer_.get();
+    }
+    // Validated before anything is drawn: the exact extent, whole rows.
+    if (framebuffer == nullptr || (*framebuffer).width() != extent.width ||
+        (*framebuffer).height() != extent.height) {
+        return false;
+    }
+    const std::size_t row_length = static_cast<std::size_t>(extent.width) * 4U;
+    const std::size_t rows = static_cast<std::size_t>(extent.height);
+    const std::size_t framebuffer_row = (*framebuffer).row_bytes();
+    if (framebuffer_row < row_length || (*framebuffer).pixels().size() < framebuffer_row * rows ||
+        image.row_bytes < row_length || image.pixels.size() < image.row_bytes * rows) {
+        return false;
+    }
+    // The base, then every backplane chunk over it at its place.
+    copy_framebuffer_rows(image, *framebuffer, extent.width, extent.height, FramebufferCopy::into_framebuffer);
+    if (!(*framebuffer).begin(image_resources(), Rect{0.0, 0.0, logical.width, logical.height})) return false;
+    Painter& painter = (*framebuffer).painter();
+    painter.save();
+    painter.translate(Point{-covered.x, -covered.y});
+    replay_backplane_subtree(root_, covered, painter);
+    painter.restore();
+    (*framebuffer).end();
+    copy_framebuffer_rows(image, *framebuffer, extent.width, extent.height, FramebufferCopy::from_framebuffer);
+    return true;
+}
+
+void Window::replay_backplane_subtree(const Control::Ptr& control, Rect clip, Painter& painter) const {
+    const Control& node = *control;
+    if (!node.is_alive() || node.window_ != this || !node.visible_ || node.layout_collapsed_) return;
+    const Rect bounds = absolute_bounds_of(node);
+    const Rect visual = visual_bounds_of(node, node.effective_visual_outsets());
+    const Rect drawn = Rect::intersection(visual, clip);
+    const std::shared_ptr<const detail::DisplayChunk>& chunk = node.display_chunk_;
+    if (!drawn.empty() && node.paint_plane_ == PaintPlane::backplane && chunk &&
+        (*chunk).plane() == PaintPlane::backplane) {
+        // As the window paint replays a chunk: at the control's corner,
+        // clipped to what it draws there.
+        painter.save();
+        painter.translate(Point{bounds.x, bounds.y});
+        painter.clip_rect(Rect{drawn.x - bounds.x, drawn.y - bounds.y, drawn.width, drawn.height});
+        static_cast<void>(detail::replay_display_chunk(*chunk, painter));
+        painter.restore();
+    }
+    const Rect viewport = node.child_viewport_rectangle();
+    const Rect children_clip =
+        Rect::intersection(Rect{bounds.x + viewport.x, bounds.y + viewport.y, viewport.width, viewport.height}, clip);
+    if (children_clip.empty()) return;
+    for (const Control::Ptr& child : node.children_) {
+        if (!child) continue;
+        replay_backplane_subtree(child, children_clip, painter);
+    }
 }
 
 void Window::composite_backplane_subtree(const Control::Ptr& control, Rect clip, const BackplaneRegion& region,

@@ -3,6 +3,7 @@
 #include "../../../render/skia/raster/skia_raster.hpp"
 #include "../services/x11_tray_icons.hpp"
 #include "../compositor/x11_compositor.hpp"
+#include "../settings/xsettings_watch.hpp"
 #include "gui_forms/platform/linux_host.hpp"
 #include <X11/Xlib.h>
 #include <array>
@@ -265,6 +266,13 @@ public:
   // never give one).
   void report_activation();
   bool ever_focused{};
+  // Reports the input settings to every attached window
+  // (HostInputSettingsEvent); a window whose settings already match ignores
+  // the report.
+  void report_input_settings();
+  // The interval click counting uses: the reported one, or the default
+  // before the watch exists.
+  [[nodiscard]] std::uint32_t double_click_milliseconds() const noexcept;
   void dispatch(XEvent &event);
   Atom atom(const char *name) const;
   Display *display{};
@@ -279,6 +287,8 @@ public:
   // The compositing manager's selection (stage T5, C4). Made after the
   // display opens; released before it closes, after every window.
   std::unique_ptr<X11CompositorWatch> compositor;
+  // Made at the end of Runtime(), released before the display closes.
+  std::unique_ptr<XSettingsWatch> input_settings;
   ::Window clipboard_owner{};
   std::string clipboard_text;
   HostImage clipboard_image;

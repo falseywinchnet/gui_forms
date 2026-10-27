@@ -3,6 +3,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/image_list.hpp"
+#include "gui_forms/theme/owner_draw/owner_draw.hpp"
 
 #include <chrono>
 #include <cstddef>
@@ -128,6 +129,18 @@ struct ListViewColumnWidthChange final {
     double width{};
 };
 
+// Where a ListView's insertion mark stands (Windows Forms'
+// ListViewInsertionMark Index and AppearsAfterItem): beside the item at
+// model index `index`, before it or, with `after`, after it.
+struct ListViewInsertionMark final {
+    std::size_t index{};
+    bool after{};
+    friend constexpr bool operator==(const ListViewInsertionMark& left,
+                                     const ListViewInsertionMark& right) noexcept {
+        return left.index == right.index && left.after == right.after;
+    }
+};
+
 // A retained item list with details, list, small-icon and large-icon views
 // (Windows Forms' ListView). Items are records, not child controls; only the
 // visible ones are laid out, painted and described, so a virtual view of
@@ -138,9 +151,10 @@ struct ListViewColumnWidthChange final {
 // Selection, focus and check boxes are kept by index. Replacing the items
 // of an ordinary view carries the selection, the focused item and the anchor
 // over by stable ID; a virtual view keeps them by index, clamped to the new
-// count. Columns are resized by dragging a header's divider. Groups, the
-// tile view, label editing, the insertion mark, owner drawing, tooltips and
-// hot-tracking activation are not supported yet.
+// count. Columns are resized by dragging a header's divider. An
+// application may draw items' content itself (draw_mode). Groups, the tile
+// view, label editing, tooltips and hot-tracking
+// activation are not supported yet.
 class ListView final : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
@@ -253,8 +267,43 @@ public:
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
 
+    // Content-only owner drawing (owner decision W-Q6; Windows Forms'
+    // OwnerDraw with DrawItem and DrawSubItem). In ItemDrawMode::owner_draw
+    // the view raises draw_item_content for each painted item's own content
+    // (column 0: its icon and text) and, in the details view, for each
+    // visible sub-item cell (its column), in paint order; the item's plate,
+    // check box and focus cue stay painted by role, and a handler's
+    // draw_default adds the default content. Column headers are not
+    // owner-drawn. A handler that changes the view's items, order, columns
+    // or view, or disposes it, ends that paint at once; the view is painted
+    // again with the change. Throws std::invalid_argument for an unknown
+    // mode.
+    [[nodiscard]] ItemDrawMode draw_mode() const noexcept { return draw_mode_; }
+    void set_draw_mode(ItemDrawMode mode);
+    [[nodiscard]] Event<ItemContentPaint&>& draw_item_content() noexcept { return draw_item_content_; }
+
     // The item under a point in window coordinates, if any.
     [[nodiscard]] std::optional<std::size_t> item_index_at(Point window_point) const;
+
+    // The insertion mark (Windows Forms' InsertionMark), for an application
+    // that reorders items by dragging: a bar in the gap beside an item, the
+    // `insertion_mark` part, painted by the drop role, until
+    // clear_insertion_mark() or any change to the items or their order.
+    // Before or after the item is above or below it in the details and list
+    // views, and left or right of it in the icon views. False, with any mark
+    // cleared, for an index past the items; true otherwise, also while the
+    // item is scrolled out of view (the mark shows when it returns). The
+    // mark's colour is the theme's: Windows Forms' InsertionMark.Color is
+    // not admitted.
+    bool show_insertion_mark(ListViewInsertionMark mark);
+    void clear_insertion_mark() noexcept;
+    [[nodiscard]] std::optional<ListViewInsertionMark> insertion_mark() const noexcept { return insertion_mark_; }
+    // The mark nearest a point in window coordinates (Windows Forms'
+    // InsertionMark.NearestIndex): beside the shown item under the point,
+    // or nearest it once the point is clamped into the viewport, after the
+    // item when the point is past the item's middle across the gap. None
+    // when the view shows no items.
+    [[nodiscard]] std::optional<ListViewInsertionMark> insertion_mark_at(Point window_point) const;
 
     [[nodiscard]] Event<const ListViewSelectionChange&>& selection_changed() noexcept {
         return selection_changed_;
@@ -293,6 +342,8 @@ public:
         PartGeometry horizontal_scroll_bar;
         PartGeometry scroll_corner;
         PartGeometry focus;
+        // The bar of the insertion mark; absent without a shown mark.
+        PartGeometry insertion_mark;
     };
     [[nodiscard]] Parts parts() const;
 
@@ -451,7 +502,12 @@ private:
     [[nodiscard]] std::size_t realized_sub_item_count(const Layout& placed) const noexcept;
     [[nodiscard]] std::size_t realized_sub_item_column(const Layout& placed, std::size_t position) const noexcept;
 
-    void paint_item(Painter& painter, const Layout& placed, std::size_t index);
+    // Paints one item; false when an owner-draw handler changed the model
+    // or disposed the view, so that the paint stops.
+    [[nodiscard]] bool paint_item(Painter& painter, const Layout& placed, std::size_t index);
+    // Whether the view is alive and its model is the one `revision` named
+    // before an owner-draw handler ran.
+    [[nodiscard]] bool model_unchanged(std::uint64_t revision) const noexcept;
     void paint_column(Painter& painter, const Layout& placed, std::size_t column);
 
     void set_top_line(std::size_t line);
@@ -480,6 +536,7 @@ private:
     void activate(std::size_t index);
     void request_column_click(std::size_t column);
     void finish_column_resize();
+    [[nodiscard]] Rect insertion_mark_bounds(const Layout& placed) const noexcept;
     [[nodiscard]] std::optional<std::size_t> navigation_target(std::uint32_t key, std::size_t from,
                                                                const Layout& placed) const;
     void type_select(std::string_view text);
@@ -498,6 +555,7 @@ private:
     std::optional<std::size_t> anchor_index_{};
     std::optional<std::size_t> hot_index_{};
     std::optional<std::size_t> hot_column_{};
+    std::optional<ListViewInsertionMark> insertion_mark_{};
     std::optional<std::size_t> pressed_column_{};
     std::optional<std::size_t> resizing_column_{};
     double resize_start_x_{};
@@ -508,6 +566,10 @@ private:
     ListViewView view_{ListViewView::details};
     std::optional<std::size_t> sort_column_{};
     ListViewSortOrder sort_order_{ListViewSortOrder::none};
+    ItemDrawMode draw_mode_{ItemDrawMode::normal};
+    // Moves with every change to the items, their order, the columns or the
+    // view, so that a paint can tell an owner-draw handler changed them.
+    std::uint64_t model_revision_{};
     bool check_boxes_{};
     bool multi_select_{true};
     bool full_row_select_{};
@@ -525,6 +587,8 @@ private:
     // Paint scratch, reused for every item of a paint pass.
     ListViewItem paint_item_{};
     std::string paint_text_{};
+    // The painted item's identity while owner-draw handlers run.
+    std::string paint_stable_id_{};
     // Type-ahead.
     std::string type_prefix_{};
     std::chrono::steady_clock::time_point last_type_time_{};
@@ -534,6 +598,7 @@ private:
     Event<const ListViewItemCheck&> item_checked_{};
     Event<const ListViewColumnClick&> column_click_{};
     Event<const ListViewColumnWidthChange&> column_width_changed_{};
+    Event<ItemContentPaint&> draw_item_content_{};
 };
 
 } // namespace gui_forms

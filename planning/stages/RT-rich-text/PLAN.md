@@ -268,7 +268,7 @@ pops them.
 |---|---|---|
 | Header | `\rtf1`; `\ansi`, `\ansicpgN`, `\deffN`, `\ucN`, `\uN` | Text must start `{\rtf`; otherwise `malformed` at offset 0. After `\uN`, its `\ucN` fallback characters are skipped |
 | Bytes | `\'hh`, and literal bytes 0x20-0x7E | Code page 1252 only. Another declared code page is accepted until it decodes a byte above 0x7F; that byte stops the read with `unsupported_encoding` (decision 3) |
-| Fonts | `\fonttbl`, `\fN`, family words, font names | A font is monospace when its family is `\fmodern` or its name is in a fixed list (Courier New, Courier, Consolas, Lucida Console, Menlo, Monaco, Cascadia Mono, Cascadia Code, DejaVu Sans Mono, Liberation Mono). Runs in a monospace font become inline code. Other font identity is dropped and counted |
+| Fonts | `\fonttbl`, `\fN`, family words, font names | A font is monospace when its family is `\fmodern` or its name is in a fixed list (Courier New, Courier, Consolas, Lucida Console, Menlo, Monaco, Cascadia Mono, Cascadia Code, DejaVu Sans Mono, Liberation Mono). Runs in a monospace font other than the document's default font (`\deff`) become inline code, so a document typed entirely in Courier is not one code span (coordinator, 2026-10-26). Other font identity is dropped |
 | Colours | `\colortbl`, `\redN\greenN\blueN`, `\cfN`, `\cbN`, `\highlightN` | `colour` and `background`. Index 0 (auto) means none |
 | Characters | `\b`, `\i`, `\ul` and its style variants, `\ulnone`, `\strike`, `\striked1`, `\super`, `\sub`, `\nosupersub`, `\fsN`, `\plain`, each with a `0` parameter to turn off | Run style. Underline styles collapse to one underline (counted). `\fsN` maps to a size step (below) |
 | Paragraphs | `\par`, `\pard`, `\line`, `\tab`, `\page`, `\sect`, `\ql`, `\qc`, `\qr`, `\qj`, `\liN`, `\fiN`, `\sbN`, `\saN` | Blocks and line breaks. `\qj` reads as left (counted). Indents and spacing are dropped (counted), except as list and quote evidence |
@@ -289,11 +289,24 @@ reaches the document.
 **Size steps.** Size steps are relative to the document's body size: step
 0 is body text. A consumer maps step 0 to its own body font, as
 `RichTextBox` maps it to the control's `Font`, and scales the other steps
-with it. RTF sizes are absolute, so the reader converts them against a
-12-point body. Word's 11-point default and TextEdit's 12-point default
-both read as step 0. The half-point value `h` maps as follows: h ≤ 17 is -2; 18-21 is -1; 22-25 is 0;
+with it. The reader finds the body size as the first of: Word's
+`{\*\defchp \fsN}`, the Normal style's `\fs` (style 0), and the size
+covering the most characters; `RtfReader::last_body()` reports which rule
+chose it (coordinator, 2026-10-26). Each absolute size `a` is scaled to a
+12-point body, `h = round(a * 24 / body)`, so Windows Forms' 8.5-point
+RichTextBox text and Word's 11-point text both read as step 0. The scaled
+value `h` maps as follows: h ≤ 17 is -2; 18-21 is -1; 22-25 is 0;
 26-31 is +1; 32-39 is +2; 40-55 is +3; h ≥ 56 is +4. A size that is not one
 of the canonical values written in section 6 is counted as quantised.
+
+**Counting.** An empty paragraph ended by `\par` or `\cell` is spacing the
+model cannot hold, counted as `spacing_dropped`, as are non-zero
+`\sb`/`\sa`. Producer words that change nothing the model holds (`\rsid`,
+`\lang`, page geometry, Cocoa and Word document settings) are not counted;
+unknown words and words that change appearance the model cannot hold
+(`\caps`, `\outl` and the like) are counted as `control_word_ignored`.
+Effort is charged per input byte, per control-word letter, per decoded
+character and per emitted run and block.
 
 ## 6. RTF written
 

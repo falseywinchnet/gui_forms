@@ -5,7 +5,7 @@ To the Holy One, blessed be He, from whom all good things come. We dedicate this
 A retained, WinForms-shaped native C++20 toolkit that paints on the CPU and
 runs the same control tree on macOS, Windows and Linux.
 
-[![CI](https://github.com/falseywinchnet/gui_forms/actions/workflows/native.yml/badge.svg)](https://github.com/falseywinchnet/gui_forms/actions/workflows/native.yml) [![Docs](https://readthedocs.org/projects/gui-forms/badge/?version=latest)](https://gui-forms.readthedocs.io/) [![Release](https://img.shields.io/github/v/release/falseywinchnet/gui_forms?display_name=tag)](https://github.com/falseywinchnet/gui_forms/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
+[![CI](https://github.com/malkuth-software/gui_forms/actions/workflows/native.yml/badge.svg)](https://github.com/malkuth-software/gui_forms/actions/workflows/native.yml) [![Docs](https://readthedocs.org/projects/gui-forms/badge/?version=latest)](https://gui-forms.readthedocs.io/) [![Release](https://img.shields.io/github/v/release/malkuth-software/gui_forms?display_name=tag)](https://github.com/malkuth-software/gui_forms/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
 
 **Status: early public preview. The API is not yet stable. The macOS and
 Windows hosts are native; the Linux X11 host is opt-in. GUI.Forms is CPU-only
@@ -71,7 +71,7 @@ Three demonstration programs are built from `demo/` and
 
 Every push to `main` that passes the build, the tests and a launch of each
 packaged program is published at
-[releases/latest](https://github.com/falseywinchnet/gui_forms/releases/latest):
+[releases/latest](https://github.com/malkuth-software/gui_forms/releases/latest):
 one archive and one installer per program for macOS arm64, Windows x64, Linux
 x64 and Linux arm64, plus `SHA256SUMS.txt`. The `build-<sha>` pre-releases are
 compiler-cache archives for CI, not downloads.
@@ -193,6 +193,8 @@ Every stock control, grouped by function; the table is generated from
 | [`ToolStripContainer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ToolStripContainer.html) |  | Four ToolStripPanels around a content panel; the edge panels take the room their strips need and the content takes the rest. |
 | [`ToolStripPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ToolStripPanel.html) |  | Band along one edge that stacks joined ToolStrips in rows (top, bottom) or vertical columns (left, right), as thick as its strips. |
 | [`AnchoredPopupLayer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.AnchoredPopupLayer.html) | Dialogs and popups | Full-client overlay that owns one retained popup content subtree, re-resolves anchored bounds on resize, and reports click-away and Escape requests. |
+| [`ColorDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ColorDialog.html) |  | The host's dialog for choosing a color, opaque unless alpha is allowed, shown modally through HostServices. |
+| [`FolderBrowserDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.FolderBrowserDialog.html) |  | The host's dialog for choosing a folder, with a description and a starting folder, shown modally through HostServices. |
 | [`FontDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.FontDialog.html) |  | In-window owned dialog choosing a bundled face by role, a style the face has, and a size, with a preview and Apply, OK and Cancel; returns a FontSpec. |
 | [`RibbonToolTip`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.RibbonToolTip.html) |  | Nonvisual provider of enhanced tooltips on controls and ToolStrip items: title, description, shortcut, image, a disabled command's reason, and an F1 help topic reported as an event. |
 | [`SaveFileDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.SaveFileDialog.html) |  | The host's dialog for choosing where to save a file, with a Windows Forms filter string, a default extension, an overwrite prompt and a cancellable file_ok, shown modally through HostServices. |

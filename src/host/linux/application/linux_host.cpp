@@ -602,12 +602,14 @@ Runtime::Runtime() {
   if (keyboard != nullptr)
     XkbFreeKeyboard(keyboard, XkbAllComponentsMask, True);
   compositor = std::make_unique<X11CompositorWatch>(display, DefaultScreen(display));
+  input_settings = std::make_unique<XSettingsWatch>(display, DefaultScreen(display));
 }
 Runtime::~Runtime() {
   for (std::size_t i = 0; i < windows.size(); ++i)
     (*windows[i]).close(HostCloseReason::application, true);
   windows.clear();
   compositor.reset();
+  input_settings.reset();
   actions.reset();
   if (input_method != nullptr)
     XCloseIM(input_method);
@@ -619,6 +621,22 @@ Runtime::~Runtime() {
 }
 Atom Runtime::atom(const char *name) const {
   return XInternAtom(display, name, False);
+}
+std::uint32_t Runtime::double_click_milliseconds() const noexcept {
+  if (!input_settings)
+    return default_double_click_milliseconds;
+  const std::uint32_t interval = (*input_settings).double_click_milliseconds();
+  return interval;
+}
+void Runtime::report_input_settings() {
+  if (!input_settings)
+    return;
+  const HostInputSettingsEvent input{(*input_settings).double_click_milliseconds(),
+                                     (*input_settings).double_click_origin()};
+  const std::vector<std::shared_ptr<NativeWindow>> snapshot = windows;
+  for (std::size_t i = 0; i < snapshot.size(); ++i)
+    if ((*snapshot[i]).session)
+      static_cast<void>((*snapshot[i]).dispatch(input));
 }
 std::shared_ptr<NativeWindow> Runtime::add(LinuxApplicationWindow entry,
                                            ::Window owner,
@@ -806,6 +824,11 @@ void NativeWindow::attach() {
   if (!dispatch(HostAttachEvent{size, 1.0}).accepted())
     throw std::runtime_error("Linux host attach rejected");
   report_compositor_state();
+  if (runtime.input_settings) {
+    const HostInputSettingsEvent input{(*runtime.input_settings).double_click_milliseconds(),
+                                       (*runtime.input_settings).double_click_origin()};
+    static_cast<void>(dispatch(input));
+  }
   accessibility = std::make_unique<LinuxAccessibility>(runtime.display, xid, *entry.model, entry.options.title);
   if (entry.options.initially_visible)
     action(ActionKind::show);
@@ -1058,7 +1081,8 @@ void NativeWindow::event(XEvent &event) {
           const double dx = pointer.position.x - last_click_position.x,
                        dy = pointer.position.y - last_click_position.y;
           click_count = button == last_click_button &&
-                                event.xbutton.time - last_click < 500 &&
+                                event.xbutton.time - last_click <
+                                    runtime.double_click_milliseconds() &&
                                 dx * dx + dy * dy < 25
                             ? click_count % 3 + 1
                             : 1;
@@ -1379,6 +1403,10 @@ void Runtime::dispatch(XEvent &event) {
   }
   if (event.type == PropertyNotify)
     selection_property(event.xproperty);
+  if (input_settings && (*input_settings).settings_event(event)) {
+    report_input_settings();
+    return;
+  }
   // Tray icon windows belong to a window's services, not to the window.
   for (std::size_t i = 0; i < windows.size(); ++i)
     if ((*windows[i]).services && (*(*windows[i]).services).tray_event(event))

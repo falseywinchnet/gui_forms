@@ -90,6 +90,7 @@ public:
     // A primitive refused to draw a part (EnginePrimitive::accepts), which
     // the built-in recipe drew instead.
     void record_engine_primitive_refusal() noexcept;
+    void record_engine_material_assembly() noexcept;
     void record_paint_group_refusals(std::uint64_t refusals) noexcept;
     void record_frame_callback_fault() noexcept;
     void record_reentrant_frame_poll() noexcept;
@@ -106,6 +107,9 @@ public:
     void record_live_present(std::uint64_t duration_nanoseconds, std::uint64_t device_pixels,
                              std::uint64_t rectangles) noexcept;
     void set_renderer(std::string_view name, bool cpu_only);
+    // Whether the window's renderer replayed its last backplane image
+    // whole (stage T5, C6; owner decision T5-Q13).
+    void set_backplane_replay(bool replayed) noexcept;
 
 private:
     MetricsSnapshot values_;

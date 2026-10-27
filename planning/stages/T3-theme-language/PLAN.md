@@ -710,12 +710,327 @@ shorthands. Gate: a fixture per row; for each, a sheet and the equivalent
 C++ material bake to identical pixels; the material cache's counters show
 one bake per distinct assembly. 3 PRs.
 
+*P6a, the engine (EC1), done:*
+- **Fields.** A `ThemeRule` carries `materials`, a list of
+  `MaterialDeclaration`s, each one `MaterialField` and its value:
+  `background_colour`, `fills` (the image layers), `fill_blend_modes`,
+  `shadows`, `glows`, the border's twelve longhands (each edge's style,
+  width and colour), `keylines`, the four corners (`corner_top_left` to
+  `corner_bottom_left`, in CSS's order), `colour_filter`, `drop_shadow`,
+  `filter_blur`, `finish` and `mask`. The fields are CSS's longhands, so
+  each cascades as CSS cascades it. The border cascades by CSS longhand, so that `border-color` in one rule and `border-width`
+  in another combine as CSS has them: the compiler (P6b) lowers `border`
+  and its shorthands to the longhands. The fills are two fields (owner
+  C6, 2026-10-26), CSS's `background-color` and `background-image`,
+  which combine across rules as CSS combines them: the colour layer
+  under the image layers, composed at assembly. The floor's bottom layer,
+  when solid, is its colour and its other layers its image layers; a
+  colour of alpha 0 adds no layer, and with no layer at all the fill is
+  one transparent solid. `fill_blend_modes` is `background-blend-mode`:
+  the modes in CSS's order (the top image layer's first), repeated over
+  the image layers; the colour layer keeps normal.
+- **Corners.** Each corner cascades on its own, as `border-top-left-radius`
+  does; the compiler lowers `border-radius` to the four. At assembly each
+  corner is its declaration's, else the floor's. Four equal corners are
+  `corner_radius` alone; unequal ones are `corner_radii`, with
+  `corner_radius` the smallest, which the built-in path rounds every
+  corner by.
+- **`initial`** (`MaterialDeclaration::initial`) keeps the floor's value
+  and still wins over the rules beneath it.
+- **Percentage radii** (R2-11): a corner marked `relative` is a
+  fraction of the box's shorter side, resolved when the material is
+  assembled for a part.
+- **Checking.** Each field is checked alone, written into the default
+  material, by `valid_surface_material`; one no material admits is the new
+  engine diagnostic `material_field_invalid`, and a second declaration of
+  a field in one rule is `duplicate_declaration`. Fields count as
+  declarations, so a rule of fields alone is not empty.
+- **Cascade.** Each field cascades on its own over every matching rule,
+  whatever primitive the rule selects (`Resolution::materials`, the
+  winning declaration of each field). Fields change a part only where its
+  primitive draws a theme material.
+- **Assembly.** The floor is the material of the recipe the primitive
+  names, for the part's state. `assemble_material` writes the winning
+  fields over it. The edges assemble together: four equal edges are one
+  uniform border, which keeps a dash and rounded corners; unequal ones are
+  single edges, which a material admits only with square corners. Each
+  edge starts as the floor's (an edge the floor lacks has the default
+  border's width and colour and is not drawn), takes its declared style,
+  width and colour, and is drawn unless its style is none or its width 0.
+  An
+  assembly no material admits (eight keylines and a finish, say) is
+  refused by the primitive and drawn by the built-in recipe, the refusal
+  counted, as any refusal is.
+- **Cache.** A keyed part keeps its assembly on its record
+  (`AssembledPartMaterial`), assembled again only when its identity
+  changes: the compiled rules' serial and the winning declarations'
+  addresses, the floor by value (a recipe may be replaced and another
+  occupy its address), and the box's shorter side. A copy of compiled rules takes a new serial; a move
+  keeps it. A part without a key assembles at each paint.
+  `engine_material_assemblies` counts assemblies.
+- **The family recipe.** The material primitive's `recipe` gains a last
+  choice, `family`, the part's own recipe family, and it is the default:
+  a material rule naming no recipe now keeps its part's own recipe as its
+  floor, not the button's (owner C5, 2026-10-26).
+  `EnginePrimitive::theme_material` takes the part's family for it. The
+  engine version is 0.3.
+- **Implicit material** (owner C7, 2026-10-26; built in P6b): a rule
+  that declares material fields and no `primitive` selects `material`.
+- Gate: `gui_forms_engine_authored_material_tests`. A part with fields
+  from two rules bakes the same pixels as the same material written into
+  the theme's recipe in C++, in two states; a colour and image layers
+  set in different rules, with the colour's rule the less and then the
+  more specific, bake as the same layers written in C++. A repaint assembles and bakes
+  nothing; a state change assembles and bakes once. The checks, the
+  per-field cascade, the edge assembly, the serials, the family default and
+  the refused assembly are tested too.
+
+*P6b, the CSS of fills, borders, radii and shadows, done:*
+- **The lowering** (`src/core/theme_language/material/`) reads a material
+  property's value into a result record (`MaterialLowering`): the fields
+  it sets, or the problem the compiler reports. Each CSS longhand is one
+  field, so a shorthand sets several, and within a rule the later
+  declaration of a field wins, whichever property set it. A shorthand's
+  omitted part is `initial` (the floor's value), the language's reading of
+  CSS's initial value. `initial` on any of them resets each field it sets.
+- **Fills** (§1, §7): `background-color`; `background-image` with
+  `linear-`, `radial-` and `conic-gradient()` and their `repeating-`
+  forms, up to 8 layers (E407 `too_many_layers` past them), CSS's first
+  layer on top; `background` with a colour (transparent when it names
+  none) and images; `background-blend-mode`. A layer's position, size,
+  repeat, attachment, origin and clip, and image resources, are P6c's
+  (E999). A colour hint, a `none` among other layers, a three- or
+  four-value position and CSS's blend modes the engine lacks are E405;
+  `currentcolor` and `em` wait for P8 (E999).
+- **Authored gradients** (`AuthoredGradient`, engine): a gradient as
+  written, resolved as CSS places it for the part's box: the stops placed
+  by CSS's fixup and clipped to the drawn range, sides and corners, the
+  four radial extents for circles and ellipses, positions and radii as a
+  fraction of the box plus logical units, repeating periods (a radial
+  one rotated to begin at its centre), CSS's average colour for a period
+  of no length. Coincident stops (CSS's hard stops) are 2^-20 apart, which
+  the engine's stops require: under a tenth of a device pixel on a
+  gradient shorter than 100,000 device pixels. A gradient the same for
+  every box is resolved when the sheet compiles, in normalized
+  coordinates or a CSS angle, exactly the layer C++ writes; the others
+  (a corner, a circle, a length) when the material is assembled, in
+  logical units. The assembly keys on the box only where a field reads
+  it (`material_fields_read_box`), so a resize assembles nothing new
+  otherwise.
+- **Borders** (§2): `border`, the four edges' shorthands, `border-style`,
+  `border-width` and `border-color` (one to four values) and the twelve
+  longhands; `thin`, `medium` and `thick` are 1, 3 and 5 px; `none` and
+  `hidden` draw no line. `double`, `groove` and `ridge` are P6c's keyline
+  pairs (E999); `inset` and `outset` are E405.
+- **Radii** (§2): `border-radius` (one to four) and the four corners'
+  longhands; a percentage is a fraction of the shorter side (R2-11);
+  elliptical radii are E405.
+- **Shadows** (§3): `box-shadow`, `none` or up to 4, `inset` admitted,
+  CSS's first on top; a shadow without a colour waits for `currentcolor`
+  (E999).
+- **Implicit material** (owner C7): a rule with material fields and no
+  `primitive` selects `material`.
+- Gate: `gui_forms_theme_material_css_tests`. Each row (the fill forms,
+  the blend mode, a uniform, a dashed and rounded, single-edge and
+  four-value border, per-corner and percentage radii, outer and inset
+  shadows) compiles from a sheet and bakes the pixels of the same
+  material written in C++, which differ from the floor's. The gradient
+  resolution, the lowering of each property and 28 refusals are tested
+  too.
+
+*P6c, filters, finish, glows and gradient masks, done:*
+- **Filters** (§5): `filter: none` or a list of CSS's functions. The
+  engine applies a material's filters in one order (the colour filter,
+  the drop shadow beneath, the blur), so a list lowers when that order
+  draws it. The colour functions compose into one matrix in source order
+  (CSS's amounts, percentages admitted, negative amounts E403); `blur()`s
+  combine in quadrature into `filter_blur` = 2σ; one `drop-shadow()`,
+  with a colour (without one it waits for `currentcolor`, E999), whose
+  colour the colour functions written after it also turn, rounded to 8
+  bits. A `drop-shadow()` after `blur()`, a second `drop-shadow()`,
+  `opacity()` after `drop-shadow()` (the engine's shadow follows the
+  filtered alpha, so it would fade twice) and an SVG filter reference are
+  E405. The colour functions are alpha-preserving affine maps of straight
+  colour (opacity a linear one), which commute with compositing and with
+  the blur; the order the engine draws differs from CSS's only where a
+  function clamps, as one matrix already differs from CSS's per-function
+  clamping (`MaterialColourMatrix`).
+- **Finish** (§8): `surface-finish`, 0 to 1 or a percentage.
+- **Glows** (§9): `glow: none` or up to 2 of a colour with a blur and an
+  optional spread (E407 past them); `glow-placement: [under | over]#`, a
+  new field (`glow_placements`) applied over the assembled glows in their
+  written order and repeated over them as CSS repeats a short list, so a
+  placement alone re-places the floor's glows.
+- **Masks** (§11): `mask-image: none` or one gradient (E407 for more; an
+  image resource is P6d's, E999), resolved like a fill's: when the sheet
+  compiles when it is fixed, else for the part's box at assembly. The
+  mask is the engine's (E9.6): outside the box it extends at its edge
+  value, so a shadow fades with the face beside it, where CSS's default
+  `mask-clip` would clip the shadow away.
+- Gate: seven more rows in `gui_forms_theme_material_css_tests` (colour
+  functions, combined blurs, a drop shadow turned by a later function, a
+  finish, two placed glows, a fixed and a sized mask) bake the pixels of
+  the same C++ material, plus the lowering of each property and 21 more
+  refusals.
+
+*P6d, image layers, done:*
+- **Binding** (`ThemeImageResource`, in `ThemeCompileInput::images`): an
+  image resource the manifest lists is bound to the engine's image, its
+  pixel size and its density (source pixels per logical unit, its own
+  size). P10's loader binds them; until then the caller does. A listed
+  resource with no image is the wrong kind (E402).
+- **Images** (§10): `url("resource:...")` in `background-image`,
+  `background` and `mask-image` is the bound image, tiled at its own size
+  from the box's corner: CSS's initial size, repetition and position.
+- **Placement**: `background-position`, `background-size` and
+  `background-repeat` are three new fields (`fill_positions`,
+  `fill_sizes`, `fill_repeats`), cascaded apart and composed at assembly
+  as the blend modes are: in CSS's order, repeated over the image layers,
+  read by the image fills. The engine draws a gradient layer over the
+  whole box, so these do not move or size a gradient; the `background`
+  shorthand refuses a gradient layer written with them (E405), and the
+  longhands leave a gradient as it is.
+  - A position is CSS's of one or two values: its percentage is the
+    fill's anchor in the room the box leaves around the image (CSS's
+    reading), within 0 to 100% (E403 past them), its length the offset.
+  - A size keeps the image's proportions: `auto`, one length or
+    percentage across (`<l>` or `<l> auto`) or down (`auto <l>`),
+    `cover`, `contain`, and of two lengths only `100% 100%`, which
+    stretches the image over the box; other pairs and a zero size are
+    E405. A size of the box is resolved at assembly. A size the engine's
+    image scale cannot draw (1/8 to 8 source pixels a unit) makes the
+    assembled material invalid, so the part draws its built-in recipe.
+  - A repetition is `repeat` or `no-repeat` on both axes; the latter is
+    the engine's new `MaterialImageMode::single`, one tile placed as a
+    tile is and nothing around it (the material primitive and the
+    built-in path both draw it). `repeat-x`, `repeat-y`, `space` and
+    `round` are E405.
+  - A layer's attachment, origin and clip are E405: the engine draws
+    every layer over the whole box.
+- Masks take an image the same way, tiled at its own size; the mask's own
+  size, repetition and position longhands are not built (E999).
+- Gate: six more rows (a tiled image, a placed single image of a set
+  size over a colour, `contain` centred, a single image half the box
+  wide, a stretched image, an image mask) bake the pixels of the same C++
+  material, with the image in the window's resources; plus the lowering
+  of each property, `cover` at assembly, nine more refusals, and the
+  single mode's pixels in the engine's own image test.
+
+*P6e, border lines and border images, done:*
+- **Lines** (§2): `double`, `groove` and `ridge` are a solid edge drawn
+  as two keylines in place of the border edge (`MaterialEdgeLines`, a
+  style field's second member, so each edge's style still cascades as
+  one field). A double edge is two lines a third of its width, a third
+  apart; a groove or ridge two halves, one in the edge's colour and one
+  in its shade, each channel halved and rounded down (CSS leaves the
+  shades to the engine): a groove's outer half is the shade on the top
+  and left and the colour on the bottom and right, a ridge's the
+  reverse. The pairs follow the declared keylines in CSS's edge order,
+  so the corner square two edges share shows the later edge's line; they
+  count toward the material's 8 keylines, past which the assembled
+  material is invalid and the part draws its built-in recipe. The
+  keylines are clipped to a rounded box, as keylines are.
+- **Border images** (§2): `border-image: none` or a bound image with
+  `<slice>{1,4} fill / <width>{1,4}` and optionally `stretch`, a new
+  field (`border_image`) holding the engine's nine-patch, drawn as the
+  top fill layer in place of the border (its edges and their lines), as
+  CSS draws a border image in place of the border's style. The
+  nine-patch fills its middle and stretches at one scale, so the
+  language admits what it draws: `fill` and the widths written (`auto`,
+  the slices at the image's own size, or lengths), each width in the
+  same proportion to its slice; slices are image pixels or percentages
+  of the image. A missing `fill` or width, a width in border widths, a
+  gradient source, an outset and `repeat`, `round` and `space` are
+  E405; the longhands wait (E999).
+- Gate: four more rows (a double border, a groove border, one ridge
+  edge, a border image over a declared border) bake the pixels of the
+  same C++ material; plus the lowering of the styles and of a
+  percentage-sliced border image, and seven more refusals.
+
+*P6f, the recipe's own fields, engine side done (coordinator D1, PR A):*
+- **Engine:** a rule's `recipe_fields` (`RecipeField`: text, the
+  outline's style, colour, width and offset, the text shadow) are the
+  control's, not a part's: a rule naming a part or a role sets none
+  (`recipe_field_on_part`). They are checked when the rules compile
+  (`recipe_field_invalid` past the recipe's ranges) and cascade one by one
+  over the matching rules (`CompiledThemeRules::resolve_recipe_fields`,
+  at once when no rule sets one). `Theme::resolve(control, role, context
+  [, states])` puts them over the built-in recipe (the floor,
+  `Theme::resolve(role, context)`), matching with no part, the region role
+  and the context's states (or the part's); forced high contrast and an
+  invalid result keep the floor. The result is a value,
+  `ResolvedControlRecipe`: the floor borrowed, or, only when a field is
+  set, the floor's copy with the fields in place. A value rather than a
+  record in the part table, since a control holds its recipe across
+  `paint_part` calls that may evict records, and its own painting is not
+  a keyed part. The built-in recipe's part path takes it, so a label part
+  is drawn in the control's resolved text colour.
+- **Outline:** `auto` is the theme's ring inside the bounds (no offset),
+  `solid` an outline outside them, `none` no width; the ring is stroked
+  solid, so the other line styles are E405. Width 0 to 16 (CSS's
+  keywords), offset within ±64. The shorthand's omitted members are
+  `initial` (the floor's), and the offset is not the shorthand's.
+- **Text shadow:** one, with a colour (currentcolor waits for P8), offset
+  within ±16 and blur 0 to 8; a second is E407.
+- `color: inherit` and `currentcolor` wait for P8 (E999).
+- Gate: the engine's cascade, resolution and label part
+  (engine_recipe_field_tests), the lowering of each property, and
+  thirteen more refusals.
+- PR B moves the controls' ~40 `Theme::resolve(role, context)` sites to
+  the control's resolution, once PR A is on main.
+
+`backdrop-filter` and the sheen's pointer gradient are deferred
+(coordinator D2, T3 README).
+
 **P7. Motion.** `transition`, the timing functions, delays, `@keyframes`,
 `animation`, ambient loops, and the state-machine grouping. Gate: a fixture
 per timing function and keyframe form; the pop scenario of the README runs
 from a sheet with the same frames as the C++ rules in
 `gui_forms_engine_motion_curve_tests`; zero bakes while a transition runs
 (E7r's counter). 2 PRs.
+
+*P7a, transitions and the grouping, done:*
+- **The lowering** (`src/core/theme_language/motion/`) reads
+  `transition` and its four longhands into the rule's lists, as CSS keeps
+  them: a later declaration replaces the lists it sets, and a short list
+  repeats. When the rule is emitted each named property takes its curve.
+  A property with a static value in the rule (`opacity`, `scale`,
+  `translate`) puts the curve on that value's machine; one without
+  becomes a machine of its own, whose states the grouping supplies.
+- **Targets:** `opacity`, `scale`, `face` (the cross-fade) and
+  `translate` (both translations), or an animated number parameter of
+  the rule's primitive (a parameter that is not animated is E402, an
+  unknown one E405). `all`, and a transition with no
+  `transition-property`, are E405 (the engine's machines each move one
+  property); `none` declares nothing.
+- **Timing functions:** `linear` and `ease` are the engine's; `ease-in-out`
+  is its smoothstep; `ease-in` and `ease-out` are CSS's exact
+  `cubic-bezier()` (R2-17). `step-start`, `step-end`, `cubic-bezier()`
+  (x within [0, 1], else E403) and `steps()` (1 to 32 levels;
+  `jump-none` and `jump-both` are E405) are CSS's. `follow(t)`, `decay(t)`
+  and `spring(t, ζ)` are the engine's physical curves (C2). A spring's ζ
+  is its damping ratio, from about 0.627 (8 % overshoot) to 1 (owner
+  decision, README). A physical curve keeps its own time, so a duration
+  with it is E405. A negative duration is E403; a negative delay is E405.
+  Every time is clamped to the 400 ms ceiling.
+- **The grouping** (R2-18), once every rule is lowered: each transition
+  absorbs the static values of the rules that refine its own (same level,
+  same selector but for more states). Its states are ordered most
+  precedent first: the higher specificity, then the later rule, then its
+  own value last. For a parameter, the values are number declarations in
+  rules selecting the same primitive. Absorbed machines and declarations
+  leave their rules, and a rule left with nothing is dropped. A
+  transition with no value to move (other than a face cross-fade) is
+  dropped. More than 8 states is E407. This first version groups only
+  exact refinements: a rule of intermediate specificity that does not
+  refine the transition's own may now win where an absorbed refinement
+  used to.
+- Gate: `gui_forms_theme_motion_css_tests`. The pop of
+  `gui_forms_engine_pop_tests` written as a sheet gives the C++ pop's
+  records, and on a hand-driven clock the same frames, pixel for pixel,
+  with the same bakes, none while it moves. The test also has a fixture
+  per timing function, the longhands, translate, a parameter, the grouping
+  order and 24 refusals.
 
 **P8. Colour roles, em, text roles and `@media` (engine changes EC3, EC4,
 EC5).** Colour roles as vocabulary atoms and the theme's `:root` palette

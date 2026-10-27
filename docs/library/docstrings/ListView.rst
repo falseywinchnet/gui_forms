@@ -71,6 +71,13 @@ large_image_list
     The images of the large-icon view.
 font
     The font of item and header text.
+draw_mode : default ``ItemDrawMode::normal``
+    With ``ItemDrawMode::owner_draw`` the application draws the items'
+    content (Windows Forms' `OwnerDraw`): see `draw_item_content`. Throws
+    `std::invalid_argument` for an unknown mode.
+insertion_mark : default none
+    Where the insertion mark stands, as an item's index and whether the mark
+    is after it, or none. See `show_insertion_mark`.
 realized_items
     The visible items' parts and states, in paint order.
 realized_sub_items
@@ -80,6 +87,18 @@ realized_columns
 
 Events
 ------
+draw_item_content
+    Raised while the view paints in the owner-draw mode, with an
+    `ItemContentPaint`: once for each painted item's own content (column 0,
+    its icon and text area) and, in the details view, once for each visible
+    sub-item cell (its column), in paint order (Windows Forms' `DrawItem` and
+    `DrawSubItem`). The painter is clipped to the content rectangle; the
+    item's plate, check box and focus cue are already painted by role.
+    `text` and `font` are the default content's. Set `draw_default` to add
+    the default content. Column headers are not owner-drawn. A handler
+    paints only; one that changes the items, their order, the columns or
+    the view, or disposes the view, ends that paint, and the view is painted
+    again.
 selection_changed
     Raised after the set of selected items changes, by the user or the
     program. It carries the selected count and the focused item; read the
@@ -135,6 +154,20 @@ sort_items
     `std::logic_error` in virtual mode.
 item_index_at
     The item under a point in window coordinates, or none.
+show_insertion_mark
+    Shows the insertion mark, the bar an application shows in the gap where
+    a dragged item would drop: before or after an item, which is above or
+    below it in the details and list views and left or right of it in the
+    icon views. It is painted by the theme's drop role and published as the
+    `insertion_mark` part. Any change to the items or their order clears
+    it. Returns false, clearing any mark, for an index past the items.
+clear_insertion_mark
+    Removes the insertion mark.
+insertion_mark_at
+    The mark nearest a point in window coordinates (Windows Forms'
+    `InsertionMark.NearestIndex`), with the point clamped into the item
+    area: the item under or nearest it, and after it when the point is past
+    the item's middle across the gap. None when no item is shown.
 
 See Also
 --------
@@ -186,8 +219,8 @@ sub-item text. In the other views the items are `list_item`, or
 The select action selects an item; press activates it, or toggles a
 check-box item.
 
-Not supported yet: groups, the tile view, label editing, the insertion mark,
-owner drawing, item tooltips, hot-tracking activation, column reordering,
+Not supported yet: groups, the tile view, label editing, item tooltips,
+hot-tracking activation, column reordering,
 type-ahead in virtual mode, and wrapping large-icon labels over two lines.
 
 Examples

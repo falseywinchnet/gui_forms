@@ -154,11 +154,21 @@ struct MetricsSnapshot {
     // built-in recipe instead. Counted when a keyed part's refusal begins,
     // and at every paint of a part without a key.
     std::uint64_t engine_primitive_refusals{};
+    // Materials assembled from a recipe's material and the material fields
+    // a theme's rules set (T3 EC1): once per distinct assembly for a keyed
+    // part (AssembledPartMaterial), and at every paint of a part without a
+    // key.
+    std::uint64_t engine_material_assemblies{};
     // Paint groups begun deeper than maximum_paint_group_depth, drawn
     // without isolation (Painter::begin_group).
     std::uint64_t paint_group_refusals{};
     std::string renderer_name{"unbound"};
     bool cpu_only{true};
+    // The renderer's backplane replay (stage T5, C6; owner decision
+    // T5-Q13): true once the window's renderer replayed a backplane image
+    // whole, false while it has not or could not (the part-raster image of
+    // E9-B is used instead). Kept across resets, as the renderer is.
+    bool backplane_replay{};
 
     [[nodiscard]] std::string to_json() const;
 };

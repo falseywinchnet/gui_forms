@@ -558,6 +558,22 @@ void example() {
 }
 }  // namespace doc_example_ColorCommand_1
 
+namespace doc_example_ColorDialog_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    gf::ColorDialog dialog;
+    dialog.set_color(gf::Color::rgba(0x27U, 0x74U, 0xB8U));
+    const gf::DialogResult result = dialog.show_dialog(window);
+    if (result == gf::DialogResult::ok) {
+        const gf::Color accent = dialog.color();
+        static_cast<void>(accent);
+    } else if (result == gf::DialogResult::none) {
+        // Without a host, dialog.status().error is gf::HostServiceError::unsupported.
+    }
+}
+}  // namespace doc_example_ColorDialog_1
+
 namespace doc_example_ColorValueEditor_1 {
 void example() {
     std::shared_ptr<gf::ColorValueEditor> tint =
@@ -1603,6 +1619,22 @@ void example() {
     // fixed stays 20 wide; narrow becomes 30 wide and wide 50 wide
 }
 }  // namespace doc_example_FlowLayoutPanel_2
+
+namespace doc_example_FolderBrowserDialog_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    gf::FolderBrowserDialog dialog;
+    dialog.set_description("Choose where the exports go");
+    const gf::DialogResult result = dialog.show_dialog(window);
+    if (result == gf::DialogResult::ok) {
+        const std::string& folder = dialog.selected_path();
+        static_cast<void>(folder);
+    } else if (result == gf::DialogResult::none) {
+        // Without a host, dialog.status().error is gf::HostServiceError::unsupported.
+    }
+}
+}  // namespace doc_example_FolderBrowserDialog_1
 
 namespace doc_example_FontCommand_1 {
 void example() {
@@ -3997,6 +4029,7 @@ int main() {
     failures += run("ChoiceGroup example 1", &doc_example_ChoiceGroup_1::example);
     failures += run("ChoiceGroup example 2", &doc_example_ChoiceGroup_2::example);
     failures += run("ColorCommand example 1", &doc_example_ColorCommand_1::example);
+    failures += run("ColorDialog example 1", &doc_example_ColorDialog_1::example);
     failures += run("ColorValueEditor example 1", &doc_example_ColorValueEditor_1::example);
     failures += run("ColorValueEditor example 2", &doc_example_ColorValueEditor_2::example);
     failures += run("ComboBox example 1", &doc_example_ComboBox_1::example);
@@ -4043,6 +4076,7 @@ int main() {
     failures += run("FlagsValueEditor example 2", &doc_example_FlagsValueEditor_2::example);
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
+    failures += run("FolderBrowserDialog example 1", &doc_example_FolderBrowserDialog_1::example);
     failures += run("FontCommand example 1", &doc_example_FontCommand_1::example);
     failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
     failures += run("GalleryCommand example 1", &doc_example_GalleryCommand_1::example);

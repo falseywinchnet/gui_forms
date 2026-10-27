@@ -151,6 +151,7 @@ add_library(gui_forms_core STATIC
     src/core/theme/owner_draw/owner_draw.cpp
     src/core/engine/types/engine_types.cpp
     src/core/engine/engine_math/engine_math.cpp
+    src/core/engine/authored_gradient/authored_gradient.cpp
     src/core/engine/engine_expression/engine_expression.cpp
     src/core/engine/primitive_registry/primitive_registry.cpp
     src/core/engine/feature_samples/engine_feature_samples.cpp
@@ -190,6 +191,7 @@ add_library(gui_forms_core STATIC
     src/core/text/unicode/unicode_grapheme.cpp
     src/core/typography/resolution/typography_resolution.cpp
     src/core/layout/types/layout_types.cpp
+    src/core/layout/style_reader/layout_style_reader.cpp
     src/core/metrics/metrics/metrics.cpp
     src/core/metrics/snapshot/metrics_snapshot.cpp
     src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp
@@ -218,6 +220,8 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/selector/theme_selector.cpp
     src/core/theme_language/custom_properties/theme_custom_properties.cpp
     src/core/theme_language/value/theme_value.cpp
+    src/core/theme_language/material/theme_material_lowering.cpp
+    src/core/theme_language/motion/theme_motion_lowering.cpp
     src/core/theme_language/compiler/theme_compiler.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
@@ -627,6 +631,8 @@ add_library(gui_forms_controls STATIC
     src/controls/file_dialog/file_dialog_types.cpp
     src/controls/open_file_dialog/open_file_dialog.cpp
     src/controls/save_file_dialog/save_file_dialog.cpp
+    src/controls/color_dialog/color_dialog.cpp
+    src/controls/folder_browser_dialog/folder_browser_dialog.cpp
     src/controls/thread_exception_dialog/thread_exception_dialog.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
@@ -1086,6 +1092,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         src/host/macos/services/appkit_host_services.mm
         src/host/macos/services/appkit_clipboard_image.mm
         src/host/macos/services/appkit_status_items.mm
+        src/host/macos/compositor/macos_compositor.mm
     )
     target_include_directories(gui_forms_host_macos PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/macos
@@ -1178,6 +1185,8 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     add_library(gui_forms_host_linux STATIC
         src/host/linux/application/linux_host.cpp
         src/host/linux/application/x11_windowing.cpp
+        src/host/linux/settings/xsettings_parse.cpp
+        src/host/linux/settings/xsettings_watch.cpp
         src/host/linux/accessibility/linux_accessibility.cpp
         src/host/linux/services/linux_services.cpp
         src/host/linux/services/x11_tray_icons.cpp
@@ -2174,6 +2183,17 @@ if(GUI_FORMS_BUILD_TESTS)
             add_test(NAME gui_forms_linux_compositor_tests COMMAND gui_forms_linux_compositor_tests)
             set_tests_properties(gui_forms_linux_compositor_tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
         endif()
+        if(GUI_FORMS_ENABLE_MACOS_HOST)
+            # Stage T5, phase C3's gate: a non-opaque window over a green
+            # backdrop, read back from AppKit and off the composed screen.
+            # Serial: it floats its windows over the desktop while it reads.
+            add_executable(gui_forms_macos_compositor_tests tests/macos_compositor_tests.mm)
+            target_compile_options(gui_forms_macos_compositor_tests PRIVATE -fobjc-arc)
+            target_link_libraries(gui_forms_macos_compositor_tests PRIVATE gui_forms_application
+                ${GUI_FORMS_APPKIT} ${GUI_FORMS_COREGRAPHICS})
+            add_test(NAME gui_forms_macos_compositor_tests COMMAND gui_forms_macos_compositor_tests)
+            set_tests_properties(gui_forms_macos_compositor_tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+        endif()
         # Stage DK W0 measurement (results/2026-10-18-dk-w0-capture-drag/): it
         # puts windows on the desktop, so it is built but never run by ctest.
         add_executable(gui_forms_frame_drag_probe tests/frame_drag_probe.cpp)
@@ -2259,6 +2279,13 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_windows_text_tests PRIVATE
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_text_tests COMMAND gui_forms_windows_text_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        add_executable(gui_forms_windows_backplane_replay_tests tests/windows_backplane_replay_tests.cpp)
+        target_compile_definitions(gui_forms_windows_backplane_replay_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_backplane_replay_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_backplane_replay_tests COMMAND gui_forms_windows_backplane_replay_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         add_executable(gui_forms_windows_part_composite_tests tests/windows_part_composite_tests.cpp)
         target_compile_definitions(gui_forms_windows_part_composite_tests PRIVATE
@@ -2442,6 +2469,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_material_tests tests/engine_material_tests.cpp)
     target_link_libraries(gui_forms_engine_material_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_material_tests COMMAND gui_forms_engine_material_tests)
+    add_executable(gui_forms_engine_authored_material_tests tests/engine_authored_material_tests.cpp)
+    target_link_libraries(gui_forms_engine_authored_material_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_authored_material_tests COMMAND gui_forms_engine_authored_material_tests)
+    add_executable(gui_forms_engine_recipe_field_tests tests/engine_recipe_field_tests.cpp)
+    target_link_libraries(gui_forms_engine_recipe_field_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_recipe_field_tests COMMAND gui_forms_engine_recipe_field_tests)
     add_executable(gui_forms_engine_procedural_tests tests/engine_procedural_tests.cpp)
     target_link_libraries(gui_forms_engine_procedural_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_procedural_tests COMMAND gui_forms_engine_procedural_tests)
@@ -2456,6 +2489,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_glass_tests tests/engine_glass_tests.cpp)
     target_link_libraries(gui_forms_engine_glass_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_glass_tests COMMAND gui_forms_engine_glass_tests)
+    add_executable(gui_forms_engine_backdrop_tests tests/engine_backdrop_tests.cpp)
+    target_link_libraries(gui_forms_engine_backdrop_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_backdrop_tests COMMAND gui_forms_engine_backdrop_tests)
+    add_executable(gui_forms_engine_backplane_replay_tests tests/engine_backplane_replay_tests.cpp)
+    target_link_libraries(gui_forms_engine_backplane_replay_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_backplane_replay_tests COMMAND gui_forms_engine_backplane_replay_tests)
     add_executable(gui_forms_engine_light_tests tests/engine_light_tests.cpp)
     target_link_libraries(gui_forms_engine_light_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_light_tests COMMAND gui_forms_engine_light_tests)
@@ -2606,6 +2645,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_compiler_tests tests/theme_language/theme_compiler_tests.cpp)
     target_link_libraries(gui_forms_theme_compiler_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_theme_compiler_tests COMMAND gui_forms_theme_compiler_tests)
+    add_executable(gui_forms_theme_material_css_tests tests/theme_language/theme_material_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_material_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_material_css_tests COMMAND gui_forms_theme_material_css_tests)
+    add_executable(gui_forms_theme_motion_css_tests tests/theme_language/theme_motion_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_motion_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_motion_css_tests COMMAND gui_forms_theme_motion_css_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
@@ -2823,6 +2868,11 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_key_commands_tests tests/key_commands_tests.cpp)
     target_link_libraries(gui_forms_key_commands_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_key_commands_tests COMMAND gui_forms_key_commands_tests)
+    # The X11 host's XSETTINGS parser takes plain bytes and no Xlib, so it is
+    # tested on every platform.
+    add_executable(gui_forms_xsettings_parse_tests
+        tests/xsettings_parse_tests.cpp src/host/linux/settings/xsettings_parse.cpp)
+    add_test(NAME gui_forms_xsettings_parse_tests COMMAND gui_forms_xsettings_parse_tests)
     add_executable(gui_forms_page_view_document_tests tests/page_view_document_tests.cpp)
     target_link_libraries(gui_forms_page_view_document_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_page_view_document_tests COMMAND gui_forms_page_view_document_tests)
@@ -2939,6 +2989,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_save_file_dialog_tests tests/save_file_dialog_tests.cpp)
     target_link_libraries(gui_forms_save_file_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_save_file_dialog_tests COMMAND gui_forms_save_file_dialog_tests)
+    add_executable(gui_forms_color_dialog_tests tests/color_dialog_tests.cpp)
+    target_link_libraries(gui_forms_color_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_color_dialog_tests COMMAND gui_forms_color_dialog_tests)
+    add_executable(gui_forms_folder_browser_dialog_tests tests/folder_browser_dialog_tests.cpp)
+    target_link_libraries(gui_forms_folder_browser_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_folder_browser_dialog_tests COMMAND gui_forms_folder_browser_dialog_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)
@@ -2974,6 +3030,15 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_layout_contract_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_layout_contract_tests
              COMMAND gui_forms_layout_contract_tests)
+
+    # Stage L, phase L2: the layout style reader, against its conformance
+    # table and the layout corpus's style attributes.
+    add_executable(gui_forms_layout_style_tests
+        tests/layout_style_tests.cpp
+    )
+    target_link_libraries(gui_forms_layout_style_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_layout_style_tests
+             COMMAND gui_forms_layout_style_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/layout_corpus)
 
     add_executable(gui_forms_layout_panel_tests
         tests/layout_panel_tests.cpp
@@ -3685,6 +3750,11 @@ if(GUI_FORMS_BUILD_TESTS)
             target_compile_definitions(gui_forms_text_identity_raster_tests PRIVATE
                 GUI_FORMS_TEST_CONTROL_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf")
             add_test(NAME gui_forms_text_identity_raster_tests COMMAND gui_forms_text_identity_raster_tests)
+            add_executable(gui_forms_backplane_replay_identity_tests tests/backplane_replay_identity_tests.cpp)
+            target_link_libraries(gui_forms_backplane_replay_identity_tests PRIVATE gui_forms_controls gui_forms_skia)
+            target_compile_definitions(gui_forms_backplane_replay_identity_tests PRIVATE
+                GUI_FORMS_TEST_CONTENT_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf")
+            add_test(NAME gui_forms_backplane_replay_identity_tests COMMAND gui_forms_backplane_replay_identity_tests)
         endif()
         add_executable(gui_forms_retained_draw_cache_raster_tests tests/retained_draw_cache_raster_tests.cpp)
         target_link_libraries(gui_forms_retained_draw_cache_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
@@ -4092,6 +4162,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
 endif()
 
 if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
+    add_executable(gui_forms_windows_input_settings_tests tests/windows_input_settings_tests.cpp)
+    target_link_libraries(gui_forms_windows_input_settings_tests PRIVATE GUIForms::Application)
+    add_test(NAME gui_forms_windows_input_settings_tests COMMAND gui_forms_windows_input_settings_tests)
+    set_tests_properties(gui_forms_windows_input_settings_tests PROPERTIES TIMEOUT 60)
     add_executable(gui_forms_windows_accessibility_tests tests/windows_accessibility_tests.cpp)
     target_link_libraries(gui_forms_windows_accessibility_tests PRIVATE GUIForms::Application oleacc uiautomationcore oleaut32 uuid)
     add_test(NAME gui_forms_windows_accessibility_tests COMMAND gui_forms_windows_accessibility_tests)

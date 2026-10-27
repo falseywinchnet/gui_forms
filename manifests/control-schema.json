@@ -18,7 +18,7 @@
     "semantic_fields": ["position_in_set", "set_size", "has_popup", "controlled_panel", "orientation", "level", "modal", "row_index", "column_index", "row_count", "column_count", "access_key", "small_step", "large_step", "text_selection", "multiline"]
   },
   "engine": {
-    "version": "0.2",
+    "version": "0.3",
     "cascade_levels": ["built_in", "theme_sheet", "class_rule", "stable_id_rule", "inline_style", "forced_high_contrast"],
     "budgets": {"operations_per_device_pixel": 512, "animated_operations_per_frame": 4000000},
     "primitives": [
@@ -197,7 +197,7 @@
         "cost": {"per_device_pixel": 512, "fixed": 64, "preparation_per_device_pixel": 0},
         "outsets": [8, 8, 8, 8],
         "parameters": [
-          {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip", "link", "visited_link"], "default": "button", "animated": false},
+          {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip", "link", "visited_link", "family"], "default": "family", "animated": false},
           {"name": "shape", "kind": "choice", "choices": ["rounded_rectangle", "pill", "circle", "cap_start", "cap_end"], "default": "rounded_rectangle", "animated": false}
         ]
       },
@@ -1418,7 +1418,8 @@
         {"name": "vertical_scroll_bar", "role": "track", "composed_from": "v_scroll_bar", "states": []},
         {"name": "horizontal_scroll_bar", "role": "track", "composed_from": "h_scroll_bar", "states": []},
         {"name": "scroll_corner", "role": "face", "composed_from": null, "states": []},
-        {"name": "focus", "role": "focus", "composed_from": null, "states": []}
+        {"name": "focus", "role": "focus", "composed_from": null, "states": []},
+        {"name": "insertion_mark", "role": "drop", "composed_from": null, "states": ["drop_accepted"]}
       ],
       "states": ["normal", "enabled", "disabled", "focused", "focus_visible"],
       "custom_states": [],
@@ -1495,6 +1496,7 @@
         {"name": "focus_observed", "payload": "bool", "mutable_payload": false},
         {"name": "arranged_bounds_changed", "payload": "Rect", "mutable_payload": false},
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
+        {"name": "draw_item_content", "payload": "ItemContentPaint", "mutable_payload": true},
         {"name": "selection_changed", "payload": "ListViewSelectionChange", "mutable_payload": false},
         {"name": "item_activated", "payload": "ListViewItemActivation", "mutable_payload": false},
         {"name": "item_checking", "payload": "ListViewItemCheck", "mutable_payload": true},
@@ -3398,6 +3400,7 @@
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
         {"name": "scroll", "payload": "ScrollEvent", "mutable_payload": true},
         {"name": "auto_validate_changed", "payload": "AutoValidate", "mutable_payload": false},
+        {"name": "draw_item_content", "payload": "ItemContentPaint", "mutable_payload": true},
         {"name": "selected_index_changed", "payload": "TabSelectionChange", "mutable_payload": false}
       ]
     },
@@ -3475,6 +3478,7 @@
         {"name": "focus_observed", "payload": "bool", "mutable_payload": false},
         {"name": "arranged_bounds_changed", "payload": "Rect", "mutable_payload": false},
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
+        {"name": "draw_item_content", "payload": "ItemContentPaint", "mutable_payload": true},
         {"name": "page_invoked", "payload": "PageInvocation", "mutable_payload": false},
         {"name": "page_close_requested", "payload": "PageCloseRequest", "mutable_payload": true},
         {"name": "page_pin_requested", "payload": "PagePinRequest", "mutable_payload": true},
@@ -5689,6 +5693,18 @@
       "interactions": [
         {"name": "closed", "payload": "DialogResult", "mutable_payload": false}
       ]
+    },
+    {
+      "id": "folder_browser_dialog",
+      "type": "FolderBrowserDialog",
+      "kind": "component",
+      "interactions": []
+    },
+    {
+      "id": "color_dialog",
+      "type": "ColorDialog",
+      "kind": "component",
+      "interactions": []
     },
     {
       "id": "tool_tip",

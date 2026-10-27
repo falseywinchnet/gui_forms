@@ -21,7 +21,9 @@ sphinx-build -W -b html docs docs/_build/html
 
 Open `docs/_build/html/index.html`. `docs/_build/` is ignored by Git. Always
 build with `-W`: Read the Docs (`.readthedocs.yaml`, `fail_on_warning: true`)
-and the `docs` job in `.github/workflows/native.yml` do. Add `--keep-going` to
+and the `docs` job in `.github/workflows/native.yml` do. Read the Docs builds
+only after CI passes on `main` (`.github/workflows/docs-publish.yml`; see
+"Documentation site" in `release/index.md`). Add `--keep-going` to
 see every warning in one run. `docs/requirements.txt` pins the versions the
 site is checked with.
 
