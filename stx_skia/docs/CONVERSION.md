@@ -71,11 +71,11 @@ The three temporary corner-array call sites in SkMatrix.h, SkMatrix.cpp and
 SkDevice.cpp now bind named arrays before forming views. Those files are only
 adapted here; they are not marked as fully converted.
 
-The spelling checker reports four compatibility declarations in these headers:
+The spelling checker reported four compatibility declarations in these headers:
 `sk_sp::operator->` and three class-template deduction guides. They are not member
-arrow expressions or trailing-return function definitions. The operator remains
-needed by unconverted source; its removal and explicit template spelling at
-remaining callers are tracked as outstanding, without suppressing the checker.
+arrow expressions or trailing-return function definitions. `sk_sp::operator->` was
+removed later, as API item 11 ("Arrow operator removed"). The deduction guides remain
+outstanding, and the checker is not suppressed for them.
 
 The lvalue-container constructor now constrains participation through a private
 trait requiring data, an integral count and compatible element-pointer access.
@@ -1859,6 +1859,17 @@ asserts in debug builds, but the value is pinned. The comment now states the act
 `paint`'s `alpha_pinning` checks each of these on both profiles. GUI.Forms passes
 `std::clamp(opacity, 0, 1)`, which keeps NaN, so a NaN opacity reaches the paint as 0.
 
+## Arrow operator removed
+
+API item 11 (house style §10). `sk_sp::operator->` was a compatibility remnant: the house style
+spells member access through a pointer as `(*pointer).member`. The owner approved removing it
+(decision 4).
+
+One site used the operator: `SkColorSpace::serialize`, which now spells
+`(*data).writable_data()`. A full build of the candidate and of GUI.Forms' Skia tree found no
+other use. Two allowance entries each drop by one finding: `SkRefCnt.h` and
+`SkColorSpace.cpp`.
+
 ## Still required
 
 Refreshed 2026-10-27 after the support leftovers. The whole-library AST inventory counts 249
@@ -1873,8 +1884,8 @@ conversion evidence. Each unit also fixes defects, as before.
 - **Memory, containers and support code.** `SkRandom`, `SkChecksum`, time, CPU detection,
   debug and assertion helpers (`SkAssert.h`, `SkDebug`, `SkLog`), the OS file ports, and the
   base headers (`SkTypes.h`, `SkFeatures.h`, `SkMacros.h`, `SkAttributes.h`). Also the
-  compatibility remnants: `sk_sp::operator->`, the `SkRefCnt` deduction guides and trailing
-  return, and the `SkSpan` traits.
+  compatibility remnants: the `SkRefCnt` deduction guides and trailing return, and the
+  `SkSpan` traits (`sk_sp::operator->` is removed: API item 11).
 - **Shaders and colour (about 180).** skcms (`Transform_inl.h`, `skcms_public.h`),
   `SkColorSpace`, `SkColor`, `SkBlendMode`, and the triangle-colour and Perlin-noise shaders.
   GUI.Forms does not call the Perlin-noise shader.
