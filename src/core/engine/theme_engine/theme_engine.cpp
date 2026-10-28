@@ -153,7 +153,19 @@ struct PartTransitionSources final {
     PartRecordHandle handle{};
     std::shared_ptr<Control> owner{};
     AnatomyStateSet states{};
+    // The serial of the compiled rules the transitions belong to.
+    std::uint64_t rules_serial{};
+    // The part's em, where a transition's value is in em (T3 P8c); else 0.
+    double em{};
 };
+
+// Whether a resolved transition's value is in em (P8c).
+bool transitions_read_em(const CompiledThemeRules::Resolution& resolution) noexcept {
+    for (std::size_t index = 0; index < resolution.transition_count; ++index) {
+        if ((*resolution.transitions[index]).reads_em) return true;
+    }
+    return false;
+}
 
 using CompiledTransition = CompiledThemeRules::CompiledTransition;
 
@@ -299,7 +311,12 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
         if (transition.property == PresentationProperty::face && motion == nullptr) continue;
         const PropertyRange range = property_range(transition, descriptor);
         const std::optional<std::size_t> state = machine_state(transition, sources.states);
-        const double target = state ? transition.states[*state].target : rest_value(transition, parameters);
+        // A value in em is taken at the part's em (P8c).
+        double target = rest_value(transition, parameters);
+        if (state) {
+            const CompiledThemeRules::CompiledPresentationState& held = transition.states[*state];
+            target = held.target + sources.em * held.target_em;
+        }
         if (motion == nullptr) {
             show_value(transition, target, range, parameters, presented);
             continue;
@@ -337,10 +354,18 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
             continue;
         }
         std::optional<double> entry{};
+        std::array<MotionStop, maximum_motion_stops> taken{};
         std::span<const MotionStop> stops{};
         if (state) {
-            entry = transition.states[*state].enter_from;
-            stops = transition.states[*state].stops;
+            const CompiledThemeRules::CompiledPresentationState& held = transition.states[*state];
+            if (held.enter_from) entry = *held.enter_from + sources.em * held.enter_from_em;
+            const std::size_t count = std::min(held.stops.size(), maximum_motion_stops);
+            for (std::size_t stop = 0; stop < count; ++stop) {
+                taken[stop] = held.stops[stop];
+                taken[stop].value = held.stops[stop].value + sources.em * held.stops[stop].value_em;
+                taken[stop].value_em = 0.0;
+            }
+            stops = std::span<const MotionStop>(taken.data(), count);
         }
         // Whether the move into the state begins this paint, so that its
         // stops (E9.6) play: on appearing from an entry value, or on a
@@ -351,6 +376,8 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
             // it has one, else at its target.
             channel.property = transition.property;
             channel.parameter = transition.parameter;
+            channel.rules_serial = sources.rules_serial;
+            channel.machine = transition.machine;
             channel.state = state;
             const double initial = entry ? *entry : target;
             channel.value.emplace(*sources.owner, transition.curve, initial);
@@ -360,11 +387,17 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
             entering = entry.has_value();
         } else {
             (*channel.value).set_curve(transition.curve);
-            if (channel.state != state) {
+            // Another machine of the same rules (another rule's) is another
+            // state, even at the same position.
+            const bool other_machine =
+                channel.rules_serial == sources.rules_serial && channel.machine != transition.machine;
+            if (channel.state != state || other_machine) {
                 channel.state = state;
                 if (entry) (*channel.value).jump_to(*entry);
                 entering = true;
             }
+            channel.rules_serial = sources.rules_serial;
+            channel.machine = transition.machine;
         }
         MotionValue& value = *channel.value;
         if (entering && !stops.empty()) {
@@ -652,9 +685,11 @@ constexpr double built_in_group_margin = 4.0;
 // Whether `assembled` was assembled from `floor` and the winning fields of
 // `resolution` in the compiled rules numbered `rules_serial`.
 bool same_assembly(const AssembledPartMaterial& assembled, std::uint64_t rules_serial, const SurfaceMaterial& floor,
-                   Size box, const CompiledThemeRules::Resolution& resolution) noexcept {
+                   Size box, MaterialAssemblyContext context,
+                   const CompiledThemeRules::Resolution& resolution) noexcept {
     if (assembled.rules_serial != rules_serial || assembled.fields != resolution.materials) return false;
-    if (!(assembled.box == box)) return false;
+    if (!(assembled.box == box) || assembled.em != context.em) return false;
+    if (!(assembled.current_colour == context.current_colour)) return false;
     const bool same_floor = assembled.floor == floor;
     return same_floor;
 }
@@ -664,29 +699,31 @@ bool same_assembly(const AssembledPartMaterial& assembled, std::uint64_t rules_s
 // a part without a record, `unkept`, assembled for this paint. Each
 // assembly is counted. The result is borrowed from `kept` or `unkept`.
 const SurfaceMaterial& authored_material(EnginePartRecord* kept, std::uint64_t rules_serial,
-                                         const SurfaceMaterial& floor, Rect box,
+                                         const SurfaceMaterial& floor, Rect box, MaterialAssemblyContext context,
                                          const CompiledThemeRules::Resolution& resolution,
                                          std::optional<SurfaceMaterial>& unkept, Metrics& metrics) {
     // The box keys the assembly only where a field reads it, so that a
-    // resize assembles nothing new otherwise.
+    // resize assembles nothing new otherwise; so does the em (P8c).
     const Size size{box.width, box.height};
     const Size keyed = material_fields_read_box(resolution.materials) ? size : Size{};
     if (kept == nullptr) {
         unkept.emplace();
-        assemble_material(floor, resolution.materials, size, *unkept);
+        assemble_material(floor, resolution.materials, size, context, *unkept);
         metrics.record_engine_material_assembly();
         return *unkept;
     }
     std::unique_ptr<AssembledPartMaterial>& held = (*kept).assembled_material;
-    if (held != nullptr && same_assembly(*held, rules_serial, floor, keyed, resolution)) {
+    if (held != nullptr && same_assembly(*held, rules_serial, floor, keyed, context, resolution)) {
         return (*held).material;
     }
     if (held == nullptr) held = std::make_unique<AssembledPartMaterial>();
     (*held).rules_serial = rules_serial;
     (*held).fields = resolution.materials;
     (*held).box = keyed;
+    (*held).em = context.em;
+    (*held).current_colour = context.current_colour;
     (*held).floor = floor;
-    assemble_material(floor, resolution.materials, size, (*held).material);
+    assemble_material(floor, resolution.materials, size, context, (*held).material);
     metrics.record_engine_material_assembly();
     return (*held).material;
 }
@@ -710,6 +747,53 @@ void paint_built_in(Painter& painter, const Control& control, const PartPaint& p
 
 } // namespace
 
+MediaFacts window_media_facts(const Window& window) noexcept {
+    const PresentationSettings& settings = window.presentation_settings();
+    MediaFacts facts{};
+    facts.dark_scheme = settings.colour_scheme == ColourScheme::dark;
+    facts.forced_colours = settings.high_contrast;
+    facts.reduced_motion = settings.reduced_motion;
+    facts.resolution = window.scale();
+    return facts;
+}
+
+TextRole resolved_text_role(const Control& control, FontDeclaration font) {
+    // Each step reads one control's own rules; the tree is finite, so the
+    // walk ends at the root.
+    Control::Ptr parent = control.parent();
+    while (font.inherit) {
+        if (parent == nullptr) return TextRole::ui;
+        const Control& above = *parent;
+        CompiledThemeRules::PartFacts facts{};
+        facts.control_type = above.anatomy().control_id;
+        facts.stable_id = above.stable_id().value();
+        facts.classes = above.classes();
+        facts.states = above.anatomy_states();
+        const Window* const window = above.attached_window();
+        if (window != nullptr) facts.media = window_media_facts(*window);
+        font = above.effective_theme().engine().rules().resolve(facts).font;
+        parent = above.parent();
+    }
+    return font.role;
+}
+
+double text_role_em(const Control& control, TextRole role) noexcept {
+    const ThemeTypographyTokens& tokens = control.effective_theme().structure().typography;
+    double size = tokens.control.size;
+    switch (role) {
+    case TextRole::ui: size = tokens.control.size; break;
+    case TextRole::field: size = tokens.field.size; break;
+    case TextRole::caption: size = tokens.caption.size; break;
+    case TextRole::heading: size = tokens.heading.size; break;
+    case TextRole::title: size = tokens.title.size; break;
+    case TextRole::monospace: size = tokens.monospace.size; break;
+    case TextRole::count:
+    default: break; // Not a role: the ui role's size.
+    }
+    const double em = size * control.effective_text_scale();
+    return em;
+}
+
 ThemeEngine::ThemeEngine() : ThemeEngine(ThemeRuleSheet{}) {}
 
 ThemeEngine::ThemeEngine(const ThemeRuleSheet& sheet)
@@ -731,12 +815,26 @@ ThemeEngine::PartPlan ThemeEngine::plan(const Control& control, const PartPaint&
     if (part.key) facts.part = (*part.key).part;
     facts.role = part.role;
     facts.states = part.states;
+    facts.media = window_media_facts(*window);
     result.resolution = rules_.resolve(facts);
     if (result.resolution.outcome == CompiledThemeRules::Outcome::role_mismatch) {
         result.drawing = PartDrawing::role_mismatch;
         return result;
     }
     if (result.resolution.outcome != CompiledThemeRules::Outcome::primitive) return result;
+    if (result.resolution.parameters_read_em) {
+        // A number parameter in em, at the part's em within its range (P8c).
+        const double em = text_role_em(control, resolved_text_role(control, result.resolution.font));
+        const PrimitiveDescriptor& described = (*result.resolution.primitive).descriptor();
+        for (std::size_t index = 0; index < result.resolution.parameters.count; ++index) {
+            const double coefficient = result.resolution.parameter_em[index];
+            if (coefficient == 0.0 || index >= described.parameters.size()) continue;
+            const PrimitiveParameterDeclaration& declared = described.parameters[index];
+            PrimitiveParameterValue& value = result.resolution.parameters.values[index];
+            const double taken = value.number + em * coefficient;
+            value.number = std::min(std::max(taken, declared.minimum), declared.maximum);
+        }
+    }
     // The engine's own last pass (CascadeLevel::forced_high_contrast).
     const ControlVisualContext context = part_visual_context(control, part.states);
     if (context.high_contrast) {
@@ -869,6 +967,10 @@ void ThemeEngine::paint_planned(Painter& painter, const Control& control, const 
     if (record) transitions.handle = *record;
     if (kept != nullptr) transitions.owner = (*window).find(control.stable_id().value());
     transitions.states = part.states;
+    transitions.rules_serial = rules_.serial();
+    if (transitions_read_em(resolution)) {
+        transitions.em = text_role_em(control, resolved_text_role(control, resolution.font));
+    }
     if (!primitive_draws) {
         if (kept != nullptr) stop_ambient(*window, *kept, *record);
         PrimitiveParameterBlock unused{};
@@ -986,8 +1088,19 @@ void ThemeEngine::paint_planned(Painter& painter, const Control& control, const 
         const ControlVisualRecipe& recipe = control.effective_theme().resolve(*material_role, context);
         request.target.material = &recipe.material;
         if (resolution.materials_authored) {
+            // The part's em and text colour, where a field reads them (P8c).
+            MaterialAssemblyContext relative{};
+            if (material_fields_read_em(resolution.materials)) {
+                relative.em = text_role_em(control, resolved_text_role(control, resolution.font));
+            }
+            if (material_fields_read_current_colour(resolution.materials)) {
+                const Theme& theme = control.effective_theme();
+                const ResolvedControlRecipe text = theme.resolve(control, part.family, context, part.states);
+                relative.current_colour = text.recipe().text;
+            }
             request.target.material = &authored_material(kept, rules_.serial(), recipe.material, part.bounds,
-                                                         resolution, unkept_material, (*window).metrics());
+                                                         relative, resolution, unkept_material,
+                                                         (*window).metrics());
         }
         request.target.corner_radius = part.corner_radius;
         request.target.images = &(*window).image_resources();

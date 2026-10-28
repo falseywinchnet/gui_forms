@@ -760,7 +760,7 @@ struct ValueCodeCase final {
 };
 
 void test_value_codes() {
-    const std::array<ValueCodeCase, 12> cases{{
+    const std::array<ValueCodeCase, 13> cases{{
         {DiagnosticCode::value_syntax, "E401", "value_syntax", DiagnosticSeverity::error},
         {DiagnosticCode::value_wrong_kind, "E402", "value_wrong_kind", DiagnosticSeverity::error},
         {DiagnosticCode::value_out_of_range, "E403", "value_out_of_range", DiagnosticSeverity::error},
@@ -770,6 +770,7 @@ void test_value_codes() {
         {DiagnosticCode::expression_invalid, "E408", "expression_invalid", DiagnosticSeverity::error},
         {DiagnosticCode::variable_undefined, "E409", "variable_undefined", DiagnosticSeverity::error},
         {DiagnosticCode::variable_cycle, "E410", "variable_cycle", DiagnosticSeverity::error},
+        {DiagnosticCode::keyframes_undefined, "E411", "keyframes_undefined", DiagnosticSeverity::error},
         {DiagnosticCode::resource_unknown, "E413", "resource_unknown", DiagnosticSeverity::error},
         {DiagnosticCode::unknown_property, "W101", "unknown_property", DiagnosticSeverity::warning},
         {DiagnosticCode::property_not_admitted, "W107", "property_not_admitted", DiagnosticSeverity::warning},

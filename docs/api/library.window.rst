@@ -742,6 +742,10 @@ Related types
 
       Default: ``{SettingOrigin::default_value}``.
 
+   .. cpp:member:: ColourScheme colour_scheme
+
+      The preferred colour scheme (EC3). A change re-resolves every part: a theme's rules may hold for one scheme only. Default: ``{ColourScheme::light}``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PresentedArea final
@@ -780,6 +784,16 @@ Related types
 
 Enumerations
 ------------
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ColourScheme
+
+   ``#include <gui_forms/window/presentation/presentation_types.hpp>``
+
+   .. cpp:enumerator:: light
+
+   .. cpp:enumerator:: dark
 
 .. cpp:namespace:: gui_forms
 

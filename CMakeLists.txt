@@ -203,6 +203,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/part_raster/part_raster.cpp
     src/core/engine/theme_engine/theme_engine.cpp
     src/core/engine/theme_rules/theme_rules.cpp
+    src/core/engine/theme_rules/colour_roles.cpp
     src/core/engine/theme_rules/built_in_rules.cpp
     src/core/engine/motion_value/motion_value.cpp
     src/core/engine/motion_clock/motion_clock.cpp
@@ -259,6 +260,7 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/value/theme_value.cpp
     src/core/theme_language/material/theme_material_lowering.cpp
     src/core/theme_language/motion/theme_motion_lowering.cpp
+    src/core/theme_language/media/theme_media_query.cpp
     src/core/theme_language/compiler/theme_compiler.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
@@ -2694,6 +2696,18 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_motion_css_tests tests/theme_language/theme_motion_css_tests.cpp)
     target_link_libraries(gui_forms_theme_motion_css_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_theme_motion_css_tests COMMAND gui_forms_theme_motion_css_tests)
+    add_executable(gui_forms_theme_animation_css_tests tests/theme_language/theme_animation_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_animation_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_animation_css_tests COMMAND gui_forms_theme_animation_css_tests)
+    add_executable(gui_forms_theme_media_css_tests tests/theme_language/theme_media_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_media_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_media_css_tests COMMAND gui_forms_theme_media_css_tests)
+    add_executable(gui_forms_theme_colour_role_css_tests tests/theme_language/theme_colour_role_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_colour_role_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_colour_role_css_tests COMMAND gui_forms_theme_colour_role_css_tests)
+    add_executable(gui_forms_theme_em_font_css_tests tests/theme_language/theme_em_font_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_em_font_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_em_font_css_tests COMMAND gui_forms_theme_em_font_css_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
@@ -4116,7 +4130,9 @@ if(GUI_FORMS_BUILD_FUZZERS)
         src/core/theme_language/syntax_tree/theme_sheet_parser.cpp
         src/core/theme_language/custom_properties/theme_custom_properties.cpp
         src/core/theme_language/value/theme_value.cpp
+        src/core/theme_language/media/theme_media_query.cpp
         src/core/engine/engine_expression/engine_expression.cpp
+        src/core/engine/theme_rules/colour_roles.cpp
         src/core/anatomy/types/anatomy_types.cpp
         src/core/schema/types/schema_types.cpp
         src/core/xml/xml_characters/xml_characters.cpp

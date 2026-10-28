@@ -139,6 +139,19 @@ struct MaterialLoweringProblem final {
 // One declaration's lowering, caller-owned and reused: a lowering
 // replaces the contents and keeps the capacity.
 struct MaterialLowering final {
+    // What the lowering reads an em length as, in logical units (P8c): the
+    // compiler lowers a value with em lengths at 0 and at 1, and the
+    // difference of each length is its em coefficient; with
+    // `keep_gradients`, no gradient is resolved at the lowering, so that
+    // each keeps its lengths.
+    double em{};
+    bool keep_gradients{};
+    // What the lowering reads CSS's currentcolor as (written, or a shadow's
+    // or a glow's default): the compiler lowers again at another colour, and
+    // the colours that differ are current; `read_current_colour` says the
+    // lowering read it.
+    Color current_colour{Color::rgba(0, 0, 0, 255)};
+    bool read_current_colour{};
     MaterialLoweringOutcome outcome{MaterialLoweringOutcome::refused};
     std::vector<MaterialDeclaration> declarations{};
     // A recipe property's fields.

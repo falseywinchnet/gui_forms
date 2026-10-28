@@ -1,5 +1,6 @@
 #include "../src/core/theme_language/custom_properties/theme_custom_properties.hpp"
 #include "../src/core/theme_language/diagnostics/theme_diagnostics.hpp"
+#include "../src/core/theme_language/media/theme_media_query.hpp"
 #include "../src/core/theme_language/source_text/theme_source_text.hpp"
 #include "../src/core/theme_language/syntax_tree/theme_syntax_tree.hpp"
 #include "../src/core/theme_language/tokenizer/theme_tokenizer.hpp"
@@ -195,6 +196,47 @@ void read_values(const theme_language::ThemeSource& source, const theme_language
     }
 }
 
+// Reads every @media prelude (P8). A refusal names a token of the prelude;
+// a read list has at least one query, each unknown feature names a token
+// of the prelude, every resolution bound is above zero, and a second read
+// gives the same queries.
+void read_media(const theme_language::ThemeSource& source, const theme_language::ThemeTokenBuffer& buffer,
+                const theme_language::ThemeSyntaxTree& tree) {
+    std::vector<theme_language::MediaQuery> queries{};
+    std::vector<theme_language::MediaQuery> again{};
+    for (const theme_language::SyntaxNode& node : tree.nodes) {
+        if (node.kind != theme_language::SyntaxNodeKind::media_rule) continue;
+        theme_language::MediaQueryProblem problem{};
+        const theme_language::MediaQueryOutcome read =
+            theme_language::read_media_queries(source.text, buffer, node.content, queries, problem);
+        if (read == theme_language::MediaQueryOutcome::refused) {
+            if (problem.token < node.content.first.value || problem.token >= node.content.end.value) {
+                fail("a media refusal names a token of the prelude");
+            }
+            continue;
+        }
+        if (queries.empty()) fail("a read media list has a query");
+        for (const theme_language::MediaQuery& query : queries) {
+            const bool inside =
+                query.unknown_token >= node.content.first.value && query.unknown_token < node.content.end.value;
+            if (query.unknown_feature && !inside) fail("an unknown feature names a token of the prelude");
+            const gui_forms::MediaCondition& condition = query.condition;
+            const bool low_valid = !condition.minimum_resolution || *condition.minimum_resolution > 0.0;
+            const bool high_valid = !condition.maximum_resolution || *condition.maximum_resolution > 0.0;
+            if (!low_valid || !high_valid) fail("a read resolution bound is above zero");
+        }
+        theme_language::MediaQueryProblem second{};
+        static_cast<void>(theme_language::read_media_queries(source.text, buffer, node.content, again, second));
+        bool same = again.size() == queries.size();
+        for (std::size_t index = 0U; same && index < queries.size(); ++index) {
+            same = again[index].condition == queries[index].condition &&
+                   again[index].unknown_feature == queries[index].unknown_feature &&
+                   again[index].never == queries[index].never;
+        }
+        if (!same) fail("reading a media list is repeatable");
+    }
+}
+
 // Tokenizes and parses the input. The tokens must cover it exactly; the
 // tree, complete or stopped, must nest and write back the input's bytes;
 // the parse adds at most one error; and a second tokenization and parse
@@ -252,7 +294,10 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         theme_language::parse_theme_sheet(source, again, lines, again_tree, again_diagnostics);
     if (reparsed != parsed || again_tree.nodes != tree.nodes) fail("parsing is repeatable");
     if (!same_records(diagnostics.records(), again_diagnostics.records())) fail("diagnostics are repeatable");
-    if (parsed == theme_language::ParseOutcome::tree_complete) read_values(source, buffer, lines, tree);
+    if (parsed == theme_language::ParseOutcome::tree_complete) {
+        read_values(source, buffer, lines, tree);
+        read_media(source, buffer, tree);
+    }
     return 0;
 }
 
@@ -271,7 +316,7 @@ std::uint64_t next_random(std::uint64_t& state) noexcept {
 
 int main() {
     // Each seed parses completely; the mutations explore around them.
-    const std::array<std::string_view, 5> seeds{
+    const std::array<std::string_view, 6> seeds{
         "@import \"palette.theme.css\";\n"
         "@gf-theme \"aurora\" { version: 1; }\n"
         "button:hover > part(face), #player-play[checked] {\n"
@@ -288,7 +333,9 @@ int main() {
         "a { --r: 4px; --c: var(--r, 1px); width: calc(var(--r) * 2 + var(--pointer-x) / 3);\n"
         "  color: color-mix(in srgb, red 30%, rgb(0 0 0 / 50%)); x: hsl(120 50% 50%) #abc;\n"
         "  y: url(\"resource:icon.check\") mix(1px, 2px, state(hot)) clamp(1, param(depth), 3);\n"
-        "  z: f(var(--progress), choose(less(1s, var(--time-in-state)), 2deg, 0.5turn)), 'q' / 2; }"};
+        "  z: f(var(--progress), choose(less(1s, var(--time-in-state)), 2deg, 0.5turn)), 'q' / 2; }",
+        "@media screen and (prefers-color-scheme: dark), (min-resolution: 2x) and (max-resolution: 3dppx),\n"
+        "  (hover: hover) and (prefers-reduced-motion: reduce) { a { b: c } }"};
     std::uint64_t state = 0xbb67ae8584caa73bULL;
     for (std::size_t run = 0; run < 100'000; ++run) {
         const std::uint64_t run_draw = next_random(state);

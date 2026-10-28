@@ -32,6 +32,8 @@ Types
      - A part's cached raster and what drew it: the primitive, every parameter (animated ones included, since they change the pixels), the target with its states restricted to those the primitive reads, and the extent.
    * - :cpp:class:`Color <gui_forms::Color>`
      - gui_forms::Color is an explicit unpremultiplied RGBA value with opaque alpha default.
+   * - :cpp:class:`ColourOrigin <gui_forms::ColourOrigin>`
+     -  
    * - :cpp:class:`CompiledThemeRules <gui_forms::CompiledThemeRules>`
      - A sheet compiled against a registry: the rules that survived, each declaration checked, in the order the cascade visits them.
    * - :cpp:class:`CompiledThemeRules::CompiledPresentationState <gui_forms::CompiledThemeRules::CompiledPresentationState>`
@@ -100,6 +102,8 @@ Types
      - The position of a number parameter among a primitive's declared parameters (PrimitiveDescriptor::parameters).
    * - :cpp:class:`ExpressionResult <gui_forms::ExpressionResult>`
      -  
+   * - :cpp:class:`FontDeclaration <gui_forms::FontDeclaration>`
+     - A part's font as the cascade resolved it: a text role, or, with ``inherit`` (D7), the parent control's, which the caller resolves at paint.
    * - :cpp:class:`FontSpec <gui_forms::FontSpec>`
      - FontSpec carries logical role, size, weight, italic, and bounded letter-spacing inputs shared by measurement and painting.
    * - :cpp:class:`GlossColours <gui_forms::GlossColours>`
@@ -116,6 +120,8 @@ Types
      - One item's content to paint (owner decision W-Q6), raised while the control paints, after the item's plate and selection and before its focus cue.
    * - :cpp:class:`LentImageVariants <gui_forms::LentImageVariants>`
      - The variants lent for one bake, by fill layer; null where none is lent.
+   * - :cpp:class:`MaterialAssemblyContext <gui_forms::MaterialAssemblyContext>`
+     - Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value.
    * - :cpp:class:`MaterialBorder <gui_forms::MaterialBorder>`
      - MaterialBorder pairs an authored color and logical stroke width.
    * - :cpp:class:`MaterialBorderEdges <gui_forms::MaterialBorderEdges>`
@@ -142,6 +148,10 @@ Types
      - One ordered physical keyline.
    * - :cpp:class:`MaterialShadow <gui_forms::MaterialShadow>`
      - MaterialShadow specifies offset, blur, spread, and color for one bounded surface shadow.
+   * - :cpp:class:`MediaCondition <gui_forms::MediaCondition>`
+     - A rule's media condition (EC3): every feature it names must hold for the window, and an unnamed feature always holds, so the default condition holds everywhere.
+   * - :cpp:class:`MediaFacts <gui_forms::MediaFacts>`
+     - What a window is, as a rule's media condition reads it (T3 EC3): its presentation settings and its scale.
    * - :cpp:class:`MotionClock <gui_forms::MotionClock>`
      - One window's motion clock (T2 plan, MotionClock; GIVEN D1-1).
    * - :cpp:class:`MotionCurve <gui_forms::MotionCurve>`
@@ -187,7 +197,7 @@ Types
    * - :cpp:class:`PartShape <gui_forms::PartShape>`
      -  
    * - :cpp:class:`PartTransitionChannel <gui_forms::PartTransitionChannel>`
-     - One property's transition on a part (E7): an engine property or the parameter at ``parameter``, the state of its machine the part was last painted in (none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
+     - One property's transition on a part (E7): an engine property or the parameter at ``parameter``, the machine and the state of it the part was last painted in (state none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
    * - :cpp:class:`Point <gui_forms::Point>`
      - Point is a renderer-neutral logical-coordinate pair.
    * - :cpp:class:`PointerOverlay <gui_forms::PointerOverlay>`
@@ -296,6 +306,12 @@ Types
    .. cpp:member:: std::array<const MaterialDeclaration*, material_field_count> fields
 
    .. cpp:member:: Size box
+
+   .. cpp:member:: double em
+
+      The part's em and text colour, where a field reads them (T3 P8c); else 0 and transparent black.
+
+   .. cpp:member:: Color current_colour
 
    .. cpp:member:: SurfaceMaterial floor
 
@@ -500,6 +516,24 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ColourOrigin final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:member:: ColourSource source
+
+      Default: ``{ColourSource::none}``.
+
+   .. cpp:member:: ColourRole role
+
+      Default: ``{ColourRole::ink_on_paper}``.
+
+   .. cpp:member:: ColourRoleSide side
+
+      Default: ``{ColourRoleSide::foreground}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:class:: CompiledThemeRules final
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
@@ -579,13 +613,17 @@ Types
 
    .. cpp:member:: std::vector<MotionStop> stops
 
+   .. cpp:member:: double target_em
+
+   .. cpp:member:: double enter_from_em
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: CompiledThemeRules::CompiledTransition final
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   A checked transition: an engine property, or the parameter at ``parameter``.
+   A checked transition: an engine property, or the parameter at ``parameter``. ``machine`` numbers it among the compilation's machines, so that a part can tell one machine from another (PresentationState: a state of another machine is another state).
 
    .. cpp:member:: PresentationProperty property
 
@@ -596,6 +634,12 @@ Types
    .. cpp:member:: std::vector<CompiledPresentationState> states
 
    .. cpp:member:: MotionCurve curve
+
+   .. cpp:member:: std::size_t machine
+
+   .. cpp:member:: bool reads_em
+
+      Whether a state's value is in em (P8c).
 
 .. cpp:namespace:: gui_forms
 
@@ -620,6 +664,10 @@ Types
       Default: ``{PartRole::region}``.
 
    .. cpp:member:: AnatomyStateSet states
+
+   .. cpp:member:: MediaFacts media
+
+      The part's window (EC3): a rule matches only where its media condition holds.
 
 .. cpp:namespace:: gui_forms
 
@@ -655,6 +703,12 @@ Types
 
       The expression whose value a parameter takes, by the parameter's position, where the winning declaration of the parameter is one; null elsewhere. The expressions belong to the compiled rules.
 
+   .. cpp:member:: std::array<double, maximum_primitive_parameters> parameter_em
+
+      Each number parameter's em coefficient (P8c), by its position: the engine adds the part's em times it to the value, within the parameter's range. ``parameters_read_em`` is whether any is not 0.
+
+   .. cpp:member:: bool parameters_read_em
+
    .. cpp:member:: std::uint64_t inputs_read
 
       The inputs the part reads (E6): the primitive's declared inputs and every input its expressions read, as expression input bits.
@@ -672,6 +726,10 @@ Types
    .. cpp:member:: PartBlend blend
 
       The part's blend (blend_property): the last matching rule's. Default: ``{PartBlend::normal}``.
+
+   .. cpp:member:: FontDeclaration font
+
+      The part's font (font_property, P8c): the last matching rule's, else the ui role.
 
    .. cpp:member:: std::array<const MaterialDeclaration*, material_field_count> materials
 
@@ -1441,6 +1499,20 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: FontDeclaration final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   A part's font as the cascade resolved it: a text role, or, with ``inherit`` (D7), the parent control's, which the caller resolves at paint.
+
+   .. cpp:member:: TextRole role
+
+      Default: ``{TextRole::ui}``.
+
+   .. cpp:member:: bool inherit
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: FontSpec
 
    ``#include <gui_forms/types/paint_types/paint_types.hpp>``
@@ -1596,6 +1668,18 @@ Types
    The variants lent for one bake, by fill layer; null where none is lent.
 
    .. cpp:member:: std::array<std::shared_ptr<const PartRaster>, maximum_image_variants> layers
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaterialAssemblyContext final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value. The fills are composed when any fill field is declared: the colour layer (the declared colour, else the floor's bottom layer when it is solid) under the image layers (the declared ones, each authored gradient resolved for ``box``, else the floor's others), which take the declared blend modes, and whose image fills take the declared sizes (resolved for ``box``), then repetitions, then positions; a colour of alpha 0 adds no layer, and with no layer at all the fill is one transparent solid. More than SurfaceMaterial::maximum_fill_layers is no material. The corners are composed when any is declared: each is its declaration's, else the floor's (its corner_radii's, else its corner_radius); four equal corners are corner_radius alone, and others corner_radii, with corner_radius the smallest (the built-in path rounds every corner by it). The glows take the declared placements; a mask's authored gradient is resolved for ``box``. The border's edges are assembled together when any of their fields is declared: each starts as the floor's (its single edge, else its uniform border; an edge the floor lacks has the default MaterialBorder's width and colour and is not drawn), takes its declared style, width and colour, and is drawn unless its style is none or its width 0. Four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material); an edge drawn as two lines (MaterialEdgeLines) is not a border edge but its two keylines, after the declared ones. A border image is the top fill layer, and the border (its edges and their lines) is not drawn, as CSS draws a border image in place of the border's style. ``box`` is the part's box in logical units: relative corners are fractions of its shorter side. What a part gives its material's relative values (P8c): its em, and its text colour, which CSS's currentcolor names.
+
+   .. cpp:member:: double em
+
+   .. cpp:member:: Color current_colour
 
 .. cpp:namespace:: gui_forms
 
@@ -1790,6 +1874,18 @@ Types
    .. cpp:member:: std::optional<MaterialDropShadow> drop_shadow
 
    .. cpp:member:: std::optional<MaterialFillLayer> mask
+
+   .. cpp:member:: ColourOrigin origin
+
+      Where the declaration's colours came from (EC4).
+
+   .. cpp:member:: std::vector<double> em_lengths
+
+      Its lengths in em (T3 P8c, owner decision D4): empty, or one coefficient for each length material_declaration_lengths lists, in its order; each length is its value plus the part's em times its coefficient (add_material_em).
+
+   .. cpp:member:: std::vector<std::uint16_t> current_colours
+
+      Its colours that are CSS's currentcolor (P8c): positions, increasing, among the colours material_declaration_colours lists; each takes the part's text colour when the material is assembled.
 
 .. cpp:namespace:: gui_forms
 
@@ -2044,6 +2140,56 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: MediaCondition final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   A rule's media condition (EC3): every feature it names must hold for the window, and an unnamed feature always holds, so the default condition holds everywhere. The resolution bounds are inclusive, in device pixels per logical unit; each is finite and above zero. A condition no window meets, such as a minimum above the maximum, is admitted: its rule never matches. The theme language's ``@media`` blocks lower to these (one rule a query of a comma list).
+
+   .. cpp:member:: std::optional<bool> dark_scheme
+
+      ``prefers-color-scheme``: dark (true) or light (false).
+
+   .. cpp:member:: std::optional<bool> forced_colours
+
+      ``forced-colors``: active (true) or none (false).
+
+   .. cpp:member:: std::optional<bool> reduced_motion
+
+      ``prefers-reduced-motion``: reduce (true) or no-preference (false).
+
+   .. cpp:member:: std::optional<double> minimum_resolution
+
+      ``min-resolution`` and ``max-resolution``.
+
+   .. cpp:member:: std::optional<double> maximum_resolution
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MediaFacts final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   What a window is, as a rule's media condition reads it (T3 EC3): its presentation settings and its scale. Every window evaluates a theme's conditions against its own facts, so windows sharing a theme may differ.
+
+   .. cpp:member:: bool dark_scheme
+
+      PresentationSettings::colour_scheme is ColourScheme::dark.
+
+   .. cpp:member:: bool forced_colours
+
+      PresentationSettings::high_contrast.
+
+   .. cpp:member:: bool reduced_motion
+
+      PresentationSettings::reduced_motion.
+
+   .. cpp:member:: double resolution
+
+      The window's scale: device pixels per logical unit. Default: ``{1.0}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:class:: MotionClock final
 
    ``#include <gui_forms/engine/motion_clock/motion_clock.hpp>``
@@ -2193,6 +2339,10 @@ Types
    .. cpp:member:: double offset
 
    .. cpp:member:: double value
+
+   .. cpp:member:: double value_em
+
+      The value's em coefficient (T3 P8c): a theme's stop is ``value`` plus the part's em times it; the theme engine resolves it before the stop reaches a motion value, which reads ``value`` alone.
 
 .. cpp:namespace:: gui_forms
 
@@ -2699,13 +2849,17 @@ Types
 
    ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
 
-   One property's transition on a part (E7): an engine property or the parameter at ``parameter``, the state of its machine the part was last painted in (none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
+   One property's transition on a part (E7): an engine property or the parameter at ``parameter``, the machine and the state of it the part was last painted in (state none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition. The machine is CompiledTransition::machine of the compiled rules whose serial is ``rules_serial``; a machine of other rules (a theme replaced) is compared by state alone.
 
    .. cpp:member:: PresentationProperty property
 
       Default: ``{PresentationProperty::parameter}``.
 
    .. cpp:member:: std::size_t parameter
+
+   .. cpp:member:: std::uint64_t rules_serial
+
+   .. cpp:member:: std::size_t machine
 
    .. cpp:member:: std::optional<std::size_t> state
 
@@ -2741,7 +2895,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One state of a part's presentational state machine (E7; design language §9.6). The machine is in the first of its states whose ``when`` states the part's published states all include (an empty ``when`` always matches), and moves its property to ``target``. A part whose states match none rests at the property's own value: its cascade value, or 1 for opacity. When the machine enters this state from another, or the part first appears in it, ``enter_from``, if set, stands the property at that value first; this is how a part fades in when it appears (the docking tiles, T2 GIVEN C2-1). Otherwise every move starts from the value shown, so a transition retargets and never restarts. ``stops`` (E9.6, multi-stop @keyframes), at most maximum_motion_stops, make the move into this state pass each stop's value at its offset of the duration, offsets strictly increasing within (0, 1), values within the property's range; they need a timed curve. They play when the move into the state begins: on entering it from another state, or on appearing in it from ``enter_from``. A part that appears in the state without an entry value stands at its target, as before. An animated parameter shows each stop at its nearest keyframe level, as any moving value (E7r). The machine is presentational only: it reads the published states and writes nothing back, so it can neither create an observable state nor delay behaviour.
+   One state of a part's presentational state machine (E7; design language §9.6). The machine is in the first of its states whose ``when`` states the part's published states all include (an empty ``when`` always matches), and moves its property to ``target``. A part whose states match none rests at the property's own value: its cascade value, or 1 for opacity. When the machine enters this state from another, or the part first appears in it, ``enter_from``, if set, stands the property at that value first; this is how a part fades in when it appears (the docking tiles, T2 GIVEN C2-1). Otherwise every move starts from the value shown, so a transition retargets and never restarts. A state of another machine of the property (another rule's) is another state: a part arriving in this state from it enters it (T3 P7b, an animation in a rule of its own). ``stops`` (E9.6, multi-stop @keyframes), at most maximum_motion_stops, make the move into this state pass each stop's value at its offset of the duration, offsets strictly increasing within (0, 1), values within the property's range; they need a timed curve. They play when the move into the state begins: on entering it from another state, or on appearing in it from ``enter_from``. A part that appears in the state without an entry value stands at its target, as before. An animated parameter shows each stop at its nearest keyframe level, as any moving value (E7r). The machine is presentational only: it reads the published states and writes nothing back, so it can neither create an observable state nor delay behaviour. ``target_em`` and ``enter_from_em`` (T3 P8c, owner decision D4) are em coefficients, as each stop's value_em: the value is the number plus the part's em times its coefficient. Only a translation's and a number parameter's machine takes them.
 
    .. cpp:member:: std::vector<AnatomyState> when
 
@@ -2750,6 +2904,10 @@ Types
    .. cpp:member:: std::optional<double> enter_from
 
    .. cpp:member:: std::vector<MotionStop> stops
+
+   .. cpp:member:: double target_em
+
+   .. cpp:member:: double enter_from_em
 
 .. cpp:namespace:: gui_forms
 
@@ -3143,6 +3301,22 @@ Types
 
    .. cpp:member:: double shadow_blur
 
+   .. cpp:member:: ColourOrigin origin
+
+      Where the declaration's colour came from (EC4).
+
+   .. cpp:member:: std::vector<double> em_lengths
+
+      Its lengths in em (P8c), as MaterialDeclaration::em_lengths, for the lengths recipe_declaration_lengths lists.
+
+   .. cpp:member:: bool inherit
+
+      CSS's ``inherit`` on the text colour (P8c, owner decision D7): the parent control's cascade result, resolved at paint.
+
+   .. cpp:member:: bool current_colour
+
+      Whether ``colour`` is CSS's currentcolor: the control's text colour.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: Rect
@@ -3263,6 +3437,14 @@ Types
    .. cpp:member:: Color colour
 
    .. cpp:member:: std::vector<ExpressionInstruction> program
+
+   .. cpp:member:: ColourOrigin origin
+
+      A colour parameter's origin (EC4).
+
+   .. cpp:member:: double number_em
+
+      A number parameter's em coefficient (T3 P8c): its value is ``number`` plus the part's em times it, held within the parameter's range when the part is painted. The rules check ``number`` against the range only where this is 0.
 
 .. cpp:namespace:: gui_forms
 
@@ -3708,6 +3890,10 @@ Types
 
    .. cpp:member:: std::vector<RecipeDeclaration> recipe_fields
 
+   .. cpp:member:: MediaCondition media
+
+      The windows the rule holds in (EC3); by default, all.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: ThemeRuleSheet final
@@ -3853,6 +4039,102 @@ Enumerations
    .. cpp:enumerator:: forced_high_contrast
 
    .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ColourPosition
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: fill
+
+   .. cpp:enumerator:: edge
+
+   .. cpp:enumerator:: text
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ColourRole
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: ink_on_paper
+
+   .. cpp:enumerator:: muted_ink_on_paper
+
+   .. cpp:enumerator:: ink_on_soft_paper
+
+   .. cpp:enumerator:: ink_on_chrome
+
+   .. cpp:enumerator:: ink_on_chrome_low
+
+   .. cpp:enumerator:: ink_on_near_white_stock
+
+   .. cpp:enumerator:: selection_ink_on_selection
+
+   .. cpp:enumerator:: ink_on_gold
+
+   .. cpp:enumerator:: on_accent_on_accent
+
+   .. cpp:enumerator:: signal_on_paper
+
+   .. cpp:enumerator:: success_on_paper
+
+   .. cpp:enumerator:: pending_ink_on_tint
+
+   .. cpp:enumerator:: invalid_ink_on_tint
+
+   .. cpp:enumerator:: disabled_ink_on_chrome
+
+   .. cpp:enumerator:: disabled_ink_on_paper
+
+   .. cpp:enumerator:: phosphor_on_instrument_black
+
+   .. cpp:enumerator:: command_link_ink_on_paper
+
+   .. cpp:enumerator:: chrome_highlight
+
+   .. cpp:enumerator:: chrome
+
+   .. cpp:enumerator:: chrome_middle
+
+   .. cpp:enumerator:: chrome_low
+
+   .. cpp:enumerator:: ordinary_line
+
+   .. cpp:enumerator:: dark_line
+
+   .. cpp:enumerator:: shadow
+
+   .. cpp:enumerator:: selection_line
+
+   .. cpp:enumerator:: focus
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ColourRoleSide
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: foreground
+
+   .. cpp:enumerator:: background
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ColourSource
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: literal
+
+   .. cpp:enumerator:: role
 
 .. cpp:namespace:: gui_forms
 
@@ -4856,6 +5138,8 @@ Enumerations
 
    .. cpp:enumerator:: blend_invalid
 
+   .. cpp:enumerator:: font_invalid
+
    .. cpp:enumerator:: published_value_invalid
 
    .. cpp:enumerator:: material_field_invalid
@@ -4863,6 +5147,8 @@ Enumerations
    .. cpp:enumerator:: recipe_field_invalid
 
    .. cpp:enumerator:: recipe_field_on_part
+
+   .. cpp:enumerator:: media_invalid
 
 .. cpp:namespace:: gui_forms
 
@@ -4903,6 +5189,26 @@ Enumerations
    .. cpp:enumerator:: bottom_to_top
 
    .. cpp:enumerator:: top_to_bottom
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TextRole
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: ui
+
+   .. cpp:enumerator:: field
+
+   .. cpp:enumerator:: caption
+
+   .. cpp:enumerator:: heading
+
+   .. cpp:enumerator:: title
+
+   .. cpp:enumerator:: monospace
+
+   .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms
 
@@ -5217,6 +5523,22 @@ Functions, constants and aliases
 
 .. cpp:namespace:: gui_forms
 
+``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
+
+.. cpp:function:: MediaFacts window_media_facts(const Window& window) noexcept
+
+   What ``window`` is to a rule's media condition (EC3): its presentation settings' colour scheme, high contrast and reduced motion, and its scale.
+
+.. cpp:function:: TextRole resolved_text_role(const Control& control, FontDeclaration font)
+
+   The text role a part of ``control`` whose cascade gave it ``font`` has (T3 P8c): the font's role, or, where it is ``inherit`` (owner decision D7), the parent control's own: the font its rules give the control itself, followed up the tree while that inherits too, and ui at the root.
+
+.. cpp:function:: double text_role_em(const Control& control, TextRole role) noexcept
+
+   The em of text in ``role`` on ``control`` (D5): the role's size in the control's theme's typography tokens times its window's text scale.
+
+.. cpp:namespace:: gui_forms
+
 ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
 .. cpp:function:: std::string_view cascade_level_name(CascadeLevel level) noexcept
@@ -5227,11 +5549,81 @@ Functions, constants and aliases
 
 .. cpp:function:: RuleSpecificity rule_specificity(const RuleSelector& selector) noexcept
 
+.. cpp:function:: bool media_condition_unconditional(const MediaCondition& condition) noexcept
+
+   Whether ``condition`` names nothing (it holds for every window).
+
+.. cpp:function:: bool media_condition_valid(const MediaCondition& condition) noexcept
+
+   Whether ``condition``'s resolution bounds are finite and above zero.
+
+.. cpp:function:: bool media_condition_holds(const MediaCondition& condition, const MediaFacts& facts) noexcept
+
+   Whether a window with ``facts`` meets ``condition``.
+
+.. cpp:function:: std::string_view colour_role_name(ColourRole role) noexcept
+
+   The role's name in kebab case, such as ``ink-on-paper``; empty for count.
+
+.. cpp:function:: std::optional<ColourRole> colour_role_from_name(std::string_view name) noexcept
+
+   The role ``name`` (kebab case, exact) names, or none.
+
+.. cpp:function:: bool colour_role_paired(ColourRole role) noexcept
+
+   Whether the role is a pair (a foreground on a background) rather than a single colour.
+
+.. cpp:function:: std::string_view text_role_name(TextRole role) noexcept
+
+   The role's name in a sheet: ``ui``, ``field``, ``caption``, ``heading``, ``title``, ``monospace``.
+
+.. cpp:function:: std::optional<TextRole> text_role_from_name(std::string_view name) noexcept
+
+   The role ``name`` names exactly, if any.
+
 .. cpp:function:: std::string_view material_field_name(MaterialField field) noexcept
+
+.. cpp:function:: ColourPosition material_field_colour_position(MaterialField field) noexcept
+
+   Where the field's colours are drawn (EC4): the background colour and the fills are a fill, the border colours and keylines an edge; every other field none.
+
+.. cpp:function:: void material_declaration_lengths(const MaterialDeclaration& declaration, std::vector<double>& lengths)
+
+   The lengths of ``declaration`` in logical units, into ``lengths`` (cleared first), in a fixed order: its number where it is a length (a border width, a corner's radius that is not relative, the filter's blur); each authored gradient's centre, radii and stop positions (their units); the image positions' and the image sizes' units; each shadow's offset, blur and spread; each glow's blur and spread; each keyline's width and inset; the drop shadow's offset and blur.
+
+.. cpp:function:: void set_material_declaration_lengths(MaterialDeclaration& declaration, std::span<const double> lengths) noexcept
+
+   Sets the lengths of ``declaration`` from ``lengths``, in that order; a length past the end of ``lengths`` is kept.
+
+.. cpp:function:: void add_material_em(MaterialDeclaration& declaration, double em) noexcept
+
+   Adds ``em`` times each of the declaration's em_lengths to its length.
+
+.. cpp:function:: void material_declaration_colours(const MaterialDeclaration& declaration, std::vector<Color>& colours)
+
+   The colours of ``declaration``, into ``colours`` (cleared first), in a fixed order: its colour; each authored gradient's stop colours; each shadow's, glow's and keyline's colour; the drop shadow's.
+
+.. cpp:function:: void set_material_declaration_colours(MaterialDeclaration& declaration, std::span<const Color> colours) noexcept
+
+   Sets them from ``colours``, in that order; one past its end is kept.
+
+.. cpp:function:: void set_material_current_colour(MaterialDeclaration& declaration, Color colour) noexcept
+
+   Sets each of the declaration's current_colours to ``colour``.
+
+.. cpp:function:: void assemble_material(const SurfaceMaterial& floor, const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box, MaterialAssemblyContext context, SurfaceMaterial& material)
+
+   With ``context``, each declaration's em lengths are first added at the part's em (add_material_em) and its current colours set (set_material_current_colour); the overload without it assembles at an em of 0, its current colours as written.
 
 .. cpp:function:: void assemble_material(const SurfaceMaterial& floor, const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box, SurfaceMaterial& material)
 
-   Replaces ``material`` with ``floor`` and the declarations of ``fields`` (the winning declaration of each field, by the field's position, null where none) in place: a part's assembled material (EC1); an ``initial`` declaration keeps the floor's value. The fills are composed when any fill field is declared: the colour layer (the declared colour, else the floor's bottom layer when it is solid) under the image layers (the declared ones, each authored gradient resolved for ``box``, else the floor's others), which take the declared blend modes, and whose image fills take the declared sizes (resolved for ``box``), then repetitions, then positions; a colour of alpha 0 adds no layer, and with no layer at all the fill is one transparent solid. More than SurfaceMaterial::maximum_fill_layers is no material. The corners are composed when any is declared: each is its declaration's, else the floor's (its corner_radii's, else its corner_radius); four equal corners are corner_radius alone, and others corner_radii, with corner_radius the smallest (the built-in path rounds every corner by it). The glows take the declared placements; a mask's authored gradient is resolved for ``box``. The border's edges are assembled together when any of their fields is declared: each starts as the floor's (its single edge, else its uniform border; an edge the floor lacks has the default MaterialBorder's width and colour and is not drawn), takes its declared style, width and colour, and is drawn unless its style is none or its width 0. Four equal edges are drawn as one uniform border, which keeps a dash and rounded corners, and unequal ones as single edges, which a material admits only with square corners (valid_surface_material); an edge drawn as two lines (MaterialEdgeLines) is not a border edge but its two keylines, after the declared ones. A border image is the top fill layer, and the border (its edges and their lines) is not drawn, as CSS draws a border image in place of the border's style. ``box`` is the part's box in logical units: relative corners are fractions of its shorter side.
+.. cpp:function:: bool material_fields_read_em(const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept
+
+   Whether assembling ``fields`` reads the part's em: a declaration with em lengths.
+
+.. cpp:function:: bool material_fields_read_current_colour(const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept
+
+   Whether assembling ``fields`` reads the part's text colour: a declaration with current colours.
 
 .. cpp:function:: bool material_fields_read_box(const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept
 
@@ -5240,6 +5632,28 @@ Functions, constants and aliases
 .. cpp:function:: std::string_view recipe_field_name(RecipeField field) noexcept
 
    The field's snake_case name, as diagnostics name it; empty for ``count``.
+
+.. cpp:function:: ColourPosition recipe_field_colour_position(RecipeField field) noexcept
+
+   Where the field's colour is drawn (EC4): the text colour is text and the outline colour an edge; every other field none.
+
+.. cpp:function:: void recipe_declaration_lengths(const RecipeDeclaration& declaration, std::vector<double>& lengths)
+
+   The lengths of a recipe declaration, into ``lengths`` (cleared first): the outline width's or offset's number; the text shadow's offset and blur.
+
+.. cpp:function:: void set_recipe_declaration_lengths(RecipeDeclaration& declaration, std::span<const double> lengths) noexcept
+
+.. cpp:function:: void add_recipe_em(RecipeDeclaration& declaration, double em) noexcept
+
+.. cpp:function:: bool current_colours_fit(const MaterialDeclaration& declaration)
+
+   Whether a declaration's current_colours are increasing positions among its colours: the rules drop it otherwise.
+
+.. cpp:function:: bool em_lengths_fit(const MaterialDeclaration& declaration)
+
+   Whether a declaration's em_lengths are empty, or one finite coefficient for each of its lengths: the rules drop it otherwise (material_field_invalid, recipe_field_invalid).
+
+.. cpp:function:: bool em_lengths_fit(const RecipeDeclaration& declaration)
 
 .. cpp:function:: bool recipe_declaration_admitted(const RecipeDeclaration& declaration) noexcept
 
@@ -5258,6 +5672,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::string_view built_in_primitive_name
 
    Value: ``"built_in"``.
+
+.. cpp:var:: constexpr std::size_t colour_role_count
+
+   Value: ``static_cast<std::size_t>(ColourRole::count)``.
 
 .. cpp:var:: constexpr std::string_view opacity_property
 
@@ -5294,6 +5712,18 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::string_view blend_property
 
    The engine's blend property (E9.6): a declaration of this name, whose value is the name ``normal``, ``multiply`` or ``screen``, draws the part through a paint group of that composite (PaintGroupComposite), whatever draws it, so that it multiplies or screens what was painted beneath it. Like opacity it is no atom and no primitive parameter, and a rule that declares it needs no primitive; the last matching rule that declares it wins. The group's bounds are the part's extent (its bounds grown by its primitive's outsets and its granted overflow): nothing the part draws beyond them is shown. The forced high-contrast pass draws no blend. Value: ``"blend"``.
+
+.. cpp:var:: constexpr std::size_t text_role_count
+
+   Value: ``static_cast<std::size_t>(TextRole::count)``.
+
+.. cpp:var:: constexpr std::string_view font_property
+
+   The engine's font property (T3 P8c, D6): a declaration of this name, whose value is a name (a text role's, or font_inherit_name), sets the part's text role. The last matching rule's wins; a part no rule sets has the ui role. It is recorded in the part's resolution, where it gives the part its em; controls' text does not read it yet. Value: ``"font"``.
+
+.. cpp:var:: constexpr std::string_view font_inherit_name
+
+   Value: ``"inherit"``.
 
 .. cpp:var:: constexpr std::size_t maximum_presentation_states
 
@@ -5516,6 +5946,10 @@ Functions, constants and aliases
 .. cpp:function:: ControlRoleRecipes derive_high_contrast_recipes(ControlRoleRecipes recipes)
 
    The forced high-contrast pass (T2 plan, E4; design language 5.8): ``recipes`` with its high_contrast and high_contrast_selected records derived from its ordinary ones. GUI.Forms' own high-contrast mode keeps each state's geometry and cues (corner radius, edge width, focus and default rings, offsets) and rebuilds the material as one solid plate inside one solid edge from a near-colourless palette by state, dropping gradients, images, keylines, per-edge borders and shadows. Selected parts take a white plate and black text inside their state's edge. Theme::create applies it to every family, so authored high-contrast records are replaced.
+
+.. cpp:function:: Color high_contrast_colour(ColourOrigin origin, ColourPosition position, ControlSurfaceState state, bool selected) noexcept
+
+   The colour forced high contrast draws in place of one a theme declared (T3 EC4, owner decision D3 of 2026-10-28), for a part in ``state``, ``selected`` or not, from the same palette as derive_high_contrast_recipes: - a literal, by its position: a fill takes the state's plate, an edge its edge and text its text (a selected part's: a white plate and black text); a colour with no position takes the plate; - a role's colour, by its side: a foreground takes the text, or the edge in an edge position, and a background the plate; a single role of the relief ramp (and ``shadow``) takes the plate and a line the edge; except that the disabled roles' foregrounds take the disabled state's text or edge, ``invalid-ink-on-tint``'s foreground the invalid edge, ``focus`` and ``selection-line`` the hot edge, and the selection and on-accent pairs black on white, as a selected part. The forced high-contrast pass that draws with it is T3 P9's (EC6).
 
 .. cpp:function:: inline std::vector<Color> provisional_accent_ramp()
 

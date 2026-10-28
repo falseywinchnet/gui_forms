@@ -105,9 +105,13 @@ inline constexpr std::uint32_t maximum_motion_steps = 32U;
 struct MotionStop final {
     double offset{};
     double value{};
+    // The value's em coefficient (T3 P8c): a theme's stop is `value` plus
+    // the part's em times it; the theme engine resolves it before the stop
+    // reaches a motion value, which reads `value` alone.
+    double value_em{};
 
     friend bool operator==(const MotionStop& left, const MotionStop& right) noexcept {
-        return left.offset == right.offset && left.value == right.value;
+        return left.offset == right.offset && left.value == right.value && left.value_em == right.value_em;
     }
 };
 

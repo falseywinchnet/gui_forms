@@ -62,9 +62,10 @@ enum class DiagnosticCode : std::uint16_t {
     // `:where()`, `:has()`, the structural ones, `::before` and the rest.
     pseudo_class_not_admitted = 303,
     attribute_selector_not_admitted = 304,
-    // E4xx values (B2: a bad value fails). 411, 412 and 414
-    // (keyframes_undefined, transition_invalid, variable_kind_mismatch)
-    // arrive with the phases that lower motion and inline styles.
+    // E4xx values (B2: a bad value fails). 412 and 414
+    // (transition_invalid, variable_kind_mismatch) are kept for later
+    // phases: the motion lowering reports a transition the engine cannot
+    // run as E405 or E403.
     // A value whose tokens are not a component of the admitted forms.
     value_syntax = 401,
     // An operand or argument of the wrong kind: units that do not agree, a
@@ -88,8 +89,13 @@ enum class DiagnosticCode : std::uint16_t {
     // A var() of a name no rule defines, with no fallback.
     variable_undefined = 409,
     variable_cycle = 410,
+    // An `animation` naming keyframes no `@keyframes` rule defines (P7b).
+    keyframes_undefined = 411,
     // A `url("resource:<name>")` the theme's resources do not list.
     resource_unknown = 413,
+    // role() of a colour role the theme's palette does not declare (P8,
+    // owner decision D2 of 2026-10-28).
+    colour_role_undefined = 415,
     // E5xx limits (T3 decision E2).
     sheet_too_large = 501,
     too_many_rules = 502,
@@ -117,6 +123,9 @@ enum class DiagnosticCode : std::uint16_t {
     // maximum_lowered_bytes (the selector lists and their copies of each
     // rule's declarations, PLAN.md P5).
     lowered_sheet_too_large = 513,
+    // More than maximum_keyframes_rules `@keyframes` rules in one sheet
+    // (R2-14, P7b).
+    too_many_keyframes = 514,
     // E7xx reserved names: a theme that defines an engine input or a
     // published value (R2-06).
     reserved_input_set = 701,
@@ -137,6 +146,9 @@ enum class DiagnosticCode : std::uint16_t {
     // An at-rule other than @import, @media and @keyframes; its block is
     // skipped.
     unknown_at_rule = 1104,
+    // An `@media` feature the language does not know (P8): its query is
+    // skipped, and with it a block whose only query it is.
+    unknown_media_feature = 1105,
     // A control type, part, role, state or pseudo-class the vocabulary does
     // not know; the rule is dropped.
     unknown_selector_name = 1106,
@@ -154,6 +166,11 @@ enum class DiagnosticCode : std::uint16_t {
     // running engine lacks, whose declaration is dropped.
     needs_newer_engine = 1301,
     keyword_from_newer_engine = 1302,
+    // W2xx colour (P8, A4): a literal colour in a text or edge position
+    // (`color`, the border colours, keylines and the outline), which
+    // forced high contrast can only replace by its position. The
+    // declaration still applies.
+    literal_colour_unremappable = 1201,
 };
 
 [[nodiscard]] DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept;
@@ -196,6 +213,12 @@ public:
     // the property, where it names none: the lowering names them for the
     // diagnostics of the stages it calls.
     void name_context(std::size_t first_record, std::string_view rule, std::string_view property);
+    // While muted, a warning is neither kept nor counted: the lowering
+    // mutes the warnings of a block it lowers again (a second media query,
+    // a palette variant's copy of a rule), which its first lowering
+    // already reported. Errors are kept as ever. clear() unmutes.
+    void mute_warnings(bool muted) noexcept { warnings_muted_ = muted; }
+    [[nodiscard]] bool warnings_muted() const noexcept { return warnings_muted_; }
     void clear() noexcept;
 
     [[nodiscard]] std::span<const ThemeDiagnostic> records() const& noexcept { return records_; }
@@ -210,6 +233,7 @@ private:
     std::size_t errors_{};
     std::size_t warnings_{};
     std::size_t dropped_{};
+    bool warnings_muted_{};
 };
 
 // The diagnostic's log line, without a line break:

@@ -306,6 +306,11 @@ private:
 
     bool read_colour(std::size_t index, Color& colour);
     bool read_length(std::size_t index, bool percentages, bool negatives, BoxLength& length);
+    // Whether a gradient is resolved now (authored_gradient_fixed), which
+    // one whose lengths may be in em is not.
+    [[nodiscard]] bool fixed_gradient(const AuthoredGradient& gradient) const noexcept;
+    // CSS's currentcolor as the lowering reads it (P8c), noting that it did.
+    [[nodiscard]] Color current_colour() noexcept;
     bool read_angle(std::size_t index, double& degrees);
     bool read_turn_fraction(std::size_t index, double& fraction);
     bool read_position(ComponentRange range, BoxLength& across, BoxLength& down);
@@ -446,9 +451,9 @@ bool MaterialReader::read_colour(std::size_t index, Color& colour) {
         return fail(DiagnosticCode::value_form_not_admitted, component.token, "an expression that reads inputs");
     }
     if (component.kind == ValueComponentKind::keyword) {
-        // P8 builds the colour roles, and currentcolor with them.
         if (equals_ascii_folded(component.text, "currentcolor")) {
-            return fail(DiagnosticCode::not_yet_built, component.token, "currentcolor");
+            colour = current_colour();
+            return true;
         }
         const std::optional<Color> named = named_colour(component.text);
         if (named) {
@@ -470,16 +475,27 @@ bool MaterialReader::read_length(std::size_t index, bool percentages, bool negat
     if (component.kind != ValueComponentKind::number) {
         return fail(DiagnosticCode::value_wrong_kind, component.token, expected);
     }
-    if (component.unit == ValueUnit::em) return fail(DiagnosticCode::not_yet_built, component.token, "em");
     const bool zero = component.unit == ValueUnit::none && component.number == 0.0;
-    const bool pixels = component.unit == ValueUnit::px;
+    const bool pixels = component.unit == ValueUnit::px || component.unit == ValueUnit::em;
     const bool percent = percentages && component.unit == ValueUnit::percent;
     if (!zero && !pixels && !percent) return fail(DiagnosticCode::value_wrong_kind, component.token, expected);
     if (!negatives && component.number < 0.0) {
         return fail(DiagnosticCode::value_out_of_range, component.token, clipped_theme_detail(component.text));
     }
     length = percent ? BoxLength{component.number / 100.0, 0.0} : BoxLength{0.0, component.number};
+    // An em length is read at the lowering's em (P8c).
+    if (component.unit == ValueUnit::em) length = BoxLength{0.0, component.number * lowering_.em};
     return true;
+}
+
+Color MaterialReader::current_colour() noexcept {
+    lowering_.read_current_colour = true;
+    return lowering_.current_colour;
+}
+
+bool MaterialReader::fixed_gradient(const AuthoredGradient& gradient) const noexcept {
+    const bool fixed = !lowering_.keep_gradients && authored_gradient_fixed(gradient);
+    return fixed;
 }
 
 // An <angle> (read in degrees), or a unitless 0.
@@ -788,7 +804,7 @@ bool MaterialReader::push_fills(std::span<const WrittenLayer> written) {
     declaration.field = MaterialField::fills;
     bool box_relative = false;
     for (const WrittenLayer& layer : written) {
-        box_relative = box_relative || (!layer.imaged && !authored_gradient_fixed(layer.gradient));
+        box_relative = box_relative || (!layer.imaged && !fixed_gradient(layer.gradient));
     }
     SurfaceMaterial checked{};
     checked.fills.clear();
@@ -797,7 +813,7 @@ bool MaterialReader::push_fills(std::span<const WrittenLayer> written) {
         MaterialFillLayer layer = source.image;
         bool fixed = true;
         if (!source.imaged) {
-            fixed = authored_gradient_fixed(source.gradient);
+            fixed = fixed_gradient(source.gradient);
             // A box only a gradient that reads the box uses; the check
             // takes a sample one.
             resolve_authored_gradient(source.gradient, Size{100.0, 100.0}, layer);
@@ -1357,8 +1373,8 @@ bool MaterialReader::lower_corner(std::size_t corner) {
     return true;
 }
 
-// One shadow: `inset? && <length>{2,4} && <color>`. CSS's default colour,
-// currentcolor, arrives with the colour roles (P8).
+// One shadow: `inset? && <length>{2,4} && <color>?`, its colour by default
+// CSS's currentcolor.
 bool MaterialReader::read_shadow(ComponentRange range, MaterialShadow& shadow) {
     shadow = MaterialShadow{};
     shadow.offset = Point{};
@@ -1394,7 +1410,7 @@ bool MaterialReader::read_shadow(ComponentRange range, MaterialShadow& shadow) {
     }
     const std::uint32_t token = range.first < range.end ? value_.components[range.first].token : start_;
     if (length_count < 2U) return fail(DiagnosticCode::value_syntax, token, "two to four lengths");
-    if (!coloured) return fail(DiagnosticCode::not_yet_built, token, "a shadow without a colour (currentcolor)");
+    if (!coloured) shadow.color = current_colour();
     shadow.offset = Point{lengths[0], lengths[1]};
     shadow.blur_radius = lengths[2];
     shadow.spread = lengths[3];
@@ -1501,7 +1517,7 @@ bool MaterialReader::read_blur(std::size_t function, double& deviation) {
 }
 
 // drop-shadow(): a colour and two or three lengths, as a shadow's without
-// inset or spread; a shadow without a colour waits for currentcolor.
+// inset or spread; its colour by default currentcolor.
 bool MaterialReader::read_drop_shadow(std::size_t function, MaterialDropShadow& shadow) {
     const ValueComponent& written = value_.components[function];
     const ComponentRange arguments{function + 1U, written.subtree_end};
@@ -1528,7 +1544,7 @@ bool MaterialReader::read_drop_shadow(std::size_t function, MaterialDropShadow& 
         if (!read_colour(index, shadow.color)) return false;
     }
     if (length_count < 2U) return fail(DiagnosticCode::value_syntax, written.token, "two or three lengths");
-    if (!coloured) return fail(DiagnosticCode::not_yet_built, written.token, "a drop shadow without a colour (currentcolor)");
+    if (!coloured) shadow.color = current_colour();
     shadow.offset = Point{lengths[0], lengths[1]};
     shadow.blur_radius = lengths[2];
     return true;
@@ -1660,7 +1676,7 @@ bool MaterialReader::read_glow(ComponentRange range, MaterialGlow& glow) {
     }
     const std::uint32_t token = range.first < range.end ? value_.components[range.first].token : start_;
     if (length_count == 0U) return fail(DiagnosticCode::value_syntax, token, "one or two lengths");
-    if (!coloured) return fail(DiagnosticCode::not_yet_built, token, "a glow without a colour (currentcolor)");
+    if (!coloured) glow.color = current_colour();
     glow.blur_radius = lengths[0];
     glow.spread = lengths[1];
     return true;
@@ -1739,7 +1755,7 @@ bool MaterialReader::lower_mask() {
     SurfaceMaterial checked{};
     checked.mask = layer;
     if (!valid_surface_material(checked)) return fail(DiagnosticCode::value_out_of_range, start_, "a mask");
-    if (written.imaged || authored_gradient_fixed(written.gradient)) {
+    if (written.imaged || fixed_gradient(written.gradient)) {
         declaration.mask = layer;
     } else {
         declaration.mask = MaterialFillLayer{};
@@ -2084,8 +2100,7 @@ bool MaterialReader::lower_outline_offset() {
 
 // `text-shadow`: none, or one shadow: two or three adjacent lengths (the
 // offset and the blur) and a colour, in either order. The recipe carries
-// one shadow; a shadow's colour is required until the colour roles bring
-// currentcolor (P8).
+// one shadow; its colour by default currentcolor.
 bool MaterialReader::lower_text_shadow() {
     RecipeDeclaration declaration = recipe_declaration(RecipeField::text_shadow);
     const ComponentRange whole{0U, value_.components.size()};
@@ -2118,7 +2133,7 @@ bool MaterialReader::lower_text_shadow() {
         if (!read_colour(index, declaration.colour)) return false;
     }
     if (length_count < 2U) return fail(DiagnosticCode::value_syntax, start_, "two or three lengths");
-    if (!coloured) return fail(DiagnosticCode::not_yet_built, start_, "a shadow without a colour (currentcolor)");
+    if (!coloured) declaration.colour = current_colour();
     declaration.shadowed = true;
     declaration.shadow_offset = Point{lengths[0], lengths[1]};
     declaration.shadow_blur = lengths[2];
@@ -2131,6 +2146,7 @@ bool MaterialReader::lower_text_shadow() {
 
 void MaterialReader::lower(MaterialProperty property) {
     lowering_.outcome = MaterialLoweringOutcome::lowered;
+    lowering_.read_current_colour = false;
     lowering_.declarations.clear();
     lowering_.recipe_fields.clear();
     lowering_.problem = MaterialLoweringProblem{};

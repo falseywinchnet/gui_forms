@@ -1029,6 +1029,72 @@ Insets box_shadow_visual_outsets(std::span<const MaterialShadow> shadows) noexce
     return result;
 }
 
+namespace {
+
+Color by_position(const HighContrastColours& colours, ColourPosition position) noexcept {
+    switch (position) {
+    case ColourPosition::edge: return colours.edge;
+    case ColourPosition::text: return colours.text;
+    case ColourPosition::fill:
+    case ColourPosition::none:
+    default: return colours.plate;
+    }
+}
+
+// A role foreground's colour from `colours`: its text, or its edge where
+// it draws an edge.
+Color foreground_of(const HighContrastColours& colours, ColourPosition position) noexcept {
+    const Color colour = position == ColourPosition::edge ? colours.edge : colours.text;
+    return colour;
+}
+
+} // namespace
+
+Color high_contrast_colour(ColourOrigin origin, ColourPosition position, ControlSurfaceState state,
+                           bool selected) noexcept {
+    HighContrastColours colours = high_contrast_colours(state);
+    if (selected) {
+        colours.plate = Color::rgba(255, 255, 255);
+        colours.text = Color::rgba(0, 0, 0);
+    }
+    if (origin.source != ColourSource::role) return by_position(colours, position);
+    const bool foreground = origin.side == ColourRoleSide::foreground;
+    switch (origin.role) {
+    case ColourRole::disabled_ink_on_chrome:
+    case ColourRole::disabled_ink_on_paper:
+        if (!foreground) return colours.plate;
+        return foreground_of(high_contrast_colours(ControlSurfaceState::disabled), position);
+    case ColourRole::invalid_ink_on_tint:
+        if (!foreground) return colours.plate;
+        return high_contrast_colours(ControlSurfaceState::invalid).edge;
+    case ColourRole::focus:
+    case ColourRole::selection_line: return high_contrast_colours(ControlSurfaceState::hot).edge;
+    case ColourRole::selection_ink_on_selection:
+    case ColourRole::on_accent_on_accent: return foreground ? Color::rgba(0, 0, 0) : Color::rgba(255, 255, 255);
+    case ColourRole::chrome_highlight:
+    case ColourRole::chrome:
+    case ColourRole::chrome_middle:
+    case ColourRole::chrome_low:
+    case ColourRole::shadow: return colours.plate;
+    case ColourRole::ordinary_line:
+    case ColourRole::dark_line: return colours.edge;
+    case ColourRole::ink_on_paper:
+    case ColourRole::muted_ink_on_paper:
+    case ColourRole::ink_on_soft_paper:
+    case ColourRole::ink_on_chrome:
+    case ColourRole::ink_on_chrome_low:
+    case ColourRole::ink_on_near_white_stock:
+    case ColourRole::ink_on_gold:
+    case ColourRole::signal_on_paper:
+    case ColourRole::success_on_paper:
+    case ColourRole::pending_ink_on_tint:
+    case ColourRole::phosphor_on_instrument_black:
+    case ColourRole::command_link_ink_on_paper:
+    case ColourRole::count:
+    default: return foreground ? foreground_of(colours, position) : colours.plate;
+    }
+}
+
 ControlRoleRecipes derive_high_contrast_recipes(ControlRoleRecipes recipes) {
     for (std::size_t index = 0; index < control_surface_state_count; ++index) {
         const ControlSurfaceState state = static_cast<ControlSurfaceState>(index);
@@ -1158,6 +1224,31 @@ const RecipeDeclaration* set_recipe_field(const CompiledThemeRules::RecipeResolu
     return declaration;
 }
 
+// The text colour `control` inherits (T3 P8c, owner decision D7): its
+// parent control's cascade result, followed up the tree while that
+// inherits too; `fallback` where a control's cascade sets no text colour,
+// or sets its initial, or at the root.
+Color inherited_text(const Control& control, Color fallback) {
+    Control::Ptr parent = control.parent();
+    while (parent != nullptr) {
+        const Control& above = *parent;
+        CompiledThemeRules::PartFacts facts{};
+        facts.control_type = above.anatomy().control_id;
+        facts.stable_id = above.stable_id().value();
+        facts.classes = above.classes();
+        facts.states = above.anatomy_states();
+        const Window* const window = above.attached_window();
+        if (window != nullptr) facts.media = window_media_facts(*window);
+        const CompiledThemeRules::RecipeResolution fields =
+            above.effective_theme().engine().rules().resolve_recipe_fields(facts);
+        const RecipeDeclaration* const text = fields.fields[static_cast<std::size_t>(RecipeField::text)];
+        if (text == nullptr || (*text).initial) return fallback;
+        if (!(*text).inherit) return (*text).colour;
+        parent = above.parent();
+    }
+    return fallback;
+}
+
 // The recipe fields `fields` sets, over `recipe` (the floor's copy), in
 // place. The outline's style comes first: a ring has no offset, and no
 // outline no width.
@@ -1218,8 +1309,37 @@ ResolvedControlRecipe Theme::resolve(const Control& control, ControlVisualRole r
     facts.stable_id = control.stable_id().value();
     facts.classes = control.classes();
     facts.states = states;
-    const CompiledThemeRules::RecipeResolution fields = engine_.rules().resolve_recipe_fields(facts);
+    const Window* const window = control.attached_window();
+    if (window != nullptr) facts.media = window_media_facts(*window);
+    CompiledThemeRules::RecipeResolution fields = engine_.rules().resolve_recipe_fields(facts);
     if (!fields.authored) return ResolvedControlRecipe(floor);
+    // The text colour first (T3 P8c): an inherited one is the parent
+    // control's, and currentcolor names the result.
+    Color text = floor.text;
+    const RecipeDeclaration* const written = set_recipe_field(fields, RecipeField::text);
+    if (written != nullptr) text = (*written).inherit ? inherited_text(control, floor.text) : (*written).colour;
+    // The fields relative to the control, copied: an inherited text colour,
+    // currentcolor, and lengths in em at the control's em.
+    std::vector<RecipeDeclaration> scaled{};
+    scaled.reserve(recipe_field_count);
+    bool reads_em = false;
+    for (const RecipeDeclaration*& field : fields.fields) {
+        if (field == nullptr || (*field).initial) continue;
+        const bool relative = (*field).inherit || (*field).current_colour || !(*field).em_lengths.empty();
+        if (!relative) continue;
+        scaled.push_back(*field);
+        RecipeDeclaration& copy = scaled.back();
+        if (copy.inherit || copy.current_colour) copy.colour = text;
+        copy.inherit = false;
+        copy.current_colour = false;
+        if (!copy.em_lengths.empty()) reads_em = true;
+        field = &copy;
+    }
+    if (reads_em) {
+        const FontDeclaration font = engine_.rules().resolve(facts).font;
+        const double em = text_role_em(control, resolved_text_role(control, font));
+        for (RecipeDeclaration& field : scaled) add_recipe_em(field, em);
+    }
     ControlVisualRecipe authored = floor;
     apply_recipe_fields(fields, authored);
     if (!valid_recipe(authored)) return ResolvedControlRecipe(floor);

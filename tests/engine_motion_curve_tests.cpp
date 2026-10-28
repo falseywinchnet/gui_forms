@@ -436,7 +436,8 @@ struct PadFixture final {
     RasterWatch painter{};
 };
 
-std::unique_ptr<PadFixture> make_pad(Insets overflow, std::vector<PropertyTransition> transitions) {
+// A pad drawn by `rules` added to the professional theme.
+std::unique_ptr<PadFixture> make_pad_with_rules(Insets overflow, std::vector<ThemeRule> rules) {
     std::unique_ptr<PadFixture> fixture = std::make_unique<PadFixture>();
     PadFixture& made = *fixture;
     made.root = make_control<Panel>(StableId("root"));
@@ -449,15 +450,21 @@ std::unique_ptr<PadFixture> make_pad(Insets overflow, std::vector<PropertyTransi
     window.motion_clock().set_time_source(&made.time);
     const std::unique_ptr<ThemeDefinition> definition = test_support::professional_definition();
     (*definition).id = "engine-motion-curve-test";
-    ThemeRule rule = pad_rule("pad", "pill_plate");
-    rule.transitions = std::move(transitions);
-    (*definition).rules.rules.push_back(std::move(rule));
+    for (ThemeRule& rule : rules) (*definition).rules.rules.push_back(std::move(rule));
     window.set_theme(Theme::create(*definition));
     require(window.theme().engine().rules().diagnostics().empty(), "the pad's theme compiles cleanly");
     window.perform_layout();
     window.paint(made.painter);
     static_cast<void>(window.take_damage());
     return fixture;
+}
+
+std::unique_ptr<PadFixture> make_pad(Insets overflow, std::vector<PropertyTransition> transitions) {
+    ThemeRule rule = pad_rule("pad", "pill_plate");
+    rule.transitions = std::move(transitions);
+    std::vector<ThemeRule> rules{};
+    rules.push_back(std::move(rule));
+    return make_pad_with_rules(overflow, std::move(rules));
 }
 
 void repaint(PadFixture& fixture) {
@@ -566,6 +573,50 @@ void stops_play_on_entering() {
     settle(made);
 }
 
+void stops_play_entering_from_another_rule() {
+    // The pad's own rule rests at 0 on an instant machine; a rule of its
+    // own for hot (as T3 lowers an animation without a transition to join)
+    // runs a machine of one state, a dip to -6 and on to 8. Arriving in it
+    // from the other rule's machine enters it, so its stop plays.
+    ThemeRule resting = pad_rule("pad", "pill_plate");
+    PropertyTransition still{};
+    still.property = std::string(translate_x_property);
+    PresentationState zero{};
+    still.states.push_back(zero);
+    still.curve = MotionCurve::timed(FrameInterval{}, MotionEasing::linear);
+    resting.transitions.push_back(still);
+    ThemeRule animated = pad_rule("pad", "pill_plate");
+    animated.selector.states.push_back(AnatomyState::hot);
+    PropertyTransition bounce{};
+    bounce.property = std::string(translate_x_property);
+    PresentationState hot{};
+    hot.target = 8.0;
+    hot.stops = {MotionStop{0.5, -6.0}};
+    bounce.states.push_back(hot);
+    bounce.curve = MotionCurve::timed(milliseconds(100), MotionEasing::linear);
+    animated.transitions.push_back(bounce);
+    std::vector<ThemeRule> rules{};
+    rules.push_back(std::move(resting));
+    rules.push_back(std::move(animated));
+    std::unique_ptr<PadFixture> fixture = make_pad_with_rules(Insets{10.0, 6.0, 10.0, 6.0}, std::move(rules));
+    PadFixture& made = *fixture;
+    const Point rest = made.painter.last_origin;
+    for (int pass = 0; pass < 2; ++pass) {
+        hover(made);
+        const std::array<double, 4> expected{-3.0, -6.0, 1.0, 8.0};
+        for (const double offset : expected) {
+            frame(made, milliseconds(25));
+            require(near(made.painter.last_origin.x - rest.x, offset, 1e-9),
+                    "arriving from another rule's machine passes the stop, each time");
+        }
+        settle(made);
+        static_cast<void>(
+            (*made.window).dispatch_pointer({PointerAction::move, PointerButton::none, Point{390.0, 290.0}}));
+        repaint(made);
+        require(made.painter.last_origin.x == rest.x, "leaving, the instant machine returns at once");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -580,6 +631,7 @@ int main() {
     translation_moves_the_drawn_part();
     translation_is_clamped_to_the_grant();
     stops_play_on_entering();
+    stops_play_entering_from_another_rule();
     std::cout << "motion curves: cubic-bezier, steps, delays, stops, identical samples, translation rules, the "
                  "translation within its grant and stops on entering passed\n";
     return 0;

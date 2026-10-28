@@ -7,6 +7,7 @@
 #include "../tokenizer/theme_tokenizer.hpp"
 
 #include "gui_forms/engine/engine_expression/engine_expression.hpp"
+#include "gui_forms/engine/theme_rules/theme_rules.hpp"
 #include "gui_forms/types/paint_types/paint_types.hpp"
 
 #include <array>
@@ -62,11 +63,15 @@ struct ValueComponent final {
     std::uint32_t token{};
     std::uint32_t program{};
     std::uint32_t subtree_end{};
+    // A colour's role, where role() gave it (P8, EC4); `source` is none
+    // for every other component, a literal colour included.
+    ColourOrigin origin{};
 
     friend bool operator==(const ValueComponent& left, const ValueComponent& right) noexcept {
         return left.kind == right.kind && left.unit == right.unit && left.number == right.number &&
                left.colour == right.colour && left.text == right.text && left.token == right.token &&
-               left.program == right.program && left.subtree_end == right.subtree_end;
+               left.program == right.program && left.subtree_end == right.subtree_end &&
+               left.origin == right.origin;
     }
 };
 
@@ -89,6 +94,9 @@ struct ThemeValue final {
     std::vector<ValueComponent> components{};
     std::vector<ValueProgram> programs{};
     std::vector<ExpressionInstruction> instructions{};
+    // The colour roles the value's role()s read, one bit a role by its
+    // position, mixed colours' included.
+    std::uint32_t roles_read{};
 
     // The instructions of `program`, one of this value's programs.
     [[nodiscard]] std::span<const ExpressionInstruction> program_instructions(ValueProgram program) const& noexcept;
@@ -97,6 +105,25 @@ struct ThemeValue final {
 
 // The colour a CSS named colour or `transparent` names, in any ASCII case.
 [[nodiscard]] std::optional<Color> named_colour(std::string_view name) noexcept;
+
+static_assert(colour_role_count <= 32U, "ThemeValue::roles_read holds one bit a role");
+
+// One role's colours in a palette: a pair's foreground and background, or
+// a single role's colour as its foreground.
+struct RoleColours final {
+    Color foreground{};
+    Color background{};
+
+    friend bool operator==(RoleColours left, RoleColours right) noexcept {
+        return left.foreground == right.foreground && left.background == right.background;
+    }
+};
+
+// The colours role() reads (P8, R2-03): each role the theme's `:root`
+// palette declares, by the role's position.
+struct RolePalette final {
+    std::array<std::optional<RoleColours>, colour_role_count> roles{};
+};
 
 // What a value may read besides constants, all borrowed for the read:
 // - `parameters`: the registered names of all the primitive's parameters,
@@ -108,11 +135,18 @@ struct ThemeValue final {
 // - `resources`: the resource names the manifest lists, for `url()`.
 // `fold_constants` is true except in the tests that compare folded and
 // unfolded programs.
+// - `palette`: the colours role() reads; null where role() is not
+//   admitted (a palette's own declarations);
+// - `bare_side`: the colour role(<pair>) without a side gives, its
+//   foreground in `color` and its background in `background` and
+//   `background-color`; none elsewhere, where a pair needs its side.
 struct ValueContext final {
     std::span<const std::string_view> parameters{};
     std::size_t published_values{};
     std::span<const std::string_view> resources{};
     bool fold_constants{true};
+    const RolePalette* palette{};
+    std::optional<ColourRoleSide> bare_side{};
 };
 
 // What one read takes, all borrowed for the call. `written` is the
@@ -145,6 +179,10 @@ public:
     // - an expression the engine's compiler refuses (E408), or one over its
     //   budget (E507);
     // - a resource the context does not list (E413);
+    // - role() of a role the vocabulary lacks or with an unknown side
+    //   (E406), of a pair without a side where the property gives none, of
+    //   a single role with a side, or where no palette is given (E405), or
+    //   of a role the palette does not declare (E415);
     // - groups nested past maximum_nesting_depth (E504).
     // On `refused`, `value` is empty. Each constant operation of an
     // expression is evaluated by the engine's own evaluator as it is read,

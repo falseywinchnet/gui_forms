@@ -130,6 +130,10 @@ struct AssembledPartMaterial final {
     std::uint64_t rules_serial{};
     std::array<const MaterialDeclaration*, material_field_count> fields{};
     Size box{};
+    // The part's em and text colour, where a field reads them (T3 P8c);
+    // else 0 and transparent black.
+    double em{};
+    Color current_colour{};
     SurfaceMaterial floor{};
     SurfaceMaterial material{};
 };
@@ -137,12 +141,17 @@ struct AssembledPartMaterial final {
 class Window;
 
 // One property's transition on a part (E7): an engine property or the
-// parameter at `parameter`, the state of its machine the part was last painted in (none
-// when the part's states matched none), and the property's motion value,
-// made the first time the part is painted with the transition.
+// parameter at `parameter`, the machine and the state of it the part was
+// last painted in (state none when the part's states matched none), and
+// the property's motion value, made the first time the part is painted
+// with the transition. The machine is CompiledTransition::machine of the
+// compiled rules whose serial is `rules_serial`; a machine of other rules
+// (a theme replaced) is compared by state alone.
 struct PartTransitionChannel final {
     PresentationProperty property{PresentationProperty::parameter};
     std::size_t parameter{};
+    std::uint64_t rules_serial{};
+    std::size_t machine{};
     std::optional<std::size_t> state{};
     std::optional<MotionValue> value{};
 };

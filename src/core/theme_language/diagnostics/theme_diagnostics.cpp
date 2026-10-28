@@ -55,6 +55,8 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::expression_invalid:
     case DiagnosticCode::variable_undefined:
     case DiagnosticCode::variable_cycle:
+    case DiagnosticCode::keyframes_undefined:
+    case DiagnosticCode::colour_role_undefined:
     case DiagnosticCode::resource_unknown:
     case DiagnosticCode::sheet_too_large:
     case DiagnosticCode::too_many_rules:
@@ -68,6 +70,7 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::too_many_custom_properties:
     case DiagnosticCode::substitution_too_long:
     case DiagnosticCode::lowered_sheet_too_large:
+    case DiagnosticCode::too_many_keyframes:
     case DiagnosticCode::reserved_input_set:
     case DiagnosticCode::not_yet_built:
         return DiagnosticSeverity::error;
@@ -75,12 +78,14 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::unknown_primitive:
     case DiagnosticCode::unknown_function:
     case DiagnosticCode::unknown_at_rule:
+    case DiagnosticCode::unknown_media_feature:
     case DiagnosticCode::unknown_selector_name:
     case DiagnosticCode::property_not_admitted:
     case DiagnosticCode::primitive_over_budget:
     case DiagnosticCode::primitive_cost_unbounded:
     case DiagnosticCode::needs_newer_engine:
     case DiagnosticCode::keyword_from_newer_engine:
+    case DiagnosticCode::literal_colour_unremappable:
         return DiagnosticSeverity::warning;
     }
     // A value outside the enumeration is treated as the stricter class.
@@ -118,6 +123,8 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
     case DiagnosticCode::expression_invalid: return "expression_invalid";
     case DiagnosticCode::variable_undefined: return "variable_undefined";
     case DiagnosticCode::variable_cycle: return "variable_cycle";
+    case DiagnosticCode::keyframes_undefined: return "keyframes_undefined";
+    case DiagnosticCode::colour_role_undefined: return "colour_role_undefined";
     case DiagnosticCode::resource_unknown: return "resource_unknown";
     case DiagnosticCode::sheet_too_large: return "sheet_too_large";
     case DiagnosticCode::too_many_rules: return "too_many_rules";
@@ -131,18 +138,21 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
     case DiagnosticCode::too_many_custom_properties: return "too_many_custom_properties";
     case DiagnosticCode::substitution_too_long: return "substitution_too_long";
     case DiagnosticCode::lowered_sheet_too_large: return "lowered_sheet_too_large";
+    case DiagnosticCode::too_many_keyframes: return "too_many_keyframes";
     case DiagnosticCode::reserved_input_set: return "reserved_input_set";
     case DiagnosticCode::not_yet_built: return "not_yet_built";
     case DiagnosticCode::unknown_property: return "unknown_property";
     case DiagnosticCode::unknown_primitive: return "unknown_primitive";
     case DiagnosticCode::unknown_function: return "unknown_function";
     case DiagnosticCode::unknown_at_rule: return "unknown_at_rule";
+    case DiagnosticCode::unknown_media_feature: return "unknown_media_feature";
     case DiagnosticCode::unknown_selector_name: return "unknown_selector_name";
     case DiagnosticCode::property_not_admitted: return "property_not_admitted";
     case DiagnosticCode::primitive_over_budget: return "primitive_over_budget";
     case DiagnosticCode::primitive_cost_unbounded: return "primitive_cost_unbounded";
     case DiagnosticCode::needs_newer_engine: return "needs_newer_engine";
     case DiagnosticCode::keyword_from_newer_engine: return "keyword_from_newer_engine";
+    case DiagnosticCode::literal_colour_unremappable: return "literal_colour_unremappable";
     }
     return "unknown";
 }
@@ -170,6 +180,7 @@ void ThemeDiagnosticList::add(ThemeDiagnostic diagnostic) {
     if (severity == DiagnosticSeverity::error) {
         ++errors_;
     } else {
+        if (warnings_muted_) return;
         ++warnings_;
     }
     if (records_.size() < maximum_diagnostic_records) {
@@ -192,6 +203,7 @@ void ThemeDiagnosticList::clear() noexcept {
     errors_ = 0U;
     warnings_ = 0U;
     dropped_ = 0U;
+    warnings_muted_ = false;
 }
 
 std::string theme_diagnostic_log_line(const ThemeDiagnostic& diagnostic) {

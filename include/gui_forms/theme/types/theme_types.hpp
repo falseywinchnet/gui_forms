@@ -220,6 +220,23 @@ struct ControlRoleRecipes final {
 // records are replaced.
 [[nodiscard]] ControlRoleRecipes derive_high_contrast_recipes(ControlRoleRecipes recipes);
 
+// The colour forced high contrast draws in place of one a theme declared
+// (T3 EC4, owner decision D3 of 2026-10-28), for a part in `state`,
+// `selected` or not, from the same palette as derive_high_contrast_recipes:
+// - a literal, by its position: a fill takes the state's plate, an edge
+//   its edge and text its text (a selected part's: a white plate and black
+//   text); a colour with no position takes the plate;
+// - a role's colour, by its side: a foreground takes the text, or the
+//   edge in an edge position, and a background the plate; a single role
+//   of the relief ramp (and `shadow`) takes the plate and a line the edge;
+//   except that the disabled roles' foregrounds take the disabled state's
+//   text or edge, `invalid-ink-on-tint`'s foreground the invalid edge,
+//   `focus` and `selection-line` the hot edge, and the selection and
+//   on-accent pairs black on white, as a selected part.
+// The forced high-contrast pass that draws with it is T3 P9's (EC6).
+[[nodiscard]] Color high_contrast_colour(ColourOrigin origin, ColourPosition position, ControlSurfaceState state,
+                                         bool selected) noexcept;
+
 // The recipes of every control visual role, indexed by ControlVisualRole,
 // held out of line. They are most of a theme's description (one family of
 // four state tables per role, some 100 KB), so holding them on the heap
