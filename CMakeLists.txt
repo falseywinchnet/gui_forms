@@ -2208,9 +2208,16 @@ if(GUI_FORMS_BUILD_TESTS)
                 ${GUI_FORMS_REFERENCE_CLANG} ${CMAKE_CURRENT_SOURCE_DIR}/include)
         add_test(NAME gui_forms_api_reference_tests
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/api_reference_tests.py)
+        # The include directories a consumer of the public headers compiles
+        # with: gui_forms_core's own and those of its public dependencies
+        # (stx_zlib, stx_png, ...), evaluated transitively by CMake, one per
+        # line. tools/api_reference.py --build reads them from here.
+        file(GENERATE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/api_reference_include_directories.txt
+            CONTENT "$<JOIN:$<TARGET_PROPERTY:gui_forms_core,INTERFACE_INCLUDE_DIRECTORIES>,\n>\n")
         add_custom_target(gui_forms_api_reference
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/api_reference.py
                 --clang ${GUI_FORMS_REFERENCE_CLANG}
+                --build ${CMAKE_CURRENT_BINARY_DIR}
                 --output ${CMAKE_CURRENT_BINARY_DIR}/reference
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             COMMENT "Extracting native C++ API and rendering authored contracts"
