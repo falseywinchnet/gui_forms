@@ -92,3 +92,21 @@ The checker's run on this tree, `gui_forms-2026-10-27.json`, reads 989 files (11
 Row 34 is fixed in Phase E cleanup. The pointer trace now takes its `%.*s` precision from `traced_stable_id` in `windows_host.cpp`, which prints at most `maximum_traced_stable_id_bytes` (1024) bytes of the target's stable ID. A longer ID is printed cut to that length, and the line then carries `target_cut_from:<full length in bytes>`, so the cut is never silent. Its record is removed from `../reviews.json`: the evidence line no longer exists, and the checker fails its gate on a decision whose line is gone. If the old line came back, the checker would raise it again as a new candidate.
 
 The checker on that tree reads 989 files (11 Skia files excluded) and has 30 candidates: 0 raised, 14 guarded and 16 reviewed. The narrowing on the old line is gone, so the candidate no longer appears. `gui_forms-2026-10-27.json` is the snapshot from before the fix and is kept as it was.
+
+# CodeQL alerts on stx_zlib and stx_vorbis (2026-10-28)
+
+GitHub's CodeQL default setup raised five alerts outside Skia on main
+`31d974a0`. Each was read against its bounds, and none is a defect, so none
+teaches this checker a new shape. By the owner's decision each site is
+rewritten in an equivalent form the query does not flag, with no change in
+behaviour; no alert is dismissed.
+
+| Alert | Rule | Site | Why it was safe | Equivalent form |
+|---|---|---|---|---|
+| 3 | integer-multiplication-cast-to-long | stx_vorbis/src/packet.cpp:188 | `row * step` is below `dimensions * step`, which is at most the residue's partition size, a 24-bit setup field plus one (setup.cpp:305) | the product is taken in `std::size_t` |
+| 4 | integer-multiplication-cast-to-long | stx_zlib/src/deflate.cpp:675 | a frequency counts one block's tokens (`block_capacity`, 32768) plus the end symbol, and a fixed code is at most 9 bits | the frequency is widened to `std::uint64_t` before the product, as is the fixed distance sum beside it |
+| 5 | integer-multiplication-cast-to-long | stx_zlib/src/deflate.cpp:577 | as alert 4, with a dynamic code of at most 15 bits | as alert 4 |
+| 6 | integer-multiplication-cast-to-long | stx_zlib/src/deflate.cpp:580 | as alert 5, for the distance alphabet | as alert 4 |
+| 10 | suspicious-add-sizeof | stx_vorbis/src/c_adapter.cpp:118 | the pointer is `std::byte*`, so adding `sizeof(stb_vorbis)` steps past the handle by exactly its size in bytes | the arena after the handle is a `subspan` of the aligned buffer |
+
+The other five open alerts are in `stx_skia/`, which is outside this review.
