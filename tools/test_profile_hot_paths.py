@@ -68,6 +68,23 @@ class ParseTests(unittest.TestCase):
         # A function the inclusive listing left out keeps its self share.
         self.assertEqual(merged[3].inclusive_percent, merged[3].self_percent)
 
+    def test_split_inclusive_rows_are_summed_and_held_above_self(self) -> None:
+        # perf --children can list one function twice; the self listing once.
+        self_rows: list[HotFunction] = [HotFunction('af_glyph_hints_reload', 'w', 12.35, 12.35, 'freetype'),
+                                        HotFunction('FT_Load_Glyph', 'w', 3.0, 3.0, 'freetype')]
+        children_rows: list[HotFunction] = [HotFunction('af_glyph_hints_reload', 'w', 11.86, 13.56, 'freetype'),
+                                            HotFunction('af_glyph_hints_reload', 'w', 0.48, 0.61, 'freetype'),
+                                            HotFunction('FT_Load_Glyph', 'w', 0.5, 1.0, 'freetype')]
+        merged: list[HotFunction] = profile_hot_paths.merge_inclusive(self_rows, children_rows)
+        self.assertEqual(merged[0].inclusive_percent, 14.17)
+        # An inclusive share below the self share (a split the listing cut off) is raised to it.
+        self.assertEqual(merged[1].inclusive_percent, 3.0)
+
+    def test_sample_count_reads_the_header_with_its_scale(self) -> None:
+        self.assertEqual(profile_hot_paths.sample_count(SELF_LISTING), 41000)
+        self.assertEqual(profile_hot_paths.sample_count("# Samples: 81  of event 'cpu-clock'"), 81)
+        self.assertEqual(profile_hot_paths.sample_count('no header'), 0)
+
     def test_symbol_padding_and_later_columns_are_dropped(self) -> None:
         # perf 6.17 pads the symbol column, and an IPC column follows it.
         line: str = ' 30.83% \tgui_forms_paint_profile_workload\t[.] sse2::rect_memset32(unsigned int*)      \t-      -'
@@ -101,6 +118,12 @@ class AreaTests(unittest.TestCase):
         self.assertIn('operator\\|(a, b)', table)
         self.assertIn('| 1 | 5.00% | 9.00% | other |', table)
         self.assertIn('libfoo.so', table)
+        self.assertNotIn('samples', table)
+
+    def test_markdown_table_flags_a_workload_too_small_to_rank(self) -> None:
+        rows: list[HotFunction] = [HotFunction('validate_utf8', 'w', 32.1, 32.1, 'gui_forms')]
+        self.assertIn('too few to rank', profile_hot_paths.markdown_table('document_view', rows, 10, 81))
+        self.assertNotIn('too few to rank', profile_hot_paths.markdown_table('paint', rows, 10, 13000))
 
 
 if __name__ == '__main__':

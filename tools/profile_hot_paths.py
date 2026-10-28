@@ -44,6 +44,9 @@ SEPARATOR: str = '\t'
 # so its frames give self shares only.
 PROFILE_FLAGS: str = '-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -gline-tables-only'
 DEFAULT_TOP: int = 40
+# Below this many samples a workload's shares are listed but not ranked:
+# one sample is more than a tenth of a percent.
+MINIMUM_RANKED_SAMPLES: int = 1000
 
 
 @dataclass(frozen=True)
@@ -51,23 +54,29 @@ class Workload:
     """One recorded workload: the build target and its arguments.
 
     {output} in an argument is the workload's own output directory; {fonts}
-    is the bundled font directory.
+    is the bundled font directory. runs is how many times one recording runs
+    the program back to back, so that a short benchmark still collects
+    MINIMUM_RANKED_SAMPLES samples.
     """
     name: str
     target: str
     arguments: tuple[str, ...]
     about: str
+    runs: int = 1
 
 
 WORKLOADS: tuple[Workload, ...] = (
     Workload('paint', 'gui_forms_paint_profile_workload', ('{output}',),
              'the Gallery through the CPU Skia adapter: M2d damage matrix and every page '
              '(benchmarks/paint_profile_workload.cpp)'),
-    Workload('text_engine', 'gui_forms_text_engine_benchmark', ('{fonts}', '15'),
-             '100 caption labels through the HarfBuzz/FreeType engine, 15 passes '
+    # 15 passes collected about 800 samples at 999 Hz; 180 collect about ten thousand.
+    Workload('text_engine', 'gui_forms_text_engine_benchmark', ('{fonts}', '180'),
+             '100 caption labels through the HarfBuzz/FreeType engine, 180 passes '
              '(benchmarks/text_engine_benchmark.cpp)'),
+    # One run collected about 80 samples; 100 runs collect about eight thousand.
     Workload('document_view', 'gui_forms_document_view_benchmark', (),
-             'the renderer-neutral DocumentView D1 workload (benchmarks/document_view_benchmark.cpp)'),
+             'the renderer-neutral DocumentView D1 workload, run 100 times in one recording '
+             '(benchmarks/document_view_benchmark.cpp)', 100),
 )
 
 # Configure options that add the workloads to the toolkit build.
@@ -173,16 +182,33 @@ def parse_report(text: str) -> list[HotFunction]:
 
 
 def merge_inclusive(self_rows: list[HotFunction], children_rows: list[HotFunction]) -> list[HotFunction]:
-    """The self rows, each given its inclusive share from the --children listing when it has one."""
+    """The self rows, each given its inclusive share from the --children listing when it has one.
+
+    The --children listing can split one function name into several rows
+    (perf keeps entries apart that the self listing merges), so the
+    inclusive shares of one name are summed. The sum is held between the
+    function's self share and 100 %.
+    """
     inclusive: dict[tuple[str, str], float] = {}
     row: HotFunction
     for row in children_rows:
-        inclusive[(row.symbol, row.dso)] = row.inclusive_percent
+        key: tuple[str, str] = (row.symbol, row.dso)
+        inclusive[key] = inclusive.get(key, 0.0) + row.inclusive_percent
     merged: list[HotFunction] = []
     for row in self_rows:
         share: float = inclusive.get((row.symbol, row.dso), row.self_percent)
-        merged.append(HotFunction(row.symbol, row.dso, row.self_percent, share, row.area))
+        share = min(100.0, max(share, row.self_percent))
+        merged.append(HotFunction(row.symbol, row.dso, row.self_percent, round(share, 2), row.area))
     return merged
+
+
+def sample_count(text: str) -> int:
+    """The sample count in a perf report header ("# Samples: 81" or "6K"), or 0 when it has none."""
+    match: re.Match[str] | None = re.search(r'^# Samples:\s*([0-9.]+)([KMG]?)', text, re.MULTILINE)
+    if match is None:
+        return 0
+    scale: dict[str, int] = {'': 1, 'K': 1000, 'M': 1000000, 'G': 1000000000}
+    return int(float(match.group(1)) * scale[match.group(2)])
 
 
 def area_shares(rows: list[HotFunction]) -> dict[str, float]:
@@ -204,9 +230,15 @@ def area_sort_key(item: tuple[str, float]) -> tuple[float, str]:
     return (-item[1], item[0])
 
 
-def markdown_table(workload: str, rows: list[HotFunction], top: int) -> str:
+def markdown_table(workload: str, rows: list[HotFunction], top: int, samples: int = 0) -> str:
     """The hot-path table for one workload: its areas, then its top functions by self share."""
-    lines: list[str] = [f'### {workload}', '', '| Area | Self share |', '|---|---:|']
+    lines: list[str] = [f'### {workload}', '']
+    if samples:
+        lines.append(f'About {samples} samples.')
+        if samples < MINIMUM_RANKED_SAMPLES:
+            lines.append(f'Fewer than {MINIMUM_RANKED_SAMPLES} samples: listed, too few to rank.')
+        lines.append('')
+    lines.extend(['| Area | Self share |', '|---|---:|'])
     name: str
     share: float
     for name, share in area_shares(rows).items():
@@ -300,7 +332,7 @@ def report_listing(data: Path, children: bool, destination: Path) -> str:
     return destination.read_text(encoding='utf-8')
 
 
-def profile_workload(workload: Workload, tree: Path, output: Path, frequency: int) -> list[HotFunction]:
+def profile_workload(workload: Workload, tree: Path, output: Path, frequency: int) -> tuple[list[HotFunction], int]:
     """Run one workload under perf record and read its two listings."""
     directory: Path = output / workload.name
     directory.mkdir(parents=True, exist_ok=True)
@@ -310,23 +342,29 @@ def profile_workload(workload: Workload, tree: Path, output: Path, frequency: in
         arguments.append(argument.replace('{output}', str(directory)).replace('{fonts}',
                                                                               str(SOURCE / 'assets/fonts')))
     data: Path = directory / 'perf.data'
-    run_command(['perf', 'record', '-F', str(frequency), '-g', '-o', str(data), '--',
-                 str(tree / workload.target), *arguments], directory / 'stdout.txt')
-    self_rows: list[HotFunction] = parse_report(report_listing(data, False, directory / 'report-self.txt'))
+    program: list[str] = [str(tree / workload.target), *arguments]
+    if workload.runs > 1:
+        # perf follows the shell's children; the loop stops at the first failing run.
+        loop: str = f'i=0; while [ "$i" -lt {workload.runs} ]; do "$0" "$@" || exit 1; i=$((i + 1)); done'
+        program = ['sh', '-c', loop, *program]
+    run_command(['perf', 'record', '-F', str(frequency), '-g', '-o', str(data), '--', *program],
+                directory / 'stdout.txt')
+    self_listing: str = report_listing(data, False, directory / 'report-self.txt')
+    self_rows: list[HotFunction] = parse_report(self_listing)
     children_rows: list[HotFunction] = parse_report(report_listing(data, True, directory / 'report-children.txt'))
     # perf.data is large and machine-bound; the listings carry its content.
     data.unlink()
-    return merge_inclusive(self_rows, children_rows)
+    return merge_inclusive(self_rows, children_rows), sample_count(self_listing)
 
 
-def hot_path_record(workload: Workload, rows: list[HotFunction], top: int) -> dict[str, object]:
+def hot_path_record(workload: Workload, rows: list[HotFunction], top: int, samples: int) -> dict[str, object]:
     functions: list[dict[str, object]] = []
     index: int
     for index in range(min(top, len(rows))):
         row: HotFunction = rows[index]
         functions.append({'symbol': row.symbol, 'object': Path(row.dso).name, 'area': row.area,
                           'self_percent': row.self_percent, 'inclusive_percent': row.inclusive_percent})
-    return {'workload': workload.name, 'about': workload.about, 'areas': area_shares(rows),
+    return {'workload': workload.name, 'about': workload.about, 'samples': samples, 'areas': area_shares(rows),
             'functions': functions}
 
 
@@ -348,9 +386,11 @@ def run(output: Path, jobs: int, frequency: int, top: int) -> int:
     sections: list[str] = []
     workload: Workload
     for workload in WORKLOADS:
-        rows: list[HotFunction] = profile_workload(workload, tree, output, frequency)
-        records.append(hot_path_record(workload, rows, top))
-        sections.append(markdown_table(workload.name, rows, top))
+        rows: list[HotFunction]
+        samples: int
+        rows, samples = profile_workload(workload, tree, output, frequency)
+        records.append(hot_path_record(workload, rows, top, samples))
+        sections.append(markdown_table(workload.name, rows, top, samples))
     report: dict[str, object] = {'schema': 'gui_forms.hot_paths.v1', 'host': host, 'frequency_hz': frequency,
                                  'build_flags': PROFILE_FLAGS, 'workloads': records}
     (output / 'hot-paths.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
@@ -370,11 +410,12 @@ def run(output: Path, jobs: int, frequency: int, top: int) -> int:
 
 
 def summarize(report: Path, workload: str, top: int) -> int:
-    rows: list[HotFunction] = parse_report(report.read_text(encoding='utf-8'))
+    listing: str = report.read_text(encoding='utf-8')
+    rows: list[HotFunction] = parse_report(listing)
     if not rows:
         print(f'{report}: no perf report rows', file=sys.stderr)
         return 1
-    print(markdown_table(workload, rows, top))
+    print(markdown_table(workload, rows, top, sample_count(listing)))
     return 0
 
 
