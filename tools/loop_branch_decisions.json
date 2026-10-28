@@ -2,6 +2,27 @@
   "about": "Decisions on the loop branches that harness/check_loop_branches.py (E2) reports, matched by path, function and condition text. keep: the branch stays, for the reason given. false_shape: the condition is not invariant (it changes inside the loop through a call, a callback or another thread).",
   "decisions": [
     {
+      "path": "demo/correspondence/correspondence_controls.cpp",
+      "function": "gui_forms::correspondence::project_messages",
+      "condition": "!search.empty()",
+      "decision": "keep",
+      "reason": "a few visible messages; a search adds its term to each item"
+    },
+    {
+      "path": "demo/responsive_tracks_lab.cpp",
+      "function": "gui_forms::responsive_tracks_lab::SidePane::arrange",
+      "condition": "seam_at_right_",
+      "decision": "keep",
+      "reason": "a demonstration's few children; one placement select per child"
+    },
+    {
+      "path": "src/audio/loop_transport/scheduler.cpp",
+      "function": "gui_forms::audio_experiment::finish",
+      "condition": "phase == RequestPhase::rejected",
+      "decision": "keep",
+      "reason": "runs once, on the matching receipt, then returns"
+    },
+    {
       "path": "src/controls/backstage_view/backstage_view.cpp",
       "function": "gui_forms::on_semantic_child_action",
       "condition": "action == SemanticAction::select || action == SemanticAction::press",
@@ -1211,6 +1232,55 @@
       "condition": "input_[offset_] != '<'",
       "decision": "false_shape",
       "reason": "skip_space() moves offset_ inside the loop"
+    },
+    {
+      "path": "src/host/linux/settings/xsettings_parse.cpp",
+      "function": "gui_forms::host::linux_detail::read_card32",
+      "condition": "cursor.most_significant",
+      "decision": "keep",
+      "reason": "four bytes; the byte order picks each lane"
+    },
+    {
+      "path": "src/host/windows/application/windows_host.cpp",
+      "function": "gui_forms::host::DibPainter::draw_group_line",
+      "condition": "length_squared > 0.0",
+      "decision": "keep",
+      "reason": "guards a division per pixel; a hoisted reciprocal would change the rounding, and a split would duplicate the coverage body"
+    },
+    {
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp",
+      "function": "gui_forms::host::Implementation::allocate_compatibility_handle",
+      "condition": "sizeof(std::uintptr_t) >= sizeof(std::uint64_t)",
+      "decision": "false_shape",
+      "reason": "an if constexpr: the choice is made at compile time"
+    },
+    {
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp",
+      "function": "gui_forms::host::Implementation::publisher_loop",
+      "condition": "publisher_stop",
+      "decision": "false_shape",
+      "reason": "another thread sets publisher_stop under the lock; the condition wait reloads it"
+    },
+    {
+      "path": "src/host/windows/win32_compat_shim.cpp",
+      "function": "try_dib32_srccopy",
+      "condition": "reverse",
+      "decision": "keep",
+      "reason": "the copy order for overlapping rows; one select per row, and the row copy is shared"
+    },
+    {
+      "path": "src/render/text/glyph_run/glyph_run_raster.cpp",
+      "function": "gui_forms::render::text::Runner::run",
+      "condition": "placement.matrix.has_value()",
+      "decision": "keep",
+      "reason": "one FreeType transform per glyph, with or without the matrix; a split would duplicate the glyph body"
+    },
+    {
+      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
+      "function": "gui_forms::render::text::Impl::append_run",
+      "condition": "Bounded",
+      "decision": "false_shape",
+      "reason": "an if constexpr on a template parameter: the choice is made at compile time"
     }
   ]
 }
