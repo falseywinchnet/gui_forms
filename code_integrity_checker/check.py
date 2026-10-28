@@ -11,15 +11,17 @@ Every candidate ends in one status:
 - reviewed: a recorded decision in reviews.json covers it (defect, guarded or
   false_shape), so it is not raised again.
 
-A `fixed` decision records a defect that a later change removed. It never
-covers a finding: if the recorded evidence line returns, the finding is raised
-again and its record names the fix it undoes.
+A decision whose evidence line no longer exists is stale. When its file is in
+the scope a run reads (or was in it and is gone), the run names it and the gate
+fails, so the record is updated or removed with the change that moved the
+line. A fixed defect is removed from reviews.json; its history stays in
+reports/README.md.
 
 Paths under a scope reviews.json excludes (the Skia renderer and its C ABI,
 which are being replaced) are not read at all.
 
-The gate fails only on raised candidates, so a reviewed scope stays clean while
-new code is checked.
+The gate fails on raised candidates and stale decisions, so a reviewed scope
+stays clean while new code is checked.
 """
 
 from __future__ import annotations
@@ -78,7 +80,7 @@ GUARDS = {
     # (admit, charge, require, validate, check).
     "named_failure": "an earlier named admission fails for an operand out of range",
 }
-REVIEW_DECISIONS = ("defect", "guarded", "false_shape", "fixed")
+REVIEW_DECISIONS = ("defect", "guarded", "false_shape")
 DEFAULT_REVIEWS = Path(__file__).resolve().parent / "reviews.json"
 
 
@@ -532,13 +534,33 @@ def classify(finding: Finding, reviews: Reviews) -> tuple[str, Review | None]:
     key = (path, finding.rule, normalized_evidence(finding.evidence))
     for review in reviews.entries:
         if (review.path, review.rule, review.evidence) == key:
-            # A fixed defect that returns is a regression: raised, never covered.
-            if review.decision == "fixed":
-                return "raised", review
             return "reviewed", review
     if finding.guard:
         return "guarded", None
     return "raised", None
+
+
+def in_scope(review: Review, roots: tuple[str, ...]) -> bool:
+    """Whether a run over these path arguments would read the review's file, if it still exists."""
+    root: str
+    for root in roots:
+        directory = root.rstrip("/") + "/"
+        if review.path == root.rstrip("/") or review.path.startswith(directory) or root in (".", "./"):
+            return True
+    return False
+
+
+def stale_reviews(reviews: Reviews, roots: tuple[str, ...], used: set[Review]) -> list[Review]:
+    """The in-scope decisions no finding matched: their evidence line, or their file, is gone."""
+    stale: list[Review] = []
+    review: Review
+    for review in reviews.entries:
+        if review in used or not in_scope(review, roots):
+            continue
+        if excluded(Path(review.path), reviews.excluded_scopes):
+            continue
+        stale.append(review)
+    return stale
 
 
 def main() -> int:
@@ -564,9 +586,12 @@ def main() -> int:
     counts: dict[str, int] = {"raised": 0, "guarded": 0, "reviewed": 0}
     records: list[dict[str, object]] = []
     apart: list[str] = []
+    used: set[Review] = set()
     for finding in findings:
         status, review = classify(finding, reviews)
         counts[status] += 1
+        if review is not None:
+            used.add(review)
         record = finding.record()
         record["status"] = status
         if review is not None:
@@ -580,8 +605,6 @@ def main() -> int:
             related = "" if finding.related_line is None else f" (related line {finding.related_line})"
             print(f"{finding.path}:{finding.line}: {finding.rule} {rule.title} [house style {rule.style}]{related}")
             print(f"  {finding.evidence}")
-            if review is not None:
-                print(f"  Regression: this line was recorded as fixed ({review.reason})")
             print(f"  Review: {rule.question}")
         else:
             detail = finding.guard if status == "guarded" else (review.decision if review is not None else "")
@@ -590,12 +613,21 @@ def main() -> int:
         print("Listed apart (guarded or reviewed):")
         for line in apart:
             print(line)
+    roots: tuple[str, ...] = tuple(normalized_path(Path(argument).as_posix()) for argument in arguments.paths)
+    stale: list[Review] = stale_reviews(reviews, roots, used)
+    stale_review: Review
+    for stale_review in stale:
+        print(f"{stale_review.path}: stale {stale_review.decision} decision in {arguments.reviews}: "
+              f"no {stale_review.rule} candidate has the evidence line")
+        print(f"  {stale_review.evidence}")
+        print("  Update the decision to the current line, or remove it.")
     print(f"code integrity: {len(paths)} files ({len(selected) - len(paths)} excluded), {len(findings)} candidates: "
-          f"{counts['raised']} raised, {counts['guarded']} guarded, {counts['reviewed']} reviewed")
+          f"{counts['raised']} raised, {counts['guarded']} guarded, {counts['reviewed']} reviewed; "
+          f"{len(stale)} stale decisions")
     if arguments.json is not None:
         arguments.json.parent.mkdir(parents=True, exist_ok=True)
         arguments.json.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
-    return 1 if arguments.gate and counts["raised"] else 0
+    return 1 if arguments.gate and (counts["raised"] or stale) else 0
 
 
 if __name__ == "__main__":

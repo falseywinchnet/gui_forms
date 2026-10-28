@@ -106,6 +106,7 @@ documented example that stops compiling or throws fails the native jobs.
 `docs/reference/inventory.json`, extracted with `clang -ast-dump=json`, and
 validates the reviewed contracts in `docs/reference/contracts/` against it.
 The API reference pages use those contracts' remarks and member summaries.
-`python3 tools/api_reference.py --check` compares the committed inventory byte
-for byte with a fresh dump; the dump differs between compiler builds, so the
+`python3 tools/api_reference.py --check --build <build tree>` compares the
+committed inventory byte for byte with a fresh dump, compiled with the include
+directories that build tree records; the dump differs between compiler builds, so the
 check runs locally with LLVM 22.1.8, not on CI runners.

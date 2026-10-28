@@ -1271,18 +1271,21 @@ void add_drop_shadow(const PartFilters& filters, const PartRasterView& destinati
     const std::size_t stride = columns;
     const std::int64_t wide = static_cast<std::int64_t>(width);
     const std::int64_t high = static_cast<std::int64_t>(height);
-    for (std::int64_t row = 0; row < high; ++row) {
+    const std::int64_t shift_x = filters.shadow_x;
+    const std::int64_t shift_y = filters.shadow_y;
+    // Only pixels whose shifted source lies inside the blurred alpha can be
+    // covered: rows [first_row, end_row) and columns [first_column,
+    // end_column). Every other pixel has no shadow and is left as it is.
+    const std::int64_t first_row = std::max<std::int64_t>(0, shift_y);
+    const std::int64_t end_row = std::min<std::int64_t>(high, high + shift_y);
+    const std::int64_t first_column = std::max<std::int64_t>(0, shift_x);
+    const std::int64_t end_column = std::min<std::int64_t>(wide, wide + shift_x);
+    for (std::int64_t row = first_row; row < end_row; ++row) {
         const std::size_t start = static_cast<std::size_t>(row) * destination.row_bytes;
-        const std::int64_t source_row = row - filters.shadow_y;
-        for (std::int64_t column = 0; column < wide; ++column) {
-            const std::int64_t source_column = column - filters.shadow_x;
-            const bool within = source_row >= 0 && source_row < high && source_column >= 0 && source_column < wide;
-            double coverage = 0.0;
-            if (within) {
-                const std::size_t at = static_cast<std::size_t>(source_row) * stride +
-                                       static_cast<std::size_t>(source_column);
-                coverage = static_cast<double>(first[at]) / 255.0;
-            }
+        const std::size_t source_start = static_cast<std::size_t>(row - shift_y) * stride;
+        for (std::int64_t column = first_column; column < end_column; ++column) {
+            const std::size_t at = source_start + static_cast<std::size_t>(column - shift_x);
+            const double coverage = static_cast<double>(first[at]) / 255.0;
             if (coverage <= 0.0) continue;
             const std::size_t offset = start + static_cast<std::size_t>(column) * part_raster_bytes_per_pixel;
             const Unit drawn{static_cast<double>(destination.pixels[offset]) / 255.0,

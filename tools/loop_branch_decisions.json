@@ -1,0 +1,530 @@
+{
+  "about": "Decisions on the loop branches that harness/check_loop_branches.py (E2) reports, matched by path, function and condition text. keep: the branch stays, for the reason given. false_shape: the condition is not invariant (it changes inside the loop through a call, a callback or another thread).",
+  "decisions": [
+    {
+      "path": "src/core/background_worker/background_worker.cpp",
+      "function": "gui_forms::detail::post_from_worker",
+      "condition": "!wait_for_room",
+      "decision": "keep",
+      "reason": "the loop is a retry on a full queue; the flag decides whether to retry at all, so it is the loop's exit"
+    },
+    {
+      "path": "src/core/binding/binding_source/binding_source.cpp",
+      "function": "gui_forms::transfer_bindings",
+      "condition": "source_to_control",
+      "decision": "keep",
+      "reason": "selects one of two member calls per binding; hoisting needs a member-function pointer or a second loop, both less clear"
+    },
+    {
+      "path": "src/core/control/control/control.cpp",
+      "function": "gui_forms::arrange",
+      "condition": "mirrored",
+      "decision": "keep",
+      "reason": "layout over a control's children; hoisting would duplicate the arrange body for a one-value select"
+    },
+    {
+      "path": "src/core/control/control/control.cpp",
+      "function": "gui_forms::end_init",
+      "condition": "initialization_depth_ != 0",
+      "decision": "false_shape",
+      "reason": "publication() runs callbacks that may begin a new initialization; initialization_depth_ changes inside the loop"
+    },
+    {
+      "path": "src/core/engine/authored_gradient/authored_gradient.cpp",
+      "function": "gui_forms::place_stops",
+      "condition": "line > 0.0",
+      "decision": "keep",
+      "reason": "one guard per authored stop (a handful); a hoisted reciprocal would change the rounding of the stop offsets"
+    },
+    {
+      "path": "src/core/engine/feature_samples/engine_feature_samples.cpp",
+      "function": "gui_forms::engine_samples::feature_sample_image_pixels",
+      "condition": "row == 1U || row == side - 2U",
+      "decision": "keep",
+      "reason": "builds one small fixed sample image; the ring test reads row and column in one expression"
+    },
+    {
+      "path": "src/core/engine/motion_clock/motion_clock.cpp",
+      "function": "gui_forms::stop_ambient",
+      "condition": "repaint",
+      "decision": "keep",
+      "reason": "a few ambient records; the repaint request is per record, and a second loop would repeat the retirement"
+    },
+    {
+      "path": "src/core/engine/part_table/engine_part_table.cpp",
+      "function": "gui_forms::assemble_slices",
+      "condition": "across.outcome != SliceAxisOutcome::sliced",
+      "decision": "keep",
+      "reason": "a per-row choice between a whole-row copy and the sliced copy; splitting would repeat the row addressing in two loops"
+    },
+    {
+      "path": "src/core/engine/part_table/engine_part_table.cpp",
+      "function": "gui_forms::lend_image_variants",
+      "condition": "images == nullptr",
+      "decision": "keep",
+      "reason": "the earlier part of each iteration (pattern awaiting) runs whatever images is; only the variant step needs it"
+    },
+    {
+      "path": "src/core/engine/primitives/bulge/bulge_primitives.cpp",
+      "function": "gui_forms::engine_primitives::fill",
+      "condition": "gold",
+      "decision": "keep",
+      "reason": "the gold and plain dot rules share the lattice walk; a split would duplicate the whole walk for one call"
+    },
+    {
+      "path": "src/core/engine/primitives/light/glass_primitive.cpp",
+      "function": "gui_forms::engine_primitives::fill",
+      "condition": "filtered",
+      "decision": "keep",
+      "reason": "glass has four independent per-call modes; hoisting them multiplies the pixel loop into many copies"
+    },
+    {
+      "path": "src/core/engine/primitives/light/glass_primitive.cpp",
+      "function": "gui_forms::engine_primitives::fill",
+      "condition": "flattened",
+      "decision": "keep",
+      "reason": "glass has four independent per-call modes; hoisting them multiplies the pixel loop into many copies"
+    },
+    {
+      "path": "src/core/engine/primitives/light/glass_primitive.cpp",
+      "function": "gui_forms::engine_primitives::fill",
+      "condition": "flattened_over_backplane",
+      "decision": "keep",
+      "reason": "glass has four independent per-call modes; hoisting them multiplies the pixel loop into many copies"
+    },
+    {
+      "path": "src/core/engine/primitives/light/glass_primitive.cpp",
+      "function": "gui_forms::engine_primitives::fill",
+      "condition": "sampled",
+      "decision": "keep",
+      "reason": "glass has four independent per-call modes; hoisting them multiplies the pixel loop into many copies"
+    },
+    {
+      "path": "src/core/engine/primitives/material/material_primitive.cpp",
+      "function": "gui_forms::engine_primitives::axis_reach",
+      "condition": "across",
+      "decision": "keep",
+      "reason": "a few shadows; selects the offset component for the axis"
+    },
+    {
+      "path": "src/core/engine/primitives/material/material_primitive.cpp",
+      "function": "gui_forms::engine_primitives::material_pixel",
+      "condition": "cached",
+      "decision": "keep",
+      "reason": "a few shadows per pixel call; cached and uncached coverage share the shadow walk"
+    },
+    {
+      "path": "src/core/engine/primitives/material/material_primitive.cpp",
+      "function": "gui_forms::engine_primitives::resolve_look_at",
+      "condition": "outline.uniform",
+      "decision": "keep",
+      "reason": "a few glows per material; one radius select per glow"
+    },
+    {
+      "path": "src/core/engine/primitives/relief/relief_primitives.cpp",
+      "function": "gui_forms::engine_primitives::fill",
+      "condition": "upright",
+      "decision": "keep",
+      "reason": "a select between the row and column index, written once for both orientations of the fade"
+    },
+    {
+      "path": "src/core/engine/theme_rules/theme_rules.cpp",
+      "function": "gui_forms::add_recipe_fields",
+      "condition": "on_part",
+      "decision": "keep",
+      "reason": "each declaration is first checked for a valid field, which decides the diagnostic; on_part only picks the next one"
+    },
+    {
+      "path": "src/core/engine/theme_rules/theme_rules.cpp",
+      "function": "gui_forms::add_rules",
+      "condition": "engine_table",
+      "decision": "keep",
+      "reason": "a pass over a sheet's rules or declarations; one select per item, and splitting would duplicate the pass"
+    },
+    {
+      "path": "src/core/engine/theme_rules/theme_rules.cpp",
+      "function": "gui_forms::compose_fills",
+      "condition": "modes.empty()",
+      "decision": "keep",
+      "reason": "a few image layers; one blend select per layer"
+    },
+    {
+      "path": "src/core/engine/theme_rules/theme_rules.cpp",
+      "function": "gui_forms::place_images",
+      "condition": "positions != nullptr && !(*positions).image_positions.empty()",
+      "decision": "keep",
+      "reason": "a few image layers; the authored position list may be absent, and a second loop would repeat the layer walk"
+    },
+    {
+      "path": "src/core/engine/theme_rules/theme_rules.cpp",
+      "function": "gui_forms::place_images",
+      "condition": "sizes != nullptr && !(*sizes).image_sizes.empty()",
+      "decision": "keep",
+      "reason": "a few image layers; the authored size list may be absent, and a second loop would repeat the layer walk"
+    },
+    {
+      "path": "src/core/engine/theme_rules/theme_rules.cpp",
+      "function": "gui_forms::resolve_transitions",
+      "condition": "same_primitive",
+      "decision": "keep",
+      "reason": "the last arm of a dispatch on each transition's property"
+    },
+    {
+      "path": "src/core/layout/block_flow_solver/block_flow_solver.cpp",
+      "function": "gui_forms::block_flow_intrinsic_width",
+      "condition": "kind == BlockFlowIntrinsicKind::min_content",
+      "decision": "keep",
+      "reason": "an arm of the per-item dispatch on the item's level"
+    },
+    {
+      "path": "src/core/layout/block_flow_solver/block_flow_solver.cpp",
+      "function": "gui_forms::place_inline_run",
+      "condition": "right_to_left",
+      "decision": "keep",
+      "reason": "places an inline run's few items; one select per item for the writing direction"
+    },
+    {
+      "path": "src/core/layout/flex_solver/flex_solver.cpp",
+      "function": "gui_forms::place_flex_items",
+      "condition": "cross_reversed",
+      "decision": "keep",
+      "reason": "maps each item's logical position to physical; one select per item and axis"
+    },
+    {
+      "path": "src/core/layout/flex_solver/flex_solver.cpp",
+      "function": "gui_forms::place_flex_items",
+      "condition": "horizontal",
+      "decision": "keep",
+      "reason": "maps each item's logical position to physical; one select per item and axis"
+    },
+    {
+      "path": "src/core/layout/flex_solver/flex_solver.cpp",
+      "function": "gui_forms::place_flex_items",
+      "condition": "main_reversed",
+      "decision": "keep",
+      "reason": "maps each item's logical position to physical; one select per item and axis"
+    },
+    {
+      "path": "src/core/layout/flex_solver/flex_solver.cpp",
+      "function": "gui_forms::place_flex_items",
+      "condition": "main_space.definite",
+      "decision": "keep",
+      "reason": "one select per flex line"
+    },
+    {
+      "path": "src/core/layout/flex_solver/flex_solver.cpp",
+      "function": "gui_forms::resolve_flex_main_sizes",
+      "condition": "!available.definite",
+      "decision": "keep",
+      "reason": "each line's sums are needed in both modes; the flag only decides what the line keeps"
+    },
+    {
+      "path": "src/core/layout/flex_solver/flex_solver.cpp",
+      "function": "gui_forms::resolve_flex_main_sizes",
+      "condition": "growing",
+      "decision": "keep",
+      "reason": "the flex algorithm reads grow or shrink factors per item; hoisting would duplicate each of its passes"
+    },
+    {
+      "path": "src/core/layout/flex_solver/flex_solver.cpp",
+      "function": "gui_forms::resolve_flex_main_sizes",
+      "condition": "remaining != 0.0 && growing",
+      "decision": "keep",
+      "reason": "the flex algorithm reads grow or shrink factors per item; hoisting would duplicate each of its passes"
+    },
+    {
+      "path": "src/core/layout/flex_solver/flex_solver.cpp",
+      "function": "gui_forms::resolve_flex_main_sizes",
+      "condition": "remaining != 0.0 && scaled_shrink > 0.0",
+      "decision": "keep",
+      "reason": "the flex algorithm reads grow or shrink factors per item; hoisting would duplicate each of its passes"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::arrange_grid_items",
+      "condition": "mirrored",
+      "decision": "keep",
+      "reason": "one mirror per placed item, after its area is solved"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::build_tracks",
+      "condition": "pattern == 0",
+      "decision": "keep",
+      "reason": "a pattern of none leaves the implicit track as built; the rest of the iteration runs for every track"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::line_index",
+      "condition": "axis == GridAxis::columns",
+      "decision": "keep",
+      "reason": "runs once, on the matching area, then returns"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::line_index",
+      "condition": "start_side",
+      "decision": "keep",
+      "reason": "runs once, on the matching area, then returns"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::place_grid_items",
+      "condition": "dense",
+      "decision": "keep",
+      "reason": "grid auto-placement; dense and sparse share the occupancy walk"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::run_spanning_step",
+      "condition": "candidates == 0U",
+      "decision": "keep",
+      "reason": "the grid's spanning step; one select per track, and splitting would duplicate the step"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::run_spanning_step",
+      "condition": "step.flexible_only",
+      "decision": "keep",
+      "reason": "the grid's spanning step; one select per item, and splitting would duplicate the step"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::run_spanning_step",
+      "condition": "step.marks_growable",
+      "decision": "keep",
+      "reason": "the grid's spanning step; one select per track, and splitting would duplicate the step"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::run_spanning_step",
+      "condition": "step.target == SizeTarget::base",
+      "decision": "keep",
+      "reason": "the grid's spanning step; one select per track, and splitting would duplicate the step"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::share_by_fraction",
+      "condition": "fractions > 0.0",
+      "decision": "keep",
+      "reason": "a few tracks; the guard avoids a division by zero, and a hoisted reciprocal would change the rounding"
+    },
+    {
+      "path": "src/core/layout/grid_solver/grid_solver.cpp",
+      "function": "gui_forms::share_equally",
+      "condition": "limited",
+      "decision": "keep",
+      "reason": "the outer loop is the distribution's convergence; the flag picks the inner pass, and hoisting would duplicate the convergence"
+    },
+    {
+      "path": "src/core/layout/style_reader/layout_style_reader.cpp",
+      "function": "gui_forms::layout_style::append_track_list",
+      "condition": "list.auto_repeat == AutoRepeatKind::auto_fill",
+      "decision": "keep",
+      "reason": "runs once per list, at the auto-repeat index"
+    },
+    {
+      "path": "src/core/live_surface/surface/live_surface.cpp",
+      "function": "gui_forms::try_acquire_write",
+      "condition": "preserve_published_contents && (*state_).published_slot < (*state_).buffers.size()",
+      "decision": "keep",
+      "reason": "the loop returns on the first free slot, so the copy runs at most once"
+    },
+    {
+      "path": "src/core/pages/page_set/page_set.cpp",
+      "function": "gui_forms::drain_notifications",
+      "condition": "!*alive",
+      "decision": "false_shape",
+      "reason": "the emits run observers that may destroy the page set; *alive changes inside the loop"
+    },
+    {
+      "path": "src/core/text/composite/text_composite.cpp",
+      "function": "gui_forms::detail::composite_text_coverage",
+      "condition": "!target.opaque",
+      "decision": "keep",
+      "reason": "the opacity of the target decides one channel of the text blend; splitting would duplicate the coverage and clip body"
+    },
+    {
+      "path": "src/core/text/prepared/prepared_storage.cpp",
+      "function": "gui_forms::detail::validate_prepared_input",
+      "condition": "text.empty()",
+      "decision": "keep",
+      "reason": "the endpoint checks before it run for every endpoint; only the mapping step needs text"
+    },
+    {
+      "path": "src/core/text_shaping/validation/text_shaping_validation.cpp",
+      "function": "gui_forms::validate_glyph_run",
+      "condition": "request.direction == TextDirection::left_to_right",
+      "decision": "keep",
+      "reason": "a validation pass; one order test per glyph in the request's direction"
+    },
+    {
+      "path": "src/core/theme/part_painting/part_painting.cpp",
+      "function": "gui_forms::fill_arrow_strips",
+      "condition": "horizontal_strips",
+      "decision": "keep",
+      "reason": "a few arrow rows; one orientation select per strip"
+    },
+    {
+      "path": "src/core/theme_language/material/theme_material_lowering.cpp",
+      "function": "gui_forms::theme_language::lower_edges",
+      "condition": "colour_at",
+      "decision": "keep",
+      "reason": "four edges; each declared field is written only when it was authored"
+    },
+    {
+      "path": "src/core/theme_language/material/theme_material_lowering.cpp",
+      "function": "gui_forms::theme_language::lower_edges",
+      "condition": "style_at",
+      "decision": "keep",
+      "reason": "four edges; each declared field is written only when it was authored"
+    },
+    {
+      "path": "src/core/theme_language/material/theme_material_lowering.cpp",
+      "function": "gui_forms::theme_language::lower_edges",
+      "condition": "width_at",
+      "decision": "keep",
+      "reason": "four edges; each declared field is written only when it was authored"
+    },
+    {
+      "path": "src/core/theme_language/material/theme_material_lowering.cpp",
+      "function": "gui_forms::theme_language::push_fills",
+      "condition": "!box_relative",
+      "decision": "keep",
+      "reason": "a parse of the fill layers; the checked and declared layers are pushed for every layer first"
+    },
+    {
+      "path": "src/core/theme_language/material/theme_material_lowering.cpp",
+      "function": "gui_forms::theme_language::read_stops",
+      "condition": "kind == MaterialFillKind::conic_gradient",
+      "decision": "keep",
+      "reason": "a parse of the stop list; the gradient kind decides how each stop's position reads"
+    },
+    {
+      "path": "src/core/theme_language/motion/theme_motion_lowering.cpp",
+      "function": "gui_forms::theme_language::build_declared_transitions",
+      "condition": "!written.delays.empty()",
+      "decision": "keep",
+      "reason": "a few transitions; an absent delay list leaves the default"
+    },
+    {
+      "path": "src/core/theme_language/motion/theme_motion_lowering.cpp",
+      "function": "gui_forms::theme_language::build_declared_transitions",
+      "condition": "!written.durations.empty()",
+      "decision": "keep",
+      "reason": "a few transitions; an absent duration list leaves the default"
+    },
+    {
+      "path": "src/core/theme_language/motion/theme_motion_lowering.cpp",
+      "function": "gui_forms::theme_language::build_declared_transitions",
+      "condition": "!written.timings.empty()",
+      "decision": "keep",
+      "reason": "a few transitions; an absent timing list leaves the default"
+    },
+    {
+      "path": "src/core/theme_language/motion/theme_motion_lowering.cpp",
+      "function": "gui_forms::theme_language::build_declared_transitions",
+      "condition": "primitive == nullptr",
+      "decision": "keep",
+      "reason": "a few transitions; a parameter target needs the primitive, and the other targets do not"
+    },
+    {
+      "path": "src/core/theme_language/motion/theme_motion_lowering.cpp",
+      "function": "gui_forms::theme_language::lower_properties",
+      "condition": "parts.size() != 1U",
+      "decision": "keep",
+      "reason": "a diagnostic for `none` among several properties; it is read only when `none` is found"
+    },
+    {
+      "path": "src/core/theme_language/motion/theme_motion_lowering.cpp",
+      "function": "gui_forms::theme_language::lower_shorthand",
+      "condition": "parts.size() != 1U",
+      "decision": "keep",
+      "reason": "a diagnostic for `none` among several transitions; it is read only when `none` is found"
+    },
+    {
+      "path": "src/core/theme_language/value/theme_value.cpp",
+      "function": "gui_forms::theme_language::hex_colour",
+      "condition": "short_form",
+      "decision": "keep",
+      "reason": "three or four channels; the short form doubles each digit"
+    },
+    {
+      "path": "src/core/threading/atomic_pool/atomic_pool.c",
+      "function": "gui_forms_atomic_pool_worker",
+      "condition": "pool->terminate",
+      "decision": "false_shape",
+      "reason": "another thread sets pool->terminate under sleep_lock; the condition wait reloads it"
+    },
+    {
+      "path": "src/core/types/painter/painter.cpp",
+      "function": "gui_forms::fill_linear_gradient",
+      "condition": "horizontal",
+      "decision": "keep",
+      "reason": "a few gradient slices; one orientation select per slice"
+    },
+    {
+      "path": "src/core/window/engine_inputs/window_engine_inputs.cpp",
+      "function": "gui_forms::damage_backplane_readers",
+      "condition": "damage != nullptr",
+      "decision": "keep",
+      "reason": "a few engine parts; with damage the reader must also be this window's"
+    },
+    {
+      "path": "src/core/window/inspection/window_visual_inspection.cpp",
+      "function": "gui_forms::visual_inspection_snapshot",
+      "condition": "options.include_display_operations",
+      "decision": "keep",
+      "reason": "an inspection walk; the option adds display operations per control"
+    },
+    {
+      "path": "src/core/window/presentation/window_presentation.cpp",
+      "function": "gui_forms::paint_rectangles",
+      "condition": "starts_clear",
+      "decision": "keep",
+      "reason": "a few painted rectangles; a clear start adds a cleared group to each"
+    },
+    {
+      "path": "src/core/window/presentation/window_presentation.cpp",
+      "function": "gui_forms::set_live_surface_idle_wake_handler",
+      "condition": "live_surface_idle_wake_",
+      "decision": "keep",
+      "reason": "a few registrations; each is disconnected, then reconnected while a handler is set"
+    },
+    {
+      "path": "src/core/window/scheduler/window_scheduler.cpp",
+      "function": "gui_forms::next_wake",
+      "condition": "occluded_",
+      "decision": "keep",
+      "reason": "UI timers are still collected while occluded; only frame requests are skipped"
+    },
+    {
+      "path": "src/core/window/scheduler/window_scheduler.cpp",
+      "function": "gui_forms::poll_frame_schedule",
+      "condition": "occluded_",
+      "decision": "keep",
+      "reason": "UI timers still run while occluded; frame requests are suppressed and counted"
+    },
+    {
+      "path": "src/core/window/window.cpp",
+      "function": "gui_forms::move_focus_region",
+      "condition": "forward",
+      "decision": "keep",
+      "reason": "a few focus regions; one direction select per step of the wrap-around search"
+    },
+    {
+      "path": "src/core/xml/xml_reader/xml_reader.cpp",
+      "function": "gui_forms::XmlDocumentReader::read_epilogue",
+      "condition": "input_[offset_] == '<'",
+      "decision": "false_shape",
+      "reason": "skip_space() moves offset_ inside the loop"
+    },
+    {
+      "path": "src/core/xml/xml_reader/xml_reader.cpp",
+      "function": "gui_forms::XmlDocumentReader::read_prolog",
+      "condition": "input_[offset_] != '<'",
+      "decision": "false_shape",
+      "reason": "skip_space() moves offset_ inside the loop"
+    }
+  ]
+}

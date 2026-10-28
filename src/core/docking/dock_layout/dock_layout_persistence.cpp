@@ -918,11 +918,12 @@ private:
     void ensure_records() {
         for (const DockNode& node : state_.nodes) {
             if (!detail::is_dock_stack(node.kind)) continue;
+            const DockPanelKind kind = node.kind == DockNodeKind::tool_stack ? DockPanelKind::tool : DockPanelKind::document;
             for (const DockPanelId& panel : node.panels) {
                 if (detail::find_dock_record(state_, panel) != nullptr) continue;
                 DockPanelRecord record{};
                 record.id = panel;
-                record.kind = node.kind == DockNodeKind::tool_stack ? DockPanelKind::tool : DockPanelKind::document;
+                record.kind = kind;
                 pending_records_.push_back(std::move(record));
             }
         }

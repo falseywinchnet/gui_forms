@@ -89,6 +89,6 @@ The checker's run on this tree, `gui_forms-2026-10-27.json`, reads 989 files (11
 
 # The defect, fixed (2026-10-27)
 
-Row 34 is fixed in Phase E cleanup. The pointer trace now takes its `%.*s` precision from `traced_stable_id` in `windows_host.cpp`, which prints at most `maximum_traced_stable_id_bytes` (1024) bytes of the target's stable ID. A longer ID is printed cut to that length, and the line then carries `target_cut_from:<full length in bytes>`, so the cut is never silent. The record in `../reviews.json` now has the decision `fixed`. A `fixed` record never covers a finding: if the old line returns, the checker raises it again as a regression.
+Row 34 is fixed in Phase E cleanup. The pointer trace now takes its `%.*s` precision from `traced_stable_id` in `windows_host.cpp`, which prints at most `maximum_traced_stable_id_bytes` (1024) bytes of the target's stable ID. A longer ID is printed cut to that length, and the line then carries `target_cut_from:<full length in bytes>`, so the cut is never silent. Its record is removed from `../reviews.json`: the evidence line no longer exists, and the checker fails its gate on a decision whose line is gone. If the old line came back, the checker would raise it again as a new candidate.
 
 The checker on that tree reads 989 files (11 Skia files excluded) and has 30 candidates: 0 raised, 14 guarded and 16 reviewed. The narrowing on the old line is gone, so the candidate no longer appears. `gui_forms-2026-10-27.json` is the snapshot from before the fix and is kept as it was.

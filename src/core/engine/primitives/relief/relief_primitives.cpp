@@ -644,14 +644,19 @@ void GripPrimitive::fill(const PrimitiveParameterBlock& parameters, const Primit
             const double r = static_cast<double>(row);
             if (r >= top && r < top + dot) row_ink = true;
         }
+        // A row between dots is clear throughout.
+        if (!row_ink) {
+            for (std::uint32_t column = 0U; column < destination.extent.width; ++column) {
+                store(destination, start + static_cast<std::size_t>(column) * part_raster_bytes_per_pixel, clear);
+            }
+            continue;
+        }
         for (std::uint32_t column = 0U; column < destination.extent.width; ++column) {
             bool inked = false;
-            if (row_ink) {
-                for (double x = 1.0; x + 2.0 <= logical_width; x += 4.0) {
-                    const double left = std::floor(x * scale + 0.5);
-                    const double c = static_cast<double>(column);
-                    if (c >= left && c < left + dot) inked = true;
-                }
+            for (double x = 1.0; x + 2.0 <= logical_width; x += 4.0) {
+                const double left = std::floor(x * scale + 0.5);
+                const double c = static_cast<double>(column);
+                if (c >= left && c < left + dot) inked = true;
             }
             store(destination, start + static_cast<std::size_t>(column) * part_raster_bytes_per_pixel,
                   inked ? ink : clear);

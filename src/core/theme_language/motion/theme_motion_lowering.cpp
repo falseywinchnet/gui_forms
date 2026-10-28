@@ -516,6 +516,7 @@ bool TransitionReader::lower_properties() {
 bool TransitionReader::lower_times(bool delays) {
     split(ComponentRange{0U, value_.components.size()}, parts_);
     const std::vector<ComponentRange> parts = parts_;
+    std::vector<FrameInterval>& times = delays ? delays_ : durations_;
     for (const ComponentRange part : parts) {
         if (part.first == part.end || next(part.first) != part.end) {
             const std::uint32_t token = part.first < value_.components.size() ? value_.components[part.first].token
@@ -524,11 +525,7 @@ bool TransitionReader::lower_times(bool delays) {
         }
         double seconds = 0.0;
         if (!read_time(part.first, delays, seconds)) return false;
-        if (delays) {
-            delays_.push_back(interval_of(seconds));
-        } else {
-            durations_.push_back(interval_of(seconds));
-        }
+        times.push_back(interval_of(seconds));
     }
     return true;
 }
@@ -839,11 +836,12 @@ MotionLoweringOutcome group_transitions(ThemeRuleSheet& sheet, std::span<const M
         for (std::size_t index = 0U; index < sheet.rules.size() && !primitive.empty(); ++index) {
             const ThemeRule& rule = sheet.rules[index];
             if (index == host.rule || selected_primitive(rule) != primitive || !refines(rule, host_rule)) continue;
+            const RuleSpecificity specificity = rule.specificity ? *rule.specificity : rule_specificity(rule.selector);
             for (std::size_t position = 0U; position < rule.declarations.size(); ++position) {
                 const RuleDeclaration& declaration = rule.declarations[position];
                 if (declaration.property != property || declaration.kind != RuleValueKind::number) continue;
                 Refinement refinement{};
-                refinement.specificity = rule.specificity ? *rule.specificity : rule_specificity(rule.selector);
+                refinement.specificity = specificity;
                 refinement.rule = index;
                 refinement.declaration = true;
                 refinement.position = position;
