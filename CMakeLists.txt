@@ -1339,6 +1339,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         gui_drawing_c_api gdi32 user32
     )
     if(GUI_FORMS_BUILD_TESTS)
+        add_test(NAME gui_drawing_windows_probe COMMAND gui_drawing_windows_probe)
         add_executable(gui_forms_windows_live_surface_endpoint_tests
             tests/windows_live_surface_endpoint_tests.cpp
         )

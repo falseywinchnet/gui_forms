@@ -26,8 +26,11 @@ struct HdcLease final {
     HDC device{};
     HBITMAP dib{};
     HGDIOBJ previous{};
+    // The DIB's BGRA pixels, byte_count bytes, owned by dib.
     void* pixels{};
     std::size_t byte_count{};
+    // The leased bitmap's format; release converts the DIB back into it.
+    PixelFormat pixel_format{PixelFormat::bgra32_premultiplied};
 };
 
 std::mutex lease_mutex;
@@ -150,6 +153,23 @@ void copy_as_bgra(const ImageSnapshot& snapshot, void* destination) {
         for (std::size_t offset = 0; offset < source.size(); offset += 4U) {
             std::swap(output[offset], output[offset + 2U]);
         }
+    }
+}
+
+// Writes a lease's BGRA pixels back in the leased bitmap's format: a copy for
+// BGRA, a red/blue swap for RGBA. destination holds lease.byte_count bytes and
+// does not overlap the lease's pixels.
+void copy_from_bgra(const HdcLease& lease, std::byte* destination) {
+    const std::byte* source = static_cast<const std::byte*>(lease.pixels);
+    if (lease.pixel_format != PixelFormat::rgba32_premultiplied) {
+        std::memcpy(destination, source, lease.byte_count);
+        return;
+    }
+    for (std::size_t offset = 0; offset < lease.byte_count; offset += 4U) {
+        destination[offset] = source[offset + 2U];
+        destination[offset + 1U] = source[offset + 1U];
+        destination[offset + 2U] = source[offset];
+        destination[offset + 3U] = source[offset + 3U];
     }
 }
 
@@ -447,8 +467,15 @@ gd_result acquire_hdc(Bitmap& bitmap, std::uintptr_t& output,
         throw std::length_error("HDC lease token space exhausted");
     }
     try {
-        leases.emplace(token, HdcLease{&bitmap, std::this_thread::get_id(),
-                       device, dib, previous, pixels, snapshot.pixels().size()});
+        const HdcLease lease{.bitmap = &bitmap,
+                             .owner = std::this_thread::get_id(),
+                             .device = device,
+                             .dib = dib,
+                             .previous = previous,
+                             .pixels = pixels,
+                             .byte_count = snapshot.pixels().size(),
+                             .pixel_format = snapshot.pixel_format};
+        leases.emplace(token, lease);
     } catch (...) {
         SelectObject(device, previous);
         DeleteDC(device);
@@ -490,8 +517,10 @@ gd_result release_hdc(Bitmap& bitmap, std::uint64_t lease_token) {
             (pixels[offset] != 0U || pixels[offset + 1U] != 0U ||
              pixels[offset + 2U] != 0U)) pixels[offset + 3U] = 255U;
     }
+    // The DIB is BGRA whatever the bitmap's format (acquire_hdc converted an
+    // RGBA bitmap with copy_as_bgra), so an RGBA bitmap is swapped back.
     BitmapLockView lock = bitmap.lock(BitmapLockMode::write);
-    std::memcpy(lock.writable_data, lease.pixels, lease.byte_count);
+    copy_from_bgra(lease, lock.writable_data);
     bitmap.unlock(lock.token);
     return GD_OK;
 }
