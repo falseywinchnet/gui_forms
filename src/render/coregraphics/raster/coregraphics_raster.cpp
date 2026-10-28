@@ -1,6 +1,7 @@
 #include "coregraphics_raster.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
 #include "../../../core/image/resource_pixels.hpp"
+#include "stx_skia/swizzle.hpp"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
@@ -399,13 +400,8 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
                 (*resource).encoded.size() ==
                     tight_row_bytes * (*resource).metadata.height) {
                 rgba.resize((*resource).encoded.size());
-                for (std::size_t offset = 0; offset < rgba.size(); offset += 4U) {
-                    rgba[offset] = (*resource).encoded[offset + 2U];
-                    rgba[offset + 1U] = (*resource).encoded[offset + 1U];
-                    rgba[offset + 2U] = (*resource).encoded[offset];
-                    rgba[offset + 3U] = (*resource).encoded[offset + 3U];
-                }
-                have_rgba = true;
+                have_rgba = stx_skia::swap_red_blue(rgba, (*resource).encoded) ==
+                            stx_skia::SwizzleResult::ok;
             }
         } else if ((*resource).metadata.decoded_byte_count <=
                    std::numeric_limits<std::size_t>::max()) {

@@ -23,6 +23,7 @@
 #include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
+#include "stx_skia/swizzle.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
 #include "../../../render/text/glyph_run/glyph_run_raster.hpp"
 #include "../../../render/text/harfbuzz/harfbuzz_font_engine.hpp"
@@ -1540,13 +1541,9 @@ public:
             // The raster owns reusable conversion storage. Convert before any
             // DC mutation; allocation failure leaves the active frame intact.
             live_bgra_scratch_.resize(frame.pixels().size());
-            const std::size_t byte_count = live_bgra_scratch_.size();
-            for (std::size_t index = 0U; index < byte_count; index += 4U) {
-                live_bgra_scratch_[index] = source[index + 2U];
-                live_bgra_scratch_[index + 1U] = source[index + 1U];
-                live_bgra_scratch_[index + 2U] = source[index];
-                live_bgra_scratch_[index + 3U] = source[index + 3U];
-            }
+            const stx_skia::SwizzleResult swapped =
+                stx_skia::swap_red_blue(live_bgra_scratch_, frame.pixels());
+            if (swapped != stx_skia::SwizzleResult::ok) return;
             source = live_bgra_scratch_.data();
         }
         const int saved = SaveDC(memory_dc_);

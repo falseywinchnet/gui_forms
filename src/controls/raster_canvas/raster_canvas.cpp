@@ -1,6 +1,7 @@
 #include "gui_forms/controls/raster_canvas/raster_canvas.hpp"
 
 #include "gui_forms/window.hpp"
+#include "stx_skia/swizzle.hpp"
 
 #include <array>
 #include <algorithm>
@@ -18,25 +19,19 @@ namespace {
         std::abs(origin.x) <= limit && std::abs(origin.y) <= limit;
 }
 
-[[nodiscard]] std::vector<std::byte> rgba_to_bgra(
+// Fills result with width x height pixels of source rows, source_row_bytes apart, as
+// tightly packed BGRA rows, reusing result's storage. False if the rows do not fit source
+// (reported as dimension_limit_exceeded, as the registry reports a pixel span of the wrong
+// shape).
+[[nodiscard]] bool rgba_to_bgra(
     std::span<const std::byte> source, std::size_t source_row_bytes,
-    std::uint32_t width, std::uint32_t height) {
-    std::vector<std::byte> result(
-        static_cast<std::size_t>(width) * height * 4U);
+    std::uint32_t width, std::uint32_t height, std::vector<std::byte>& result) {
     const std::size_t tight_row = static_cast<std::size_t>(width) * 4U;
-    for (std::uint32_t row = 0; row < height; ++row) {
-        const std::byte* input = source.data() +
-            static_cast<std::size_t>(row) * source_row_bytes;
-        std::byte* output = result.data() + static_cast<std::size_t>(row) * tight_row;
-        for (std::uint32_t column = 0; column < width; ++column) {
-            const std::size_t pixel = static_cast<std::size_t>(column) * 4U;
-            output[pixel] = input[pixel + 2U];
-            output[pixel + 1U] = input[pixel + 1U];
-            output[pixel + 2U] = input[pixel];
-            output[pixel + 3U] = input[pixel + 3U];
-        }
-    }
-    return result;
+    result.resize(tight_row * static_cast<std::size_t>(height));
+    const stx_skia::SwizzleResult swapped = stx_skia::swap_red_blue_rows(
+        result, stx_skia::RowBytes(tight_row), source, stx_skia::RowBytes(source_row_bytes),
+        stx_skia::PixelCount(width), stx_skia::RowCount(height));
+    return swapped == stx_skia::SwizzleResult::ok;
 }
 
 } // namespace
@@ -138,6 +133,7 @@ bool RasterCanvas::publish_full_bitmap() {
     const std::size_t count = static_cast<std::size_t>((width + side - 1) / side) *
                               static_cast<std::size_t>((height + side - 1) / side);
     tiles_.reserve(count);
+    std::vector<std::byte> converted;
     try {
         for (std::int32_t y = 0; y < height; y += side) {
             for (std::int32_t x = 0; x < width; x += side) {
@@ -153,11 +149,15 @@ bool RasterCanvas::publish_full_bitmap() {
                 const std::size_t bytes = static_cast<std::size_t>(storage.height - 1) * snapshot.row_bytes() +
                     static_cast<std::size_t>(storage.width) * 4U;
                 std::span<const std::byte> pixels(snapshot.pixels().data() + offset, bytes);
-                std::vector<std::byte> converted;
                 std::uint64_t stride = snapshot.row_bytes();
                 if (snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied) {
-                    converted = rgba_to_bgra(pixels, snapshot.row_bytes(),
-                        static_cast<std::uint32_t>(storage.width), static_cast<std::uint32_t>(storage.height));
+                    if (!rgba_to_bgra(pixels, static_cast<std::size_t>(snapshot.row_bytes()),
+                            static_cast<std::uint32_t>(storage.width),
+                            static_cast<std::uint32_t>(storage.height), converted)) {
+                        last_resource_error_ = ImageResourceError::dimension_limit_exceeded;
+                        release_tiles(*owner);
+                        return false;
+                    }
                 } else {
                     // A load owns complete, tightly packed rows. The source is
                     // a subrectangle of the document with its larger stride.
@@ -218,6 +218,7 @@ bool RasterCanvas::synchronize_bitmap() {
     const gui_drawing::BitmapDamageSnapshot changes = (*bitmap_).changes_since(presented_generation_);
     if (changes.empty()) return true;
     const gui_drawing::ImageSnapshot snapshot = (*bitmap_).snapshot();
+    std::vector<std::byte> converted;
     for (std::size_t change = 0; change < changes.rectangles.size(); ++change) {
         const gui_drawing::RectI dirty = changes.rectangles[change];
         for (std::size_t index = 0; index < tiles_.size(); ++index) {
@@ -229,11 +230,14 @@ bool RasterCanvas::synchronize_bitmap() {
             const std::size_t required = static_cast<std::size_t>(rect.height - 1) * snapshot.row_bytes() +
                 static_cast<std::size_t>(rect.width) * 4U;
             std::span<const std::byte> patch(snapshot.pixels().data() + source_offset, required);
-            std::vector<std::byte> converted;
             std::uint64_t source_row_bytes = snapshot.row_bytes();
             if (snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied) {
-                converted = rgba_to_bgra(patch, snapshot.row_bytes(),
-                    static_cast<std::uint32_t>(rect.width), static_cast<std::uint32_t>(rect.height));
+                if (!rgba_to_bgra(patch, static_cast<std::size_t>(snapshot.row_bytes()),
+                        static_cast<std::uint32_t>(rect.width),
+                        static_cast<std::uint32_t>(rect.height), converted)) {
+                    last_resource_error_ = ImageResourceError::dimension_limit_exceeded;
+                    return false;
+                }
                 patch = converted;
                 source_row_bytes = static_cast<std::uint64_t>(rect.width) * 4U;
             }
