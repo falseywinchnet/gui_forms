@@ -149,14 +149,6 @@
       "reviewed": "2026-10-27"
     },
     {
-      "path": "stx_skia/skia/include/core/SkUnPreMultiply.h",
-      "rule": "I03",
-      "evidence": "SkASSERT(alpha <= 255);",
-      "decision": "defect",
-      "reason": "public GetScale(U8CPU) indexes the 256-entry gTable with only a debug bound; the one internal caller passes SkGetPackedA32 (8 bits), but the public entry needs a Release bound (API-behaviour queue)",
-      "reviewed": "2026-10-28"
-    },
-    {
       "path": "stx_skia/skia/src/core/SkAlphaRuns.cpp",
       "rule": "I03",
       "evidence": "SkASSERT(width > 0);",

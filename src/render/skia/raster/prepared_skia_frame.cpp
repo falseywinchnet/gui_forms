@@ -128,7 +128,7 @@ PreparedTextStatus PreparedSkiaFrame::begin(const Size size, const double scale,
         const bool reuse = matches(size, scale) && front_authorities_.current() && !bounded_damage.empty() && !full_damage(bounded_damage, size);
         candidate_authorities_.clear();
         SkCanvas& target = *(*candidate_).getCanvas();
-        target.restoreToCount(1);
+        target.restoreAll();
         target.resetMatrix();
         if (reuse) {
             SkPixmap source{};
@@ -157,7 +157,7 @@ PreparedTextStatus PreparedSkiaFrame::begin(const Size size, const double scale,
 }
 void PreparedSkiaFrame::abort() noexcept {
     if (std::this_thread::get_id() != executor_) return;
-    if (candidate_) (*(*candidate_).getCanvas()).restoreToCount(1);
+    if (candidate_) (*(*candidate_).getCanvas()).restoreAll();
     candidate_authorities_.clear();
     active_ = false;
     failed_ = false;
@@ -179,7 +179,7 @@ PreparedTextStatus PreparedSkiaFrame::commit(const PaintReceipt receipt) {
             return PreparedTextStatus::stale;
         }
     }
-    (*(*candidate_).getCanvas()).restoreToCount(1);
+    (*(*candidate_).getCanvas()).restoreAll();
     front_.swap(candidate_);
     front_authorities_ = retained;
     front_size_ = candidate_size_;
