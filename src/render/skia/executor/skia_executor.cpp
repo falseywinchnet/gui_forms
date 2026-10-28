@@ -967,7 +967,7 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
             gui_forms::detail::TextPixelOrder::bgra : gui_forms::detail::TextPixelOrder::rgba;
         std::size_t executed{};
         for (const DrawingCommand& command : commands.subspan(first_command)) {
-            (*canvas).restoreToCount(1);
+            (*canvas).restoreAll();
             (*canvas).resetMatrix();
             if (command.state.clip) {
                 (*canvas).clipRect(to_sk_rect(*command.state.clip),

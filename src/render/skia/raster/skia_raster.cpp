@@ -384,7 +384,7 @@ public:
         for (std::size_t level = group_depth; level > 0U; --level) {
             GroupLevel& open = groups[level - 1U];
             if (!open.isolated) continue;
-            (*(*open.surface).getCanvas()).restoreToCount(1);
+            (*(*open.surface).getCanvas()).restoreAll();
             text_clips = std::move(open.parent_text_clips);
             text_clip_base = open.parent_text_clip_base;
             save_floor = open.parent_save_floor;
@@ -576,7 +576,7 @@ void SkiaRaster::begin_frame(const DamageRegion& damage) {
     if (!canvas) {
         return;
     }
-    (*canvas).restoreToCount(1);
+    (*canvas).restoreAll();
     (*canvas).resetMatrix();
     (*canvas).scale(static_cast<SkScalar>((*impl_).scale),
                   static_cast<SkScalar>((*impl_).scale));
@@ -632,7 +632,7 @@ void SkiaRaster::clip_damage(const DamageRegion& damage) {
 void SkiaRaster::end_frame() {
     (*impl_).close_groups();
     if (SkCanvas* canvas = (*impl_).canvas()) {
-        (*canvas).restoreToCount(1);
+        (*canvas).restoreAll();
     }
     (*impl_).text_clips.clear();
     (*impl_).offset = Point{};
@@ -727,9 +727,9 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
             kPremul_SkAlphaType,
             SkColorSpace::MakeSRGB());
         const std::size_t row_bytes = output_info.minRowBytes();
+        const std::optional<std::size_t> output_bytes = output_info.checkedByteSize(row_bytes);
         if (row_bytes != static_cast<std::size_t>((*resource).metadata.width) * 4U ||
-            output_info.computeByteSize(row_bytes) !=
-                (*resource).metadata.decoded_byte_count) {
+            !output_bytes || *output_bytes != (*resource).metadata.decoded_byte_count) {
             (*impl_).images.erase(id.value);
             synchronized = false;
             continue;
@@ -833,12 +833,14 @@ std::vector<std::byte> SkiaRaster::encode_png() const {
     const bool rgba = pixmap.colorType() == kRGBA_8888_SkColorType;
     const bool bgra = pixmap.colorType() == kBGRA_8888_SkColorType;
     if ((!rgba && !bgra) || pixmap.alphaType() != kPremul_SkAlphaType) return result;
+    const std::optional<std::size_t> pixel_bytes = pixmap.checkedByteSize();
+    if (!pixel_bytes) return result;
     gui_forms::image::PngEncodeInput input{};
     input.width = static_cast<std::uint32_t>(pixmap.width());
     input.height = static_cast<std::uint32_t>(pixmap.height());
     input.row_bytes = pixmap.rowBytes();
     input.pixels = std::span<const std::byte>(static_cast<const std::byte*>(pixmap.addr()),
-                                              pixmap.computeByteSize());
+                                              *pixel_bytes);
     input.order = rgba ? gui_forms::image::PngChannelOrder::rgba
                        : gui_forms::image::PngChannelOrder::bgra;
     input.alpha = gui_forms::image::PngSourceAlpha::premultiplied;
@@ -1070,7 +1072,7 @@ void SkiaRaster::draw_box_shadow(Rect rect, double corner_radius, Point offset,
                                  Color color) {
     SkCanvas* canvas = (*impl_).canvas();
     if (canvas == nullptr || rect.empty() || color.alpha == 0U ||
-        blur_radius < 0.0) {
+        std::isnan(blur_radius) || blur_radius < 0.0) {
         return;
     }
     Rect shadow{rect.x + offset.x - spread, rect.y + offset.y - spread,
@@ -1078,9 +1080,12 @@ void SkiaRaster::draw_box_shadow(Rect rect, double corner_radius, Point offset,
     if (shadow.empty()) return;
     SkPaint paint = make_paint(color);
     if (blur_radius > 0.0) {
-        paint.setMaskFilter(SkMaskFilter::MakeBlur(
-            kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5),
-            false));
+        SkBlurMaskFilterResult blur = SkMaskFilter::MakeBlur(
+            kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5), false);
+        // A blur the filter refuses (a radius past float range) draws no shadow, never a
+        // sharp one.
+        if (!blur.filter) return;
+        paint.setMaskFilter(std::move(blur.filter));
     }
     (*canvas).drawRRect(to_sk_rrect(
         shadow, std::max(0.0, corner_radius + spread)), paint);
@@ -1109,7 +1114,8 @@ void SkiaRaster::draw_retained_box_shadow(const Rect rect, const double corner_r
                                           const double spread, const Color color,
                                           const std::shared_ptr<RetainedDrawCache>& cache) {
     SkCanvas* const canvas = (*impl_).canvas();
-    if (canvas == nullptr || rect.empty() || color.alpha == 0U || blur_radius < 0.0) return;
+    if (canvas == nullptr || rect.empty() || color.alpha == 0U ||
+        std::isnan(blur_radius) || blur_radius < 0.0) return;
     const SkMatrix matrix = (*canvas).getTotalMatrix();
     // Unblurred shadows, rotations and reflections draw directly.
     if (!cache || blur_radius == 0.0 || !matrix.isScaleTranslate() ||
@@ -1133,9 +1139,27 @@ void SkiaRaster::draw_retained_box_shadow(const Rect rect, const double corner_r
     if (!current) {
         // The mask filter's sigma is in device pixels (respectCTM is false).
         const double sigma = blur_radius * 0.5;
-        const int margin = static_cast<int>(std::ceil(sigma * 3.0)) + 2;
-        const int width = static_cast<int>(std::ceil(device.right() - origin_x)) + margin * 2;
-        const int height = static_cast<int>(std::ceil(device.bottom() - origin_y)) + margin * 2;
+        const double margin_extent = std::ceil(sigma * 3.0) + 2.0;
+        const double width_extent =
+            std::ceil(static_cast<double>(device.right()) - origin_x) + margin_extent * 2.0;
+        const double height_extent =
+            std::ceil(static_cast<double>(device.bottom()) - origin_y) + margin_extent * 2.0;
+        // A coverage mask past this extent is not kept; the shadow draws directly. The checks
+        // also keep the conversions to int below in range (NaN fails them too).
+        constexpr double largest_kept_extent = 16384.0;
+        if (!(width_extent <= largest_kept_extent) || !(height_extent <= largest_kept_extent)) {
+            draw_box_shadow(rect, corner_radius, offset, blur_radius, spread, color);
+            return;
+        }
+        const int margin = static_cast<int>(margin_extent);
+        const int width = static_cast<int>(width_extent);
+        const int height = static_cast<int>(height_extent);
+        SkBlurMaskFilterResult blur = SkMaskFilter::MakeBlur(
+            kNormal_SkBlurStyle, static_cast<SkScalar>(sigma), false);
+        if (!blur.filter) {
+            draw_box_shadow(rect, corner_radius, offset, blur_radius, spread, color);
+            return;
+        }
         sk_sp<SkSurface> coverage = SkSurfaces::Raster(SkImageInfo::MakeA8(width, height));
         if (!coverage) {
             draw_box_shadow(rect, corner_radius, offset, blur_radius, spread, color);
@@ -1152,8 +1176,7 @@ void SkiaRaster::draw_retained_box_shadow(const Rect rect, const double corner_r
         SkPaint opaque{};
         opaque.setAntiAlias(true);
         opaque.setColor(SK_ColorWHITE);
-        opaque.setMaskFilter(SkMaskFilter::MakeBlur(
-            kNormal_SkBlurStyle, static_cast<SkScalar>(sigma), false));
+        opaque.setMaskFilter(std::move(blur.filter));
         target.drawRRect(local, opaque);
         std::unique_ptr<ShadowMaskMemo> replacement = std::make_unique<ShadowMaskMemo>();
         (*replacement).scale_x = matrix.getScaleX();
@@ -1186,7 +1209,7 @@ void SkiaRaster::draw_inset_box_shadow(
     double spread, Color color) {
     SkCanvas* canvas = (*impl_).canvas();
     if (canvas == nullptr || rect.empty() || color.alpha == 0U ||
-        blur_radius < 0.0) {
+        std::isnan(blur_radius) || blur_radius < 0.0) {
         return;
     }
     const Rect hole{rect.x + offset.x + spread,
@@ -1212,9 +1235,11 @@ void SkiaRaster::draw_inset_box_shadow(
     const SkPath complement = complement_builder.detach();
     SkPaint paint = make_paint(color);
     if (blur_radius > 0.0) {
-        paint.setMaskFilter(SkMaskFilter::MakeBlur(
-            kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5),
-            false));
+        SkBlurMaskFilterResult blur = SkMaskFilter::MakeBlur(
+            kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5), false);
+        // As for draw_box_shadow: a refused blur draws no shadow, never a sharp one.
+        if (!blur.filter) return;
+        paint.setMaskFilter(std::move(blur.filter));
     }
     (*canvas).save();
     (*canvas).clipRRect(to_sk_rrect(rect, corner_radius),
@@ -1591,7 +1616,7 @@ void SkiaRaster::begin_group(const PaintGroup& group) {
         level.surface = std::move(grown);
     }
     SkCanvas& canvas = *(*level.surface).getCanvas();
-    canvas.restoreToCount(1);
+    canvas.restoreAll();
     canvas.resetMatrix();
     canvas.save();
     canvas.clipRect(SkRect::MakeIWH(width, height), SkClipOp::kIntersect, false);
@@ -1629,7 +1654,7 @@ void SkiaRaster::end_group() {
         return;
     }
     SkCanvas& canvas = *(*level.surface).getCanvas();
-    canvas.restoreToCount(1);
+    canvas.restoreAll();
     impl.text_clips = std::move(level.parent_text_clips);
     impl.text_clip_base = level.parent_text_clip_base;
     impl.save_floor = level.parent_save_floor;
