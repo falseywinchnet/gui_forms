@@ -763,6 +763,7 @@ Rect TextBox::paint_multiline(Painter& painter) {
     const ControlVisualRecipe& highlight = effective_theme().resolve(ControlVisualRole::selection,
         visual_context(false, false, true, true));
     const Color foreground = themed ? editor.text : enabled() ? style().text : style().disabled_text;
+    const Color selected_text = themed ? highlight.text : style().highlight;
     painter.save();
     painter.clip_rect({text_left_, 4.0, width, height});
     const std::size_t first = static_cast<std::size_t>(offset.y / line_height_);
@@ -793,7 +794,7 @@ Rect TextBox::paint_multiline(Painter& painter) {
             if (selected) {
                 painter.save();
                 painter.clip_rect(selection_bounds);
-                painter.draw_text_utf8(baseline, value, font, themed ? highlight.text : style().highlight);
+                painter.draw_text_utf8(baseline, value, font, selected_text);
                 painter.restore();
             }
         }

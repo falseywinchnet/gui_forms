@@ -2073,6 +2073,7 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
     const Rect absolute = absolute_bounds();
     const std::size_t count = placed.tabs.size();
     const bool enabled = effectively_enabled();
+    const SemanticState enabled_state = enabled ? SemanticState::enabled : SemanticState::none;
     const std::optional<std::size_t> selected = selected_position();
     const std::optional<std::size_t> keyboard = keyboard_position();
     nodes.reserve(count + 3U);
@@ -2091,8 +2092,7 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
         node.position_in_set = position + 1U;
         node.set_size = count;
         node.controlled_panel = page_panel_identity(record.id);
-        node.states = SemanticState::focusable;
-        if (enabled) node.states |= SemanticState::enabled;
+        node.states = SemanticState::focusable | enabled_state;
         if (!bounds.empty()) {
             node.bounds = to_window(absolute, bounds);
             node.states |= SemanticState::visible;

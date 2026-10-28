@@ -120,10 +120,12 @@ void ChoiceGroup::apply_selection(const int selected) {
     if (selected < -1 || (selected >= 0 && static_cast<std::size_t>(selected) >= (*revision).entries.size())) {
         throw std::out_of_range("ChoiceGroup selection is outside its items");
     }
+    // With nothing selected the first item is the tab stop.
+    const int tab_stop = selected < 0 ? 0 : selected;
     for (std::size_t index = 0U; index < (*revision).entries.size(); ++index) {
         Button& button = *(*(*revision).entries[index]).button;
         button.set_selected(static_cast<int>(index) == selected);
-        button.set_tab_stop(static_cast<int>(index) == (selected < 0 ? 0 : selected));
+        button.set_tab_stop(static_cast<int>(index) == tab_stop);
         if (!is_alive() || revision_ != revision) return;
     }
     refresh_tab_stop();

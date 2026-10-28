@@ -921,6 +921,7 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
         (top_row_ + visible_row_count() + 1U) * columns());
     std::optional<std::size_t> hovered_truncated;
     std::optional<std::size_t> focused_truncated;
+    const Color selected_fill = focused_ ? style().accent_light : with_alpha(style().accent_light, 190);
     for (std::size_t index = first; index < end; ++index) {
         const ObjectViewItem& item = items_[index];
         const Rect cell = item_bounds(index);
@@ -933,8 +934,7 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
         if (selected) {
             painter.fill_rect({cell.x + 1.0, cell.y + 1.0,
                                cell.width - 2.0, cell.height - 2.0},
-                              focused_ ? style().accent_light
-                                       : with_alpha(style().accent_light, 190));
+                              selected_fill);
             painter.stroke_rect({cell.x + 1.5, cell.y + 1.5,
                                  std::max(0.0, cell.width - 3.0),
                                  std::max(0.0, cell.height - 3.0)},
@@ -958,13 +958,12 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
                 font.size * 1.2,
                 painter.measure_text_utf8("Ag", font).height);
             double baseline = cell.y + std::max(57.0, 47.0 + font.size);
+            const Color label_colour = item.enabled ? style().text : style().disabled_text;
             for (const std::string& line : label.lines) {
                 const Size measured = painter.measure_text_utf8(line, font);
                 const double text_x = cell.x +
                     std::max(4.0, (cell.width - measured.width) * .5);
-                painter.draw_text_utf8(
-                    {text_x, baseline}, line, font,
-                    item.enabled ? style().text : style().disabled_text);
+                painter.draw_text_utf8({text_x, baseline}, line, font, label_colour);
                 baseline += line_height;
             }
             if (label.truncated) {
@@ -1746,6 +1745,7 @@ void ObjectView::paint_details(Painter& painter) {
     }
     painter.draw_line({4.0, 2.0 + header}, {viewport_right, 2.0 + header}, style().border, 1.0);
     painter.clip_rect({4.0, 2.0 + header, viewport_right - 4.0, std::max(0.0, bounds.height - header - 4.0)});
+    const Color selected_row_fill = focused_ ? style().accent_light : with_alpha(style().accent_light, 190);
     for (std::size_t item_index_value = first; item_index_value < end; ++item_index_value) {
         const ObjectViewItem& item = items_[item_index_value];
         const Rect row = item_bounds(item_index_value);
@@ -1753,7 +1753,7 @@ void ObjectView::paint_details(Painter& painter) {
         ++details_paint_work_.rows;
         const bool selected = is_selected(item.stable_id);
         if (selected) {
-            painter.fill_rect(row, focused_ ? style().accent_light : with_alpha(style().accent_light, 190));
+            painter.fill_rect(row, selected_row_fill);
             painter.stroke_rect({row.x + .5, row.y + .5, std::max(0.0, row.width - 1.0), row.height - 1.0}, style().accent, 1.0);
         } else if (hovered_index_ == item_index_value) painter.fill_rect(row, style().face_light);
         for (std::size_t visible = 0U; visible < visible_count; ++visible) {

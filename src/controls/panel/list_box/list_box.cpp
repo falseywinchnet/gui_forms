@@ -290,6 +290,7 @@ void ListBox::on_paint(Painter& painter, Rect damage) {
                        std::max(0.0, bounds.height - 4.0)});
     const std::size_t visible = visible_row_count() + 1U;
     const std::size_t end = std::min(items_.size(), top_index_ + visible);
+    const Color selected_fill = focused_ ? style().accent : style().accent_light;
     for (std::size_t index = top_index_; index < end; ++index) {
         const double y = 2.0 + static_cast<double>(index - top_index_) * row_height;
         const bool selected = detail::binary_search_contains(
@@ -302,8 +303,7 @@ void ListBox::on_paint(Painter& painter, Rect damage) {
         if (themed && (selected || hovered)) {
             paint_surface_material(painter, row, row_recipe.material);
         } else if (selected) {
-            painter.fill_rect(row, focused_ ? style().accent
-                                            : style().accent_light);
+            painter.fill_rect(row, selected_fill);
         } else if (hovered) {
             painter.fill_rect(row, style().face_light);
         }

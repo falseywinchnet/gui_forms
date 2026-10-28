@@ -253,14 +253,14 @@ void TreeView::on_paint(Painter& painter, Rect damage) {
     painter.clip_rect({2.0, 2.0, std::max(0.0, bounds.width - 4.0),
                        std::max(0.0, bounds.height - 4.0)});
     const std::size_t end = std::min(visible_.size(), top_row_ + visible_row_count() + 1U);
+    const Color selected_fill = focused_ ? style().accent : style().accent_light;
     for (std::size_t row = top_row_; row < end; ++row) {
         const TreeViewItem& item = items_[visible_[row]];
         const double y = 2.0 + static_cast<double>(row - top_row_) * row_height;
         const bool selected = item.stable_id == selected_id_;
         const bool active = focused_ && item.stable_id == active_id_;
         if (selected) {
-            painter.fill_rect({2.0, y, std::max(0.0, bounds.width - 4.0), row_height},
-                              focused_ ? style().accent : style().accent_light);
+            painter.fill_rect({2.0, y, std::max(0.0, bounds.width - 4.0), row_height}, selected_fill);
         } else if (hovered_row_ == row) {
             painter.fill_rect({2.0, y, std::max(0.0, bounds.width - 4.0), row_height},
                               style().face_light);
