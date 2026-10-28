@@ -242,10 +242,8 @@ jobs:
         with:
           path: |
             .ccache
-            gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
-            .build/native-linux-x64/skia
           key: gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-${{ github.sha }}
           restore-keys: |
             gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-
@@ -336,10 +334,8 @@ jobs:
         with:
           path: |
             .ccache
-            gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
-            .build/native-linux-x64/skia
           key: ${{ steps.sanitizer-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         if: failure()

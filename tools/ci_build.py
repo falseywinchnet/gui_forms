@@ -136,9 +136,8 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         # checks both decoder/header digests before compiling it. A missing
         # FetchContent stamp must not discard and clone these same bytes again.
         options.append(f'-DFETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO={miniaudio}')
-    skia_out: Path = build / 'skia'
-    prepare_host(host, ROOT / 'gui_forms', skia_out, True)
-    options.extend(host_options(host, skia_out))
+    prepare_host(ROOT / 'gui_forms', True)
+    options.extend(host_options(host))
     timeout: str = '120'
     if sanitize:
         sanitizer_cmake: list[str]
@@ -248,7 +247,6 @@ def main() -> None:
         architecture = 'arm64'
     build: Path = ROOT / '.build' / ('native-' + host + '-' + architecture)
     build.mkdir(parents=True, exist_ok=True)
-    os.environ['BUILD_JOBS'] = str(args.jobs)
     build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
                   gallery_enabled(args.gallery, dict(os.environ)), args.sanitize, args.tests,
                   args.test_jobs, debug_info, args.skip_labels, args.changed_from)

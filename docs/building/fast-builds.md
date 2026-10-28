@@ -128,11 +128,9 @@ echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
 
 `CCACHE_COMPILERCHECK=content` hashes the compiler binary itself, not its
 path or timestamp. No sloppiness options are set. The Objective-C++ launcher
-matters on macOS, where the AppKit host is Objective-C++. On macOS and Linux,
-Skia is built by its own GN build: `third_party/build_skia_cpu.sh` and
-`build_skia_cpu_linux.sh` add `cc_wrapper = "ccache"` to `args.gn` when the
-environment variable `CMAKE_CXX_COMPILER_LAUNCHER` is `ccache`, so Skia's
-objects land in the same cache. A build then runs as:
+matters on macOS, where the AppKit host is Objective-C++. The CPU renderer,
+`stx_skia/`, builds as part of the tree, so its objects land in the same
+cache. A build then runs as:
 
 ```sh
 ccache --zero-stats

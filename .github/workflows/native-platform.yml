@@ -257,12 +257,10 @@ jobs:
         if: steps.promotion.outputs.reused != 'true' && (steps.reuse.outputs.reused != 'true')
         with:
           path: |
-            gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
             gui_forms/third_party/libunibreak
             .build/native-${{ inputs.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
-            .build/native-${{ inputs.platform }}/skia
           key: gui-deps-v3-${{ inputs.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn', 'gui_forms/cmake/Audio.cmake') }}
           restore-keys: gui-deps-v2-${{ inputs.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}
       - name: Find recent validated object seed across branches
@@ -309,11 +307,12 @@ jobs:
       - name: Prove one compression and PNG implementation in the link map
         if: steps.promotion.outputs.reused != 'true' && (steps.reuse.outputs.reused != 'true')
         run: |
-          # Every static archive the toolkit links, plus Skia's: no C zlib,
+          # Every static archive the toolkit links (stx_skia's among them on macOS
+          # and Linux), plus the Windows Skia archive: no C zlib,
           # FreeType gzip or libpng may remain (Z-stage I5, decision 3A).
           build=.build/native-${{ inputs.platform }}
           archives=$(find "$build/gui-forms" -name '*.a' -not -path '*/_deps/*' -not -name '*.dll.a')
-          skia=$(find "$build/skia" "$build/skia-archive/out" -maxdepth 1 -name '*.a' 2>/dev/null || true)
+          skia=$(find "$build/skia-archive/out" -maxdepth 1 -name '*.a' 2>/dev/null || true)
           python gui_forms/tools/audit_link_map.py --forbid-foreign $archives $skia
           # Archive sizes for third_party/SKIA_BUILD_EVIDENCE.md.
           if [ -n "$skia" ]; then ls -l $skia; fi
@@ -370,12 +369,10 @@ jobs:
         if: steps.promotion.outputs.reused != 'true' && (always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.reuse.outputs.reused != 'true' && steps.dependencies.outputs.cache-primary-key != '' && steps.dependencies.outputs.cache-hit != 'true')
         with:
           path: |
-            gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
             gui_forms/third_party/libunibreak
             .build/native-${{ inputs.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
-            .build/native-${{ inputs.platform }}/skia
           key: ${{ steps.dependencies.outputs.cache-primary-key }}
       - name: Report cache statistics
         if: steps.promotion.outputs.reused != 'true' && (always())

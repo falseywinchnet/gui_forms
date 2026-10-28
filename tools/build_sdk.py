@@ -100,24 +100,21 @@ def vendored_sources_present(source: Path) -> bool:
     return True
 
 
-def configure_command(target: str, source: Path, toolkit: Path, skia_out: Path, prefix: Path,
+def configure_command(target: str, source: Path, toolkit: Path, prefix: Path,
                       features: str = "default") -> list[str]:
     """The configure of target's SDK: ci_build.py's options with tests and programs off, plus features' options."""
     host: str = TARGET_HOSTS[target]
     return ["cmake", "-S", str(source), "-B", str(toolkit), "-G", "Ninja",
-            *toolkit_configure.toolkit_options(source, prefix, False, False), *toolkit_configure.host_options(host, skia_out),
+            *toolkit_configure.toolkit_options(source, prefix, False, False), *toolkit_configure.host_options(host),
             *FEATURE_SETS[features]]
 
 
 def build(target: str, prefix: Path, jobs: int, work: Path, features: str = "default") -> None:
     """Prepare, configure, build and install target's SDK with features into prefix, using work for the build trees."""
-    host: str = TARGET_HOSTS[target]
     work.mkdir(parents=True, exist_ok=True)
     toolkit: Path = work / "gui-forms"
-    skia_out: Path = work / "skia"
-    os.environ["BUILD_JOBS"] = str(jobs)
-    toolkit_configure.prepare_host(host, ROOT, skia_out, not vendored_sources_present(ROOT))
-    toolkit_configure.run(*configure_command(target, ROOT, toolkit, skia_out, prefix, features))
+    toolkit_configure.prepare_host(ROOT, not vendored_sources_present(ROOT))
+    toolkit_configure.run(*configure_command(target, ROOT, toolkit, prefix, features))
     toolkit_configure.run("cmake", "--build", toolkit, "--parallel", jobs)
     toolkit_configure.run("cmake", "--install", toolkit)
     print(f"GUI.Forms SDK for {target} installed in {prefix}", flush=True)

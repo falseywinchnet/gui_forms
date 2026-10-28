@@ -919,63 +919,19 @@ elseif(UNIX)
 endif()
 
 if(GUI_FORMS_ENABLE_SKIA)
-    set(GUI_FORMS_SKIA_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia)
-    set(GUI_FORMS_SKIA_OUT
-        "${GUI_FORMS_SKIA_ROOT}/out/gui_forms-cpu-release"
-        CACHE PATH "Directory containing the pinned CPU-only Skia archives")
-    option(GUI_FORMS_SKIA_PREBUILT
-           "Use already-built Skia archives instead of invoking the host build"
-           OFF)
-    set(GUI_FORMS_SKIA_ARCHIVES
-        ${GUI_FORMS_SKIA_OUT}/libskia.a
-        ${GUI_FORMS_SKIA_OUT}/libskcms.a
-    )
-
-    if(GUI_FORMS_SKIA_PREBUILT)
-        foreach(archive_path IN LISTS GUI_FORMS_SKIA_ARCHIVES)
-            if(NOT EXISTS "${archive_path}")
-                message(FATAL_ERROR "Missing prebuilt Skia archive: ${archive_path}")
-            endif()
-        endforeach()
-    else()
-        add_custom_command(
-            OUTPUT ${GUI_FORMS_SKIA_ARCHIVES}
-            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
-            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh ${GUI_FORMS_SKIA_OUT}
-            DEPENDS
-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh
-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_cpu_args.gn
-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_png_only.patch
-            COMMENT "Building pinned CPU-only, codec-free Skia"
-            VERBATIM
-        )
-    endif()
-    add_custom_target(gui_forms_skia_dependency DEPENDS ${GUI_FORMS_SKIA_ARCHIVES})
-
-    foreach(archive IN ITEMS skia skcms)
-        add_library(gui_forms_${archive}_archive STATIC IMPORTED GLOBAL)
-        set_target_properties(gui_forms_${archive}_archive PROPERTIES
-            IMPORTED_LOCATION ${GUI_FORMS_SKIA_OUT}/lib${archive}.a
-        )
-        add_dependencies(gui_forms_${archive}_archive gui_forms_skia_dependency)
-    endforeach()
+    # stx_skia/ is the CPU Skia derivative the adapters draw with, built from source as part of
+    # this tree; its headers are system headers here, as the imported Skia's were.
+    add_subdirectory(stx_skia SYSTEM)
 
     add_library(gui_forms_skia STATIC
         src/render/skia/raster/skia_raster.cpp
     )
-    add_dependencies(gui_forms_skia gui_forms_skia_dependency)
     target_include_directories(gui_forms_skia
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia/raster
     )
-    target_include_directories(gui_forms_skia SYSTEM PRIVATE
-        ${GUI_FORMS_SKIA_ROOT}
-    )
     target_link_libraries(gui_forms_skia
         PUBLIC gui_forms_core
-        PRIVATE
-            gui_forms_skia_archive
-            gui_forms_skcms_archive
+        PRIVATE stx_skia::stx_skia
     )
     # ADR-004: the Skia painter draws text only through the shared
     # HarfBuzz/FreeType engine; Skia itself has no font backend.
@@ -997,9 +953,6 @@ if(GUI_FORMS_ENABLE_SKIA)
             ${GUI_FORMS_COREGRAPHICS}
         )
     endif()
-    target_compile_definitions(gui_forms_skia PRIVATE
-        SK_DISABLE_TRACING
-    )
 
     add_library(gui_drawing_skia STATIC
         src/render/skia/executor/skia_executor.cpp
@@ -1009,12 +962,8 @@ if(GUI_FORMS_ENABLE_SKIA)
         target_sources(gui_drawing_skia PRIVATE
             src/render/skia/executor/core_text_font_bytes.cpp)
     endif()
-    add_dependencies(gui_drawing_skia gui_forms_skia_dependency)
     target_include_directories(gui_drawing_skia
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia/executor
-    )
-    target_include_directories(gui_drawing_skia SYSTEM PRIVATE
-        ${GUI_FORMS_SKIA_ROOT}
     )
     # ADR-004: the C drawing API draws text with the shared HarfBuzz/FreeType
     # engine and compositor.
@@ -1027,8 +976,7 @@ if(GUI_FORMS_ENABLE_SKIA)
             gui_forms_text_engine
             gui_forms_core
             freetype
-            gui_forms_skia_archive
-            gui_forms_skcms_archive
+            stx_skia::stx_skia
     )
     if(APPLE)
         target_link_libraries(gui_drawing_skia PRIVATE
@@ -1037,9 +985,6 @@ if(GUI_FORMS_ENABLE_SKIA)
             ${GUI_FORMS_CORETEXT}
         )
     endif()
-    target_compile_definitions(gui_drawing_skia PRIVATE
-        SK_DISABLE_TRACING
-    )
 
     add_library(gui_drawing_raster_c_api SHARED
         src/abi/drawing_skia_c_api.cpp
@@ -1151,8 +1096,6 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         gui_forms_controls
         gui_forms_skia
         gui_forms_host_macos
-        gui_forms_skia_archive
-        gui_forms_skcms_archive
         ${GUI_FORMS_APPKIT}
         ${GUI_FORMS_QUARTZCORE}
         ${GUI_FORMS_COREGRAPHICS}
@@ -1962,7 +1905,7 @@ if(GUI_FORMS_BUILD_BENCHMARKS)
             -DCOREGRAPHICS_ADAPTER=$<TARGET_FILE:gui_forms_coregraphics>
             -DBENCHMARK_BINARY=$<TARGET_FILE:gui_forms_renderer_benchmark>
             -DPUBLIC_INCLUDE_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/include
-            -DSKIA_ARCHIVE=${GUI_FORMS_SKIA_OUT}/libskia.a
+            -DSKIA_ARCHIVE=$<TARGET_FILE:stx_skia>
             -DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/renderer-boundary-audit.txt
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_renderer_boundaries.cmake
         DEPENDS gui_forms_renderer_benchmark
@@ -2020,10 +1963,8 @@ if(GUI_FORMS_BUILD_TESTS)
             COMMAND gui_forms_prepared_text_raster_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         if(TARGET gui_forms_skia)
             add_executable(gui_forms_prepared_text_skia_tests tests/prepared_text_skia_tests.cpp)
-            target_include_directories(gui_forms_prepared_text_skia_tests SYSTEM PRIVATE
-                ${GUI_FORMS_SKIA_ROOT})
             target_link_libraries(gui_forms_prepared_text_skia_tests PRIVATE
-                gui_forms_skia gui_forms_prepared_text_impl)
+                gui_forms_skia gui_forms_prepared_text_impl stx_skia::stx_skia)
             add_test(NAME gui_forms_prepared_text_skia_tests
                 COMMAND gui_forms_prepared_text_skia_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
             set_tests_properties(gui_forms_prepared_text_skia_tests PROPERTIES TIMEOUT 30)
@@ -3903,7 +3844,7 @@ if(GUI_FORMS_BUILD_TESTS)
         add_test(
             NAME gui_forms_skia_archive_policy
             COMMAND ${CMAKE_COMMAND}
-                -DSKIA_ARCHIVE=${GUI_FORMS_SKIA_OUT}/libskia.a
+                -DSKIA_ARCHIVE=$<TARGET_FILE:stx_skia>
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_skia_archive.cmake
         )
     endif()
@@ -3962,7 +3903,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 -DCOREGRAPHICS_ADAPTER=$<TARGET_FILE:gui_forms_coregraphics>
                 -DBENCHMARK_BINARY=$<TARGET_FILE:gui_forms_renderer_benchmark>
                 -DPUBLIC_INCLUDE_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/include
-                -DSKIA_ARCHIVE=${GUI_FORMS_SKIA_OUT}/libskia.a
+                -DSKIA_ARCHIVE=$<TARGET_FILE:stx_skia>
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_renderer_boundaries.cmake
         )
     endif()
@@ -4182,7 +4123,8 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/freetype/docs/FTL.TXT" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME FreeType-FTL.txt)
 endif()
 if(GUI_FORMS_ENABLE_SKIA)
-    install(FILES "${GUI_FORMS_SKIA_ROOT}/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Skia-LICENSE.txt)
+    install(FILES stx_skia/LICENSE-Skia DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Skia-LICENSE.txt)
+    install(FILES stx_skia/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_skia-LICENSE.txt)
 endif()
 
 install(FILES third_party/sheenbidi/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME SheenBidi-LICENSE.txt)

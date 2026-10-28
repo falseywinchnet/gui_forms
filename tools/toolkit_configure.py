@@ -8,7 +8,6 @@ This module therefore imports nothing from template_harness: run and the
 pinned-checkout check are its own, and match harness/ci_build_steps.py's.
 """
 from __future__ import annotations
-import os
 from pathlib import Path
 import re
 import subprocess
@@ -81,41 +80,26 @@ def fetch_line_break(script: Path) -> None:
 HOST_OPTION_NAMES: dict[str, str] = {'WINDOWS': 'windows', 'MACOS': 'macos', 'LINUX': 'linux'}
 
 
-def prepare_host(host: str, source: Path, skia_out: Path, fetch_text: bool) -> None:
-    """Fetch and build what host's configure reads, before configuring source.
+def prepare_host(source: Path, fetch_text: bool) -> None:
+    """Fetch what a host's configure reads, before configuring source.
 
-    On macOS and Linux that is the pinned Skia source, built into skia_out;
-    with fetch_text, also the pinned text sources (HarfBuzz, FreeType and
-    libunibreak). A source SDK archive already holds the text sources
-    (tools/build_sdk.py passes fetch_text False). On Linux it sets
-    GUI_FORMS_SYSTEM_BUILD_TOOLS=1 in this process's environment, so Skia
-    builds with the system gn and ninja.
+    With fetch_text, the pinned text sources (HarfBuzz, FreeType and
+    libunibreak); a source SDK archive already holds them
+    (tools/build_sdk.py passes fetch_text False). Every host needs the same
+    sources: the renderer, stx_skia/, is part of the tree.
     """
     third_party: Path = source / 'third_party'
-    if host == 'windows':
-        # ADR-004: the Win32 host draws text with the shared HarfBuzz/FreeType engine.
-        if fetch_text:
-            fetch_text_stack(third_party / 'fetch_text_stack.sh')
-            fetch_line_break(third_party / 'fetch_linebreak.sh')
-        return
-    if host == 'linux':
-        os.environ['GUI_FORMS_SYSTEM_BUILD_TOOLS'] = '1'
-    run('sh', third_party / 'fetch_skia_cpu.sh')
     if fetch_text:
         fetch_text_stack(third_party / 'fetch_text_stack.sh')
         fetch_line_break(third_party / 'fetch_linebreak.sh')
-    if host == 'linux':
-        run('sh', third_party / 'build_skia_cpu_linux.sh', skia_out)
-    else:
-        run('sh', third_party / 'build_skia_cpu.sh', skia_out)
 
 
-def host_options(host: str, skia_out: Path) -> list[str]:
+def host_options(host: str) -> list[str]:
     """The configure options that select host's native host and renderer.
 
-    Windows draws with the Win32 host and no Skia; macOS and Linux link the
-    Skia archives prepare_host built into skia_out. Every host uses the
-    HarfBuzz/FreeType text engine.
+    Windows draws with the Win32 host and no Skia; macOS and Linux build the
+    Skia adapters on stx_skia/. Every host uses the HarfBuzz/FreeType text
+    engine.
     """
     options: list[str] = []
     name: str
@@ -127,8 +111,7 @@ def host_options(host: str, skia_out: Path) -> list[str]:
     if host == 'windows':
         options.extend(['-DGUI_FORMS_ENABLE_SKIA=OFF', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON'])
     else:
-        options.extend(['-DGUI_FORMS_ENABLE_SKIA=ON', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON',
-                        '-DGUI_FORMS_SKIA_PREBUILT=ON', f'-DGUI_FORMS_SKIA_OUT={skia_out}'])
+        options.extend(['-DGUI_FORMS_ENABLE_SKIA=ON', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON'])
     return options
 
 
