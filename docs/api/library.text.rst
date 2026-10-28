@@ -168,15 +168,23 @@ Types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: DisplayMappingResult final
+.. cpp:class:: DisplayMappingResult final
 
    ``#include <gui_forms/document_view/types/document_view_types.hpp>``
 
-   .. cpp:member:: DocumentViewStatus status
 
-      Default: ``{DocumentViewStatus::unavailable}``.
+   .. rubric:: Properties
 
-   .. cpp:member:: std::optional<DisplayByteOffset> position
+   .. cpp:function:: DocumentViewStatus status() const noexcept
+
+   .. cpp:function:: const DisplayByteOffset* position() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static DisplayMappingResult mapped(DisplayByteOffset position) noexcept
+
+   .. cpp:function:: static DisplayMappingResult refused(DocumentViewStatus status) noexcept
 
 .. cpp:namespace:: gui_forms
 
@@ -238,15 +246,23 @@ Types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: DocumentRequestResult final
+.. cpp:class:: DocumentRequestResult final
 
    ``#include <gui_forms/document_view/types/document_view_types.hpp>``
 
-   .. cpp:member:: DocumentViewStatus status
 
-      Default: ``{DocumentViewStatus::unavailable}``.
+   .. rubric:: Properties
 
-   .. cpp:member:: std::optional<DocumentPageRequest> request
+   .. cpp:function:: DocumentViewStatus status() const noexcept
+
+   .. cpp:function:: const DocumentPageRequest* request() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static DocumentRequestResult requested(DocumentPageRequest request) noexcept
+
+   .. cpp:function:: static DocumentRequestResult refused(DocumentViewStatus status) noexcept
 
 .. cpp:namespace:: gui_forms
 
@@ -1038,15 +1054,23 @@ Types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: SourceMappingResult final
+.. cpp:class:: SourceMappingResult final
 
    ``#include <gui_forms/document_view/types/document_view_types.hpp>``
 
-   .. cpp:member:: DocumentViewStatus status
 
-      Default: ``{DocumentViewStatus::unavailable}``.
+   .. rubric:: Properties
 
-   .. cpp:member:: std::optional<SourceByteOffset> position
+   .. cpp:function:: DocumentViewStatus status() const noexcept
+
+   .. cpp:function:: const SourceByteOffset* position() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static SourceMappingResult mapped(SourceByteOffset position) noexcept
+
+   .. cpp:function:: static SourceMappingResult refused(DocumentViewStatus status) noexcept
 
 .. cpp:namespace:: gui_forms
 

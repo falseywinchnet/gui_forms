@@ -70,17 +70,83 @@ struct DocumentPage final {
     void swap(DocumentPage& other) noexcept;
 };
 
-struct DocumentRequestResult final {
-    DocumentViewStatus status{DocumentViewStatus::unavailable};
-    std::optional<DocumentPageRequest> request{};
+class DocumentRequestResult final {
+public:
+    [[nodiscard]] static DocumentRequestResult requested(DocumentPageRequest request) noexcept {
+        DocumentRequestResult result{DocumentViewStatus::success, std::move(request)};
+        return result;
+    }
+    [[nodiscard]] static DocumentRequestResult refused(DocumentViewStatus status) noexcept {
+        DocumentRequestResult result{status, std::nullopt};
+        return result;
+    }
+
+    [[nodiscard]] DocumentViewStatus status() const noexcept {
+        return status_;
+    }
+    [[nodiscard]] const DocumentPageRequest* request() const noexcept {
+        const DocumentPageRequest* const found = request_.has_value() ? &(*request_) : nullptr;
+        return found;
+    }
+
+private:
+    DocumentRequestResult(DocumentViewStatus status, std::optional<DocumentPageRequest> request) noexcept
+        : status_(status), request_(std::move(request)) {}
+
+    DocumentViewStatus status_;
+    std::optional<DocumentPageRequest> request_;
 };
-struct SourceMappingResult final {
-    DocumentViewStatus status{DocumentViewStatus::unavailable};
-    std::optional<SourceByteOffset> position{};
+class SourceMappingResult final {
+public:
+    [[nodiscard]] static SourceMappingResult mapped(SourceByteOffset position) noexcept {
+        SourceMappingResult result{DocumentViewStatus::success, std::move(position)};
+        return result;
+    }
+    [[nodiscard]] static SourceMappingResult refused(DocumentViewStatus status) noexcept {
+        SourceMappingResult result{status, std::nullopt};
+        return result;
+    }
+
+    [[nodiscard]] DocumentViewStatus status() const noexcept {
+        return status_;
+    }
+    [[nodiscard]] const SourceByteOffset* position() const noexcept {
+        const SourceByteOffset* const found = position_.has_value() ? &(*position_) : nullptr;
+        return found;
+    }
+
+private:
+    SourceMappingResult(DocumentViewStatus status, std::optional<SourceByteOffset> position) noexcept
+        : status_(status), position_(std::move(position)) {}
+
+    DocumentViewStatus status_;
+    std::optional<SourceByteOffset> position_;
 };
-struct DisplayMappingResult final {
-    DocumentViewStatus status{DocumentViewStatus::unavailable};
-    std::optional<DisplayByteOffset> position{};
+class DisplayMappingResult final {
+public:
+    [[nodiscard]] static DisplayMappingResult mapped(DisplayByteOffset position) noexcept {
+        DisplayMappingResult result{DocumentViewStatus::success, std::move(position)};
+        return result;
+    }
+    [[nodiscard]] static DisplayMappingResult refused(DocumentViewStatus status) noexcept {
+        DisplayMappingResult result{status, std::nullopt};
+        return result;
+    }
+
+    [[nodiscard]] DocumentViewStatus status() const noexcept {
+        return status_;
+    }
+    [[nodiscard]] const DisplayByteOffset* position() const noexcept {
+        const DisplayByteOffset* const found = position_.has_value() ? &(*position_) : nullptr;
+        return found;
+    }
+
+private:
+    DisplayMappingResult(DocumentViewStatus status, std::optional<DisplayByteOffset> position) noexcept
+        : status_(status), position_(std::move(position)) {}
+
+    DocumentViewStatus status_;
+    std::optional<DisplayByteOffset> position_;
 };
 
 } // namespace gui_forms

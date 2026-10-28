@@ -65,20 +65,68 @@ enum class DockDragEnd : std::uint8_t {
     floated,
 };
 
-struct DockDragOutcome final {
-    DockDragEnd end{DockDragEnd::escaped};
-    DockSubject subject{};
+class DockDragOutcome final {
+public:
+    [[nodiscard]] static DockDragOutcome dropped(DockSubject subject, DockDropTarget target,
+            DockTransactionResult result, bool across_windows) noexcept {
+        DockDragOutcome built{DockDragEnd::dropped, std::move(subject), std::move(target), std::move(result),
+            across_windows, {}};
+        return built;
+    }
+    [[nodiscard]] static DockDragOutcome floated(DockSubject subject, DockTransactionResult result,
+            Rect frame) noexcept {
+        DockDragOutcome built{DockDragEnd::floated, std::move(subject), std::nullopt, std::move(result),
+            false, std::move(frame)};
+        return built;
+    }
+    [[nodiscard]] static DockDragOutcome ended(DockDragEnd end, DockSubject subject) noexcept {
+        DockDragOutcome built{end, std::move(subject), std::nullopt, {}, false, {}};
+        return built;
+    }
+
+    [[nodiscard]] DockDragEnd end() const noexcept {
+        return end_;
+    }
+    [[nodiscard]] const DockSubject& subject() const noexcept {
+        return subject_;
+    }
     // The target dropped on, for `dropped`, in the coordinates of the site
     // that showed it.
-    std::optional<DockDropTarget> target{};
+    [[nodiscard]] const DockDropTarget* target() const noexcept {
+        const DockDropTarget* const found = target_.has_value() ? &(*target_) : nullptr;
+        return found;
+    }
     // The layout transaction's result, for `dropped` and `floated`.
-    DockTransactionResult result{};
+    [[nodiscard]] const DockTransactionResult* result() const noexcept {
+        const bool present = end_ == DockDragEnd::dropped || end_ == DockDragEnd::floated;
+        const DockTransactionResult* const found = present ? &result_ : nullptr;
+        return found;
+    }
     // For `dropped`: whether the target was in another site's window (a drag
     // across windows, phase D4).
-    bool across_windows{};
+    [[nodiscard]] bool across_windows() const noexcept {
+        return across_windows_;
+    }
     // For `floated`: the new floating window's client area, in desktop
     // logical units.
-    Rect frame{};
+    [[nodiscard]] const Rect* frame() const noexcept {
+        const bool present = end_ == DockDragEnd::floated;
+        const Rect* const found = present ? &frame_ : nullptr;
+        return found;
+    }
+
+private:
+    DockDragOutcome(DockDragEnd end, DockSubject subject, std::optional<DockDropTarget> target,
+                    DockTransactionResult result, bool across_windows, Rect frame) noexcept
+        : end_(end), subject_(std::move(subject)), target_(std::move(target)), result_(std::move(result)),
+          across_windows_(across_windows), frame_(std::move(frame)) {}
+
+    DockDragEnd end_;
+    DockSubject subject_;
+    std::optional<DockDropTarget> target_;
+    DockTransactionResult result_;
+    bool across_windows_;
+    Rect frame_;
 };
 
 // Why a flyout opened or closed (DockFlyoutChange; owner decision DK-27,

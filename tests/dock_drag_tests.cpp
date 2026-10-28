@@ -302,7 +302,7 @@ void threshold_escape_and_close_up() {
                 !stack_bounds(site, output).empty() &&
                 stack_bounds(site, documents) == documents_before,
             "after Escape the saved layout is byte-identical and the stack is back");
-    require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end == DockDragEnd::escaped,
+    require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end() == DockDragEnd::escaped,
             "the drag reports its end once");
     release(window, from);
     require((*fixture).outcomes.size() == 1U, "a release after the end does nothing more");
@@ -336,8 +336,8 @@ void drop_is_one_transaction() {
     require(stack_of(workspace, "output") == stack_of(workspace, "properties") &&
                 workspace.active_panel() && (*workspace.active_panel()).value == "output",
             "Output is tabbed into Properties' stack and active");
-    require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end == DockDragEnd::dropped &&
-                (*fixture).outcomes[0].result.applied,
+    require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end() == DockDragEnd::dropped &&
+                (*(*fixture).outcomes[0].result()).applied,
             "the drag reports its drop");
     settle(window);
     require(site.drag_phase() == DockDragPhase::idle && site.drag_stamp().empty(), "the stamp settled and left");
@@ -414,7 +414,7 @@ void target_table() {
     release(window, centre(properties_pane), Modifier::control);
     settle(window);
     require(saved(workspace) == before && (*fixture).changes == 0U && (*fixture).outcomes.size() == 1U &&
-                (*fixture).outcomes[0].end == DockDragEnd::rejected,
+                (*fixture).outcomes[0].end() == DockDragEnd::rejected,
             "a release with docking suppressed snaps back");
 }
 
@@ -426,7 +426,7 @@ void cancellations() {
         Window& window = *(*fixture).window;
         const std::string before = saved(*(*fixture).workspace);
         window.capture_pointer(window.find("content.doc.second"));
-        require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end == DockDragEnd::capture_lost &&
+        require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end() == DockDragEnd::capture_lost &&
                     saved(*(*fixture).workspace) == before,
                 "losing the capture to another control cancels");
     }
@@ -438,7 +438,7 @@ void cancellations() {
         window.release_pointer();
         require((*fixture).outcomes.empty(), "a release of the capture waits for the dispatch to end");
         static_cast<void>(window.drain_posted_work());
-        require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end == DockDragEnd::capture_lost,
+        require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end() == DockDragEnd::capture_lost,
                 "a capture released with no drop cancels");
     }
     // The window deactivates.
@@ -446,7 +446,7 @@ void cancellations() {
         std::unique_ptr<Fixture> fixture = make_fixture();
         drag_caption(*fixture, "output", {400.0, 200.0});
         (*(*fixture).window).set_active(false);
-        require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end == DockDragEnd::deactivated,
+        require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end() == DockDragEnd::deactivated,
                 "deactivating the window cancels");
     }
     // The program changes the layout under the drag.
@@ -454,7 +454,7 @@ void cancellations() {
         std::unique_ptr<Fixture> fixture = make_fixture();
         drag_caption(*fixture, "output", {400.0, 200.0});
         static_cast<void>((*(*fixture).workspace).hide_panel(DockPanelId("properties"), DockEditOrigin::program));
-        require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end == DockDragEnd::layout_changed &&
+        require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end() == DockDragEnd::layout_changed &&
                     (*(*fixture).site).drag_phase() != DockDragPhase::dragging,
                 "a layout change by the program cancels the drag");
     }
@@ -468,7 +468,7 @@ void cancellations() {
         require(!site.drag_target(), "the documents' middle refuses Output");
         release(*(*fixture).window, centre(documents));
         settle(*(*fixture).window);
-        require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end == DockDragEnd::rejected &&
+        require((*fixture).outcomes.size() == 1U && (*fixture).outcomes[0].end() == DockDragEnd::rejected &&
                     saved(*(*fixture).workspace) == before && (*fixture).changes == 0U,
                 "a release where nothing accepts snaps back with the layout unchanged");
     }
@@ -724,7 +724,7 @@ void keyboard_reaches_every_target() {
             "Ctrl+Alt+Shift+M starts the move mode");
     window.perform_layout();
     require(key(window, PhysicalKey::enter) && (*fixture).changes == 1U && (*fixture).outcomes.size() == 2U &&
-                (*fixture).outcomes[1].end == DockDragEnd::dropped,
+                (*fixture).outcomes[1].end() == DockDragEnd::dropped,
             "Enter commits one transaction");
     settle(window);
 }

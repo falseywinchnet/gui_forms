@@ -507,9 +507,11 @@ void DockSite::end_drag(DockDragEnd end) {
     }
     if (drag_.phase != DockDragPhase::dragging || workspace_ == nullptr || drag_.guest) return;
     const Control::Ptr keep = shared_from_this();
-    DockDragOutcome outcome{};
-    outcome.end = end;
-    outcome.subject = drag_.subject;
+    // How the drag ends is settled step by step below; its outcome is built
+    // once, from these locals, just before it is emitted.
+    DockDragEnd ending = end;
+    const DockSubject subject = drag_.subject;
+    bool across_windows = false;
     // A target in another window is that site's; it stops showing the drag
     // before the drop's transaction.
     DockSite* const guest = remote_guest();
@@ -520,18 +522,18 @@ void DockSite::end_drag(DockDragEnd end) {
         if (target) described = (*guest).describe_target(*target);
         (*guest).leave_guest_drag();
         drag_.remote.reset();
-        outcome.across_windows = target.has_value();
+        across_windows = target.has_value();
     } else if (target) {
         described = describe_target(*target);
     }
-    if (end == DockDragEnd::dropped && !target) outcome.end = DockDragEnd::rejected;
-    if (outcome.end == DockDragEnd::dropped && drag_.generation != (*workspace_).tree_generation()) {
-        outcome.end = DockDragEnd::layout_changed;
+    if (end == DockDragEnd::dropped && !target) ending = DockDragEnd::rejected;
+    if (ending == DockDragEnd::dropped && drag_.generation != (*workspace_).tree_generation()) {
+        ending = DockDragEnd::layout_changed;
     }
     // Released where nothing accepts: it floats at the pointer when it may
     // (D4-1).
     std::optional<Rect> float_frame{};
-    if (outcome.end == DockDragEnd::rejected && end == DockDragEnd::dropped && drag_.may_float) {
+    if (ending == DockDragEnd::rejected && end == DockDragEnd::dropped && drag_.may_float) {
         float_frame = float_frame_at(drag_.pointer);
     }
     const DockNodeId source_stack = drag_.source_stack;
@@ -552,29 +554,26 @@ void DockSite::end_drag(DockDragEnd end) {
     tile_fade_.finish();
     Window* const host = attached_window();
     if (host != nullptr && !keyboard && (*host).captured_control().get() == this) (*host).release_pointer();
-    if (outcome.end == DockDragEnd::dropped) {
-        outcome.target = target;
+    DockTransactionResult result{};
+    if (ending == DockDragEnd::dropped) {
         DockTransaction transaction{};
         transaction.origin = DockEditOrigin::user;
         transaction.edits.push_back((*target).edit);
-        outcome.result = (*workspace_).apply(transaction);
-        if (!outcome.result.applied) outcome.end = DockDragEnd::rejected;
+        result = (*workspace_).apply(transaction);
+        if (!result.applied) ending = DockDragEnd::rejected;
     } else if (float_frame) {
-        outcome.result = (*workspace_).float_subject(outcome.subject, *float_frame);
-        if (outcome.result.applied) {
-            outcome.end = DockDragEnd::floated;
-            outcome.frame = *float_frame;
-        }
+        result = (*workspace_).float_subject(subject, *float_frame);
+        if (result.applied) ending = DockDragEnd::floated;
     }
     if (!is_alive() || workspace_ == nullptr) return;
-    if (outcome.end != DockDragEnd::dropped && outcome.end != DockDragEnd::floated && panel_only) {
+    if (ending != DockDragEnd::dropped && ending != DockDragEnd::floated && panel_only) {
         StackSlot* const slot = slot_for(source_stack);
         const DockNode* const node = (*workspace_).layout().find_node(source_stack);
         if (slot != nullptr && node != nullptr) sync_pages(*slot, *node);
     }
-    if (outcome.end == DockDragEnd::dropped) {
+    if (ending == DockDragEnd::dropped) {
         drag_.announcement = drag_.title + ": " + described + ", done";
-    } else if (outcome.end == DockDragEnd::floated) {
+    } else if (ending == DockDragEnd::floated) {
         drag_.announcement = drag_.title + ": floating in a new window";
     } else {
         drag_.announcement = drag_.title + ": back in its place";
@@ -584,6 +583,14 @@ void DockSite::end_drag(DockDragEnd end) {
     const DockActivationCause cause = keyboard ? DockActivationCause::keyboard : DockActivationCause::pointer;
     static_cast<void>((*workspace_).activate_panel(panel, cause));
     if (!is_alive()) return;
+    // Only a drop keeps its target and only a float its frame; every other
+    // end reports the subject alone.
+    DockDragOutcome outcome = DockDragOutcome::ended(ending, subject);
+    if (ending == DockDragEnd::dropped) {
+        outcome = DockDragOutcome::dropped(subject, *target, result, across_windows);
+    } else if (ending == DockDragEnd::floated) {
+        outcome = DockDragOutcome::floated(subject, result, *float_frame);
+    }
     drag_ended_.emit(outcome);
 }
 
@@ -1233,22 +1240,20 @@ void DockSite::end_window_move(bool cancelled) {
         window_move_.drag.end(now_nanoseconds());
     }
     if (!target || workspace_ == nullptr) return;
-    DockDragOutcome outcome{};
-    outcome.end = DockDragEnd::dropped;
-    outcome.subject = window_move_.subject;
-    outcome.target = target;
-    outcome.across_windows = true;
+    const DockSubject subject = window_move_.subject;
     DockPanelId panel{};
     const DockNode* const node = (*workspace_).layout().find_node(window_move_.subject.stack);
     if (node != nullptr && !(*node).panels.empty()) panel = (*node).panels[(*node).selected];
     DockTransaction transaction{};
     transaction.origin = DockEditOrigin::user;
     transaction.edits.push_back((*target).edit);
-    outcome.result = (*workspace_).apply(transaction);
-    if (!outcome.result.applied) outcome.end = DockDragEnd::rejected;
+    const DockTransactionResult result = (*workspace_).apply(transaction);
     if (workspace_ == nullptr) return;
-    if (outcome.result.applied) static_cast<void>((*workspace_).activate_panel(panel, DockActivationCause::pointer));
+    if (result.applied) static_cast<void>((*workspace_).activate_panel(panel, DockActivationCause::pointer));
     if (!is_alive()) return;
+    // A window moved onto another site's target is always across windows.
+    DockDragOutcome outcome = DockDragOutcome::ended(DockDragEnd::rejected, subject);
+    if (result.applied) outcome = DockDragOutcome::dropped(subject, *target, result, true);
     drag_ended_.emit(outcome);
 }
 

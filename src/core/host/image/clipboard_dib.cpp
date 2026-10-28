@@ -56,36 +56,40 @@ std::vector<std::byte> encode_clipboard_dib(HostImageView image) {
     }
     return bytes;
 }
-HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes) {
-    HostClipboardImageResult result;
-    result.status.error = HostServiceError::backend_failure;
-    if (bytes.size() < 40U) return result;
+HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes, std::uint64_t generation) {
+    // Malformed bytes are a backend failure; an image this decoder cannot
+    // represent is unsupported, and one over the pixel bound too large.
+    const HostClipboardImageResult malformed = HostClipboardImageResult::failed(HostServiceError::backend_failure);
+    const HostClipboardImageResult unsupported = HostClipboardImageResult::failed(HostServiceError::unsupported);
+    if (bytes.size() < 40U) return malformed;
     const std::uint32_t header = u32(bytes, 0);
-    if ((header != 40U && header != 108U && header != 124U) || bytes.size() < header) return result;
+    if ((header != 40U && header != 108U && header != 124U) || bytes.size() < header) return malformed;
     const std::uint32_t width = u32(bytes, 4);
     const std::uint32_t signed_height = u32(bytes, 8);
     const bool top_down = (signed_height & 0x80000000U) != 0U;
     const std::uint32_t height = top_down ? 0U - signed_height : signed_height;
-    if (width == 0U || width > 0x7fffffffU || height == 0U || height > 0x7fffffffU || u16(bytes, 12) != 1U) return result;
+    if (width == 0U || width > 0x7fffffffU || height == 0U || height > 0x7fffffffU || u16(bytes, 12) != 1U) {
+        return malformed;
+    }
     const std::uint64_t pixel_count = static_cast<std::uint64_t>(width) * height;
-    if (pixel_count > HostImage::maximum_pixels) { result.status.error = HostServiceError::too_large; return result; }
+    if (pixel_count > HostImage::maximum_pixels) return HostClipboardImageResult::failed(HostServiceError::too_large);
     const std::uint16_t bits = u16(bytes, 14);
     const std::uint32_t compression = u32(bytes, 16);
     std::size_t start = header;
     std::uint32_t masks[4]{0x00ff0000U, 0x0000ff00U, 0x000000ffU, 0U};
     if ((bits != 24U && bits != 32U) || (compression != 0U && compression != 3U) ||
         (bits == 24U && compression != 0U)) {
-        result.status.error = HostServiceError::unsupported; return result;
+        return unsupported;
     }
     if (header >= 108U) {
         const std::uint32_t color_space = u32(bytes, 56);
         if (color_space != 0x73524742U && color_space != 0x57696e20U) {
-            result.status.error = HostServiceError::unsupported; return result;
+            return unsupported;
         }
     }
     if (compression == 3U) {
         if (header == 40U) {
-            if (bytes.size() < 52U) return result;
+            if (bytes.size() < 52U) return malformed;
             start += 12U;
         }
         for (std::size_t index = 0; index < 3U; ++index) masks[index] = u32(bytes, 40U + index * 4U);
@@ -94,16 +98,16 @@ HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes) 
         for (std::size_t index = 0; index < 4U; ++index) {
             if (index == 3U && masks[index] == 0U) continue;
             if (!byte_mask(masks[index]) || (occupied & masks[index]) != 0U) {
-                result.status.error = HostServiceError::unsupported; return result;
+                return unsupported;
             }
             occupied |= masks[index];
         }
     }
     const std::uint32_t palette = u32(bytes, 32);
-    if (palette > 256U || palette * 4U > bytes.size() - start) return result;
+    if (palette > 256U || palette * 4U > bytes.size() - start) return malformed;
     start += palette * 4U;
     const std::uint64_t stride = ((static_cast<std::uint64_t>(width) * bits + 31U) / 32U) * 4U;
-    if (stride * height > bytes.size() - start) return result;
+    if (stride * height > bytes.size() - start) return malformed;
     HostImage image{};
     image.width = width;
     image.height = height;
@@ -128,8 +132,6 @@ HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes) 
             }
         }
     }
-    result.status = {};
-    result.image = std::move(image);
-    return result;
+    return HostClipboardImageResult::image_read(std::move(image), generation);
 }
 } // namespace gui_forms::detail

@@ -58,7 +58,9 @@ void HeadlessHostServices::set_dialog_handler(DialogHandler handler) {
 }
 
 HostClipboardImageResult HeadlessHostServices::read_clipboard_image_impl() {
-    return {{}, clipboard_image_, clipboard_generation_};
+    if (!clipboard_image_.has_value()) return HostClipboardImageResult::nothing_read(clipboard_generation_);
+    // A copy: the consumer's image never shares the clipboard's storage.
+    return HostClipboardImageResult::image_read(*clipboard_image_, clipboard_generation_);
 }
 
 HostServiceStatus HeadlessHostServices::write_clipboard_image_impl(HostImageView image) {

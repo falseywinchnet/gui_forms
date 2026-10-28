@@ -345,7 +345,7 @@ void release_outside_floats() {
     release(main, outside);
     (*(*app).application).reclaim();
     lay_out_all(*app);
-    require((*app).outcomes.size() == 1U && (*app).outcomes[0].end == DockDragEnd::floated,
+    require((*app).outcomes.size() == 1U && (*app).outcomes[0].end() == DockDragEnd::floated,
             "the release floats the stack");
     const DockSiteId floating = floating_site_of(workspace, "output");
     require(!(floating == DockSiteId{}) && workspace.floating_window_count() == 1U, "Output floats in a new window");
@@ -398,7 +398,7 @@ void float_limit_snaps_back() {
     move(main, gap, Modifier::control);
     require(!(*(*app).site).parts().drop_cue.bounds.empty(), "the rejected cue shows where a release snaps back");
     release(main, gap);
-    require((*app).outcomes.size() == 1U && (*app).outcomes[0].end == DockDragEnd::rejected &&
+    require((*app).outcomes.size() == 1U && (*app).outcomes[0].end() == DockDragEnd::rejected &&
                 workspace.layout().locate(DockPanelId("output")).placement == DockPlacementKind::docked,
             "at the limit a release where nothing accepts snaps back");
     (*(*app).application).reclaim();
@@ -434,8 +434,8 @@ void drag_into_floating_window() {
     require((*(*app).site).realized_tiles().size() == 4U, "the main window shows only its own edges");
     release(main, over);
     (*(*app).application).reclaim();
-    require((*app).outcomes.size() == 1U && (*app).outcomes[0].end == DockDragEnd::dropped &&
-                (*app).outcomes[0].across_windows,
+    require((*app).outcomes.size() == 1U && (*app).outcomes[0].end() == DockDragEnd::dropped &&
+                (*app).outcomes[0].across_windows(),
             "the drop lands in the other window");
     require(workspace.layout().locate(DockPanelId("output")).stack == stack_of(workspace, "properties"),
             "Output is tabbed into the floating stack");

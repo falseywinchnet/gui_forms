@@ -37,8 +37,8 @@ DocumentPageRequest request(DocumentViewState& state, std::uint64_t begin, std::
     const SourceByteRange permitted = range(begin, end);
     const DocumentViewport desired = viewport(begin);
     const DocumentRequestResult result = state.request_page(desired, permitted);
-    require(result.status == DocumentViewStatus::success && result.request.has_value(), "request success");
-    return *result.request;
+    require(result.status() == DocumentViewStatus::success && result.request() != nullptr, "request success");
+    return *result.request();
 }
 
 DocumentPage identity_page(const DocumentPageRequest& token, std::string_view text) {
@@ -71,13 +71,13 @@ void test_empty_and_huge_offsets() {
     DocumentViewState state{};
     const SourceByteRange empty_range{};
     const DocumentRequestResult unbound = state.request_page(DocumentViewport{}, empty_range);
-    require(unbound.status == DocumentViewStatus::unavailable, "unbound unavailable");
+    require(unbound.status() == DocumentViewStatus::unavailable, "unbound unavailable");
     bind(state, 0);
     const DocumentPageRequest empty_token = request(state, 0, 0);
     DocumentPage empty_page = identity_page(empty_token, "");
     publish(state, empty_page);
     const SourceMappingResult empty = state.source_position(empty_token, DisplayByteOffset(0));
-    require(empty.status == DocumentViewStatus::success && (*empty.position).value == 0, "empty mapping");
+    require(empty.status() == DocumentViewStatus::success && (*empty.position()).value == 0, "empty mapping");
 
     const std::uint64_t end = std::numeric_limits<std::uint64_t>::max();
     const std::uint64_t begin = end - 3;
@@ -88,17 +88,17 @@ void test_empty_and_huge_offsets() {
     for (std::uint32_t index = 0; index <= 3; ++index) {
         const SourceMappingResult source = state.source_position(token, DisplayByteOffset(index));
         const std::uint64_t expected = begin + index;
-        require(source.status == DocumentViewStatus::success && (*source.position).value == expected,
+        require(source.status() == DocumentViewStatus::success && (*source.position()).value == expected,
                 "uint64 edge must remain exact, beyond double precision");
         const DisplayMappingResult display = state.display_position(token, SourceByteOffset(expected));
-        require(display.status == DocumentViewStatus::success && (*display.position).value == index,
+        require(display.status() == DocumentViewStatus::success && (*display.position()).value == index,
                 "uint64 edge roundtrip");
     }
     const DocumentPageRequest eof_token = request(state, end, end);
     DocumentPage eof_page = identity_page(eof_token, "");
     publish(state, eof_page);
     const SourceMappingResult eof = state.source_position(eof_token, DisplayByteOffset(0));
-    require(eof.status == DocumentViewStatus::success && (*eof.position).value == end, "EOF exact boundary");
+    require(eof.status() == DocumentViewStatus::success && (*eof.position()).value == end, "EOF exact boundary");
 }
 
 void test_slots_and_validation_precedence() {
@@ -110,12 +110,12 @@ void test_slots_and_validation_precedence() {
     require(occupied == 2, "two slots reserved");
     const SourceByteRange three = range(0, 3);
     const DocumentRequestResult invalid = state.request_page(viewport(4), three);
-    require(invalid.status == DocumentViewStatus::invalid_range, "invalid precedes busy");
+    require(invalid.status() == DocumentViewStatus::invalid_range, "invalid precedes busy");
     const SourceByteRange excessive = range(0, 65'537);
     const DocumentRequestResult budget = state.request_page(viewport(0), excessive);
-    require(budget.status == DocumentViewStatus::budget_exceeded, "source budget precedes busy");
+    require(budget.status() == DocumentViewStatus::budget_exceeded, "source budget precedes busy");
     const DocumentRequestResult busy = state.request_page(viewport(0), three);
-    require(busy.status == DocumentViewStatus::busy && !busy.request.has_value(), "third request cannot start");
+    require(busy.status() == DocumentViewStatus::busy && busy.request() == nullptr, "third request cannot start");
     const DocumentViewport retained = state.viewport();
     require(retained.anchor.value == 3, "busy and invalid preserve viewport");
     DocumentPage newest = identity_page(second, "def");
@@ -163,9 +163,9 @@ void test_full_token_and_binding() {
     const SourceMappingResult stale = state.source_position(token, DisplayByteOffset(1));
     const DisplayMappingResult stale_reverse = state.display_position(token, SourceByteOffset(1));
     const SourceMappingResult current = state.source_position(next, DisplayByteOffset(1));
-    require(stale.status == DocumentViewStatus::stale && stale_reverse.status == DocumentViewStatus::stale,
+    require(stale.status() == DocumentViewStatus::stale && stale_reverse.status() == DocumentViewStatus::stale,
             "same-revision page replacement invalidates BOTH old mapping directions");
-    require(current.status == DocumentViewStatus::success && (*current.position).value == 4,
+    require(current.status() == DocumentViewStatus::success && (*current.position()).value == 4,
             "new page maps same display position differently");
     for (std::size_t index = 0; index < 3; ++index) {
         DocumentPageRequest forged_mapping = next;
@@ -174,7 +174,7 @@ void test_full_token_and_binding() {
         if (index == 2) { ++forged_mapping.revision.revision; }
         const SourceMappingResult source = state.source_position(forged_mapping, DisplayByteOffset(1));
         const DisplayMappingResult display = state.display_position(forged_mapping, SourceByteOffset(4));
-        require(source.status == DocumentViewStatus::stale && display.status == DocumentViewStatus::stale,
+        require(source.status() == DocumentViewStatus::stale && display.status() == DocumentViewStatus::stale,
                 "exact mapping rejects altered viewport, permitted interval and revision");
     }
 
@@ -218,22 +218,22 @@ void test_mapping_units() {
     page.mapping.assign(units.begin(), units.end());
     publish(state, page);
     const SourceMappingResult literal = state.source_position(token, DisplayByteOffset(2));
-    require(literal.status == DocumentViewStatus::success && (*literal.position).value == 2,
+    require(literal.status() == DocumentViewStatus::success && (*literal.position()).value == 2,
             "literal labels never reverse parsed");
     const SourceMappingResult scalar = state.source_position(token, DisplayByteOffset(12));
     const SourceMappingResult atomic = state.source_position(token, DisplayByteOffset(15));
     const DisplayMappingResult crlf = state.display_position(token, SourceByteOffset(15));
-    require(scalar.status == DocumentViewStatus::invalid_boundary &&
-            atomic.status == DocumentViewStatus::invalid_boundary &&
-            crlf.status == DocumentViewStatus::invalid_boundary, "scalar, label and CRLF interiors refused");
+    require(scalar.status() == DocumentViewStatus::invalid_boundary &&
+            atomic.status() == DocumentViewStatus::invalid_boundary &&
+            crlf.status() == DocumentViewStatus::invalid_boundary, "scalar, label and CRLF interiors refused");
     const std::array<std::uint32_t, 4> display_boundaries{0, 13, 22, 28};
     const std::array<std::uint64_t, 4> source_boundaries{0, 13, 14, 16};
     for (std::size_t index = 0; index < display_boundaries.size(); ++index) {
         const SourceMappingResult source = state.source_position(token, DisplayByteOffset(display_boundaries[index]));
         const DisplayMappingResult display = state.display_position(token, SourceByteOffset(source_boundaries[index]));
-        require(source.status == DocumentViewStatus::success && (*source.position).value == source_boundaries[index],
+        require(source.status() == DocumentViewStatus::success && (*source.position()).value == source_boundaries[index],
                 "source shared endpoints");
-        require(display.status == DocumentViewStatus::success && (*display.position).value == display_boundaries[index],
+        require(display.status() == DocumentViewStatus::success && (*display.position()).value == display_boundaries[index],
                 "display shared endpoints");
     }
 }
@@ -309,10 +309,10 @@ void test_large_mapping_reference_and_reuse() {
         for (std::uint32_t source = 0; source <= 65'536; source += 16) {
             const std::uint32_t expected = source * 9;
             const DisplayMappingResult actual = state.display_position(token, SourceByteOffset(source));
-            require(actual.status == DocumentViewStatus::success && (*actual.position).value == expected,
+            require(actual.status() == DocumentViewStatus::success && (*actual.position()).value == expected,
                     "maximum mapping matches arithmetic reference");
             const SourceMappingResult reverse = state.source_position(token, DisplayByteOffset(expected));
-            require(reverse.status == DocumentViewStatus::success && (*reverse.position).value == source,
+            require(reverse.status() == DocumentViewStatus::success && (*reverse.position()).value == source,
                     "maximum mapping inverse");
         }
     }
@@ -331,15 +331,15 @@ void test_invalid_viewports_and_page_partitions() {
         DocumentViewport invalid = viewport(0);
         invalid.horizontal_dip = invalid_offsets[index];
         const DocumentRequestResult result = state.request_page(invalid, permitted);
-        require(result.status == DocumentViewStatus::invalid_range, "invalid DIP precedes capacity");
+        require(result.status() == DocumentViewStatus::invalid_range, "invalid DIP precedes capacity");
     }
     const SourceByteRange reversed = range(3, 0);
     const SourceByteRange outside = range(0, 21);
     const DocumentViewport origin = viewport(0);
     const DocumentRequestResult reversed_result = state.request_page(origin, reversed);
     const DocumentRequestResult outside_result = state.request_page(origin, outside);
-    require(reversed_result.status == DocumentViewStatus::invalid_range &&
-            outside_result.status == DocumentViewStatus::invalid_range, "range validation before slot lookup");
+    require(reversed_result.status() == DocumentViewStatus::invalid_range &&
+            outside_result.status() == DocumentViewStatus::invalid_range, "range validation before slot lookup");
     DocumentPage valid = identity_page(later, "def");
     publish(state, valid);
     finish(state, token);

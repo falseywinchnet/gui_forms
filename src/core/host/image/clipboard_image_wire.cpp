@@ -52,26 +52,27 @@ std::vector<std::byte> encode_clipboard_image(HostImageView image) {
     return bytes;
 }
 HostClipboardImageResult decode_clipboard_image(
-    std::span<const std::byte> bytes, bool allow_allocation_padding) {
-    HostClipboardImageResult result;
-    result.status.error = HostServiceError::backend_failure;
+    std::span<const std::byte> bytes, std::uint64_t generation, bool allow_allocation_padding) {
     if (bytes.size() < 16U || !std::equal(magic.begin(), magic.end(), bytes.begin()) ||
-        read_u32(bytes, 4) != 1U) return result;
+        read_u32(bytes, 4) != 1U) {
+        return HostClipboardImageResult::failed(HostServiceError::backend_failure);
+    }
     const std::uint32_t width = read_u32(bytes, 8);
     const std::uint32_t height = read_u32(bytes, 12);
     const std::uint64_t pixel_count = static_cast<std::uint64_t>(width) * height;
     if (pixel_count > HostImage::maximum_pixels) {
-        result.status.error = HostServiceError::too_large;
-        return result;
+        return HostClipboardImageResult::failed(HostServiceError::too_large);
     }
     const std::uint64_t expected = pixel_count * 4U;
     if (bytes.size() - 16U < expected ||
-        (!allow_allocation_padding && bytes.size() - 16U != expected)) return result;
+        (!allow_allocation_padding && bytes.size() - 16U != expected)) {
+        return HostClipboardImageResult::failed(HostServiceError::backend_failure);
+    }
     const HostImageView view{width, height, static_cast<std::uint64_t>(width) * 4U,
                              bytes.subspan(16, static_cast<std::size_t>(expected))};
-    if (validate_host_image(view) != HostImageError::none) return result;
-    result.image = copy_host_image(view);
-    result.status = {};
-    return result;
+    if (validate_host_image(view) != HostImageError::none) {
+        return HostClipboardImageResult::failed(HostServiceError::backend_failure);
+    }
+    return HostClipboardImageResult::image_read(copy_host_image(view), generation);
 }
 } // namespace gui_forms::detail

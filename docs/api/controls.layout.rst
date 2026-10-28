@@ -266,31 +266,41 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: DockDragOutcome final
+.. cpp:class:: DockDragOutcome final
 
    ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
 
-   .. cpp:member:: DockDragEnd end
 
-      Default: ``{DockDragEnd::escaped}``.
+   .. rubric:: Properties
 
-   .. cpp:member:: DockSubject subject
+   .. cpp:function:: DockDragEnd end() const noexcept
 
-   .. cpp:member:: std::optional<DockDropTarget> target
+   .. cpp:function:: const DockSubject& subject() const noexcept
 
-      The target dropped on, for ``dropped``, in the coordinates of the site that showed it.
+   .. cpp:function:: const DockDropTarget* target() const noexcept
 
-   .. cpp:member:: DockTransactionResult result
+      The target dropped on, for :cpp:func:`dropped <gui_forms::DockDragOutcome::dropped>`, in the coordinates of the site that showed it.
 
-      The layout transaction's result, for ``dropped`` and ``floated``.
+   .. cpp:function:: const DockTransactionResult* result() const noexcept
 
-   .. cpp:member:: bool across_windows
+      The layout transaction's result, for :cpp:func:`dropped <gui_forms::DockDragOutcome::dropped>` and :cpp:func:`floated <gui_forms::DockDragOutcome::floated>`.
 
-      For ``dropped``: whether the target was in another site's window (a drag across windows, phase D4).
+   .. cpp:function:: bool across_windows() const noexcept
 
-   .. cpp:member:: Rect frame
+      For :cpp:func:`dropped <gui_forms::DockDragOutcome::dropped>`: whether the target was in another site's window (a drag across windows, phase D4).
 
-      For ``floated``: the new floating window's client area, in desktop logical units.
+   .. cpp:function:: const Rect* frame() const noexcept
+
+      For :cpp:func:`floated <gui_forms::DockDragOutcome::floated>`: the new floating window's client area, in desktop logical units.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static DockDragOutcome dropped(DockSubject subject, DockDropTarget target, DockTransactionResult result, bool across_windows) noexcept
+
+   .. cpp:function:: static DockDragOutcome floated(DockSubject subject, DockTransactionResult result, Rect frame) noexcept
+
+   .. cpp:function:: static DockDragOutcome ended(DockDragEnd end, DockSubject subject) noexcept
 
 .. cpp:namespace:: gui_forms
 

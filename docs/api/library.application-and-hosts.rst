@@ -569,17 +569,37 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: HostClipboardImageResult final
+.. cpp:class:: HostClipboardImageResult final
 
    ``#include <gui_forms/host/types/host_types.hpp>``
 
-   .. cpp:member:: HostServiceStatus status
 
-   .. cpp:member:: std::optional<HostImage> image
+   .. rubric:: Properties
+
+   .. cpp:function:: HostServiceStatus status() const noexcept
+
+   .. cpp:function:: const HostImage* image() const noexcept
 
       The clipboard's image; absent when the clipboard holds none or the read failed.
 
-   .. cpp:member:: std::uint64_t generation
+   .. cpp:function:: std::uint64_t generation() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static HostClipboardImageResult image_read(HostImage image, std::uint64_t generation) noexcept
+
+      The clipboard's image, read at a clipboard generation.
+
+   .. cpp:function:: static HostClipboardImageResult nothing_read(std::uint64_t generation) noexcept
+
+      The clipboard held no image at this generation.
+
+   .. cpp:function:: static HostClipboardImageResult failed(HostServiceError error) noexcept
+
+   .. cpp:function:: std::optional<HostImage> release_image() && noexcept
+
+      Moves the image out of a result the caller is finished with (``std::move(result).release_image()``), so a paste keeps the pixels without copying them.
 
 .. cpp:namespace:: gui_forms
 

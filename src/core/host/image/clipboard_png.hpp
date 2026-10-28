@@ -13,7 +13,9 @@ namespace gui_forms::detail {
 // by HostImage::maximum_pixels. Errors: undecodable bytes are invalid_argument,
 // an image over the bound is too_large, exhausted storage is backend_failure;
 // the result then holds no image. Every host's clipboard calls this one path.
-[[nodiscard]] HostClipboardImageResult decode_clipboard_png(std::span<const std::byte> bytes);
+// The result is read at `generation`.
+[[nodiscard]] HostClipboardImageResult decode_clipboard_png(std::span<const std::byte> bytes,
+                                                            std::uint64_t generation);
 
 // Encodes a valid host image (straight RGBA8) as the PNG every host offers on
 // the clipboard, with the shared owned encoder at its default level. Returns

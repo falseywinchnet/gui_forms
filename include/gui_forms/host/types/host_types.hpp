@@ -134,12 +134,52 @@ struct HostClipboardTextResult final {
     bool has_text{};
 };
 
-struct HostClipboardImageResult final {
-    HostServiceStatus status;
+class HostClipboardImageResult final {
+public:
+    // The clipboard's image, read at a clipboard generation.
+    [[nodiscard]] static HostClipboardImageResult image_read(HostImage image, std::uint64_t generation) noexcept {
+        HostClipboardImageResult result{HostServiceStatus{HostServiceError::none}, std::move(image),
+            generation};
+        return result;
+    }
+    // The clipboard held no image at this generation.
+    [[nodiscard]] static HostClipboardImageResult nothing_read(std::uint64_t generation) noexcept {
+        HostClipboardImageResult result{HostServiceStatus{HostServiceError::none}, std::nullopt, generation};
+        return result;
+    }
+    [[nodiscard]] static HostClipboardImageResult failed(HostServiceError error) noexcept {
+        HostClipboardImageResult result{HostServiceStatus{error}, std::nullopt, 0};
+        return result;
+    }
+
+    [[nodiscard]] HostServiceStatus status() const noexcept {
+        return status_;
+    }
     // The clipboard's image; absent when the clipboard holds none or the
     // read failed.
-    std::optional<HostImage> image;
-    std::uint64_t generation{};
+    [[nodiscard]] const HostImage* image() const noexcept {
+        const HostImage* const found = image_.has_value() ? &(*image_) : nullptr;
+        return found;
+    }
+    // Moves the image out of a result the caller is finished with
+    // (`std::move(result).release_image()`), so a paste keeps the pixels
+    // without copying them.
+    [[nodiscard]] std::optional<HostImage> release_image() && noexcept {
+        std::optional<HostImage> released = std::move(image_);
+        return released;
+    }
+    [[nodiscard]] std::uint64_t generation() const noexcept {
+        return generation_;
+    }
+
+private:
+    HostClipboardImageResult(HostServiceStatus status, std::optional<HostImage> image,
+                             std::uint64_t generation) noexcept
+        : status_(status), image_(std::move(image)), generation_(generation) {}
+
+    HostServiceStatus status_;
+    std::optional<HostImage> image_;
+    std::uint64_t generation_;
 };
 
 // File-manager copies carry local file references as well as optional icon
