@@ -1729,10 +1729,12 @@ bool SkiaRaster::draw_live_surface_frame(const LiveSurfaceFrame& frame,
                                                    stride, clipped.left(), clipped.top());
         return written;
     }
-    sk_sp<SkData> data = SkData::MakeWithoutCopy(
-        frame.pixels().data(), frame.pixels().size());
+    // The frame's pixels are lent to the image for this draw only. borrowed is
+    // declared first so the image is released before it; it stops the program if
+    // anything (a cache, say) still holds the pixels when the draw returns.
+    const SkBorrowedData borrowed(frame.pixels().data(), frame.pixels().size());
     sk_sp<SkImage> image = SkImages::RasterFromData(
-        info, std::move(data), static_cast<size_t>(frame.row_bytes()));
+        info, borrowed.data(), static_cast<size_t>(frame.row_bytes()));
     if (!image) return false;
 
     SkPaint paint{};
