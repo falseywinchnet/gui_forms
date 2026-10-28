@@ -2274,6 +2274,7 @@ std::vector<SemanticNode> DockSite::semantic_virtual_children() const {
     nodes.reserve(seams_.size() + 1U);
     const Rect absolute = absolute_bounds();
     const bool enabled = effectively_enabled();
+    const SemanticState enabled_state = enabled ? SemanticState::enabled : SemanticState::none;
     for (std::size_t seam = 0; seam < seams_.size(); ++seam) {
         const SeamSlot& slot = seams_[seam];
         SemanticNode node{};
@@ -2286,8 +2287,7 @@ std::vector<SemanticNode> DockSite::semantic_virtual_children() const {
         node.maximum_value = std::max(slot.first_minimum, slot.span - slot.second_minimum);
         node.value = std::to_string(static_cast<long long>(std::lround(slot.first)));
         node.bounds = to_window(absolute, slot.bar);
-        node.states = SemanticState::visible | SemanticState::focusable;
-        if (enabled) node.states |= SemanticState::enabled;
+        node.states = SemanticState::visible | SemanticState::focusable | enabled_state;
         if (focused_ && keyboard_seam_ == seam) node.states |= SemanticState::focused;
         node.actions = {SemanticAction::focus, SemanticAction::increment, SemanticAction::decrement,
                         SemanticAction::set_value};

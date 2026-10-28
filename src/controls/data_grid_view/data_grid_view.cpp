@@ -1458,11 +1458,10 @@ void DataGridView::set_row_selected(DataGridViewRowPosition row, bool selected) 
     if (selection_mode_ == DataGridViewSelectionMode::full_row_select) {
         if (selected) insert_selected_row(row_id);
         else erase_selected_row(row_id);
+    } else if (selected) {
+        for (std::size_t column = 0; column < columns_.size(); ++column) insert_selected_cell(row_id, column);
     } else {
-        for (std::size_t column = 0; column < columns_.size(); ++column) {
-            if (selected) insert_selected_cell(row_id, column);
-            else erase_selected_cell(row_id, column);
-        }
+        for (std::size_t column = 0; column < columns_.size(); ++column) erase_selected_cell(row_id, column);
     }
     publish_selection(before);
 }
