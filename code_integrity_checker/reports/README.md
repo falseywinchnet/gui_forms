@@ -95,14 +95,12 @@ The checker on that tree reads 989 files (11 Skia files excluded) and has 30 can
 
 # CodeQL alerts in stx_skia (2026-10-28)
 
-GitHub's CodeQL default setup raised five alerts in `stx_skia/` on main. Each was read against its code and sorted as above. None is a defect, so no checker rule is added.
+GitHub's CodeQL default setup raised five alerts in `stx_skia/` on main. Each was read against its code; all five are false positives, so no checker rule is added. The owner's decision: rewrite each into an equivalent form that does not match the query, with no dismissals and no change in behaviour.
 
-| Alert | CodeQL rule | Site | Class | Basis |
+| Alert | CodeQL rule | Site | Class | Basis and rewrite |
 |---|---|---|---|---|
-| 1 | cpp/integer-multiplication-cast-to-long | stx_skia/skia/modules/skcms/skcms.cc:818 | false shape | `output_channels * byte_width` in `init_tables`: both callers validate `output_channels` first (A2B exactly 3, B2A 3 or 4) and `byte_width` is 1 or 2, so the 32-bit product is at most 8. Left unchanged: skcms is excluded from conversion until the coordinator's prune, keep or convert decision, and pruning would remove the line. |
-| 2 | cpp/integer-multiplication-cast-to-long | stx_skia/tests/read_buffer.cpp:184 | false shape | `dimensions[0] * dimensions[1]`: both are checked to be at most 4 just above, so the product is at most 16. The multiplication now widens first anyway, so the size arithmetic is evident at the line. |
-| 7 | cpp/suspicious-add-sizeof | stx_skia/tests/aligned_storage.cpp:62 | false shape | a `std::byte*` plus `index * sizeof(T)` is a byte offset, which is correct; the rule exempts only `char*` and `void*`. The slot is now taken with `subspan` from a span over the storage, so its length travels with it. |
+| 1 | cpp/integer-multiplication-cast-to-long | stx_skia/skia/modules/skcms/skcms.cc:818 | false shape | `output_channels * byte_width` in `init_tables`: both callers validate `output_channels` first (A2B exactly 3, B2A 3 or 4) and `byte_width` is 1 or 2, so the product is at most 8. Now `uint64_t{out->output_channels} * byte_width`. |
+| 2 | cpp/integer-multiplication-cast-to-long | stx_skia/tests/read_buffer.cpp:184 | false shape | both dimensions are checked to be at most 4 just above, so the product is at most 16. Now `size_t{dimensions[0]} * dimensions[1]`. |
+| 7 | cpp/suspicious-add-sizeof | stx_skia/tests/aligned_storage.cpp:62 | false shape | a `std::byte*` plus `index * sizeof(T)` is a correct byte offset; the rule exempts only `char*` and `void*`. Each slot is now taken with `subspan` from a span over the storage. |
 | 8 | cpp/suspicious-add-sizeof | stx_skia/tests/aligned_storage.cpp:72 | false shape | as alert 7 |
-| 9 | cpp/suspicious-add-sizeof | stx_skia/tests/tarray_core.cpp:143 | false shape | `const std::byte*` plus `sizeof(array)` is the object's end, which is correct, as alert 7. The object's bytes are now a `std::as_bytes` span, and the end is its `data() + size()`. |
-
-The four test sites were rewritten, so their alerts close when the change reaches main. Alert 1 stays open until the skcms decision; it can be dismissed on GitHub as a false positive with this table as the reason.
+| 9 | cpp/suspicious-add-sizeof | stx_skia/tests/tarray_core.cpp:143 | false shape | `const std::byte*` plus `sizeof(array)` is the object's end, as alert 7. The object's bytes are now a `std::as_bytes` span, and the bounds are its `data()` and `data() + size()`. |
