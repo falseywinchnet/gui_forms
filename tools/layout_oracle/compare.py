@@ -34,7 +34,10 @@ def _box_text(difference: NodeDifference, side: str) -> object:
     box = difference.reference if side == "reference" else difference.observed
     if box is None:
         return None
-    return {"x": box.x, "y": box.y, "width": box.width, "height": box.height}
+    record: dict[str, object] = {"x": box.x, "y": box.y, "width": box.width, "height": box.height}
+    if box.baseline is not None:
+        record["baseline"] = box.baseline
+    return record
 
 
 def _difference_record(difference: NodeDifference) -> dict[str, object]:
@@ -42,6 +45,7 @@ def _difference_record(difference: NodeDifference) -> dict[str, object]:
         "profile": difference.profile,
         "id": difference.identity,
         "edge": None if math.isinf(difference.edge) else difference.edge,
+        "baseline": None if math.isinf(difference.baseline) else difference.baseline,
         "missing": difference.missing,
         "reference": _box_text(difference, "reference"),
         "observed": _box_text(difference, "observed"),
@@ -52,18 +56,21 @@ def _difference_record(difference: NodeDifference) -> dict[str, object]:
 def report(corpus: Corpus, native: Path) -> tuple[dict[str, object], bool]:
     fixtures: list[dict[str, object]] = []
     passed = True
-    totals = {"nodes": 0, "over_tolerance": 0, "recorded": 0, "largest_edge": 0.0}
+    totals = {"nodes": 0, "over_tolerance": 0, "recorded": 0, "largest_edge": 0.0,
+              "largest_baseline": 0.0}
     for fixture in corpus.fixtures:
         tolerance = corpus.tolerances.text_edge if fixture.is_text else corpus.tolerances.box_edge
         _, reference = read_box_file(corpus.reference_path(fixture))
         _, observed = read_box_file(native / f"{fixture.name}.xml")
         comparison: Comparison = compare_box_sets(reference, observed, tolerance,
-                                                  fixture.expected_differences)
+                                                  fixture.expected_differences,
+                                                  corpus.tolerances.baseline)
         passed = passed and not comparison.over_tolerance
         totals["nodes"] += comparison.nodes
         totals["over_tolerance"] += len(comparison.over_tolerance)
         totals["recorded"] += len(comparison.recorded)
         totals["largest_edge"] = max(totals["largest_edge"], comparison.largest_edge)
+        totals["largest_baseline"] = max(totals["largest_baseline"], comparison.largest_baseline)
         fixtures.append({
             "fixture": fixture.name,
             "class": "text" if fixture.is_text else "box",
@@ -71,6 +78,7 @@ def report(corpus: Corpus, native: Path) -> tuple[dict[str, object], bool]:
             "tolerance": tolerance,
             "nodes": comparison.nodes,
             "largest_edge": comparison.largest_edge,
+            "largest_baseline": comparison.largest_baseline,
             "over_tolerance": [_difference_record(item) for item in comparison.over_tolerance],
             "recorded": [_difference_record(item) for item in comparison.recorded],
         })
@@ -103,7 +111,8 @@ def drift(corpus: Corpus, regenerated: Path) -> bool:
         largest = max(largest, comparison.largest_edge)
         for difference in comparison.over_tolerance:
             print(f"{fixture.name} {difference.profile} #{difference.identity}: moved "
-                  f"{difference.edge} from the checked-in reference")
+                  f"{difference.edge} (baseline {difference.baseline}) from the checked-in "
+                  f"reference")
             passed = False
     print(f"drift: {len(corpus.fixtures)} fixtures, largest movement {largest}, "
           f"{'within' if passed else 'OVER'} {corpus.tolerances.reference_drift}")

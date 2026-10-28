@@ -196,6 +196,29 @@ void test_fit_content_and_minmax() {
     require(near(columns[2].size, 70.0), "minmax(30px, 70px) is maximized to 70 px");
 }
 
+// An item's automatic minimum (CSS Grid 6.6) is clamped only by fixed
+// maximums: a fit-content() argument limits the min- and max-content
+// contributions, not the automatic minimum. A word wider than the argument
+// keeps its column at the word's width, as Chromium lays it out.
+void test_fit_content_keeps_an_automatic_minimum() {
+    Grid grid{};
+    grid.container = definite(500.0, 50.0);
+    grid.container.justify_content = LayoutAlignment::start;
+    grid.style.template_columns.tracks = {fit(40.0), fit(120.0)};
+    grid.add(placed(line(1), {}, {}, {}), {70.0, 10.0});
+    grid.add(placed(line(2), {}, {}, {}), {200.0, 10.0});
+    require(grid.solve() == GridSolveOutcome::solved, "solved");
+    // The first item is one 70 px word: every contribution is its width,
+    // and its minimum is automatic. The second is a 200 px paragraph whose
+    // widest word is 30 px.
+    grid.columns[0] = GridItemContribution{70.0, true, 70.0, 70.0};
+    grid.columns[1] = GridItemContribution{30.0, true, 30.0, 200.0};
+    require(grid.run() == GridSolveOutcome::solved, "solved with automatic minimums");
+    const std::span<const GridTrack> columns = grid.workspace.columns();
+    require(near(columns[0].size, 70.0), "fit-content(40px) does not clamp a 70 px automatic minimum");
+    require(near(columns[1].size, 120.0), "fit-content(120px) clamps a 200 px max-content contribution");
+}
+
 void test_spanning_item_distributes() {
     Grid grid{};
     grid.container.width = GridAvailableExtent{0.0, GridSizingKind::max_content};
@@ -400,6 +423,7 @@ int main() {
         test_fixed_and_flexible_columns();
         test_auto_tracks_size_and_stretch();
         test_fit_content_and_minmax();
+        test_fit_content_keeps_an_automatic_minimum();
         test_spanning_item_distributes();
         test_placement_lines_and_auto_flow();
         test_template_areas();

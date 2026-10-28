@@ -79,6 +79,8 @@ struct KeyProbe final {
     bool open_after_ordinary_key{};
     bool closed_by_watchdog{};
     std::uint32_t polls_left{};
+    // Polls spent waiting for the alert to be key and visible.
+    std::uint32_t show_polls_used{};
 };
 
 constexpr std::int64_t first_key_delay_nanoseconds = 250 * NSEC_PER_MSEC;
@@ -87,28 +89,31 @@ constexpr std::int64_t watch_interval_nanoseconds = 20 * NSEC_PER_MSEC;
 // About one second of polls before the watchdog ends a dialog that ignored
 // its key.
 constexpr std::uint32_t watch_polls = 50U;
+// The window server reports a new window's occlusion state asynchronously,
+// after the window has become key; on a loaded machine the first alert of a
+// fresh process can still read as occluded when first_key_delay has passed.
+// About three seconds of polls for the alert to be key and visible before its
+// facts are recorded anyway (and fail).
+constexpr std::uint32_t show_polls = 150U;
 
 void post_after(std::int64_t delay_nanoseconds, KeyProbe* probe, dispatch_function_t function) {
     const dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delay_nanoseconds);
     dispatch_after_f(when, dispatch_get_main_queue(), probe, function);
 }
 
+NSEvent* key_event(NSString* characters, unsigned short key_code, NSInteger window_number);
+
 NSEvent* key_down_event(ProbeKey key, NSInteger window_number) {
-    NSString* characters = @"\e";
-    unsigned short key_code = 53U;
     switch (key) {
-    case ProbeKey::escape:
-        // The characters and key code above are escape's.
-        break;
-    case ProbeKey::return_key:
-        characters = @"\r";
-        key_code = 36U;
-        break;
-    case ProbeKey::ordinary:
-        characters = @"a";
-        key_code = 0U;
-        break;
+    case ProbeKey::escape: return key_event(@"\e", 53U, window_number);
+    case ProbeKey::return_key: return key_event(@"\r", 36U, window_number);
+    case ProbeKey::ordinary: return key_event(@"a", 0U, window_number);
     }
+    // Fallback for a value outside ProbeKey: Escape, which ends any dialog.
+    return key_event(@"\e", 53U, window_number);
+}
+
+NSEvent* key_event(NSString* characters, unsigned short key_code, NSInteger window_number) {
     const NSTimeInterval timestamp = [NSProcessInfo processInfo].systemUptime;
     NSEvent* event = [NSEvent keyEventWithType:NSEventTypeKeyDown
                                       location:NSZeroPoint
@@ -183,6 +188,27 @@ void post_probe_key(void* context) {
     post_after(watch_interval_nanoseconds, &probe, &watch_dialog);
 }
 
+bool alert_shown(NSWindow* window) {
+    if (window == nil || !window.isKeyWindow) {
+        return false;
+    }
+    const NSWindowOcclusionState occlusion = window.occlusionState;
+    return (occlusion & NSWindowOcclusionStateVisible) != 0;
+}
+
+// Waits until the modal alert is key and visible, then records its facts and
+// posts the key; after `polls_left` polls it records whatever it sees.
+void wait_for_alert(void* context) {
+    KeyProbe& probe = *static_cast<KeyProbe*>(context);
+    if (!alert_shown([NSApp modalWindow]) && probe.polls_left > 0U) {
+        --probe.polls_left;
+        ++probe.show_polls_used;
+        post_after(watch_interval_nanoseconds, &probe, &wait_for_alert);
+        return;
+    }
+    post_probe_key(context);
+}
+
 // Runs the main run loop until the probe's last step has run, so no step
 // outlives its record. There is deliberately no turn limit: the chain always
 // ends (its polls are bounded and the dialog has returned), and leaving early
@@ -243,7 +269,8 @@ bool run_probe_case(gui_forms::HostServices& services, const ProbeCase& probe_ca
     request.default_choice = probe_case.default_choice;
     KeyProbe probe;
     probe.key = probe_case.key;
-    post_after(first_key_delay_nanoseconds, &probe, &post_probe_key);
+    probe.polls_left = show_polls;
+    post_after(first_key_delay_nanoseconds, &probe, &wait_for_alert);
     const gui_forms::HostDialogResult result =
         services.show_dialog({request_id, "test.window", std::move(request)});
     probe.dialog_finished = true;
@@ -276,6 +303,7 @@ bool run_probe_case(gui_forms::HostServices& services, const ProbeCase& probe_ca
               << " active=" << probe.application_active
               << " alert_key=" << probe.alert_key
               << " visible=" << probe.alert_visible
+              << " show_polls=" << probe.show_polls_used
               << " level=" << probe.alert_level
               << " frame=" << probe.alert_frame.origin.x << ',' << probe.alert_frame.origin.y
               << ',' << probe.alert_frame.size.width << ',' << probe.alert_frame.size.height

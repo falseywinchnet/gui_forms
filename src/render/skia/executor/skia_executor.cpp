@@ -173,7 +173,8 @@ void mark_hatch_pixel(std::array<SkColor, Count>& pixels,
     return result;
 }
 
-[[nodiscard]] SkPath to_sk_path(const PathSnapshot& source) {
+// The path, or nullopt when an element has no PathVerb; the command then fails.
+[[nodiscard]] std::optional<SkPath> to_sk_path(const PathSnapshot& source) {
     SkPathBuilder builder(source.fill_mode == FillMode::alternate ?
         SkPathFillType::kEvenOdd : SkPathFillType::kWinding);
     bool has_current_point = false;
@@ -256,6 +257,8 @@ void mark_hatch_pixel(std::array<SkColor, Count>& pixels,
             builder.close();
             has_current_point = false;
             break;
+        default:
+            return std::nullopt;
         }
     }
     return builder.detach();
@@ -397,6 +400,9 @@ std::vector<SkScalar> preset_dash_pattern(DashStyle style, SkScalar width) {
                 mark_hatch_pixel(pixels, extent, coordinate,
                                  extent - 1 - coordinate, hatch_color);
                 break;
+            default:
+                // Not a HatchStyle: the brush is refused and the command fails.
+                return false;
             }
         }
         const SkImageInfo info = SkImageInfo::MakeN32Premul(extent, extent);
@@ -967,7 +973,7 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
             gui_forms::detail::TextPixelOrder::bgra : gui_forms::detail::TextPixelOrder::rgba;
         std::size_t executed{};
         for (const DrawingCommand& command : commands.subspan(first_command)) {
-            (*canvas).restoreToCount(1);
+            (*canvas).restoreAll();
             (*canvas).resetMatrix();
             if (command.state.clip) {
                 (*canvas).clipRect(to_sk_rect(*command.state.clip),
@@ -1042,18 +1048,22 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 (*canvas).drawPath(builder.detach(), paint);
                 break;
             }
-            case CommandKind::draw_path:
-                if (!configure_pen(paint, command.pen, command.state)) {
+            case CommandKind::draw_path: {
+                const std::optional<SkPath> path = to_sk_path(command.path);
+                if (!path || !configure_pen(paint, command.pen, command.state)) {
                     return {RasterError::invalid_argument, executed};
                 }
-                (*canvas).drawPath(to_sk_path(command.path), paint);
+                (*canvas).drawPath(*path, paint);
                 break;
-            case CommandKind::fill_path:
-                if (!configure_brush(paint, command.brush, command.state)) {
+            }
+            case CommandKind::fill_path: {
+                const std::optional<SkPath> path = to_sk_path(command.path);
+                if (!path || !configure_brush(paint, command.brush, command.state)) {
                     return {RasterError::invalid_argument, executed};
                 }
-                (*canvas).drawPath(to_sk_path(command.path), paint);
+                (*canvas).drawPath(*path, paint);
                 break;
+            }
             case CommandKind::draw_image: {
                 if (!command.image.has_pixels()) {
                     return {RasterError::missing_image_pixels, executed};
@@ -1077,6 +1087,9 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                                       SkCanvas::kStrict_SrcRectConstraint);
                 break;
             }
+            default:
+                // Not a CommandKind: the list cannot be replayed.
+                return {RasterError::invalid_argument, executed};
             }
             ++executed;
         }
