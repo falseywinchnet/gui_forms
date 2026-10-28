@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<layout-reference fixture="text/block-inline-text" chromium="155.0.8059.39" platform="win64">
+<layout-reference fixture="text/block-inline-text" chromium="155.0.8059.39" platform="linux64">
   <profile viewport="320x240" scale="1">
     <node id="root" x="0" y="0" width="320" height="240"/>
     <node id="line" x="4" y="4" width="312" height="32"/>
     <node id="label" x="4" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="31.984375" y="11" width="30" height="20"/>
     <node id="two-lines" x="61.984375" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="121.984375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="121.984375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="800x600" scale="1">
     <node id="root" x="0" y="0" width="800" height="600"/>
@@ -14,7 +14,7 @@
     <node id="label" x="4" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="31.984375" y="11" width="30" height="20"/>
     <node id="two-lines" x="61.984375" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="121.984375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="121.984375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="1280x800" scale="1">
     <node id="root" x="0" y="0" width="1280" height="800"/>
@@ -22,7 +22,7 @@
     <node id="label" x="4" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="31.984375" y="11" width="30" height="20"/>
     <node id="two-lines" x="61.984375" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="121.984375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="121.984375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="1440x900" scale="1">
     <node id="root" x="0" y="0" width="1440" height="900"/>
@@ -30,7 +30,7 @@
     <node id="label" x="4" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="31.984375" y="11" width="30" height="20"/>
     <node id="two-lines" x="61.984375" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="121.984375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="121.984375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="320x240" scale="2">
     <node id="root" x="0" y="0" width="320" height="240"/>
@@ -38,7 +38,7 @@
     <node id="label" x="4" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="31.984375" y="11" width="30" height="20"/>
     <node id="two-lines" x="61.984375" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="121.984375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="121.984375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="800x600" scale="2">
     <node id="root" x="0" y="0" width="800" height="600"/>
@@ -46,7 +46,7 @@
     <node id="label" x="4" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="31.984375" y="11" width="30" height="20"/>
     <node id="two-lines" x="61.984375" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="121.984375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="121.984375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="1280x800" scale="2">
     <node id="root" x="0" y="0" width="1280" height="800"/>
@@ -54,7 +54,7 @@
     <node id="label" x="4" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="31.984375" y="11" width="30" height="20"/>
     <node id="two-lines" x="61.984375" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="121.984375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="121.984375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="1440x900" scale="2">
     <node id="root" x="0" y="0" width="1440" height="900"/>
@@ -62,7 +62,7 @@
     <node id="label" x="4" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="31.984375" y="11" width="30" height="20"/>
     <node id="two-lines" x="61.984375" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="121.984375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="121.984375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="320x240" scale="1" direction="rtl">
     <node id="root" x="0" y="0" width="320" height="240"/>
@@ -70,7 +70,7 @@
     <node id="label" x="288.015625" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="258.015625" y="11" width="30" height="20"/>
     <node id="two-lines" x="198.015625" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="175.359375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="175.375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="800x600" scale="1" direction="rtl">
     <node id="root" x="0" y="0" width="800" height="600"/>
@@ -78,7 +78,7 @@
     <node id="label" x="768.015625" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="738.015625" y="11" width="30" height="20"/>
     <node id="two-lines" x="678.015625" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="655.359375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="655.375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="1280x800" scale="1" direction="rtl">
     <node id="root" x="0" y="0" width="1280" height="800"/>
@@ -86,7 +86,7 @@
     <node id="label" x="1248.015625" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="1218.015625" y="11" width="30" height="20"/>
     <node id="two-lines" x="1158.015625" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="1135.359375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="1135.375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="1440x900" scale="1" direction="rtl">
     <node id="root" x="0" y="0" width="1440" height="900"/>
@@ -94,7 +94,7 @@
     <node id="label" x="1408.015625" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="1378.015625" y="11" width="30" height="20"/>
     <node id="two-lines" x="1318.015625" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="1295.359375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="1295.375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="320x240" scale="2" direction="rtl">
     <node id="root" x="0" y="0" width="320" height="240"/>
@@ -102,7 +102,7 @@
     <node id="label" x="288.015625" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="258.015625" y="11" width="30" height="20"/>
     <node id="two-lines" x="198.015625" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="175.359375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="175.375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="800x600" scale="2" direction="rtl">
     <node id="root" x="0" y="0" width="800" height="600"/>
@@ -110,7 +110,7 @@
     <node id="label" x="768.015625" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="738.015625" y="11" width="30" height="20"/>
     <node id="two-lines" x="678.015625" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="655.359375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="655.375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="1280x800" scale="2" direction="rtl">
     <node id="root" x="0" y="0" width="1280" height="800"/>
@@ -118,7 +118,7 @@
     <node id="label" x="1248.015625" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="1218.015625" y="11" width="30" height="20"/>
     <node id="two-lines" x="1158.015625" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="1135.359375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="1135.375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="1440x900" scale="2" direction="rtl">
     <node id="root" x="0" y="0" width="1440" height="900"/>
@@ -126,7 +126,7 @@
     <node id="label" x="1408.015625" y="19" width="27.984375" height="15" baseline="31"/>
     <node id="box" x="1378.015625" y="11" width="30" height="20"/>
     <node id="two-lines" x="1318.015625" y="4" width="60" height="30" baseline="16"/>
-    <node id="large" x="1295.359375" y="14" width="22.65625" height="22" baseline="31"/>
+    <node id="large" x="1295.375" y="14" width="22.640625" height="22" baseline="31"/>
   </profile>
   <profile viewport="320x240" scale="1" text-scale="1.5">
     <node id="root" x="0" y="0" width="320" height="240"/>

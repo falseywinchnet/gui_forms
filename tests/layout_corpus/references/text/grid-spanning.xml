@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<layout-reference fixture="text/grid-spanning" chromium="155.0.8059.39" platform="win64">
+<layout-reference fixture="text/grid-spanning" chromium="155.0.8059.39" platform="linux64">
   <profile viewport="320x240" scale="1">
     <node id="root" x="0" y="0" width="320" height="240"/>
     <node id="a" x="0" y="0" width="56.203125" height="15" baseline="12"/>
