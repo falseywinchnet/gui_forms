@@ -17,6 +17,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -134,52 +135,80 @@ struct HostClipboardTextResult final {
     bool has_text{};
 };
 
+// A clipboard image read: the image and the clipboard generation it was read
+// at, no image at that generation, or a failure. One alternative per state
+// (house form for results).
 class HostClipboardImageResult final {
 public:
     // The clipboard's image, read at a clipboard generation.
     [[nodiscard]] static HostClipboardImageResult image_read(HostImage image, std::uint64_t generation) noexcept {
-        HostClipboardImageResult result{HostServiceStatus{HostServiceError::none}, std::move(image),
-            generation};
+        HostClipboardImageResult result{ImageRead{std::move(image), generation}};
         return result;
     }
     // The clipboard held no image at this generation.
     [[nodiscard]] static HostClipboardImageResult nothing_read(std::uint64_t generation) noexcept {
-        HostClipboardImageResult result{HostServiceStatus{HostServiceError::none}, std::nullopt, generation};
+        HostClipboardImageResult result{NothingRead{generation}};
         return result;
     }
+    // A failed read. `none` is no failure, so it is read as `backend_failure`.
     [[nodiscard]] static HostClipboardImageResult failed(HostServiceError error) noexcept {
-        HostClipboardImageResult result{HostServiceStatus{error}, std::nullopt, 0};
+        const HostServiceError reason = error == HostServiceError::none ? HostServiceError::backend_failure : error;
+        HostClipboardImageResult result{Failed{reason}};
         return result;
     }
 
     [[nodiscard]] HostServiceStatus status() const noexcept {
-        return status_;
+        const Failed* const failure = std::get_if<Failed>(&state_);
+        const HostServiceStatus status{failure != nullptr ? (*failure).error : HostServiceError::none};
+        return status;
     }
-    // The clipboard's image; absent when the clipboard holds none or the
-    // read failed.
+    // The clipboard's image; null when the clipboard holds none or the read
+    // failed.
     [[nodiscard]] const HostImage* image() const noexcept {
-        const HostImage* const found = image_.has_value() ? &(*image_) : nullptr;
+        const ImageRead* const read = std::get_if<ImageRead>(&state_);
+        const HostImage* const found = read != nullptr ? &(*read).image : nullptr;
         return found;
+    }
+    // The clipboard generation read at; 0 for a failed read.
+    [[nodiscard]] std::uint64_t generation() const noexcept {
+        const ImageRead* const read = std::get_if<ImageRead>(&state_);
+        const NothingRead* const empty = std::get_if<NothingRead>(&state_);
+        std::uint64_t generation = 0U;
+        if (read != nullptr) generation = (*read).generation;
+        if (empty != nullptr) generation = (*empty).generation;
+        return generation;
     }
     // Moves the image out of a result the caller is finished with
     // (`std::move(result).release_image()`), so a paste keeps the pixels
-    // without copying them.
+    // without copying them; empty when the result holds no image.
     [[nodiscard]] std::optional<HostImage> release_image() && noexcept {
-        std::optional<HostImage> released = std::move(image_);
+        ImageRead* const read = std::get_if<ImageRead>(&state_);
+        std::optional<HostImage> released{};
+        if (read != nullptr) released.emplace(std::move((*read).image));
         return released;
-    }
-    [[nodiscard]] std::uint64_t generation() const noexcept {
-        return generation_;
     }
 
 private:
-    HostClipboardImageResult(HostServiceStatus status, std::optional<HostImage> image,
-                             std::uint64_t generation) noexcept
-        : status_(status), image_(std::move(image)), generation_(generation) {}
+    struct ImageRead final {
+        HostImage image{};
+        std::uint64_t generation{};
+    };
+    struct NothingRead final {
+        std::uint64_t generation{};
+    };
+    struct Failed final {
+        HostServiceError error{HostServiceError::backend_failure};
+    };
+    // A throwing move would leave the variant valueless, a state no query
+    // describes.
+    static_assert(std::is_nothrow_move_constructible_v<ImageRead>);
+    static_assert(std::is_nothrow_move_assignable_v<ImageRead>);
 
-    HostServiceStatus status_;
-    std::optional<HostImage> image_;
-    std::uint64_t generation_;
+    explicit HostClipboardImageResult(ImageRead read) noexcept : state_(std::move(read)) {}
+    explicit HostClipboardImageResult(NothingRead empty) noexcept : state_(empty) {}
+    explicit HostClipboardImageResult(Failed failure) noexcept : state_(failure) {}
+
+    std::variant<ImageRead, NothingRead, Failed> state_;
 };
 
 // File-manager copies carry local file references as well as optional icon

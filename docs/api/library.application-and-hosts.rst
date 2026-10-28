@@ -76,7 +76,7 @@ Related types
    * - :cpp:class:`HostClipboardFilesResult <gui_forms::HostClipboardFilesResult>`
      - File-manager copies carry local file references as well as optional icon bitmaps.
    * - :cpp:class:`HostClipboardImageResult <gui_forms::HostClipboardImageResult>`
-     -  
+     - A clipboard image read: the image and the clipboard generation it was read at, no image at that generation, or a failure.
    * - :cpp:class:`HostClipboardTextResult <gui_forms::HostClipboardTextResult>`
      - HostClipboardTextResult couples portable status with bounded UTF-8 text, native generation, and explicit text presence.
    * - :cpp:class:`HostClosedEvent <gui_forms::HostClosedEvent>`
@@ -573,6 +573,8 @@ Related types
 
    ``#include <gui_forms/host/types/host_types.hpp>``
 
+   A clipboard image read: the image and the clipboard generation it was read at, no image at that generation, or a failure. One alternative per state (house form for results).
+
 
    .. rubric:: Properties
 
@@ -580,9 +582,11 @@ Related types
 
    .. cpp:function:: const HostImage* image() const noexcept
 
-      The clipboard's image; absent when the clipboard holds none or the read failed.
+      The clipboard's image; null when the clipboard holds none or the read failed.
 
    .. cpp:function:: std::uint64_t generation() const noexcept
+
+      The clipboard generation read at; 0 for a failed read.
 
 
    .. rubric:: Methods
@@ -597,9 +601,11 @@ Related types
 
    .. cpp:function:: static HostClipboardImageResult failed(HostServiceError error) noexcept
 
+      A failed read. ``none`` is no failure, so it is read as ``backend_failure``.
+
    .. cpp:function:: std::optional<HostImage> release_image() && noexcept
 
-      Moves the image out of a result the caller is finished with (``std::move(result).release_image()``), so a paste keeps the pixels without copying them.
+      Moves the image out of a result the caller is finished with (``std::move(result).release_image()``), so a paste keeps the pixels without copying them; empty when the result holds no image.
 
 .. cpp:namespace:: gui_forms
 

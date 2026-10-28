@@ -17,7 +17,7 @@ Types
    * - :cpp:class:`DisplayByteOffset <gui_forms::DisplayByteOffset>`
      -  
    * - :cpp:class:`DisplayMappingResult <gui_forms::DisplayMappingResult>`
-     -  
+     - A source position mapped to the display.
    * - :cpp:class:`DocumentMapSpan <gui_forms::DocumentMapSpan>`
      -  
    * - :cpp:class:`DocumentPage <gui_forms::DocumentPage>`
@@ -25,7 +25,7 @@ Types
    * - :cpp:class:`DocumentPageRequest <gui_forms::DocumentPageRequest>`
      -  
    * - :cpp:class:`DocumentRequestResult <gui_forms::DocumentRequestResult>`
-     -  
+     - A page request's result: the request the document side fulfils, or why there is none.
    * - :cpp:class:`DocumentRevision <gui_forms::DocumentRevision>`
      -  
    * - :cpp:class:`DocumentViewLimits <gui_forms::DocumentViewLimits>`
@@ -101,7 +101,7 @@ Types
    * - :cpp:class:`SourceByteRange <gui_forms::SourceByteRange>`
      -  
    * - :cpp:class:`SourceMappingResult <gui_forms::SourceMappingResult>`
-     -  
+     - A display position mapped to the source.
    * - :cpp:class:`TextEditResult <gui_forms::TextEditResult>`
      - TextEditResult records exact removed/inserted UTF-8 ranges, scalar counts, resulting revision, and whether content changed.
    * - :cpp:class:`TextMaskBudgetSnapshot <gui_forms::TextMaskBudgetSnapshot>`
@@ -172,6 +172,8 @@ Types
 
    ``#include <gui_forms/document_view/types/document_view_types.hpp>``
 
+   A source position mapped to the display. One alternative per state (house form for results).
+
 
    .. rubric:: Properties
 
@@ -179,12 +181,16 @@ Types
 
    .. cpp:function:: const DisplayByteOffset* position() const noexcept
 
+      The mapped position, for ``success``; null otherwise.
+
 
    .. rubric:: Methods
 
    .. cpp:function:: static DisplayMappingResult mapped(DisplayByteOffset position) noexcept
 
    .. cpp:function:: static DisplayMappingResult refused(DocumentViewStatus status) noexcept
+
+      A refusal. ``success`` refuses nothing, so it is read as ``unavailable``.
 
 .. cpp:namespace:: gui_forms
 
@@ -250,6 +256,8 @@ Types
 
    ``#include <gui_forms/document_view/types/document_view_types.hpp>``
 
+   A page request's result: the request the document side fulfils, or why there is none. One alternative per state (house form for results).
+
 
    .. rubric:: Properties
 
@@ -257,12 +265,16 @@ Types
 
    .. cpp:function:: const DocumentPageRequest* request() const noexcept
 
+      The request, for ``success``; null otherwise.
+
 
    .. rubric:: Methods
 
    .. cpp:function:: static DocumentRequestResult requested(DocumentPageRequest request) noexcept
 
    .. cpp:function:: static DocumentRequestResult refused(DocumentViewStatus status) noexcept
+
+      A refusal. ``success`` refuses nothing, so it is read as ``unavailable``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1058,6 +1070,8 @@ Types
 
    ``#include <gui_forms/document_view/types/document_view_types.hpp>``
 
+   A display position mapped to the source. One alternative per state (house form for results).
+
 
    .. rubric:: Properties
 
@@ -1065,12 +1079,16 @@ Types
 
    .. cpp:function:: const SourceByteOffset* position() const noexcept
 
+      The mapped position, for ``success``; null otherwise.
+
 
    .. rubric:: Methods
 
    .. cpp:function:: static SourceMappingResult mapped(SourceByteOffset position) noexcept
 
    .. cpp:function:: static SourceMappingResult refused(DocumentViewStatus status) noexcept
+
+      A refusal. ``success`` refuses nothing, so it is read as ``unavailable``.
 
 .. cpp:namespace:: gui_forms
 
