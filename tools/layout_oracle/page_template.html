@@ -16,9 +16,14 @@ html, body {
   height: 100%;
   overflow: hidden;
 }
+/* The root font size is what a text-scale profile multiplies (PLAN
+   section 12.4); the body's text is set in it. */
+html {
+  font-size: 13px;
+}
 body {
   font-family: "Carlito";
-  font-size: 13px;
+  font-size: 1rem;
   line-height: normal;
 }
 *, *::before, *::after {

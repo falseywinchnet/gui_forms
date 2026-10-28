@@ -26,6 +26,10 @@ REPOSITORY = Path(__file__).resolve().parent.parent.parent
 CORPUS = REPOSITORY / "tests" / "layout_corpus"
 
 
+def right_to_left(profile: corpus.Profile) -> corpus.Profile:
+    return corpus.Profile(profile.width, profile.height, profile.scale, "rtl", profile.text_scale)
+
+
 def box_set(profile: str, **nodes: tuple[float, float, float, float]) -> corpus.BoxSet:
     return {profile: {name: corpus.Box(*values) for name, values in nodes.items()}}
 
@@ -130,14 +134,29 @@ class CorpusTests(unittest.TestCase):
 
     def test_right_to_left_profiles_apply_to_bidirectional_fixtures_only(self) -> None:
         checked_in = corpus.read_corpus(CORPUS)
-        left_to_right = [profile for profile in checked_in.profiles if profile.direction == "ltr"]
-        right_to_left = [profile for profile in checked_in.profiles if profile.direction == "rtl"]
+        unscaled = [profile for profile in checked_in.profiles if profile.text_scale == 1.0]
+        left_to_right = [profile for profile in unscaled if profile.direction == "ltr"]
+        right_to_left = [profile for profile in unscaled if profile.direction == "rtl"]
         self.assertEqual(len(left_to_right), 8)
         self.assertEqual(len(right_to_left), 8)
         plain = corpus.Fixture("f", Path("f.html"), False, {}, False)
         marked = corpus.Fixture("f", Path("f.html"), False, {}, True)
         self.assertEqual(checked_in.profiles_for(plain), tuple(left_to_right))
         self.assertEqual(len(checked_in.profiles_for(marked)), 16)
+
+    def test_text_scale_profiles_apply_to_text_fixtures_only(self) -> None:
+        checked_in = corpus.read_corpus(CORPUS)
+        scaled = [profile for profile in checked_in.profiles if profile.text_scale != 1.0]
+        self.assertEqual(len(scaled), 16)
+        self.assertTrue(all(profile.text_scale == 1.5 for profile in scaled))
+        self.assertTrue(all(profile.key.endswith("/text150") for profile in scaled))
+        text = corpus.Fixture("f", Path("f.html"), True, {}, False)
+        marked_text = corpus.Fixture("f", Path("f.html"), True, {}, True)
+        self.assertEqual(len(checked_in.profiles_for(text)), 16)
+        self.assertEqual(len(checked_in.profiles_for(marked_text)), 32)
+        texts = [fixture for fixture in checked_in.fixtures if fixture.is_text]
+        self.assertEqual(len(texts), 30)
+        self.assertTrue(all(fixture.name.startswith("text/") for fixture in texts))
 
     def test_bidirectional_fixtures_depend_on_the_direction(self) -> None:
         # A fixture is marked bidirectional only when Chromium lays it out
@@ -147,8 +166,9 @@ class CorpusTests(unittest.TestCase):
             if not fixture.bidirectional:
                 continue
             _, boxes = corpus.read_box_file(checked_in.reference_path(fixture))
-            mirrored = [profile.key for profile in checked_in.profiles
-                        if profile.direction == "ltr" and boxes[profile.key] != boxes[profile.key + "/rtl"]]
+            mirrored = [profile.key for profile in checked_in.profiles_for(fixture)
+                        if profile.direction == "ltr" and
+                        boxes[profile.key] != boxes[right_to_left(profile).key]]
             self.assertTrue(mirrored, fixture.name)
 
     def test_fixture_rules_are_enforced(self) -> None:
@@ -165,6 +185,10 @@ class CorpusTests(unittest.TestCase):
             path.write_text('<div data-gf-id="r" data-gf-kind="flow-layout-panel-compat">'
                             '<div data-gf-id="t" data-gf-kind="label">text</div></div>',
                             encoding="utf-8")
+            self.assertFalse(corpus.read_fixture("f", path).is_text)
+            path.write_text('<div data-gf-id="r" data-gf-kind="block-panel">'
+                            '<div data-gf-id="t" data-gf-kind="text-block" data-gf-text="text">'
+                            '</div></div>', encoding="utf-8")
             self.assertTrue(corpus.read_fixture("f", path).is_text)
 
     def test_report_of_the_references_against_themselves_is_clean(self) -> None:
