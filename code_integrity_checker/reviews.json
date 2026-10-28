@@ -122,14 +122,6 @@
       "reviewed": "2026-10-27"
     },
     {
-      "path": "src/host/windows/application/windows_host.cpp",
-      "rule": "I05",
-      "evidence": "static_cast<int>(target_id.size()), target_id.data(),",
-      "decision": "fixed",
-      "reason": "was a defect: a stable ID longer than INT_MAX gave the trace a negative %.*s precision, and printf read the string_view past its end. Fixed by traced_stable_id: the trace prints at most maximum_traced_stable_id_bytes (1024) and marks a longer ID with target_cut_from:<length>",
-      "reviewed": "2026-10-27"
-    },
-    {
       "path": "src/host/windows/services/windows_notify_icons.cpp",
       "rule": "I05",
       "evidence": "static_cast<int>(text.size()), nullptr, 0);",

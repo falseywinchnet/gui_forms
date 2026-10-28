@@ -245,15 +245,36 @@ class ReviewTests(unittest.TestCase):
             self.assertNotEqual(completed.returncode, 0)
             self.assertIn("No C or C++ files selected", completed.stderr)
 
-    def test_fixed_defect_that_returns_is_raised(self) -> None:
+    def test_decision_whose_line_is_gone_is_stale(self) -> None:
         source = "void make(size_t width, size_t height) {\n    storage.resize(width * height);\n}\n"
         status, data = self.run_checker(source, None)
         reviews = {"reviews": [{"path": data[0]["path"], "rule": "I06", "evidence": data[0]["evidence"],
-                                "decision": "fixed", "reason": "bounded by maximum_side"}]}
-        status, data = self.run_checker(source, reviews)
+                                "decision": "defect", "reason": "unbounded product"}]}
+        status, data = self.run_checker("void make() {}\n", reviews)
         self.assertEqual(status, 1)
-        self.assertEqual(data[0]["status"], "raised")
-        self.assertEqual(data[0]["decision"], "fixed")
+        self.assertEqual(data, [])
+
+    def test_decision_for_a_removed_file_is_stale_and_one_out_of_scope_is_not(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "core").mkdir()
+            (root / "core" / "plain.cpp").write_text("void plain() {}\n", encoding="utf-8")
+            review_path = root / "reviews.json"
+            gone = {"path": "core/removed.cpp", "rule": "I06", "evidence": "x", "decision": "defect"}
+            elsewhere = {"path": "other/kept.cpp", "rule": "I06", "evidence": "x", "decision": "defect"}
+            review_path.write_text(json.dumps({"reviews": [gone, elsewhere]}), encoding="utf-8")
+            command = [sys.executable, "-B", str(Path(check.__file__).resolve()), "core",
+                       "--reviews", str(review_path), "--gate"]
+            completed = subprocess.run(command, capture_output=True, text=True, check=False, cwd=root)
+            self.assertEqual(completed.returncode, 1)
+            self.assertIn("core/removed.cpp: stale defect decision", completed.stdout)
+            self.assertNotIn("other/kept.cpp", completed.stdout)
+            self.assertIn("1 stale decisions", completed.stdout)
+
+    def test_fixed_is_not_a_decision(self) -> None:
+        status, _ = self.run_checker("void make() {}\n", {"reviews": [{"path": "x.cpp", "rule": "I06",
+                                                                      "evidence": "x", "decision": "fixed"}]})
+        self.assertEqual(status, 2)
 
     def test_unknown_decision_is_an_error(self) -> None:
         status, _ = self.run_checker("void make() {}\n", {"reviews": [{"path": "x.cpp", "rule": "I06",
