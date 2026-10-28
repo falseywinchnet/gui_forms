@@ -384,7 +384,7 @@ public:
         for (std::size_t level = group_depth; level > 0U; --level) {
             GroupLevel& open = groups[level - 1U];
             if (!open.isolated) continue;
-            (*(*open.surface).getCanvas()).restoreToCount(1);
+            (*(*open.surface).getCanvas()).restoreAll();
             text_clips = std::move(open.parent_text_clips);
             text_clip_base = open.parent_text_clip_base;
             save_floor = open.parent_save_floor;
@@ -576,7 +576,7 @@ void SkiaRaster::begin_frame(const DamageRegion& damage) {
     if (!canvas) {
         return;
     }
-    (*canvas).restoreToCount(1);
+    (*canvas).restoreAll();
     (*canvas).resetMatrix();
     (*canvas).scale(static_cast<SkScalar>((*impl_).scale),
                   static_cast<SkScalar>((*impl_).scale));
@@ -632,7 +632,7 @@ void SkiaRaster::clip_damage(const DamageRegion& damage) {
 void SkiaRaster::end_frame() {
     (*impl_).close_groups();
     if (SkCanvas* canvas = (*impl_).canvas()) {
-        (*canvas).restoreToCount(1);
+        (*canvas).restoreAll();
     }
     (*impl_).text_clips.clear();
     (*impl_).offset = Point{};
@@ -1616,7 +1616,7 @@ void SkiaRaster::begin_group(const PaintGroup& group) {
         level.surface = std::move(grown);
     }
     SkCanvas& canvas = *(*level.surface).getCanvas();
-    canvas.restoreToCount(1);
+    canvas.restoreAll();
     canvas.resetMatrix();
     canvas.save();
     canvas.clipRect(SkRect::MakeIWH(width, height), SkClipOp::kIntersect, false);
@@ -1654,7 +1654,7 @@ void SkiaRaster::end_group() {
         return;
     }
     SkCanvas& canvas = *(*level.surface).getCanvas();
-    canvas.restoreToCount(1);
+    canvas.restoreAll();
     impl.text_clips = std::move(level.parent_text_clips);
     impl.text_clip_base = level.parent_text_clip_base;
     impl.save_floor = level.parent_save_floor;

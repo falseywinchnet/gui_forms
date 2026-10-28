@@ -620,6 +620,15 @@ if(STX_SKIA_TESTS)
                  COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:stx_skia_borrowed_data_tests>
                          -DMODE=--outlive -DTRAP=${stx_skia_release_trap}
                          -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/expect_stop.cmake)
+        add_executable(stx_skia_canvas_restore_tests tests/canvas_restore.cpp)
+        target_link_libraries(stx_skia_canvas_restore_tests PRIVATE stx_skia)
+        add_test(NAME stx_skia_canvas_restore_contract COMMAND stx_skia_canvas_restore_tests)
+        foreach(mode IN ITEMS restore-empty restore-to-zero restore-to-above)
+            add_test(NAME stx_skia_canvas_restore_stops_${mode}
+                     COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:stx_skia_canvas_restore_tests>
+                             -DMODE=--${mode} -DTRAP=${stx_skia_release_trap}
+                             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/expect_stop.cmake)
+        endforeach()
         add_test(NAME stx_skia_unpremultiply_stops_alpha_256
                  COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:stx_skia_unpremultiply_tests>
                          -DMODE=--alpha-256 -DTRAP=${stx_skia_release_trap}

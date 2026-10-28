@@ -1827,6 +1827,25 @@ as a defect. The bound is now a Release check, and the reviews.json entry is rem
   and must end in the Release-check trap. With the debug-only assertion restored, the stop test
   fails (negative control).
 
+## Balanced canvas restores
+
+API item 9 (house style §9). SkCanvas used to ignore an unbalanced save stack. `restore()`
+with nothing saved did nothing. `restoreToCount` treated a count below 1 as 1 and a count above
+the stack as no restore at all. Both now stop in Release:
+- `restore()` with no saved state to remove;
+- `restoreToCount(count)` outside 1 to `getSaveCount()`.
+
+`restoreToCount(getSaveCount())` still does nothing. `restoreAll()` is the named reset to the
+base state, used by the canvas's own reset and destructor. GUI.Forms uses it in place of
+`restoreToCount(1)` at its nine reset sites. `SkiaRaster::restore` already refused to pop below
+its save floor.
+- **Evidence:** `canvas_restore` (candidate only). The contract covers exact unwinding,
+  deferred saves, a no-op restore to the current count, and `restoreAll` on both the base and
+  a deep stack.
+- **Stop tests:** `stx_skia_canvas_restore_stops_restore-empty`, `…restore-to-zero` and
+  `…restore-to-above`. With the old silent returns restored, all three fail (negative control).
+- **Wider check:** 181 Skia-drawing GUI.Forms tests pass, so no GUI.Forms path over-restores.
+
 ## Still required
 
 Refreshed 2026-10-27 after the support leftovers. The whole-library AST inventory counts 249
