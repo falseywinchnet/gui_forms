@@ -65,9 +65,9 @@ details are under [Done and tested](#done-and-tested).
   progress). The Windows, macOS and X11 adapters, the XWayland probe, the
   join with the theme engine and full-fidelity glass are on main. Reflection,
   the stage gate and a rerun of the Mac measurements remain.
-- **Universal Skia:** one CPU Skia renderer on every host (paused by the
-  owner). The Windows CPU Skia archive is built and published by CI; making
-  Skia mandatory everywhere waits for the owner.
+- **Universal Skia:** one CPU Skia renderer on every host. `stx_skia/`, the
+  pruned and converted CPU derivative of Skia, builds with the tree on macOS,
+  Linux and Windows (stage SK1b).
 
 ## 0.4 Flexible
 
@@ -230,7 +230,7 @@ gates as their own rows. "Done" means the deliverable exists and a test in
 - Compositor adapters on Windows, macOS and X11, with full-fidelity glass.
 - `stx_rtf2md`, the first-party rich-text library: one document model, a
   markdown-like dialect, and RTF read and written by meaning.
-- A Windows CPU Skia archive built and published by CI.
+- `stx_skia/`, the CPU renderer, built with the tree on every host.
 - Three demonstration programs (the Gallery and the Explore and
   Correspondence previews) on macOS, Windows and Linux, and a release
   pipeline that builds, tests, packages and launch-tests each of them before

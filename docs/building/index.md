@@ -8,8 +8,8 @@ All commands run from the repository root.
 ## Standard native build
 
 First follow [Installation](../user/install.md#configure-build-install) to fetch the text
-sources and configure for your platform. Linux requires a separately prepared
-Skia archive and an enabled X11 host; Windows uses `GUI_FORMS_ENABLE_SKIA=OFF`.
+sources and configure for your platform. Linux requires an enabled X11 host;
+the CPU renderer, `stx_skia/`, builds with the tree on every platform.
 Then:
 
 ```sh
@@ -51,7 +51,6 @@ is part of the repository and builds with the tree, as SheenBidi is vendored.
 
 | Script | Purpose |
 |---|---|
-| `fetch_skia_cpu.sh`, `build_skia_cpu_windows_mingw.sh` | Fetch and build upstream Skia for the stage SK1 Windows archive (`tools/skia_archive.py`); no toolkit build reads them |
 | `fetch_text_stack.sh` | HarfBuzz and FreeType |
 | `fetch_linebreak.sh` | libunibreak (UAX #14 line breaking), required with `fetch_text_stack.sh` before configuring `GUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON` |
 

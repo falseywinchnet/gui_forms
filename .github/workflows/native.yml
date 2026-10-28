@@ -63,7 +63,6 @@ jobs:
       - name: Check scanner fixtures and corrected authoring scope
         run: |
           python3 -B -m unittest discover -s tools -p test_readthedocs_build.py
-          python3 -B -m unittest discover -s tools -p test_skia_archive.py
           python3 -B -m unittest discover -s tools -p test_stack_frames.py
           python3 -B -m unittest discover -s tools -p test_workflow_pipelines.py
           python3 -B -m unittest discover -s tools -p test_control_registry.py
@@ -387,106 +386,9 @@ jobs:
       contents: write
       actions: read
 
-  # Stage SK1: the Windows CPU Skia archive (tools/skia_archive.py). The plan
-  # job reads the pin and the artifacts; the build job runs only when no
-  # archive of the current identity is pinned or uploaded, with its own limit
-  # sized for a cold Skia build. Steady-state runs skip it, and the native
-  # Windows job keeps its own limit: it fetches the archive.
-  skia-windows-x64-plan:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    outputs:
-      build: ${{ steps.plan.outputs.build }}
-      identity: ${{ steps.plan.outputs.identity }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: gui_forms
-      # The archive's identity reads the toolchain pin from the harness.
-      - uses: ./gui_forms/.github/actions/harness-checkout
-      - name: Decide whether the Windows CPU Skia archive must be built
-        id: plan
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 -B gui_forms/tools/skia_archive.py plan --platform windows-x64
-
-  # The job always runs. When the plan finds an archive of this identity, it
-  # is a no-op on Ubuntu. A skipped job here would make GitHub skip, or report
-  # as skipped, the jobs after it (programs-windows-x64, publish, engine-gate),
-  # even though native-windows-x64 itself runs.
-  skia-windows-x64:
-    needs: skia-windows-x64-plan
-    runs-on: ${{ needs.skia-windows-x64-plan.outputs.build == 'true' && 'windows-2022' || 'ubuntu-24.04' }}
-    timeout-minutes: 60
-    env:
-      GUI_FORMS_RUNNER: windows-2022
-      CC: clang
-      CXX: clang++
-    defaults:
-      run:
-        shell: 'msys2 {0}'
-    steps:
-      - name: No archive to build
-        if: needs.skia-windows-x64-plan.outputs.build != 'true'
-        shell: bash
-        run: echo "An archive of identity ${{ needs.skia-windows-x64-plan.outputs.identity }} is pinned or uploaded; nothing to build."
-      - uses: actions/checkout@v4
-        if: needs.skia-windows-x64-plan.outputs.build == 'true'
-        with:
-          path: gui_forms
-      - uses: ./gui_forms/.github/actions/harness-checkout
-        if: needs.skia-windows-x64-plan.outputs.build == 'true'
-      - uses: actions/setup-python@v5
-        if: needs.skia-windows-x64-plan.outputs.build == 'true'
-        id: toolchain-python
-        with:
-          python-version: '3.14'
-          update-environment: false
-      - name: Restore the published Windows toolchain without MSYS2 mirrors
-        if: needs.skia-windows-x64-plan.outputs.build == 'true'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
-        run: '"$TOOLCHAIN_PYTHON" template_harness/harness/windows_toolchain.py restore'
-      # Natively with the pinned CLANG64 toolchain (BGRA, the profile's
-      # spelled-out order); then packed, and compiled against and run from a
-      # fresh extraction. The log prints the build's own time.
-      - name: Build, pack and probe the Windows CPU Skia archive
-        if: needs.skia-windows-x64-plan.outputs.build == 'true'
-        id: archive
-        env:
-          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
-        run: |
-          toolchain_python=$(cygpath -u "$TOOLCHAIN_PYTHON")
-          skia_out=.build/native-windows-x64/skia
-          started=$(date +%s)
-          sh gui_forms/third_party/fetch_skia_cpu.sh
-          fetched=$(date +%s)
-          sh gui_forms/third_party/build_skia_cpu_windows_mingw.sh "$skia_out"
-          built=$(date +%s)
-          echo "Skia fetch $((fetched - started)) s, cold build $((built - fetched)) s"
-          ls -l "$skia_out"/*.a
-          "$toolchain_python" gui_forms/tools/skia_archive.py pack --platform windows-x64 --skia-out "$skia_out"
-          "$toolchain_python" gui_forms/tools/skia_archive.py probe --platform windows-x64
-      - uses: actions/upload-artifact@v4
-        if: needs.skia-windows-x64-plan.outputs.build == 'true'
-        with:
-          name: ${{ steps.archive.outputs.artifact-name }}
-          overwrite: true
-          path: |
-            gui-forms-skia-windows-x64.tar.zst
-            gui-forms-skia-windows-x64.json
-          compression-level: 0
-          retention-days: 30
-
   native-windows-x64:
     name: native (windows-2022, windows-x64, msys2 {0})
-    needs: [house-style, skia-windows-x64-plan, skia-windows-x64]
-    # Runs after the Skia job, which builds an archive or does nothing.
-    if: >-
-      !cancelled() && needs.house-style.result == 'success'
-      && needs.skia-windows-x64-plan.result == 'success' && needs.skia-windows-x64.result == 'success'
+    needs: house-style
     uses: ./.github/workflows/native-platform.yml
     with:
       runner: windows-2022

@@ -28,11 +28,4 @@ pruned, converted CPU derivative of Skia `chrome/m152`
 README and PROVENANCE.md record what it keeps and why. No Skia type may leave
 `src/render/skia/`.
 
-What remains of the upstream Skia build here serves only the stage SK1
-Windows archive (`tools/skia_archive.py`), which no toolkit build reads:
-`fetch_skia_cpu.sh` fetches upstream Skia into `skia/` (not committed) with
-`skia_png_only.patch` and `skia_windows_mingw.patch`, and
-`build_skia_cpu_windows_mingw.sh` builds it with
-`skia_cpu_windows_mingw_args.gn`. They go when that archive does.
-
 SheenBidi 2.9.0 is vendored under `sheenbidi/` for Unicode bidirectional ordering in the private text adapter. Its Headers and Source are unchanged from the pinned commit in PROVENANCE.md; Apache License 2.0 is included. Linux accessibility dynamically links the system ATK/AT-SPI bridge (LGPL 2.1 or later); it does not use GTK widgets.

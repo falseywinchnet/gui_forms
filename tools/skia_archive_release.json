@@ -1,9 +1,0 @@
-{
-  "notes": [
-    "The release that publishes each platform's CPU Skia archive (tools/skia_archive.py), read by its tag.",
-    "identity is skia_archive.identity of the tree that built it; archive_sha256 is the archive's digest in that release's manifest.",
-    "Until a platform is pinned, every push to main publishes its current archive in that revision's build release. Pin the newest one, then keep its revision in packaging/pinned_cache_revisions.json so that the release is never pruned.",
-    "Change a pin with every identity change, once the new archive is published."
-  ],
-  "platforms": {}
-}

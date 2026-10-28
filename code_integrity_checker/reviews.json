@@ -155,6 +155,131 @@
       "guard": "dominating_validation",
       "reason": "the shaping entry refuses input above limits.input_bytes or INT_MAX (line 863)",
       "reviewed": "2026-10-27"
+    },
+    {
+      "path": "stx_skia/skia/include/core/SkUnPreMultiply.h",
+      "rule": "I03",
+      "evidence": "SkASSERT(alpha <= 255);",
+      "decision": "defect",
+      "reason": "public GetScale(U8CPU) indexes the 256-entry gTable with only a debug bound; the one internal caller passes SkGetPackedA32 (8 bits), but the public entry needs a Release bound (API-behaviour queue)",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/skia/src/core/SkAlphaRuns.cpp",
+      "rule": "I03",
+      "evidence": "SkASSERT(width > 0);",
+      "decision": "guarded",
+      "reason": "the only caller is RunBasedAdditiveBlitter::advanceRuns with fWidth from sectBounds; SkScan::AntiFillPath returns before AAAFillPath when the path bounds or their clip intersection is empty or clipped out, so the width is positive",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/skia/src/core/SkBlitRow_D32.cpp",
+      "rule": "I03",
+      "evidence": "SkASSERT(flags < std::size(kProcs));",
+      "decision": "guarded",
+      "reason": "the next statement masks flags with std::size(kProcs) - 1 (a power of two) before the table read",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/skia/src/core/SkLatticeIter.cpp",
+      "rule": "I03",
+      "evidence": "SkASSERT(x >= 0 && x < fSrcX.size() - 1);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "next() returns at currRect == fNumRectsInLattice ((xCount+1)*(yCount+1), or 9 with four entries for the nine-patch form) and fCurrX wraps at fSrcX.size() - 1, so x indexes within the xCount+2 divisions",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/skia/src/core/SkLatticeIter.cpp",
+      "rule": "I03",
+      "evidence": "SkASSERT(y >= 0 && y < fSrcY.size() - 1);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "next() returns at currRect == fNumRectsInLattice, and y advances only when x wraps, so y stays below fSrcY.size() - 1",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/src/swizzle.cpp",
+      "rule": "I06",
+      "evidence": "std::memcpy(&pixel, src + i * kPixelBytes, kPixelBytes);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "swap_red_blue rejects spans that are not whole pixels or differ in size, and count is dst.size() / kPixelBytes, so i * kPixelBytes stays inside the span",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/src/swizzle.cpp",
+      "rule": "I06",
+      "evidence": "std::memcpy(dst + i * kPixelBytes, &swapped, kPixelBytes);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "swap_red_blue rejects spans that are not whole pixels or differ in size, and count is dst.size() / kPixelBytes, so i * kPixelBytes stays inside the span",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/arena_core.cpp",
+      "rule": "I05",
+      "evidence": "append(output, static_cast<int32_t>(gDestroyed.size()));",
+      "decision": "false_shape",
+      "reason": "test probe output: gDestroyed holds the few destructor ids one arena case records",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/block_list_core.cpp",
+      "rule": "I05",
+      "evidence": "append(output, static_cast<int32_t>(list.count()));",
+      "decision": "false_shape",
+      "reason": "SkTBlockList::count() already returns int; the cast only names the output width",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/buffer_core.cpp",
+      "rule": "I05",
+      "evidence": "append(output, static_cast<int32_t>(table.count()));",
+      "decision": "false_shape",
+      "reason": "SkDataTable::count() already returns int; the cast only names the output width",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/mask_cache.cpp",
+      "rule": "I05",
+      "evidence": "if (filter.size() < 1 || filter.size() > 5 || filter.radius() + 1 != static_cast<int>(filter.size()) ||",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "the earlier operands of the same condition bound filter.size() to 1..5 before the cast",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/mipmap.cpp",
+      "rule": "I01",
+      "evidence": "client = sk_ref_sp(cache);",
+      "decision": "false_shape",
+      "reason": "attachToCacheAndRef keeps a cache reference, so the object outlives client.reset(); the test then re-references it on purpose to probe the purge path",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/tarray_core.cpp",
+      "rule": "I05",
+      "evidence": "append(output, static_cast<int32_t>(array.size()));",
+      "decision": "false_shape",
+      "reason": "TArray::size() already returns int; the cast only names the output width",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/tarray_core.cpp",
+      "rule": "I05",
+      "evidence": "append(gCapacities, static_cast<int32_t>(array.size()));",
+      "decision": "false_shape",
+      "reason": "TArray::size() already returns int; the cast only names the output width",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/tarray_core.cpp",
+      "rule": "I05",
+      "evidence": "append(gCapacities, static_cast<int32_t>(array.capacity()));",
+      "decision": "false_shape",
+      "reason": "TArray::capacity() already returns int; the cast only names the output width",
+      "reviewed": "2026-10-28"
     }
   ]
 }
