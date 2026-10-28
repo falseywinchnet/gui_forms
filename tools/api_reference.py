@@ -238,6 +238,10 @@ parsed Clang tree; no node, callback or source buffer survives this builder.
             return
         if not filename.startswith('include/gui_forms/'):
             return
+        # An opaque enum declaration (`enum class E : std::uint8_t;`) names a
+        # type defined in another header; only the definition is recorded.
+        if kind == 'EnumDecl' and not node.get('inner') and '{' not in self.declaration(node, filename):
+            return
         identifier: str = '::'.join(scope + [name])
         record_kind: str = node.get('tagUsed', 'class')
         if kind == 'EnumDecl':
@@ -308,7 +312,32 @@ def inventory(ast_text: str) -> Inventory:
     return result
 
 
-def extract(compiler: str) -> Inventory:
+INCLUDE_DIRECTORIES_FILE: str = 'api_reference_include_directories.txt'
+
+
+def build_include_directories(build: Path) -> list[str]:
+    """The public headers' include directories, as the CMake build at `build` wrote them.
+
+    CMake writes gui_forms_core's transitive INTERFACE_INCLUDE_DIRECTORIES
+    (its own and its public dependencies') one per line at configure time, so
+    a library added to the public headers needs no change here.
+    """
+    listing: Path = build / INCLUDE_DIRECTORIES_FILE
+    if not listing.exists():
+        raise SystemExit(f'{listing} is missing; configure GUI.Forms with tests on (it is written beside '
+                         'the gui_forms_api_reference target) and pass that tree as --build')
+    directories: list[str] = []
+    line: str
+    for line in listing.read_text(encoding='utf-8').splitlines():
+        # CMake lists a directory once per target that publishes it; one -I each is enough.
+        if line.strip() and line.strip() not in directories:
+            directories.append(line.strip())
+    if not directories:
+        raise SystemExit(f'{listing} lists no include directories')
+    return directories
+
+
+def extract(compiler: str, include_directories: list[str]) -> Inventory:
     scratch: str
     with tempfile.TemporaryDirectory(prefix='gui-forms-api-') as scratch:
         translation: Path = Path(scratch) / 'public.cpp'
@@ -321,8 +350,12 @@ def extract(compiler: str) -> Inventory:
             includes.append('#include "' + str(relative) + '"\n')
         translation_text: str = ''.join(includes)
         translation.write_text(translation_text, encoding='utf-8')
-        command: list[str] = [compiler, '-std=c++20', '-x', 'c++', '-Iinclude', '-fsyntax-only',
-            '-Xclang', '-ast-dump=json', '-Xclang', '-ast-dump-filter=gui_', str(translation)]
+        command: list[str] = [compiler, '-std=c++20', '-x', 'c++']
+        directory: str
+        for directory in include_directories:
+            command.append('-I' + directory)
+        command.extend(['-fsyntax-only', '-Xclang', '-ast-dump=json', '-Xclang', '-ast-dump-filter=gui_',
+                        str(translation)])
         compiled: subprocess.CompletedProcess[str] = subprocess.run(
             command, cwd=ROOT, capture_output=True, text=True, check=False, encoding='utf-8')
         if compiled.returncode:
@@ -335,6 +368,9 @@ def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--clang', default='clang++')
     parser.add_argument('--ast', type=Path, help='Read an already captured Clang AST')
+    parser.add_argument('--build', type=Path, default=None,
+        help='A configured GUI.Forms build tree; the public headers compile with the include directories '
+             'it records (required unless --ast)')
     parser.add_argument('--output', type=Path, default=None,
         help='Also render the standalone HTML site into this directory (off by default)')
     parser.add_argument('--markdown', type=Path, default=None,
@@ -348,14 +384,16 @@ def main() -> None:
     if args.ast:
         ast_text: str = args.ast.read_text(encoding='utf-8')
         data = inventory(ast_text)
+    elif args.build is None:
+        raise SystemExit('pass --build <configured GUI.Forms build tree> (or --ast)')
     else:
-        data = extract(args.clang)
+        data = extract(args.clang, build_include_directories(args.build))
     REFERENCE.mkdir(exist_ok=True)
     encoded: str = json.dumps(data, indent=2) + '\n'
     inventory_path: Path = REFERENCE / 'inventory.json'
     if args.check:
         if not inventory_path.exists() or inventory_path.read_text(encoding='utf-8') != encoded:
-            raise SystemExit('API inventory is stale; run tools/api_reference.py')
+            raise SystemExit('API inventory is stale; run tools/api_reference.py --build <build tree>')
     else:
         inventory_path.write_text(encoded, encoding='utf-8')
     from api_reference_render import load_contracts, render, render_markdown
