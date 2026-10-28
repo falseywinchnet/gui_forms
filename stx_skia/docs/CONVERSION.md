@@ -1806,8 +1806,8 @@ same numbers.
 
 The sibling's other reports of wrong numbers are each covered by an existing case:
 - A1, TArray capacity after a move: `tarray-core-capacity.raw`.
-- A2, `SkDoubleToFixed(-32768.0)` is exactly INT32_MIN: `numeric_core.cpp`. The other limits
-  wait for API item 12, the SkFixed policy.
+- A2, `SkDoubleToFixed(-32768.0)` is exactly INT32_MIN: `numeric_core.cpp`. Every other SkFixed
+  limit is in `fixed-limits.raw` ("SkFixed limits" below).
 - A3, `SkAbs32(INT32_MIN)`: `template_core.cpp`.
 - A4, blurred inverse fills and capped points: `canvas_device.cpp`'s blurred-shape cases
   ("Blurred path and point divergence" above).
@@ -1869,6 +1869,51 @@ One site used the operator: `SkColorSpace::serialize`, which now spells
 `(*data).writable_data()`. A full build of the candidate and of GUI.Forms' Skia tree found no
 other use. Two allowance entries each drop by one finding: `SkRefCnt.h` and
 `SkColorSpace.cpp`.
+
+## SkFixed limits
+
+The owner's API item 12: SK_FixedMin is INT32_MIN (it was -INT32_MAX), so every conversion into
+SkFixed agrees on its two limits.
+- SkFloatToFixed (and SkScalarToFixed) saturates to exactly INT32_MIN or INT32_MAX. The intake
+  conversion stopped 128 short of either (it clamped in float to ±2147483520); NaN now gives
+  INT32_MAX rather than 2147483520. In-range values still truncate, so nothing in range moves.
+- SkDoubleToFixed already saturated to INT32_MIN or INT32_MAX; NaN is spelled SK_FixedMax.
+- SkFixedDiv by zero gives INT32_MAX or INT32_MIN by the numerator's sign (0 / 0 gives 0), and a
+  quotient past the range pins to the same pair; the negative end was -INT32_MAX.
+- The 32-bit ARM VFPv3 SkFloatToFixed (NaN gave 0) is removed, so no build has other limits.
+  SkFloatToFixed_Check, a debug-only conversion with no caller and an undefined cast out of
+  range, is removed too.
+- The SkFixed.h comment states the limits and that SK_FixedMin has no positive counterpart.
+
+The audit covered every user of SK_FixedMin and every negation or magnitude of an SkFixed in the
+seventeen files that use the type. SK_FixedMin had no user but its definition. Sites:
+- `SkAbs32` (SkSafe32.h), used for every SkFixed magnitude in the scan converters
+  (SkScan_AAAPath, SkAnalyticEdge, SkEdge, SkScan_Antihair, SkScan_Hairline, SkEdgeBuilder):
+  already saturates INT32_MIN to INT32_MAX; unchanged, and recorded in `fixed-limits.raw`.
+- `SkFDot6Div` (SkFDot6.h): its 32-bit fast path divided -32768 << 16 by -1, which overflows
+  (the quotient is 2^31). Fixed: a divisor of -1 takes SkFixedDiv, which saturates to INT32_MAX.
+  `SkFDot6Div(-32768, -1)` is checked by the candidate (`numeric_core.cpp`); it is undefined
+  in the reference.
+- `edges_too_close` (SkScan_AAAPath.cpp): `fX - SkAbs32(fDX)` with a saturated slope subtracts
+  INT32_MAX, which overflows for a negative position. Fixed: compared in 64 bits. The corpora do
+  not reach a negative position with a saturated slope, so this one is fixed by inspection.
+- `quick_inverse` (SkAnalyticEdge.cpp) negates a table entry, bounded by the table; no change.
+- Every other unary minus in the seventeen files applies to a float, a bounded integer constant
+  or an int clip coordinate, not an SkFixed (listed by a scan for unary minus, 20 sites).
+- The scan heads' sentinels (`SK_MinS32`, SkScan_Path.cpp and SkScan_AAAPath.cpp) stay at
+  -INT32_MAX: edge positions are bounded to ±32767 pixels by the scan limits, so no edge reaches
+  either value.
+- Not changed: SkFixedMul of two values whose product leaves the range wraps (defined since
+  C++20); SkFixed3232Min stays -SkFixed3232Max (unused, and outside this item).
+
+Corpus: `fixed-limits.raw`, a second artifact of `numeric_core.cpp` and an intentional
+difference, records each limit where the reference is defined: SK_FixedMin and SK_FixedMax, the
+float conversion at the last value below 2^15, at ±2^15, one step past -2^15, at ±1e9, ±infinity
+and NaN, the double conversion at the ends of its range, SkFixedDiv past either end, and
+rounding, averaging, multiplying and magnitude at SK_FixedMin. The inputs where the reference is
+undefined (division by zero, doubles past the range, the average of two SK_FixedMin) are
+checked by the candidate alone. `numeric-core.raw` stays shared: its in-range rows are
+unchanged, and a quotient that saturates negative is folded onto -SK_FixedMax there.
 
 ## Still required
 
