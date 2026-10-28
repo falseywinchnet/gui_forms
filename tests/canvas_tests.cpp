@@ -1,12 +1,17 @@
 #include "gui_forms/canvas.hpp"
 #include "gui_forms/window.hpp"
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <chrono>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -179,6 +184,98 @@ void canvas_converts_rgba_storage_without_changing_document_truth() {
     CHECK(window.image_resource_snapshot().resource_count == 1U);
 }
 
+// Every tile resource of an RGBA canvas equals the BGRA canvas's for the same picture,
+// after publication and after strided edits that cross tile gutters.
+bool same_tile_resources(Window& first, Window& second) {
+    const std::vector<ImageId> first_ids = first.image_resources().image_ids();
+    const std::vector<ImageId> second_ids = second.image_resources().image_ids();
+    if (first_ids.size() != second_ids.size()) return false;
+    for (std::size_t index = 0; index < first_ids.size(); ++index) {
+        const std::optional<ImageResourceView> a = first.image_resources().find(first_ids[index]);
+        const std::optional<ImageResourceView> b = second.image_resources().find(second_ids[index]);
+        if (!a || !b) return false;
+        if ((*a).metadata.width != (*b).metadata.width ||
+            (*a).metadata.height != (*b).metadata.height ||
+            (*a).encoded.size() != (*b).encoded.size()) return false;
+        for (std::size_t byte = 0; byte < (*a).encoded.size(); ++byte) {
+            if ((*a).encoded[byte] != (*b).encoded[byte]) return false;
+        }
+    }
+    return true;
+}
+
+void edit_both(gui_drawing::Bitmap& rgba, gui_drawing::Bitmap& bgra, gui_drawing::RectI area,
+               std::uint32_t seed) {
+    gui_drawing::BitmapEditView rgba_edit = rgba.begin_edit(area);
+    gui_drawing::BitmapEditView bgra_edit = bgra.begin_edit(area);
+    std::uint32_t state = seed;
+    for (std::int32_t row = 0; row < area.height; ++row) {
+        for (std::int32_t column = 0; column < area.width; ++column) {
+            state = state * 1664525U + 1013904223U;
+            const std::byte red{static_cast<unsigned char>(state >> 24)};
+            const std::byte green{static_cast<unsigned char>(state >> 16)};
+            const std::byte blue{static_cast<unsigned char>(state >> 8)};
+            const std::size_t rgba_at = static_cast<std::size_t>(row) * rgba_edit.row_bytes +
+                static_cast<std::size_t>(column) * 4U;
+            const std::size_t bgra_at = static_cast<std::size_t>(row) * bgra_edit.row_bytes +
+                static_cast<std::size_t>(column) * 4U;
+            rgba_edit.writable_data[rgba_at] = red;
+            rgba_edit.writable_data[rgba_at + 1U] = green;
+            rgba_edit.writable_data[rgba_at + 2U] = blue;
+            rgba_edit.writable_data[rgba_at + 3U] = std::byte{255};
+            bgra_edit.writable_data[bgra_at] = blue;
+            bgra_edit.writable_data[bgra_at + 1U] = green;
+            bgra_edit.writable_data[bgra_at + 2U] = red;
+            bgra_edit.writable_data[bgra_at + 3U] = std::byte{255};
+        }
+    }
+    CHECK(rgba.commit_edit(rgba_edit.token) != 0U);
+    CHECK(bgra.commit_edit(bgra_edit.token) != 0U);
+}
+
+void rgba_tiles_match_bgra_tiles() {
+    constexpr std::uint32_t width = 1100;
+    constexpr std::uint32_t height = 600;
+    const std::shared_ptr<gui_drawing::Bitmap> rgba = std::make_shared<gui_drawing::Bitmap>(
+        width, height, gui_drawing::PixelFormat::rgba32_premultiplied);
+    const std::shared_ptr<gui_drawing::Bitmap> bgra =
+        std::make_shared<gui_drawing::Bitmap>(width, height);
+    std::uint32_t state = 0x9e3779b9U;
+    for (std::uint32_t y = 0; y < height; y += 7) {
+        for (std::uint32_t x = 0; x < width; x += 5) {
+            state = state * 1664525U + 1013904223U;
+            const gui_drawing::Color color = gui_drawing::Color::from_argb(state | 0xff000000U);
+            (*rgba).set_pixel(x, y, color);
+            (*bgra).set_pixel(x, y, color);
+        }
+    }
+    const std::shared_ptr<RasterCanvas> rgba_canvas = make_control<RasterCanvas>(StableId("rgba.tiles"));
+    const std::shared_ptr<RasterCanvas> bgra_canvas = make_control<RasterCanvas>(StableId("bgra.tiles"));
+    (*rgba_canvas).set_bitmap(rgba);
+    (*bgra_canvas).set_bitmap(bgra);
+    Window rgba_window(rgba_canvas, {200, 200});
+    Window bgra_window(bgra_canvas, {200, 200});
+    rgba_window.perform_layout();
+    bgra_window.perform_layout();
+    CHECK(rgba_window.image_resources().image_ids().size() == 6U);
+    CHECK(same_tile_resources(rgba_window, bgra_window));
+
+    // Across the vertical and horizontal tile boundaries, one column, one row, and a
+    // bottom-right edge tile.
+    const std::array<gui_drawing::RectI, 4> edits{gui_drawing::RectI{500, 300, 30, 230},
+                                                  gui_drawing::RectI{511, 0, 1, 600},
+                                                  gui_drawing::RectI{0, 512, 1100, 1},
+                                                  gui_drawing::RectI{1030, 590, 70, 10}};
+    std::uint32_t seed = 7U;
+    for (const gui_drawing::RectI area : edits) {
+        edit_both(*rgba, *bgra, area, seed);
+        seed += 101U;
+        CHECK((*rgba_canvas).synchronize_bitmap());
+        CHECK((*bgra_canvas).synchronize_bitmap());
+        CHECK(same_tile_resources(rgba_window, bgra_window));
+    }
+}
+
 void tiled_updates_include_sampling_gutters_and_recover_resources() {
     const std::shared_ptr<RasterCanvas> canvas = make_control<RasterCanvas>(StableId("tiles"));
     const std::shared_ptr<gui_drawing::Bitmap> bitmap = std::make_shared<gui_drawing::Bitmap>(1025, 1025);
@@ -282,6 +379,7 @@ int main(int argc, char** argv) {
     derived_canvas_keeps_routing_presentation_and_resource_lifetime();
     canvas_projects_bitmap_changes_as_local_window_damage();
     canvas_converts_rgba_storage_without_changing_document_truth();
+    rgba_tiles_match_bgra_tiles();
     tiled_updates_include_sampling_gutters_and_recover_resources();
     explicit_window_quota_rolls_back_partial_tile_publication();
     if (argc > 1 && std::string_view(argv[1]) == "--large") hundred_megapixel_publication_probe();

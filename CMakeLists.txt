@@ -98,6 +98,14 @@ add_subdirectory(stx_conv)
 # The rich-text library: one document model, the markdown-like dialect and
 # RTF (notes:planning/stages/RT-rich-text/PLAN.md).
 add_subdirectory(stx_rtf2md)
+# stx_skia/ is the CPU Skia derivative the Skia adapters draw with, built from source as part
+# of this tree; its headers are system headers here, as the imported Skia's were. Without the
+# adapters only its red/blue swap kernel, stx_skia::swizzle, is built: it links no Skia code,
+# and the core, the controls and the hosts swap RGBA and BGRA rows with it.
+if(NOT GUI_FORMS_ENABLE_SKIA)
+    set(STX_SKIA_SWIZZLE_ONLY ON)
+endif()
+add_subdirectory(stx_skia SYSTEM)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -785,7 +793,9 @@ endif()
 # The audio loop transport and the text masks install as the AudioLoopTransport
 # and TextMasks components (cmake/Audio.cmake, cmake/ApplicationText.cmake),
 # with their headers; the main header install below leaves them to those files.
-install(TARGETS gui_forms_threading gui_forms_core gui_forms_controls gui_drawing_core
+# stx_skia_swizzle installs with them (as GUIForms::swizzle): the core and the controls link it
+# privately, so a consumer of their static archives links its archive too.
+install(TARGETS gui_forms_threading gui_forms_core gui_forms_controls gui_drawing_core stx_skia_swizzle
         EXPORT GUIFormsTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -919,10 +929,6 @@ elseif(UNIX)
 endif()
 
 if(GUI_FORMS_ENABLE_SKIA)
-    # stx_skia/ is the CPU Skia derivative the adapters draw with, built from source as part of
-    # this tree; its headers are system headers here, as the imported Skia's were.
-    add_subdirectory(stx_skia SYSTEM)
-
     add_library(gui_forms_skia STATIC
         src/render/skia/raster/skia_raster.cpp
     )
@@ -4365,6 +4371,22 @@ if(gui_forms_font_programs)
         add_dependencies(${font_target} gui_forms_program_fonts)
     endforeach()
 endif()
+
+# The targets that compile the red/blue swap loops' replacements link stx_skia::swizzle: the
+# core (material images), the controls (the raster canvas), the CoreGraphics raster, the
+# Windows drawing C API, and the Windows host with the tests that compile windows_host.cpp,
+# the last seven by including it textually.
+foreach(gui_forms_swizzle_target IN ITEMS gui_forms_core gui_forms_controls
+        gui_forms_coregraphics gui_drawing_c_api gui_forms_host_windows
+        gui_forms_windows_dib_lifecycle_tests gui_forms_windows_tooltip_tests
+        gui_forms_windows_prepared_text_tests gui_forms_windows_backplane_replay_tests
+        gui_forms_windows_canvas_raster_tests gui_forms_windows_content_pixels_tests
+        gui_forms_windows_control_snapshot_tests gui_forms_windows_damage_rectangles_tests
+        gui_forms_windows_part_composite_tests gui_forms_windows_text_tests)
+    if(TARGET ${gui_forms_swizzle_target})
+        target_link_libraries(${gui_forms_swizzle_target} PRIVATE stx_skia::swizzle)
+    endif()
+endforeach()
 
 # Every test carries one area label (cmake/TestAreas.cmake, tools/test_areas.json).
 if(GUI_FORMS_BUILD_TESTS)

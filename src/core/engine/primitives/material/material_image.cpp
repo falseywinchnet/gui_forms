@@ -1,6 +1,7 @@
 #include "material_image.hpp"
 
 #include "../../../image/resource_pixels.hpp"
+#include "stx_skia/swizzle.hpp"
 
 #include <algorithm>
 #include <array>
@@ -139,22 +140,16 @@ bool read_material_image(const ImageRegistry& registry, const ImageId image, con
             return false;
         }
     } else {
-        // Premultiplied BGRA rows of view.row_bytes each: swap to RGBA.
-        if (view.row_bytes < row_bytes || view.encoded.size() < view.row_bytes * (height - 1U) + row_bytes) {
-            return false;
-        }
-        for (std::uint32_t row = 0U; row < height; ++row) {
-            const std::size_t from = static_cast<std::size_t>(view.row_bytes) * row;
-            const std::size_t to = row_bytes * row;
-            for (std::uint32_t column = 0U; column < width; ++column) {
-                const std::size_t source = from + static_cast<std::size_t>(column) * 4U;
-                const std::size_t target = to + static_cast<std::size_t>(column) * 4U;
-                bytes[target] = static_cast<std::uint8_t>(view.encoded[source + 2U]);
-                bytes[target + 1U] = static_cast<std::uint8_t>(view.encoded[source + 1U]);
-                bytes[target + 2U] = static_cast<std::uint8_t>(view.encoded[source]);
-                bytes[target + 3U] = static_cast<std::uint8_t>(view.encoded[source + 3U]);
-            }
-        }
+        // Premultiplied BGRA rows of view.row_bytes each: swap to tightly packed
+        // RGBA rows. The kernel checks the stride and both extents before it
+        // writes, so a short or narrow resource leaves bytes zeroed and fails.
+        if (view.row_bytes > std::numeric_limits<std::size_t>::max()) return false;
+        const std::span<std::byte> destination = std::as_writable_bytes(std::span<std::uint8_t>(bytes));
+        const stx_skia::SwizzleResult swapped = stx_skia::swap_red_blue_rows(
+            destination, stx_skia::RowBytes(row_bytes), view.encoded,
+            stx_skia::RowBytes(static_cast<std::size_t>(view.row_bytes)), stx_skia::PixelCount(width),
+            stx_skia::RowCount(height));
+        if (swapped != stx_skia::SwizzleResult::ok) return false;
     }
     pixels.bytes = std::move(bytes);
     pixels.width = width;
