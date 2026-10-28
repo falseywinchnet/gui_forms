@@ -145,29 +145,24 @@ DocumentViewStatus DocumentViewState::bind(DocumentRevision revision,
 
 DocumentRequestResult DocumentViewState::request_page(DocumentViewport viewport,
                                                      SourceByteRange permitted) noexcept {
-    DocumentRequestResult result{};
-    if (revision_.document == 0) { return result; }
+    if (revision_.document == 0) { return DocumentRequestResult::refused(DocumentViewStatus::unavailable); }
     const bool finite = std::isfinite(viewport.horizontal_dip);
     if (!finite || viewport.horizontal_dip < 0 || permitted.begin.value > permitted.end.value ||
         permitted.end.value > document_size_.value || viewport.anchor.value < permitted.begin.value ||
         viewport.anchor.value > permitted.end.value) {
-        result.status = DocumentViewStatus::invalid_range;
-        return result;
+        return DocumentRequestResult::refused(DocumentViewStatus::invalid_range);
     }
     const std::uint64_t source_length = permitted.end.value - permitted.begin.value;
     if (source_length > DocumentViewLimits::source_bytes) {
-        result.status = DocumentViewStatus::budget_exceeded;
-        return result;
+        return DocumentRequestResult::refused(DocumentViewStatus::budget_exceeded);
     }
     if (serial_ == std::numeric_limits<std::uint64_t>::max()) {
-        result.status = DocumentViewStatus::serial_exhausted;
-        return result;
+        return DocumentRequestResult::refused(DocumentViewStatus::serial_exhausted);
     }
     std::size_t slot = 0;
     while (slot < slots_.size() && slots_[slot].has_value()) { ++slot; }
     if (slot == slots_.size()) {
-        result.status = DocumentViewStatus::busy;
-        return result;
+        return DocumentRequestResult::refused(DocumentViewStatus::busy);
     }
     ++serial_;
     const DocumentPageRequest request{
@@ -175,9 +170,7 @@ DocumentRequestResult DocumentViewState::request_page(DocumentViewport viewport,
     slots_[slot] = request;
     authorized_serial_ = serial_;
     viewport_ = viewport;
-    result.status = DocumentViewStatus::success;
-    result.request = request;
-    return result;
+    return DocumentRequestResult::requested(request);
 }
 
 void DocumentViewState::cancel() noexcept { authorized_serial_ = 0; }
@@ -226,16 +219,15 @@ std::size_t DocumentViewState::pending_count() const noexcept {
 
 SourceMappingResult DocumentViewState::source_position(
     const DocumentPageRequest& page_token, DisplayByteOffset position) const noexcept {
-    SourceMappingResult result{};
-    if (!page_.has_value()) { return result; }
+    if (!page_.has_value()) { return SourceMappingResult::refused(DocumentViewStatus::unavailable); }
     const DocumentPage& current = *page_;
     const bool matching = same_request(current.request, page_token);
-    if (!matching) { result.status = DocumentViewStatus::stale; return result; }
-    if (position.value > current.display_utf8.size()) { return result; }
+    if (!matching) { return SourceMappingResult::refused(DocumentViewStatus::stale); }
+    if (position.value > current.display_utf8.size()) {
+        return SourceMappingResult::refused(DocumentViewStatus::unavailable);
+    }
     if (current.mapping.empty()) {
-        result.status = DocumentViewStatus::success;
-        result.position = current.covered.begin;
-        return result;
+        return SourceMappingResult::mapped(current.covered.begin);
     }
     const std::span<const DocumentMapSpan> spans(current.mapping);
     const std::size_t index = detail::lower_bound_index(spans, position, DisplayEndLess{});
@@ -246,31 +238,25 @@ SourceMappingResult DocumentViewState::source_position(
     } else if (position.value != span.begin.value) {
         const bool boundary = scalar_boundary(current.display_utf8, position.value);
         if (span.kind == DocumentMapKind::atomic_token || !boundary) {
-            result.status = DocumentViewStatus::invalid_boundary;
-            return result;
+            return SourceMappingResult::refused(DocumentViewStatus::invalid_boundary);
         }
         const std::uint32_t relative = position.value - span.begin.value;
         source += relative;
     }
-    result.status = DocumentViewStatus::success;
-    result.position = SourceByteOffset(source);
-    return result;
+    return SourceMappingResult::mapped(SourceByteOffset(source));
 }
 
 DisplayMappingResult DocumentViewState::display_position(
     const DocumentPageRequest& page_token, SourceByteOffset position) const noexcept {
-    DisplayMappingResult result{};
-    if (!page_.has_value()) { return result; }
+    if (!page_.has_value()) { return DisplayMappingResult::refused(DocumentViewStatus::unavailable); }
     const DocumentPage& current = *page_;
     const bool matching = same_request(current.request, page_token);
-    if (!matching) { result.status = DocumentViewStatus::stale; return result; }
+    if (!matching) { return DisplayMappingResult::refused(DocumentViewStatus::stale); }
     if (position.value < current.covered.begin.value || position.value > current.covered.end.value) {
-        return result;
+        return DisplayMappingResult::refused(DocumentViewStatus::unavailable);
     }
     if (current.mapping.empty()) {
-        result.status = DocumentViewStatus::success;
-        result.position = DisplayByteOffset(0);
-        return result;
+        return DisplayMappingResult::mapped(DisplayByteOffset(0));
     }
     const std::span<const DocumentMapSpan> spans(current.mapping);
     const std::size_t index = detail::lower_bound_index(spans, position, SourceEndLess{});
@@ -280,19 +266,16 @@ DisplayMappingResult DocumentViewState::display_position(
         display = span.end.value;
     } else if (position.value != span.source.begin.value) {
         if (span.kind == DocumentMapKind::atomic_token) {
-            result.status = DocumentViewStatus::invalid_boundary;
-            return result;
+            return DisplayMappingResult::refused(DocumentViewStatus::invalid_boundary);
         }
         const std::uint64_t relative = position.value - span.source.begin.value;
         // Validated identity extents fit the page-local uint32 display range.
         const std::uint32_t display_relative = static_cast<std::uint32_t>(relative);
         display += display_relative;
         const bool boundary = scalar_boundary(current.display_utf8, display);
-        if (!boundary) { result.status = DocumentViewStatus::invalid_boundary; return result; }
+        if (!boundary) { return DisplayMappingResult::refused(DocumentViewStatus::invalid_boundary); }
     }
-    result.status = DocumentViewStatus::success;
-    result.position = DisplayByteOffset(display);
-    return result;
+    return DisplayMappingResult::mapped(DisplayByteOffset(display));
 }
 
 } // namespace gui_forms

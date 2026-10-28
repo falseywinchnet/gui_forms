@@ -8,10 +8,8 @@
 
 namespace gui_forms::detail {
 
-HostClipboardImageResult decode_clipboard_png(std::span<const std::byte> bytes) {
-    HostClipboardImageResult result;
-    result.status.error = HostServiceError::invalid_argument;
-    if (bytes.empty()) return result;
+HostClipboardImageResult decode_clipboard_png(std::span<const std::byte> bytes, std::uint64_t generation) {
+    if (bytes.empty()) return HostClipboardImageResult::failed(HostServiceError::invalid_argument);
     image::PngPixelRequest request{};
     request.limits = image::png_limits_for_pixels(HostImage::maximum_pixels, bytes.size());
     request.target = {image::PixelOrder::rgba, image::PixelAlpha::straight};
@@ -19,10 +17,9 @@ HostClipboardImageResult decode_clipboard_png(std::span<const std::byte> bytes) 
     image::PngPixelDecoder decoder{};
     const image::PngPixelResult inspected = decoder.inspect(bytes, request);
     if (inspected.error != image::PngPixelError::none) {
-        if (inspected.decode_error == image::PngDecodeError::resource_limit) {
-            result.status.error = HostServiceError::too_large;
-        }
-        return result;
+        const HostServiceError refused = inspected.decode_error == image::PngDecodeError::resource_limit
+            ? HostServiceError::too_large : HostServiceError::invalid_argument;
+        return HostClipboardImageResult::failed(refused);
     }
     // inspect bounded width * height by HostImage::maximum_pixels.
     const std::uint64_t row_bytes = static_cast<std::uint64_t>(inspected.width) * 4U;
@@ -31,25 +28,21 @@ HostClipboardImageResult decode_clipboard_png(std::span<const std::byte> bytes) 
     try {
         image.pixels.resize(static_cast<std::size_t>(byte_count));
     } catch (const std::bad_alloc&) {
-        result.status.error = HostServiceError::backend_failure;
-        return result;
+        return HostClipboardImageResult::failed(HostServiceError::backend_failure);
     } catch (const std::length_error&) {
-        result.status.error = HostServiceError::too_large;
-        return result;
+        return HostClipboardImageResult::failed(HostServiceError::too_large);
     }
     const image::PngPixelResult decoded = decoder.decode(bytes, request, image.pixels,
                                                          static_cast<std::size_t>(row_bytes));
     if (decoded.error != image::PngPixelError::none) {
-        result.status.error = decoded.error == image::PngPixelError::allocation_failed
+        const HostServiceError refused = decoded.error == image::PngPixelError::allocation_failed
             ? HostServiceError::backend_failure : HostServiceError::invalid_argument;
-        return result;
+        return HostClipboardImageResult::failed(refused);
     }
     image.width = decoded.width;
     image.height = decoded.height;
     image.row_bytes = row_bytes;
-    result.image = std::move(image);
-    result.status = {};
-    return result;
+    return HostClipboardImageResult::image_read(std::move(image), generation);
 }
 
 std::vector<std::byte> encode_clipboard_png(HostImageView source) {

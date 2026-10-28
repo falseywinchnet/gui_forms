@@ -11,29 +11,25 @@ NSString* const raw_type = @"org.guiforms.rgba8";
 } // namespace
 
 HostClipboardImageResult read_appkit_clipboard_image(NSPasteboard* pasteboard) {
-    HostClipboardImageResult result;
-    if (pasteboard == nil) {
-        result.status.error = HostServiceError::backend_failure;
-        return result;
-    }
+    if (pasteboard == nil) return HostClipboardImageResult::failed(HostServiceError::backend_failure);
     const std::uint64_t generation = static_cast<std::uint64_t>(pasteboard.changeCount);
+    HostClipboardImageResult result = HostClipboardImageResult::nothing_read(generation);
     NSData* raw = [pasteboard dataForType:raw_type];
     if (raw != nil) {
         result = gui_forms::detail::decode_clipboard_image(
-            {static_cast<const std::byte*>(raw.bytes), raw.length});
+            {static_cast<const std::byte*>(raw.bytes), raw.length}, generation, false);
     } else {
         // PNG through the shared owned decoder, as on every host. There is no
         // TIFF fallback (owner decision 4A): PNG and raw pixels only.
         NSData* native = [pasteboard dataForType:NSPasteboardTypePNG];
         if (native != nil) {
             result = gui_forms::detail::decode_clipboard_png(
-                {static_cast<const std::byte*>(native.bytes), native.length});
+                {static_cast<const std::byte*>(native.bytes), native.length}, generation);
         }
     }
-    result.generation = generation;
+    // Another program wrote the pasteboard while it was read.
     if (static_cast<std::uint64_t>(pasteboard.changeCount) != generation) {
-        result = {};
-        result.status.error = HostServiceError::backend_failure;
+        return HostClipboardImageResult::failed(HostServiceError::backend_failure);
     }
     return result;
 }

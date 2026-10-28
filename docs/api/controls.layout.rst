@@ -76,7 +76,7 @@ Related types
    * - :cpp:class:`CommandOverflowSnapshot <gui_forms::CommandOverflowSnapshot>`
      -  
    * - :cpp:class:`DockDragOutcome <gui_forms::DockDragOutcome>`
-     -  
+     - How a drag ended, with the subject dragged.
    * - :cpp:class:`DockFlyoutChange <gui_forms::DockFlyoutChange>`
      - Raised after a flyout opened (open true) or closed.
    * - :cpp:class:`DockNavigator::Item <gui_forms::DockNavigator::Item>`
@@ -266,31 +266,49 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: DockDragOutcome final
+.. cpp:class:: DockDragOutcome final
 
    ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
 
-   .. cpp:member:: DockDragEnd end
+   How a drag ended, with the subject dragged. Only a drop has a target and only a float a frame; the subject is common to every end. One alternative per state (house form for results).
 
-      Default: ``{DockDragEnd::escaped}``.
 
-   .. cpp:member:: DockSubject subject
+   .. rubric:: Properties
 
-   .. cpp:member:: std::optional<DockDropTarget> target
+   .. cpp:function:: DockDragEnd end() const noexcept
 
-      The target dropped on, for ``dropped``, in the coordinates of the site that showed it.
+   .. cpp:function:: const DockSubject& subject() const noexcept
 
-   .. cpp:member:: DockTransactionResult result
+   .. cpp:function:: const DockDropTarget* target() const noexcept
 
-      The layout transaction's result, for ``dropped`` and ``floated``.
+      The target dropped on, for :cpp:func:`dropped <gui_forms::DockDragOutcome::dropped>`, in the coordinates of the site that showed it; null otherwise.
 
-   .. cpp:member:: bool across_windows
+   .. cpp:function:: const DockTransactionResult* result() const noexcept
 
-      For ``dropped``: whether the target was in another site's window (a drag across windows, phase D4).
+      The layout transaction's result, for :cpp:func:`dropped <gui_forms::DockDragOutcome::dropped>` and :cpp:func:`floated <gui_forms::DockDragOutcome::floated>`; null otherwise.
 
-   .. cpp:member:: Rect frame
+   .. cpp:function:: bool across_windows() const noexcept
 
-      For ``floated``: the new floating window's client area, in desktop logical units.
+      For :cpp:func:`dropped <gui_forms::DockDragOutcome::dropped>`: whether the target was in another site's window (a drag across windows, phase D4); false otherwise.
+
+   .. cpp:function:: const Rect* frame() const noexcept
+
+      For :cpp:func:`floated <gui_forms::DockDragOutcome::floated>`: the new floating window's client area, in desktop logical units; null otherwise.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static DockDragOutcome dropped(DockSubject subject, DockDropTarget target, DockTransactionResult result, bool across_windows) noexcept
+
+      :cpp:func:`across_windows <gui_forms::DockDragOutcome::across_windows>`: whether the target was in another site's window (a drag across windows, phase D4).
+
+   .. cpp:function:: static DockDragOutcome floated(DockSubject subject, DockTransactionResult result, Rect frame) noexcept
+
+      :cpp:func:`frame <gui_forms::DockDragOutcome::frame>`: the new floating window's client area, in desktop logical units.
+
+   .. cpp:function:: static DockDragOutcome ended(DockDragEnd end, DockSubject subject) noexcept
+
+      Every other end. A drop or a float without its parts is read as ``rejected``.
 
 .. cpp:namespace:: gui_forms
 
