@@ -134,21 +134,29 @@ LinkLabel::States LinkLabel::states() const {
 // decision W-Q5): `visited_link` once visited, else `link`, in the state
 // the control's anatomy states select. A compatibility style set on the
 // control (set_style) keeps its own link colours outside high contrast, as
-// a Button's recipe override does.
+// a Button's recipe override does. The underline part is the glyph role's
+// underline mark (owner decision, 2026-10-28), drawn in the text's colour.
 void LinkLabel::on_paint(Painter& painter, Rect) {
     const Rect bounds = local_bounds();
-    const ControlVisualContext context = part_visual_context(*this, anatomy_states());
+    const AnatomyStateSet states = anatomy_states();
+    const ControlVisualContext context = part_visual_context(*this, states);
     const ControlVisualRole family = visited_ ? ControlVisualRole::visited_link : ControlVisualRole::link;
-    Color foreground = effective_theme().resolve(family, context).text;
+    ControlVisualRecipe recipe = effective_theme().resolve(family, context);
     if (has_style_override() && !context.high_contrast) {
         const BasicControlStyle& colors = style();
-        foreground = enabled() ? (visited_ ? colors.visited_link : colors.link) : colors.disabled_text;
+        recipe.text = enabled() ? (visited_ ? colors.visited_link : colors.link) : colors.disabled_text;
     }
+    recipe.glyph = recipe.text;
+    const Color foreground = recipe.text;
     const double baseline = text_baseline();
-    const double width = underline_width();
     painter.draw_text_utf8({2.0, baseline}, display_text(), font(), foreground);
-    painter.draw_line({2.0, baseline + 2.0}, {2.0 + width, baseline + 2.0},
-                      foreground, 1.0);
+    PartPaint underline;
+    underline.role = PartRole::glyph;
+    underline.family = family;
+    underline.mark = PartMark::underline;
+    underline.states = states;
+    underline.bounds = {2.0, baseline + 1.5, underline_width(), 1.0};
+    paint_part_from_recipe(painter, underline, recipe, context);
     if (focus_cue_visible()) {
         paint_focus(painter, bounds, foreground);
     }

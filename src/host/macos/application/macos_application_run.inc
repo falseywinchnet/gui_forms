@@ -582,6 +582,9 @@ struct MacRunOpen final {
 int run_macos_application(std::vector<MacApplicationWindow> windows,
                           MacApplicationOptions application) {
     if (windows.empty() || windows.size() > gui_forms::HostWindowing::maximum_windows) return 2;
+    // The run holds the bundled font set, so windows opened and closed during it share one
+    // copy of each face.
+    const std::shared_ptr<gui_forms::detail::BundledFontSet> run_fonts = bundle_font_set();
     int exitCode = 0;
     std::unordered_set<std::string> identities;
     std::size_t primary_count{};

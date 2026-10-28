@@ -36,6 +36,11 @@ void example() {
     if (!result.accepted()) {
         std::fprintf(stderr, "run failed: %d\n", static_cast<int>(result.error));
     }
+    // Once, after the program's last run.
+    gf::ApplicationResult ended = gf::Application::shutdown();
+    if (!ended.accepted()) {
+        std::fprintf(stderr, "shutdown failed: %d\n", static_cast<int>(ended.error));
+    }
 }
 }  // namespace doc_example_Application_1
 

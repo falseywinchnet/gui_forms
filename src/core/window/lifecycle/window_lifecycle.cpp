@@ -181,6 +181,9 @@ void Window::set_presentation_settings(PresentationSettings settings) {
         settings.double_click_origin != SettingOrigin::host) {
         throw std::invalid_argument("GUI.Forms double-click origin is not a SettingOrigin");
     }
+    if (settings.colour_scheme != ColourScheme::light && settings.colour_scheme != ColourScheme::dark) {
+        throw std::invalid_argument("GUI.Forms colour scheme is not a ColourScheme");
+    }
     if (presentation_settings_ == settings) {
         return;
     }

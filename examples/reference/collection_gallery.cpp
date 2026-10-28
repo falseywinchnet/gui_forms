@@ -102,7 +102,9 @@ int main() {
         const gf::ApplicationResult result = gf::Application::run(std::move(window),
             {.title = "GUI.Forms — shared state and collections",
              .initial_size = {760.0, 610.0}, .minimum_size = {760.0, 610.0}});
-        if (!result.accepted()) return 1;
+        // Once, after the last run: ends the rendering library for the process.
+        const gf::ApplicationResult ended = gf::Application::shutdown();
+        if (!result.accepted() || !ended.accepted()) return 1;
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

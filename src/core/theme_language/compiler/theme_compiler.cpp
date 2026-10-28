@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -51,23 +52,25 @@ constexpr std::array<std::string_view, 147> not_admitted_properties{
 static_assert(std::is_sorted(not_admitted_properties.begin(), not_admitted_properties.end()),
               "binary_search needs the table sorted");
 
-// Families of left-out properties: the name, or the name and a '-'.
-constexpr std::array<std::string_view, 12> not_admitted_families{
-    "column", "flex",   "font",       "grid",   "inset",          "margin",
-    "overflow", "overscroll", "padding", "scroll", "text-decoration", "transform",
+// Families of left-out properties: the name, or the name and a '-'. The
+// `animation` longhands the motion lowering does not list (such as
+// `animation-composition` and `animation-timeline`) are left out.
+constexpr std::array<std::string_view, 13> not_admitted_families{
+    "animation", "column",     "flex",    "font",   "grid",            "inset",     "margin",
+    "overflow",  "overscroll", "padding", "scroll", "text-decoration", "transform",
 };
 
 // The properties of P6d to P8 (the rest of the authored materials, motion
 // and the colour and font roles): refused with not_yet_built until their
 // phases, so that no interim meaning ships. Sorted. A family's members the
 // material lowering lists (P6b, P6c) are lowered before these are consulted.
-constexpr std::array<std::string_view, 2> later_properties{
-    "backdrop-filter", "font",
+constexpr std::array<std::string_view, 1> later_properties{
+    "backdrop-filter",
 };
 static_assert(std::is_sorted(later_properties.begin(), later_properties.end()), "binary_search needs the table sorted");
 
-constexpr std::array<std::string_view, 6> later_families{
-    "animation", "background", "border", "mask", "outline", "transition",
+constexpr std::array<std::string_view, 5> later_families{
+    "background", "border", "mask", "outline", "transition",
 };
 
 constexpr std::array<std::string_view, 3> blend_modes{"normal", "multiply", "screen"};
@@ -100,11 +103,15 @@ enum class PropertyClass : std::uint8_t {
     translate,
     blend,
     isolation,
+    // `font` (P8c): the part's text role.
+    font,
     // A material property (P6b): its fields are lowered by the material
     // lowering.
     material,
     // `transition` and its longhands (P7a).
     transition,
+    // `animation` and its longhands (P7b).
+    animation,
     later,
     not_admitted,
     // A primitive parameter, or an unknown name.
@@ -120,8 +127,10 @@ enum class PropertyClass : std::uint8_t {
     if (name == "translate") return PropertyClass::translate;
     if (name == "mix-blend-mode") return PropertyClass::blend;
     if (name == "isolation") return PropertyClass::isolation;
+    if (name == font_property) return PropertyClass::font;
     if (material_property(name)) return PropertyClass::material;
     if (transition_property(name)) return PropertyClass::transition;
+    if (animation_property(name)) return PropertyClass::animation;
     if (listed(later_properties, name) || in_family(later_families, name)) return PropertyClass::later;
     if (listed(not_admitted_properties, name) || in_family(not_admitted_families, name)) {
         return PropertyClass::not_admitted;
@@ -143,11 +152,12 @@ void fold_ascii(std::string_view text, std::string& output) {
 
 // A machine holding `target` in every state, reached at once: a static
 // presentational value (CSS_COVERAGE section 4).
-[[nodiscard]] PropertyTransition still_machine(std::string_view property, double target) {
+[[nodiscard]] PropertyTransition still_machine(std::string_view property, double target, double target_em = 0.0) {
     PropertyTransition machine{};
     machine.property = std::string(property);
     PresentationState state{};
     state.target = target;
+    state.target_em = target_em;
     machine.states.push_back(std::move(state));
     machine.curve = MotionCurve::timed(FrameInterval{}, MotionEasing::linear);
     return machine;
@@ -179,9 +189,36 @@ void fold_ascii(std::string_view text, std::string& output) {
 }
 
 [[nodiscard]] std::size_t transition_bytes(const PropertyTransition& transition) noexcept {
-    const std::size_t bytes =
+    std::size_t bytes =
         lowered_record_bytes + transition.property.size() + transition.states.size() * lowered_record_bytes;
+    for (const PresentationState& state : transition.states) bytes += state.stops.size() * sizeof(MotionStop);
     return bytes;
+}
+
+// The value a presentational property rests at: 1 for opacity and scale,
+// 0 for a translation.
+[[nodiscard]] double engine_rest_value(std::string_view property) noexcept {
+    const bool translation = property == translate_x_property || property == translate_y_property;
+    return translation ? 0.0 : 1.0;
+}
+
+// The number a rule's own declaration gives `parameter`, if it declares
+// one.
+[[nodiscard]] std::optional<double> own_number(const ThemeRule& rule, std::string_view parameter) noexcept {
+    for (const RuleDeclaration& declaration : rule.declarations) {
+        if (declaration.property == parameter && declaration.kind == RuleValueKind::number) return declaration.number;
+    }
+    return std::nullopt;
+}
+
+// That declaration's em coefficient (P8c), 0 where it has none.
+[[nodiscard]] double own_number_em(const ThemeRule& rule, std::string_view parameter) noexcept {
+    for (const RuleDeclaration& declaration : rule.declarations) {
+        if (declaration.property == parameter && declaration.kind == RuleValueKind::number) {
+            return declaration.number_em;
+        }
+    }
+    return 0.0;
 }
 
 // The rule's primitive, as its `primitive` declarations select it.
@@ -196,6 +233,80 @@ struct PrimitiveSelection final {
     bool dropped{};
 };
 
+// The join of one optional flag of two media conditions into `joined`:
+// false where they name opposite values.
+[[nodiscard]] bool join_flag(std::optional<bool> left, std::optional<bool> right,
+                             std::optional<bool>& joined) noexcept {
+    if (left && right && *left != *right) return false;
+    joined = left ? left : right;
+    return true;
+}
+
+// The condition that holds where both `left` and `right` hold, into
+// `joined`; false where no window can meet both.
+[[nodiscard]] bool join_media(const MediaCondition& left, const MediaCondition& right,
+                              MediaCondition& joined) noexcept {
+    MediaCondition both{};
+    if (!join_flag(left.dark_scheme, right.dark_scheme, both.dark_scheme)) return false;
+    if (!join_flag(left.forced_colours, right.forced_colours, both.forced_colours)) return false;
+    if (!join_flag(left.reduced_motion, right.reduced_motion, both.reduced_motion)) return false;
+    both.minimum_resolution = left.minimum_resolution ? left.minimum_resolution : right.minimum_resolution;
+    if (left.minimum_resolution && right.minimum_resolution) {
+        both.minimum_resolution = std::max(*left.minimum_resolution, *right.minimum_resolution);
+    }
+    both.maximum_resolution = left.maximum_resolution ? left.maximum_resolution : right.maximum_resolution;
+    if (left.maximum_resolution && right.maximum_resolution) {
+        both.maximum_resolution = std::min(*left.maximum_resolution, *right.maximum_resolution);
+    }
+    if (both.minimum_resolution && both.maximum_resolution && *both.minimum_resolution > *both.maximum_resolution) {
+        return false;
+    }
+    joined = both;
+    return true;
+}
+
+// The token of the value's first em length, if it has one (P8c).
+[[nodiscard]] std::optional<std::uint32_t> first_em_length(const ThemeValue& value) noexcept {
+    for (const ValueComponent& component : value.components) {
+        if (component.kind == ValueComponentKind::number && component.unit == ValueUnit::em) return component.token;
+    }
+    return std::nullopt;
+}
+
+// Whether the value names CSS's currentcolor (P8c).
+[[nodiscard]] bool names_current_colour(const ThemeValue& value) noexcept {
+    for (const ValueComponent& component : value.components) {
+        if (component.kind != ValueComponentKind::keyword) continue;
+        if (equals_ascii_folded(component.text, "currentcolor")) return true;
+    }
+    return false;
+}
+
+// A colour a declaration's value writes: a colour component, or a named
+// colour's keyword.
+[[nodiscard]] bool writes_colour(const ValueComponent& component) noexcept {
+    if (component.kind == ValueComponentKind::colour) return true;
+    return component.kind == ValueComponentKind::keyword && named_colour(component.text).has_value();
+}
+
+// Where one declaration's colours came from (EC4): a literal, where any
+// colour of the value is one (its token into `literal`); otherwise its
+// first role; none for a value without a colour.
+[[nodiscard]] ColourOrigin value_colour_origin(const ThemeValue& value, std::uint32_t& literal) noexcept {
+    ColourOrigin origin{};
+    for (const ValueComponent& component : value.components) {
+        if (!writes_colour(component)) continue;
+        if (component.origin.source != ColourSource::role) {
+            ColourOrigin written{};
+            written.source = ColourSource::literal;
+            literal = component.token;
+            return written;
+        }
+        if (origin.source == ColourSource::none) origin = component.origin;
+    }
+    return origin;
+}
+
 // One compilation.
 class CompilePass final {
 public:
@@ -207,13 +318,33 @@ public:
                 ThemeValue& value, std::vector<std::string_view>& parameter_names,
                 std::vector<LoweredDeclaration>& declarations, std::vector<MaterialDeclaration>& materials,
                 MaterialLowering& material_lowering, std::vector<MaterialField>& material_fields,
-                std::vector<RecipeDeclaration>& recipe_fields, TransitionStorage& transitions,
+                std::vector<RecipeDeclaration>& recipe_fields, MotionStorage& motion,
+                std::vector<MediaQuery>& media_queries, PaletteStorage& palette,
                 std::string& folded) noexcept;
 
     [[nodiscard]] CompileOutcome run();
 
 private:
+    // The `:root` palette (P8b), each block's role declarations under its
+    // media condition, into palette_; false after an error.
+    [[nodiscard]] bool collect_palette();
+    // One `:root` block's declarations, recorded under media_ when
+    // `record` (a block no media query lowers is only checked).
+    [[nodiscard]] bool collect_palette_block(std::size_t rule_index, bool record);
+    // Whether the style rule's selector is `:root` alone: the palette's
+    // block, collected before the rules.
+    [[nodiscard]] bool selects_root(std::size_t rule_index) const noexcept;
+    // The next combination of the varying roles' variants in order; false
+    // after the last.
+    [[nodiscard]] bool next_palette_choice() noexcept;
+    [[nodiscard]] bool lower_media(std::size_t media_index);
+    // The style rules of an `@media` block under media_, which is then
+    // reset.
+    [[nodiscard]] bool lower_media_rules(std::size_t media_index);
+    // A style rule, and its copies for the palette's conditional variants
+    // of the roles it reads (P8b).
     [[nodiscard]] bool lower_rule(std::size_t rule_index);
+    [[nodiscard]] bool lower_rule_once(std::size_t rule_index);
     [[nodiscard]] bool select_primitive(const SyntaxNode& node, PrimitiveSelection& selection);
     [[nodiscard]] bool lower_declaration(const SyntaxNode& node, PropertyClass kind,
                                          const PrimitiveSelection& selection);
@@ -223,10 +354,47 @@ private:
     [[nodiscard]] bool lower_translate(const SyntaxNode& node);
     [[nodiscard]] bool lower_keyword_property(const SyntaxNode& node, PropertyClass kind);
     [[nodiscard]] bool lower_material(const SyntaxNode& node);
+    // `font: <role>` (P8c, D6): the part's text role, or `inherit`, the
+    // parent control's (D7).
+    [[nodiscard]] bool lower_font(const SyntaxNode& node);
+    // Reports material_lowering_'s problem; true where the declaration is
+    // only dropped.
+    [[nodiscard]] bool report_material_problem();
+    // The em coefficients (P8c, D4) of the declarations material_lowering_
+    // holds, lowered at an em of 0 and the current colour black, where the
+    // value has an em length at `em_token`, and their current colours
+    // where `current` (the lowering read currentcolor); false after an
+    // error.
+    [[nodiscard]] bool lower_relative(MaterialProperty property, std::uint32_t start,
+                                      std::optional<std::uint32_t> em_token, bool current);
+    // Lowers again at an em of 1, and takes the lengths that differ as em
+    // coefficients, into em_materials_ and em_recipe_fields_.
+    [[nodiscard]] bool lower_em_pass(MaterialProperty property, std::uint32_t start);
+    // Lowers again at the current colour white, and takes the colours that
+    // differ as current colours, into em_materials_ and em_recipe_fields_.
+    [[nodiscard]] bool lower_current_colour_pass(MaterialProperty property, std::uint32_t start);
+    // The coefficients em_at_one_ less em_pixels_ into `coefficients`;
+    // whether any is not 0.
+    [[nodiscard]] bool em_coefficients(std::vector<double>& coefficients) const;
     [[nodiscard]] bool lower_transition(const SyntaxNode& node);
+    [[nodiscard]] bool lower_animation(const SyntaxNode& node);
     // The rule's declared curves on its machines (P7a), the machines'
-    // origins into transitions_.rule_machines; false after an error.
+    // origins into motion_.rule_machines; false after an error.
     [[nodiscard]] bool apply_transitions(const PrimitiveSelection& selection, ThemeRule& lowered);
+    // The rule's animations (P7b): moves on its machines, loops as its
+    // parameters' expressions and its ambient effect; false after an
+    // error.
+    [[nodiscard]] bool apply_animations(const PrimitiveSelection& selection, ThemeRule& lowered);
+    [[nodiscard]] bool apply_loop(const DeclaredLoop& loop, ThemeRule& lowered);
+    // A `@keyframes` rule's definition into motion_.keyframes; false after
+    // an error.
+    [[nodiscard]] bool collect_keyframes(std::size_t index);
+    // The offsets a keyframe block's selectors name, into `offsets`.
+    [[nodiscard]] bool keyframe_offsets(const SyntaxNode& block, std::vector<double>& offsets);
+    // One keyframe declaration's values into `definition` at `offsets`;
+    // false after an error (a dropped declaration returns true).
+    [[nodiscard]] bool keyframe_declaration(const SyntaxNode& node, std::span<const double> offsets,
+                                            KeyframesDefinition& definition);
     void add_material(MaterialDeclaration declaration);
     void add_recipe_field(const RecipeDeclaration& declaration);
     // Whether a selector of the rule names a part or a role: the recipe's
@@ -271,12 +439,32 @@ private:
     MaterialLowering& material_lowering_;
     std::vector<MaterialField>& material_fields_;
     std::vector<RecipeDeclaration>& recipe_fields_;
-    TransitionStorage& transitions_;
+    MotionStorage& motion_;
+    std::vector<MediaQuery>& media_queries_;
+    PaletteStorage& palette_;
     std::string& folded_;
     SourcePositionCursor cursor_;
     ReservedInputs reserved_{};
     LoweringBudget budget_{};
     bool newer_engine_{};
+    // The media condition of the query being lowered (EC3); outside
+    // `@media`, the unconditional one.
+    MediaCondition media_{};
+    // Whether the value being read is a palette's own: role() is not
+    // admitted there.
+    bool reading_palette_{};
+    // The side role(<pair>) gives without one, as the property being
+    // lowered sets it.
+    std::optional<ColourRoleSide> bare_side_{};
+    // The roles the rule being lowered read, one bit a role.
+    std::uint32_t rule_roles_read_{};
+    // The em lowering's storage (P8c).
+    std::vector<MaterialDeclaration> em_materials_{};
+    std::vector<RecipeDeclaration> em_recipe_fields_{};
+    std::vector<double> em_pixels_{};
+    std::vector<double> em_at_one_{};
+    std::vector<Color> base_colours_{};
+    std::vector<Color> other_colours_{};
     // The rule and the property being lowered, as diagnostics name them.
     std::string rule_{};
     std::string property_{};
@@ -290,14 +478,15 @@ CompilePass::CompilePass(const ThemeCompileInput& input, ThemeRuleSheet& sheet, 
                          ThemeValue& value, std::vector<std::string_view>& parameter_names,
                          std::vector<LoweredDeclaration>& declarations, std::vector<MaterialDeclaration>& materials,
                          MaterialLowering& material_lowering, std::vector<MaterialField>& material_fields,
-                         std::vector<RecipeDeclaration>& recipe_fields, TransitionStorage& transitions,
+                         std::vector<RecipeDeclaration>& recipe_fields, MotionStorage& motion,
+                         std::vector<MediaQuery>& media_queries, PaletteStorage& palette,
                          std::string& folded) noexcept
     : input_(input), sheet_(sheet), diagnostics_(diagnostics), tokens_(tokens), lines_(lines), tree_(tree),
       custom_properties_(custom_properties), selectors_(selectors), substitution_(substitution), reader_(reader),
       lowered_selectors_(lowered_selectors), substituted_(substituted), value_(value),
       parameter_names_(parameter_names), declarations_(declarations), materials_(materials),
       material_lowering_(material_lowering), material_fields_(material_fields), recipe_fields_(recipe_fields),
-      transitions_(transitions), folded_(folded),
+      motion_(motion), media_queries_(media_queries), palette_(palette), folded_(folded),
       cursor_(lines, input.source.text) {}
 
 CompileOutcome CompilePass::run() {
@@ -306,6 +495,7 @@ CompileOutcome CompilePass::run() {
     const ParseOutcome parsed = parse_theme_sheet(input_.source, tokens_, lines_, tree_, diagnostics_);
     if (parsed != ParseOutcome::tree_complete) return CompileOutcome::refused;
     newer_engine_ = current_engine_version < input_.requires_engine;
+    motion_.keyframes.clear();
     if (newer_engine_) {
         const std::string version =
             std::to_string(input_.requires_engine.major) + "." + std::to_string(input_.requires_engine.minor);
@@ -316,15 +506,34 @@ CompileOutcome CompilePass::run() {
         return CompileOutcome::refused;
     }
     parameter_names_.reserve(maximum_primitive_parameters);
-    transitions_.origins.clear();
+    motion_.origins.clear();
+    // The palette first: a rule reads it wherever its `:root` block is.
+    if (!collect_palette()) return CompileOutcome::refused;
     const std::vector<SyntaxNode>& nodes = tree_.nodes;
+    // The keyframes first: an animation may name keyframes defined after
+    // its rule, as in CSS.
+    std::size_t keyframes_rules = 0U;
+    for (std::size_t index = 1U; index < nodes.size(); index = nodes[index].subtree_end.value) {
+        if (nodes[index].kind != SyntaxNodeKind::keyframes_rule) continue;
+        keyframes_rules = keyframes_rules + 1U;
+        if (keyframes_rules > maximum_keyframes_rules) {
+            report(DiagnosticCode::too_many_keyframes, nodes[index].tokens.first.value,
+                   std::to_string(maximum_keyframes_rules));
+            return CompileOutcome::refused;
+        }
+        if (!collect_keyframes(index)) return CompileOutcome::refused;
+    }
     std::size_t index = 1U;
     while (index < nodes.size()) {
         const SyntaxNode& node = nodes[index];
         const std::size_t next = node.subtree_end.value;
-        if (node.kind == SyntaxNodeKind::import_rule || node.kind == SyntaxNodeKind::media_rule ||
-            node.kind == SyntaxNodeKind::keyframes_rule) {
-            // P10 builds @import, P7 @media and @keyframes.
+        if (node.kind == SyntaxNodeKind::media_rule) {
+            if (!lower_media(index)) return CompileOutcome::refused;
+            index = next;
+            continue;
+        }
+        if (node.kind == SyntaxNodeKind::import_rule) {
+            // P10 builds @import.
             const std::uint32_t keyword = node.tokens.first.value;
             report(DiagnosticCode::not_yet_built, keyword, clipped_theme_detail(token_text(keyword)));
             return CompileOutcome::refused;
@@ -335,9 +544,9 @@ CompileOutcome CompilePass::run() {
     }
     // Each transition takes the state values of the rules refining its own
     // (R2-18).
-    const MotionLoweringOutcome grouped = group_transitions(sheet_, transitions_.origins, transitions_.problem);
+    const MotionLoweringOutcome grouped = group_transitions(sheet_, motion_.origins, motion_.problem);
     if (grouped != MotionLoweringOutcome::lowered) {
-        MotionLoweringProblem& problem = transitions_.problem;
+        MotionLoweringProblem& problem = motion_.problem;
         report(problem.code, problem.token, std::move(problem.detail));
         return CompileOutcome::refused;
     }
@@ -346,7 +555,226 @@ CompileOutcome CompilePass::run() {
     return CompileOutcome::compiled;
 }
 
+// An `@media` block (EC3): its rules, lowered once for each query of its
+// list that names only known features and that some window can meet. A
+// block no query lowers is still lowered once and its rules discarded, so
+// its errors refuse the sheet as any other rule's do (B2).
+bool CompilePass::lower_media(std::size_t media_index) {
+    const SyntaxNode& media = tree_.nodes[media_index];
+    MediaQueryProblem problem{};
+    const MediaQueryOutcome read =
+        read_media_queries(input_.source.text, tokens_, media.content, media_queries_, problem);
+    if (read == MediaQueryOutcome::refused) {
+        report(problem.code, problem.token, std::move(problem.detail));
+        return false;
+    }
+    bool lowered = false;
+    const bool muted = diagnostics_.warnings_muted();
+    for (const MediaQuery& query : media_queries_) {
+        if (query.unknown_feature) {
+            report(DiagnosticCode::unknown_media_feature, query.unknown_token,
+                   clipped_theme_detail(token_text(query.unknown_token)));
+            continue;
+        }
+        if (query.never) continue;
+        media_ = query.condition;
+        // The block's warnings are reported once, for its first query.
+        if (lowered) diagnostics_.mute_warnings(true);
+        lowered = true;
+        const bool block = lower_media_rules(media_index);
+        diagnostics_.mute_warnings(muted);
+        if (!block) return false;
+    }
+    if (lowered) return true;
+    const std::size_t rules = sheet_.rules.size();
+    const std::size_t origins = motion_.origins.size();
+    const LoweringBudget budget = budget_;
+    if (!lower_media_rules(media_index)) return false;
+    sheet_.rules.resize(rules);
+    motion_.origins.resize(origins);
+    budget_ = budget;
+    return true;
+}
+
+bool CompilePass::lower_media_rules(std::size_t media_index) {
+    const std::size_t end = tree_.nodes[media_index].subtree_end.value;
+    for (std::size_t child = media_index + 1U; child < end; child = tree_.nodes[child].subtree_end.value) {
+        if (tree_.nodes[child].kind != SyntaxNodeKind::style_rule) continue;
+        if (!lower_rule(child)) return false;
+    }
+    media_ = MediaCondition{};
+    return true;
+}
+
+// A window takes the last copy whose condition holds there: for each role,
+// its last variant that holds, as CSS's later `:root` declaration wins.
 bool CompilePass::lower_rule(std::size_t rule_index) {
+    // The palette's own block was collected first.
+    if (selects_root(rule_index)) return true;
+    palette_.in_use = palette_.base;
+    rule_roles_read_ = 0U;
+    if (!lower_rule_once(rule_index)) return false;
+    palette_.varying.clear();
+    for (std::size_t role = 0U; role < colour_role_count; ++role) {
+        const bool read = (rule_roles_read_ & (1U << role)) != 0U;
+        if (read && palette_.variants[role].size() > 1U) palette_.varying.push_back(role);
+    }
+    if (palette_.varying.empty()) return true;
+    palette_.choice.assign(palette_.varying.size(), 0U);
+    const MediaCondition rule_media = media_;
+    const bool muted = diagnostics_.warnings_muted();
+    // The copies' warnings are the rule's, reported once.
+    diagnostics_.mute_warnings(true);
+    bool lowered = true;
+    while (lowered && next_palette_choice()) {
+        MediaCondition joined = rule_media;
+        bool holds = true;
+        for (std::size_t index = 0U; index < palette_.varying.size(); ++index) {
+            const std::size_t role = palette_.varying[index];
+            const PaletteVariant& variant = palette_.variants[role][palette_.choice[index]];
+            palette_.in_use.roles[role] = variant.colours;
+            if (holds) holds = join_media(joined, variant.media, joined);
+        }
+        // A copy no window can meet is skipped.
+        if (!holds) continue;
+        media_ = joined;
+        lowered = lower_rule_once(rule_index);
+    }
+    media_ = rule_media;
+    palette_.in_use = palette_.base;
+    diagnostics_.mute_warnings(muted);
+    return lowered;
+}
+
+bool CompilePass::next_palette_choice() noexcept {
+    // The last role's variant moves fastest: the combinations come in
+    // lexicographic order, the base's first.
+    for (std::size_t index = palette_.choice.size(); index > 0U; --index) {
+        std::size_t& choice = palette_.choice[index - 1U];
+        const std::size_t role = palette_.varying[index - 1U];
+        if (choice + 1U < palette_.variants[role].size()) {
+            choice = choice + 1U;
+            return true;
+        }
+        choice = 0U;
+    }
+    return false;
+}
+
+bool CompilePass::selects_root(std::size_t rule_index) const noexcept {
+    const TokenRange range = tree_.nodes[rule_index].content;
+    std::size_t written = 0U;
+    bool root = false;
+    for (std::uint32_t index = range.first.value; index < range.end.value; ++index) {
+        const Token& token = tokens_.tokens[index];
+        if (token.kind == TokenKind::whitespace || token.kind == TokenKind::comment) continue;
+        written = written + 1U;
+        if (written == 1U && token.kind != TokenKind::colon) return false;
+        if (written == 2U) root = token.kind == TokenKind::ident && equals_ascii_folded(token_text(index), "root");
+    }
+    return written == 2U && root;
+}
+
+bool CompilePass::collect_palette() {
+    for (std::vector<PaletteVariant>& variants : palette_.variants) variants.clear();
+    palette_.base = RolePalette{};
+    const std::vector<SyntaxNode>& nodes = tree_.nodes;
+    for (std::size_t index = 1U; index < nodes.size(); index = nodes[index].subtree_end.value) {
+        const SyntaxNode& node = nodes[index];
+        if (node.kind == SyntaxNodeKind::style_rule && selects_root(index)) {
+            if (!collect_palette_block(index, true)) return false;
+            continue;
+        }
+        if (node.kind != SyntaxNodeKind::media_rule) continue;
+        // The rules' pass reports the prelude's problems.
+        MediaQueryProblem problem{};
+        const MediaQueryOutcome read =
+            read_media_queries(input_.source.text, tokens_, node.content, media_queries_, problem);
+        if (read == MediaQueryOutcome::refused) continue;
+        const std::size_t end = node.subtree_end.value;
+        bool lowered = false;
+        for (const MediaQuery& query : media_queries_) {
+            if (query.unknown_feature || query.never) continue;
+            media_ = query.condition;
+            for (std::size_t child = index + 1U; child < end; child = nodes[child].subtree_end.value) {
+                if (nodes[child].kind != SyntaxNodeKind::style_rule || !selects_root(child)) continue;
+                if (!collect_palette_block(child, true)) return false;
+            }
+            lowered = true;
+        }
+        media_ = MediaCondition{};
+        for (std::size_t child = index + 1U; !lowered && child < end; child = nodes[child].subtree_end.value) {
+            if (nodes[child].kind != SyntaxNodeKind::style_rule || !selects_root(child)) continue;
+            if (!collect_palette_block(child, false)) return false;
+        }
+    }
+    for (std::size_t role = 0U; role < colour_role_count; ++role) {
+        const std::vector<PaletteVariant>& variants = palette_.variants[role];
+        if (variants.empty() || !media_condition_unconditional(variants[0].media)) continue;
+        palette_.base.roles[role] = variants[0].colours;
+    }
+    palette_.in_use = palette_.base;
+    rule_.clear();
+    property_.clear();
+    return true;
+}
+
+bool CompilePass::collect_palette_block(std::size_t rule_index, bool record) {
+    const SyntaxNode& rule = tree_.nodes[rule_index];
+    rule_ = clipped_theme_detail(range_text(rule.content));
+    const std::size_t end = rule.subtree_end.value;
+    for (std::size_t child = rule_index + 1U; child < end; child = tree_.nodes[child].subtree_end.value) {
+        const SyntaxNode& node = tree_.nodes[child];
+        const std::uint32_t property = node.tokens.first.value;
+        property_ = clipped_theme_detail(token_text(property));
+        fold_ascii(token_text(property), folded_);
+        if (classify(folded_) == PropertyClass::custom) continue;
+        if ((node.flags & syntax_flag_important) != 0U) {
+            report(DiagnosticCode::value_form_not_admitted, property, "!important in the palette");
+            return false;
+        }
+        const std::optional<ColourRole> role = colour_role_from_name(folded_);
+        if (!role) {
+            // A palette declares roles and custom properties only.
+            report(DiagnosticCode::property_not_admitted, property, property_ + " in the palette");
+            continue;
+        }
+        const bool paired = colour_role_paired(*role);
+        parameter_names_.clear();
+        reading_palette_ = true;
+        const bool read = read_value(node);
+        reading_palette_ = false;
+        if (!read) return false;
+        const std::vector<ValueComponent>& components = value_.components;
+        bool shaped = paired ? components.size() == 3U : components.size() == 1U;
+        if (shaped) shaped = writes_colour(components[0]) && writes_colour(components.back());
+        if (shaped && paired) {
+            const ValueComponent& between = components[1];
+            shaped = between.kind == ValueComponentKind::keyword && equals_ascii_folded(between.text, "on");
+        }
+        if (!shaped) {
+            report(DiagnosticCode::value_wrong_kind, components[0].token,
+                   paired ? "<colour> on <colour>" : "one colour");
+            return false;
+        }
+        const ValueComponent& foreground = components[0];
+        const ValueComponent& background = components.back();
+        PaletteVariant variant{};
+        variant.media = media_;
+        variant.colours.foreground =
+            foreground.kind == ValueComponentKind::colour ? foreground.colour : *named_colour(foreground.text);
+        variant.colours.background =
+            background.kind == ValueComponentKind::colour ? background.colour : *named_colour(background.text);
+        if (!record) continue;
+        std::vector<PaletteVariant>& variants = palette_.variants[static_cast<std::size_t>(*role)];
+        // An unconditional declaration replaces the role's earlier ones.
+        if (media_condition_unconditional(media_)) variants.clear();
+        variants.push_back(variant);
+    }
+    return true;
+}
+
+bool CompilePass::lower_rule_once(std::size_t rule_index) {
     const SyntaxNode& rule = tree_.nodes[rule_index];
     const std::string_view written = range_text(rule.content);
     rule_ = clipped_theme_detail(written);
@@ -380,7 +808,8 @@ bool CompilePass::lower_rule(std::size_t rule_index) {
     declarations_.clear();
     materials_.clear();
     recipe_fields_.clear();
-    clear_written_transitions(transitions_.written);
+    clear_written_transitions(motion_.written);
+    clear_written_animations(motion_.animations_written);
     for (std::size_t child = rule_index + 1U; child < end; child = tree_.nodes[child].subtree_end.value) {
         const SyntaxNode& node = tree_.nodes[child];
         const std::uint32_t property = node.tokens.first.value;
@@ -466,7 +895,9 @@ bool CompilePass::lower_declaration(const SyntaxNode& node, PropertyClass kind, 
     case PropertyClass::blend:
     case PropertyClass::isolation: return lower_keyword_property(node, kind);
     case PropertyClass::material: return lower_material(node);
+    case PropertyClass::font: return lower_font(node);
     case PropertyClass::transition: return lower_transition(node);
+    case PropertyClass::animation: return lower_animation(node);
     case PropertyClass::later:
         report(DiagnosticCode::not_yet_built, property, property_);
         return false;
@@ -529,6 +960,13 @@ bool CompilePass::lower_parameter(const SyntaxNode& node, const PrimitiveDescrip
         return false;
     }
     if (declared.kind == PrimitiveParameterKind::number) {
+        if (first.kind == ValueComponentKind::number && first.unit == ValueUnit::em) {
+            // A length in em (P8c), held within the range at the part's em.
+            lowered.declaration = RuleDeclaration::number_value(declared.name, 0.0);
+            lowered.declaration.number_em = first.number;
+            add_lowered(std::move(lowered));
+            return true;
+        }
         const bool length_or_number = first.unit == ValueUnit::none || first.unit == ValueUnit::px;
         if (first.kind == ValueComponentKind::number && length_or_number) {
             if (first.number < declared.minimum || first.number > declared.maximum) {
@@ -574,6 +1012,8 @@ bool CompilePass::lower_parameter(const SyntaxNode& node, const PrimitiveDescrip
             return false;
         }
         lowered.declaration = RuleDeclaration::colour_value(declared.name, *colour);
+        std::uint32_t literal = first.token;
+        lowered.declaration.origin = value_colour_origin(value_, literal);
         add_lowered(std::move(lowered));
         return true;
     }
@@ -643,6 +1083,8 @@ bool CompilePass::lower_translate(const SyntaxNode& node) {
     const ValueComponent& first = value_.components[0];
     const WideKeyword wide = wide_keyword();
     std::array<double, 2> offsets{0.0, 0.0};
+    // An offset in em (P8c), taken at the part's em.
+    std::array<double, 2> em_offsets{0.0, 0.0};
     if (wide == WideKeyword::inherit || wide == WideKeyword::outside) {
         const DiagnosticCode code =
             wide == WideKeyword::inherit ? DiagnosticCode::value_wrong_kind : DiagnosticCode::value_form_not_admitted;
@@ -664,7 +1106,8 @@ bool CompilePass::lower_translate(const SyntaxNode& node) {
         for (std::size_t axis = 0U; axis < count; ++axis) {
             const ValueComponent& component = value_.components[axis];
             const bool number = component.kind == ValueComponentKind::number;
-            const bool length = number && (component.unit == ValueUnit::px ||
+            const bool em = number && component.unit == ValueUnit::em;
+            const bool length = number && (component.unit == ValueUnit::px || em ||
                                             (component.unit == ValueUnit::none && component.number == 0.0));
             if (number && component.unit == ValueUnit::percent) {
                 // A percentage of the part's box; the engine translates by
@@ -680,6 +1123,10 @@ bool CompilePass::lower_translate(const SyntaxNode& node) {
                 report(DiagnosticCode::value_wrong_kind, component.token, "a length");
                 return false;
             }
+            if (em) {
+                em_offsets[axis] = component.number;
+                continue;
+            }
             if (std::abs(component.number) > maximum_presentational_translate) {
                 report(DiagnosticCode::value_out_of_range, component.token,
                        clipped_theme_detail(token_text(component.token)));
@@ -690,8 +1137,8 @@ bool CompilePass::lower_translate(const SyntaxNode& node) {
     }
     LoweredDeclaration lowered{};
     lowered.kind = LoweredKind::translate;
-    lowered.transitions[0] = still_machine(translate_x_property, offsets[0]);
-    lowered.transitions[1] = still_machine(translate_y_property, offsets[1]);
+    lowered.transitions[0] = still_machine(translate_x_property, offsets[0], em_offsets[0]);
+    lowered.transitions[1] = still_machine(translate_y_property, offsets[1], em_offsets[1]);
     lowered.transition_count = 2U;
     add_lowered(std::move(lowered));
     return true;
@@ -749,6 +1196,43 @@ bool CompilePass::lower_keyword_property(const SyntaxNode& node, PropertyClass k
     return true;
 }
 
+bool CompilePass::lower_font(const SyntaxNode& node) {
+    parameter_names_.clear();
+    if (!read_value(node)) return false;
+    const ValueComponent& first = value_.components[0];
+    const WideKeyword wide = wide_keyword();
+    if (wide == WideKeyword::outside) {
+        report(DiagnosticCode::value_form_not_admitted, first.token, clipped_theme_detail(first.text));
+        return false;
+    }
+    // `initial` is the ui role, which a part no rule sets has.
+    std::string_view name = text_role_name(TextRole::ui);
+    if (wide == WideKeyword::inherit) name = font_inherit_name;
+    if (wide == WideKeyword::none) {
+        if (drop_unknown_function()) return true;
+        if (value_.components.size() != 1U) {
+            report(DiagnosticCode::value_form_not_admitted, value_.components[1].token,
+                   "font takes a text role alone");
+            return false;
+        }
+        if (!keyword_of(first, "a text role")) return false;
+        fold_ascii(first.text, folded_);
+        const std::optional<TextRole> role = text_role_from_name(folded_);
+        if (!role) {
+            const DiagnosticCode code =
+                newer_engine_ ? DiagnosticCode::keyword_from_newer_engine : DiagnosticCode::keyword_unknown;
+            report(code, first.token, clipped_theme_detail(first.text));
+            return newer_engine_;
+        }
+        name = text_role_name(*role);
+    }
+    LoweredDeclaration lowered{};
+    lowered.kind = LoweredKind::font;
+    lowered.declaration = RuleDeclaration::choice_value(font_property, name);
+    add_lowered(std::move(lowered));
+    return true;
+}
+
 // A material property's fields (P6b), or the recipe's (P6f): its CSS-wide
 // `initial` resets each field it sets; any other value is lowered by the
 // material lowering. A recipe property in a rule naming a part or a role
@@ -762,13 +1246,26 @@ bool CompilePass::lower_material(const SyntaxNode& node) {
         return true;
     }
     parameter_names_.clear();
-    if (!read_value(node)) return false;
+    // role(<pair>) gives its foreground in `color`, its background in
+    // `background` and `background-color`.
+    if (property == MaterialProperty::color) bare_side_ = ColourRoleSide::foreground;
+    const bool background = property == MaterialProperty::background || property == MaterialProperty::background_color;
+    if (background) bare_side_ = ColourRoleSide::background;
+    const bool read = read_value(node);
+    bare_side_.reset();
+    if (!read) return false;
     const ValueComponent& first = value_.components[0];
     const WideKeyword wide = wide_keyword();
-    if (wide == WideKeyword::inherit && property == MaterialProperty::color) {
-        // P8 builds inheritance, for the colour and font roles.
-        report(DiagnosticCode::not_yet_built, first.token, "inherit");
-        return false;
+    // `color: inherit`, and `color: currentcolor`, which CSS reads as it
+    // (P8c, D7): the parent control's text colour, resolved at paint.
+    const bool current = value_.components.size() == 1U && first.kind == ValueComponentKind::keyword &&
+                         equals_ascii_folded(first.text, "currentcolor");
+    if (property == MaterialProperty::color && (wide == WideKeyword::inherit || current)) {
+        RecipeDeclaration inherited{};
+        inherited.field = RecipeField::text;
+        inherited.inherit = true;
+        add_recipe_field(inherited);
+        return true;
     }
     if (wide == WideKeyword::inherit || wide == WideKeyword::outside) {
         const DiagnosticCode code =
@@ -793,19 +1290,168 @@ bool CompilePass::lower_material(const SyntaxNode& node) {
         }
         return true;
     }
+    // A gradient whose em lengths or current colours the rules take stays
+    // authored, so the walks reach them.
+    const std::optional<std::uint32_t> em_token = first_em_length(value_);
+    material_lowering_.em = 0.0;
+    material_lowering_.current_colour = Color::rgba(0, 0, 0, 255);
+    material_lowering_.keep_gradients = em_token.has_value() || names_current_colour(value_);
     lower_material_value(property, value_, node.content.first.value, input_.images, material_lowering_);
-    if (material_lowering_.outcome != MaterialLoweringOutcome::lowered) {
-        MaterialLoweringProblem& problem = material_lowering_.problem;
-        // A keyword the running engine lacks, in a sheet for a newer one,
-        // is dropped with a warning (R2-07).
-        const bool newer = newer_engine_ && problem.code == DiagnosticCode::keyword_unknown;
-        const DiagnosticCode code = newer ? DiagnosticCode::keyword_from_newer_engine : problem.code;
-        report(code, problem.token, std::move(problem.detail));
-        return newer || material_lowering_.outcome == MaterialLoweringOutcome::dropped;
+    if (material_lowering_.outcome != MaterialLoweringOutcome::lowered) return report_material_problem();
+    const bool reads_current = material_lowering_.read_current_colour;
+    if ((em_token || reads_current) &&
+        !lower_relative(property, node.content.first.value, em_token, reads_current)) {
+        return material_lowering_.outcome == MaterialLoweringOutcome::dropped;
     }
-    for (MaterialDeclaration& declaration : material_lowering_.declarations) add_material(std::move(declaration));
-    for (const RecipeDeclaration& declaration : material_lowering_.recipe_fields) add_recipe_field(declaration);
+    // Each field drawn at a colour position remembers where its colour
+    // came from (EC4); a literal at a text or edge position loses, under
+    // forced high contrast, the relation its author meant (W201).
+    std::uint32_t literal = node.content.first.value;
+    const ColourOrigin origin = value_colour_origin(value_, literal);
+    bool unremappable = false;
+    for (MaterialDeclaration& declaration : material_lowering_.declarations) {
+        const ColourPosition position = material_field_colour_position(declaration.field);
+        if (position != ColourPosition::none) declaration.origin = origin;
+        if (position == ColourPosition::edge) unremappable = true;
+        add_material(std::move(declaration));
+    }
+    for (RecipeDeclaration& declaration : material_lowering_.recipe_fields) {
+        const ColourPosition position = recipe_field_colour_position(declaration.field);
+        if (position != ColourPosition::none) declaration.origin = origin;
+        if (position == ColourPosition::text || position == ColourPosition::edge) unremappable = true;
+        add_recipe_field(declaration);
+    }
+    if (unremappable && origin.source == ColourSource::literal) {
+        report(DiagnosticCode::literal_colour_unremappable, literal, clipped_theme_detail(token_text(literal)));
+    }
     return true;
+}
+
+bool CompilePass::report_material_problem() {
+    MaterialLoweringProblem& problem = material_lowering_.problem;
+    // A keyword the running engine lacks, in a sheet for a newer one, is
+    // dropped with a warning (R2-07).
+    const bool newer = newer_engine_ && problem.code == DiagnosticCode::keyword_unknown;
+    const DiagnosticCode code = newer ? DiagnosticCode::keyword_from_newer_engine : problem.code;
+    report(code, problem.token, std::move(problem.detail));
+    return newer || material_lowering_.outcome == MaterialLoweringOutcome::dropped;
+}
+
+bool CompilePass::lower_relative(MaterialProperty property, std::uint32_t start,
+                                 std::optional<std::uint32_t> em_token, bool current) {
+    em_materials_.assign(material_lowering_.declarations.begin(), material_lowering_.declarations.end());
+    em_recipe_fields_.assign(material_lowering_.recipe_fields.begin(), material_lowering_.recipe_fields.end());
+    if (em_token && !lower_em_pass(property, start)) {
+        if (material_lowering_.outcome == MaterialLoweringOutcome::lowered) {
+            report(DiagnosticCode::value_form_not_admitted, *em_token, "an em length here");
+            material_lowering_.outcome = MaterialLoweringOutcome::refused;
+        }
+        return false;
+    }
+    if (current && !lower_current_colour_pass(property, start)) {
+        if (material_lowering_.outcome == MaterialLoweringOutcome::lowered) {
+            report(DiagnosticCode::value_form_not_admitted, start, "currentcolor here");
+            material_lowering_.outcome = MaterialLoweringOutcome::refused;
+        }
+        return false;
+    }
+    material_lowering_.declarations.swap(em_materials_);
+    material_lowering_.recipe_fields.swap(em_recipe_fields_);
+    return true;
+}
+
+// Each length lowered at an em of 0 is its pixels; lowered again at an em
+// of 1, it differs by its em coefficient, exactly, since a component is in
+// one unit. A length the walk does not list (material_declaration_lengths)
+// that em changes is not admitted.
+bool CompilePass::lower_em_pass(MaterialProperty property, std::uint32_t start) {
+    material_lowering_.em = 1.0;
+    lower_material_value(property, value_, start, input_.images, material_lowering_);
+    material_lowering_.em = 0.0;
+    if (material_lowering_.outcome != MaterialLoweringOutcome::lowered) {
+        static_cast<void>(report_material_problem());
+        return false;
+    }
+    bool admitted = em_materials_.size() == material_lowering_.declarations.size() &&
+                    em_recipe_fields_.size() == material_lowering_.recipe_fields.size();
+    for (std::size_t index = 0U; admitted && index < em_materials_.size(); ++index) {
+        MaterialDeclaration& pixels = em_materials_[index];
+        MaterialDeclaration& at_one = material_lowering_.declarations[index];
+        material_declaration_lengths(pixels, em_pixels_);
+        material_declaration_lengths(at_one, em_at_one_);
+        admitted = em_pixels_.size() == em_at_one_.size();
+        if (!admitted) break;
+        set_material_declaration_lengths(at_one, em_pixels_);
+        admitted = at_one == pixels;
+        if (em_coefficients(pixels.em_lengths)) continue;
+        pixels.em_lengths.clear();
+    }
+    for (std::size_t index = 0U; admitted && index < em_recipe_fields_.size(); ++index) {
+        RecipeDeclaration& pixels = em_recipe_fields_[index];
+        RecipeDeclaration& at_one = material_lowering_.recipe_fields[index];
+        recipe_declaration_lengths(pixels, em_pixels_);
+        recipe_declaration_lengths(at_one, em_at_one_);
+        admitted = em_pixels_.size() == em_at_one_.size();
+        if (!admitted) break;
+        set_recipe_declaration_lengths(at_one, em_pixels_);
+        admitted = at_one == pixels;
+        if (em_coefficients(pixels.em_lengths)) continue;
+        pixels.em_lengths.clear();
+    }
+    return admitted;
+}
+
+// Each colour lowered at the current colour black is its value; lowered
+// again at white, a colour that differs is the current colour, since a
+// written colour does not depend on it. A colour the walk does not list
+// (material_declaration_colours) that changes is not admitted.
+bool CompilePass::lower_current_colour_pass(MaterialProperty property, std::uint32_t start) {
+    material_lowering_.current_colour = Color::rgba(255, 255, 255, 255);
+    lower_material_value(property, value_, start, input_.images, material_lowering_);
+    material_lowering_.current_colour = Color::rgba(0, 0, 0, 255);
+    if (material_lowering_.outcome != MaterialLoweringOutcome::lowered) {
+        static_cast<void>(report_material_problem());
+        return false;
+    }
+    bool admitted = em_materials_.size() == material_lowering_.declarations.size() &&
+                    em_recipe_fields_.size() == material_lowering_.recipe_fields.size();
+    for (std::size_t index = 0U; admitted && index < em_materials_.size(); ++index) {
+        MaterialDeclaration& base = em_materials_[index];
+        MaterialDeclaration& at_white = material_lowering_.declarations[index];
+        material_declaration_colours(base, base_colours_);
+        material_declaration_colours(at_white, other_colours_);
+        admitted = base_colours_.size() == other_colours_.size() &&
+                   base_colours_.size() <= std::numeric_limits<std::uint16_t>::max();
+        if (!admitted) break;
+        set_material_declaration_colours(at_white, base_colours_);
+        at_white.em_lengths = base.em_lengths;
+        admitted = at_white == base;
+        base.current_colours.clear();
+        for (std::size_t position = 0U; position < base_colours_.size(); ++position) {
+            if (base_colours_[position] == other_colours_[position]) continue;
+            base.current_colours.push_back(static_cast<std::uint16_t>(position));
+        }
+    }
+    for (std::size_t index = 0U; admitted && index < em_recipe_fields_.size(); ++index) {
+        RecipeDeclaration& base = em_recipe_fields_[index];
+        RecipeDeclaration& at_white = material_lowering_.recipe_fields[index];
+        base.current_colour = !(base.colour == at_white.colour);
+        at_white.colour = base.colour;
+        at_white.em_lengths = base.em_lengths;
+        at_white.current_colour = base.current_colour;
+        admitted = at_white == base;
+    }
+    return admitted;
+}
+
+bool CompilePass::em_coefficients(std::vector<double>& coefficients) const {
+    coefficients.resize(em_pixels_.size());
+    bool any = false;
+    for (std::size_t index = 0U; index < em_pixels_.size(); ++index) {
+        coefficients[index] = em_at_one_[index] - em_pixels_[index];
+        if (coefficients[index] != 0.0) any = true;
+    }
+    return any;
 }
 
 // `transition` and its longhands (P7a): CSS-wide `initial` resets the
@@ -825,26 +1471,26 @@ bool CompilePass::lower_transition(const SyntaxNode& node) {
         return false;
     }
     if (wide == WideKeyword::initial) {
-        reset_transition_lists(property, transitions_.written);
-        transitions_.written.token = node.content.first.value;
+        reset_transition_lists(property, motion_.written);
+        motion_.written.token = node.content.first.value;
         return true;
     }
     const MotionLoweringOutcome outcome = lower_transition_value(property, value_, node.content.first.value,
-                                                                 transitions_.written, transitions_.problem);
+                                                                 motion_.written, motion_.problem);
     if (outcome == MotionLoweringOutcome::lowered) return true;
-    MotionLoweringProblem& problem = transitions_.problem;
+    MotionLoweringProblem& problem = motion_.problem;
     report(problem.code, problem.token, std::move(problem.detail));
     return outcome == MotionLoweringOutcome::dropped;
 }
 
 bool CompilePass::apply_transitions(const PrimitiveSelection& selection, ThemeRule& lowered) {
-    transitions_.rule_machines.clear();
+    motion_.rule_machines.clear();
     const PrimitiveDescriptor* const primitive =
         selection.primitive == nullptr ? nullptr : &(*selection.primitive).descriptor();
     const MotionLoweringOutcome built =
-        build_declared_transitions(transitions_.written, primitive, transitions_.declared, transitions_.problem);
+        build_declared_transitions(motion_.written, primitive, motion_.declared, motion_.problem);
     if (built != MotionLoweringOutcome::lowered) {
-        MotionLoweringProblem& problem = transitions_.problem;
+        MotionLoweringProblem& problem = motion_.problem;
         report(problem.code, problem.token, std::move(problem.detail));
         return false;
     }
@@ -853,16 +1499,16 @@ bool CompilePass::apply_transitions(const PrimitiveSelection& selection, ThemeRu
     // static value is a machine of its own, whose states the grouping adds.
     for (PropertyTransition& machine : lowered.transitions) {
         MachineOrigin origin{};
-        origin.machine = transitions_.rule_machines.size();
-        for (const DeclaredTransition& declared : transitions_.declared) {
+        origin.machine = motion_.rule_machines.size();
+        for (const DeclaredTransition& declared : motion_.declared) {
             if (declared.property != machine.property) continue;
             machine.curve = declared.curve;
             origin.curved = true;
             origin.token = declared.token;
         }
-        transitions_.rule_machines.push_back(origin);
+        motion_.rule_machines.push_back(origin);
     }
-    for (const DeclaredTransition& declared : transitions_.declared) {
+    for (const DeclaredTransition& declared : motion_.declared) {
         bool held = false;
         for (const PropertyTransition& machine : lowered.transitions) {
             if (machine.property == declared.property) held = true;
@@ -873,19 +1519,347 @@ bool CompilePass::apply_transitions(const PrimitiveSelection& selection, ThemeRu
         machine.curve = declared.curve;
         lowered.transitions.push_back(std::move(machine));
         MachineOrigin origin{};
-        origin.machine = transitions_.rule_machines.size();
+        origin.machine = motion_.rule_machines.size();
         origin.curved = true;
         origin.token = declared.token;
-        transitions_.rule_machines.push_back(origin);
+        motion_.rule_machines.push_back(origin);
     }
     // The engine runs at most maximum_part_transitions machines a part and
     // would drop the rest; only a primitive with two animated parameters
     // can reach it.
     if (lowered.transitions.size() > maximum_part_transitions) {
-        report(DiagnosticCode::too_many_layers, transitions_.written.token,
+        report(DiagnosticCode::too_many_layers, motion_.written.token,
                std::to_string(maximum_part_transitions) + " transitions of one part");
         return false;
     }
+    return true;
+}
+
+// `animation` and its longhands (P7b), as lower_transition does.
+bool CompilePass::lower_animation(const SyntaxNode& node) {
+    // folded_ holds the property's name, which classify() found listed.
+    const AnimationProperty property = *animation_property(folded_);
+    parameter_names_.clear();
+    if (!read_value(node)) return false;
+    const ValueComponent& first = value_.components[0];
+    const WideKeyword wide = wide_keyword();
+    if (wide == WideKeyword::inherit || wide == WideKeyword::outside) {
+        const DiagnosticCode code =
+            wide == WideKeyword::inherit ? DiagnosticCode::value_wrong_kind : DiagnosticCode::value_form_not_admitted;
+        report(code, first.token, clipped_theme_detail(first.text));
+        return false;
+    }
+    if (wide == WideKeyword::initial) {
+        reset_animation_lists(property, motion_.animations_written);
+        motion_.animations_written.token = node.content.first.value;
+        return true;
+    }
+    const MotionLoweringOutcome outcome = lower_animation_value(property, value_, node.content.first.value,
+                                                                motion_.animations_written, motion_.problem);
+    if (outcome == MotionLoweringOutcome::lowered) return true;
+    MotionLoweringProblem& problem = motion_.problem;
+    report(problem.code, problem.token, std::move(problem.detail));
+    return outcome == MotionLoweringOutcome::dropped;
+}
+
+bool CompilePass::apply_animations(const PrimitiveSelection& selection, ThemeRule& lowered) {
+    if (!animations_written(motion_.animations_written)) return true;
+    const PrimitiveDescriptor* const primitive =
+        selection.primitive == nullptr ? nullptr : &(*selection.primitive).descriptor();
+    MotionLoweringProblem& problem = motion_.problem;
+    const MotionLoweringOutcome built = build_declared_animations(motion_.animations_written, motion_.keyframes,
+                                                                  primitive, motion_.animations, problem);
+    if (built != MotionLoweringOutcome::lowered) {
+        report(problem.code, problem.token, std::move(problem.detail));
+        return false;
+    }
+    // A move takes its property's machine in the rule, or a machine of its
+    // own: one state, entered from `from` through the stops to `to`, whose
+    // absent end is the rule's own value or the property's rest.
+    for (const DeclaredMove& move : motion_.animations.moves) {
+        std::optional<std::size_t> held{};
+        for (std::size_t machine = 0U; machine < lowered.transitions.size(); ++machine) {
+            if (lowered.transitions[machine].property == move.property) held = machine;
+        }
+        if (held && motion_.rule_machines[*held].curved) {
+            // Strict for now (owner, 2026-10-27): the machine's entry would
+            // replay on every return to the rule's own state.
+            report(DiagnosticCode::value_form_not_admitted, move.token,
+                   "an animation and a transition of " + move.property + " in one rule");
+            return false;
+        }
+        PresentationState state{};
+        state.enter_from = move.from;
+        state.stops = move.stops;
+        if (move.to) {
+            state.target = *move.to;
+        } else if (held) {
+            state.target = lowered.transitions[*held].states[0].target;
+            state.target_em = lowered.transitions[*held].states[0].target_em;
+        } else if (move.parameter) {
+            const std::optional<double> own = own_number(lowered, move.property);
+            if (!own) {
+                report(DiagnosticCode::value_form_not_admitted, move.token,
+                       move.property + ": keyframes without `to` need the rule's own value");
+                return false;
+            }
+            state.target = *own;
+            state.target_em = own_number_em(lowered, move.property);
+        } else {
+            state.target = engine_rest_value(move.property);
+        }
+        if (!held) {
+            PropertyTransition made{};
+            made.property = move.property;
+            lowered.transitions.push_back(std::move(made));
+            MachineOrigin origin{};
+            origin.machine = motion_.rule_machines.size();
+            motion_.rule_machines.push_back(origin);
+            held = lowered.transitions.size() - 1U;
+        }
+        PropertyTransition& machine = lowered.transitions[*held];
+        machine.curve = move.curve;
+        machine.states.clear();
+        machine.states.push_back(std::move(state));
+        motion_.rule_machines[*held].animated = true;
+        motion_.rule_machines[*held].token = move.token;
+    }
+    for (const DeclaredLoop& loop : motion_.animations.loops) {
+        if (!apply_loop(loop, lowered)) return false;
+    }
+    lowered.ambient = motion_.animations.ambient;
+    if (lowered.transitions.size() > maximum_part_transitions) {
+        report(DiagnosticCode::too_many_layers, motion_.animations_written.token,
+               std::to_string(maximum_part_transitions) + " transitions of one part");
+        return false;
+    }
+    return true;
+}
+
+// A loop becomes the parameter's declaration: an expression of
+// time_in_state through its keyframes, an absent end taking the rule's own
+// value. It replaces that value, as a running animation overrides a
+// declaration in CSS.
+bool CompilePass::apply_loop(const DeclaredLoop& loop, ThemeRule& lowered) {
+    std::vector<MotionStop>& frames = motion_.frames;
+    frames = loop.frames;
+    const bool starts = !frames.empty() && frames.front().offset == 0.0;
+    const bool ends = !frames.empty() && frames.back().offset == 1.0;
+    if (!starts || !ends) {
+        const std::optional<double> own = own_number(lowered, loop.parameter);
+        if (!own) {
+            report(DiagnosticCode::value_form_not_admitted, loop.token,
+                   loop.parameter + ": a loop's keyframes without `from` or `to` need the rule's own value");
+            return false;
+        }
+        if (own_number_em(lowered, loop.parameter) != 0.0) {
+            // A loop is an expression of time, which reads no part's em.
+            report(DiagnosticCode::value_form_not_admitted, loop.token, "an em length in a looped animation");
+            return false;
+        }
+        MotionStop edge{};
+        edge.value = *own;
+        if (!starts) frames.insert(frames.begin(), edge);
+        edge.offset = 1.0;
+        if (!ends) frames.push_back(edge);
+    }
+    const AmbientEffect& ambient = *motion_.animations.ambient;
+    const MotionLoweringOutcome built =
+        loop_program(frames, loop.timing, ambient.period, loop.token, motion_.program, motion_.problem);
+    if (built != MotionLoweringOutcome::lowered) {
+        MotionLoweringProblem& problem = motion_.problem;
+        report(problem.code, problem.token, std::move(problem.detail));
+        return false;
+    }
+    for (std::size_t index = 0U; index < lowered.declarations.size(); ++index) {
+        if (lowered.declarations[index].property != loop.parameter) continue;
+        lowered.declarations.erase(lowered.declarations.begin() + static_cast<std::ptrdiff_t>(index));
+        break;
+    }
+    lowered.declarations.push_back(RuleDeclaration::expression_value(loop.parameter, motion_.program, frames[0].value));
+    return true;
+}
+
+bool CompilePass::collect_keyframes(std::size_t index) {
+    const SyntaxNode& rule = tree_.nodes[index];
+    const std::uint32_t keyword = rule.tokens.first.value;
+    rule_ = clipped_theme_detail(range_text(TokenRange{rule.tokens.first, rule.content.end}));
+    property_.clear();
+    // The name: one name or string, not a CSS-wide keyword or `none`.
+    std::optional<std::uint32_t> named{};
+    for (std::uint32_t token = rule.content.first.value; token < rule.content.end.value; ++token) {
+        const TokenKind kind = tokens_.tokens[token].kind;
+        if (kind == TokenKind::whitespace || kind == TokenKind::comment) continue;
+        if (named || (kind != TokenKind::ident && kind != TokenKind::string)) {
+            report(DiagnosticCode::value_syntax, token, "one keyframes name");
+            return false;
+        }
+        named = token;
+    }
+    if (!named) {
+        report(DiagnosticCode::value_syntax, keyword, "a keyframes name");
+        return false;
+    }
+    KeyframesDefinition definition{};
+    definition.token = *named;
+    const std::string_view text = token_text(*named);
+    if (tokens_.tokens[*named].kind == TokenKind::string) {
+        definition.name = std::string(text.substr(1U, text.size() >= 2U ? text.size() - 2U : 0U));
+    } else {
+        fold_ascii(text, folded_);
+        const bool reserved = folded_ == "none" || folded_ == "initial" || folded_ == "inherit" ||
+                              folded_ == "unset" || folded_ == "default" || folded_ == "revert" ||
+                              folded_ == "revert-layer";
+        if (reserved) {
+            report(DiagnosticCode::value_syntax, *named, clipped_theme_detail(text));
+            return false;
+        }
+        definition.name = std::string(text);
+    }
+    if (definition.name.empty()) {
+        report(DiagnosticCode::value_syntax, *named, "a keyframes name");
+        return false;
+    }
+    std::vector<double> offsets{};
+    const std::size_t end = rule.subtree_end.value;
+    for (std::size_t block = index + 1U; block < end; block = tree_.nodes[block].subtree_end.value) {
+        const SyntaxNode& keyframe = tree_.nodes[block];
+        if (!keyframe_offsets(keyframe, offsets)) return false;
+        const std::size_t block_end = keyframe.subtree_end.value;
+        for (std::size_t child = block + 1U; child < block_end; child = tree_.nodes[child].subtree_end.value) {
+            if (!keyframe_declaration(tree_.nodes[child], offsets, definition)) return false;
+        }
+    }
+    property_.clear();
+    // A later definition of a name replaces an earlier one, as in CSS.
+    for (std::size_t kept = 0U; kept < motion_.keyframes.size(); ++kept) {
+        if (motion_.keyframes[kept].name != definition.name) continue;
+        motion_.keyframes.erase(motion_.keyframes.begin() + static_cast<std::ptrdiff_t>(kept));
+        break;
+    }
+    motion_.keyframes.push_back(std::move(definition));
+    return true;
+}
+
+// `from`, `to` and percentages from 0% to 100%, separated by commas.
+bool CompilePass::keyframe_offsets(const SyntaxNode& block, std::vector<double>& offsets) {
+    offsets.clear();
+    bool expecting = true;
+    std::uint32_t last = block.content.first.value;
+    for (std::uint32_t token = block.content.first.value; token < block.content.end.value; ++token) {
+        const Token& read = tokens_.tokens[token];
+        if (read.kind == TokenKind::whitespace || read.kind == TokenKind::comment) continue;
+        last = token;
+        if (!expecting) {
+            if (read.kind != TokenKind::comma) {
+                report(DiagnosticCode::selector_syntax, token, clipped_theme_detail(token_text(token)));
+                return false;
+            }
+            expecting = true;
+            continue;
+        }
+        double offset = 0.0;
+        if (read.kind == TokenKind::ident) {
+            fold_ascii(token_text(token), folded_);
+            if (folded_ != "from" && folded_ != "to") {
+                report(DiagnosticCode::selector_syntax, token, clipped_theme_detail(token_text(token)));
+                return false;
+            }
+            offset = folded_ == "to" ? 1.0 : 0.0;
+        } else if (read.kind == TokenKind::percentage) {
+            const double percent = tokens_.numbers[read.number].value;
+            if (!(percent >= 0.0 && percent <= 100.0)) {
+                report(DiagnosticCode::value_out_of_range, token, clipped_theme_detail(token_text(token)));
+                return false;
+            }
+            offset = percent / 100.0;
+        } else {
+            report(DiagnosticCode::selector_syntax, token, clipped_theme_detail(token_text(token)));
+            return false;
+        }
+        offsets.push_back(offset);
+        expecting = false;
+    }
+    if (expecting) {
+        report(DiagnosticCode::selector_syntax, last, "a keyframe offset");
+        return false;
+    }
+    return true;
+}
+
+// A keyframe's declaration: opacity, scale and translate as their static
+// values are read, or a parameter's number. Other properties do not move.
+bool CompilePass::keyframe_declaration(const SyntaxNode& node, std::span<const double> offsets,
+                                       KeyframesDefinition& definition) {
+    const std::uint32_t property = node.tokens.first.value;
+    property_ = clipped_theme_detail(token_text(property));
+    fold_ascii(token_text(property), folded_);
+    const PropertyClass kind = classify(folded_);
+    const std::uint32_t at = node.content.first.value < node.content.end.value ? node.content.first.value : property;
+    if (kind == PropertyClass::opacity || kind == PropertyClass::scale || kind == PropertyClass::translate) {
+        declarations_.clear();
+        const bool read = kind == PropertyClass::translate ? lower_translate(node) : lower_opacity_or_scale(node, kind);
+        if (!read) return false;
+        // A dropped value (an unknown function, reported) adds nothing.
+        if (declarations_.empty()) return true;
+        const LoweredDeclaration& lowered = declarations_.back();
+        for (std::size_t machine = 0U; machine < lowered.transition_count; ++machine) {
+            const PropertyTransition& still = lowered.transitions[machine];
+            if (still.states[0].target_em != 0.0) {
+                // A keyframe's value is a number of the move or the loop,
+                // which reads no part's em.
+                report(DiagnosticCode::value_form_not_admitted, at, "an em length in @keyframes");
+                return false;
+            }
+            for (const double offset : offsets) {
+                add_keyframe(definition, still.property, false, offset, still.states[0].target, at);
+            }
+        }
+        declarations_.clear();
+        return true;
+    }
+    if (kind == PropertyClass::not_admitted) {
+        report(DiagnosticCode::property_not_admitted, property, property_);
+        return true;
+    }
+    if (kind == PropertyClass::later) {
+        report(DiagnosticCode::not_yet_built, property, property_);
+        return false;
+    }
+    if (kind != PropertyClass::other) {
+        report(DiagnosticCode::value_form_not_admitted, property,
+               property_ + ": keyframes move opacity, scale, translate and primitive parameters");
+        return false;
+    }
+    // A parameter, checked against the primitive of the rule that plays
+    // the keyframes.
+    const std::string registered = registered_name_from_kebab(folded_);
+    if (registered.empty()) {
+        report(DiagnosticCode::unknown_property, property, property_);
+        return true;
+    }
+    parameter_names_.clear();
+    if (!read_value(node)) return false;
+    const ValueComponent& first = value_.components[0];
+    if (value_.components.size() != 1U) {
+        report(DiagnosticCode::value_syntax, value_.components[1].token, "one value");
+        return false;
+    }
+    if (first.kind == ValueComponentKind::expression) {
+        report(DiagnosticCode::value_form_not_admitted, first.token, "an expression that reads inputs");
+        return false;
+    }
+    if (first.kind == ValueComponentKind::number && first.unit == ValueUnit::em) {
+        report(DiagnosticCode::value_form_not_admitted, first.token, "an em length in @keyframes");
+        return false;
+    }
+    const bool number = first.kind == ValueComponentKind::number &&
+                        (first.unit == ValueUnit::none || first.unit == ValueUnit::px);
+    if (!number) {
+        report(DiagnosticCode::value_wrong_kind, first.token, "a number or a length");
+        return false;
+    }
+    for (const double offset : offsets) add_keyframe(definition, registered, true, offset, first.number, first.token);
     return true;
 }
 
@@ -920,6 +1894,7 @@ void CompilePass::add_material(MaterialDeclaration declaration) {
 bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t at) {
     ThemeRule lowered{};
     lowered.label = rule_;
+    lowered.media = media_;
     if (selection.selects) {
         const std::string_view name =
             selection.primitive == nullptr ? built_in_primitive_name : (*selection.primitive).descriptor().name;
@@ -930,7 +1905,9 @@ bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t a
         lowered.declarations.push_back(RuleDeclaration::primitive(material_primitive_name));
     }
     for (LoweredDeclaration& declaration : declarations_) {
-        if (declaration.kind == LoweredKind::parameter || declaration.kind == LoweredKind::blend) {
+        const bool declared = declaration.kind == LoweredKind::parameter || declaration.kind == LoweredKind::blend ||
+                              declaration.kind == LoweredKind::font;
+        if (declared) {
             lowered.declarations.push_back(std::move(declaration.declaration));
             continue;
         }
@@ -939,10 +1916,11 @@ bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t a
         }
     }
     if (!apply_transitions(selection, lowered)) return false;
+    if (!apply_animations(selection, lowered)) return false;
     lowered.materials = materials_;
     lowered.recipe_fields = recipe_fields_;
     if (lowered.declarations.empty() && lowered.transitions.empty() && lowered.materials.empty() &&
-        lowered.recipe_fields.empty()) {
+        lowered.recipe_fields.empty() && !lowered.ambient) {
         return true;
     }
     std::size_t bytes = lowered_record_bytes + lowered.label.size();
@@ -963,10 +1941,10 @@ bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t a
         // A given specificity only where CSS's differs from the engine's
         // own count of the selector (EC2: an `:is()` argument's).
         if (!(selector.specificity == rule_specificity(selector.selector))) rule.specificity = selector.specificity;
-        for (const MachineOrigin& machine : transitions_.rule_machines) {
+        for (const MachineOrigin& machine : motion_.rule_machines) {
             MachineOrigin origin = machine;
             origin.rule = sheet_.rules.size() - 1U;
-            transitions_.origins.push_back(origin);
+            motion_.origins.push_back(origin);
         }
     }
     return true;
@@ -978,6 +1956,8 @@ bool CompilePass::read_value(const SyntaxNode& node) {
     context.parameters = parameter_names_;
     context.published_values = input_.published_values.size();
     context.resources = input_.resources;
+    context.palette = reading_palette_ ? nullptr : &palette_.in_use;
+    context.bare_side = bare_side_;
     const SubstitutionInput substitution{.source = input_.source,
                                          .tokens = tokens_,
                                          .table = custom_properties_,
@@ -993,6 +1973,7 @@ bool CompilePass::read_value(const SyntaxNode& node) {
                                      .context = context,
                                      .cursor = cursor_};
         read = reader_.read(value_input, value_, diagnostics_) == ValueOutcome::read;
+        rule_roles_read_ = rule_roles_read_ | value_.roles_read;
     }
     diagnostics_.name_context(first_record, rule_, property_);
     return read;
@@ -1091,7 +2072,8 @@ CompileOutcome ThemeCompiler::compile(const ThemeCompileInput& input, ThemeRuleS
     sheet.requires_engine = current_engine_version;
     CompilePass pass(input, sheet, diagnostics, tokens_, lines_, tree_, custom_properties_, selectors_, substitution_,
                      reader_, lowered_selectors_, substituted_, value_, parameter_names_, declarations_, materials_,
-                     material_lowering_, material_fields_, recipe_fields_, transitions_, folded_);
+                     material_lowering_, material_fields_, recipe_fields_, motion_, media_queries_, palette_,
+                     folded_);
     const CompileOutcome outcome = pass.run();
     if (outcome == CompileOutcome::refused) {
         sheet.rules.clear();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../../core/resources/fonts/codepoint_coverage.hpp"
 #include "../../../core/text/shaping/shaped_text_geometry.hpp"
 #include "gui_forms/typography.hpp"
 #include "gui_forms/types.hpp"
@@ -10,6 +11,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -46,6 +48,14 @@ struct FontFaceSource final {
     std::shared_ptr<const void> owner{};
     std::uint32_t face_index{};
 };
+
+// The encoded font a lazily registered face opens from; `owner` keeps `bytes` alive. Empty
+// bytes mean the face could not be loaded.
+struct LazyFaceBytes final {
+    std::span<const std::byte> bytes{};
+    std::shared_ptr<const void> owner{};
+};
+using LazyFaceLoader = std::function<LazyFaceBytes()>;
 
 struct ShapeStorageLimits final {
     std::size_t input_bytes{16'384};
@@ -97,6 +107,17 @@ public:
         std::optional<FontRole> role, std::uint16_t weight, bool italic,
         std::span<const std::byte> encoded, std::shared_ptr<const void> owner,
         std::uint32_t face_index = 0U);
+    // A fallback face that is loaded and opened only when a cluster first needs it: when no
+    // face before it covers the cluster and `coverage` does. `coverage` must be exactly the
+    // scalars the face's Unicode charmap maps to a glyph, as the bundled coverage tables are,
+    // so selection is the same as with the face opened at registration; it must outlive the
+    // engine. `load` runs on the shaping thread, at most once unless it throws; a face whose
+    // bytes are empty or do not open covers nothing from then on.
+    [[nodiscard]] std::optional<FontFaceId> register_lazy_fallback_typeface(
+        std::uint16_t weight, bool italic, std::span<const gui_forms::detail::CodepointRange> coverage,
+        LazyFaceLoader load);
+    // Faces opened so far: eager faces and lazy faces that have been needed.
+    [[nodiscard]] std::size_t opened_face_count() const noexcept;
     // Native setup/allocation failures throw; a call-owned partial result never
     // becomes a successful return. Callers retain old state until return succeeds.
     [[nodiscard]] ShapedText shape(std::string_view utf8, FontSpec font);

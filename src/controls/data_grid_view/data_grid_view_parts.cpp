@@ -288,12 +288,47 @@ DataGridView::CellParts DataGridView::cell_parts(DataGridViewRowPosition row, st
         const Rect content{inside.x + padding, inside.y,
                            std::max(0.0, inside.width - padding * 2.0 - reserved), inside.height};
         record.cell_content = visible_part(content, clip);
+        if (kind == DataGridViewColumnKind::link) {
+            const std::optional<CellLink> link = cell_link(row, column, content);
+            if (link) {
+                record.cell_link = visible_part((*link).text, clip);
+                record.cell_link_underline = visible_part((*link).underline, clip);
+            }
+        }
     }
     const Rect vertical_rule{cell.x + cell.width - 1.0, cell.y, 1.0, cell.height};
     const Rect horizontal_rule{cell.x, cell.y + cell.height - 1.0, cell.width, 1.0};
     record.cell_vertical_rule = visible_part(vertical_rule, clip);
     record.cell_horizontal_rule = visible_part(horizontal_rule, clip);
     return record;
+}
+
+std::optional<DataGridView::CellLink> DataGridView::cell_link(DataGridViewRowPosition row, std::size_t column,
+                                                              Rect content) const {
+    const DataGridViewColumn& definition = columns_[column];
+    if (definition.kind != DataGridViewColumnKind::link || content.empty()) return std::nullopt;
+    const std::string text = cell_text(row, column);
+    if (text.empty()) return std::nullopt;
+    // The link is as wide as its text, measured with the font it is drawn
+    // in, and no wider than the content area, which cuts it as it cuts a
+    // text cell's text.
+    const FontSpec font = effective_font(font_);
+    const ResolvedTextLayout measured = resolve_text_layout_utf8(text, font);
+    const double width = std::min(content.width, measured.logical_size.width);
+    double x = content.x;
+    if (definition.alignment == DataGridViewCellAlignment::center) {
+        x = content.x + (content.width - width) * 0.5;
+    } else if (definition.alignment == DataGridViewCellAlignment::end) {
+        x = content.x + content.width - width;
+    }
+    // The baseline is where the content role sets a line of text: its line
+    // box centred across the content area. The underline lies 1.5 units
+    // below it, as LinkLabel's does.
+    const double line_height = std::max(measured.logical_size.height, font.size * 1.2);
+    const double ascent = std::max(font.size, line_height * 0.82);
+    const double baseline = content.y + (content.height - line_height) * 0.5 + ascent;
+    const CellLink result{{x, content.y, width, content.height}, {x, baseline + 1.5, width, 1.0}};
+    return result;
 }
 
 std::optional<DataGridView::CellImage> DataGridView::cell_image(DataGridViewRowPosition row, std::size_t column,
@@ -364,6 +399,8 @@ namespace {
 // Application-defined column states, as ObjectView declares them.
 constexpr CustomStateIndex sorted_ascending_state{0U};
 constexpr CustomStateIndex sorted_descending_state{1U};
+// The cell system's own state: a link cell whose link is visited.
+constexpr CustomStateIndex visited_state{0U};
 
 } // namespace
 
@@ -390,6 +427,9 @@ AnatomyStateSet DataGridView::cell_states(DataGridViewRowPosition row, std::size
     const bool pressed = pressed_content_ && (*pressed_content_).column == column &&
                          (*pressed_content_).row_id == row_id_text(row);
     if (pressed) states.insert(AnatomyState::pressed);
+    if (kind == DataGridViewColumnKind::link && is_link_visited(row_id_text(row), column)) {
+        states.insert(visited_state);
+    }
     if (current && edit_kind_ == EditKind::choice) states.insert(AnatomyState::open);
     const Window* const host = attached_window();
     const bool cue = host != nullptr && (*host).focus_cue_visible();
@@ -520,7 +560,28 @@ void DataGridView::paint_cell(Painter& painter, DataGridViewRowPosition row, std
     part.bounds = parts.cell_selection.bounds;
     paint_part(painter, *this, part);
     part.family = ControlVisualRole::editor;
-    if (parts.cell_content.present && !text_edit) {
+    if (parts.cell_link.present) {
+        // A link cell draws its text as a link (owner decision W-Q5): the
+        // visited_link family once visited, else link, over the selection
+        // plate. The text starts at the link's own start, which the
+        // column's alignment placed. The underline is the glyph role's
+        // underline mark (owner decision, 2026-10-28).
+        const std::string text = cell_text(row, column);
+        part.family = states.contains(visited_state) ? ControlVisualRole::visited_link : ControlVisualRole::link;
+        part.role = PartRole::content;
+        part.bounds = parts.cell_link.bounds;
+        part.text = text;
+        paint_part(painter, *this, part);
+        part.text = {};
+        if (parts.cell_link_underline.present) {
+            part.role = PartRole::glyph;
+            part.mark = PartMark::underline;
+            part.bounds = parts.cell_link_underline.bounds;
+            paint_part(painter, *this, part);
+            part.mark = PartMark::none;
+        }
+        part.family = ControlVisualRole::editor;
+    } else if (parts.cell_content.present && !text_edit) {
         const std::string text = cell_text(row, column);
         part.role = PartRole::content;
         part.bounds = parts.cell_content.bounds;
@@ -740,7 +801,7 @@ constexpr std::array<StateField<DataGridView::RowStates>, 3> row_state_fields{{
     {.state = AnatomyState::read_only, .member = &DataGridView::RowStates::read_only},
 }};
 
-constexpr std::array<PartField<DataGridView::CellParts>, 13> cell_part_fields{{
+constexpr std::array<PartField<DataGridView::CellParts>, 15> cell_part_fields{{
     {.declaration = {.name = "cell", .role = PartRole::region, .composed_from = {}},
      .member = &DataGridView::CellParts::cell},
     {.declaration = {.name = "cell_selection", .role = PartRole::selection, .composed_from = {}},
@@ -749,6 +810,10 @@ constexpr std::array<PartField<DataGridView::CellParts>, 13> cell_part_fields{{
      .member = &DataGridView::CellParts::cell_content},
     {.declaration = {.name = "cell_image", .role = PartRole::image, .composed_from = {}},
      .member = &DataGridView::CellParts::cell_image},
+    {.declaration = {.name = "cell_link", .role = PartRole::content, .composed_from = {}},
+     .member = &DataGridView::CellParts::cell_link},
+    {.declaration = {.name = "cell_link_underline", .role = PartRole::glyph, .composed_from = {}},
+     .member = &DataGridView::CellParts::cell_link_underline},
     {.declaration = {.name = "cell_check_well", .role = PartRole::well, .composed_from = "check_box"},
      .member = &DataGridView::CellParts::cell_check_well},
     {.declaration = {.name = "cell_check_indicator", .role = PartRole::indicator, .composed_from = {}},
@@ -799,6 +864,12 @@ constexpr std::array<StateField<DataGridView::ColumnStates>, 3> column_state_fie
     {.state = AnatomyState::captured, .member = &DataGridView::ColumnStates::captured},
 }};
 
+// "visited" has no counterpart in the design language's state set, so a
+// link cell declares it as the grid's own, as LinkLabel does.
+constexpr std::array<CustomStateDeclaration, 1> cell_custom_states{{
+    {.name = "visited"},
+}};
+
 constexpr std::array<CustomStateDeclaration, 2> column_custom_states{{
     {.name = "sorted_ascending"},
     {.name = "sorted_descending"},
@@ -808,7 +879,7 @@ constexpr std::array<PartDeclaration, 11> grid_parts_declared = part_declaration
 constexpr std::array<AnatomyState, 6> grid_states_declared = state_declarations(grid_state_fields);
 constexpr std::array<PartDeclaration, 4> row_parts_declared = part_declarations(row_part_fields);
 constexpr std::array<AnatomyState, 3> row_states_declared = state_declarations(row_state_fields);
-constexpr std::array<PartDeclaration, 13> cell_parts_declared = part_declarations(cell_part_fields);
+constexpr std::array<PartDeclaration, 15> cell_parts_declared = part_declarations(cell_part_fields);
 constexpr std::array<AnatomyState, 8> cell_states_declared = state_declarations(cell_state_fields);
 constexpr std::array<PartDeclaration, 5> column_parts_declared = part_declarations(column_part_fields);
 constexpr std::array<AnatomyState, 3> column_states_declared = state_declarations(column_state_fields);
@@ -819,7 +890,8 @@ constexpr ItemSystemIndex column_system{2U};
 
 constexpr std::array<ItemSystemDeclaration, 3> grid_item_systems{{
     {.name = "row", .parts = row_parts_declared, .states = row_states_declared, .custom_states = {}},
-    {.name = "cell", .parts = cell_parts_declared, .states = cell_states_declared, .custom_states = {}},
+    {.name = "cell", .parts = cell_parts_declared, .states = cell_states_declared,
+     .custom_states = cell_custom_states},
     {.name = "column", .parts = column_parts_declared, .states = column_states_declared,
      .custom_states = column_custom_states},
 }};
@@ -969,7 +1041,9 @@ std::vector<DataGridView::Cell> DataGridView::realized_cells() const {
         record.address = {DataGridViewRowPosition{first_row_ + position / columns}, first_column + position % columns};
         record.stable_id = cell_stable_id(record.address.row, record.address.column);
         read_item_parts(anatomy().item_systems[cell_system.value], cell_part_fields, published.parts(), record.parts);
-        read_states(cell_state_fields, cell_states(record.address.row, record.address.column), record.states);
+        const AnatomyStateSet states = cell_states(record.address.row, record.address.column);
+        read_states(cell_state_fields, states, record.states);
+        record.states.visited = states.contains(visited_state);
         records.push_back(record);
     }
     return records;

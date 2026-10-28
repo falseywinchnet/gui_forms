@@ -439,6 +439,12 @@ void paint_mark(Painter& painter, const PartPaint& part, const ControlVisualReci
     case PartMark::dock_shape:
         paint_dock_shape(painter, box, part.dock_region, ink);
         return;
+    case PartMark::underline: {
+        // A one-unit rule whose lower edge is the box's bottom edge.
+        const double y = box.y + box.height - 0.5;
+        painter.draw_line({box.x, y}, {box.x + box.width, y}, ink, 1.0);
+        return;
+    }
     }
     // A mark outside the enumeration draws nothing.
     return;
@@ -537,6 +543,7 @@ std::string_view part_mark_name(PartMark mark) noexcept {
     case PartMark::customize: return "customize";
     case PartMark::pin: return "pin";
     case PartMark::dock_shape: return "dock_shape";
+    case PartMark::underline: return "underline";
     case PartMark::count: return {};
     }
     return {};

@@ -12,6 +12,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -1090,6 +1091,216 @@ void image_cells() {
             "set_value on an image cell is refused");
 }
 
+// Records drawn text with its colour, to tell a link's family by its colour.
+class TextColourPainter final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect, Color) override {}
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point from, Point to, Color color, double width) override {
+        lines.push_back({from, to, color, width});
+    }
+    void draw_text_utf8(Point, std::string_view text, FontSpec, Color color) override {
+        drawn.push_back({std::string(text), color});
+    }
+    void draw_image(ImageId, Rect, double) override {}
+
+    struct Drawn final {
+        std::string text{};
+        Color color{};
+    };
+    std::vector<Drawn> drawn;
+    struct Line final {
+        Point from{};
+        Point to{};
+        Color color{};
+        double width{};
+    };
+    std::vector<Line> lines;
+
+    // Whether a one-unit horizontal rule of `color` fills `bounds`, a
+    // one-unit high part.
+    [[nodiscard]] bool has_rule(Rect bounds, Color color) const {
+        const double y = bounds.y + bounds.height - 0.5;
+        for (const Line& line : lines) {
+            if (line.color == color && near(line.width, 1.0) && near(line.from.y, y) && near(line.to.y, y) &&
+                near(line.from.x, bounds.x) && near(line.to.x, bounds.x + bounds.width)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    [[nodiscard]] std::optional<Color> colour_of(std::string_view text) const {
+        for (const Drawn& entry : drawn) {
+            if (entry.text == text) return entry.color;
+        }
+        return std::nullopt;
+    }
+};
+
+struct LinkVisitedOnText final {
+    DataGridView* grid{};
+    void operator()() const { static_cast<void>((*grid).link_visited(row_at(0U), 0U)); }
+};
+struct LinkVisitedPastEnd final {
+    DataGridView* grid{};
+    void operator()() const { (*grid).set_link_visited(row_at(9U), 1U, true); }
+};
+struct AddBadLinkText final {
+    DataGridView* grid{};
+    void operator()() const {
+        (*grid).add_column({.name = "bad", .kind = DataGridViewColumnKind::link, .link_text = std::string("\xff")});
+    }
+};
+
+void link_cells() {
+    std::shared_ptr<DataGridView> grid = make_control<DataGridView>(StableId("grid.links"));
+    (*grid).set_columns({
+        {.name = "name", .header_text = "Name", .width = 80.0},
+        {.name = "site", .header_text = "Site", .kind = DataGridViewColumnKind::link, .width = 150.0,
+         .link_text = "Open"},
+        {.name = "plain", .header_text = "Plain", .kind = DataGridViewColumnKind::link, .width = 100.0,
+         .alignment = DataGridViewCellAlignment::end, .track_visited_state = false},
+    });
+    Window window(grid, {420.0, 160.0});
+    (*grid).add_row({.stable_id = {"alpha"},
+                     .cells = {BindingValue{std::string("Alpha")}, BindingValue{std::string("Go")},
+                               BindingValue{std::string("Docs")}}});
+    (*grid).add_row({.stable_id = {"bravo"}, .cells = {BindingValue{std::string("Bravo")}}});
+    window.perform_layout();
+    require(throws<std::invalid_argument>(AddBadLinkText{grid.get()}), "link text must be valid UTF-8");
+    require(throws<std::invalid_argument>(LinkVisitedOnText{grid.get()}),
+            "the visited state belongs to link columns only");
+    require(throws<std::out_of_range>(LinkVisitedPastEnd{grid.get()}), "a link cell past the rows is refused");
+    require((*grid).cell_text(row_at(0U), 1U) == "Go" && (*grid).cell_text(row_at(1U), 1U) == "Open" &&
+                (*grid).cell_text(row_at(1U), 2U).empty(),
+            "a link cell shows its value, or its column's link text when empty");
+
+    // The link is its text's extent in the content area, placed by the
+    // column's alignment; an empty cell without link text has no link.
+    const std::vector<DataGridView::Cell> cells = (*grid).realized_cells();
+    const DataGridView::Cell* const go_cell = find_cell(cells, 0U, 1U);
+    const DataGridView::Cell* const docs_cell = find_cell(cells, 0U, 2U);
+    const DataGridView::Cell* const open_cell = find_cell(cells, 1U, 1U);
+    const DataGridView::Cell* const empty_cell = find_cell(cells, 1U, 2U);
+    require(go_cell != nullptr && docs_cell != nullptr && open_cell != nullptr && empty_cell != nullptr,
+            "the link cells are realized");
+    const DataGridView::Cell& go = *go_cell;
+    const Rect go_content = go.parts.cell_content.bounds;
+    const Rect go_link = go.parts.cell_link.bounds;
+    require(go.parts.cell_link.present && near(go_link.x, go_content.x) && go_link.width > 0.0 &&
+                go_link.width < go_content.width * 0.5 && near(go_link.height, go_content.height),
+            "a start-aligned link starts at the content area and is as wide as its text");
+    const DataGridView::Cell& docs = *docs_cell;
+    const Rect docs_content = docs.parts.cell_content.bounds;
+    require(docs.parts.cell_link.present &&
+                near(docs.parts.cell_link.bounds.x + docs.parts.cell_link.bounds.width,
+                     docs_content.x + docs_content.width),
+            "an end-aligned link ends at the content area's end");
+    require((*open_cell).parts.cell_link.present && !(*empty_cell).parts.cell_link.present,
+            "an empty link cell shows its column's link text, or no link without one");
+    require(!go.states.visited && !(*grid).link_visited(row_at(0U), 1U), "a link starts unvisited");
+
+    // Clicking the link follows it: cell_content_click, and the link is
+    // visited where the column tracks it. Clicking beside the link only
+    // makes the cell current.
+    std::vector<DataGridViewCellEvent> clicked;
+    SubscriptionToken click_token = (*grid).cell_content_click().subscribe(RecordCell{&clicked});
+    require(window.request_focus(grid), "the grid takes focus");
+    const Rect beside{go_link.x + go_link.width + 20.0, go_link.y, 10.0, go_link.height};
+    PointerEvent over_link{PointerAction::move, PointerButton::none, centre(*grid, go_link)};
+    static_cast<void>(window.dispatch_pointer(over_link));
+    require((*grid).cursor() == CursorKind::hand, "the pointer over a link is the hand");
+    PointerEvent over_beside{PointerAction::move, PointerButton::none, centre(*grid, beside)};
+    static_cast<void>(window.dispatch_pointer(over_beside));
+    require((*grid).cursor() == CursorKind::arrow, "the pointer beside a link is the arrow");
+    click(window, centre(*grid, beside));
+    require(clicked.empty() && (*grid).current_cell() == cell_at(0U, 1U) && !(*grid).link_visited(row_at(0U), 1U),
+            "a click beside the link makes the cell current and follows nothing");
+    click(window, centre(*grid, go_link));
+    require(clicked.size() == 1U && clicked[0].row_id == id("alpha") && clicked[0].column == 1U &&
+                (*grid).link_visited(row_at(0U), 1U),
+            "clicking the link raises cell_content_click and visits the link");
+    const std::vector<DataGridView::Cell> visited_cells = (*grid).realized_cells();
+    const DataGridView::Cell* const visited_cell = find_cell(visited_cells, 0U, 1U);
+    require(visited_cell != nullptr && (*visited_cell).states.visited,
+            "a visited link cell publishes the visited state");
+
+    // Space follows the current cell's link; a column that does not track
+    // visits leaves its link unvisited.
+    require((*grid).set_current_cell(cell_at(0U, 2U)), "the plain link becomes current");
+    static_cast<void>(key(window, PhysicalKey::space));
+    require(clicked.size() == 2U && clicked[1].column == 2U && !(*grid).link_visited(row_at(0U), 2U),
+            "space follows a link; an untracked link stays unvisited");
+    static_cast<void>(key(window, PhysicalKey::f2));
+    require(!(*grid).is_current_cell_in_edit_mode(), "a link cell does not edit");
+
+    // The link is drawn in the link family's colour, visited or not.
+    TextColourPainter painter;
+    (*grid).on_paint(painter, (*grid).client_rectangle());
+    const BasicControlStyle& style = (*grid).effective_theme().basic_style();
+    const std::optional<Color> go_colour = painter.colour_of("Go");
+    const std::optional<Color> open_colour = painter.colour_of("Open");
+    require(go_colour && *go_colour == style.visited_link && open_colour && *open_colour == style.link,
+            "a visited link is drawn in the visited link colour, another in the link colour");
+
+    // The underline is a one-unit rule just below the text's baseline, as
+    // wide as the link, in the link's colour.
+    const Rect go_underline = go.parts.cell_link_underline.bounds;
+    const Rect open_underline = (*open_cell).parts.cell_link_underline.bounds;
+    require(go.parts.cell_link_underline.present && near(go_underline.x, go_link.x) &&
+                near(go_underline.width, go_link.width) && near(go_underline.height, 1.0) &&
+                go_underline.y > go_link.y + go_link.height * 0.5 &&
+                go_underline.y + go_underline.height <= go_link.y + go_link.height,
+            "a link's underline lies below its baseline, inside the link, as wide as it");
+    require(!(*empty_cell).parts.cell_link_underline.present, "a cell with no link has no underline");
+    require(painter.has_rule(go_underline, style.visited_link) && painter.has_rule(open_underline, style.link),
+            "the underline is drawn by the underline mark in the link's colour");
+
+    // Semantics: a link cell is named by its text, valued visited or
+    // unvisited, and pressed to follow its link.
+    const std::vector<SemanticNode> nodes = (*grid).semantic_virtual_children();
+    const SemanticNode* alpha = nullptr;
+    const SemanticNode* bravo = nullptr;
+    for (const SemanticNode& node : nodes) {
+        if (node.stable_id == "alpha") alpha = &node;
+        if (node.stable_id == "bravo") bravo = &node;
+    }
+    require(alpha != nullptr && bravo != nullptr, "both rows are published");
+    const SemanticNode& visited_node = (*alpha).children[2];
+    const SemanticNode& open_node = (*bravo).children[2];
+    require(visited_node.role == SemanticRole::cell && visited_node.name == "Go" &&
+                visited_node.value == "visited" && has_action(visited_node, SemanticAction::press) &&
+                !has_action(visited_node, SemanticAction::set_value) && open_node.name == "Open" &&
+                open_node.value == "unvisited",
+            "a link cell is named by its text, valued by its visited state, and offers press");
+    require((*grid).on_semantic_child_action("bravo.site", SemanticAction::press, {}) && clicked.size() == 3U &&
+                (*grid).link_visited(row_at(1U), 1U),
+            "pressing a link cell follows its link");
+    require(!(*grid).on_semantic_child_action("bravo.site", SemanticAction::set_value, "x"),
+            "set_value on a link cell is refused");
+
+    // The visited state is kept by row, and ends with its row and with
+    // replaced columns.
+    (*grid).set_link_visited(row_at(1U), 1U, false);
+    require(!(*grid).link_visited(row_at(1U), 1U), "set_link_visited clears a visit");
+    (*grid).set_link_visited(row_at(1U), 1U, true);
+    require((*grid).sort(0U, DataGridViewSortDirection::descending) && (*grid).link_visited(row_at(0U), 1U) &&
+                (*grid).link_visited(row_at(1U), 1U) && (*grid).row_position(id("bravo")) == row_at(0U),
+            "visits stay on their rows when rows move");
+    (*grid).remove_row_at(row_at(0U));
+    (*grid).add_row({.stable_id = {"bravo"}});
+    require(!(*grid).link_visited(row_at(1U), 1U) && (*grid).link_visited(row_at(0U), 1U),
+            "a removed row's visits end with it");
+    const std::span<const DataGridViewColumn> kept = (*grid).columns();
+    (*grid).set_columns(std::vector<DataGridViewColumn>(kept.begin(), kept.end()));
+    require(!(*grid).link_visited(row_at(0U), 1U), "replacing the columns ends every visit");
+}
+
 void semantics() {
     std::shared_ptr<DataGridView> grid = make_grid("grid.semantics");
     (*grid).set_accessible_name("Stations");
@@ -1174,7 +1385,8 @@ int main() {
     scrolling();
     semantics();
     image_cells();
+    link_cells();
     std::cout << "DataGridView: columns, rows, parts, selection, keys, editing, cell kinds, virtual rows, "
-                 "row identity, sorting, resizing, binding, scrolling, semantics and image cells passed\n";
+                 "row identity, sorting, resizing, binding, scrolling, semantics, image and link cells passed\n";
     return 0;
 }

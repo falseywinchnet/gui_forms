@@ -632,6 +632,88 @@ void test_menu_mnemonics_strip_markers_and_popup_activation() {
     require(operation_check_77, "UseMnemonic false must leave the ampersand literal and revoke activation");
 }
 
+// A plain letter in an open menu is that item's mnemonic, without Alt, as
+// in a native Windows menu: one match activates, several take the focus in
+// turn, and no match leaves the menu open.
+void test_menu_plain_letter_mnemonics() {
+    std::shared_ptr<gui_forms::Panel> root = make_control<Panel>(StableId("letter.root"));
+    std::shared_ptr<gui_forms::Button> owner = make_control<Button>(StableId("letter.owner"), "Owner");
+    (*owner).set_requested_bounds({20.0, 20.0, 90.0, 28.0});
+    (*root).add_child(owner);
+    Window window(root, {360.0, 320.0});
+    window.perform_layout();
+
+    std::shared_ptr<gui_forms::Command> cut = std::make_shared<Command>("cut", "Cut");
+    std::shared_ptr<gui_forms::Command> copy = std::make_shared<Command>("copy", "Copy");
+    std::shared_ptr<gui_forms::Command> paste = std::make_shared<Command>("paste", "Paste");
+    std::shared_ptr<gui_forms::Command> erase = std::make_shared<Command>("delete", "Delete");
+    std::shared_ptr<gui_forms::Command> zoom = std::make_shared<Command>("zoom", "Zoom");
+    (*erase).set_enabled(false);
+    std::string trace;
+    SubscriptionToken cut_invoked = (*cut).invoked().subscribe(RecordCommandId(trace));
+    SubscriptionToken copy_invoked = (*copy).invoked().subscribe(RecordCommandId(trace));
+    SubscriptionToken paste_invoked = (*paste).invoked().subscribe(RecordCommandId(trace));
+    SubscriptionToken zoom_invoked = (*zoom).invoked().subscribe(RecordCommandId(trace));
+    ContextMenu menu("letter.menu");
+    menu.set_items({
+        {"cut", MenuItemKind::command, cut, "Cu&t"},
+        {"copy", MenuItemKind::command, copy, "&Copy"},
+        {"close", MenuItemKind::command, cut, "&Close"},
+        {"paste", MenuItemKind::command, paste, "&Paste"},
+        {"delete", MenuItemKind::command, erase, "&Delete"},
+        {"more", MenuItemKind::submenu, {}, "&More", {
+            {"zoom", MenuItemKind::command, zoom, "&Zoom"},
+        }},
+    });
+
+    TextInputEvent typed_p{"p"};
+    menu.show(owner, {20.0, 50.0});
+    require(window.dispatch_text(typed_p) && trace == "paste" && !menu.is_open(),
+            "one matching plain letter must activate its item and close the menu");
+
+    trace.clear();
+    menu.show(owner, {20.0, 50.0});
+    TextInputEvent typed_c{"c"};
+    require(window.dispatch_text(typed_c), "a shared plain letter must be handled");
+    Control::Ptr focused = window.focused_control();
+    require(focused && (*focused).semantic_descriptor().name == "Copy" &&
+                menu.is_open() && trace.empty(),
+            "a shared plain letter must move the focus to the next match without activating");
+    TextInputEvent typed_capital_c{"C"};
+    require(window.dispatch_text(typed_capital_c), "a capital letter must match as well");
+    focused = window.focused_control();
+    require(focused && (*focused).semantic_descriptor().name == "Close" && trace.empty(),
+            "a shared plain letter must move to the following match, ignoring case");
+    require(window.dispatch_text(typed_c), "a shared plain letter must wrap round");
+    focused = window.focused_control();
+    require(focused && (*focused).semantic_descriptor().name == "Copy" && trace.empty(),
+            "a shared plain letter must wrap round to the first match");
+
+    TextInputEvent typed_x{"x"};
+    TextInputEvent typed_d{"d"};
+    TextInputEvent typed_two{"pc"};
+    TextInputEvent composing{"p"};
+    composing.composing = true;
+    require(!window.dispatch_text(typed_x) && !window.dispatch_text(typed_d) &&
+                !window.dispatch_text(typed_two) && !window.dispatch_text(composing) &&
+                menu.is_open() && trace.empty(),
+            "an unmatched, disabled, multi-character or composing input must leave the menu open");
+
+    TextInputEvent typed_m{"m"};
+    require(window.dispatch_text(typed_m), "a submenu's plain letter must be handled");
+    focused = window.focused_control();
+    require(focused && (*focused).semantic_descriptor().name == "Zoom" && menu.is_open(),
+            "a submenu's plain letter must open it and focus its first item");
+    TextInputEvent typed_z{"z"};
+    require(window.dispatch_text(typed_z) && trace == "zoom" && !menu.is_open(),
+            "a plain letter in a submenu must activate the submenu's item");
+
+    trace.clear();
+    menu.show(owner, {20.0, 50.0}, MenuOpenMode::pointer);
+    require(window.dispatch_text(typed_p) && trace == "paste" && !menu.is_open(),
+            "a plain letter must act while the menu panel itself has the focus");
+}
+
 class MenuFontMetrics final : public TextMetricsProvider {
 public:
     [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
@@ -711,6 +793,7 @@ int main() {
         test_context_menu_scroll_and_validation_bounds();
         test_menu_strip_retained_switching_commands_and_semantics();
         test_menu_mnemonics_strip_markers_and_popup_activation();
+        test_menu_plain_letter_mnemonics();
         test_menu_font_controls_geometry_paint_and_hit_testing();
         std::cout << "gui_forms_menu_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;

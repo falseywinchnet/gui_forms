@@ -51,6 +51,13 @@ void require(bool condition, std::string_view message) {
     }
 }
 
+// A colour parameter a sheet wrote as a literal (EC4).
+RuleDeclaration literal_colour(std::string_view name, Color colour) {
+    RuleDeclaration declaration = RuleDeclaration::colour_value(name, colour);
+    declaration.origin.source = ColourSource::literal;
+    return declaration;
+}
+
 // -- the vocabulary and the compilation -------------------------------------------
 
 constexpr std::array<PartDeclaration, 2> button_parts{{
@@ -188,8 +195,8 @@ ThemeRuleSheet reference_sheet() {
     };
     pad.declarations.push_back(RuleDeclaration::expression_value("amplitude", amplitude, 1.0));
     pad.declarations.push_back(RuleDeclaration::number_value("exponent", 3.0));
-    pad.declarations.push_back(RuleDeclaration::colour_value("light_colour", Color::rgba(255, 240, 200, 255)));
-    pad.declarations.push_back(RuleDeclaration::colour_value("shade_colour", Color::rgba(70, 130, 180, 255)));
+    pad.declarations.push_back(literal_colour("light_colour", Color::rgba(255, 240, 200, 255)));
+    pad.declarations.push_back(literal_colour("shade_colour", Color::rgba(70, 130, 180, 255)));
     pad.declarations.push_back(RuleDeclaration::choice_value(blend_property, "multiply"));
     pad.transitions.push_back(still(opacity_property, 0.9));
     sheet.rules.push_back(pad);
@@ -419,7 +426,7 @@ void test_properties() {
             "a choice's initial is its default; keywords match in any case");
     const ThemeRule named = only_rule("#a { primitive: bulge; light-colour: transparent }");
     require(named.declarations.size() == 2U &&
-                named.declarations[1] == RuleDeclaration::colour_value("light_colour", Color::rgba(0, 0, 0, 0)),
+                named.declarations[1] == literal_colour("light_colour", Color::rgba(0, 0, 0, 0)),
             "a named colour");
     const ThemeRule state = only_rule("#a { primitive: bulge; amplitude: calc(state(hot) * 0.5 + param(exponent) / 10) }");
     require(state.declarations.size() == 2U && state.declarations[1].kind == RuleValueKind::expression &&
@@ -463,16 +470,15 @@ struct Refusal final {
 };
 
 void test_refusals() {
-    const std::array<Refusal, 36> refusals{{
+    const std::array<Refusal, 35> refusals{{
         {"#a { opacity: 0.5 !important }", DiagnosticCode::not_yet_built, "opacity"},
         {"@import \"x\"; #a { opacity: 1 }", DiagnosticCode::not_yet_built, "@import"},
-        {"#a { opacity: 1 } @media (min-width: 1px) { #a { opacity: 1 } }", DiagnosticCode::not_yet_built, "@media"},
-        {"@keyframes k { from { opacity: 0 } }", DiagnosticCode::not_yet_built, "@keyframes"},
+        {"#a { opacity: 1 } @media print { #a { opacity: 1 } }", DiagnosticCode::value_form_not_admitted, "print"},
+        {"@keyframes k { from { color: red } }", DiagnosticCode::value_form_not_admitted, "color"},
         {"#a { backdrop-filter: blur(2px) }", DiagnosticCode::not_yet_built, "backdrop-filter"},
         {"#a { border-image-slice: 1 }", DiagnosticCode::not_yet_built, "border"},
-        {"#a { animation: fade 1s }", DiagnosticCode::not_yet_built, "animation"},
-        {"#a { color: inherit }", DiagnosticCode::not_yet_built, "inherit"},
-        {"#a { font: ui }", DiagnosticCode::not_yet_built, "font"},
+        {"#a { animation: fade 1s }", DiagnosticCode::keyframes_undefined, "fade"},
+        {"#a { font: huge }", DiagnosticCode::keyword_unknown, "huge"},
         {"#a { opacity: inherit }", DiagnosticCode::value_wrong_kind, "inherit"},
         {"#a { opacity: unset }", DiagnosticCode::value_form_not_admitted, "unset"},
         {"#a { scale: revert-layer }", DiagnosticCode::value_form_not_admitted, "revert-layer"},
@@ -664,8 +670,9 @@ struct CodeLabel final {
 };
 
 void test_codes() {
-    const std::array<CodeLabel, 7> codes{{
+    const std::array<CodeLabel, 8> codes{{
         {DiagnosticCode::lowered_sheet_too_large, "E513"},
+        {DiagnosticCode::too_many_keyframes, "E514"},
         {DiagnosticCode::unknown_primitive, "W102"},
         {DiagnosticCode::unknown_function, "W103"},
         {DiagnosticCode::primitive_over_budget, "W108"},

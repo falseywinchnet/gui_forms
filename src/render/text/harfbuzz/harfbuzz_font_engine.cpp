@@ -162,6 +162,50 @@ void decode_scalars(std::string_view utf8, Utf8Range range,
     return ignorable;
 }
 
+// A face's nominal glyph map, read from its open native face.
+struct NativeGlyphMap final {
+    FT_Face face{};
+    [[nodiscard]] bool operator()(char32_t scalar) const {
+        const bool mapped = FT_Get_Char_Index(face, static_cast<FT_ULong>(scalar)) != 0U;
+        return mapped;
+    }
+};
+
+// A lazy face's nominal glyph map, read from its compiled coverage table.
+struct TableGlyphMap final {
+    std::span<const gui_forms::detail::CodepointRange> ranges{};
+    [[nodiscard]] bool operator()(char32_t scalar) const noexcept {
+        const bool mapped = gui_forms::detail::coverage_contains(ranges, scalar);
+        return mapped;
+    }
+};
+
+// Whether a face whose nominal glyph map is `mapped` covers the cluster `scalars`.
+template <typename GlyphMap>
+[[nodiscard]] bool cluster_covered(const GlyphMap& mapped, std::span<const char32_t> scalars) {
+    bool nominal = true;
+    for (const char32_t scalar : scalars) {
+        if (ignorable_for_coverage(scalar)) continue;
+        if (!mapped(scalar)) {
+            nominal = false;
+            break;
+        }
+    }
+    if (nominal) { return true; }
+    // HarfBuzz can canonically compose a two-scalar cluster even when the
+    // face has no nominal glyph for its combining mark. Keep original text
+    // and offsets; this is only a bounded same-face coverage check.
+    if (scalars.size() != 2) { return false; }
+    const hb_codepoint_t first = static_cast<hb_codepoint_t>(scalars[0]);
+    const hb_codepoint_t second = static_cast<hb_codepoint_t>(scalars[1]);
+    hb_codepoint_t composed{};
+    hb_unicode_funcs_t* unicode = hb_unicode_funcs_get_default();
+    const hb_bool_t combined = hb_unicode_compose(unicode, first, second, &composed);
+    if (!combined) { return false; }
+    const bool covered = mapped(static_cast<char32_t>(composed));
+    return covered;
+}
+
 } // namespace
 
 class HarfBuzzFontEngine::Impl final {
@@ -190,6 +234,11 @@ public:
         // its scale is the one set at shaping_size.
         HarfBuzzFontOwner shaping_font{nullptr, hb_font_destroy};
         FT_F26Dot6 shaping_size{};
+        // A lazy face: face stays null until coverage first covers a needed cluster, when
+        // loader runs and is then released. A lazy face with neither face nor loader could
+        // not be opened and covers nothing.
+        std::span<const gui_forms::detail::CodepointRange> coverage{};
+        LazyFaceLoader loader{};
 
         Face(FontFaceId id_value, std::optional<FontRole> role_value,
              std::uint16_t weight_value, bool italic_value,
@@ -210,7 +259,8 @@ public:
               italic(other.italic), fallback(other.fallback),
               family(std::move(other.family)), encoded(std::move(other.encoded)),
               face(std::exchange(other.face, nullptr)), shaping_font(std::move(other.shaping_font)),
-              shaping_size(other.shaping_size) {}
+              shaping_size(other.shaping_size), coverage(other.coverage),
+              loader(std::move(other.loader)) {}
         Face& operator=(Face&&) = delete;
     };
 
@@ -275,30 +325,60 @@ public:
         return false;
     }
 
-    [[nodiscard]] static bool covers(Face& face,
-                                     std::span<const char32_t> scalars) {
-        bool nominal = true;
-        for (const char32_t scalar : scalars) {
-            if (ignorable_for_coverage(scalar)) continue;
-            if (FT_Get_Char_Index(face.face, static_cast<FT_ULong>(scalar)) == 0U) {
-                nominal = false;
-                break;
-            }
+    // Whether `face` covers the cluster. A lazy face answers from its table and is opened
+    // the first time the table covers a cluster; one that cannot be opened covers nothing.
+    [[nodiscard]] bool covers(Face& face, std::span<const char32_t> scalars) {
+        if (face.face == nullptr) {
+            if (!face.loader) return false;
+            if (!cluster_covered(TableGlyphMap{face.coverage}, scalars)) return false;
+            if (!open_lazy(face)) return false;
         }
-        if (nominal) { return true; }
-        // HarfBuzz can canonically compose a two-scalar cluster even when the
-        // face has no nominal glyph for its combining mark. Keep original text
-        // and offsets; this is only a bounded same-face coverage check.
-        if (scalars.size() != 2) { return false; }
-        const hb_codepoint_t first = static_cast<hb_codepoint_t>(scalars[0]);
-        const hb_codepoint_t second = static_cast<hb_codepoint_t>(scalars[1]);
-        hb_codepoint_t composed{};
-        hb_unicode_funcs_t* unicode = hb_unicode_funcs_get_default();
-        const hb_bool_t combined = hb_unicode_compose(unicode, first, second, &composed);
-        if (!combined) { return false; }
-        const FT_ULong scalar = static_cast<FT_ULong>(composed);
-        const bool covered = FT_Get_Char_Index(face.face, scalar) != 0U;
+        const bool covered = cluster_covered(NativeGlyphMap{face.face}, scalars);
         return covered;
+    }
+
+    // Opens `bytes` as a face the engine can shape with, or returns null.
+    [[nodiscard]] FreeTypeFaceOwner open_native(std::span<const std::byte> bytes,
+                                                std::uint32_t face_index) const {
+        FT_Face native{};
+        const FT_Error opened = FT_New_Memory_Face(
+            library.value, reinterpret_cast<const FT_Byte*>(bytes.data()),
+            static_cast<FT_Long>(bytes.size()), static_cast<FT_Long>(face_index),
+            &native);
+        FreeTypeFaceOwner owner{native};
+        if (opened != 0 || native == nullptr || (*native).num_glyphs <= 0 ||
+            (*native).num_glyphs > maximum_glyphs ||
+            ((*native).face_flags & FT_FACE_FLAG_SCALABLE) == 0) {
+            owner.reset();
+            return owner;
+        }
+        const FT_Error charmap_selected = FT_Select_Charmap(native, FT_ENCODING_UNICODE);
+        if (charmap_selected != 0) owner.reset();
+        return owner;
+    }
+
+    // Loads and opens a lazy face. The loader is released once it has answered, so a face
+    // that cannot be opened is not loaded again; a throwing loader is kept for a retry.
+    [[nodiscard]] bool open_lazy(Face& face) {
+        LazyFaceBytes loaded = face.loader();
+        FreeTypeFaceOwner native{};
+        if (loaded.owner && !loaded.bytes.empty() && loaded.bytes.size() <= maximum_face_bytes) {
+            native = open_native(loaded.bytes, 0U);
+        }
+        if (!native) {
+            face.loader = nullptr;
+            return false;
+        }
+        std::string family{};
+        if (bounded_face_limit == 0) {
+            family = (*native).family_name != nullptr ? (*native).family_name : "unknown bundled face";
+        }
+        // Nothing below throws.
+        face.loader = nullptr;
+        face.family = std::move(family);
+        face.encoded = std::move(loaded.owner);
+        face.face = native.release();
+        return true;
     }
 
     [[nodiscard]] std::optional<FontFaceId> register_face(
@@ -310,19 +390,9 @@ public:
             faces.size() >= maximum_faces || face_index > 255U) {
             return std::nullopt;
         }
-        FT_Face native{};
-        const FT_Error opened = FT_New_Memory_Face(
-            library.value, reinterpret_cast<const FT_Byte*>(bytes.data()),
-            static_cast<FT_Long>(bytes.size()), static_cast<FT_Long>(face_index),
-            &native);
-        FreeTypeFaceOwner pending_face{native};
-        if (opened != 0 || native == nullptr || (*native).num_glyphs <= 0 ||
-            (*native).num_glyphs > maximum_glyphs ||
-            ((*native).face_flags & FT_FACE_FLAG_SCALABLE) == 0) {
-            return std::nullopt;
-        }
-        const FT_Error charmap_selected = FT_Select_Charmap(native, FT_ENCODING_UNICODE);
-        if (charmap_selected != 0) return std::nullopt;
+        FreeTypeFaceOwner pending_face = open_native(bytes, face_index);
+        if (!pending_face) return std::nullopt;
+        FT_Face native = pending_face.get();
         // Retain native cleanup until the owning Face has been constructed.
         // Family-name allocation and vector growth can both throw.
         const FontFaceId id{next_face_id++};
@@ -333,6 +403,19 @@ public:
         faces.emplace_back(id, role, weight, italic, !role.has_value(),
                            std::move(family), std::move(owned), native);
         static_cast<void>(pending_face.release());
+        return id;
+    }
+
+    [[nodiscard]] std::optional<FontFaceId> register_lazy_face(
+        std::uint16_t weight, bool italic, std::span<const gui_forms::detail::CodepointRange> coverage,
+        LazyFaceLoader load) {
+        if (bounded_face_limit != 0 && faces.size() == bounded_face_limit) return std::nullopt;
+        if (!load || coverage.empty() || faces.size() >= maximum_faces) return std::nullopt;
+        const FontFaceId id{next_face_id++};
+        Face& face = faces.emplace_back(id, std::nullopt, weight, italic, true, std::string{},
+                                        std::shared_ptr<const void>{}, nullptr);
+        face.coverage = coverage;
+        face.loader = std::move(load);
         return id;
     }
 
@@ -608,7 +691,7 @@ public:
             const std::span<const char32_t> cluster(scalar_scratch.data(), scalar_count);
             Impl::Face* selected = nullptr;
             for (std::size_t face_index = 0; face_index < candidate_count; ++face_index) {
-                if (Impl::covers(*candidates[face_index], cluster)) { selected = candidates[face_index]; break; }
+                if (covers(*candidates[face_index], cluster)) { selected = candidates[face_index]; break; }
             }
             if (selected == nullptr) { selected = candidates[0]; ++output.missing_clusters; }
             const std::size_t selected_index = static_cast<std::size_t>(selected - faces.data());
@@ -720,6 +803,22 @@ std::optional<FontFaceId> HarfBuzzFontEngine::register_owned_typeface(
     return result;
 }
 
+std::optional<FontFaceId> HarfBuzzFontEngine::register_lazy_fallback_typeface(
+    std::uint16_t weight, bool italic, std::span<const gui_forms::detail::CodepointRange> coverage,
+    LazyFaceLoader load) {
+    const std::optional<FontFaceId> id =
+        (*impl_).register_lazy_face(weight, italic, coverage, std::move(load));
+    return id;
+}
+
+std::size_t HarfBuzzFontEngine::opened_face_count() const noexcept {
+    std::size_t count = 0U;
+    for (const Impl::Face& face : (*impl_).faces) {
+        if (face.face != nullptr) ++count;
+    }
+    return count;
+}
+
 std::optional<FontFaceId> HarfBuzzFontEngine::register_typeface(
     FontRole role, std::uint16_t weight, bool italic,
     std::span<const std::byte> encoded, std::uint32_t face_index) {
@@ -790,7 +889,7 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
         decode_scalars(utf8, range, scalars);
         Impl::Face* selected = nullptr;
         for (Impl::Face* candidate : candidates) {
-            if (Impl::covers(*candidate, scalars)) {
+            if ((*impl_).covers(*candidate, scalars)) {
                 selected = candidate;
                 break;
             }

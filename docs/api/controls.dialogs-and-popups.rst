@@ -64,6 +64,14 @@ Related types
      - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`FontDialogResult <gui_forms::FontDialogResult>`
      - How a FontDialog closed, and the font it holds then.
+   * - :cpp:class:`MessageBoxClosed <gui_forms::MessageBoxClosed>`
+     - A message box that closed: the button the user chose, as Windows Forms' DialogResult (none for a Yes/No box the host closed without a choice).
+   * - :cpp:class:`MessageBoxRefused <gui_forms::MessageBoxRefused>`
+     - A message box that was not shown: the host's refusal, never HostServiceError::none.
+   * - :cpp:class:`MessageBoxRequest <gui_forms::MessageBoxRequest>`
+     - The arguments of Windows Forms' MessageBox.Show: the message, the caption in the title bar, the buttons, the icon and the default button.
+   * - :cpp:class:`MessageBoxResult <gui_forms::MessageBoxResult>`
+     - What show_message_box returns: either the box closed, with the chosen button, or it was not shown, with the reason.
    * - :cpp:class:`RibbonToolTipContent <gui_forms::RibbonToolTipContent>`
      - What an enhanced tooltip shows (owner decision RB-13, E3-2): a title, a description, the shortcut, an image, the reason a disabled command is unavailable, and a help topic F1 opens while the tooltip shows.
    * - :cpp:class:`RibbonToolTipEvent <gui_forms::RibbonToolTipEvent>`
@@ -206,6 +214,86 @@ Related types
       Default: ``{DialogResult::none}``.
 
    .. cpp:member:: FontSpec font
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MessageBoxClosed final
+
+   ``#include <gui_forms/components/message_box/message_box.hpp>``
+
+   A message box that closed: the button the user chose, as Windows Forms' DialogResult (none for a Yes/No box the host closed without a choice).
+
+   .. cpp:member:: DialogResult result
+
+      Default: ``{DialogResult::none}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MessageBoxRefused final
+
+   ``#include <gui_forms/components/message_box/message_box.hpp>``
+
+   A message box that was not shown: the host's refusal, never HostServiceError::none.
+
+   .. cpp:member:: HostServiceError error
+
+      Default: ``{HostServiceError::unsupported}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MessageBoxRequest final
+
+   ``#include <gui_forms/components/message_box/message_box.hpp>``
+
+   The arguments of Windows Forms' MessageBox.Show: the message, the caption in the title bar, the buttons, the icon and the default button.
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: std::string caption
+
+   .. cpp:member:: HostMessageButtons buttons
+
+      Default: ``{HostMessageButtons::ok}``.
+
+   .. cpp:member:: HostMessageIcon icon
+
+      Default: ``{HostMessageIcon::none}``.
+
+   .. cpp:member:: MessageBoxDefaultButton default_button
+
+      Default: ``{MessageBoxDefaultButton::button1}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: MessageBoxResult final
+
+   ``#include <gui_forms/components/message_box/message_box.hpp>``
+
+   What show_message_box returns: either the box closed, with the chosen button, or it was not shown, with the reason. Built only through :cpp:func:`closed <gui_forms::MessageBoxResult::closed>` and :cpp:func:`refused <gui_forms::MessageBoxResult::refused>`.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool shown() const noexcept
+
+      Whether the box was shown and closed.
+
+   .. cpp:function:: DialogResult result() const noexcept
+
+      The chosen button; none when the box was not shown.
+
+   .. cpp:function:: HostServiceError error() const noexcept
+
+      Why the box was not shown; none when it was shown.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static MessageBoxResult closed(DialogResult result) noexcept
+
+   .. cpp:function:: static MessageBoxResult refused(HostServiceError error)
+
+      Throws std::invalid_argument for HostServiceError::none, which is not a refusal.
 
 .. cpp:namespace:: gui_forms
 
@@ -526,6 +614,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: MessageBoxDefaultButton
+
+   ``#include <gui_forms/components/message_box/message_box.hpp>``
+
+   .. cpp:enumerator:: button1
+
+   .. cpp:enumerator:: button2
+
+   .. cpp:enumerator:: button3
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PopupDismissReason
 
    ``#include <gui_forms/controls/panel/anchored_popup_layer/anchored_popup_layer.hpp>``
@@ -620,6 +720,14 @@ Functions, constants and aliases
 .. cpp:function:: std::string file_dialog_name_part(std::string_view path)
 
    The last component of a host path: the file's name without its directory, by the path rules of the platform the program runs on (Windows accepts ``\`` and ``/``, the others ``/`` only). Empty for a path that ends in a separator.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/components/message_box/message_box.hpp>``
+
+.. cpp:function:: MessageBoxResult show_message_box(Window& owner, const MessageBoxRequest& request)
+
+   Shows a message box over ``owner``, modally, and returns when it closes (Windows Forms' MessageBox.Show). The host draws the box (owner decision W-Q3): MessageBoxW on Windows, NSAlert on macOS, and a dialog of GUI.Forms controls on X11, through the window's HostServices (capability ``dialogs``). TaskDialog stays the themed, richer dialog drawn in the window. The result is the chosen button. A box the user closes without choosing (Escape or the title bar's close button) returns cancel, or ok for a box whose only button is OK, as in Windows Forms; a Yes/No box the host closes without a choice returns none. Without a host or without ``dialogs`` the result is refused, with HostServiceError::unsupported. Throws std::invalid_argument for text or a caption that is not valid UTF-8, contains NUL or is longer than HostServices::maximum_dialog_text_bytes, and for an unknown button set, icon or default button; throws std::logic_error off the window's UI thread.
 
 .. cpp:namespace:: gui_forms
 

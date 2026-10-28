@@ -15,6 +15,20 @@ class Painter;
 class Window;
 struct PartPaint;
 
+// What `window` is to a rule's media condition (EC3): its presentation
+// settings' colour scheme, high contrast and reduced motion, and its scale.
+[[nodiscard]] MediaFacts window_media_facts(const Window& window) noexcept;
+
+// The text role a part of `control` whose cascade gave it `font` has (T3
+// P8c): the font's role, or, where it is `inherit` (owner decision D7),
+// the parent control's own: the font its rules give the control itself,
+// followed up the tree while that inherits too, and ui at the root.
+[[nodiscard]] TextRole resolved_text_role(const Control& control, FontDeclaration font);
+
+// The em of text in `role` on `control` (D5): the role's size in the
+// control's theme's typography tokens times its window's text scale.
+[[nodiscard]] double text_role_em(const Control& control, TextRole role) noexcept;
+
 // The theme engine's entry point (T2 plan, ThemeEngine). paint_part hands it
 // every part; controls never call it directly.
 //

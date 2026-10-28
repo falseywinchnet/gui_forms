@@ -238,11 +238,19 @@ activates. Typing the first letters of an item's text selects the next
 matching item; virtual views do not search yet.
 
 With `label_edit` on, F2 begins editing the focused item's label in a
-`TextBox` over its text. Enter, a press elsewhere in the view, or focus
-leaving the editor commits the edit; Escape cancels it. Replacing or
-sorting the items, a new virtual source or `refresh_virtual_items` cancels
-an edit once the change is made. Scrolling keeps the edit: the editor
-follows its item, at no size while the item is out of view.
+`TextBox` over its text. So does a slow second click, as in Windows: a
+single primary press without modifiers on the text of the item that was
+already focused and selected begins its edit once the window's double-click
+interval (`PresentationSettings::double_click_milliseconds`) passes. A second
+press within the interval is a double click and activates the item instead;
+a key, the wheel, another press, a change to the items, focus leaving the
+view or turning `label_edit` off in the wait drops the slow click.
+
+Enter, a press elsewhere in the view, or focus leaving the editor commits
+the edit; Escape cancels it. Replacing or sorting the items, a new virtual
+source or `refresh_virtual_items` cancels an edit once the change is made.
+Scrolling keeps the edit: the editor follows its item, at no size while the
+item is out of view.
 
 In the details view the control publishes the accessibility role `table`,
 with the item count and the column count; in the other views it publishes
@@ -256,9 +264,8 @@ The select action selects an item; press activates it, or toggles a
 check-box item.
 
 Not supported yet: groups, the tile view, item tooltips, hot-tracking
-activation, column reordering, type-ahead in virtual mode, wrapping
-large-icon labels over two lines, and beginning a label edit with a slow
-second click on the focused item.
+activation, column reordering, type-ahead in virtual mode, and wrapping
+large-icon labels over two lines.
 
 Examples
 --------

@@ -5,13 +5,16 @@
 // the custom properties, then per style rule lower its selectors and its
 // declarations) and lowers each declaration onto today's engine: the
 // `primitive` a rule selects, that primitive's parameters by name, the
-// presentational properties as one-state machines, and `mix-blend-mode`.
+// presentational properties as one-state machines, `mix-blend-mode`, the
+// material and recipe properties, transitions and animations. An `@media`
+// block's rules are lowered once for each query, carrying its condition.
 // The parser and the records between the stages stay internal (E3); the
 // compiler is what the package loader (P9) and the tools call.
 
 #include "../custom_properties/theme_custom_properties.hpp"
 #include "../diagnostics/theme_diagnostics.hpp"
 #include "../material/theme_material_lowering.hpp"
+#include "../media/theme_media_query.hpp"
 #include "../motion/theme_motion_lowering.hpp"
 #include "../selector/theme_selector.hpp"
 #include "../source_text/theme_source_text.hpp"
@@ -66,7 +69,7 @@ enum class CompileOutcome : std::uint8_t {
 // One kind of lowered declaration, for the cascade's last-wins rule within
 // a rule: a later declaration of the same kind (and parameter) replaces an
 // earlier one.
-enum class LoweredKind : std::uint8_t { parameter, opacity, scale, translate, blend };
+enum class LoweredKind : std::uint8_t { parameter, opacity, scale, translate, blend, font };
 
 // A rule's declaration once lowered, kept until the rule's last
 // declaration is read: the engine records it becomes, at most two
@@ -81,12 +84,20 @@ struct LoweredDeclaration final {
     std::size_t transition_count{};
 };
 
-// The transitions' storage (P7a): a rule's written lists and declared
-// curves, and the origin of every machine of the sheet, for the grouping
-// once every rule is lowered.
-struct TransitionStorage final {
+// The motion storage (P7): a rule's written transition and animation
+// lists and what they declare, the sheet's keyframes, and the origin of
+// every machine of the sheet, for the grouping once every rule is lowered.
+struct MotionStorage final {
     WrittenTransitions written{};
     std::vector<DeclaredTransition> declared{};
+    WrittenAnimations animations_written{};
+    DeclaredAnimations animations{};
+    // The sheet's `@keyframes`, a name defined once (a later definition
+    // replaces an earlier one).
+    std::vector<KeyframesDefinition> keyframes{};
+    // A loop's expression, being built.
+    std::vector<ExpressionInstruction> program{};
+    std::vector<MotionStop> frames{};
     std::vector<MachineOrigin> origins{};
     // The machines of the rule being emitted, `rule` unset.
     std::vector<MachineOrigin> rule_machines{};
@@ -95,6 +106,31 @@ struct TransitionStorage final {
 
 // Compiles theme sheets. It keeps every stage's storage from sheet to
 // sheet; one instance serves one compilation at a time.
+// One `:root` declaration of a palette role (P8b): the role's colours where
+// `media` holds.
+struct PaletteVariant final {
+    MediaCondition media{};
+    RoleColours colours{};
+};
+
+// The theme's palette (P8b, R2-03) and what lowering its readers takes,
+// reused from one compilation to the next.
+struct PaletteStorage final {
+    // Each role's declarations in sheet order, from its last unconditional
+    // one, which an unconditional declaration replaces: the first, when it
+    // is unconditional, is the role's base colours; each other holds where
+    // its condition holds.
+    std::array<std::vector<PaletteVariant>, colour_role_count> variants{};
+    // Each role's base colours, where it has them.
+    RolePalette base{};
+    // The palette role() reads: the base, or a copy's variants.
+    RolePalette in_use{};
+    // The roles a rule reads that have conditional variants, and the
+    // variant of each that the copy being lowered reads (0 for the base).
+    std::vector<std::size_t> varying{};
+    std::vector<std::size_t> choice{};
+};
+
 class ThemeCompiler final {
 public:
     // Replaces `sheet` with the lowered rules of `input.source` and appends
@@ -125,7 +161,9 @@ private:
     MaterialLowering material_lowering_{};
     std::vector<MaterialField> material_fields_{};
     std::vector<RecipeDeclaration> recipe_fields_{};
-    TransitionStorage transitions_{};
+    MotionStorage motion_{};
+    std::vector<MediaQuery> media_queries_{};
+    PaletteStorage palette_{};
     std::string folded_{};
 };
 

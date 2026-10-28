@@ -1,0 +1,56 @@
+# Build-time generation of the runtime font set's manifest table:
+#   cmake -DMANIFEST=<bundled-fonts.sha256> -DFONT_DIRECTORY=<dir> -DOUTPUT=<inc>
+#         -P generate_bundled_font_manifest.cmake
+# The manifest (sha256sum format: 64 lowercase hex digits, two spaces, the file name) is the one
+# source of the bundled faces and their digests; cmake/check_gallery_fonts.cmake reads it too.
+# Each record adds the face's size in bytes, measured here, so the font set can refuse a file of
+# the wrong size before it allocates. Every face must exist and match its digest, and no face may
+# exceed 64 MiB (the font set's limit), so a stale manifest fails the build, not the program.
+cmake_minimum_required(VERSION 3.25)
+if(NOT EXISTS "${MANIFEST}")
+    message(FATAL_ERROR "Bundled font manifest is missing: ${MANIFEST}")
+endif()
+file(STRINGS "${MANIFEST}" manifest_lines)
+set(records "")
+set(face_count 0)
+foreach(raw_line IN LISTS manifest_lines)
+    # A Windows checkout may carry CRLF line endings.
+    string(REPLACE "\r" "" line "${raw_line}")
+    if(NOT line MATCHES "^([0-9a-f]+)  ([A-Za-z0-9._-]+)$")
+        message(FATAL_ERROR "Bundled font manifest line is malformed: ${line}")
+    endif()
+    set(digest "${CMAKE_MATCH_1}")
+    set(filename "${CMAKE_MATCH_2}")
+    string(LENGTH "${digest}" digest_length)
+    if(NOT digest_length EQUAL 64)
+        message(FATAL_ERROR "Bundled font manifest digest is not SHA-256: ${line}")
+    endif()
+    set(path "${FONT_DIRECTORY}/${filename}")
+    if(NOT EXISTS "${path}")
+        message(FATAL_ERROR "Bundled font face is missing: ${filename}")
+    endif()
+    file(SHA256 "${path}" actual)
+    if(NOT actual STREQUAL digest)
+        message(FATAL_ERROR "Bundled font face ${filename} does not match its manifest digest")
+    endif()
+    file(SIZE "${path}" size)
+    if(size EQUAL 0 OR size GREATER 67108864)
+        message(FATAL_ERROR "Bundled font face ${filename} has ${size} bytes; 1 to 64 MiB allowed")
+    endif()
+    string(APPEND records "    {\"${filename}\", ${size}U, \"${digest}\"},\n")
+    math(EXPR face_count "${face_count} + 1")
+endforeach()
+if(face_count EQUAL 0)
+    message(FATAL_ERROR "Bundled font manifest lists no faces: ${MANIFEST}")
+endif()
+set(content "// Generated from assets/fonts/bundled-fonts.sha256 by cmake/generate_bundled_font_manifest.cmake.\n")
+string(APPEND content "// {file name, size in bytes, SHA-256 in lowercase hex}, in the manifest's order.\n")
+string(APPEND content "${records}")
+# Rewrite only on a change, so an unchanged manifest does not rebuild its users.
+if(EXISTS "${OUTPUT}")
+    file(READ "${OUTPUT}" previous)
+    if(previous STREQUAL content)
+        return()
+    endif()
+endif()
+file(WRITE "${OUTPUT}" "${content}")

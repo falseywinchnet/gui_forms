@@ -30,6 +30,8 @@ enum class ApplicationError : std::uint8_t {
     unsupported,
     backend_failure,
     callback_failure,
+    // Application::shutdown has already run in this process.
+    after_shutdown,
 };
 
 struct ApplicationResult final {
@@ -212,6 +214,14 @@ public:
         std::unique_ptr<Window> window, ApplicationWindowOptions options = {});
     [[nodiscard]] static ApplicationResult run(
         std::vector<ApplicationWindow> windows);
+    // Ends the rendering library once per process, after the last `run`: it
+    // frees stx_skia's caches and singletons. Call it when the last `run` has
+    // returned and every window, surface and font the program made is gone.
+    // Refused with already_running during a run, and with wrong_thread on
+    // macOS off the main thread; after it, `run` and `shutdown` return
+    // after_shutdown. A process that ends without it, a crash included,
+    // leaks nothing: the library holds only process memory.
+    [[nodiscard]] static ApplicationResult shutdown();
 };
 
 } // namespace gui_forms

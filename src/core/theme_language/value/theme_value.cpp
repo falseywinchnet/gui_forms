@@ -424,6 +424,8 @@ struct ColourArguments final {
 // One side of a color-mix(): its colour and its percentage, if written.
 struct MixItem final {
     Color colour{};
+    // The colour's role, where role() gave it.
+    ColourOrigin origin{};
     bool has_colour{};
     bool has_percentage{};
     double percentage{};
@@ -452,6 +454,7 @@ private:
     [[nodiscard]] bool colour_from_rgb(std::uint32_t function);
     [[nodiscard]] bool colour_from_hsl(std::uint32_t function);
     [[nodiscard]] bool colour_from_mix(std::uint32_t function);
+    [[nodiscard]] bool colour_from_role(std::uint32_t function);
     [[nodiscard]] bool read_mix_item(const ChildList& children, std::size_t first, std::size_t end,
                                      std::uint32_t function, MixItem& item);
     void replace_with_colour(std::uint32_t function, Color colour);
@@ -673,6 +676,7 @@ bool ValuePass::close_function() {
     if (equals_ascii_folded(name, "rgb") || equals_ascii_folded(name, "rgba")) return colour_from_rgb(function);
     if (equals_ascii_folded(name, "hsl") || equals_ascii_folded(name, "hsla")) return colour_from_hsl(function);
     if (equals_ascii_folded(name, "color-mix")) return colour_from_mix(function);
+    if (equals_ascii_folded(name, "role")) return colour_from_role(function);
     return true;
 }
 
@@ -841,6 +845,7 @@ bool ValuePass::read_mix_item(const ChildList& children, std::size_t first, std:
         if (written.kind == ValueComponentKind::keyword) colour = named_colour(written.text);
         if (colour && !item.has_colour) {
             item.colour = *colour;
+            item.origin = written.origin;
             item.has_colour = true;
             continue;
         }
@@ -945,6 +950,77 @@ bool ValuePass::colour_from_mix(std::uint32_t function) {
     const double scaled_alpha = alpha * alpha_scale;
     const Color colour = Color::rgba(mixed[0], mixed[1], mixed[2], channel_byte(scaled_alpha * 255.0));
     replace_with_colour(function, colour);
+    // A mix of roles keeps its first role (EC4); a literal in it makes the
+    // mix a literal.
+    const bool roles = first.origin.source == ColourSource::role && second.origin.source == ColourSource::role;
+    if (roles) value_.components.back().origin = first.origin;
+    return true;
+}
+
+// role(<role> [foreground | background]) (P8, R2-03): the palette's colour
+// of the role's side, carrying the role.
+bool ValuePass::colour_from_role(std::uint32_t function) {
+    const std::uint32_t token = value_.components[function].token;
+    ChildList children{};
+    if (!children_of(function, children)) return false;
+    bool shaped = children.count == 1U || children.count == 2U;
+    for (std::size_t child = 0U; shaped && child < children.count; ++child) {
+        if (value_.components[children.index[child]].kind != ValueComponentKind::keyword) shaped = false;
+    }
+    if (!shaped) {
+        report(DiagnosticCode::value_syntax, token, "role(<role> [foreground | background])");
+        return false;
+    }
+    const ValueComponent& written = value_.components[children.index[0]];
+    std::string lower(written.text);
+    for (char& character : lower) {
+        if (character >= 'A' && character <= 'Z') character = static_cast<char>(character - 'A' + 'a');
+    }
+    const std::optional<ColourRole> role = colour_role_from_name(lower);
+    if (!role) {
+        report(DiagnosticCode::keyword_unknown, written.token, clipped_theme_detail(written.text));
+        return false;
+    }
+    const bool paired = colour_role_paired(*role);
+    ColourRoleSide side = ColourRoleSide::foreground;
+    if (children.count == 2U) {
+        const ValueComponent& named = value_.components[children.index[1]];
+        const bool foreground = equals_ascii_folded(named.text, "foreground");
+        const bool background = equals_ascii_folded(named.text, "background");
+        if (!foreground && !background) {
+            report(DiagnosticCode::keyword_unknown, named.token, clipped_theme_detail(named.text));
+            return false;
+        }
+        if (!paired) {
+            report(DiagnosticCode::value_form_not_admitted, named.token, "a side of a single colour role");
+            return false;
+        }
+        side = foreground ? ColourRoleSide::foreground : ColourRoleSide::background;
+    } else if (paired) {
+        if (!context_.bare_side) {
+            report(DiagnosticCode::value_form_not_admitted, token, "role() of a pair without its side");
+            return false;
+        }
+        side = *context_.bare_side;
+    }
+    if (context_.palette == nullptr) {
+        report(DiagnosticCode::value_form_not_admitted, token, "role() in a palette");
+        return false;
+    }
+    const std::size_t position = static_cast<std::size_t>(*role);
+    const std::optional<RoleColours>& declared = (*context_.palette).roles[position];
+    value_.roles_read |= 1U << position;
+    if (!declared) {
+        report(DiagnosticCode::colour_role_undefined, written.token, std::string(colour_role_name(*role)));
+        return false;
+    }
+    const Color colour = side == ColourRoleSide::foreground ? (*declared).foreground : (*declared).background;
+    replace_with_colour(function, colour);
+    ColourOrigin origin{};
+    origin.source = ColourSource::role;
+    origin.role = *role;
+    origin.side = side;
+    value_.components.back().origin = origin;
     return true;
 }
 
@@ -1449,6 +1525,7 @@ ValueOutcome ValueReader::read(const ValueInput& input, ThemeValue& value, Theme
     value.components.clear();
     value.programs.clear();
     value.instructions.clear();
+    value.roles_read = 0U;
     value.components.reserve(input.substituted.size());
     ValuePass pass(input, value, diagnostics, unfolded_, operands_);
     const ValueOutcome outcome = pass.run();

@@ -625,6 +625,14 @@ Related types
 
    .. cpp:member:: PartGeometry cell_image
 
+   .. cpp:member:: PartGeometry cell_link
+
+      A link cell's link: its text's extent, which a click must hit.
+
+   .. cpp:member:: PartGeometry cell_link_underline
+
+      The link's underline: a one-unit rule just below the baseline.
+
    .. cpp:member:: PartGeometry cell_check_well
 
    .. cpp:member:: PartGeometry cell_check_indicator
@@ -664,6 +672,10 @@ Related types
    .. cpp:member:: bool open
 
    .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool visited
+
+      A link cell whose link is visited; a cell state of the grid's own (as LinkLabel's).
 
 .. cpp:namespace:: gui_forms
 
@@ -890,7 +902,7 @@ Related types
 
    ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
 
-   One column. ``name`` is the column's identity: unique within the grid, not empty, and without '.', since a cell's stable ID is its row's ID, '.' and the column's name. ``width`` and ``minimum_width`` are logical units at text scale 1. ``value_kind`` is the kind a committed text edit converts to (text by default; a number column takes signed_integer or number). ``items`` are a combo box column's choices and must be empty for other kinds. ``button_text`` is shown on a button cell whose value is empty. An image column's cells hold ImageId values, images of the grid's window, placed by ``image_layout``; ``image_description`` is the text an image cell gives in place of its image (Windows Forms' Description), as its cell text and its semantic name. ``data_property_name`` names the BindingSource field a bound column shows.
+   One column. ``name`` is the column's identity: unique within the grid, not empty, and without '.', since a cell's stable ID is its row's ID, '.' and the column's name. ``width`` and ``minimum_width`` are logical units at text scale 1. ``value_kind`` is the kind a committed text edit converts to (text by default; a number column takes signed_integer or number). ``items`` are a combo box column's choices and must be empty for other kinds. ``button_text`` is shown on a button cell whose value is empty. An image column's cells hold ImageId values, images of the grid's window, placed by ``image_layout``; ``image_description`` is the text an image cell gives in place of its image (Windows Forms' Description), as its cell text and its semantic name. A link column's cells show their text as a link; ``link_text`` is shown on a link cell whose value is empty (Windows Forms' Text with UseColumnTextForLinkValue). With ``track_visited_state`` a link the user clicks becomes visited (Windows Forms' TrackVisitedState). ``data_property_name`` names the BindingSource field a bound column shows.
 
    .. cpp:member:: std::string name
 
@@ -927,6 +939,12 @@ Related types
       Default: ``{DataGridViewImageLayout::normal}``.
 
    .. cpp:member:: std::string image_description
+
+   .. cpp:member:: std::string link_text
+
+   .. cpp:member:: bool track_visited_state
+
+      Default: ``{true}``.
 
    .. cpp:member:: std::string data_property_name
 
@@ -2317,6 +2335,8 @@ Enumerations
    .. cpp:enumerator:: button
 
    .. cpp:enumerator:: image
+
+   .. cpp:enumerator:: link
 
 .. cpp:namespace:: gui_forms
 

@@ -671,7 +671,7 @@ struct Refusal final {
 };
 
 void test_refusals() {
-    const std::array<Refusal, 78> refusals{{
+    const std::array<Refusal, 71> refusals{{
         {"#a { background-image: "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
          "linear-gradient(red, blue), linear-gradient(red, blue), linear-gradient(red, blue), "
@@ -684,7 +684,6 @@ void test_refusals() {
         {"#a { background-image: none, linear-gradient(red, blue) }", DiagnosticCode::value_form_not_admitted},
         {"#a { background-blend-mode: overlay }", DiagnosticCode::value_form_not_admitted},
         {"#a { background-blend-mode: sideways }", DiagnosticCode::keyword_unknown},
-        {"#a { background-color: currentcolor }", DiagnosticCode::not_yet_built},
         {"#a { background-color: 3px }", DiagnosticCode::value_wrong_kind},
         {"#a { background-color: inherit }", DiagnosticCode::value_wrong_kind},
         {"#a { background-image: radial-gradient(circle 10%, red, blue) }", DiagnosticCode::value_wrong_kind},
@@ -692,7 +691,7 @@ void test_refusals() {
         {"#a { background-image: linear-gradient(to center, red, blue) }", DiagnosticCode::value_syntax},
         {"#a { background-image: radial-gradient(at left 10px top, red, blue) }",
          DiagnosticCode::value_form_not_admitted},
-        {"#a { background-image: linear-gradient(red 1em, blue) }", DiagnosticCode::not_yet_built},
+        {"#a { border-width: -1em }", DiagnosticCode::value_out_of_range},
         {"#a { border-image: url(\"resource:tile.quadrant\") 1 / 2px }", DiagnosticCode::value_form_not_admitted},
         {"#a { border-style: inset }", DiagnosticCode::value_form_not_admitted},
         {"#a { border-style: wavy }", DiagnosticCode::keyword_unknown},
@@ -702,14 +701,12 @@ void test_refusals() {
         {"#a { border-width: 1px 1px 1px 1px 1px }", DiagnosticCode::value_syntax},
         {"#a { border: 1px 2px }", DiagnosticCode::value_syntax},
         {"#a { box-shadow: 1px }", DiagnosticCode::value_syntax},
-        {"#a { box-shadow: 1px 1px }", DiagnosticCode::not_yet_built},
         {"#a { box-shadow: 1px 1px -2px red }", DiagnosticCode::value_out_of_range},
         {"#a { box-shadow: 1px 1px red, 1px 1px red, 1px 1px red, 1px 1px red, 1px 1px red }",
          DiagnosticCode::too_many_layers},
         {"#a { filter: blur(1px) drop-shadow(1px 1px red) }", DiagnosticCode::value_form_not_admitted},
         {"#a { filter: drop-shadow(1px 1px red) drop-shadow(1px 1px red) }", DiagnosticCode::value_form_not_admitted},
         {"#a { filter: drop-shadow(1px 1px red) opacity(50%) }", DiagnosticCode::value_form_not_admitted},
-        {"#a { filter: drop-shadow(1px 1px) }", DiagnosticCode::not_yet_built},
         {"#a { filter: drop-shadow(1px) }", DiagnosticCode::value_syntax},
         {"#a { filter: drop-shadow(8px 8px 8px red) }", DiagnosticCode::value_out_of_range},
         {"#a { filter: url(\"resource:icon.check\") }", DiagnosticCode::value_form_not_admitted},
@@ -721,7 +718,6 @@ void test_refusals() {
         {"#a { surface-finish: 2 }", DiagnosticCode::value_out_of_range},
         {"#a { surface-finish: 1px }", DiagnosticCode::value_wrong_kind},
         {"#a { glow: red }", DiagnosticCode::value_syntax},
-        {"#a { glow: 2px }", DiagnosticCode::not_yet_built},
         {"#a { glow: red 1px, red 1px, red 1px }", DiagnosticCode::too_many_layers},
         {"#a { glow: red 8px }", DiagnosticCode::value_out_of_range},
         {"#a { glow-placement: sideways }", DiagnosticCode::keyword_unknown},
@@ -746,8 +742,6 @@ void test_refusals() {
          DiagnosticCode::value_form_not_admitted},
         {"#a { border-image: url(\"resource:tile.quadrant\") 1 fill / 1 }", DiagnosticCode::value_form_not_admitted},
         {"#a { border-image: url(\"resource:icon.check\") 1 fill / 2px }", DiagnosticCode::value_wrong_kind},
-        {"#a { color: inherit }", DiagnosticCode::not_yet_built},
-        {"#a { color: currentcolor }", DiagnosticCode::not_yet_built},
         {"#a { color: red blue }", DiagnosticCode::value_syntax},
         {"#a { outline: 2px dashed red }", DiagnosticCode::value_form_not_admitted},
         {"#a { outline-style: hidden }", DiagnosticCode::keyword_unknown},
@@ -755,7 +749,6 @@ void test_refusals() {
         {"#a { outline-offset: 65px }", DiagnosticCode::value_out_of_range},
         {"#a { outline: 1px 2px }", DiagnosticCode::value_syntax},
         {"#a { text-shadow: 1px 1px red, 2px 2px blue }", DiagnosticCode::too_many_layers},
-        {"#a { text-shadow: 1px 1px }", DiagnosticCode::not_yet_built},
         {"#a { text-shadow: 1px 1px 9px red }", DiagnosticCode::value_out_of_range},
         {"#a { text-shadow: 1px 1px 1px 1px red }", DiagnosticCode::value_syntax},
         {"#a { text-shadow: 17px 0 red }", DiagnosticCode::value_out_of_range},

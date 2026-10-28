@@ -92,6 +92,20 @@ Types
      -  
    * - :cpp:class:`ResolvedTextLayout <gui_forms::ResolvedTextLayout>`
      -  
+   * - :cpp:class:`RichParagraphFormat <gui_forms::RichParagraphFormat>`
+     - A paragraph's kind and the fields that kind has.
+   * - :cpp:class:`RichRgb <gui_forms::RichRgb>`
+     - An sRGB colour without alpha, as rich text documents carry it.
+   * - :cpp:class:`RichRunStyle <gui_forms::RichRunStyle>`
+     - How a run of text is set.
+   * - :cpp:class:`RichTextLoadResult <gui_forms::RichTextLoadResult>`
+     - The result of RichTextModel::load_markdown and load_rtf: loaded, with the number of constructs the reader dropped or kept as plain text (0 when the document was read whole), or failed, with the error and the input offset
+   * - :cpp:class:`RichTextModel <gui_forms::RichTextModel>`
+     - Paragraphs of styled runs.
+   * - :cpp:class:`RichTextSaveReport <gui_forms::RichTextSaveReport>`
+     - What saving changed so that the document fits the format: the model can hold more than a document can say.
+   * - :cpp:class:`RichTextSaveResult <gui_forms::RichTextSaveResult>`
+     - The result of RichTextModel::save_markdown and save_rtf: saved, with its report, or failed with an error (a document past the writer's limits).
    * - :cpp:class:`ShapingFeature <gui_forms::ShapingFeature>`
      - ShapingFeature applies one OpenType tag/value to a validated UTF-8 subrange.
    * - :cpp:class:`ShapingRequest <gui_forms::ShapingRequest>`
@@ -1000,6 +1014,259 @@ Types
    .. cpp:member:: TextResolutionStatus status
 
       Default: ``{TextResolutionStatus::estimated}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: RichParagraphFormat final
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   A paragraph's kind and the fields that kind has. Built only through the factories, which reject a value out of range with std::invalid_argument: a heading's level is 1 to maximum_rich_heading_level, a list item's 0 to maximum_rich_list_level, a numbered item's ordinal 0 to maximum_rich_ordinal, and any kind's quote depth 0 to
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: RichParagraphKind kind() const noexcept
+
+   .. cpp:function:: std::uint8_t level() const noexcept
+
+      A heading's level or a list item's nesting; 0 for other kinds.
+
+   .. cpp:function:: std::uint32_t ordinal() const noexcept
+
+      A numbered item's ordinal; 0 for other kinds.
+
+   .. cpp:function:: RichAlignment alignment() const noexcept
+
+   .. cpp:function:: std::uint8_t quote_depth() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static RichParagraphFormat body(RichAlignment alignment = RichAlignment::left, std::uint8_t quote_depth = 0U)
+
+   .. cpp:function:: static RichParagraphFormat heading(std::uint8_t level, RichAlignment alignment = RichAlignment::left, std::uint8_t quote_depth = 0U)
+
+   .. cpp:function:: static RichParagraphFormat bulleted(std::uint8_t level, RichAlignment alignment = RichAlignment::left, std::uint8_t quote_depth = 0U)
+
+   .. cpp:function:: static RichParagraphFormat numbered(std::uint8_t level, std::uint32_t ordinal, RichAlignment alignment = RichAlignment::left, std::uint8_t quote_depth = 0U)
+
+   .. cpp:function:: static RichParagraphFormat code_block(std::uint8_t quote_depth = 0U)
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RichRgb final
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   An sRGB colour without alpha, as rich text documents carry it.
+
+   .. cpp:member:: std::uint8_t red
+
+   .. cpp:member:: std::uint8_t green
+
+   .. cpp:member:: std::uint8_t blue
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RichRunStyle final
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   How a run of text is set. The default value is body text with no attribute. ``link`` is the link's target; ``size_step`` counts steps from the
+
+   .. cpp:member:: bool bold
+
+   .. cpp:member:: bool italic
+
+   .. cpp:member:: bool underline
+
+   .. cpp:member:: bool strikethrough
+
+   .. cpp:member:: bool code
+
+      Inline code: a monospace span that may carry every other attribute.
+
+   .. cpp:member:: RichBaseline baseline
+
+      Default: ``{RichBaseline::normal}``.
+
+   .. cpp:member:: std::optional<std::string> link
+
+   .. cpp:member:: std::optional<RichRgb> colour
+
+   .. cpp:member:: std::optional<RichRgb> background
+
+   .. cpp:member:: std::int8_t size_step
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: RichTextLoadResult final
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   The result of RichTextModel::load_markdown and load_rtf: loaded, with the number of constructs the reader dropped or kept as plain text (0 when the document was read whole), or failed, with the error and the input offset
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool succeeded() const noexcept
+
+   .. cpp:function:: std::uint64_t losses() const noexcept
+
+      The losses of a load that succeeded; 0 for a failure.
+
+   .. cpp:function:: std::optional<RichTextError> error() const noexcept
+
+      The error of a load that failed; none when it succeeded.
+
+   .. cpp:function:: std::uint64_t offset() const noexcept
+
+      The input offset of a load that failed; 0 when it succeeded.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static RichTextLoadResult loaded(std::uint64_t losses) noexcept
+
+   .. cpp:function:: static RichTextLoadResult failed(RichTextError error, std::uint64_t offset) noexcept
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: RichTextModel final
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   Paragraphs of styled runs. A new model holds one empty body paragraph. Text: the model's text is its paragraphs joined by rich_paragraph_separator, with rich_line_break inside a paragraph. Text given to replace may contain both; it may not contain another C0 control than tab and line feed, DEL, U+0085, U+2029 or U+FEFF (carriage returns are the caller's to turn into line feeds), and must be valid UTF-8, or std::invalid_argument is thrown and the model is unchanged. Paragraphs: replacing text across paragraph separators joins those paragraphs into the first, which keeps its format; each separator the new text brings splits off a paragraph with the format of the paragraph it is typed in. Styles: a style change over a range applies to every character in it, separators included; the queries over a range read only the characters that are not separators. A range is checked against scalar_count and an
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit RichTextModel(TextStoreLimits limits = {})
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::string_view text() const noexcept
+
+   .. cpp:function:: ScalarIndex scalar_count() const noexcept
+
+   .. cpp:function:: std::uint64_t revision() const noexcept
+
+      Counts the model's changes: every edit, style or format change, clear and load adds one.
+
+   .. cpp:function:: std::size_t paragraph_count() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: std::size_t paragraph_at(ScalarIndex position) const
+
+      The paragraph holding position; the last paragraph for the end.
+
+   .. cpp:function:: ScalarRange paragraph_range(std::size_t paragraph) const
+
+      A paragraph's text, without its separator.
+
+   .. cpp:function:: const RichParagraphFormat& paragraph_format(std::size_t paragraph) const
+
+   .. cpp:function:: RichRunStyle style_at(ScalarIndex position) const
+
+      The style of the scalar at position; the default style at the end.
+
+   .. cpp:function:: RichRunStyle insertion_style(ScalarIndex position) const
+
+      The style text typed at position takes: that of the scalar before it in the same paragraph, else of the scalar after it in the same paragraph, else the default style.
+
+   .. cpp:function:: std::optional<RichRunStyle> uniform_style(ScalarRange range) const
+
+      The style every non-separator character of the range has, or none when they differ. An empty range, or one of separators only, has the insertion style at its start.
+
+   .. cpp:function:: RichAttributeState attribute_state(ScalarRange range, RichStyleAttribute attribute) const
+
+   .. cpp:function:: void replace(ScalarRange range, std::string_view text, const RichRunStyle& style)
+
+      Replaces the range with text in one style (see the class comment).
+
+   .. cpp:function:: void clear()
+
+      One empty body paragraph.
+
+   .. cpp:function:: RichTextLoadResult load_markdown(std::string_view markdown)
+
+      Replace the model's contents with a document read from the dialect (stx_rtf2md's markdown) or from RTF. A failure leaves the model as it was.
+
+   .. cpp:function:: RichTextLoadResult load_rtf(std::span<const std::byte> rtf)
+
+   .. cpp:function:: RichTextSaveResult save_markdown(std::string& output) const
+
+      Write the model as the dialect's canonical text or as RTF into output, which is replaced (see RichTextSaveReport for what saving changes).
+
+   .. cpp:function:: RichTextSaveResult save_rtf(std::vector<std::byte>& output) const
+
+   .. cpp:function:: void set_paragraph_format(ScalarRange range, const RichParagraphFormat& format)
+
+      Sets the format of every paragraph the range touches (an empty range: the paragraph holding it).
+
+   .. cpp:function:: void set_attribute(ScalarRange range, RichStyleAttribute attribute, bool on)
+
+   .. cpp:function:: void set_colour(ScalarRange range, std::optional<RichRgb> colour)
+
+   .. cpp:function:: void set_background(ScalarRange range, std::optional<RichRgb> background)
+
+   .. cpp:function:: void set_size_step(ScalarRange range, std::int8_t size_step)
+
+      Throws std::invalid_argument for a step outside minimum_rich_size_step to maximum_rich_size_step.
+
+   .. cpp:function:: void set_link(ScalarRange range, std::optional<std::string_view> target)
+
+      A target must be non-empty valid UTF-8 without the characters text may not contain, nor a separator; none removes the link.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RichTextSaveReport final
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   What saving changed so that the document fits the format: the model can hold more than a document can say. Empty paragraphs are dropped; a line break that ends a paragraph is dropped; a heading's line break becomes a space; a heading's size steps and a code block's run styles are dropped (styles_simplified counts the runs); a list item nested deeper than the
+
+   .. cpp:member:: std::size_t empty_paragraphs_dropped
+
+   .. cpp:member:: std::size_t line_breaks_dropped
+
+   .. cpp:member:: std::size_t line_breaks_in_headings
+
+   .. cpp:member:: std::size_t styles_simplified
+
+   .. cpp:member:: std::size_t list_levels_lowered
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: RichTextSaveResult final
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   The result of RichTextModel::save_markdown and save_rtf: saved, with its report, or failed with an error (a document past the writer's limits).
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool succeeded() const noexcept
+
+   .. cpp:function:: std::optional<RichTextSaveReport> report() const noexcept
+
+      The report of a save that succeeded; none for a failure.
+
+   .. cpp:function:: std::optional<RichTextError> error() const noexcept
+
+      The error of a save that failed; none when it succeeded.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static RichTextSaveResult saved(const RichTextSaveReport& report) noexcept
+
+   .. cpp:function:: static RichTextSaveResult failed(RichTextError error) noexcept
 
 .. cpp:namespace:: gui_forms
 
@@ -1957,6 +2224,92 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: RichAlignment
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   .. cpp:enumerator:: left
+
+   .. cpp:enumerator:: center
+
+   .. cpp:enumerator:: right
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RichAttributeState
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   .. cpp:enumerator:: off
+
+   .. cpp:enumerator:: on
+
+   .. cpp:enumerator:: mixed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RichBaseline
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   .. cpp:enumerator:: normal
+
+   .. cpp:enumerator:: superscript
+
+   .. cpp:enumerator:: subscript
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RichParagraphKind
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   .. cpp:enumerator:: body
+
+   .. cpp:enumerator:: heading
+
+   .. cpp:enumerator:: bulleted
+
+   .. cpp:enumerator:: numbered
+
+   .. cpp:enumerator:: code_block
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RichStyleAttribute
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   .. cpp:enumerator:: bold
+
+   .. cpp:enumerator:: italic
+
+   .. cpp:enumerator:: underline
+
+   .. cpp:enumerator:: strikethrough
+
+   .. cpp:enumerator:: code
+
+   .. cpp:enumerator:: superscript
+
+   .. cpp:enumerator:: subscript
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RichTextError
+
+   ``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+   .. cpp:enumerator:: malformed
+
+   .. cpp:enumerator:: limit_exceeded
+
+   .. cpp:enumerator:: unsupported_encoding
+
+   .. cpp:enumerator:: effort_exceeded
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: ShapingRequestError
 
    ``#include <gui_forms/text_shaping/types/text_shaping_types.hpp>``
@@ -2163,6 +2516,42 @@ Functions, constants and aliases
 .. cpp:function:: bool same_prepared_text_key(const PreparedTextKey& left, const PreparedTextKey& right) noexcept
 
 .. cpp:function:: bool same_layout_authority(const LayoutAuthority left, const LayoutAuthority right) noexcept
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/text/rich_text/rich_text.hpp>``
+
+.. cpp:var:: constexpr std::int8_t minimum_rich_size_step
+
+   Value: ``-2``.
+
+.. cpp:var:: constexpr std::int8_t maximum_rich_size_step
+
+   Value: ``4``.
+
+.. cpp:var:: constexpr std::uint8_t maximum_rich_heading_level
+
+   Value: ``6``.
+
+.. cpp:var:: constexpr std::uint8_t maximum_rich_list_level
+
+   Value: ``7``.
+
+.. cpp:var:: constexpr std::uint8_t maximum_rich_quote_depth
+
+   Value: ``7``.
+
+.. cpp:var:: constexpr std::uint32_t maximum_rich_ordinal
+
+   Value: ``999999999U``.
+
+.. cpp:var:: constexpr char32_t rich_paragraph_separator
+
+   The scalar that separates paragraphs in the model's text. Value: ``U'\n'``.
+
+.. cpp:var:: constexpr char32_t rich_line_break
+
+   The scalar that breaks a line inside a paragraph (RTF's \line, a markdown hard break, a line of a code block). Value: ``U'``.
 
 .. cpp:namespace:: gui_forms
 

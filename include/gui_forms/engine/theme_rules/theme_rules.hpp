@@ -99,6 +99,57 @@ struct RuleSpecificity final {
 
 [[nodiscard]] RuleSpecificity rule_specificity(const RuleSelector& selector) noexcept;
 
+// What a window is, as a rule's media condition reads it (T3 EC3): its
+// presentation settings and its scale. Every window evaluates a theme's
+// conditions against its own facts, so windows sharing a theme may differ.
+struct MediaFacts final {
+    // PresentationSettings::colour_scheme is ColourScheme::dark.
+    bool dark_scheme{};
+    // PresentationSettings::high_contrast.
+    bool forced_colours{};
+    // PresentationSettings::reduced_motion.
+    bool reduced_motion{};
+    // The window's scale: device pixels per logical unit.
+    double resolution{1.0};
+
+    friend bool operator==(const MediaFacts& left, const MediaFacts& right) noexcept {
+        return left.dark_scheme == right.dark_scheme && left.forced_colours == right.forced_colours &&
+               left.reduced_motion == right.reduced_motion && left.resolution == right.resolution;
+    }
+};
+
+// A rule's media condition (EC3): every feature it names must hold for the
+// window, and an unnamed feature always holds, so the default condition
+// holds everywhere. The resolution bounds are inclusive, in device pixels
+// per logical unit; each is finite and above zero. A condition no window
+// meets, such as a minimum above the maximum, is admitted: its rule never
+// matches. The theme language's `@media` blocks lower to these (one rule a
+// query of a comma list).
+struct MediaCondition final {
+    // `prefers-color-scheme`: dark (true) or light (false).
+    std::optional<bool> dark_scheme{};
+    // `forced-colors`: active (true) or none (false).
+    std::optional<bool> forced_colours{};
+    // `prefers-reduced-motion`: reduce (true) or no-preference (false).
+    std::optional<bool> reduced_motion{};
+    // `min-resolution` and `max-resolution`.
+    std::optional<double> minimum_resolution{};
+    std::optional<double> maximum_resolution{};
+
+    friend bool operator==(const MediaCondition& left, const MediaCondition& right) noexcept {
+        return left.dark_scheme == right.dark_scheme && left.forced_colours == right.forced_colours &&
+               left.reduced_motion == right.reduced_motion && left.minimum_resolution == right.minimum_resolution &&
+               left.maximum_resolution == right.maximum_resolution;
+    }
+};
+
+// Whether `condition` names nothing (it holds for every window).
+[[nodiscard]] bool media_condition_unconditional(const MediaCondition& condition) noexcept;
+// Whether `condition`'s resolution bounds are finite and above zero.
+[[nodiscard]] bool media_condition_valid(const MediaCondition& condition) noexcept;
+// Whether a window with `facts` meets `condition`.
+[[nodiscard]] bool media_condition_holds(const MediaCondition& condition, const MediaFacts& facts) noexcept;
+
 // The name of the declaration that selects a part's primitive. Its value is
 // a registered primitive's name, or `built_in` for the built-in recipe.
 inline constexpr std::string_view primitive_property = "primitive";
@@ -113,6 +164,79 @@ enum class RuleValueKind : std::uint8_t {
     // part's inputs, states and the primitive's other parameters (E6).
     expression,
 };
+
+// The colour roles (T3 EC4, design language §5.4, owner decision D1 of
+// 2026-10-28): vocabulary atoms a theme's palette gives colours, so that
+// forced high contrast can remap a colour by what it means. The first 17
+// are §5.4's pairs, a foreground on a background; the other 9 are single
+// colours (the relief ramp, the lines, and focus, which §5.4 sets "on any
+// surface"). Their names are the
+// enumerators' in kebab case (colour_role_name).
+enum class ColourRole : std::uint8_t {
+    ink_on_paper,
+    muted_ink_on_paper,
+    ink_on_soft_paper,
+    ink_on_chrome,
+    ink_on_chrome_low,
+    ink_on_near_white_stock,
+    selection_ink_on_selection,
+    ink_on_gold,
+    on_accent_on_accent,
+    signal_on_paper,
+    success_on_paper,
+    pending_ink_on_tint,
+    invalid_ink_on_tint,
+    disabled_ink_on_chrome,
+    disabled_ink_on_paper,
+    phosphor_on_instrument_black,
+    command_link_ink_on_paper,
+    chrome_highlight,
+    chrome,
+    chrome_middle,
+    chrome_low,
+    ordinary_line,
+    dark_line,
+    shadow,
+    selection_line,
+    focus,
+    count,
+};
+
+inline constexpr std::size_t colour_role_count = static_cast<std::size_t>(ColourRole::count);
+
+// The role's name in kebab case, such as `ink-on-paper`; empty for count.
+[[nodiscard]] std::string_view colour_role_name(ColourRole role) noexcept;
+// The role `name` (kebab case, exact) names, or none.
+[[nodiscard]] std::optional<ColourRole> colour_role_from_name(std::string_view name) noexcept;
+// Whether the role is a pair (a foreground on a background) rather than a
+// single colour.
+[[nodiscard]] bool colour_role_paired(ColourRole role) noexcept;
+
+// Which colour of a pair; a single role's colour is its foreground.
+enum class ColourRoleSide : std::uint8_t { foreground, background };
+
+// Where a declaration's colour came from (EC4): none (the declaration
+// holds no colour, or is `initial`); a literal (a hexadecimal, functional
+// or named colour, or a colour mixed from others); or a role. A
+// declaration holding a literal anywhere is a literal; one holding only
+// role colours carries the first of them. Forced high contrast remaps a
+// role's colour by the role, and a literal by its position.
+enum class ColourSource : std::uint8_t { none, literal, role };
+
+struct ColourOrigin final {
+    ColourSource source{ColourSource::none};
+    ColourRole role{ColourRole::ink_on_paper};
+    ColourRoleSide side{ColourRoleSide::foreground};
+
+    friend constexpr bool operator==(ColourOrigin left, ColourOrigin right) noexcept {
+        return left.source == right.source && left.role == right.role && left.side == right.side;
+    }
+};
+
+// Where a colour is drawn, as forced high contrast reads it: a fill (a
+// plate), an edge (a border, a keyline or a ring) or text; `none` for a
+// colour the high-contrast pass drops (a shadow, a glow, an image).
+enum class ColourPosition : std::uint8_t { none, fill, edge, text };
 
 // One declaration: a property and its value. Every property but `primitive`
 // is a parameter of the primitive the same rule selects, so a rule that sets
@@ -131,6 +255,13 @@ struct RuleDeclaration final {
     double number{};
     Color colour{};
     std::vector<ExpressionInstruction> program{};
+    // A colour parameter's origin (EC4).
+    ColourOrigin origin{};
+    // A number parameter's em coefficient (T3 P8c): its value is `number`
+    // plus the part's em times it, held within the parameter's range when
+    // the part is painted. The rules check `number` against the range only
+    // where this is 0.
+    double number_em{};
 
     [[nodiscard]] static RuleDeclaration primitive(std::string_view primitive_name);
     [[nodiscard]] static RuleDeclaration number_value(std::string_view parameter, double value);
@@ -143,7 +274,8 @@ struct RuleDeclaration final {
 
     friend bool operator==(const RuleDeclaration& left, const RuleDeclaration& right) noexcept {
         return left.property == right.property && left.kind == right.kind && left.name == right.name &&
-               left.number == right.number && left.colour == right.colour && left.program == right.program;
+               left.number == right.number && left.colour == right.colour && left.program == right.program &&
+               left.origin == right.origin && left.number_em == right.number_em;
     }
 };
 
@@ -203,6 +335,40 @@ enum class PartBlend : std::uint8_t { normal, multiply, screen };
 // beyond them is shown. The forced high-contrast pass draws no blend.
 inline constexpr std::string_view blend_property = "blend";
 
+// The text roles (T3 P8c, owner decision D5 of 2026-10-28): the theme's
+// typography tokens (ThemeTypographyTokens) a part's text takes, `ui`
+// being the controls' own (`control`). A part's em is its role's size
+// times its window's text scale.
+enum class TextRole : std::uint8_t { ui, field, caption, heading, title, monospace, count };
+
+inline constexpr std::size_t text_role_count = static_cast<std::size_t>(TextRole::count);
+
+// The role's name in a sheet: `ui`, `field`, `caption`, `heading`,
+// `title`, `monospace`.
+[[nodiscard]] std::string_view text_role_name(TextRole role) noexcept;
+// The role `name` names exactly, if any.
+[[nodiscard]] std::optional<TextRole> text_role_from_name(std::string_view name) noexcept;
+
+// The engine's font property (T3 P8c, D6): a declaration of this name,
+// whose value is a name (a text role's, or font_inherit_name), sets the
+// part's text role. The last matching rule's wins; a part no rule sets has
+// the ui role. It is recorded in the part's resolution, where it gives the
+// part its em; controls' text does not read it yet.
+inline constexpr std::string_view font_property = "font";
+inline constexpr std::string_view font_inherit_name = "inherit";
+
+// A part's font as the cascade resolved it: a text role, or, with
+// `inherit` (D7), the parent control's, which the caller resolves at
+// paint.
+struct FontDeclaration final {
+    TextRole role{TextRole::ui};
+    bool inherit{};
+
+    friend constexpr bool operator==(FontDeclaration left, FontDeclaration right) noexcept {
+        return left.role == right.role && left.inherit == right.inherit;
+    }
+};
+
 // What a transition moves: a primitive parameter, or one of the engine's
 // presentational properties.
 enum class PresentationProperty : std::uint8_t {
@@ -230,7 +396,9 @@ inline constexpr std::size_t maximum_part_transitions = 6;
 // appears in it, `enter_from`, if set, stands the property at that value
 // first; this is how a part fades in when it appears (the docking tiles,
 // T2 GIVEN C2-1). Otherwise every move starts from the value shown, so a
-// transition retargets and never restarts.
+// transition retargets and never restarts. A state of another machine of
+// the property (another rule's) is another state: a part arriving in this
+// state from it enters it (T3 P7b, an animation in a rule of its own).
 //
 // `stops` (E9.6, multi-stop @keyframes), at most maximum_motion_stops,
 // make the move into this state pass each stop's value at its offset of
@@ -245,15 +413,23 @@ inline constexpr std::size_t maximum_part_transitions = 6;
 // The machine is presentational only: it reads the published states and
 // writes nothing back, so it can neither create an observable state nor
 // delay behaviour.
+//
+// `target_em` and `enter_from_em` (T3 P8c, owner decision D4) are em
+// coefficients, as each stop's value_em: the value is the number plus the
+// part's em times its coefficient. Only a translation's and a number
+// parameter's machine takes them.
 struct PresentationState final {
     std::vector<AnatomyState> when{};
     double target{};
     std::optional<double> enter_from{};
     std::vector<MotionStop> stops{};
+    double target_em{};
+    double enter_from_em{};
 
     friend bool operator==(const PresentationState& left, const PresentationState& right) noexcept {
         return left.when == right.when && left.target == right.target && left.enter_from == right.enter_from &&
-               left.stops == right.stops;
+               left.stops == right.stops && left.target_em == right.target_em &&
+               left.enter_from_em == right.enter_from_em;
     }
 };
 
@@ -402,6 +578,10 @@ enum class MaterialField : std::uint8_t {
 inline constexpr std::size_t material_field_count = static_cast<std::size_t>(MaterialField::count);
 
 [[nodiscard]] std::string_view material_field_name(MaterialField field) noexcept;
+// Where the field's colours are drawn (EC4): the background colour and the
+// fills are a fill, the border colours and keylines an edge; every other
+// field none.
+[[nodiscard]] ColourPosition material_field_colour_position(MaterialField field) noexcept;
 
 // One material field a rule sets and its value. Only the members `field`
 // names are read; the others stay empty:
@@ -457,6 +637,17 @@ struct MaterialDeclaration final {
     MaterialColourFilter colour_filter{};
     std::optional<MaterialDropShadow> drop_shadow{};
     std::optional<MaterialFillLayer> mask{};
+    // Where the declaration's colours came from (EC4).
+    ColourOrigin origin{};
+    // Its lengths in em (T3 P8c, owner decision D4): empty, or one
+    // coefficient for each length material_declaration_lengths lists, in
+    // its order; each length is its value plus the part's em times its
+    // coefficient (add_material_em).
+    std::vector<double> em_lengths{};
+    // Its colours that are CSS's currentcolor (P8c): positions, increasing,
+    // among the colours material_declaration_colours lists; each takes the
+    // part's text colour when the material is assembled.
+    std::vector<std::uint16_t> current_colours{};
 
     friend bool operator==(const MaterialDeclaration& left, const MaterialDeclaration& right) noexcept {
         return left.field == right.field && left.initial == right.initial && left.fills == right.fills &&
@@ -469,9 +660,33 @@ struct MaterialDeclaration final {
                left.colour == right.colour && left.keylines == right.keylines &&
                left.number == right.number && left.relative == right.relative &&
                left.colour_filter == right.colour_filter && left.drop_shadow == right.drop_shadow &&
-               left.mask == right.mask;
+               left.mask == right.mask && left.origin == right.origin && left.em_lengths == right.em_lengths &&
+               left.current_colours == right.current_colours;
     }
 };
+
+// The lengths of `declaration` in logical units, into `lengths` (cleared
+// first), in a fixed order: its number where it is a length (a border
+// width, a corner's radius that is not relative, the filter's blur); each
+// authored gradient's centre, radii and stop positions (their units); the
+// image positions' and the image sizes' units; each shadow's offset, blur
+// and spread; each glow's blur and spread; each keyline's width and inset;
+// the drop shadow's offset and blur.
+void material_declaration_lengths(const MaterialDeclaration& declaration, std::vector<double>& lengths);
+// Sets the lengths of `declaration` from `lengths`, in that order; a length
+// past the end of `lengths` is kept.
+void set_material_declaration_lengths(MaterialDeclaration& declaration, std::span<const double> lengths) noexcept;
+// Adds `em` times each of the declaration's em_lengths to its length.
+void add_material_em(MaterialDeclaration& declaration, double em) noexcept;
+
+// The colours of `declaration`, into `colours` (cleared first), in a fixed
+// order: its colour; each authored gradient's stop colours; each shadow's,
+// glow's and keyline's colour; the drop shadow's.
+void material_declaration_colours(const MaterialDeclaration& declaration, std::vector<Color>& colours);
+// Sets them from `colours`, in that order; one past its end is kept.
+void set_material_declaration_colours(MaterialDeclaration& declaration, std::span<const Color> colours) noexcept;
+// Sets each of the declaration's current_colours to `colour`.
+void set_material_current_colour(MaterialDeclaration& declaration, Color colour) noexcept;
 
 // Replaces `material` with `floor` and the declarations of `fields` (the
 // winning declaration of each field, by the field's position, null where
@@ -505,9 +720,32 @@ struct MaterialDeclaration final {
 // lines) is not drawn, as CSS draws a border image in place of the
 // border's style. `box` is the part's box in logical units: relative
 // corners are fractions of its shorter side.
+// What a part gives its material's relative values (P8c): its em, and
+// its text colour, which CSS's currentcolor names.
+struct MaterialAssemblyContext final {
+    double em{};
+    Color current_colour{};
+};
+
+// With `context`, each declaration's em lengths are first added at the
+// part's em (add_material_em) and its current colours set
+// (set_material_current_colour); the overload without it assembles at an
+// em of 0, its current colours as written.
+void assemble_material(const SurfaceMaterial& floor,
+                       const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
+                       MaterialAssemblyContext context, SurfaceMaterial& material);
 void assemble_material(const SurfaceMaterial& floor,
                        const std::array<const MaterialDeclaration*, material_field_count>& fields, Size box,
                        SurfaceMaterial& material);
+
+// Whether assembling `fields` reads the part's em: a declaration with em
+// lengths.
+[[nodiscard]] bool material_fields_read_em(
+    const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept;
+// Whether assembling `fields` reads the part's text colour: a declaration
+// with current colours.
+[[nodiscard]] bool material_fields_read_current_colour(
+    const std::array<const MaterialDeclaration*, material_field_count>& fields) noexcept;
 
 // Whether assembling `fields` reads the part's box: a relative corner, an
 // authored gradient, of a fill or the mask, other than a fixed one
@@ -543,6 +781,9 @@ inline constexpr std::size_t recipe_field_count = static_cast<std::size_t>(Recip
 
 // The field's snake_case name, as diagnostics name it; empty for `count`.
 [[nodiscard]] std::string_view recipe_field_name(RecipeField field) noexcept;
+// Where the field's colour is drawn (EC4): the text colour is text and the
+// outline colour an edge; every other field none.
+[[nodiscard]] ColourPosition recipe_field_colour_position(RecipeField field) noexcept;
 
 // How the focus ring is drawn (CSS `outline-style`): the theme's own ring
 // inside the control's bounds (CSS's `auto`), an outline outside them,
@@ -575,14 +816,42 @@ struct RecipeDeclaration final {
     bool shadowed{};
     Point shadow_offset{};
     double shadow_blur{};
+    // Where the declaration's colour came from (EC4).
+    ColourOrigin origin{};
+    // Its lengths in em (P8c), as MaterialDeclaration::em_lengths, for the
+    // lengths recipe_declaration_lengths lists.
+    std::vector<double> em_lengths{};
+    // CSS's `inherit` on the text colour (P8c, owner decision D7): the
+    // parent control's cascade result, resolved at paint.
+    bool inherit{};
+    // Whether `colour` is CSS's currentcolor: the control's text colour.
+    bool current_colour{};
 
     friend bool operator==(const RecipeDeclaration& left, const RecipeDeclaration& right) noexcept {
         return left.field == right.field && left.initial == right.initial && left.colour == right.colour &&
                left.number == right.number && left.outline_style == right.outline_style &&
                left.shadowed == right.shadowed && left.shadow_offset == right.shadow_offset &&
-               left.shadow_blur == right.shadow_blur;
+               left.shadow_blur == right.shadow_blur && left.origin == right.origin &&
+               left.em_lengths == right.em_lengths && left.inherit == right.inherit &&
+               left.current_colour == right.current_colour;
     }
 };
+
+// The lengths of a recipe declaration, into `lengths` (cleared first): the
+// outline width's or offset's number; the text shadow's offset and blur.
+void recipe_declaration_lengths(const RecipeDeclaration& declaration, std::vector<double>& lengths);
+void set_recipe_declaration_lengths(RecipeDeclaration& declaration, std::span<const double> lengths) noexcept;
+void add_recipe_em(RecipeDeclaration& declaration, double em) noexcept;
+
+// Whether a declaration's current_colours are increasing positions among
+// its colours: the rules drop it otherwise.
+[[nodiscard]] bool current_colours_fit(const MaterialDeclaration& declaration);
+
+// Whether a declaration's em_lengths are empty, or one finite coefficient
+// for each of its lengths: the rules drop it otherwise
+// (material_field_invalid, recipe_field_invalid).
+[[nodiscard]] bool em_lengths_fit(const MaterialDeclaration& declaration);
+[[nodiscard]] bool em_lengths_fit(const RecipeDeclaration& declaration);
 
 // Whether `declaration` is one a recipe admits: a field below `count`, and
 // a finite value within its field's range.
@@ -616,13 +885,15 @@ struct ThemeRule final {
     std::optional<AmbientEffect> ambient{};
     std::vector<MaterialDeclaration> materials{};
     std::vector<RecipeDeclaration> recipe_fields{};
+    // The windows the rule holds in (EC3); by default, all.
+    MediaCondition media{};
 
     friend bool operator==(const ThemeRule& left, const ThemeRule& right) noexcept {
         return left.label == right.label && left.level == right.level && left.selector == right.selector &&
                left.specificity == right.specificity && left.declarations == right.declarations &&
                left.requires_engine == right.requires_engine && left.transitions == right.transitions &&
                left.ambient == right.ambient && left.materials == right.materials &&
-               left.recipe_fields == right.recipe_fields;
+               left.recipe_fields == right.recipe_fields && left.media == right.media;
     }
 };
 
@@ -712,6 +983,9 @@ enum class RuleDiagnosticKind : std::uint8_t {
     // A blend declaration (blend_property) whose value is not one of its
     // names is dropped.
     blend_invalid,
+    // A font declaration whose value is not a text role's name or
+    // `inherit` (P8c).
+    font_invalid,
     // A published value's name is invalid, repeats an earlier one or is
     // past maximum_published_values. The diagnostic, of the sheet rather
     // than a rule, names it in `property`; its position stays, and reads as
@@ -726,6 +1000,9 @@ enum class RuleDiagnosticKind : std::uint8_t {
     // A recipe field in a rule whose selector names a part or a role: the
     // recipe's fields are the control's, so the field is dropped.
     recipe_field_on_part,
+    // The rule's media condition has a resolution bound that is not finite
+    // or not above zero (media_condition_valid); the rule is dropped.
+    media_invalid,
 };
 
 [[nodiscard]] std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept;
@@ -798,6 +1075,9 @@ public:
         std::string_view part{};
         PartRole role{PartRole::region};
         AnatomyStateSet states{};
+        // The part's window (EC3): a rule matches only where its media
+        // condition holds.
+        MediaFacts media{};
     };
 
     // Why a part resolved as it did.
@@ -818,15 +1098,22 @@ public:
         double target{};
         std::optional<double> enter_from{};
         std::vector<MotionStop> stops{};
+        double target_em{};
+        double enter_from_em{};
     };
 
     // A checked transition: an engine property, or the parameter at
-    // `parameter`.
+    // `parameter`. `machine` numbers it among the compilation's machines,
+    // so that a part can tell one machine from another (PresentationState:
+    // a state of another machine is another state).
     struct CompiledTransition final {
         PresentationProperty property{PresentationProperty::parameter};
         std::size_t parameter{};
         std::vector<CompiledPresentationState> states{};
         MotionCurve curve{};
+        std::size_t machine{};
+        // Whether a state's value is in em (P8c).
+        bool reads_em{};
     };
 
     struct Resolution final {
@@ -840,6 +1127,11 @@ public:
         // position, where the winning declaration of the parameter is one;
         // null elsewhere. The expressions belong to the compiled rules.
         std::array<const EngineExpression*, maximum_primitive_parameters> expressions{};
+        // Each number parameter's em coefficient (P8c), by its position:
+        // the engine adds the part's em times it to the value, within the
+        // parameter's range. `parameters_read_em` is whether any is not 0.
+        std::array<double, maximum_primitive_parameters> parameter_em{};
+        bool parameters_read_em{};
         // The inputs the part reads (E6): the primitive's declared inputs
         // and every input its expressions read, as expression input bits.
         std::uint64_t inputs_read{};
@@ -853,6 +1145,9 @@ public:
         const AmbientEffect* ambient{};
         // The part's blend (blend_property): the last matching rule's.
         PartBlend blend{PartBlend::normal};
+        // The part's font (font_property, P8c): the last matching rule's,
+        // else the ui role.
+        FontDeclaration font{};
         // The winning declaration of each material field (EC1), by the
         // field's position, or null where no matching rule sets it; they
         // belong to the compiled rules. `materials_authored` is whether any
@@ -902,6 +1197,8 @@ private:
         // An expression declaration: `program` gives the value.
         bool expression{};
         EngineExpression program{};
+        // A number value's em coefficient (P8c).
+        double em{};
     };
 
     struct CompiledRule final {
@@ -919,6 +1216,8 @@ private:
         std::vector<CompiledTransition> transitions{};
         std::optional<AmbientEffect> ambient{};
         std::optional<PartBlend> blend{};
+        std::optional<FontDeclaration> font{};
+        MediaCondition media{};
         // Checked material fields, at most one per field.
         std::vector<MaterialDeclaration> materials{};
         // Checked recipe fields, at most one per field.
@@ -929,6 +1228,9 @@ private:
     // for the engine's own table, at CascadeLevel::built_in.
     static void add_rules(CompiledThemeRules& result, const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry,
                           bool engine_table);
+    // Numbers every compiled machine (CompiledTransition::machine), in rule
+    // order, once the rules are final.
+    void number_machines() noexcept;
     // The winning rule's primitive and parameters into `result`.
     void resolve_primitive(const PartFacts& facts, const CompiledRule& chosen, Resolution& result) const noexcept;
     // The resolved transitions, ambient effect and blend of the matching
@@ -944,6 +1246,9 @@ private:
     // diagnostic.
     static void add_blend(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
                           const RuleDeclaration& declaration, CompiledRule& compiled);
+    // A rule's font declaration (P8c), checked likewise.
+    static void add_font(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
+                         const RuleDeclaration& declaration, CompiledRule& compiled);
     // A rule's material fields, checked; a defect or a second declaration
     // of one field drops it with a diagnostic.
     static void add_materials(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,

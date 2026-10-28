@@ -1,6 +1,7 @@
 #include "linux_host_internal.hpp"
 #include "../../../core/host/frame_capture/frame_capture.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
+#include "../../posix/fonts/sealed_pages_posix.hpp"
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text/types/text_types.hpp"
 #include <thread>
@@ -463,44 +464,15 @@ std::filesystem::path fonts_directory() {
     return local;
   return executable.parent_path() / "../share/GUIForms/fonts";
 }
+// Every window borrows the process's one bundled font set: each face is read once, checked
+// against the manifest and sealed read-only (gui_forms::detail::BundledFontSet), then shared.
 void register_fonts(render::SkiaRaster &raster) {
-  struct Face final {
-    const char *name;
-    FontRole role;
-    std::uint16_t weight;
-    bool italic;
-    bool fallback;
-  };
-  const Face faces[] = {
-      {"PortsmouthRapids.ttf", FontRole::control, 400, false, false},
-      {"PortsmouthRapids-Bold.ttf", FontRole::control, 700, false, false},
-      {"Carlito-Regular.ttf", FontRole::content, 400, false, false},
-      {"Carlito-Bold.ttf", FontRole::content, 700, false, false},
-      {"Carlito-Italic.ttf", FontRole::content, 400, true, false},
-      {"Carlito-BoldItalic.ttf", FontRole::content, 700, true, false},
-      {"Cousine-Regular.ttf", FontRole::monospace, 400, false, false},
-      {"Cousine-Bold.ttf", FontRole::monospace, 700, false, false},
-      {"Cousine-Italic.ttf", FontRole::monospace, 400, true, false},
-      {"Cousine-BoldItalic.ttf", FontRole::monospace, 700, true, false},
-      {"NotoSansCJKjp-Regular.otf", FontRole::content, 400, false, true},
-      {"NotoSansArabic-Regular.ttf", FontRole::content, 400, false, true},
-      {"NotoSansHebrew-Regular.ttf", FontRole::content, 400, false, true},
-      {"NotoSansDevanagari-Regular.ttf", FontRole::content, 400, false, true},
-      {"NotoSansBengali-Regular.ttf", FontRole::content, 400, false, true},
-      {"NotoSansGurmukhi-Regular.ttf", FontRole::content, 400, false, true},
-      {"NotoEmoji-Regular.ttf", FontRole::content, 400, false, true}};
   const std::filesystem::path directory = fonts_directory();
-  for (std::size_t index = 0; index < std::size(faces); ++index) {
-    const Face &face = faces[index];
-    const std::filesystem::path path = directory / face.name;
-    // Optional Unicode and mono faces may be omitted by a consumer.
-    if (!std::filesystem::exists(path) && index >= 7) continue;
-    const std::string filename = path.string();
-    const bool accepted = face.fallback
-        ? raster.register_fallback_typeface_file(face.weight, face.italic, filename.c_str())
-        : raster.register_typeface_file(face.role, face.weight, face.italic, filename.c_str());
-    if (!accepted) throw std::runtime_error("Cannot load bundled GUI.Forms font: " + filename);
-  }
+  const std::shared_ptr<gui_forms::detail::BundledFontSet> set =
+      gui_forms::detail::shared_bundled_font_set(directory, gui_forms::host::posix_sealed_pages());
+  if (!raster.register_bundled_fonts(set))
+    throw std::runtime_error("Cannot load the bundled GUI.Forms fonts from " +
+                             directory.string());
 }
 struct Closing final {
   NativeWindow *window;
@@ -1583,6 +1555,11 @@ int run_linux_application(std::vector<LinuxApplicationWindow> windows,
   const std::shared_ptr<linux_detail::RunOpenState> open_state =
       std::make_shared<linux_detail::RunOpenState>();
   try {
+    // The run holds the bundled font set, so windows opened and closed during it share one
+    // copy of each face.
+    const std::shared_ptr<gui_forms::detail::BundledFontSet> run_fonts =
+        gui_forms::detail::shared_bundled_font_set(linux_detail::fonts_directory(),
+                                                   posix_sealed_pages());
     linux_detail::Runtime runtime;
     runtime.windowing = std::make_unique<linux_detail::X11Windowing>(runtime);
     // Ends the windowing on every exit from here, before ~Runtime closes the

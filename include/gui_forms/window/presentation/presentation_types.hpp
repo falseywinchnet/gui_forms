@@ -14,6 +14,15 @@ class LiveSurface;
 
 // Presentation preferences are logical UI policy and remain independent from
 // the native/device pixel scale.
+// The colour scheme a window prefers (T3 EC3): light unless the
+// application, or a host that reports one, says dark. A theme reads it
+// through `@media (prefers-color-scheme: ...)`; it changes no built-in
+// recipe.
+enum class ColourScheme : std::uint8_t {
+    light,
+    dark,
+};
+
 struct PresentationSettings final {
     double text_scale{1.0};
     bool high_contrast{};
@@ -40,6 +49,9 @@ struct PresentationSettings final {
     // default. Between 1 and maximum_double_click_milliseconds.
     std::uint32_t double_click_milliseconds{default_double_click_milliseconds};
     SettingOrigin double_click_origin{SettingOrigin::default_value};
+    // The preferred colour scheme (EC3). A change re-resolves every part:
+    // a theme's rules may hold for one scheme only.
+    ColourScheme colour_scheme{ColourScheme::light};
     friend constexpr bool operator==(const PresentationSettings& left,
                                      const PresentationSettings& right) noexcept {
         return left.text_scale == right.text_scale &&
@@ -49,7 +61,8 @@ struct PresentationSettings final {
                left.ambient_motion == right.ambient_motion &&
                left.reduced_transparency == right.reduced_transparency &&
                left.double_click_milliseconds == right.double_click_milliseconds &&
-               left.double_click_origin == right.double_click_origin;
+               left.double_click_origin == right.double_click_origin &&
+               left.colour_scheme == right.colour_scheme;
     }
 };
 

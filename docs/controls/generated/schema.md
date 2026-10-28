@@ -26,7 +26,7 @@ States: `normal`, `hot`, `pressed`, `captured`, `focused`, `focus_visible`, `pre
 
 Admitted custom states: `modified`, `pinned`.
 
-Marks: `check`, `indeterminate`, `radio_dot`, `toggle_knob`, `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right`, `chevron_down`, `chevron_right`, `close`, `grip_dots`, `dialog_launcher`, `more`, `overflow`, `customize`, `pin`, `dock_shape`.
+Marks: `check`, `indeterminate`, `radio_dot`, `toggle_knob`, `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right`, `chevron_down`, `chevron_right`, `close`, `grip_dots`, `dialog_launcher`, `more`, `overflow`, `customize`, `pin`, `dock_shape`, `underline`.
 
 Engine inputs: `pointer_x`, `pointer_y`, `time_in_state`, `display_scale`, `text_scale`.
 
@@ -820,6 +820,8 @@ Item system `cell`:
 | `cell_selection` | selection |  |  |
 | `cell_content` | content |  |  |
 | `cell_image` | image |  |  |
+| `cell_link` | content |  |  |
+| `cell_link_underline` | glyph |  |  |
 | `cell_check_well` | well | `check_box` |  |
 | `cell_check_indicator` | indicator |  |  |
 | `cell_button_face` | face | `button` |  |
@@ -830,7 +832,7 @@ Item system `cell`:
 | `cell_horizontal_rule` | divider |  |  |
 | `cell_focus` | focus |  |  |
 
-Item states: `selected`, `current`, `read_only`, `invalid`, `checked`, `pressed`, `open`, `focus_visible`.
+Item states: `selected`, `current`, `read_only`, `invalid`, `checked`, `pressed`, `open`, `focus_visible`. Application-defined: `visited`.
 
 Item system `column`:
 
