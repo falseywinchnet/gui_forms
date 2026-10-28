@@ -33,7 +33,10 @@ template_harness, checked out beside this repository at the commit
   `docs/reference/contracts/`. Without options it rewrites the inventory;
   `--check` fails on a stale inventory or an invalid contract. The dump
   depends on the compiler build, so run it with LLVM 22.1.8 (`--clang`).
-  `python3 tools/api_reference.py --check --clang /path/to/clang++`
+  The headers compile with the include directories a configured build tree
+  records (`--build`): gui_forms_core's and its public dependencies', which
+  CMake writes to `api_reference_include_directories.txt` in that tree.
+  `python3 tools/api_reference.py --check --build /path/to/build --clang /path/to/clang++`
 
 ## House style
 
