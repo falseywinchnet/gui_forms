@@ -74,7 +74,12 @@ finding:
 ```text
 python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv fuzz
 python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis
+python3 -B tools/check_stx_skia_style.py
 ```
+
+The third covers `stx_skia/`, whose files imported from Skia still carry
+findings while they are converted: it fails on any finding its shrink-only
+allowance does not list (`stx_skia/AGENTS.md`).
 
 The second checks two rules of sections 5 and 9: a function returning a
 borrow of a container or snapshot argument deletes its rvalue overload, and a
