@@ -78,6 +78,7 @@ struct Probe final {
     bool attached_services{};
     bool primary_hide_rejected{};
     bool recursive_rejected{};
+    bool shutdown_rejected{};
     bool system_close{};
     // The model's client size when close was first requested, after the
     // size request made in ready has been delivered.
@@ -105,6 +106,8 @@ struct Ready final {
         std::unique_ptr<Window> recursive_window = make_window();
         const ApplicationResult recursive = Application::run(std::move(recursive_window));
         (*probe).recursive_rejected = recursive.error == ApplicationError::already_running;
+        const ApplicationResult nested_shutdown = Application::shutdown();
+        (*probe).shutdown_rejected = nested_shutdown.error == ApplicationError::already_running;
         if ((*probe).fail) throw std::runtime_error("intentional ready failure");
 #if defined(_WIN32)
         if ((*probe).system_close) {
@@ -361,6 +364,27 @@ void check_runtime_windows() {
     require(probe.floating_open.accepted() && probe.floating_destroy.accepted(),
             "floating document window not opened and destroyed");
 }
+#if defined(__APPLE__)
+struct ForeignShutdown final {
+    ApplicationResult* result{};
+    void operator()() const { (*result) = Application::shutdown(); }
+};
+#endif
+// Last in the process: after it no run can start, and stx_skia is ended.
+void check_shutdown() {
+#if defined(__APPLE__)
+    ApplicationResult foreign{};
+    std::thread worker(ForeignShutdown{&foreign});
+    worker.join();
+    require(foreign.error == ApplicationError::wrong_thread, "shutdown off the main thread accepted");
+#endif
+    const ApplicationResult ended = Application::shutdown();
+    require(ended.accepted(), "shutdown after the last run refused");
+    const ApplicationResult again = Application::shutdown();
+    require(again.error == ApplicationError::after_shutdown, "second shutdown accepted");
+    const ApplicationResult late = Application::run(make_window());
+    require(late.error == ApplicationError::after_shutdown, "run after shutdown accepted");
+}
 }
 int main() {
 #if defined(_WIN32)
@@ -380,6 +404,7 @@ int main() {
     require(result.accepted(), "native application run failed");
     require(normal.ready == 1U && normal.closing == 2U && normal.closed == 1U, "native close/cancel order wrong");
     require(normal.attached_services && normal.primary_hide_rejected && normal.recursive_rejected, "ready contract incomplete");
+    require(normal.shutdown_rejected, "shutdown during a run accepted");
     const HostServiceStatus shown = normal.handle.show();
     require(!normal.closed_active && !normal.handle.active() && shown.error == HostServiceError::after_shutdown,
             "native window handle survived close");
@@ -402,5 +427,6 @@ int main() {
     require(failed_dispatch.error == ApplicationError::callback_failure && failed_dispatch.callback_exception,
             "dispatch exception escaped the portable application boundary");
     check_runtime_windows();
-    std::cout << "portable application API: native attach, cancel/retry, close, expiry, recursion, exception containment and runtime windows passed\n";
+    check_shutdown();
+    std::cout << "portable application API: native attach, cancel/retry, close, expiry, recursion, exception containment, runtime windows and shutdown passed\n";
 }

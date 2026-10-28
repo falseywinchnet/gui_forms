@@ -8,6 +8,8 @@
 #include "gui_forms/window/presentation/presentation_types.hpp"
 #endif
 
+#include "../../../core/resources/fonts/bundled_font_set.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -15,6 +17,12 @@
 #include <vector>
 
 namespace gui_forms::render {
+
+// Ends stx_skia for the process (SkGraphics::Shutdown): frees its caches and
+// singletons. Application::shutdown calls it once, after every SkiaRaster and
+// every image or font registered through one is destroyed. Any later stx_skia
+// use stops the program.
+void shutdown_skia_library();
 
 class SkiaRaster final : public Painter {
 public:
@@ -53,7 +61,15 @@ public:
     [[nodiscard]] bool register_fallback_typeface(
         std::uint16_t weight, bool italic,
         std::span<const std::byte> encoded);
-    // Bundled files remain read-only mappings shared with the text shaper.
+    // Registers the bundled faces in gui_forms::detail::bundled_face_uses() order from `set`, borrowing its
+    // sealed bytes (no copy), and keeps the set for as long as this raster lives. A fallback
+    // with a coverage table is read from the set only when text first needs it. Returns false
+    // if a required face is unavailable; optional faces that fail are left out, and faces
+    // registered before a failure stay registered.
+    [[nodiscard]] bool register_bundled_fonts(std::shared_ptr<gui_forms::detail::BundledFontSet> set);
+    // Fonts an application supplies by path. Reads the whole file into a private copy shared
+    // with the text shaper; false when the path is null, the file cannot be read, is empty or
+    // is larger than 64 MiB.
     [[nodiscard]] bool register_typeface_file(
         FontRole role, std::uint16_t weight, bool italic, const char* path);
     [[nodiscard]] bool register_fallback_typeface_file(

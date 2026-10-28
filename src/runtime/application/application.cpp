@@ -13,9 +13,17 @@
 #include "gui_forms/platform/linux_host.hpp"
 #endif
 
+#if defined(GUI_FORMS_APPLICATION_SKIA)
+#include "skia_raster.hpp"
+#endif
+
 namespace gui_forms {
 namespace {
 std::atomic_flag running = ATOMIC_FLAG_INIT;
+// Set once by Application::shutdown. Read and written only while `running`
+// is held, so the flag orders it; atomic so a refused caller on another
+// thread never races the store.
+std::atomic<bool> shut_down{false};
 
 class RunningScope final {
 public:
@@ -370,6 +378,7 @@ ApplicationResult Application::run(std::vector<ApplicationWindow> windows) {
 #endif
     const RunningScope running_scope{};
     if (!running_scope.acquired()) return {ApplicationError::already_running};
+    if (shut_down.load()) return {ApplicationError::after_shutdown};
     ApplicationResult result = validate(windows);
     if (!result.accepted()) return result;
     // Before any native window exists (stage T5).
@@ -416,6 +425,24 @@ ApplicationResult Application::run(std::vector<ApplicationWindow> windows) {
     } else if (result.native_exit_code != 0) {
         result.error = ApplicationError::backend_failure;
     }
+    return result;
+}
+
+ApplicationResult Application::shutdown() {
+#if defined(GUI_FORMS_APPLICATION_MACOS)
+    if (pthread_main_np() == 0) return {ApplicationError::wrong_thread};
+#endif
+    // Holding the run flag keeps a run from starting while the library ends.
+    const RunningScope running_scope{};
+    if (!running_scope.acquired()) return {ApplicationError::already_running};
+    if (shut_down.load()) return {ApplicationError::after_shutdown};
+    shut_down.store(true);
+    // Every run has returned, so its windows, rasters and fonts are destroyed
+    // (the window models are consumed by run, and handles are weak).
+#if defined(GUI_FORMS_APPLICATION_SKIA)
+    render::shutdown_skia_library();
+#endif
+    const ApplicationResult result{};
     return result;
 }
 } // namespace gui_forms

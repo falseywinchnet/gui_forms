@@ -35,6 +35,8 @@ gui_forms::Application
         - The application's one set of keyboard-command keys (owner decision DK-44): :cpp:func:`run <gui_forms::Application::run>` gives it to every window it runs, before the host attaches, so the host seeds it once and a rebinding in any window holds in all.
       * - :cpp:func:`run <gui_forms::Application::run>`
         - ``run(std::unique_ptr<Window>, ApplicationWindowOptions)`` presents one window, with the stable ID ``"main"``.
+      * - :cpp:func:`shutdown <gui_forms::Application::shutdown>`
+        - Ends the rendering library once per process: it frees stx_skia's caches and singletons.
 
    .. seealso::
 
@@ -48,7 +50,7 @@ gui_forms::Application
          One entry of a multi-window run.
 
       :cpp:class:`ApplicationResult <gui_forms::ApplicationResult>`
-         What ``run`` and ``validate`` return.
+         What ``run``, ``validate`` and ``shutdown`` return.
 
       :cpp:class:`Window <gui_forms::Window>`
          The retained model each native window presents.
@@ -73,6 +75,8 @@ gui_forms::Application
      window to end the run.
    - :cpp:enumerator:`ApplicationError::backend_failure <gui_forms::ApplicationError::backend_failure>`: the native host exited with a nonzero
      ``ApplicationResult::native_exit_code``.
+   - :cpp:enumerator:`ApplicationError::after_shutdown <gui_forms::ApplicationError::after_shutdown>`: :cpp:func:`shutdown <gui_forms::Application::shutdown>` has already run in this
+     process.
 
    The rules :cpp:func:`validate <gui_forms::Application::validate>` checks: between 1 and 64 windows; every stable ID
    nonempty, unique, at most 1024 bytes of valid UTF-8 without NUL; an owner ID,
@@ -120,6 +124,11 @@ gui_forms::Application
           if (!result.accepted()) {
               std::fprintf(stderr, "run failed: %d\n", static_cast<int>(result.error));
           }
+          // Once, after the program's last run.
+          gf::ApplicationResult ended = gf::Application::shutdown();
+          if (!ended.accepted()) {
+              std::fprintf(stderr, "shutdown failed: %d\n", static_cast<int>(ended.error));
+          }
       }
 
 
@@ -159,6 +168,18 @@ gui_forms::Application
       with no owner, plus owned and tool windows. It returns when the primary
       window has closed. The window models are consumed even when :cpp:func:`run <gui_forms::Application::run>`
       fails.
+
+   .. cpp:function:: static ApplicationResult shutdown()
+
+      Ends the rendering library once per process: it frees stx_skia's caches
+      and singletons. Call it after the last :cpp:func:`run <gui_forms::Application::run>` has returned, when every
+      window, surface and font the program made is gone; the window models
+      :cpp:func:`run <gui_forms::Application::run>` consumed are already destroyed. It is refused with
+      ``already_running`` while a :cpp:func:`run <gui_forms::Application::run>` is in progress (from a callback, for
+      example) and with ``wrong_thread`` on macOS off the main thread. After it,
+      :cpp:func:`run <gui_forms::Application::run>` and :cpp:func:`shutdown <gui_forms::Application::shutdown>` return ``after_shutdown``. A process may end without
+      it, a crash included, and lose nothing: the library holds only process
+      memory, which the operating system reclaims.
 
    .. cpp:member:: constexpr std::size_t maximum_windows
 

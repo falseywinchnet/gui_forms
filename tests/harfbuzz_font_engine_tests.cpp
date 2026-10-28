@@ -1,4 +1,5 @@
 #include "harfbuzz_font_engine.hpp"
+#include "../src/core/resources/fonts/bundled_font_set.hpp"
 
 #include <algorithm>
 #include <array>
@@ -385,7 +386,6 @@ void test_public_resolution_record_names_actual_bundled_runs() {
 
 } // namespace
 
-#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
 namespace {
 void require_same_shape(const ShapedText& left, const ShapedText& right) {
     require(left.width == right.width && left.height == right.height &&
@@ -407,6 +407,143 @@ void require_same_shape(const ShapedText& left, const ShapedText& right) {
     }
 }
 
+// A lazy fallback's loader, counting its calls. `throws` calls fail before the bytes are
+// handed out.
+struct CountingLoader final {
+    std::shared_ptr<const std::vector<std::byte>> bytes;
+    std::shared_ptr<int> calls;
+    std::shared_ptr<int> throws;
+
+    [[nodiscard]] LazyFaceBytes operator()() const {
+        ++(*calls);
+        if (*throws > 0) {
+            --(*throws);
+            throw std::runtime_error("lazy face read failed");
+        }
+        LazyFaceBytes result{};
+        if (!bytes) return result;
+        result.bytes = std::span<const std::byte>(*bytes);
+        result.owner = bytes;
+        return result;
+    }
+};
+
+CountingLoader counting_loader(const char* path) {
+    CountingLoader loader{};
+    if (path != nullptr) loader.bytes = std::make_shared<const std::vector<std::byte>>(read_file(path));
+    loader.calls = std::make_shared<int>(0);
+    loader.throws = std::make_shared<int>(0);
+    return loader;
+}
+
+std::span<const gui_forms::detail::CodepointRange> table(const char* file_name) {
+    const std::optional<std::span<const gui_forms::detail::CodepointRange>> coverage =
+        gui_forms::detail::bundled_face_coverage(file_name);
+    require(coverage.has_value(), "bundled fallback has a coverage table");
+    return *coverage;
+}
+
+void register_primaries(HarfBuzzFontEngine& engine, const std::vector<std::byte>& rapids,
+                        const std::vector<std::byte>& carlito, const std::vector<std::byte>& cousine) {
+    require(engine.register_typeface(FontRole::control, 400, false, rapids) &&
+            engine.register_typeface(FontRole::content, 400, false, carlito) &&
+            engine.register_typeface(FontRole::monospace, 400, false, cousine), "primaries register");
+}
+
+// A lazy fallback is read only when a cluster first needs it, once, and then selects and shapes
+// exactly as the same face registered eagerly; one that cannot be read or opened covers nothing,
+// and one whose read throws is read again by the next call.
+void test_lazy_fallback_matches_eager_and_loads_once() {
+    const std::vector<std::byte> rapids = read_file(GUI_FORMS_TEST_RAPIDS_REGULAR);
+    const std::vector<std::byte> carlito = read_file(GUI_FORMS_TEST_CARLITO_REGULAR);
+    const std::vector<std::byte> cousine = read_file(GUI_FORMS_TEST_COUSINE_REGULAR);
+    const std::array<const char*, 4> paths{GUI_FORMS_TEST_NOTO_CJK_REGULAR, GUI_FORMS_TEST_NOTO_ARABIC_REGULAR,
+                                           GUI_FORMS_TEST_NOTO_HEBREW_REGULAR, GUI_FORMS_TEST_NOTO_EMOJI};
+    const std::array<const char*, 4> names{"NotoSansCJKjp-Regular.otf", "NotoSansArabic-Regular.ttf",
+                                           "NotoSansHebrew-Regular.ttf", "NotoEmoji-Regular.ttf"};
+    HarfBuzzFontEngine eager;
+    HarfBuzzFontEngine lazy;
+    register_primaries(eager, rapids, carlito, cousine);
+    register_primaries(lazy, rapids, carlito, cousine);
+    std::array<CountingLoader, 4> loaders{};
+    for (std::size_t index = 0; index < paths.size(); ++index) {
+        loaders[index] = counting_loader(paths[index]);
+        require(eager.register_fallback_typeface(400, false, *loaders[index].bytes).has_value(),
+                "eager fallback registers");
+        require(lazy.register_lazy_fallback_typeface(400, false, table(names[index]), loaders[index]).has_value(),
+                "lazy fallback registers");
+    }
+    require(lazy.face_count() == 7U && lazy.opened_face_count() == 3U && eager.opened_face_count() == 7U,
+            "lazy fallbacks are registered unopened");
+    require(!lazy.face_source(FontFaceId{4U}).has_value(), "an unopened face has no source");
+
+    const FontSpec control{FontRole::control, 15.0, 400, false};
+    require_same_shape(lazy.shape("Plain Latin text", control), eager.shape("Plain Latin text", control));
+    require(*loaders[0].calls + *loaders[1].calls + *loaders[2].calls + *loaders[3].calls == 0,
+            "text the primaries cover reads no fallback");
+    require_same_shape(lazy.shape("A日本語Z", control), eager.shape("A日本語Z", control));
+    require(*loaders[0].calls == 1 && *loaders[1].calls + *loaders[2].calls + *loaders[3].calls == 0 &&
+            lazy.opened_face_count() == 4U, "CJK text reads only the CJK face");
+    const std::optional<FontFaceSource> source = lazy.face_source(FontFaceId{4U});
+    require(source && (*source).bytes.data() == (*loaders[0].bytes).data() &&
+            (*source).bytes.size() == (*loaders[0].bytes).size(), "an opened face's source is its loaded bytes");
+
+    const std::string sample = "A日本語🚀Z مرحبا שלום é ü";
+    for (const FontRole role : std::array{FontRole::control, FontRole::content, FontRole::monospace}) {
+        const FontSpec font{role, 15.0, 400, false};
+        require_same_shape(lazy.shape(sample, font), eager.shape(sample, font));
+        const ResolvedTextLayout lazy_resolved = lazy.resolve(sample, font);
+        const ResolvedTextLayout eager_resolved = eager.resolve(sample, font);
+        require(lazy_resolved.status == eager_resolved.status &&
+                lazy_resolved.primary_family == eager_resolved.primary_family &&
+                lazy_resolved.runs == eager_resolved.runs, "a lazy face resolves as the eager face does");
+    }
+    for (const CountingLoader& loader : loaders) require(*loader.calls == 1, "each fallback is read once");
+    require(lazy.opened_face_count() == 7U, "every needed fallback opened");
+
+    // Unreadable bytes, and bytes that are not a font, cover nothing and are not read again.
+    HarfBuzzFontEngine primaries;
+    register_primaries(primaries, rapids, carlito, cousine);
+    for (const char* path : std::array<const char*, 2>{nullptr, GUI_FORMS_TEST_NOTO_EMOJI}) {
+        HarfBuzzFontEngine damaged;
+        register_primaries(damaged, rapids, carlito, cousine);
+        CountingLoader loader = counting_loader(path);
+        if (path != nullptr) {
+            std::vector<std::byte> garbage(*loader.bytes);
+            std::fill(garbage.begin(), garbage.begin() + 64, std::byte{0x5A});
+            loader.bytes = std::make_shared<const std::vector<std::byte>>(std::move(garbage));
+        }
+        require(damaged.register_lazy_fallback_typeface(400, false, table(names[0]), loader).has_value(),
+                "damaged lazy fallback registers");
+        require_same_shape(damaged.shape("日本", control), primaries.shape("日本", control));
+        require_same_shape(damaged.shape("日本", control), primaries.shape("日本", control));
+        require(*loader.calls == 1 && damaged.opened_face_count() == 3U,
+                "a face that cannot be opened is read once and covers nothing");
+    }
+
+    // A read that throws fails the call and leaves the face to be read by the next one.
+    HarfBuzzFontEngine retried;
+    register_primaries(retried, rapids, carlito, cousine);
+    CountingLoader flaky = counting_loader(GUI_FORMS_TEST_NOTO_CJK_REGULAR);
+    *flaky.throws = 1;
+    require(retried.register_lazy_fallback_typeface(400, false, table(names[0]), flaky).has_value(),
+            "retried lazy fallback registers");
+    bool threw = false;
+    try {
+        static_cast<void>(retried.shape("日本", control));
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    require(threw && retried.opened_face_count() == 3U, "a throwing read fails the call");
+    require_same_shape(retried.shape("A日本語Z", control), eager.shape("A日本語Z", control));
+    require(*flaky.calls == 2 && retried.opened_face_count() == 4U, "the next call reads the face again");
+
+    require(!lazy.register_lazy_fallback_typeface(400, false, {}, loaders[0]).has_value() &&
+            !lazy.register_lazy_fallback_typeface(400, false, table(names[0]), LazyFaceLoader{}).has_value(),
+            "a lazy face needs coverage and a loader");
+}
+
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
 void test_call_failure_preserves_caller_and_recovers() {
     HarfBuzzFontEngine engine{};
     const std::vector<std::byte> primary = read_file(GUI_FORMS_TEST_CARLITO_REGULAR);
@@ -457,8 +594,8 @@ void test_call_failure_preserves_caller_and_recovers() {
         require_same_shape(recovered, expected);
     }
 }
-} // namespace
 #endif
+} // namespace
 
 namespace {
 void test_canonical_pair_coverage_preserves_source() {
@@ -539,6 +676,7 @@ int main() {
         test_control_navigation_symbols_stay_in_rapids();
         test_metrics_scale_and_repeat_deterministically();
         test_shared_cjk_and_emoji_fallback_across_roles();
+        test_lazy_fallback_matches_eager_and_loads_once();
         test_letter_spacing_is_a_shaped_layout_input();
         test_rejection_and_missing_role_are_honest();
         test_public_resolution_record_names_actual_bundled_runs();

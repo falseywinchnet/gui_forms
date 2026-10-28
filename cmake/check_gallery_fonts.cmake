@@ -2,19 +2,30 @@ if(NOT IS_DIRECTORY "${FONT_DIRECTORY}")
     message(FATAL_ERROR "Bundled font directory is missing: ${FONT_DIRECTORY}")
 endif()
 
-set(font_manifest
-    "PortsmouthRapids.ttf|88988bea222852c30e08a3629d9f929baacfec4844c85bb978dcc68e6f4d4add"
-    "PortsmouthRapids-Bold.ttf|f97d702778f5933b4ae138064a348499a6dba90d9e2e6bf75a6ab81a6730c03a"
-    "Carlito-Regular.ttf|f6418f708baede9789daef5d458c0f53d2a888af9820e8062934e504fedc6595"
-    "Carlito-Bold.ttf|bb5d20f79b82599ec72983597437373a80f2d2085fa91fc144fd74e876a594db"
-    "Carlito-Italic.ttf|0b019225e58d702bfedcbd35c21696769f8ee115cb6343f84c2f240312450d1c"
-    "Carlito-BoldItalic.ttf|b32928186c119599e03ca6a1ffc680fdcb7fac95772f4b95d989cf6cd3861517"
-    "Cousine-Regular.ttf|5a57f0184000371cb22fe3fcea4c500354cab1a69efaf7beaf3e6eca6ecfefea"
-    "Cousine-Bold.ttf|331215ec6445f41e98d8971251bb6237e722907f4101faae990583accfe79545"
-    "Cousine-Italic.ttf|afb869eee8643d09915c3286edb61dad66278ceb1511c79b474ce21548421bcd"
-    "Cousine-BoldItalic.ttf|7f804549c941ceaac0a9635389ed09c4bbc86e4bfe37589191dacd1b5b0e26a5"
-    "NotoSansCJKjp-Regular.otf|68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5"
-    "NotoEmoji-Regular.ttf|415dc6290378574135b64c808dc640c1df7531973290c4970c51fdeb849cb0c5"
+# The bundled faces and their SHA-256 digests come from one source, assets/fonts/
+# bundled-fonts.sha256 (sha256sum format: 64 hex digits, two spaces, the file name), which the
+# runtime font set also embeds. The two notices that must not drift are listed here.
+set(font_manifest_path "${CMAKE_CURRENT_LIST_DIR}/../assets/fonts/bundled-fonts.sha256")
+if(NOT EXISTS "${font_manifest_path}")
+    message(FATAL_ERROR "Bundled font manifest is missing: ${font_manifest_path}")
+endif()
+file(STRINGS "${font_manifest_path}" manifest_lines)
+set(font_manifest)
+foreach(line IN LISTS manifest_lines)
+    if(NOT line MATCHES "^([0-9a-f]+)  ([^ ]+)$")
+        message(FATAL_ERROR "Bundled font manifest line is malformed: ${line}")
+    endif()
+    string(LENGTH "${CMAKE_MATCH_1}" digest_length)
+    if(NOT digest_length EQUAL 64)
+        message(FATAL_ERROR "Bundled font manifest digest is not SHA-256: ${line}")
+    endif()
+    list(APPEND font_manifest "${CMAKE_MATCH_2}|${CMAKE_MATCH_1}")
+endforeach()
+list(LENGTH font_manifest face_count)
+if(face_count EQUAL 0)
+    message(FATAL_ERROR "Bundled font manifest lists no faces: ${font_manifest_path}")
+endif()
+list(APPEND font_manifest
     "OFL-NotoSansCJKjp.txt|6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
     "OFL-NotoEmoji.txt|6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2")
 

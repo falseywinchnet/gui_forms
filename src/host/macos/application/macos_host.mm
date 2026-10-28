@@ -13,6 +13,7 @@
 #include "../../../render/skia/raster/skia_raster.hpp"
 #include "../../../core/host/frame_capture/frame_capture.hpp"
 #include "../compositor/macos_compositor.hpp"
+#include "../../posix/fonts/sealed_pages_posix.hpp"
 
 #include <algorithm>
 #include <array>
@@ -22,6 +23,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <exception>
+#include <filesystem>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -697,34 +699,24 @@ static std::string utf8_string(id value) {
     return bytes == nullptr ? std::string{} : std::string(bytes);
 }
 
-static bool register_bundle_typeface(SkiaRaster& raster,
-                                     NSString* resource_name,
-                                     gui_forms::FontRole role,
-                                     std::uint16_t weight,
-                                     bool italic = false,
-                                     NSString* extension = @"ttf",
-                                     bool optional = false) {
-    NSURL* url = [[NSBundle mainBundle] URLForResource:resource_name
-                                        withExtension:extension
-                                         subdirectory:@"fonts"];
-    if (url == nil) {
-        return optional;
-    }
-    const bool registered = raster.register_typeface_file(role, weight, italic, url.fileSystemRepresentation);
-    return registered;
+// The bundle's font directory (Contents/Resources/fonts), or empty when the process has no
+// bundle resources.
+static std::filesystem::path bundle_font_directory() {
+    NSString* resources = [[NSBundle mainBundle] resourcePath];
+    if (resources == nil) return {};
+    const std::filesystem::path directory =
+        std::filesystem::path(resources.fileSystemRepresentation) / "fonts";
+    return directory;
 }
 
-static bool register_bundle_fallback_typeface(SkiaRaster& raster,
-                                              NSString* resource_name,
-                                              NSString* extension,
-                                              std::uint16_t weight = 400,
-                                              bool italic = false) {
-    NSURL* url = [[NSBundle mainBundle] URLForResource:resource_name
-                                        withExtension:extension
-                                         subdirectory:@"fonts"];
-    if (url == nil) return true;
-    const bool registered = raster.register_fallback_typeface_file(weight, italic, url.fileSystemRepresentation);
-    return registered;
+// The process's one bundled font set, shared by every view and held by the application run:
+// each face is read once, checked against the manifest and sealed read-only.
+static std::shared_ptr<gui_forms::detail::BundledFontSet> bundle_font_set() {
+    const std::filesystem::path directory = bundle_font_directory();
+    if (directory.empty()) return {};
+    const std::shared_ptr<gui_forms::detail::BundledFontSet> set =
+        gui_forms::detail::shared_bundled_font_set(directory, gui_forms::host::posix_sealed_pages());
+    return set;
 }
 
 namespace {
@@ -1900,41 +1892,7 @@ void post_perform_close(NSWindow* window) {
         [self setWantsLayer:NO];
         [self registerForDraggedTypes:@[
             NSPasteboardTypeString, NSPasteboardTypeFileURL, @"public.data"]];
-        const bool fonts_ready =
-            register_bundle_typeface(_raster, @"PortsmouthRapids",
-                                     gui_forms::FontRole::control, 400) &&
-            register_bundle_typeface(_raster, @"PortsmouthRapids-Bold",
-                                     gui_forms::FontRole::control, 700) &&
-            register_bundle_typeface(_raster, @"Carlito-Regular",
-                                     gui_forms::FontRole::content, 400) &&
-            register_bundle_typeface(_raster, @"Carlito-Bold",
-                                     gui_forms::FontRole::content, 700) &&
-            register_bundle_typeface(_raster, @"Carlito-Italic",
-                                     gui_forms::FontRole::content, 400, true) &&
-            register_bundle_typeface(_raster, @"Carlito-BoldItalic",
-                                     gui_forms::FontRole::content, 700, true) &&
-            register_bundle_typeface(_raster, @"Cousine-Regular",
-                                     gui_forms::FontRole::monospace, 400) &&
-            register_bundle_typeface(_raster, @"Cousine-Bold",
-                                     gui_forms::FontRole::monospace, 700, false, @"ttf", true) &&
-            register_bundle_typeface(_raster, @"Cousine-Italic",
-                                     gui_forms::FontRole::monospace, 400, true, @"ttf", true) &&
-            register_bundle_typeface(_raster, @"Cousine-BoldItalic",
-                                     gui_forms::FontRole::monospace, 700, true, @"ttf", true) &&
-            register_bundle_fallback_typeface(
-                _raster, @"NotoSansCJKjp-Regular", @"otf") &&
-            register_bundle_fallback_typeface(
-                _raster, @"NotoSansArabic-Regular", @"ttf") &&
-            register_bundle_fallback_typeface(
-                _raster, @"NotoSansHebrew-Regular", @"ttf") &&
-            register_bundle_fallback_typeface(
-                _raster, @"NotoSansDevanagari-Regular", @"ttf") &&
-            register_bundle_fallback_typeface(
-                _raster, @"NotoSansBengali-Regular", @"ttf") &&
-            register_bundle_fallback_typeface(
-                _raster, @"NotoSansGurmukhi-Regular", @"ttf") &&
-            register_bundle_fallback_typeface(
-                _raster, @"NotoEmoji-Regular", @"ttf");
+        const bool fonts_ready = _raster.register_bundled_fonts(bundle_font_set());
         (*_model).set_text_metrics_provider(fonts_ready ? &_raster : nullptr);
         (*_model).set_framebuffer_painter(fonts_ready ? &_raster : nullptr);
         (*_model).metrics().set_renderer(

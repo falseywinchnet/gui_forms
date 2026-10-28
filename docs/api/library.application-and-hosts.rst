@@ -2711,6 +2711,8 @@ Enumerations
 
    .. cpp:enumerator:: callback_failure
 
+   .. cpp:enumerator:: after_shutdown
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: CompositorPresence

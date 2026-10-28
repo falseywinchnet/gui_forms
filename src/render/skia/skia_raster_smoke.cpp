@@ -1,12 +1,24 @@
 #include "skia_raster.hpp"
+#include "gui_forms/paint_framebuffer.hpp"
+#include "gui_forms/resources/image_registry/image_registry.hpp"
+#include "../text/harfbuzz/bundled_face_loader.hpp"
+#if defined(_WIN32)
+#include "../../host/windows/fonts/sealed_pages_windows.hpp"
+#else
+#include "../../host/posix/fonts/sealed_pages_posix.hpp"
+#endif
 
 #include <array>
 #include <cstring>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
+#include <memory>
 #include <fstream>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -62,18 +74,57 @@ const std::uint8_t* pixel_at(const std::uint8_t* pixels, std::size_t row_bytes,
            static_cast<std::size_t>(x * scale) * 4U;
 }
 
-bool mapped_fonts_match_copied_fonts() {
+// Registration from a file refuses a null path, a missing file, a directory and an empty
+// file, and leaves the raster able to register a readable file afterwards.
+bool unreadable_font_files_are_refused() {
+    gui_forms::render::SkiaRaster raster;
+    const std::filesystem::path empty_path =
+        std::filesystem::temp_directory_path() / "gui_forms_skia_smoke_empty_font.ttf";
+    {
+        std::ofstream empty_file(empty_path, std::ios::binary | std::ios::trunc);
+        if (!empty_file) return false;
+    }
+    const std::string empty_name = empty_path.string();
+    const std::string directory_name = std::filesystem::temp_directory_path().string();
+    const bool refused_null = !raster.register_typeface_file(gui_forms::FontRole::control, 400, false, nullptr);
+    const bool refused_missing =
+        !raster.register_typeface_file(gui_forms::FontRole::control, 400, false, "/gui-forms-missing-font.otf");
+    const bool refused_directory =
+        !raster.register_typeface_file(gui_forms::FontRole::control, 400, false, directory_name.c_str());
+    const bool refused_empty =
+        !raster.register_fallback_typeface_file(400, false, empty_name.c_str());
+    std::error_code removal_error;
+    std::filesystem::remove(empty_path, removal_error);
+    const bool accepted_readable =
+        raster.register_typeface_file(gui_forms::FontRole::control, 400, false, GUI_FORMS_TEST_CONTROL_FONT);
+    // The path is UTF-8, so a copy under a non-ASCII name must register too.
+    const std::filesystem::path utf8_path =
+        std::filesystem::temp_directory_path() / std::u8string_view(u8"gui_forms_skia_smoke_\u00e9t\u00e9.ttf");
+    std::error_code copy_error;
+    std::filesystem::copy_file(GUI_FORMS_TEST_CONTROL_FONT, utf8_path,
+                               std::filesystem::copy_options::overwrite_existing, copy_error);
+    if (copy_error) return false;
+    const std::u8string utf8_name = utf8_path.u8string();
+    const std::string utf8_bytes(reinterpret_cast<const char*>(utf8_name.data()), utf8_name.size());
+    const bool accepted_utf8 =
+        raster.register_fallback_typeface_file(400, false, utf8_bytes.c_str());
+    std::filesystem::remove(utf8_path, removal_error);
+    return refused_null && refused_missing && refused_directory && refused_empty &&
+        accepted_readable && accepted_utf8;
+}
+
+bool file_fonts_match_copied_fonts() {
     gui_forms::render::SkiaRaster copied;
-    gui_forms::render::SkiaRaster mapped;
+    gui_forms::render::SkiaRaster from_file;
     if (!copied.register_typeface(gui_forms::FontRole::control, 400, false,
             read_file(GUI_FORMS_TEST_CONTROL_FONT)) ||
         !copied.register_fallback_typeface(400, false, read_file(GUI_FORMS_TEST_CJK_FONT)) ||
-        !mapped.register_typeface_file(gui_forms::FontRole::control, 400, false, GUI_FORMS_TEST_CONTROL_FONT) ||
-        !mapped.register_fallback_typeface_file(400, false, GUI_FORMS_TEST_CJK_FONT) ||
-        mapped.register_fallback_typeface_file(400, false, nullptr) ||
-        mapped.register_fallback_typeface_file(400, false, "/gui-forms-missing-font.otf")) return false;
+        !from_file.register_typeface_file(gui_forms::FontRole::control, 400, false, GUI_FORMS_TEST_CONTROL_FONT) ||
+        !from_file.register_fallback_typeface_file(400, false, GUI_FORMS_TEST_CJK_FONT) ||
+        from_file.register_fallback_typeface_file(400, false, nullptr) ||
+        from_file.register_fallback_typeface_file(400, false, "/gui-forms-missing-font.otf")) return false;
     const std::string_view text = "Plan Paint — 漢字 日本語 中文";
-    for (gui_forms::render::SkiaRaster* raster : {&copied, &mapped}) {
+    for (gui_forms::render::SkiaRaster* raster : {&copied, &from_file}) {
         if (!(*raster).resize({440, 60}, 2)) return false;
         gui_forms::DamageRegion damage;
         damage.add({0, 0, 440, 60});
@@ -83,16 +134,106 @@ bool mapped_fonts_match_copied_fonts() {
                                gui_forms::Color::rgba(0, 0, 0));
         (*raster).end_frame();
     }
-    return copied.byte_size() == mapped.byte_size() &&
-        std::memcmp(copied.pixels(), mapped.pixels(), copied.byte_size()) == 0;
+    return copied.byte_size() == from_file.byte_size() &&
+        std::memcmp(copied.pixels(), from_file.pixels(), copied.byte_size()) == 0;
+}
+
+// Two rasters borrow one bundled set: registration reads every face except the fallbacks with
+// coverage tables, each once; a fallback is read when text first needs it, once for every
+// raster and framebuffer; and the borrowed faces draw what copies of the same files draw. A set
+// over a directory without the fonts registers nothing required.
+bool bundled_fonts_are_shared() {
+#if defined(_WIN32)
+    const gui_forms::detail::SealedPageFunctions pages = gui_forms::host::windows_sealed_pages();
+#else
+    const gui_forms::detail::SealedPageFunctions pages = gui_forms::host::posix_sealed_pages();
+#endif
+    const std::filesystem::path directory =
+        std::filesystem::path(GUI_FORMS_TEST_CONTROL_FONT).parent_path();
+    const std::shared_ptr<gui_forms::detail::BundledFontSet> set =
+        gui_forms::detail::shared_bundled_font_set(directory, pages);
+    gui_forms::render::SkiaRaster first;
+    gui_forms::render::SkiaRaster second;
+    if (!first.register_bundled_fonts(set) || !second.register_bundled_fonts(set)) return false;
+    std::size_t eager_faces = 0;
+    std::uint64_t eager_bytes = 0;
+    std::uint64_t cjk_bytes = 0;
+    for (const gui_forms::detail::BundledFaceUse& use : gui_forms::detail::bundled_face_uses()) {
+        for (const gui_forms::detail::BundledFaceRecord& record : gui_forms::detail::bundled_face_manifest()) {
+            if (record.file_name != use.file_name) continue;
+            if (use.file_name == "NotoSansCJKjp-Regular.otf") cjk_bytes = record.size_bytes;
+            if (gui_forms::render::text::lazy_bundled_coverage(use)) continue;
+            ++eager_faces;
+            eager_bytes += record.size_bytes;
+        }
+    }
+    if (eager_faces != 10U || cjk_bytes == 0U || (*set).loaded_face_count() != eager_faces ||
+        (*set).loaded_bytes() != eager_bytes) return false;
+
+    gui_forms::render::SkiaRaster copied;
+    if (!copied.register_typeface(gui_forms::FontRole::control, 400, false,
+            read_file(GUI_FORMS_TEST_CONTROL_FONT)) ||
+        !copied.register_fallback_typeface(400, false, read_file(GUI_FORMS_TEST_CJK_FONT))) return false;
+    const std::string_view text = "Plan Paint 漢字 日本語 中文";
+    for (gui_forms::render::SkiaRaster* raster : {&first, &copied}) {
+        if (!(*raster).resize({440, 60}, 2)) return false;
+        gui_forms::DamageRegion damage;
+        damage.add({0, 0, 440, 60});
+        (*raster).begin_frame(damage);
+        (*raster).fill_rect({0, 0, 440, 60}, gui_forms::Color::rgba(255, 255, 255));
+        (*raster).draw_text_utf8({8, 36}, text, {gui_forms::FontRole::control, 20, 400, false},
+                               gui_forms::Color::rgba(0, 0, 0));
+        (*raster).end_frame();
+    }
+    if (first.byte_size() != copied.byte_size() ||
+        std::memcmp(first.pixels(), copied.pixels(), first.byte_size()) != 0) return false;
+    if ((*set).loaded_face_count() != eager_faces + 1U || (*set).loaded_bytes() != eager_bytes + cjk_bytes)
+        return false;
+    // The second raster, and a framebuffer made from the first, borrow the face already read.
+    if (!second.resize({440, 60}, 2)) return false;
+    gui_forms::DamageRegion damage;
+    damage.add({0, 0, 440, 60});
+    second.begin_frame(damage);
+    second.fill_rect({0, 0, 440, 60}, gui_forms::Color::rgba(255, 255, 255));
+    second.draw_text_utf8({8, 36}, text, {gui_forms::FontRole::control, 20, 400, false},
+                          gui_forms::Color::rgba(0, 0, 0));
+    second.end_frame();
+    if (second.byte_size() != copied.byte_size() ||
+        std::memcmp(second.pixels(), copied.pixels(), copied.byte_size()) != 0) return false;
+    const std::unique_ptr<gui_forms::PaintFramebuffer> framebuffer = first.create_framebuffer({440, 60}, 2);
+    const gui_forms::ImageRegistry images;
+    if (!framebuffer || !(*framebuffer).begin(images, {0, 0, 440, 60})) return false;
+    (*framebuffer).painter().fill_rect({0, 0, 440, 60}, gui_forms::Color::rgba(255, 255, 255));
+    (*framebuffer).painter().draw_text_utf8({8, 36}, text, {gui_forms::FontRole::control, 20, 400, false},
+                                            gui_forms::Color::rgba(0, 0, 0));
+    (*framebuffer).end();
+    const std::span<std::byte> drawn = (*framebuffer).pixels();
+    if (drawn.size() != copied.byte_size() || std::memcmp(drawn.data(), copied.pixels(), drawn.size()) != 0)
+        return false;
+    if ((*set).loaded_face_count() != eager_faces + 1U || (*set).loaded_bytes() != eager_bytes + cjk_bytes)
+        return false;
+
+    gui_forms::render::SkiaRaster missing;
+    const std::shared_ptr<gui_forms::detail::BundledFontSet> empty =
+        gui_forms::detail::shared_bundled_font_set(directory / "no-fonts-here", pages);
+    const bool refused = !missing.register_bundled_fonts(empty) && !missing.register_bundled_fonts(nullptr);
+    return refused;
 }
 
 } // namespace
 
 int main() {
-    if (!mapped_fonts_match_copied_fonts()) {
-        std::fputs("Mapped fonts changed rendered text or accepted an invalid path\n", stderr);
+    if (!bundled_fonts_are_shared()) {
+        std::fputs("Bundled fonts were not shared once, drew differently, or a missing set was accepted\n", stderr);
+        return 23;
+    }
+    if (!file_fonts_match_copied_fonts()) {
+        std::fputs("Fonts read from files changed rendered text or accepted an invalid path\n", stderr);
         return 20;
+    }
+    if (!unreadable_font_files_are_refused()) {
+        std::fputs("Font registration accepted an unreadable file\n", stderr);
+        return 21;
     }
 
     constexpr std::array<std::uint8_t, 70> png = {

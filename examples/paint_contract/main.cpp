@@ -133,7 +133,10 @@ int main() {
     options.initial_size = {240, 180};
     options.ready = CloseWhenReady{};
     options.print_metrics_on_close = false;
-    return Application::run(std::move(window), std::move(options)).accepted() ? 0 : 1;
+    const ApplicationResult result = Application::run(std::move(window), std::move(options));
+    // Once, after the last run: ends the rendering library for the process.
+    const ApplicationResult ended = Application::shutdown();
+    return result.accepted() && ended.accepted() ? 0 : 1;
 #else
     return 0;
 #endif

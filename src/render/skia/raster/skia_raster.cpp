@@ -7,6 +7,7 @@
 #include "prepared_skia_frame.hpp"
 #endif
 
+#include "../../text/harfbuzz/bundled_face_loader.hpp"
 #include "../../text/harfbuzz/harfbuzz_font_engine.hpp"
 #include "../../text/glyph_run/glyph_run_raster.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
@@ -18,6 +19,7 @@
 #include "include/core/SkBlurTypes.h"
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkData.h"
+#include "include/core/SkGraphics.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkMaskFilter.h"
@@ -36,8 +38,12 @@
 #include <array>
 #include <cstring>
 #include <cmath>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -252,6 +258,34 @@ Rect outset_rect(const Rect rect, const double amount) noexcept {
     return result;
 }
 
+// The largest font file registration accepts; the registry refuses larger data too.
+constexpr std::uintmax_t maximum_font_file_bytes = 64U * 1024U * 1024U;
+
+// Reads a whole font file into new data, or returns null when the path is null, the file
+// cannot be opened, is empty or larger than the limit, or reads short. The path is UTF-8 on
+// Windows, as the file loader this replaces took it, and the native byte string elsewhere.
+sk_sp<SkData> read_font_file(const char* path) {
+    if (path == nullptr) return nullptr;
+#ifdef _WIN32
+    const std::u8string_view utf8_path(reinterpret_cast<const char8_t*>(path));
+    const std::filesystem::path file_path(utf8_path);
+#else
+    const std::filesystem::path file_path(path);
+#endif
+    std::error_code size_error;
+    const std::uintmax_t file_bytes = std::filesystem::file_size(file_path, size_error);
+    if (size_error || file_bytes == 0 || file_bytes > maximum_font_file_bytes) return nullptr;
+    std::ifstream input(file_path, std::ios::binary);
+    if (!input) return nullptr;
+    const std::size_t length = static_cast<std::size_t>(file_bytes);
+    sk_sp<SkData> data = SkData::MakeUninitialized(length);
+    char* destination = static_cast<char*>((*data).writable_data());
+    input.read(destination, static_cast<std::streamsize>(length));
+    const bool complete = static_cast<std::uintmax_t>(input.gcount()) == file_bytes;
+    if (!complete) return nullptr;
+    return data;
+}
+
 } // namespace
 
 class SkiaRaster::Impl {
@@ -263,13 +297,20 @@ public:
 
     using ImageMap = std::unordered_map<std::uint64_t, DecodedImage>;
 
+    // One registered face; `bytes` stay valid while `owner` lives (an SkData, a copy, or a
+    // sealed bundled face). A lazy fallback has no bytes yet: its coverage and loader instead.
     struct FontSource {
         std::optional<FontRole> role;
         std::uint16_t weight;
         bool italic;
-        sk_sp<SkData> data;
+        std::span<const std::byte> bytes;
+        std::shared_ptr<const void> owner;
+        std::span<const gui_forms::detail::CodepointRange> coverage;
+        text::LazyFaceLoader loader;
     };
     std::vector<FontSource> font_sources;
+    // The process's bundled font set, held so every window shares it (register_bundled_fonts).
+    std::shared_ptr<gui_forms::detail::BundledFontSet> bundled_fonts;
     sk_sp<SkSurface> surface;
 #if defined(GUI_FORMS_PREPARED_TEXT)
     PreparedSkiaFrame prepared_frame{};
@@ -424,20 +465,41 @@ public:
     std::uint64_t image_registry_revision{std::numeric_limits<std::uint64_t>::max()};
     bool image_registry_synchronized{true};
 
-    [[nodiscard]] bool register_font_data(std::optional<FontRole> role,
-                                          std::uint16_t weight, bool italic,
-                                          sk_sp<SkData> data) {
-        if (!data || (*data).isEmpty() || (*data).size() > 64U * 1024U * 1024U) return false;
-        const sk_sp<SkData> retained_data = data;
-        const std::span<const std::byte> bytes(
-            static_cast<const std::byte*>((*data).data()), (*data).size());
-        const std::shared_ptr<const sk_sp<SkData>> owner =
-            std::make_shared<const sk_sp<SkData>>(std::move(data));
+    // Registers `bytes`, kept alive by `owner`, with the text engine without copying them.
+    [[nodiscard]] bool register_font_bytes(std::optional<FontRole> role, std::uint16_t weight,
+                                           bool italic, std::span<const std::byte> bytes,
+                                           std::shared_ptr<const void> owner) {
+        if (!owner || bytes.empty() || bytes.size() > 64U * 1024U * 1024U) return false;
+        // Room first, so the record cannot fail after the engine has the face.
+        font_sources.reserve(font_sources.size() + 1U);
         const std::optional<FontFaceId> text_face = text_engine.register_owned_typeface(
             role, weight, italic, bytes, owner);
         if (!text_face) return false;
-        font_sources.push_back({role, weight, italic, retained_data});
+        font_sources.push_back({role, weight, italic, bytes, std::move(owner), {}, {}});
         return true;
+    }
+
+    // Registers a fallback face that the text engine loads when text first needs it.
+    [[nodiscard]] bool register_lazy_font(std::uint16_t weight, bool italic,
+                                          std::span<const gui_forms::detail::CodepointRange> coverage,
+                                          const text::LazyFaceLoader& loader) {
+        font_sources.reserve(font_sources.size() + 1U);
+        const std::optional<FontFaceId> text_face =
+            text_engine.register_lazy_fallback_typeface(weight, italic, coverage, loader);
+        if (!text_face) return false;
+        font_sources.push_back({std::nullopt, weight, italic, {}, {}, coverage, loader});
+        return true;
+    }
+
+    [[nodiscard]] bool register_font_data(std::optional<FontRole> role,
+                                          std::uint16_t weight, bool italic,
+                                          sk_sp<SkData> data) {
+        if (!data || (*data).isEmpty()) return false;
+        const std::span<const std::byte> bytes(
+            static_cast<const std::byte*>((*data).data()), (*data).size());
+        std::shared_ptr<const void> owner = std::make_shared<const sk_sp<SkData>>(std::move(data));
+        const bool registered = register_font_bytes(role, weight, italic, bytes, std::move(owner));
+        return registered;
     }
 
     [[nodiscard]] SkCanvas* canvas() const noexcept {
@@ -483,16 +545,40 @@ bool SkiaRaster::register_fallback_typeface(
 
 bool SkiaRaster::register_typeface_file(FontRole role, std::uint16_t weight,
                                         bool italic, const char* path) {
-    sk_sp<SkData> data = SkData::MakeFromFileName(path);
+    sk_sp<SkData> data = read_font_file(path);
     const bool registered = (*impl_).register_font_data(role, weight, italic, std::move(data));
     return registered;
 }
 
 bool SkiaRaster::register_fallback_typeface_file(
     std::uint16_t weight, bool italic, const char* path) {
-    sk_sp<SkData> data = SkData::MakeFromFileName(path);
+    sk_sp<SkData> data = read_font_file(path);
     const bool registered = (*impl_).register_font_data(std::nullopt, weight, italic, std::move(data));
     return registered;
+}
+
+bool SkiaRaster::register_bundled_fonts(std::shared_ptr<gui_forms::detail::BundledFontSet> set) {
+    if (!set) return false;
+    for (const gui_forms::detail::BundledFaceUse& use : gui_forms::detail::bundled_face_uses()) {
+        // A fallback with a compiled coverage table is read only when text needs it.
+        const std::optional<std::span<const gui_forms::detail::CodepointRange>> coverage =
+            text::lazy_bundled_coverage(use);
+        if (coverage) {
+            const text::LazyFaceLoader loader = text::BundledFaceLoader{set, use.file_name};
+            if (!(*impl_).register_lazy_font(use.weight, use.italic, *coverage, loader)) return false;
+            continue;
+        }
+        const gui_forms::detail::FontFaceLoad load = (*set).face(use.file_name);
+        const std::shared_ptr<const gui_forms::detail::SealedFontFace>* face = load.face();
+        bool registered = false;
+        if (face != nullptr) {
+            const std::span<const std::byte> bytes = (*(*face)).bytes();
+            registered = (*impl_).register_font_bytes(use.role, use.weight, use.italic, bytes, *face);
+        }
+        if (!registered && use.required) return false;
+    }
+    (*impl_).bundled_fonts = std::move(set);
+    return true;
 }
 
 class SkiaFramebuffer final : public PaintFramebuffer {
@@ -521,9 +607,15 @@ std::unique_ptr<PaintFramebuffer> SkiaRaster::create_framebuffer(Size logical_si
         std::ceil(logical_size.width * scale) * std::ceil(logical_size.height * scale) > 16777216.0)
         return {};
     std::unique_ptr<SkiaFramebuffer> result = std::make_unique<SkiaFramebuffer>();
-    for (const Impl::FontSource& source : (*impl_).font_sources)
-        if (!(*(*result).raster.impl_).register_font_data(source.role, source.weight, source.italic, source.data))
-            return {};
+    for (const Impl::FontSource& source : (*impl_).font_sources) {
+        const bool registered = source.loader
+            ? (*(*result).raster.impl_).register_lazy_font(source.weight, source.italic, source.coverage,
+                                                          source.loader)
+            : (*(*result).raster.impl_).register_font_bytes(source.role, source.weight, source.italic,
+                                                           source.bytes, source.owner);
+        if (!registered) return {};
+    }
+    (*(*result).raster.impl_).bundled_fonts = (*impl_).bundled_fonts;
     if (!(*result).raster.resize(logical_size, scale)) return {};
     return result;
 }
@@ -1843,6 +1935,10 @@ void SkiaRaster::fill_image_pattern(
         SkTileMode::kRepeat, SkTileMode::kRepeat,
         SkSamplingOptions(SkFilterMode::kLinear), local));
     (*canvas).drawRect(to_sk_rect(destination), paint);
+}
+
+void shutdown_skia_library() {
+    SkGraphics::Shutdown();
 }
 
 } // namespace gui_forms::render

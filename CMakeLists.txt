@@ -140,6 +140,25 @@ if(WIN32)
     target_link_options(gui_forms_threading PRIVATE "-Wl,--export-all-symbols")
 endif()
 
+# The runtime font set's manifest table (src/core/resources/fonts/bundled_font_set.cpp): one
+# record per face of assets/fonts/bundled-fonts.sha256, with its size; regenerated when the
+# manifest changes, and the build fails if a face is missing or does not match its digest.
+set(GUI_FORMS_BUNDLED_FONT_MANIFEST ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/bundled-fonts.sha256)
+set(GUI_FORMS_BUNDLED_FONT_MANIFEST_RECORDS
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/bundled_fonts/bundled_font_manifest.inc)
+add_custom_command(
+    OUTPUT ${GUI_FORMS_BUNDLED_FONT_MANIFEST_RECORDS}
+    COMMAND ${CMAKE_COMMAND}
+        -DMANIFEST=${GUI_FORMS_BUNDLED_FONT_MANIFEST}
+        -DFONT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts
+        -DOUTPUT=${GUI_FORMS_BUNDLED_FONT_MANIFEST_RECORDS}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_bundled_font_manifest.cmake
+    DEPENDS
+        ${GUI_FORMS_BUNDLED_FONT_MANIFEST}
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_bundled_font_manifest.cmake
+    COMMENT "Generating the bundled font manifest records"
+    VERBATIM)
+
 add_library(gui_forms_core STATIC
     src/core/application/application.cpp
     src/core/application/window_frame_drag.cpp
@@ -213,6 +232,9 @@ add_library(gui_forms_core STATIC
     src/core/window/inspection/window_visual_inspection.cpp
     src/core/resources/image_registry/image_registry.cpp
     src/core/resources/application_resources/application_resources.cpp
+    src/core/resources/integrity/sha256.cpp
+    src/core/resources/fonts/bundled_font_set.cpp
+    ${GUI_FORMS_BUNDLED_FONT_MANIFEST_RECORDS}
     src/core/live_surface/buffer/live_surface_buffer.cpp
     src/core/live_surface/frame/live_surface_frame.cpp
     src/core/live_surface/surface/live_surface.cpp
@@ -315,6 +337,8 @@ target_include_directories(gui_forms_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+target_include_directories(gui_forms_core PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/bundled_fonts)
 target_compile_features(gui_forms_core PUBLIC cxx_std_20)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     # Inspection must account for every retained operation, including optional
@@ -1061,6 +1085,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         src/host/macos/services/appkit_clipboard_image.mm
         src/host/macos/services/appkit_status_items.mm
         src/host/macos/compositor/macos_compositor.mm
+        src/host/posix/fonts/sealed_pages_posix.cpp
     )
     target_include_directories(gui_forms_host_macos PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/macos
@@ -1095,7 +1120,8 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     )
     target_compile_features(gui_forms_application PUBLIC cxx_std_20)
-    target_compile_definitions(gui_forms_application PRIVATE GUI_FORMS_APPLICATION_MACOS=1)
+    target_compile_definitions(gui_forms_application PRIVATE
+        GUI_FORMS_APPLICATION_MACOS=1 GUI_FORMS_APPLICATION_SKIA=1)
     target_link_libraries(gui_forms_application PRIVATE
         gui_forms_core
         gui_drawing_core
@@ -1150,6 +1176,7 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     endif()
     add_library(gui_forms_host_linux STATIC
         src/host/linux/application/linux_host.cpp
+        src/host/posix/fonts/sealed_pages_posix.cpp
         src/host/linux/application/x11_windowing.cpp
         src/host/linux/settings/xsettings_parse.cpp
         src/host/linux/settings/xsettings_watch.cpp
@@ -1172,7 +1199,8 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     target_include_directories(gui_forms_application PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-    target_compile_definitions(gui_forms_application PRIVATE GUI_FORMS_APPLICATION_LINUX=1)
+    target_compile_definitions(gui_forms_application PRIVATE
+        GUI_FORMS_APPLICATION_LINUX=1 GUI_FORMS_APPLICATION_SKIA=1)
     target_link_libraries(gui_forms_application PRIVATE
         "-Wl,--whole-archive" gui_forms_core gui_drawing_core gui_forms_controls gui_forms_host_linux gui_forms_skia
         "-Wl,--no-whole-archive" X11::X11 X11::Xfixes X11::Xrender)
@@ -1192,6 +1220,7 @@ endif()
 if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     add_library(gui_forms_host_windows STATIC
         src/host/windows/application/windows_host.cpp
+        src/host/windows/fonts/sealed_pages_windows.cpp
         src/host/windows/accessibility/windows_accessibility.cpp
         src/host/windows/accessibility/windows_semantic_source.cpp
         src/host/windows/accessibility/windows_automation.cpp
@@ -2031,6 +2060,7 @@ if(GUI_FORMS_BUILD_TESTS)
             add_executable(gui_forms_windows_dib_lifecycle_tests
                 tests/windows_dib_lifecycle_tests.cpp
                 src/host/windows/application/windows_host.cpp
+                src/host/windows/fonts/sealed_pages_windows.cpp
                 src/host/windows/accessibility/windows_accessibility.cpp
                 src/host/windows/accessibility/windows_semantic_source.cpp
                 src/host/windows/accessibility/windows_automation.cpp
@@ -2054,6 +2084,7 @@ if(GUI_FORMS_BUILD_TESTS)
             add_executable(gui_forms_windows_tooltip_tests
                 tests/windows_tooltip_tests.cpp
                 src/host/windows/application/windows_host.cpp
+                src/host/windows/fonts/sealed_pages_windows.cpp
                 src/host/windows/accessibility/windows_accessibility.cpp
                 src/host/windows/accessibility/windows_semantic_source.cpp
                 src/host/windows/accessibility/windows_automation.cpp
@@ -2078,6 +2109,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 add_executable(gui_forms_windows_prepared_text_tests
                     tests/windows_prepared_text_tests.cpp
                     src/host/windows/application/windows_host.cpp
+                    src/host/windows/fonts/sealed_pages_windows.cpp
                     src/host/windows/accessibility/windows_accessibility.cpp
                     src/host/windows/accessibility/windows_semantic_source.cpp
                     src/host/windows/accessibility/windows_automation.cpp
@@ -2504,6 +2536,28 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_engine_gate_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_gate_tests COMMAND gui_forms_engine_gate_tests)
 
+    add_executable(gui_forms_sha256_tests tests/sha256_tests.cpp)
+    target_link_libraries(gui_forms_sha256_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_sha256_tests COMMAND gui_forms_sha256_tests)
+
+    # The bundled font set over the platform's sealed pages (item 4, step 3); the fault mode
+    # must end in the platform's protection fault (cmake/expect_fault.cmake).
+    if(WIN32)
+        set(gui_forms_sealed_pages_source src/host/windows/fonts/sealed_pages_windows.cpp)
+    else()
+        set(gui_forms_sealed_pages_source src/host/posix/fonts/sealed_pages_posix.cpp)
+    endif()
+    add_executable(gui_forms_bundled_font_set_tests
+        tests/bundled_font_set_tests.cpp ${gui_forms_sealed_pages_source})
+    target_link_libraries(gui_forms_bundled_font_set_tests PRIVATE gui_forms_core)
+    target_compile_definitions(gui_forms_bundled_font_set_tests PRIVATE
+        GUI_FORMS_TEST_FONT_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+    add_test(NAME gui_forms_bundled_font_set_tests COMMAND gui_forms_bundled_font_set_tests)
+    add_test(NAME gui_forms_bundled_font_set_write_faults
+             COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:gui_forms_bundled_font_set_tests>
+                     -DMODE=--write-sealed
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/expect_fault.cmake)
+
     add_executable(gui_forms_engine_fill_shape_tests tests/engine_fill_shape_tests.cpp)
     target_link_libraries(gui_forms_engine_fill_shape_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_fill_shape_tests COMMAND gui_forms_engine_fill_shape_tests)
@@ -2702,6 +2756,12 @@ if(GUI_FORMS_BUILD_TESTS)
         add_test(NAME gui_forms_prepared_window_shape_rows_verify
             COMMAND gui_forms_prepared_window_shape_bench --fonts "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" --scene window-512 --verify-only)
 
+        # The bundled fallback faces' compiled coverage tables against FreeType (item 4, step 5).
+        add_executable(gui_forms_bundled_font_coverage_tests tests/bundled_font_coverage_tests.cpp)
+        target_link_libraries(gui_forms_bundled_font_coverage_tests PRIVATE gui_forms_core freetype)
+        target_compile_definitions(gui_forms_bundled_font_coverage_tests PRIVATE
+            GUI_FORMS_TEST_FONT_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        add_test(NAME gui_forms_bundled_font_coverage_tests COMMAND gui_forms_bundled_font_coverage_tests)
         add_executable(gui_forms_harfbuzz_font_engine_tests
             tests/harfbuzz_font_engine_tests.cpp
         )
@@ -3845,7 +3905,13 @@ if(GUI_FORMS_BUILD_TESTS)
             GUI_FORMS_TEST_CONTROL_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf"
             GUI_FORMS_TEST_FALLBACK_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoEmoji-Regular.ttf")
         add_test(NAME gui_forms_retained_draw_cache_raster_tests COMMAND gui_forms_retained_draw_cache_raster_tests)
-        add_executable(gui_forms_skia_smoke src/render/skia/skia_raster_smoke.cpp)
+        if(WIN32)
+            add_executable(gui_forms_skia_smoke src/render/skia/skia_raster_smoke.cpp
+                src/host/windows/fonts/sealed_pages_windows.cpp)
+        else()
+            add_executable(gui_forms_skia_smoke src/render/skia/skia_raster_smoke.cpp
+                src/host/posix/fonts/sealed_pages_posix.cpp)
+        endif()
         target_compile_definitions(gui_forms_skia_smoke PRIVATE
             GUI_FORMS_TEST_CONTROL_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf"
             GUI_FORMS_TEST_CJK_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansCJKjp-Regular.otf"
@@ -3853,6 +3919,15 @@ if(GUI_FORMS_BUILD_TESTS)
         )
         target_link_libraries(gui_forms_skia_smoke PRIVATE gui_forms_skia)
         add_test(NAME gui_forms_skia_smoke COMMAND gui_forms_skia_smoke)
+        # Process memory of the bundled fonts per configuration (item 4, step 6); a report, not a test.
+        if(WIN32)
+            add_executable(gui_forms_bundled_font_memory_report src/render/skia/bundled_font_memory_report.cpp
+                src/host/windows/fonts/sealed_pages_windows.cpp)
+        else()
+            add_executable(gui_forms_bundled_font_memory_report src/render/skia/bundled_font_memory_report.cpp
+                src/host/posix/fonts/sealed_pages_posix.cpp)
+        endif()
+        target_link_libraries(gui_forms_bundled_font_memory_report PRIVATE gui_forms_skia)
 
         add_executable(gui_forms_canvas_raster_tests tests/canvas_raster_tests.cpp)
         target_link_libraries(gui_forms_canvas_raster_tests PRIVATE gui_forms_controls gui_forms_skia)

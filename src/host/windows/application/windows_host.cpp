@@ -9,6 +9,7 @@
 #include "../input/windows_key_translation.hpp"
 #include "../input/windows_message_queue.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
+#include "../fonts/sealed_pages_windows.hpp"
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
 #include "../raster/dib_frame_store.hpp"
 #endif
@@ -27,6 +28,7 @@
 #include "../../../core/text/composite/text_composite.hpp"
 #include "../../../render/text/glyph_run/glyph_run_raster.hpp"
 #include "../../../render/text/harfbuzz/harfbuzz_font_engine.hpp"
+#include "../../../render/text/harfbuzz/bundled_face_loader.hpp"
 #include "gui_forms/detail/bound_member_function.hpp"
 
 #include "../paint_endpoint/windows_compatibility_paint_endpoint_metrics.hpp"
@@ -618,65 +620,60 @@ void enable_best_dpi_awareness() noexcept {
 class DibFramebuffer;
 namespace text = gui_forms::render::text;
 
-// One bundled face. The encoded bytes are read once per host and shared by
-// every painter's engine.
+// One bundled face, borrowed from the process's bundled font set
+// (gui_forms::detail::BundledFontSet): read once, checked against the manifest and sealed
+// read-only, then shared by every painter's engine. A lazy fallback has no face yet, only
+// its coverage table and name; an engine reads it when its text first needs it.
 struct BundledFace final {
-    std::shared_ptr<const std::vector<std::byte>> bytes;
-    FontRole role{FontRole::control};
+    std::shared_ptr<const gui_forms::detail::SealedFontFace> face;
+    std::optional<FontRole> role;
     std::uint16_t weight{400};
     bool italic{};
-    bool fallback{};
+    std::span<const gui_forms::detail::CodepointRange> coverage;
+    std::string_view file_name;
 };
-using BundledFonts = std::vector<BundledFace>;
+// The faces, with the set they came from: holding the set keeps it the process's shared one
+// while any painter uses its faces.
+struct BundledFonts final {
+    std::shared_ptr<gui_forms::detail::BundledFontSet> set;
+    std::vector<BundledFace> faces;
+};
 
-// The bundled faces, as every host registers them (ADR-004). The first seven
-// are required; the remaining Unicode faces may be omitted by a consumer.
-// Nullptr when a required face is missing or unreadable.
+// The bundled font directory: GUI_FORMS_FONT_DIR when it is set, as on Linux, else "fonts"
+// beside the executable; empty when neither is known.
+std::filesystem::path bundled_font_directory() {
+    const wchar_t* override_directory = _wgetenv(L"GUI_FORMS_FONT_DIR");
+    if (override_directory != nullptr) return std::filesystem::path(override_directory);
+    wchar_t executable[MAX_PATH]{};
+    const DWORD count = GetModuleFileNameW(nullptr, executable, MAX_PATH);
+    if (count == 0 || count >= MAX_PATH) return {};
+    const std::filesystem::path directory =
+        std::filesystem::path(std::wstring(executable, count)).parent_path() / L"fonts";
+    return directory;
+}
+
+// The bundled faces in gui_forms::detail::bundled_face_uses() order, as every host registers
+// them (ADR-004). Nullptr when a required face is unavailable; optional faces that fail are
+// left out.
 std::shared_ptr<const BundledFonts> load_bundled_fonts(const std::filesystem::path& directory) {
-    struct Entry final {
-        const wchar_t* name;
-        FontRole role;
-        std::uint16_t weight;
-        bool italic;
-        bool fallback;
-    };
-    constexpr std::array<Entry, 17> entries{{
-        {L"PortsmouthRapids.ttf", FontRole::control, 400, false, false},
-        {L"PortsmouthRapids-Bold.ttf", FontRole::control, 700, false, false},
-        {L"Carlito-Regular.ttf", FontRole::content, 400, false, false},
-        {L"Carlito-Bold.ttf", FontRole::content, 700, false, false},
-        {L"Carlito-Italic.ttf", FontRole::content, 400, true, false},
-        {L"Carlito-BoldItalic.ttf", FontRole::content, 700, true, false},
-        {L"Cousine-Regular.ttf", FontRole::monospace, 400, false, false},
-        {L"Cousine-Bold.ttf", FontRole::monospace, 700, false, false},
-        {L"Cousine-Italic.ttf", FontRole::monospace, 400, true, false},
-        {L"Cousine-BoldItalic.ttf", FontRole::monospace, 700, true, false},
-        {L"NotoSansCJKjp-Regular.otf", FontRole::content, 400, false, true},
-        {L"NotoSansArabic-Regular.ttf", FontRole::content, 400, false, true},
-        {L"NotoSansHebrew-Regular.ttf", FontRole::content, 400, false, true},
-        {L"NotoSansDevanagari-Regular.ttf", FontRole::content, 400, false, true},
-        {L"NotoSansBengali-Regular.ttf", FontRole::content, 400, false, true},
-        {L"NotoSansGurmukhi-Regular.ttf", FontRole::content, 400, false, true},
-        {L"NotoEmoji-Regular.ttf", FontRole::content, 400, false, true}}};
     std::shared_ptr<BundledFonts> result = std::make_shared<BundledFonts>();
-    (*result).reserve(entries.size());
-    for (std::size_t index = 0; index < entries.size(); ++index) {
-        const Entry& entry = entries[index];
-        std::ifstream input(directory / entry.name, std::ios::binary | std::ios::ate);
-        const std::streamoff size = input ? static_cast<std::streamoff>(input.tellg()) : std::streamoff{-1};
-        if (size <= 0 || size > 64 * 1024 * 1024) {
-            if (index < 7U) return {};
+    (*result).set = gui_forms::detail::shared_bundled_font_set(directory, windows_sealed_pages());
+    const std::span<const gui_forms::detail::BundledFaceUse> uses = gui_forms::detail::bundled_face_uses();
+    (*result).faces.reserve(uses.size());
+    for (const gui_forms::detail::BundledFaceUse& use : uses) {
+        const std::optional<std::span<const gui_forms::detail::CodepointRange>> coverage =
+            text::lazy_bundled_coverage(use);
+        if (coverage) {
+            (*result).faces.push_back({{}, std::nullopt, use.weight, use.italic, *coverage, use.file_name});
             continue;
         }
-        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
-        input.seekg(0);
-        input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(size));
-        if (!input) {
-            if (index < 7U) return {};
+        const gui_forms::detail::FontFaceLoad load = (*(*result).set).face(use.file_name);
+        const std::shared_ptr<const gui_forms::detail::SealedFontFace>* face = load.face();
+        if (face == nullptr) {
+            if (use.required) return {};
             continue;
         }
-        (*result).push_back({std::make_shared<const std::vector<std::byte>>(std::move(bytes)), entry.role,
-                             entry.weight, entry.italic, entry.fallback});
+        (*result).faces.push_back({*face, use.role, use.weight, use.italic, {}, use.file_name});
     }
     return result;
 }
@@ -1515,10 +1512,16 @@ public:
         bundled_fonts_ready_ = false;
         if (!bundled_fonts_) return;
         std::unique_ptr<text::HarfBuzzFontEngine> engine = std::make_unique<text::HarfBuzzFontEngine>();
-        for (const BundledFace& face : *bundled_fonts_) {
-            std::optional<FontRole> role;
-            if (!face.fallback) role = face.role;
-            if (!(*engine).register_shared_typeface(role, face.weight, face.italic, face.bytes)) return;
+        for (const BundledFace& face : (*bundled_fonts_).faces) {
+            if (!face.face) {
+                const text::LazyFaceLoader loader = text::BundledFaceLoader{(*bundled_fonts_).set, face.file_name};
+                if (!(*engine).register_lazy_fallback_typeface(face.weight, face.italic, face.coverage, loader))
+                    return;
+                continue;
+            }
+            const std::span<const std::byte> bytes = (*face.face).bytes();
+            if (!(*engine).register_owned_typeface(face.role, face.weight, face.italic, bytes, face.face))
+                return;
         }
         text_engine_ = std::move(engine);
         bundled_fonts_ready_ = true;
@@ -2763,13 +2766,9 @@ public:
         }
         hwnd_ = window;
         scale_ = query_scale(window);
-        // GUI_FORMS_FONT_DIR overrides the fonts beside the executable, as on Linux.
+        const std::filesystem::path font_directory = bundled_font_directory();
         std::shared_ptr<const BundledFonts> fonts;
-        if (const wchar_t* override_directory = _wgetenv(L"GUI_FORMS_FONT_DIR"); override_directory != nullptr) {
-            fonts = load_bundled_fonts(std::filesystem::path(override_directory));
-        } else if (const std::wstring directory = executable_directory(); !directory.empty()) {
-            fonts = load_bundled_fonts(std::filesystem::path(directory) / L"fonts");
-        }
+        if (!font_directory.empty()) fonts = load_bundled_fonts(font_directory);
         RECT client{};
         GetClientRect(window, &client);
         const Size logical{(client.right - client.left) / scale_,
@@ -4672,6 +4671,12 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
 int run_windows_application(std::vector<WindowsApplicationWindow> windows,
                             WindowsApplicationOptions application) {
     if (windows.empty() || windows.size() > HostWindowing::maximum_windows) return 2;
+    // The run holds the bundled font set, so windows opened and closed during it share one
+    // copy of each face.
+    const std::filesystem::path font_directory = bundled_font_directory();
+    std::shared_ptr<gui_forms::detail::BundledFontSet> run_fonts;
+    if (!font_directory.empty())
+        run_fonts = gui_forms::detail::shared_bundled_font_set(font_directory, windows_sealed_pages());
     std::unordered_set<std::string> identities;
     std::size_t primary_count{};
     for (const WindowsApplicationWindow& entry : windows) {
