@@ -305,8 +305,11 @@ std::vector<SkScalar> preset_dash_pattern(DashStyle style, SkScalar width) {
     return {};
 }
 
-void configure_pen(SkPaint& paint, const PenSnapshot& pen,
-                   const GraphicsState& state) {
+// Configures paint to stroke with pen. False when stx_skia refuses the pen's
+// dash pattern (an entry that overflows float, for example); the command must
+// then fail rather than draw a solid line.
+[[nodiscard]] bool configure_pen(SkPaint& paint, const PenSnapshot& pen,
+                                 const GraphicsState& state) {
     configure_paint(paint, state);
     paint.setColor(to_sk_color(pen.color));
     paint.setStyle(SkPaint::kStroke_Style);
@@ -321,9 +324,12 @@ void configure_pen(SkPaint& paint, const PenSnapshot& pen,
         pattern = preset_dash_pattern(pen.dash_style, static_cast<SkScalar>(pen.width));
     }
     if (pattern.size() >= 2U && pattern.size() % 2U == 0U) {
-        paint.setPathEffect(SkDashPathEffect::Make(
-            SkSpan<const SkScalar>(pattern.data(), pattern.size()), 0.0F));
+        SkDashPathEffectResult made = SkDashPathEffect::Make(
+            SkSpan<const SkScalar>(pattern.data(), pattern.size()), 0.0F);
+        if (made.rejection != SkDashRejection::kNone) return false;
+        paint.setPathEffect(std::move(made.effect));
     }
+    return true;
 }
 
 [[nodiscard]] SkTileMode tile_mode(WrapMode mode) noexcept {
@@ -991,11 +997,15 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 (*canvas).drawRect(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::draw_rectangle:
-                configure_pen(paint, command.pen, command.state);
+                if (!configure_pen(paint, command.pen, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawRect(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::draw_line:
-                configure_pen(paint, command.pen, command.state);
+                if (!configure_pen(paint, command.pen, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawLine(static_cast<SkScalar>(command.first.x),
                                  static_cast<SkScalar>(command.first.y),
                                  static_cast<SkScalar>(command.second.x),
@@ -1005,7 +1015,9 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 (*impl_).draw_text(command, text_target);
                 break;
             case CommandKind::draw_ellipse:
-                configure_pen(paint, command.pen, command.state);
+                if (!configure_pen(paint, command.pen, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawOval(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::fill_ellipse:
@@ -1031,7 +1043,9 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 break;
             }
             case CommandKind::draw_path:
-                configure_pen(paint, command.pen, command.state);
+                if (!configure_pen(paint, command.pen, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawPath(to_sk_path(command.path), paint);
                 break;
             case CommandKind::fill_path:
