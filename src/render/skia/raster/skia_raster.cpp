@@ -1072,7 +1072,7 @@ void SkiaRaster::draw_box_shadow(Rect rect, double corner_radius, Point offset,
                                  Color color) {
     SkCanvas* canvas = (*impl_).canvas();
     if (canvas == nullptr || rect.empty() || color.alpha == 0U ||
-        blur_radius < 0.0) {
+        std::isnan(blur_radius) || blur_radius < 0.0) {
         return;
     }
     Rect shadow{rect.x + offset.x - spread, rect.y + offset.y - spread,
@@ -1080,9 +1080,12 @@ void SkiaRaster::draw_box_shadow(Rect rect, double corner_radius, Point offset,
     if (shadow.empty()) return;
     SkPaint paint = make_paint(color);
     if (blur_radius > 0.0) {
-        paint.setMaskFilter(SkMaskFilter::MakeBlur(
-            kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5),
-            false));
+        SkBlurMaskFilterResult blur = SkMaskFilter::MakeBlur(
+            kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5), false);
+        // A blur the filter refuses (a radius past float range) draws no shadow, never a
+        // sharp one.
+        if (!blur.filter) return;
+        paint.setMaskFilter(std::move(blur.filter));
     }
     (*canvas).drawRRect(to_sk_rrect(
         shadow, std::max(0.0, corner_radius + spread)), paint);
@@ -1111,7 +1114,8 @@ void SkiaRaster::draw_retained_box_shadow(const Rect rect, const double corner_r
                                           const double spread, const Color color,
                                           const std::shared_ptr<RetainedDrawCache>& cache) {
     SkCanvas* const canvas = (*impl_).canvas();
-    if (canvas == nullptr || rect.empty() || color.alpha == 0U || blur_radius < 0.0) return;
+    if (canvas == nullptr || rect.empty() || color.alpha == 0U ||
+        std::isnan(blur_radius) || blur_radius < 0.0) return;
     const SkMatrix matrix = (*canvas).getTotalMatrix();
     // Unblurred shadows, rotations and reflections draw directly.
     if (!cache || blur_radius == 0.0 || !matrix.isScaleTranslate() ||
@@ -1135,9 +1139,27 @@ void SkiaRaster::draw_retained_box_shadow(const Rect rect, const double corner_r
     if (!current) {
         // The mask filter's sigma is in device pixels (respectCTM is false).
         const double sigma = blur_radius * 0.5;
-        const int margin = static_cast<int>(std::ceil(sigma * 3.0)) + 2;
-        const int width = static_cast<int>(std::ceil(device.right() - origin_x)) + margin * 2;
-        const int height = static_cast<int>(std::ceil(device.bottom() - origin_y)) + margin * 2;
+        const double margin_extent = std::ceil(sigma * 3.0) + 2.0;
+        const double width_extent =
+            std::ceil(static_cast<double>(device.right()) - origin_x) + margin_extent * 2.0;
+        const double height_extent =
+            std::ceil(static_cast<double>(device.bottom()) - origin_y) + margin_extent * 2.0;
+        // A coverage mask past this extent is not kept; the shadow draws directly. The checks
+        // also keep the conversions to int below in range (NaN fails them too).
+        constexpr double largest_kept_extent = 16384.0;
+        if (!(width_extent <= largest_kept_extent) || !(height_extent <= largest_kept_extent)) {
+            draw_box_shadow(rect, corner_radius, offset, blur_radius, spread, color);
+            return;
+        }
+        const int margin = static_cast<int>(margin_extent);
+        const int width = static_cast<int>(width_extent);
+        const int height = static_cast<int>(height_extent);
+        SkBlurMaskFilterResult blur = SkMaskFilter::MakeBlur(
+            kNormal_SkBlurStyle, static_cast<SkScalar>(sigma), false);
+        if (!blur.filter) {
+            draw_box_shadow(rect, corner_radius, offset, blur_radius, spread, color);
+            return;
+        }
         sk_sp<SkSurface> coverage = SkSurfaces::Raster(SkImageInfo::MakeA8(width, height));
         if (!coverage) {
             draw_box_shadow(rect, corner_radius, offset, blur_radius, spread, color);
@@ -1154,8 +1176,7 @@ void SkiaRaster::draw_retained_box_shadow(const Rect rect, const double corner_r
         SkPaint opaque{};
         opaque.setAntiAlias(true);
         opaque.setColor(SK_ColorWHITE);
-        opaque.setMaskFilter(SkMaskFilter::MakeBlur(
-            kNormal_SkBlurStyle, static_cast<SkScalar>(sigma), false));
+        opaque.setMaskFilter(std::move(blur.filter));
         target.drawRRect(local, opaque);
         std::unique_ptr<ShadowMaskMemo> replacement = std::make_unique<ShadowMaskMemo>();
         (*replacement).scale_x = matrix.getScaleX();
@@ -1188,7 +1209,7 @@ void SkiaRaster::draw_inset_box_shadow(
     double spread, Color color) {
     SkCanvas* canvas = (*impl_).canvas();
     if (canvas == nullptr || rect.empty() || color.alpha == 0U ||
-        blur_radius < 0.0) {
+        std::isnan(blur_radius) || blur_radius < 0.0) {
         return;
     }
     const Rect hole{rect.x + offset.x + spread,
@@ -1214,9 +1235,11 @@ void SkiaRaster::draw_inset_box_shadow(
     const SkPath complement = complement_builder.detach();
     SkPaint paint = make_paint(color);
     if (blur_radius > 0.0) {
-        paint.setMaskFilter(SkMaskFilter::MakeBlur(
-            kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5),
-            false));
+        SkBlurMaskFilterResult blur = SkMaskFilter::MakeBlur(
+            kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5), false);
+        // As for draw_box_shadow: a refused blur draws no shadow, never a sharp one.
+        if (!blur.filter) return;
+        paint.setMaskFilter(std::move(blur.filter));
     }
     (*canvas).save();
     (*canvas).clipRRect(to_sk_rrect(rect, corner_radius),

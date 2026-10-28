@@ -1756,6 +1756,34 @@ them, and `SkAutoPixmapStorage::AllocSize` returns the optional too.
   value. `encode_png` returns nothing in that case. `gui_forms_skia_smoke` now checks that a
   drawn frame encodes as PNG.
 
+## Blur mask filter result
+
+API item 6 (house style §9). `SkMaskFilter::MakeBlur` now returns `SkBlurMaskFilterResult`:
+the filter, or an `SkBlurRejection`. The checks run in order:
+1. `kNonFiniteSigma`: sigma is infinite or NaN.
+2. `kNonPositiveSigma`: sigma is zero or negative.
+3. `kInvalidStyle`: style is out of range.
+
+The flattenable `CreateProc` takes the filter, so a malformed record still reads as no filter.
+- **Evidence:** `mask_filter` gains `rejection_contract` (candidate only). Its twelve cases
+  cover the smallest and largest finite sigma, each rejection, and the check order. Each runs
+  with and without the matrix.
+- **Tests:** they reach the filter through `tests/blur_result.hpp` (`filter_of`), so they
+  compile against both profiles.
+- **GUI.Forms:**
+  - Before, a blur radius past float range gave a sharp shadow without any error.
+    `draw_box_shadow` and `draw_inset_box_shadow` now draw no shadow when the filter refuses
+    the blur. A NaN radius is refused before drawing.
+  - `draw_retained_box_shadow` worked out its coverage mask's margin and size by converting
+    unchecked doubles to `int`. That was undefined behaviour for very large or infinite radii.
+    It now draws directly when the mask would be wider or taller than 16384 pixels, or when the
+    blur is refused.
+  - `retained_draw_cache_raster_tests` gains `refused_blurs_draw_no_shadow`. Radii of 1e39,
+    infinity and NaN must leave the background unchanged on the direct, retained and inset
+    paths, and keep no mask. A 12000-pixel radius must draw the same on the retained path as on
+    the direct path.
+  - Negative control: when the refusal returns were removed, the test failed.
+
 ## Still required
 
 Refreshed 2026-10-27 after the support leftovers. The whole-library AST inventory counts 249

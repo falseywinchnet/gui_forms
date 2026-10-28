@@ -25,6 +25,7 @@
 #include "src/core/SkReadBuffer.h"
 #include "src/core/SkWriteBuffer.h"
 #include "dash_result.hpp"
+#include "blur_result.hpp"
 
 #include <array>
 #include <cstdint>
@@ -207,7 +208,7 @@ void equality_corpus(Output& output) {
 void bounds_corpus(Output& output) {
     const float dash[2] = {3, 2};
     sk_sp<SkPathEffect> dashed = effect_of(SkDashPathEffect::Make(SkSpan<const float>(dash, 2), 0));
-    sk_sp<SkMaskFilter> blur = SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, 2.5f, false);
+    sk_sp<SkMaskFilter> blur = filter_of(SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, 2.5f, false));
     const SkRect rect = SkRect::MakeLTRB(-3.5f, 2, 40.25f, 17);
     for (int style = 0; style < SkPaint::kStyleCount; ++style) {
         for (const float width : {0.0f, 1.0f, 6.5f}) {
@@ -239,7 +240,7 @@ void priv_corpus(Output& output) {
                                            kARGB_4444_SkColorType, kRGBA_8888_SkColorType,
                                            kRGBA_F16_SkColorType, kAlpha_8_SkColorType};
     sk_sp<SkShader> constant = SkShaders::Color(0xFF808080u);
-    sk_sp<SkMaskFilter> blur = SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, 1.0f, false);
+    sk_sp<SkMaskFilter> blur = filter_of(SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, 1.0f, false));
     for (const SkColorType type : types) {
         for (int setup = 0; setup < 4; ++setup) {
             SkPaint paint;
