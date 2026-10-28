@@ -245,6 +245,16 @@ class ReviewTests(unittest.TestCase):
             self.assertNotEqual(completed.returncode, 0)
             self.assertIn("No C or C++ files selected", completed.stderr)
 
+    def test_fixed_defect_that_returns_is_raised(self) -> None:
+        source = "void make(size_t width, size_t height) {\n    storage.resize(width * height);\n}\n"
+        status, data = self.run_checker(source, None)
+        reviews = {"reviews": [{"path": data[0]["path"], "rule": "I06", "evidence": data[0]["evidence"],
+                                "decision": "fixed", "reason": "bounded by maximum_side"}]}
+        status, data = self.run_checker(source, reviews)
+        self.assertEqual(status, 1)
+        self.assertEqual(data[0]["status"], "raised")
+        self.assertEqual(data[0]["decision"], "fixed")
+
     def test_unknown_decision_is_an_error(self) -> None:
         status, _ = self.run_checker("void make() {}\n", {"reviews": [{"path": "x.cpp", "rule": "I06",
                                                                       "evidence": "x", "decision": "accepted"}]})

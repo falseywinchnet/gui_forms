@@ -73,7 +73,7 @@ Phase E, item E1. The rebase onto main (61e4bf85) found 45 candidates: the 44 ab
 | 31 | I05 | src/host/linux/application/linux_host.cpp:1140 | false shape | as row 28 |
 | 32 | I05 | src/host/linux/services/linux_services.cpp:288 | false shape (reviewed) | `targets` holds three atoms built just above: a literal extent the rule cannot see |
 | 33 | I05 | src/host/linux/services/linux_services.cpp:325 | guarded (detected) | above 64 KiB the transfer goes through INCR; this branch is at most 64 KiB |
-| 34 | I05 | src/host/windows/application/windows_host.cpp:3915 | defect (low, reviewed) | trace `%.*s` precision from a stable ID's length; a negative value reads past the view |
+| 34 | I05 | src/host/windows/application/windows_host.cpp:3915 | defect (low, reviewed; fixed, see below) | trace `%.*s` precision from a stable ID's length; a negative value reads past the view |
 | 35 | I06 | src/host/windows/raster/dib_frame_store.cpp:99 | guarded (detected) | `columns > pixel_limit / rows` returns first |
 | 36 | I05 | src/host/windows/services/windows_notify_icons.cpp:18 | guarded (reviewed) | NotifyIcon refuses text above maximum_tray_tooltip_bytes (notify_icon.cpp:90) |
 | 37 | I05 | src/host/windows/services/windows_notify_icons.cpp:21 | guarded (reviewed) | as row 36 |
@@ -86,3 +86,9 @@ Phase E, item E1. The rebase onto main (61e4bf85) found 45 candidates: the 44 ab
 - **false shape: 15.** The refined I04 and I05 rules remove 14, and 1 is recorded (row 32).
 
 The checker's run on this tree, `gui_forms-2026-10-27.json`, reads 989 files (11 Skia files excluded) and has 31 candidates: 0 raised, 14 guarded and 17 reviewed. Its 14 guarded include six earlier-suppressed sites (windows_host.cpp 104 to 123, windows_semantic_source.cpp 205 and 220), now listed as guarded instead of being dropped silently.
+
+# The defect, fixed (2026-10-27)
+
+Row 34 is fixed in Phase E cleanup. The pointer trace now takes its `%.*s` precision from `traced_stable_id` in `windows_host.cpp`, which prints at most `maximum_traced_stable_id_bytes` (1024) bytes of the target's stable ID. A longer ID is printed cut to that length, and the line then carries `target_cut_from:<full length in bytes>`, so the cut is never silent. The record in `../reviews.json` now has the decision `fixed`. A `fixed` record never covers a finding: if the old line returns, the checker raises it again as a regression.
+
+The checker on that tree reads 989 files (11 Skia files excluded) and has 30 candidates: 0 raised, 14 guarded and 16 reviewed. The narrowing on the old line is gone, so the candidate no longer appears. `gui_forms-2026-10-27.json` is the snapshot from before the fix and is kept as it was.

@@ -92,6 +92,31 @@ bool trace_win32_input() noexcept {
     return enabled;
 }
 
+// An input trace line prints at most this many bytes of a stable ID, so the
+// `%.*s` precision always fits in int (a stable ID has no length limit of its
+// own). A longer ID is printed cut to this length, and the line then carries
+// `target_cut_from:<full length in bytes>` so the cut is never silent.
+constexpr std::size_t maximum_traced_stable_id_bytes = 1024;
+
+struct TracedStableId {
+    // The `%.*s` precision: the number of bytes printed, at most
+    // maximum_traced_stable_id_bytes.
+    int printed_bytes = 0;
+    // The full length when the ID was cut, otherwise 0.
+    std::size_t cut_from_bytes = 0;
+};
+
+TracedStableId traced_stable_id(std::string_view id) noexcept {
+    TracedStableId traced;
+    std::size_t printed = id.size();
+    if (printed > maximum_traced_stable_id_bytes) {
+        traced.cut_from_bytes = printed;
+        printed = maximum_traced_stable_id_bytes;
+    }
+    traced.printed_bytes = static_cast<int>(printed);
+    return traced;
+}
+
 std::uint64_t now_nanoseconds() noexcept {
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count());
@@ -3908,12 +3933,23 @@ private:
         if (trace_win32_input()) {
             const Control::Ptr target = (*model_).hit_test(event.position);
             const std::string_view target_id = target ? (*target).stable_id().value() : std::string_view{"<none>"};
-            std::fprintf(stderr,
-                         "win32-input=pointer|message:%u|action:%u|x:%.2f|y:%.2f|target:%.*s|active:%d|focus:%d|capture:%d\n",
-                         static_cast<unsigned>(message), static_cast<unsigned>(action),
-                         event.position.x, event.position.y,
-                         static_cast<int>(target_id.size()), target_id.data(),
-                         GetActiveWindow() == hwnd_, GetFocus() == hwnd_, GetCapture() == hwnd_);
+            const TracedStableId traced = traced_stable_id(target_id);
+            if (traced.cut_from_bytes != 0) {
+                std::fprintf(stderr,
+                             "win32-input=pointer|message:%u|action:%u|x:%.2f|y:%.2f|target:%.*s|target_cut_from:%zu|"
+                             "active:%d|focus:%d|capture:%d\n",
+                             static_cast<unsigned>(message), static_cast<unsigned>(action),
+                             event.position.x, event.position.y,
+                             traced.printed_bytes, target_id.data(), traced.cut_from_bytes,
+                             GetActiveWindow() == hwnd_, GetFocus() == hwnd_, GetCapture() == hwnd_);
+            } else {
+                std::fprintf(stderr,
+                             "win32-input=pointer|message:%u|action:%u|x:%.2f|y:%.2f|target:%.*s|active:%d|focus:%d|capture:%d\n",
+                             static_cast<unsigned>(message), static_cast<unsigned>(action),
+                             event.position.x, event.position.y,
+                             traced.printed_bytes, target_id.data(),
+                             GetActiveWindow() == hwnd_, GetFocus() == hwnd_, GetCapture() == hwnd_);
+            }
             std::fflush(stderr);
         }
         dispatch(std::move(event));
