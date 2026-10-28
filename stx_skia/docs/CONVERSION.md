@@ -1816,6 +1816,17 @@ The sibling's other reports of wrong numbers are each covered by an existing cas
 
 Still to add: counts and capacities checked against contents, beyond the tarray-core corpus.
 
+## Unpremultiply scale bound
+
+API item 13 (house style §9). `SkUnPreMultiply::GetScale(U8CPU)` indexes its 256-entry table,
+and its only bound was a debug assertion. The code-integrity checker recorded the public entry
+as a defect. The bound is now a Release check, and the reviews.json entry is removed.
+- **Evidence:** `unpremultiply` (both profiles) checks two things for every alpha: GetScale
+  reads that alpha's table entry, and ApplyScale undoes premultiplication within one level.
+- **Stop test:** `stx_skia_unpremultiply_stops_alpha_256` (candidate only) asks for alpha 256
+  and must end in the Release-check trap. With the debug-only assertion restored, the stop test
+  fails (negative control).
+
 ## Still required
 
 Refreshed 2026-10-27 after the support leftovers. The whole-library AST inventory counts 249
