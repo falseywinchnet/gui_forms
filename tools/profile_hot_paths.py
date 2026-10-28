@@ -93,8 +93,16 @@ class HotFunction:
 # Areas, tested in order; the first whose pattern matches the symbol (or,
 # for the runtimes and the kernel, the object) names the row's area.
 AREA_SYMBOLS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ('gui_forms', re.compile(r'^(?:[\w:<>, ]*\s)?gui_forms::')),
-    ('skia', re.compile(r'^(?:[\w:<>, ]*\s)?(?:Sk|sk_|skcms|skvm|SkOpts|portable::|hsw::|skx::|sse2::|sse41::|neon::|lowp::)')),
+    # The workloads' own drivers (benchmarks/*.cpp): setup, timing and the
+    # paint workload's pixel hash, kept apart so they do not count as the
+    # library's cost.
+    ('workload', re.compile(r'^(?:main|\(anonymous namespace\)::(?:measure|paint_once|pixel_hash|prepare_scale|'
+                            r'run_damage_phase|run_page_phase|register_bundled_faces|case_record|write_record)\()')),
+    ('skia', re.compile(r'^(?:[\w:<>, ]*\s)?(?:Sk|sk_|skcms|skvm|SkOpts|portable::|hsw::|skx::|sse2::|sse41::|neon::|'
+                        r'lowp::|aaa_|blit_trapezoid|walk_edges|walk_convex_edges)')),
+    # A standard container or algorithm instantiated for a GUI.Forms type is
+    # GUI.Forms' cost, so the name may appear anywhere in the symbol.
+    ('gui_forms', re.compile(r'gui_forms::')),
     ('harfbuzz', re.compile(r'^(?:[\w:<>, ]*\s)?(?:hb_|OT::|AAT::|CFF::)')),
     ('freetype', re.compile(r'^(?:FT_|ft_|tt_|TT_|cff_|ps_|af_|psh_|gray_|t1_|pfr_)')),
 )
@@ -133,8 +141,11 @@ def parse_report(text: str) -> list[HotFunction]:
 
     A row is one or two percentages (with --children: inclusive, then self;
     without: self), the object and the symbol, which perf prefixes with
-    "[.] " (user) or "[k] " (kernel). Comment lines (#) and blank lines are
-    skipped. Rows keep perf's order.
+    "[.] " (user) or "[k] " (kernel) and pads with spaces. perf 6.17 adds
+    an "IPC [IPC Coverage]" column after the symbol ("-" when the hardware
+    gives none); columns after the symbol are ignored. Comment lines (#),
+    blank lines and call-tree lines (no percentage column) are skipped.
+    Rows keep perf's order.
     """
     rows: list[HotFunction] = []
     line: str
@@ -153,7 +164,7 @@ def parse_report(text: str) -> list[HotFunction]:
         if not percents or len(columns) < index + 2:
             continue
         dso: str = columns[index].strip()
-        symbol: str = SEPARATOR.join(columns[index + 1:]).strip()
+        symbol: str = columns[index + 1].strip()
         symbol = re.sub(r'^\[[.kgu]\]\s*', '', symbol)
         self_percent: float = percents[-1]
         inclusive_percent: float = percents[0]
@@ -345,7 +356,9 @@ def run(output: Path, jobs: int, frequency: int, top: int) -> int:
     (output / 'hot-paths.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     header: list[str] = ['# GUI.Forms hot paths', '',
                          'Shares of perf samples per workload (self: in the function itself; inclusive: with '
-                         'its callees, where frame pointers allow). Not timings.', '',
+                         'its callees, where frame pointers allow). Not timings. The Skia archive is built '
+                         'without frame pointers, so a sample inside Skia may not reach its GUI.Forms callers: '
+                         'inclusive shares of GUI.Forms functions are lower bounds.', '',
                          f'- Commit: `{host["commit"]}`',
                          f'- Host: {host["cpu"]}, {host["cpus"]} CPUs, {host["system"]}',
                          f'- Runner: {host["runner"]} ({host["image"].strip()})',

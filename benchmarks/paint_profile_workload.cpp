@@ -36,6 +36,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -121,13 +122,24 @@ void register_bundled_faces(SkiaRaster& raster, const std::filesystem::path& dir
     }
 }
 
-// FNV-1a over the raster's bytes: an identity for the drawn frame, not a
-// checksum against corruption.
+// FNV-1a over the raster's 8-byte words (host byte order), then its tail
+// bytes: an identity for the drawn frame, not a checksum against corruption.
+// Word steps keep the hash a small part of the samples (the first run spent
+// 6.7 % of them hashing byte by byte).
 std::uint64_t pixel_hash(const SkiaRaster& raster) {
     const std::span<const std::byte> bytes(static_cast<const std::byte*>(raster.pixels()), raster.byte_size());
+    constexpr std::size_t word_bytes = sizeof(std::uint64_t);
+    const std::size_t words = bytes.size() / word_bytes;
     std::uint64_t hash = 14695981039346656037ULL;
-    for (const std::byte value : bytes) {
-        hash ^= std::to_integer<std::uint64_t>(value);
+    std::size_t index = 0;
+    for (index = 0; index < words; ++index) {
+        std::uint64_t word = 0;
+        std::memcpy(&word, bytes.data() + index * word_bytes, word_bytes);
+        hash ^= word;
+        hash *= 1099511628211ULL;
+    }
+    for (index = words * word_bytes; index < bytes.size(); ++index) {
+        hash ^= std::to_integer<std::uint64_t>(bytes[index]);
         hash *= 1099511628211ULL;
     }
     return hash;
