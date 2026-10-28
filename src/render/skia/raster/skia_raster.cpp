@@ -727,9 +727,9 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
             kPremul_SkAlphaType,
             SkColorSpace::MakeSRGB());
         const std::size_t row_bytes = output_info.minRowBytes();
+        const std::optional<std::size_t> output_bytes = output_info.checkedByteSize(row_bytes);
         if (row_bytes != static_cast<std::size_t>((*resource).metadata.width) * 4U ||
-            output_info.computeByteSize(row_bytes) !=
-                (*resource).metadata.decoded_byte_count) {
+            !output_bytes || *output_bytes != (*resource).metadata.decoded_byte_count) {
             (*impl_).images.erase(id.value);
             synchronized = false;
             continue;
@@ -833,12 +833,14 @@ std::vector<std::byte> SkiaRaster::encode_png() const {
     const bool rgba = pixmap.colorType() == kRGBA_8888_SkColorType;
     const bool bgra = pixmap.colorType() == kBGRA_8888_SkColorType;
     if ((!rgba && !bgra) || pixmap.alphaType() != kPremul_SkAlphaType) return result;
+    const std::optional<std::size_t> pixel_bytes = pixmap.checkedByteSize();
+    if (!pixel_bytes) return result;
     gui_forms::image::PngEncodeInput input{};
     input.width = static_cast<std::uint32_t>(pixmap.width());
     input.height = static_cast<std::uint32_t>(pixmap.height());
     input.row_bytes = pixmap.rowBytes();
     input.pixels = std::span<const std::byte>(static_cast<const std::byte*>(pixmap.addr()),
-                                              pixmap.computeByteSize());
+                                              *pixel_bytes);
     input.order = rgba ? gui_forms::image::PngChannelOrder::rgba
                        : gui_forms::image::PngChannelOrder::bgra;
     input.alpha = gui_forms::image::PngSourceAlpha::premultiplied;

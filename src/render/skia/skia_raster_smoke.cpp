@@ -314,6 +314,13 @@ int main() {
         std::fputs("Skia raster surface remained empty\n", stderr);
         return 10;
     }
+    // The PNG export sizes the surface through checkedByteSize; a frame must encode.
+    const std::vector<std::byte> encoded_frame = raster.encode_png();
+    if (encoded_frame.size() < 8 || encoded_frame[1] != std::byte{0x50} ||
+        encoded_frame[2] != std::byte{0x4e} || encoded_frame[3] != std::byte{0x47}) {
+        std::fputs("Skia raster frame did not encode as PNG\n", stderr);
+        return 22;
+    }
     std::printf("{\"renderer\":\"skia-cpu\",\"width\":%u,\"height\":%u,"
                 "\"bytes\":%zu,\"checksum\":%llu}\n",
                 raster.pixel_width(), raster.pixel_height(), raster.byte_size(),

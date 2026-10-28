@@ -1727,6 +1727,35 @@ left to the coordinator.
   reaches the borrow: when the destructor was made to stop unconditionally, that test stopped.
   With the real check, it and the live-surface tests pass, including under ASan and UBSan.
 
+## Checked byte sizes
+
+API item 5 (house style §1, §9). `SkImageInfo::computeByteSize` reported "too large" by
+returning `SIZE_MAX`, a value that is also a valid `size_t`. Each caller had to remember to call
+`ByteSizeOverflowed`, and four callers did not.
+
+`SkImageInfo::checkedByteSize(rowBytes)` and `checkedMinByteSize()` now return
+`std::optional<size_t>`. There is no value when the extent exceeds `size_t` or the 32-bit
+pixel-buffer limit. `SkPixmap::checkedByteSize()` and `SkBitmap::checkedByteSize()` forward to
+them, and `SkAutoPixmapStorage::AllocSize` returns the optional too.
+- **Library callers:** all of them use the checked form.
+  - Callers that validated before still fail the same way.
+  - Four callers sized pixels that were already allocated and never checked the result:
+    `detachPixelsAsData`, the bitmap cache's `bytesUsed`, `SkSpecialImage::getSize` and the
+    raster surface's copy-on-write `memcpy`. They now stop in Release if the size is missing.
+  - `extractAlpha` rejected the sentinel only because it compared the size with the mask's
+    size. It now rejects a missing size by name.
+- **Kept for outside callers:** `computeByteSize`, `computeMinByteSize` and `ByteSizeOverflowed`
+  return the checked value or `SIZE_MAX`. Removing them would be a removal, so that decision is
+  left to the coordinator.
+- **Evidence:** `pixel_extent` gains `checked_extents` (candidate only). It covers nine cases:
+  empty, zero height, padded stride, exactly the limit, one byte over, row overflow and
+  `size_t` overflow. In each case the checked form, the sentinel form and the pixmap form must
+  agree. It also checks owned-storage sizing, bitmap sizing and `detachPixelsAsData`. A negative
+  control fails it: a pixmap form that ignores the row stride.
+- **GUI.Forms:** image synchronization in `SkiaRaster` refuses a resource whose size has no
+  value. `encode_png` returns nothing in that case. `gui_forms_skia_smoke` now checks that a
+  drawn frame encodes as PNG.
+
 ## Still required
 
 Refreshed 2026-10-27 after the support leftovers. The whole-library AST inventory counts 249
