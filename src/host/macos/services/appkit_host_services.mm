@@ -441,12 +441,16 @@ protected:
                     break;
                 case HostMessageIcon::none:
                 case HostMessageIcon::information:
+                default:
+                    // Fallback: a value outside HostMessageIcon shows as information.
                     alert.alertStyle = NSAlertStyleInformational;
                     break;
                 }
                 std::vector<std::pair<NSString*, HostDialogChoice>> buttons;
                 switch (payload.buttons) {
                 case HostMessageButtons::ok:
+                default:
+                    // Fallback: a value outside HostMessageButtons offers OK alone.
                     buttons = {{@"OK", HostDialogChoice::ok}};
                     break;
                 case HostMessageButtons::ok_cancel:
@@ -598,6 +602,10 @@ protected:
         case HostSoundCue::warning: name = @"Funk"; break;
         case HostSoundCue::error: name = @"Basso"; break;
         case HostSoundCue::operation_complete: name = @"Pop"; break;
+        default:
+            // Fallback: a value outside HostSoundCue plays the notification cue.
+            name = @"Ping";
+            break;
         }
         NSSound* sound = [NSSound soundNamed:name];
         if (sound == nil) {

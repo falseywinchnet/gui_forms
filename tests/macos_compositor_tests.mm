@@ -375,8 +375,9 @@ void read_step(GateContext& gate) {
         break;
     case GateStep::waiting_for_report:
     case GateStep::finished:
-        // Never read: the gate reads a step only between its first report
-        // and its finish (advance).
+    default:
+        // Ignored: no step to check. The gate reads a step only between its
+        // first report and its finish (advance).
         break;
     }
 }
