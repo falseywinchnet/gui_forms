@@ -1021,12 +1021,14 @@ void SkiaRaster::fill_linear_gradient_spread(
                              static_cast<SkScalar>(start.y)},
                             {static_cast<SkScalar>(end.x),
                              static_cast<SkScalar>(end.y)}};
-    sk_sp<SkShader> shader = SkShaders::LinearGradient(
+    // The painter contract draws nothing for geometry stx_skia refuses (points
+    // that overflow float, for example), as for the invalid input checked above.
+    SkGradientShaderResult made = SkShaders::LinearGradient(
         points, make_sk_gradient(data, spread));
-    if (!shader) return;
+    if (made.rejection != SkGradientRejection::kNone) return;
     SkPaint paint;
     paint.setAntiAlias(true);
-    paint.setShader(std::move(shader));
+    paint.setShader(std::move(made.shader));
     const SkRect box = snapped_box((*impl_).snap_transform_of(*canvas), rect, paint);
     (*canvas).drawRect(box, paint);
 }
@@ -1040,12 +1042,12 @@ void SkiaRaster::fill_radial_gradient(
         return;
     }
     const SkGradientData data = to_sk_gradient(stops);
-    sk_sp<SkShader> shader = SkShaders::RadialGradient(
+    SkGradientShaderResult made = SkShaders::RadialGradient(
         {0.0F, 0.0F}, 1.0F, make_sk_gradient(data));
-    if (!shader) return;
+    if (made.rejection != SkGradientRejection::kNone) return;
     SkPaint paint;
     paint.setAntiAlias(true);
-    paint.setShader(std::move(shader));
+    paint.setShader(std::move(made.shader));
     (*canvas).save();
     SkRect box = to_sk_rect(rect);
     const bool snapped = snapped_local_rect((*impl_).snap_transform_of(*canvas), rect, box);
