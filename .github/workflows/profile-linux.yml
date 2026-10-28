@@ -65,17 +65,15 @@ jobs:
       - name: Identify and verify LLVM release compiler
         id: compiler
         run: python template_harness/harness/compiler_identity.py
-      # The native jobs' Skia and text-stack cache (native-platform.yml):
-      # main's entry serves a scheduled run, so Skia is rarely built here.
+      # The native jobs' text-stack cache (native-platform.yml), with the
+      # same paths so main's entry serves a scheduled run.
       - uses: actions/cache/restore@v4
         with:
           path: |
-            gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
             gui_forms/third_party/libunibreak
             .build/native-linux-x64/gui-forms/_deps/gui_forms_miniaudio-src
-            .build/native-linux-x64/skia
           key: gui-deps-v3-linux-x64-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn', 'gui_forms/cmake/Audio.cmake') }}
       - name: Configure compiler cache
         run: |

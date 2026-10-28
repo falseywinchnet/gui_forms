@@ -40,8 +40,8 @@ SOURCE: Path = ROOT / 'gui_forms'
 # perf report's column separator: symbols (demangled C++) never hold a tab.
 SEPARATOR: str = '\t'
 # Frame pointers let perf walk GUI.Forms' own stacks (inclusive shares); line
-# tables name the functions. The prebuilt Skia archive keeps its own flags,
-# so its frames give self shares only.
+# tables name the functions. stx_skia/ is built in this tree, so it takes
+# the same flags and its frames reach their GUI.Forms callers.
 PROFILE_FLAGS: str = '-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -gline-tables-only'
 DEFAULT_TOP: int = 40
 # Below this many samples a workload's shares are listed but not ranked:
@@ -302,11 +302,10 @@ def run_command(command: list[str], output: Path | None = None) -> None:
 def build_workloads(build: Path, jobs: int) -> Path:
     """Configure and build the workloads; returns the build tree."""
     tree: Path = build / 'gui-forms-profile'
-    skia_out: Path = build / 'skia'
-    prepare_host('linux', SOURCE, skia_out, True)
+    prepare_host(SOURCE, True)
     configure: list[str] = ['cmake', '-S', str(SOURCE), '-B', str(tree), '-G', 'Ninja',
                             *toolkit_options(SOURCE, build / 'gui-forms-profile-sdk', True, False),
-                            *host_options('linux', skia_out), *WORKLOAD_OPTIONS,
+                            *host_options('linux'), *WORKLOAD_OPTIONS,
                             f'-DCMAKE_C_FLAGS={PROFILE_FLAGS}', f'-DCMAKE_CXX_FLAGS={PROFILE_FLAGS}']
     # The miniaudio source the native jobs' dependency cache restores, as
     # tools/ci_build.py uses it; Audio.cmake checks its digest either way.
@@ -396,9 +395,7 @@ def run(output: Path, jobs: int, frequency: int, top: int) -> int:
     (output / 'hot-paths.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     header: list[str] = ['# GUI.Forms hot paths', '',
                          'Shares of perf samples per workload (self: in the function itself; inclusive: with '
-                         'its callees, where frame pointers allow). Not timings. The Skia archive is built '
-                         'without frame pointers, so a sample inside Skia may not reach its GUI.Forms callers: '
-                         'inclusive shares of GUI.Forms functions are lower bounds.', '',
+                         'its callees, where frame pointers allow). Not timings.', '',
                          f'- Commit: `{host["commit"]}`',
                          f'- Host: {host["cpu"]}, {host["cpus"]} CPUs, {host["system"]}',
                          f'- Runner: {host["runner"]} ({host["image"].strip()})',
