@@ -236,7 +236,7 @@
     <fixture name="text/block-margins-collapse"/>
     <fixture name="text/block-paragraphs"/>
     <fixture name="text/block-strut-large-font" bidirectional="true"/>
-    <fixture name="text/block-text-align" bidirectional="true"/>
+    <fixture name="text/block-text-align"/>
     <fixture name="text/bold-italic" bidirectional="true"/>
     <fixture name="text/flex-auto-minimum"/>
     <fixture name="text/flex-baseline-padding" bidirectional="true"/>

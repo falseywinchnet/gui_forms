@@ -74,8 +74,8 @@ details are under [Done and tested](#done-and-tested).
 - **Flex and grid layout** containers, checked against a browser's layout
   (in progress). FlexPanel, GridPanel, BlockPanel and the `TextBlock` leaf
   are on main, with the Windows Forms containers mirrored for right-to-left
-  layout; the box gate passes 181 fixtures with none over tolerance. The
-  text corpus remains.
+  layout. The corpus passes 211 fixtures, 30 of them text at text scales
+  100 % and 150 %, with none over tolerance.
 - **Form documents that round-trip:** hand edits and visual edits never
   overwrite each other (not started; the format is decided).
 - **Damage-preserving painting** (done): each damaged region is painted and
@@ -156,7 +156,7 @@ gates as their own rows. "Done" means the deliverable exists and a test in
 | Display chunks, damage and the CPU renderer | Retained display chunks, bounded multi-rectangle damage per paint plane, a bounded PNG registry with a fuzz target, the renderer-free drawing core (paths, gradients, transforms, clips, images), and the private CPU-only Skia adapter behind symbol audits | done |
 | Portable host protocol and the macOS host | A versioned, capability-reported protocol; on AppKit: lifecycle and close cancellation, monitors, occlusion, capture, cursors, clipboard text and images, inbound typed drops, the five common dialogs, sound cues and IME composition | done; outbound drag and native menus are open |
 | Unicode text, shaping and editing | A strict UTF-8 text store with distinct position types, Unicode grapheme boundaries, HarfBuzz/FreeType shaping over bundled faces with script fallback, bidirectional analysis, and single and multiline editing with selection, clipboard and undo | in progress: preedit on Windows and X11 remains |
-| Layout, scrolling and virtualization | Measure and arrange with Dock/Anchor, flow, table, split and responsive-track containers; scrollable containers with real scrollbars; read barriers and bounded passes; lists and trees that realize only visible rows | in progress: FlexPanel, GridPanel and BlockPanel pass a box gate against a browser layout oracle (181 fixtures); the text corpus and million-item list, tree and grid fixtures are not in place |
+| Layout, scrolling and virtualization | Measure and arrange with Dock/Anchor, flow, table, split and responsive-track containers; scrollable containers with real scrollbars; read barriers and bounded passes; lists and trees that realize only visible rows | in progress: FlexPanel, GridPanel and BlockPanel pass a box and text gate against a browser layout oracle (211 fixtures); the million-item list, tree and grid fixtures are not in place |
 | Basic Forms controls | Panel, GroupBox, Label, LinkLabel, Button, CheckBox, RadioButton, TextBox, ListBox, ComboBox, NumericUpDown, scroll bars, TrackBar, ProgressBar, PictureBox, ContainerControl, UserControl, Timer, ToolTip, ErrorProvider, HelpProvider, ImageList and commands, with initialization scopes, mnemonics and accept/cancel targets | done |
 | Collection, command and data controls | TreeView, ObjectView, CheckedListBox, TabControl, SplitContainer, MasterDetailView, MenuStrip, ContextMenu, CommandBar, DateTimePicker and a metadata-driven PropertyGrid; `Value<T>` and `Command` bindings with record currency and validation | in progress: DataGridView, ListView and StatusStrip are implemented; MessageBox, the link column, menu letter mnemonics and the RichTextBox run model are open |
 | Semantic tree | A retained semantic graph with stable-ID snapshots, default adapters for stock controls, virtual children and semantic actions, independent of authored metadata | done |
