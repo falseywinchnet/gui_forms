@@ -254,12 +254,10 @@ jobs:
         id: dependencies
         with:
           path: |
-            gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
             gui_forms/third_party/libunibreak
             .build/native-${{ matrix.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
-            .build/native-${{ matrix.platform }}/skia
           key: gui-deps-v3-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn', 'gui_forms/cmake/Audio.cmake') }}
       # Called from native.yml: this run's native job for the platform compiled
       # the toolkit and tests of this very tree and archived its .ccache (or,
@@ -280,22 +278,14 @@ jobs:
           tar -xzf .ci/native-cache/gui-forms-cache-${{ matrix.platform }}.tar.gz -O cache-manifest.json > .ci/native-manifest.json
           rm -rf .ci/native-cache
       # --- build, as tools/ci_build.py configures it, plus the programs ------------
-      - name: Fetch pinned text sources and build the CPU renderer
+      # The CPU renderer, stx_skia/, is part of the tree and builds with it.
+      - name: Fetch pinned text sources
         run: |
           sh gui_forms/third_party/fetch_text_stack.sh
           sh gui_forms/third_party/fetch_linebreak.sh
-          if [ "$RUNNER_OS" != Windows ]; then
-            if [ "$RUNNER_OS" = Linux ]; then export GUI_FORMS_SYSTEM_BUILD_TOOLS=1; fi
-            sh gui_forms/third_party/fetch_skia_cpu.sh
-            if [ "$RUNNER_OS" = Linux ]; then
-              BUILD_JOBS=4 sh gui_forms/third_party/build_skia_cpu_linux.sh "$PWD/.build/native-${{ matrix.platform }}/skia"
-            else
-              BUILD_JOBS=4 sh gui_forms/third_party/build_skia_cpu.sh "$PWD/.build/native-${{ matrix.platform }}/skia"
-            fi
-          fi
       - name: Configure the programs
         run: |
-          renderer="-DGUI_FORMS_ENABLE_SKIA=ON -DGUI_FORMS_SKIA_PREBUILT=ON -DGUI_FORMS_SKIA_OUT=$PWD/.build/native-${{ matrix.platform }}/skia"
+          renderer="-DGUI_FORMS_ENABLE_SKIA=ON"
           if [ "$RUNNER_OS" = Windows ]; then renderer="-DGUI_FORMS_ENABLE_SKIA=OFF"; fi
           miniaudio="$BUILD_DIR/_deps/gui_forms_miniaudio-src"
           if [ -f "$miniaudio/miniaudio.h" ]; then renderer="$renderer -DFETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO=$PWD/$miniaudio"; fi
@@ -322,12 +312,10 @@ jobs:
         if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.compile.outcome == 'success' && steps.dependencies.outputs.cache-hit != 'true'
         with:
           path: |
-            gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
             gui_forms/third_party/libunibreak
             .build/native-${{ matrix.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
-            .build/native-${{ matrix.platform }}/skia
           key: ${{ steps.dependencies.outputs.cache-primary-key }}
       # The saved cache is this build's working set, not every generation up
       # to CCACHE_MAXSIZE (notes:planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1).

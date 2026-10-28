@@ -1,5 +1,10 @@
 # Skia CPU proving-build evidence
 
+> Historical record. Since 2026-10-27 macOS and Linux build the renderer from
+> `stx_skia/` with the tree; `build_skia_cpu.sh`, `build_skia_cpu_linux.sh` and
+> `skia_cpu_args.gn`, which the measurements below used, are removed. Only the
+> stage SK1 Windows archive build remains in `third_party/`.
+
 ## 2026-10-21: codec-free Skia (Z-stage I5)
 
 `skia_cpu_args.gn` and `skia_cpu_windows_mingw_args.gn` now set

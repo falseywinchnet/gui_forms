@@ -79,7 +79,6 @@ class Fixture:
             "third_party/fetch_text_stack.sh": "harfbuzz_revision=" + self.revisions["harfbuzz"] + "\n"
                                                "freetype_revision=" + self.revisions["freetype"] + "\n",
             "third_party/fetch_linebreak.sh": "revision=" + self.revisions["libunibreak"] + "\n",
-            "third_party/fetch_skia_cpu.sh": "skia_revision=" + "a" * 40 + "\nfreetype_revision=" + "b" * 40 + "\n",
         })
 
     def package(self, out: Path) -> Path:
@@ -149,8 +148,8 @@ class SourceArchiveTests(unittest.TestCase):
         network: list[str] = []
         for source in record["network_inputs"]:
             network.append(source["name"])
-        self.assertIn("skia", network)
-        self.assertEqual(record["network_inputs"][0]["revision"], "a" * 40)
+        # stx_skia/ is part of the tree, so Skia is no longer downloaded.
+        self.assertEqual(network, ["llvm-runtimes-source"])
         self.assertTrue(record["prebuilt_inputs"])
 
     def test_the_archive_is_reproducible(self) -> None:
@@ -258,9 +257,8 @@ class PinTests(unittest.TestCase):
 
     def test_the_real_network_inputs_name_their_pins(self) -> None:
         inputs: list[dict[str, Any]] = sdk.network_inputs(sdk.ROOT)
-        self.assertEqual(inputs[0]["name"], "skia")
-        self.assertRegex(inputs[0]["revision"], r"^[0-9a-f]{40}$")
-        self.assertRegex(inputs[1]["revision"], r"^[0-9a-f]{40}$")
+        self.assertEqual(inputs[0]["name"], "llvm-runtimes-source")
+        self.assertRegex(inputs[0]["sha256"], r"^[0-9a-f]{64}$")
 
 
 class ReleaseTests(unittest.TestCase):

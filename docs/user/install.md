@@ -76,18 +76,13 @@ cmake -S . -B build -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$PWD/sdk"
 ```
 
-Linux (build Skia with the system GN and Ninja first):
+Linux:
 
 ```sh
-export GUI_FORMS_SYSTEM_BUILD_TOOLS=1
-sh third_party/fetch_skia_cpu.sh
-sh third_party/build_skia_cpu_linux.sh "$PWD/build-skia-linux"
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake \
     -DCMAKE_INSTALL_PREFIX="$PWD/sdk" \
-    -DGUI_FORMS_ENABLE_LINUX_HOST=ON \
-    -DGUI_FORMS_SKIA_PREBUILT=ON \
-    -DGUI_FORMS_SKIA_OUT="$PWD/build-skia-linux"
+    -DGUI_FORMS_ENABLE_LINUX_HOST=ON
 ```
 
 Windows (in MSYS2 CLANG64, using the DIB renderer):
@@ -107,9 +102,8 @@ ctest --test-dir build --output-on-failure
 cmake --install build
 ```
 
-On macOS the first build fetches and builds the private CPU-only Skia;
-configure does not build it. HarfBuzz and FreeType come from the explicit text
-fetch above. SheenBidi is vendored; libunibreak is needed only for the optional
+The CPU renderer, `stx_skia/`, builds with the tree. HarfBuzz and FreeType
+come from the explicit text fetch above. SheenBidi is vendored; libunibreak is needed only for the optional
 development text-mask profile. Linux native tests need an X11 display;
 use `xvfb-run -a ctest --test-dir build --output-on-failure` on a headless runner.
 
@@ -221,8 +215,8 @@ python3 tools/build_sdk.py --target <platform> --prefix "$HOME/gui-forms-sdk"
 `linux-arm64`. Only the platform of the machine running the build is
 accepted until per-target cross-compile toolchains exist.
 
-`build_sdk.py` runs the target's own preparation: on macOS and Linux it
-fetches and builds the pinned CPU Skia. It then configures the toolkit with
+`build_sdk.py` runs the target's own preparation (the pinned text sources,
+unless the source SDK archive already holds them). It then configures the toolkit with
 the options CI uses, minus the tests and the demonstration programs, builds
 it with `--jobs` jobs in `--work` (default `.build/sdk-<platform>`), and
 installs it into `--prefix`. The [Prerequisites](#prerequisites) still apply,
@@ -253,24 +247,15 @@ out as well.
 
 | Input | Platforms | From |
 |---|---|---|
-| Skia source at the pin in `third_party/fetch_skia_cpu.sh` (about 176 MB in 12,278 files, so not vendored) | macOS, Linux | skia.googlesource.com (mirror github.com/google/skia), by `fetch_skia_cpu.sh` |
-| Skia's own FreeType, pinned in the same script (about 11 MB) | macOS, Linux | chromium.googlesource.com (mirror github.com/freetype/freetype) |
-| gn and ninja binaries | macOS | Skia's `bin/fetch-gn` and `bin/fetch-ninja`; Linux uses the system `gn` and `ninja` |
 | The LLVM 22.1.8 source tarball, digest pinned in `tools/macos_runtime_manifest.py` | macOS, once | github.com/llvm/llvm-project releases, by `tools/build_macos_runtimes.py`, to build the macOS 14 runtime |
 
-Windows builds without Skia at this release, so it downloads nothing. On
-every platform the toolchain itself (LLVM 22.1, CMake, Ninja, Git and
-Python) is installed as in [Prerequisites](#prerequisites), not shipped.
+The CPU renderer, `stx_skia/`, is part of the source tree, so nothing is
+downloaded for it. On every platform the toolchain itself (LLVM 22.1, CMake,
+Ninja, Git and Python) is installed as in [Prerequisites](#prerequisites),
+not shipped.
 
-A fully offline build therefore needs only the installed toolchain on
-Windows. On macOS and Linux it also needs, before `build_sdk.py` runs:
-
-- a Git checkout of Skia at its pin in `third_party/skia/`;
-- Skia's FreeType at its pin in `third_party/skia/third_party/externals/freetype/`;
-- `gn` and `ninja`.
-
-On macOS, an already built `GUI_FORMS_LLVM_RUNTIME` prefix is also needed.
-`fetch_skia_cpu.sh` fetches only a pin its checkout lacks.
+A fully offline build therefore needs only the installed toolchain, and on
+macOS an already built `GUI_FORMS_LLVM_RUNTIME` prefix.
 
 ### Build with CI's compiler cache
 
@@ -302,7 +287,7 @@ only in CI's layout, with the same LLVM 22.1.8 toolchain:
   (`CMAKE_C_COMPILER_LAUNCHER` and `CMAKE_CXX_COMPILER_LAUNCHER`);
 - `python3 gui_forms/tools/build_sdk.py --target <platform> --prefix <dir>
   --work <workspace>/.build/native-<platform>`, which compiles in
-  `.build/native-<platform>/gui-forms` (and Skia in `.build/native-<platform>/skia`),
+  `.build/native-<platform>/gui-forms`,
   as CI does;
 - the toolchain's own headers at CI's paths, since they lie outside the
   workspace and their absolute paths are hashed: Homebrew's `llvm@22` on

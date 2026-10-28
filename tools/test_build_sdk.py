@@ -11,7 +11,7 @@ import ci_build
 
 # Options whose values are paths of the tree or build that ran the configure;
 # only their presence and file names are compared.
-PATH_OPTIONS: dict[str, str] = {"CMAKE_TOOLCHAIN_FILE": "cmake/llvm22.cmake", "GUI_FORMS_SKIA_OUT": "skia"}
+PATH_OPTIONS: dict[str, str] = {"CMAKE_TOOLCHAIN_FILE": "cmake/llvm22.cmake"}
 # Options the two set differently by design: CI also builds and runs the
 # tests; each installs into its own prefix.
 DIFFERENT_BY_DESIGN: dict[str, tuple[str, str]] = {"GUI_FORMS_BUILD_TESTS": ("ON", "OFF")}
@@ -29,7 +29,7 @@ def capture_configure(toolkit: Path, configure: list[str]) -> None:
     raise Captured(configure)
 
 
-def ignore_preparation(host: str, source: Path, skia_out: Path, fetch_text: bool) -> None:
+def ignore_preparation(source: Path, fetch_text: bool) -> None:
     return None
 
 
@@ -63,7 +63,7 @@ class ConfigureOptionTests(unittest.TestCase):
                 build: Path = Path(directory)
                 ci: dict[str, str] = definitions(ci_configure(build_sdk.TARGET_HOSTS[target], build))
                 sdk: dict[str, str] = definitions(build_sdk.configure_command(
-                    target, build_sdk.ROOT, build / "sdk-tree", build / "skia", build / "prefix"))
+                    target, build_sdk.ROOT, build / "sdk-tree", build / "prefix"))
                 self.assertEqual(sorted(ci), sorted(sdk))
                 name: str
                 for name in ci:
@@ -83,9 +83,9 @@ class ConfigureOptionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             build: Path = Path(directory)
             default: list[str] = build_sdk.configure_command(
-                "windows-x64", build_sdk.ROOT, build / "tree", build / "skia", build / "prefix")
+                "windows-x64", build_sdk.ROOT, build / "tree", build / "prefix")
             every: list[str] = build_sdk.configure_command(
-                "windows-x64", build_sdk.ROOT, build / "tree", build / "skia", build / "prefix", "all")
+                "windows-x64", build_sdk.ROOT, build / "tree", build / "prefix", "all")
         self.assertEqual(every[:len(default)], default)
         self.assertEqual(definitions(every[len(default):]), {
             "GUI_FORMS_BUILD_TEXT_MASKS": "ON", "GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT": "ON",

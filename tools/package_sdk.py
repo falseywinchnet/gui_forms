@@ -129,15 +129,6 @@ def pinned_revision(root: Path, source: VendoredSource) -> str:
     return pins[0]
 
 
-def script_pin(root: Path, script: str, variable: str) -> str:
-    """The commit a fetch script pins as <variable>=<commit>."""
-    text: str = (root / script).read_text(encoding="utf-8")
-    pins: list[str] = re.findall(r"^" + variable + r"=(" + REVISION_PATTERN + r")$", text, re.MULTILINE)
-    if len(pins) != 1:
-        raise ValueError(f"{script} pins {variable} {len(pins)} times, not once")
-    return pins[0]
-
-
 def is_build_output(relative: str) -> bool:
     """Whether a path inside the top directory is a Git directory or build output."""
     parts: tuple[str, ...] = PurePosixPath(relative).parts
@@ -208,22 +199,6 @@ def network_inputs(root: Path) -> list[dict[str, Any]]:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from macos_runtime_manifest import SOURCE_SHA256, VERSION
     return [
-        {"name": "skia", "platforms": ["macos-arm64", "linux-x64", "linux-arm64"],
-         "fetched_by": "third_party/fetch_skia_cpu.sh", "path": "third_party/skia",
-         "upstream": "https://skia.googlesource.com/skia.git", "mirror": "https://github.com/google/skia.git",
-         "revision": script_pin(root, "third_party/fetch_skia_cpu.sh", "skia_revision"),
-         "note": "the CPU renderer's source, built by build_skia_cpu.sh or build_skia_cpu_linux.sh; "
-                 "about 176 MB in 12,278 files, so it is not vendored"},
-        {"name": "skia-freetype", "platforms": ["macos-arm64", "linux-x64", "linux-arm64"],
-         "fetched_by": "third_party/fetch_skia_cpu.sh", "path": "third_party/skia/third_party/externals/freetype",
-         "upstream": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git",
-         "mirror": "https://github.com/freetype/freetype.git",
-         "revision": script_pin(root, "third_party/fetch_skia_cpu.sh", "freetype_revision"),
-         "note": "Skia's own FreeType, about 11 MB"},
-        {"name": "skia-gn-ninja", "platforms": ["macos-arm64"],
-         "fetched_by": "third_party/skia/bin/fetch-gn and bin/fetch-ninja (run by fetch_skia_cpu.sh)",
-         "note": "prebuilt gn and ninja binaries Skia's scripts download; Linux uses the system gn and ninja "
-                 "(GUI_FORMS_SYSTEM_BUILD_TOOLS=1)"},
         {"name": "llvm-runtimes-source", "platforms": ["macos-arm64"],
          "fetched_by": "template_harness harness/build_macos_runtimes.py (the commit harness.lock pins)",
          "upstream": "https://github.com/llvm/llvm-project/releases/download/llvmorg-" + VERSION +

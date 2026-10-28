@@ -46,14 +46,12 @@ probes. They are not installed.
 ## Third-party dependencies
 
 Dependencies are pinned. Fetch HarfBuzz and FreeType explicitly before
-configuration. CMake schedules the default Skia fetch/build at build time;
-Linux native builds use the platform-specific script and prebuilt options
-shown in [Installation](../user/install). SheenBidi is already vendored in the repository.
+configuration. The CPU renderer, `stx_skia/` (a pruned CPU Skia derivative),
+is part of the repository and builds with the tree, as SheenBidi is vendored.
 
 | Script | Purpose |
 |---|---|
-| `fetch_skia_cpu.sh` | Fetch Skia and its pinned FreeType source (no libpng or zlib: PNG is stx_png on stx_zlib), with the decoder-removal patch applied |
-| `build_skia_cpu.sh`, `build_skia_cpu_linux.sh` | Build the fetched CPU-only Skia for macOS or Linux; they do not fetch sources |
+| `fetch_skia_cpu.sh`, `build_skia_cpu_windows_mingw.sh` | Fetch and build upstream Skia for the stage SK1 Windows archive (`tools/skia_archive.py`); no toolkit build reads them |
 | `fetch_text_stack.sh` | HarfBuzz and FreeType |
 | `fetch_linebreak.sh` | libunibreak (UAX #14 line breaking), required with `fetch_text_stack.sh` before configuring `GUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON` |
 

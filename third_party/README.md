@@ -19,38 +19,20 @@ without HarfBuzz text and from SDK exports. See
 local conformance reproduction, caller-buffer boundary and license requirements.
 
 Unicode grapheme property tables and conformance cases are pinned, generated,
-and attributed under [`unicode/`](unicode/README.md). Unlike Skia, these are
-checked-in generated data so renderer-free builds stay offline.
+and attributed under [`unicode/`](unicode/README.md). They are checked-in
+generated data so renderer-free builds stay offline.
 
-Skia is fetched locally into `skia/` and is deliberately not committed as a
-source copy. GUI.Forms pins the following upstream revisions:
+The CPU renderer is not here: it is `stx_skia/` at the repository root, a
+pruned, converted CPU derivative of Skia `chrome/m152`
+(`2a9b593bab4b2fd019fa494c8d401ff1fab0b883`) that builds with the tree; its
+README and PROVENANCE.md record what it keeps and why. No Skia type may leave
+`src/render/skia/`.
 
-- Skia `chrome/m152`: `2a9b593bab4b2fd019fa494c8d401ff1fab0b883`
-- GN fetched by that Skia checkout: `2175 (b2afae122eeb)`
-
-`skia_cpu_args.gn` is the audited build profile. It compiles the CPU raster
-library with no codec and no zlib, and explicitly excludes Ganesh, Graphite,
-every graphics-device API, every image decoder and encoder (libpng included),
-zlib, PDF, SVG, Skottie, SkParagraph dependencies, tracing, tools, and Rust
-targets. Since Z-stage I5 (2026-10-21) PNG is GUI.Forms' owned `stx_png` on
-`stx_zlib` on every host, so Skia's libpng and Chromium's zlib are neither
-fetched nor built, and the fetch no longer needs chromium.googlesource.com
-for zlib (it had no GitHub mirror).
-
-Upstream's main `:skia` target unconditionally compiles legacy BMP/WBMP and
-folds ICO into its libpng target. `skia_png_only.patch` reproducibly removes
-those three decoder objects and their public feature defines; with libpng
-off, the ICO hunk edits a target that is no longer enabled. This is a local
-policy patch, not a claim about an upstream-supported preset.
-
-The fetched tree may contain excluded source. The build must not compile, link,
-initialize, probe, or expose it. No Skia type may leave `src/render/skia/`.
-
-For the X11 Linux host, use `GUI_FORMS_SYSTEM_BUILD_TOOLS=1` when fetching
-Skia to retain the builder's native GN/Ninja tools (including musl builders),
-then run `build_skia_cpu_linux.sh`. This selects the existing CPU renderer
-instead of the macOS font host; GPU features and every Skia codec remain
-disabled. See `docs/LINUX_HOST.md` for the
-installed Application target and its runtime contracts.
+What remains of the upstream Skia build here serves only the stage SK1
+Windows archive (`tools/skia_archive.py`), which no toolkit build reads:
+`fetch_skia_cpu.sh` fetches upstream Skia into `skia/` (not committed) with
+`skia_png_only.patch` and `skia_windows_mingw.patch`, and
+`build_skia_cpu_windows_mingw.sh` builds it with
+`skia_cpu_windows_mingw_args.gn`. They go when that archive does.
 
 SheenBidi 2.9.0 is vendored under `sheenbidi/` for Unicode bidirectional ordering in the private text adapter. Its Headers and Source are unchanged from the pinned commit in PROVENANCE.md; Apache License 2.0 is included. Linux accessibility dynamically links the system ATK/AT-SPI bridge (LGPL 2.1 or later); it does not use GTK widgets.
