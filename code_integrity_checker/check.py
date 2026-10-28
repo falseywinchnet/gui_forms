@@ -11,6 +11,10 @@ Every candidate ends in one status:
 - reviewed: a recorded decision in reviews.json covers it (defect, guarded or
   false_shape), so it is not raised again.
 
+A `fixed` decision records a defect that a later change removed. It never
+covers a finding: if the recorded evidence line returns, the finding is raised
+again and its record names the fix it undoes.
+
 Paths under a scope reviews.json excludes (the Skia renderer and its C ABI,
 which are being replaced) are not read at all.
 
@@ -74,7 +78,7 @@ GUARDS = {
     # (admit, charge, require, validate, check).
     "named_failure": "an earlier named admission fails for an operand out of range",
 }
-REVIEW_DECISIONS = ("defect", "guarded", "false_shape")
+REVIEW_DECISIONS = ("defect", "guarded", "false_shape", "fixed")
 DEFAULT_REVIEWS = Path(__file__).resolve().parent / "reviews.json"
 
 
@@ -528,6 +532,9 @@ def classify(finding: Finding, reviews: Reviews) -> tuple[str, Review | None]:
     key = (path, finding.rule, normalized_evidence(finding.evidence))
     for review in reviews.entries:
         if (review.path, review.rule, review.evidence) == key:
+            # A fixed defect that returns is a regression: raised, never covered.
+            if review.decision == "fixed":
+                return "raised", review
             return "reviewed", review
     if finding.guard:
         return "guarded", None
@@ -573,6 +580,8 @@ def main() -> int:
             related = "" if finding.related_line is None else f" (related line {finding.related_line})"
             print(f"{finding.path}:{finding.line}: {finding.rule} {rule.title} [house style {rule.style}]{related}")
             print(f"  {finding.evidence}")
+            if review is not None:
+                print(f"  Regression: this line was recorded as fixed ({review.reason})")
             print(f"  Review: {rule.question}")
         else:
             detail = finding.guard if status == "guarded" else (review.decision if review is not None else "")

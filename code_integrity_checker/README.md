@@ -51,7 +51,7 @@ The checker recognizes three guards:
 | `dominating_validation` | An `if` that bounds an operand with a comparison and then leaves (`return`, `throw`, `break`, `continue`), or a limit constant (`numeric_limits`, `SIZE_MAX`, `INT_MAX`). An emptiness test is not a bound. |
 | `named_failure` | A call that admits or charges the operand and fails by name (`admit`, `charge*`, `require*`, `validate*`, `check*`). |
 
-`reviews.json` records a decision for each candidate a person has read: `defect`, `guarded` (with the guard and where it lives, when it is outside the function) or `false_shape` (with a one-line reason naming the shape, so a rule can learn it if it recurs). A decision matches a finding by path, rule and evidence line. Editing the line raises the finding again, so a stale decision cannot hide new code.
+`reviews.json` records a decision for each candidate a person has read: `defect`, `guarded` (with the guard and where it lives, when it is outside the function) or `false_shape` (with a one-line reason naming the shape, so a rule can learn it if it recurs). A decision matches a finding by path, rule and evidence line. Editing the line raises the finding again, so a stale decision cannot hide new code. A defect that a later change removed is recorded as `fixed`, with the fix in its reason. A `fixed` decision never covers a finding: if its evidence line returns, the finding is raised again as a regression.
 
 `--gate` fails only on raised candidates. CI runs it over `include` and `src` (`.github/workflows/code-integrity.yml`). A new candidate therefore fails the job until it is guarded in code or reviewed in `reviews.json`, while reviewed and guarded sites stay listed.
 
