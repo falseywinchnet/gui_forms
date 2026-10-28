@@ -45,6 +45,8 @@ jobs:
           key: chromium-headless-shell-linux64-${{ steps.pin.outputs.version }}-${{ steps.pin.outputs.sha256 }}
       - name: Fetch and verify Chromium
         run: |
+          # The fetch's failure must survive the pipe into tee.
+          set -o pipefail
           if [ -f "$RUNNER_TEMP/chromium-download/chrome-headless-shell-linux64.zip" ]; then
             source="--archive $RUNNER_TEMP/chromium-download/chrome-headless-shell-linux64.zip"
           else
