@@ -281,6 +281,50 @@ void gradients_and_hatches_are_native_raster_commands() {
     CHECK(center.red() > edge.red());
 }
 
+// A gradient brush whose geometry stx_skia refuses (bounds wider than float can
+// hold, so an end point is infinite) fails its command with invalid_argument and
+// leaves the target untouched, instead of filling with the paint's plain color.
+void refused_gradient_fails_without_drawing() {
+    SkiaExecutor executor;
+    Bitmap target(8, 8);
+    target.set_pixel(3, 3, Color::from_name("lime"));
+    const ImageSnapshot before = target.snapshot();
+    const std::uint64_t before_checksum = checksum(before);
+    const std::uint64_t before_generation = target.generation();
+
+    LinearGradientBrush overflowing({0, 0, 1e39, 8}, Color::from_name("red"),
+                                    Color::from_name("blue"), 0.0, WrapMode::clamp);
+    GraphicsRecorder recorder;
+    recorder.fill_rectangle(overflowing, {0, 0, 8, 8});
+    const RasterResult refused = executor.execute(recorder, target);
+    CHECK(refused.error == RasterError::invalid_argument);
+    CHECK(refused.commands_executed == 0U);
+    CHECK(target.generation() == before_generation);
+    CHECK(checksum(target.snapshot()) == before_checksum);
+}
+
+// A pen whose dash pattern stx_skia refuses (an entry wider than float can hold)
+// fails its command with invalid_argument and leaves the target untouched,
+// instead of drawing a solid line.
+void refused_dash_fails_without_drawing() {
+    SkiaExecutor executor;
+    Bitmap target(8, 8);
+    target.set_pixel(3, 3, Color::from_name("lime"));
+    const std::uint64_t before_checksum = checksum(target.snapshot());
+    const std::uint64_t before_generation = target.generation();
+
+    Pen overflowing(Color::from_name("blue"), 2.0);
+    const double pattern[] = {1e39, 1.0};
+    overflowing.set_dash_pattern(pattern);
+    GraphicsRecorder recorder;
+    recorder.draw_line(overflowing, {0, 4}, {8, 4});
+    const RasterResult refused = executor.execute(recorder, target);
+    CHECK(refused.error == RasterError::invalid_argument);
+    CHECK(refused.commands_executed == 0U);
+    CHECK(target.generation() == before_generation);
+    CHECK(checksum(target.snapshot()) == before_checksum);
+}
+
 void connected_line_figures_fill_as_one_contour() {
     SkiaExecutor executor;
     Bitmap target(20, 20);
@@ -488,6 +532,8 @@ int main() {
     texture_brush_tiles_and_mirrors_retained_pixels();
     transparent_png_channels_are_premultiplied();
     gradients_and_hatches_are_native_raster_commands();
+    refused_gradient_fails_without_drawing();
+    refused_dash_fails_without_drawing();
     connected_line_figures_fill_as_one_contour();
     quadratic_bezier_polygon_and_pie_paths_rasterize();
     text_uses_the_shared_engine();
