@@ -1962,6 +1962,7 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
     const Rect absolute = absolute_bounds();
     const std::string list_id(stable_id().value());
     const bool enabled = effectively_enabled();
+    const SemanticState enabled_state = enabled ? SemanticState::enabled : SemanticState::none;
     // Column headers first, in reading order; a header's press raises
     // column_click.
     for (std::size_t column = 0; column < columns_.size(); ++column) {
@@ -1976,8 +1977,7 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
         if (sort_column_ == column && sort_order_ == ListViewSortOrder::ascending) node.value = "ascending";
         if (sort_column_ == column && sort_order_ == ListViewSortOrder::descending) node.value = "descending";
         node.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
-        node.states = SemanticState::visible;
-        if (enabled) node.states |= SemanticState::enabled;
+        node.states = SemanticState::visible | enabled_state;
         node.actions = {SemanticAction::press};
         nodes.push_back(std::move(node));
     }
@@ -1999,8 +1999,7 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
             node.role = check_boxes_ ? SemanticRole::check_list_item : SemanticRole::list_item;
         }
         node.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
-        node.states = SemanticState::visible | SemanticState::focusable;
-        if (enabled) node.states |= SemanticState::enabled;
+        node.states = SemanticState::visible | SemanticState::focusable | enabled_state;
         if (selected_[index] != 0U) node.states |= SemanticState::selected;
         if (focused_ && focused_index_ == index) node.states |= SemanticState::focused;
         if (check_boxes_) {
@@ -2022,6 +2021,7 @@ void ListView::append_row_cells(const Layout& placed, std::size_t index, const L
     const Rect absolute = absolute_bounds();
     const Rect line = item_bounds(placed, index);
     const bool enabled = effectively_enabled();
+    const SemanticState enabled_state = enabled ? SemanticState::enabled : SemanticState::none;
     for (std::size_t column = 0; column < columns_.size(); ++column) {
         const Rect extent = column_cell(placed, column);
         const Rect cell_rect{extent.x, line.y, extent.width, line.height};
@@ -2036,8 +2036,7 @@ void ListView::append_row_cells(const Layout& placed, std::size_t index, const L
         cell.row_index = index + 1U;
         cell.column_index = column + 1U;
         cell.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
-        cell.states = SemanticState::visible;
-        if (enabled) cell.states |= SemanticState::enabled;
+        cell.states = SemanticState::visible | enabled_state;
         row_node.children.push_back(std::move(cell));
     }
 }

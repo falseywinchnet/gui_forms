@@ -2,6 +2,692 @@
   "about": "Decisions on the loop branches that harness/check_loop_branches.py (E2) reports, matched by path, function and condition text. keep: the branch stays, for the reason given. false_shape: the condition is not invariant (it changes inside the loop through a call, a callback or another thread).",
   "decisions": [
     {
+      "path": "src/controls/backstage_view/backstage_view.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "action == SemanticAction::select || action == SemanticAction::press",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/button_base/button_base.cpp",
+      "function": "gui_forms::paint_button_content",
+      "condition": "text_alignment_ == ContentAlignment::top_center || text_alignment_ == ContentAlignment::middle_center || text_alignment_ == ContentAlignment::bottom_center",
+      "decision": "keep",
+      "reason": "aligns a few text lines; one alignment select per line"
+    },
+    {
+      "path": "src/controls/button_base/button_base.cpp",
+      "function": "gui_forms::paint_button_content",
+      "condition": "text_alignment_ == ContentAlignment::top_right || text_alignment_ == ContentAlignment::middle_right || text_alignment_ == ContentAlignment::bottom_right",
+      "decision": "keep",
+      "reason": "aligns a few text lines; one alignment select per line"
+    },
+    {
+      "path": "src/controls/collections/choice_group.cpp",
+      "function": "gui_forms::on_key",
+      "condition": "backward",
+      "decision": "keep",
+      "reason": "steps through a few items with wrap-around; the direction decides each step"
+    },
+    {
+      "path": "src/controls/collections/choice_group.cpp",
+      "function": "gui_forms::set_items",
+      "condition": "revision_",
+      "decision": "keep",
+      "reason": "reuses an entry of the previous revision when there is one; the lookup is per item"
+    },
+    {
+      "path": "src/controls/collections/command_bar.cpp",
+      "function": "gui_forms::on_key",
+      "condition": "backward",
+      "decision": "keep",
+      "reason": "steps through a few items with wrap-around; the direction decides each step"
+    },
+    {
+      "path": "src/controls/collections/command_bar.cpp",
+      "function": "gui_forms::set_items",
+      "condition": "revision_",
+      "decision": "keep",
+      "reason": "reuses an entry of the previous revision when there is one; the lookup is per item"
+    },
+    {
+      "path": "src/controls/collections/expandable_sections.cpp",
+      "function": "gui_forms::on_toggled",
+      "condition": "expanded && single_open_",
+      "decision": "keep",
+      "reason": "runs once, for the toggled section, then the other sections close"
+    },
+    {
+      "path": "src/controls/collections/expandable_sections.cpp",
+      "function": "gui_forms::set_items",
+      "condition": "revision_",
+      "decision": "keep",
+      "reason": "reuses an entry of the previous revision when there is one; the lookup is per item"
+    },
+    {
+      "path": "src/controls/data_grid_view/data_grid_view.cpp",
+      "function": "gui_forms::semantic_virtual_children",
+      "condition": "row_headers_visible_",
+      "decision": "keep",
+      "reason": "publishes one semantic node per item; the flag decides one field of each node"
+    },
+    {
+      "path": "src/controls/docking/dock_navigator/dock_navigator.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "action == SemanticAction::press",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/docking/dock_site/dock_site.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "action != SemanticAction::set_value",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/docking/dock_site/dock_site.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "action == SemanticAction::decrement",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/docking/dock_site/dock_site.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "action == SemanticAction::focus",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/docking/dock_site/dock_site.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "action == SemanticAction::increment",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/docking/dock_site/dock_site.cpp",
+      "function": "gui_forms::plan_bands_and_collapse",
+      "condition": "maximized_",
+      "decision": "keep",
+      "reason": "the attempt loop converges the bands; a maximized site stops after its first plan"
+    },
+    {
+      "path": "src/controls/docking/dock_site/dock_site_auto_hide.cpp",
+      "function": "gui_forms::collect_side_panels",
+      "condition": "pass == 0",
+      "decision": "keep",
+      "reason": "two passes over the stacks; the pass picks which stacks it collects"
+    },
+    {
+      "path": "src/controls/gallery/pages/retained-layout-panels.cpp",
+      "function": "gui_forms::gallery::pages::LayoutPanelsPage::build_flow_cards",
+      "condition": "index < 2U",
+      "decision": "keep",
+      "reason": "builds the gallery's fixed demonstration cards once"
+    },
+    {
+      "path": "src/controls/gallery_controls.cpp",
+      "function": "gui_forms::gallery::arrange_children",
+      "condition": "(*specification_).layout == LayoutKind::flex_row",
+      "decision": "keep",
+      "reason": "maps the logical main and cross axes to physical fields once per item; a split would duplicate the layout body"
+    },
+    {
+      "path": "src/controls/guidance/error_provider/error_provider.cpp",
+      "function": "gui_forms::update_binding",
+      "condition": "!data_member_.empty()",
+      "decision": "keep",
+      "reason": "a few bindings; a data member prefixes each binding's field"
+    },
+    {
+      "path": "src/controls/label/label.cpp",
+      "function": "gui_forms::layout_label_text",
+      "condition": "alignment_ == HorizontalAlignment::center",
+      "decision": "keep",
+      "reason": "aligns a few text lines; one alignment select per line"
+    },
+    {
+      "path": "src/controls/label/label.cpp",
+      "function": "gui_forms::layout_label_text",
+      "condition": "alignment_ == HorizontalAlignment::far",
+      "decision": "keep",
+      "reason": "aligns a few text lines; one alignment select per line"
+    },
+    {
+      "path": "src/controls/menu/menu_strip/menu_strip.cpp",
+      "function": "gui_forms::item_bounds",
+      "condition": "use_mnemonic_",
+      "decision": "keep",
+      "reason": "a loop over a control's few items; one select per item, and a split would duplicate the body"
+    },
+    {
+      "path": "src/controls/menu/menu_strip/menu_strip.cpp",
+      "function": "gui_forms::on_paint",
+      "condition": "use_mnemonic_",
+      "decision": "keep",
+      "reason": "a loop over a control's few items; one select per item, and a split would duplicate the body"
+    },
+    {
+      "path": "src/controls/menu/menu_strip/menu_strip.cpp",
+      "function": "gui_forms::semantic_virtual_children",
+      "condition": "use_mnemonic_",
+      "decision": "keep",
+      "reason": "a loop over a control's few items; one select per item, and a split would duplicate the body"
+    },
+    {
+      "path": "src/controls/pages/page_strip/page_strip.cpp",
+      "function": "gui_forms::layout_shrink",
+      "condition": "widths_frozen_",
+      "decision": "keep",
+      "reason": "a loop over a control's few items; one select per item, and a split would duplicate the body"
+    },
+    {
+      "path": "src/controls/pages/page_strip/page_strip.cpp",
+      "function": "gui_forms::measure_tabs",
+      "condition": "item_sizing_ != PageItemSizing::fixed",
+      "decision": "keep",
+      "reason": "a loop over a control's few items; one select per item, and a split would duplicate the body"
+    },
+    {
+      "path": "src/controls/pages/page_strip/page_strip.cpp",
+      "function": "gui_forms::measure_tabs",
+      "condition": "mnemonics_enabled_",
+      "decision": "keep",
+      "reason": "a loop over a control's few items; one select per item, and a split would duplicate the body"
+    },
+    {
+      "path": "src/controls/pages/page_strip/page_strip.cpp",
+      "function": "gui_forms::prepare_list_commands",
+      "condition": "mnemonics_enabled_",
+      "decision": "keep",
+      "reason": "a loop over a control's few items; one select per item, and a split would duplicate the body"
+    },
+    {
+      "path": "src/controls/pages/page_strip/page_strip.cpp",
+      "function": "gui_forms::semantic_virtual_children",
+      "condition": "mnemonics_enabled_",
+      "decision": "keep",
+      "reason": "a loop over a control's few items; one select per item, and a split would duplicate the body"
+    },
+    {
+      "path": "src/controls/panel/date_time_picker/calendar_popup/calendar_popup.hpp",
+      "function": "gui_forms::CalendarPopup::on_semantic_child_action",
+      "condition": "action == SemanticAction::press",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/panel/date_time_picker/calendar_popup/calendar_popup.hpp",
+      "function": "gui_forms::CalendarPopup::semantic_virtual_children",
+      "condition": "focused_",
+      "decision": "keep",
+      "reason": "a few calendar cells; focus is added only to the selected cell"
+    },
+    {
+      "path": "src/controls/panel/date_time_picker/date_time_utilities.cpp",
+      "function": "gui_forms::date_time_detail::format_date_time",
+      "condition": "value.hour % 12U == 0U",
+      "decision": "keep",
+      "reason": "formats one pattern token per iteration; the value decides the hour and designator"
+    },
+    {
+      "path": "src/controls/panel/date_time_picker/date_time_utilities.cpp",
+      "function": "gui_forms::date_time_detail::format_date_time",
+      "condition": "value.hour < 12U",
+      "decision": "keep",
+      "reason": "formats one pattern token per iteration; the value decides the hour and designator"
+    },
+    {
+      "path": "src/controls/panel/instrument_rack/rack_module_panel/rack_module_panel.cpp",
+      "function": "gui_forms::detail::arrange",
+      "condition": "total_weight > 0.0",
+      "decision": "keep",
+      "reason": "guards a division per item; a hoisted reciprocal would change the rounding"
+    },
+    {
+      "path": "src/controls/panel/list_box/list_box.cpp",
+      "function": "gui_forms::on_paint",
+      "condition": "themed",
+      "decision": "keep",
+      "reason": "paints a few rows or items; the select depends on the item's own state as well"
+    },
+    {
+      "path": "src/controls/panel/list_view/list_view.cpp",
+      "function": "gui_forms::layout_for",
+      "condition": "details",
+      "decision": "keep",
+      "reason": "three layout passes converge on the scroll bars; the view picks the per-line rule"
+    },
+    {
+      "path": "src/controls/panel/list_view/list_view.cpp",
+      "function": "gui_forms::layout_for",
+      "condition": "list",
+      "decision": "keep",
+      "reason": "three layout passes converge on the scroll bars; the view picks the per-line rule"
+    },
+    {
+      "path": "src/controls/panel/list_view/list_view.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "action != SemanticAction::press",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/panel/list_view/list_view.cpp",
+      "function": "gui_forms::paint_item",
+      "condition": "owner_drawn",
+      "decision": "keep",
+      "reason": "owner-drawn and stock columns share the column walk; a split would duplicate it"
+    },
+    {
+      "path": "src/controls/panel/list_view/list_view.cpp",
+      "function": "gui_forms::semantic_virtual_children",
+      "condition": "check_boxes_",
+      "decision": "keep",
+      "reason": "publishes one semantic node per item; the flag decides one field of each node"
+    },
+    {
+      "path": "src/controls/panel/list_view/list_view.cpp",
+      "function": "gui_forms::semantic_virtual_children",
+      "condition": "view_ == ListViewView::details",
+      "decision": "keep",
+      "reason": "publishes one semantic node per item; the flag decides one field of each node"
+    },
+    {
+      "path": "src/controls/panel/masked_text_box/masked_text_box.cpp",
+      "function": "gui_forms::filter_paste",
+      "condition": "overwrite_mode_",
+      "decision": "keep",
+      "reason": "a few pasted pieces; overwrite or insert per piece"
+    },
+    {
+      "path": "src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp",
+      "function": "gui_forms::place",
+      "condition": "placement == Placement::insert",
+      "decision": "keep",
+      "reason": "the placement decides whether each character shifts the slots right; a split would duplicate the slot walk"
+    },
+    {
+      "path": "src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp",
+      "function": "gui_forms::to_string",
+      "condition": "literals",
+      "decision": "keep",
+      "reason": "assembles the text slot by slot; literals and prompts are included on request"
+    },
+    {
+      "path": "src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp",
+      "function": "gui_forms::to_string",
+      "condition": "prompts",
+      "decision": "keep",
+      "reason": "assembles the text slot by slot; literals and prompts are included on request"
+    },
+    {
+      "path": "src/controls/panel/month_calendar/month_calendar.cpp",
+      "function": "gui_forms::on_paint",
+      "condition": "show_week_numbers_",
+      "decision": "keep",
+      "reason": "a few months; week numbers add their rows when shown"
+    },
+    {
+      "path": "src/controls/panel/month_calendar/month_calendar.cpp",
+      "function": "gui_forms::realized_item_count",
+      "condition": "show_week_numbers_",
+      "decision": "keep",
+      "reason": "a few months; week numbers add their rows when shown"
+    },
+    {
+      "path": "src/controls/panel/object_view/object_view.cpp",
+      "function": "gui_forms::append_column_headers",
+      "condition": "details_sort_.direction == ObjectSortDirection::ascending",
+      "decision": "keep",
+      "reason": "publishes one semantic node per item; the flag decides one field of each node"
+    },
+    {
+      "path": "src/controls/panel/object_view/object_view.cpp",
+      "function": "gui_forms::on_paint",
+      "condition": "view_mode_ == ObjectViewMode::icons",
+      "decision": "keep",
+      "reason": "the view mode decides each item's glyph and label placement; a split would duplicate the item paint"
+    },
+    {
+      "path": "src/controls/panel/object_view/object_view.cpp",
+      "function": "gui_forms::paint_details",
+      "condition": "details_sort_.direction == ObjectSortDirection::ascending",
+      "decision": "keep",
+      "reason": "runs for the sorted column only"
+    },
+    {
+      "path": "src/controls/panel/object_view/object_view.cpp",
+      "function": "gui_forms::select_all",
+      "condition": "selection_mode_ == ObjectSelectionMode::single",
+      "decision": "keep",
+      "reason": "single selection stops at the first enabled item; the loop is the search"
+    },
+    {
+      "path": "src/controls/panel/object_view/object_view.cpp",
+      "function": "gui_forms::semantic_virtual_children",
+      "condition": "table",
+      "decision": "keep",
+      "reason": "publishes one semantic node per item; the flag decides one field of each node"
+    },
+    {
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "function": "gui_forms::Impl::rebuild",
+      "condition": "sort == PropertySort::alphabetical",
+      "decision": "keep",
+      "reason": "the sort picks which list each descriptor's rows join"
+    },
+    {
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "function": "gui_forms::Impl::set_value",
+      "condition": "reset",
+      "decision": "keep",
+      "reason": "a property edit over a few selected objects; reset and path decide each object's edit"
+    },
+    {
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "function": "gui_forms::Impl::set_value",
+      "condition": "target_spec.path.empty()",
+      "decision": "keep",
+      "reason": "a property edit over a few selected objects; reset and path decide each object's edit"
+    },
+    {
+      "path": "src/controls/panel/property_list/property_list.cpp",
+      "function": "gui_forms::Impl::recompute_geometry",
+      "condition": "stacked",
+      "decision": "keep",
+      "reason": "a few property rows; the stacked layout adds height and moves the name per row"
+    },
+    {
+      "path": "src/controls/panel/text_box/text_box.cpp",
+      "function": "gui_forms::on_paint",
+      "condition": "masked",
+      "decision": "keep",
+      "reason": "one presentation offset per grapheme; a masked box counts mask characters instead"
+    },
+    {
+      "path": "src/controls/panel/text_box/text_box.cpp",
+      "function": "gui_forms::paint_multiline",
+      "condition": "focused_ && !selection_.empty()",
+      "decision": "keep",
+      "reason": "paints a few rows or items; the select depends on the item's own state as well"
+    },
+    {
+      "path": "src/controls/panel/text_box/text_box.cpp",
+      "function": "gui_forms::paint_multiline",
+      "condition": "selected",
+      "decision": "keep",
+      "reason": "draws each run, then its highlight over the selection, in run order; splitting would change the paint order"
+    },
+    {
+      "path": "src/controls/panel/text_box/text_box.cpp",
+      "function": "gui_forms::paint_multiline",
+      "condition": "themed",
+      "decision": "keep",
+      "reason": "paints a few rows or items; the select depends on the item's own state as well"
+    },
+    {
+      "path": "src/controls/panel/text_box/text_box.cpp",
+      "function": "gui_forms::push_history",
+      "condition": "!undo_.empty()",
+      "decision": "false_shape",
+      "reason": "pop_front() empties undo_ inside the loop, which then trims redo_"
+    },
+    {
+      "path": "src/controls/panel/tree_list_view/tree_list_view.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "action != SemanticAction::press",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/range_control/range_control_rendering.cpp",
+      "function": "gui_forms::range_control_detail::paint_progress_laser",
+      "condition": "orientation == Orientation::horizontal",
+      "decision": "keep",
+      "reason": "a few flames and sparks; reduced motion and orientation shape each one"
+    },
+    {
+      "path": "src/controls/range_control/range_control_rendering.cpp",
+      "function": "gui_forms::range_control_detail::paint_progress_laser",
+      "condition": "reduced",
+      "decision": "keep",
+      "reason": "a few flames and sparks; reduced motion and orientation shape each one"
+    },
+    {
+      "path": "src/controls/range_control/track_bar/track_bar.cpp",
+      "function": "gui_forms::on_paint",
+      "condition": "bounded_count == 0U",
+      "decision": "keep",
+      "reason": "guards a division per item; a hoisted reciprocal would change the rounding"
+    },
+    {
+      "path": "src/controls/range_control/track_bar/track_bar.cpp",
+      "function": "gui_forms::on_paint",
+      "condition": "horizontal",
+      "decision": "keep",
+      "reason": "a few ticks; one orientation select per tick"
+    },
+    {
+      "path": "src/controls/raster_canvas/raster_canvas.cpp",
+      "function": "gui_forms::publish_full_bitmap",
+      "condition": "snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied",
+      "decision": "keep",
+      "reason": "one conversion choice per tile, not per pixel; the tile walk is shared"
+    },
+    {
+      "path": "src/controls/raster_canvas/raster_canvas.cpp",
+      "function": "gui_forms::synchronize_bitmap",
+      "condition": "snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied",
+      "decision": "keep",
+      "reason": "one conversion choice per tile, not per pixel; the tile walk is shared"
+    },
+    {
+      "path": "src/controls/ribbon/ribbon.cpp",
+      "function": "gui_forms::append_group_node",
+      "condition": "focused_ && stop_",
+      "decision": "keep",
+      "reason": "publishes one semantic node per item; the flag decides one field of each node"
+    },
+    {
+      "path": "src/controls/ribbon/ribbon.cpp",
+      "function": "gui_forms::append_group_node",
+      "condition": "popup_focused_ && popup_stop_",
+      "decision": "keep",
+      "reason": "publishes one semantic node per item; the flag decides one field of each node"
+    },
+    {
+      "path": "src/controls/ribbon/ribbon.cpp",
+      "function": "gui_forms::arrange",
+      "condition": "selected_tab_ == tab",
+      "decision": "keep",
+      "reason": "commands of other tabs collapse; the selected tab's are placed"
+    },
+    {
+      "path": "src/controls/ribbon/ribbon.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "action != SemanticAction::select",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/ribbon/ribbon.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "action == SemanticAction::press",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/ribbon/ribbon.cpp",
+      "function": "gui_forms::on_semantic_child_action",
+      "condition": "minimized_",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/ribbon/ribbon.cpp",
+      "function": "gui_forms::process_mnemonic_self",
+      "condition": "minimized_",
+      "decision": "keep",
+      "reason": "runs once, on the matching item, then returns"
+    },
+    {
+      "path": "src/controls/ribbon/ribbon_application_menu.cpp",
+      "function": "gui_forms::move",
+      "condition": "forward",
+      "decision": "keep",
+      "reason": "steps through a few items with wrap-around; the direction decides each step"
+    },
+    {
+      "path": "src/controls/ribbon_color_picker/ribbon_color_picker.cpp",
+      "function": "gui_forms::palette_key",
+      "condition": "key == PhysicalKey::down",
+      "decision": "keep",
+      "reason": "a few palette entries; the key decides the direction of each comparison"
+    },
+    {
+      "path": "src/controls/ribbon_gallery/ribbon_gallery.cpp",
+      "function": "gui_forms::navigate",
+      "condition": "upward",
+      "decision": "keep",
+      "reason": "steps through a few items with wrap-around; the direction decides each step"
+    },
+    {
+      "path": "src/controls/ribbon_gallery/ribbon_gallery.cpp",
+      "function": "gui_forms::semantic_virtual_children",
+      "condition": "grouped && !groups.empty()",
+      "decision": "keep",
+      "reason": "publishes one semantic node per item; the flag decides one field of each node"
+    },
+    {
+      "path": "src/controls/ribbon_gallery/ribbon_gallery.cpp",
+      "function": "gui_forms::semantic_virtual_children",
+      "condition": "in_view",
+      "decision": "keep",
+      "reason": "publishes one semantic node per item; the flag decides one field of each node"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/flex_panel/flex_panel.cpp",
+      "function": "gui_forms::intrinsic_content_width",
+      "condition": "minimum",
+      "decision": "keep",
+      "reason": "a few children; min-content or max-content per query"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/flex_panel/flex_panel.cpp",
+      "function": "gui_forms::measure_item_crosses",
+      "condition": "horizontal",
+      "decision": "keep",
+      "reason": "maps the logical main and cross axes to physical fields once per item; a split would duplicate the layout body"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/flex_panel/flex_panel.cpp",
+      "function": "gui_forms::resolve_item_inputs",
+      "condition": "horizontal",
+      "decision": "keep",
+      "reason": "maps the logical main and cross axes to physical fields once per item; a split would duplicate the layout body"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/flow_layout_panel_compat/flow_layout_panel_compat.cpp",
+      "function": "gui_forms::layout_pass",
+      "condition": "assign && total_grow > 0.0",
+      "decision": "keep",
+      "reason": "the grow share is per item, and only when the pass assigns"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/flow_layout_panel_compat/flow_layout_panel_compat.cpp",
+      "function": "gui_forms::layout_pass",
+      "condition": "flow_direction_ == FlowDirection::left_to_right",
+      "decision": "keep",
+      "reason": "places or mirrors each child after its slot is solved; one select per child"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/flow_layout_panel_compat/flow_layout_panel_compat.cpp",
+      "function": "gui_forms::layout_pass",
+      "condition": "flow_direction_ == FlowDirection::top_down",
+      "decision": "keep",
+      "reason": "places or mirrors each child after its slot is solved; one select per child"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/flow_layout_panel_compat/flow_layout_panel_compat.cpp",
+      "function": "gui_forms::layout_pass",
+      "condition": "horizontal",
+      "decision": "keep",
+      "reason": "maps the logical main and cross axes to physical fields once per item; a split would duplicate the layout body"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/flow_layout_panel_compat/flow_layout_panel_compat.cpp",
+      "function": "gui_forms::layout_pass",
+      "condition": "right_to_left",
+      "decision": "keep",
+      "reason": "places or mirrors each child after its slot is solved; one select per child"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.cpp",
+      "function": "gui_forms::extent_with_gaps",
+      "condition": "desired",
+      "decision": "keep",
+      "reason": "a few tracks; desired or minimum extent per track"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.cpp",
+      "function": "gui_forms::layout_children",
+      "condition": "horizontal",
+      "decision": "keep",
+      "reason": "maps the logical main and cross axes to physical fields once per item; a split would duplicate the layout body"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.cpp",
+      "function": "gui_forms::shrink_to_available",
+      "condition": "capacity > 0.0",
+      "decision": "keep",
+      "reason": "guards a division per item; a hoisted reciprocal would change the rounding"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.cpp",
+      "function": "gui_forms::layout_pass",
+      "condition": "!assign",
+      "decision": "keep",
+      "reason": "places or mirrors each child after its slot is solved; one select per child"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.cpp",
+      "function": "gui_forms::layout_pass",
+      "condition": "right_to_left",
+      "decision": "keep",
+      "reason": "places or mirrors each child after its slot is solved; one select per child"
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.cpp",
+      "function": "gui_forms::resolve_tracks",
+      "condition": "percent_weight > 0.0",
+      "decision": "keep",
+      "reason": "guards a division per item; a hoisted reciprocal would change the rounding"
+    },
+    {
+      "path": "src/controls/scrollable_control/scrollable_control.cpp",
+      "function": "gui_forms::arrange",
+      "condition": "mirrored",
+      "decision": "keep",
+      "reason": "places or mirrors each child after its slot is solved; one select per child"
+    },
+    {
+      "path": "src/controls/splitter/splitter.cpp",
+      "function": "gui_forms::target",
+      "condition": "edge",
+      "decision": "keep",
+      "reason": "a switch on the edge per sibling; a few siblings"
+    },
+    {
+      "path": "src/controls/tool_strip_panel/tool_strip_panel.cpp",
+      "function": "gui_forms::arrange",
+      "condition": "along_height",
+      "decision": "keep",
+      "reason": "maps the logical main and cross axes to physical fields once per item; a split would duplicate the layout body"
+    },
+    {
       "path": "src/core/background_worker/background_worker.cpp",
       "function": "gui_forms::detail::post_from_worker",
       "condition": "!wait_for_room",
