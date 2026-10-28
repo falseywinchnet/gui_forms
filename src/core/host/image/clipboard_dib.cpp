@@ -113,23 +113,42 @@ HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes, 
     image.height = height;
     image.row_bytes = static_cast<std::uint64_t>(width) * 4U;
     image.pixels.resize(static_cast<std::size_t>(pixel_count * 4U));
-    for (std::uint32_t y = 0; y < height; ++y) {
-        const std::uint32_t source_y = top_down ? y : height - 1U - y;
-        const std::byte* source = bytes.data() + start + static_cast<std::size_t>(stride) * source_y;
-        std::byte* target = image.pixels.data() + static_cast<std::size_t>(image.row_bytes) * y;
-        for (std::uint32_t x = 0; x < width; ++x) {
-            const std::size_t dest = static_cast<std::size_t>(x) * 4U;
-            if (bits == 24U) {
+    // A bottom-up DIB stores the image's last row first: its rows are walked
+    // from the end of the pixel data backwards. stride * height fits the
+    // bytes (checked above), so both walks stay inside them.
+    const std::ptrdiff_t row_step = static_cast<std::ptrdiff_t>(stride);
+    const std::ptrdiff_t source_step = top_down ? row_step : -row_step;
+    const std::byte* const first_source_row =
+        bytes.data() + start + (top_down ? 0U : static_cast<std::size_t>(stride) * (height - 1U));
+    if (bits == 24U) {
+        for (std::uint32_t y = 0; y < height; ++y) {
+            const std::byte* source = first_source_row + source_step * static_cast<std::ptrdiff_t>(y);
+            std::byte* target = image.pixels.data() + static_cast<std::size_t>(image.row_bytes) * y;
+            for (std::uint32_t x = 0; x < width; ++x) {
+                const std::size_t dest = static_cast<std::size_t>(x) * 4U;
                 const std::size_t offset = static_cast<std::size_t>(x) * 3U;
                 target[dest] = source[offset + 2U]; target[dest + 1U] = source[offset + 1U];
                 target[dest + 2U] = source[offset]; target[dest + 3U] = std::byte{255};
-            } else {
-                const std::uint32_t pixel = u32({source + dest, 4U}, 0);
-                for (std::size_t channel = 0; channel < 4U; ++channel) {
-                    target[dest + channel] = channel == 3U && masks[3] == 0U ? std::byte{255} :
-                        static_cast<std::byte>((pixel & masks[channel]) >> shift_for(masks[channel]));
-                }
             }
+        }
+        return HostClipboardImageResult::image_read(std::move(image), generation);
+    }
+    // 32 bits: every mask is one whole byte of the pixel (checked above), read
+    // at its shift. Without an alpha mask the alpha reads as zero and the
+    // fill makes it opaque.
+    unsigned shifts[4]{};
+    for (std::size_t channel = 0; channel < 4U; ++channel) shifts[channel] = shift_for(masks[channel]);
+    const std::byte alpha_fill = masks[3] == 0U ? std::byte{255} : std::byte{0};
+    for (std::uint32_t y = 0; y < height; ++y) {
+        const std::byte* source = first_source_row + source_step * static_cast<std::ptrdiff_t>(y);
+        std::byte* target = image.pixels.data() + static_cast<std::size_t>(image.row_bytes) * y;
+        for (std::uint32_t x = 0; x < width; ++x) {
+            const std::size_t dest = static_cast<std::size_t>(x) * 4U;
+            const std::uint32_t pixel = u32({source + dest, 4U}, 0);
+            for (std::size_t channel = 0; channel < 3U; ++channel) {
+                target[dest + channel] = static_cast<std::byte>((pixel & masks[channel]) >> shifts[channel]);
+            }
+            target[dest + 3U] = static_cast<std::byte>((pixel & masks[3]) >> shifts[3]) | alpha_fill;
         }
     }
     return HostClipboardImageResult::image_read(std::move(image), generation);

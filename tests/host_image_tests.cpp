@@ -109,6 +109,17 @@ void native_dib_interchange() {
     require(result.status().accepted() && result.image() != nullptr && (*result.image()).pixels[0] == std::byte{201} &&
             (*result.image()).pixels[3] == std::byte{255} && (*result.image()).pixels[4] == std::byte{101},
             "padded 24-bit native DIB was not converted");
+    // A 32-bit DIB without an alpha mask (BI_RGB) is opaque whatever its
+    // fourth byte holds.
+    std::vector<std::byte> rgb32(44U);
+    rgb32[0] = std::byte{40}; rgb32[4] = std::byte{1}; rgb32[8] = std::byte{1};
+    rgb32[12] = std::byte{1}; rgb32[14] = std::byte{32};
+    rgb32[40] = std::byte{13}; rgb32[41] = std::byte{42}; rgb32[42] = std::byte{101}; rgb32[43] = std::byte{9};
+    result = detail::decode_clipboard_dib(rgb32, 0);
+    require(result.status().accepted() && result.image() != nullptr &&
+            (*result.image()).pixels == std::vector<std::byte>{std::byte{101}, std::byte{42}, std::byte{13},
+                                                               std::byte{255}},
+            "32-bit DIB without an alpha mask was not opaque");
     std::vector<std::byte> invalid = dib;
     invalid[40] = std::byte{1};
     require(detail::decode_clipboard_dib(invalid, 0).status().error == HostServiceError::unsupported,

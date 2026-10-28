@@ -170,6 +170,21 @@ std::unique_ptr<Bitmap> Bitmap::thumbnail(std::uint32_t width,
     return result;
 }
 
+namespace {
+
+// The colour the remap table maps `input` to: the first entry whose old
+// colour matches, else `input` unchanged.
+[[nodiscard]] Color remapped_color(const ImageAttributesSnapshot& adjustment, Color input) noexcept {
+    std::vector<ImageAttributesSnapshot::ColorRemap>::const_iterator remap = adjustment.remap_table.begin();
+    while (remap != adjustment.remap_table.end() && (*remap).old_color.argb() != input.argb()) {
+        ++remap;
+    }
+    if (remap == adjustment.remap_table.end()) return input;
+    return (*remap).new_color;
+}
+
+} // namespace
+
 std::unique_ptr<Bitmap> Bitmap::adjusted(
     const ImageAttributes& attributes) const {
     require_alive();
@@ -177,21 +192,20 @@ std::unique_ptr<Bitmap> Bitmap::adjusted(
     const ImageAttributesSnapshot adjustment = attributes.snapshot();
     std::unique_ptr<gui_drawing::Bitmap> result = std::make_unique<Bitmap>((*storage_).width, (*storage_).height,
                                            (*storage_).pixel_format);
+    // Without a colour matrix the adjustment is the remap alone.
+    if (!adjustment.color_matrix.has_value()) {
+        for (std::uint32_t y = 0; y < (*storage_).height; ++y) {
+            for (std::uint32_t x = 0; x < (*storage_).width; ++x) {
+                const Color remapped = remapped_color(adjustment, load_color(*storage_, x, y));
+                store_color(*(*result).storage_, x, y, remapped);
+            }
+        }
+        return result;
+    }
+    const std::array<double, 25>& matrix = *adjustment.color_matrix;
     for (std::uint32_t y = 0; y < (*storage_).height; ++y) {
         for (std::uint32_t x = 0; x < (*storage_).width; ++x) {
-            Color input = load_color(*storage_, x, y);
-            std::vector<ImageAttributesSnapshot::ColorRemap>::const_iterator
-                remap = adjustment.remap_table.begin();
-            while (remap != adjustment.remap_table.end() &&
-                   (*remap).old_color.argb() != input.argb()) {
-                ++remap;
-            }
-            if (remap != adjustment.remap_table.end()) input = (*remap).new_color;
-            if (!adjustment.color_matrix.has_value()) {
-                store_color(*(*result).storage_, x, y, input);
-                continue;
-            }
-            const std::array<double, 25>& matrix = *adjustment.color_matrix;
+            const Color input = remapped_color(adjustment, load_color(*storage_, x, y));
             const double values[5] = {
                 input.red() / 255.0, input.green() / 255.0,
                 input.blue() / 255.0, input.alpha() / 255.0, 1.0};
