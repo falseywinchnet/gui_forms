@@ -506,10 +506,11 @@ void test_template_areas_are_rectangles_in_written_order() {
 // Every `style="..."` attribute of the corpus's fixtures (the L0 reader's
 // declarations and the flex, grid and block ones its fixtures write) reads
 // without a diagnostic. The fixtures use no character references in styles.
-// `font-size`, `line-height` and `direction` are not layout values: the
+// The font declarations (`font-size`, `font-family`, `font-weight`,
+// `font-style`), `line-height` and `direction` are not layout values: the
 // corpus harness takes them out before the reader sees the style (they set
-// a block flow panel's strut and a control's layout direction), and so does
-// this sweep.
+// a text leaf's font, a block flow panel's strut and a control's layout
+// direction), and so does this sweep.
 std::string without_harness_declarations(std::string_view style) {
     std::string kept;
     std::size_t start = 0U;
@@ -521,8 +522,9 @@ std::string without_harness_declarations(std::string_view style) {
         const std::size_t name_start = declaration.find_first_not_of(" \t\n");
         const std::string_view rest =
             name_start == std::string_view::npos ? std::string_view{} : declaration.substr(name_start);
-        const bool harness = rest.starts_with("font-size") || rest.starts_with("line-height") ||
-                             rest.starts_with("direction");
+        const bool harness = rest.starts_with("font-size") || rest.starts_with("font-family") ||
+                             rest.starts_with("font-weight") || rest.starts_with("font-style") ||
+                             rest.starts_with("line-height") || rest.starts_with("direction");
         if (harness || rest.empty()) continue;
         kept.append(declaration);
         kept.push_back(';');

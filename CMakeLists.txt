@@ -3134,8 +3134,17 @@ if(GUI_FORMS_BUILD_TESTS)
         tests/layout_corpus_tests.cpp
     )
     target_link_libraries(gui_forms_layout_corpus_tests PRIVATE gui_forms_controls)
+    # Text fixtures (phase L8b) are laid out through the bundled text engine;
+    # a build without it reports them as not run, which fails the test.
+    set(GUI_FORMS_LAYOUT_CORPUS_FONTS)
+    if(TARGET gui_forms_text_engine)
+        target_link_libraries(gui_forms_layout_corpus_tests PRIVATE gui_forms_text_engine)
+        target_compile_definitions(gui_forms_layout_corpus_tests PRIVATE GUI_FORMS_LAYOUT_CORPUS_TEXT_ENGINE=1)
+        set(GUI_FORMS_LAYOUT_CORPUS_FONTS --fonts ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts)
+    endif()
     add_test(NAME gui_forms_layout_corpus_tests
-             COMMAND gui_forms_layout_corpus_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/layout_corpus)
+             COMMAND gui_forms_layout_corpus_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/layout_corpus
+                     ${GUI_FORMS_LAYOUT_CORPUS_FONTS})
 
     add_executable(gui_forms_responsive_track_panel_tests
         tests/responsive_track_panel_tests.cpp

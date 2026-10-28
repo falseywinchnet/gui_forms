@@ -50,3 +50,12 @@ python -B tools/layout_oracle/compare.py report --corpus tests/layout_corpus \
 
 The `layout-oracle` job regenerates every reference on Linux and fails if
 any box moved by more than one LayoutUnit (1/64 px) from the checked-in one.
+It keeps its capture as the `layout-oracle-references` artifact.
+
+Box references agree between the win64 and linux64 captures. Text
+references do not: glyph advances differ between the two builds by up to
+1/16 px, which exceeds the drift bound although it is well inside the text
+tolerance. Take a text fixture's reference from the job's linux64 artifact
+(`gh run download <run> -n layout-oracle-references`), so that the drift
+check reproduces it; a local win64 capture serves only to work on the
+fixture.

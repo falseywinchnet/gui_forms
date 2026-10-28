@@ -5,6 +5,7 @@
 // tools/layout_oracle/capture.py.
 //
 //   gui_forms_layout_corpus_tests <corpus directory> [--native-out <dir>]
+//                                 [--fonts <dir>]
 //
 // For each fixture of corpus.xml and each profile that applies to it, the
 // fixture's HTML fragment is read as XML, built into GUI.Forms controls,
@@ -24,6 +25,17 @@
 // FlexPanel or GridPanel properties, an item's its
 // FlexItemLayout or GridItemLayout, and every other declaration is refused
 // by name.
+//
+// Text fixtures (phase L8b, PLAN section 12.4) hold text leaves:
+// `<div data-gf-kind="text-block" data-gf-text="...">`, built as TextBlock.
+// They are laid out through the bundled text engine (HarfBuzzFontEngine over
+// the faces in --fonts, the faces the Chromium page declares), at every
+// profile including the text-scale ones, where the window's text scale is
+// the profile's. Each text leaf's first baseline is compared too. A build
+// without the engine, or a run without --fonts, reports every text fixture
+// as not run and fails, so a text fixture never passes unmeasured. The text
+// declarations (font-size in rem, font-family, font-weight, font-style, a
+// unitless line-height, text-align and direction) are inherited as in CSS.
 
 #include "../src/core/layout/style_reader/layout_style_reader.hpp"
 
@@ -32,12 +44,17 @@
 #include "gui_forms/window.hpp"
 #include "gui_forms/xml.hpp"
 
+#if defined(GUI_FORMS_LAYOUT_CORPUS_TEXT_ENGINE)
+#include "harfbuzz_font_engine.hpp"
+#endif
+
 #include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -68,6 +85,8 @@ struct Profile final {
     // The root's direction; right to left applies only to bidirectional
     // fixtures.
     LayoutDirection direction{LayoutDirection::left_to_right};
+    // The window's text scale; other than 1 only for text fixtures.
+    double text_scale{1.0};
 };
 
 struct FixtureEntry final {
@@ -78,6 +97,7 @@ struct FixtureEntry final {
 struct Tolerances final {
     double box_edge{};
     double text_edge{};
+    double baseline{};
 };
 
 struct Corpus final {
@@ -90,6 +110,8 @@ struct Corpus final {
 struct NodeBox final {
     std::string identity;
     Rect bounds;
+    // A text leaf's first baseline, in the same coordinates as bounds.y.
+    std::optional<double> baseline;
 };
 
 // Boxes of one profile, in document order.
@@ -175,12 +197,19 @@ Profile parse_profile(const XmlElement& element, const std::string& where) {
             fault(where, "profile direction " + *direction + " is not ltr or rtl");
         }
     }
+    if (attribute(element, "text-scale") != nullptr) {
+        profile.text_scale = number_attribute(element, "text-scale", where);
+        if (profile.text_scale < 0.5 || profile.text_scale > 4.0) {
+            fault(where, "profile text-scale is out of range");
+        }
+    }
     return profile;
 }
 
 bool same_profile(const Profile& left, const Profile& right) noexcept {
     return left.width == right.width && left.height == right.height &&
-           left.scale == right.scale && left.direction == right.direction;
+           left.scale == right.scale && left.direction == right.direction &&
+           left.text_scale == right.text_scale;
 }
 
 bool right_to_left(const Profile& profile) noexcept {
@@ -191,6 +220,7 @@ std::string profile_name(const Profile& profile) {
     std::ostringstream name;
     name << profile.width << 'x' << profile.height << '@' << profile.scale;
     if (right_to_left(profile)) name << "/rtl";
+    if (profile.text_scale != 1.0) name << "/text" << profile.text_scale * 100.0;
     return name.str();
 }
 
@@ -208,6 +238,7 @@ Corpus read_corpus(const std::filesystem::path& root) {
         } else if (section.name == "tolerance") {
             corpus.tolerances.box_edge = number_attribute(section, "box-edge", where);
             corpus.tolerances.text_edge = number_attribute(section, "text-edge", where);
+            corpus.tolerances.baseline = number_attribute(section, "baseline", where);
         } else if (section.name == "fixtures") {
             for (const XmlElement& fixture : section.children) {
                 const std::string* name = attribute(fixture, "name");
@@ -252,6 +283,9 @@ std::vector<ProfileBoxes> read_boxes(const std::filesystem::path& path) {
             box.bounds = Rect{number_attribute(node, "x", where), number_attribute(node, "y", where),
                               number_attribute(node, "width", where),
                               number_attribute(node, "height", where)};
+            if (attribute(node, "baseline") != nullptr) {
+                box.baseline = number_attribute(node, "baseline", where);
+            }
             boxes.nodes.push_back(std::move(box));
         }
         profiles.push_back(std::move(boxes));
@@ -354,6 +388,7 @@ enum class FixtureKind : std::uint8_t {
     flex_panel,
     grid_panel,
     block_panel,
+    text_block,
 };
 
 FixtureKind parse_kind(const std::string& kind, const std::string& where) {
@@ -363,6 +398,7 @@ FixtureKind parse_kind(const std::string& kind, const std::string& where) {
     if (kind == "flex-panel") return FixtureKind::flex_panel;
     if (kind == "grid-panel") return FixtureKind::grid_panel;
     if (kind == "block-panel") return FixtureKind::block_panel;
+    if (kind == "text-block") return FixtureKind::text_block;
     fault(where, "data-gf-kind \"" + kind + "\" is not built by the corpus harness yet");
 }
 
@@ -486,14 +522,25 @@ bool reader_kind(FixtureKind kind) {
            kind == FixtureKind::block_panel;
 }
 
-// What a block flow panel's line boxes inherit from the fixture's text
-// declarations, which are not layout values: the corpus sets inline content
-// at `font-size: 0`, so a strut has no font metrics, and a `line-height`
-// in px then gives it half that above and half below the baseline.
+// The template's root font size (tools/layout_oracle/page_template.html):
+// a `rem` is this many logical pixels at text scale 1.
+constexpr double root_font_size = 13.0;
+
+// What the fixture's text declarations, which are not layout values, give
+// an element and its descendants, as CSS inherits them. The box fixtures set
+// inline content at `font-size: 0`, so a strut has no font metrics, and a
+// `line-height` in px then gives it half that above and half below the
+// baseline. Text fixtures set fonts in rem and line heights unitless, so
+// both scale with the text scale on both sides.
 struct InheritedText final {
     bool zero_font{};
-    // Negative for `normal`.
+    // A px line height; negative for none (`normal`, or a unitless one).
     double line_height{-1.0};
+    // A unitless line height; negative for none.
+    double line_height_number{-1.0};
+    // The body's font: Carlito, 13 px, as the page template sets it.
+    FontSpec font{FontRole::content, root_font_size, 400, false, 0.0};
+    TextAlignment text_align{TextAlignment::start};
 };
 
 // The text declarations taken out of an inline style before the layout
@@ -501,8 +548,40 @@ struct InheritedText final {
 struct TextDeclarations final {
     std::optional<bool> zero_font;
     std::optional<double> line_height;
+    std::optional<double> line_height_number;
+    bool line_height_normal{};
+    std::optional<double> font_size;
+    std::optional<FontRole> font_role;
+    std::optional<std::uint16_t> font_weight;
+    std::optional<bool> italic;
+    std::optional<TextAlignment> text_align;
     std::optional<LayoutDirection> direction;
+
+    [[nodiscard]] bool any_font() const noexcept {
+        return font_size.has_value() || font_role.has_value() || font_weight.has_value() || italic.has_value();
+    }
 };
+
+// The bundled families the page template declares, each a font role of the
+// corpus's text engine.
+FontRole parse_font_family(std::string_view value, const std::string& where) {
+    std::string_view family = value;
+    if (family.size() >= 2U && (family.front() == '\'' || family.front() == '"') && family.back() == family.front()) {
+        family = family.substr(1U, family.size() - 2U);
+    }
+    if (family == "Carlito") return FontRole::content;
+    if (family == "Portsmouth Rapids") return FontRole::control;
+    fault(where, "font-family is Carlito or 'Portsmouth Rapids'");
+}
+
+TextAlignment parse_text_align(std::string_view value, const std::string& where) {
+    if (value == "start") return TextAlignment::start;
+    if (value == "end") return TextAlignment::end;
+    if (value == "left") return TextAlignment::left;
+    if (value == "right") return TextAlignment::right;
+    if (value == "center") return TextAlignment::center;
+    fault(where, "text-align is start, end, left, right or center");
+}
 
 TextDeclarations take_text_declarations(std::string& style, const std::string& where) {
     TextDeclarations taken;
@@ -519,10 +598,40 @@ TextDeclarations take_text_declarations(std::string& style, const std::string& w
         const std::string value =
             colon == std::string::npos ? std::string{} : std::string(trimmed(std::string_view(declaration).substr(colon + 1U)));
         if (name == "font-size") {
-            if (value != "0" && value != "0px") fault(where, "font-size is admitted only as 0 (the corpus's strut)");
-            taken.zero_font = true;
+            if (value == "0" || value == "0px") {
+                taken.zero_font = true;
+            } else if (value.size() > 3U && value.substr(value.size() - 3U) == "rem") {
+                const double rem = parse_double(std::string_view(value).substr(0U, value.size() - 3U), where);
+                if (!(rem > 0.0) || rem > 16.0) fault(where, "font-size in rem is in (0, 16]");
+                taken.font_size = rem * root_font_size;
+            } else {
+                fault(where, "font-size is 0 (the box fixtures' strut) or in rem, which the text scale scales");
+            }
+        } else if (name == "font-family") {
+            taken.font_role = parse_font_family(value, where);
+        } else if (name == "font-weight") {
+            if (value == "normal" || value == "400") {
+                taken.font_weight = static_cast<std::uint16_t>(400U);
+            } else if (value == "bold" || value == "700") {
+                taken.font_weight = static_cast<std::uint16_t>(700U);
+            } else {
+                fault(where, "font-weight is normal, bold, 400 or 700 (the bundled faces)");
+            }
+        } else if (name == "font-style") {
+            if (value != "normal" && value != "italic") fault(where, "font-style is normal or italic");
+            taken.italic = value == "italic";
         } else if (name == "line-height") {
-            taken.line_height = parse_length(value, where);
+            if (value == "normal") {
+                taken.line_height_normal = true;
+            } else if (value.size() >= 2U && value.substr(value.size() - 2U) == "px") {
+                taken.line_height = parse_length(value, where);
+            } else {
+                const double number = parse_double(value, where);
+                if (!(number > 0.0) || number > 16.0) fault(where, "a unitless line-height is in (0, 16]");
+                taken.line_height_number = number;
+            }
+        } else if (name == "text-align") {
+            taken.text_align = parse_text_align(value, where);
         } else if (name == "direction") {
             if (value == "rtl") {
                 taken.direction = LayoutDirection::right_to_left;
@@ -572,6 +681,8 @@ AnchorStyles cell_anchor(CellAlignment justify, CellAlignment align, const Child
 struct BuiltIdentity final {
     std::string identity;
     Control::Ptr control;
+    // A text leaf, whose first baseline is compared.
+    bool text_leaf{};
 };
 
 // A built element and the layout its parent container reads from it.
@@ -582,7 +693,8 @@ struct BuiltElement final {
 
 class FixtureBuilder final {
 public:
-    explicit FixtureBuilder(std::string fixture_name) : fixture_name_(std::move(fixture_name)) {}
+    FixtureBuilder(std::string fixture_name, bool text_fixture)
+        : fixture_name_(std::move(fixture_name)), text_fixture_(text_fixture) {}
 
     Control::Ptr build(const XmlElement& root) {
         identities_.clear();
@@ -608,31 +720,78 @@ private:
         const std::string where = fixture_name_ + " #" + *identity;
         if (element.name != "div") fault(where, "only <div> elements are admitted in L0");
         const FixtureKind kind = parse_kind(*kind_name, where);
+        const bool text_leaf = kind == FixtureKind::text_block;
+        const std::string* leaf_text = attribute(element, "data-gf-text");
+        if (text_leaf && (leaf_text == nullptr || !element.children.empty())) {
+            fault(where, "a text-block is empty and carries its text in data-gf-text");
+        }
+        if (!text_leaf && leaf_text != nullptr) fault(where, "only a text-block carries data-gf-text");
+        if (text_leaf && !(parent_kind && reader_kind(*parent_kind))) {
+            fault(where, "a text-block is an item of a flex-panel, grid-panel or block-panel");
+        }
         BuiltElement built;
-        built.control = make_kind(kind, *identity);
+        built.control = text_leaf ? make_control<TextBlock>(StableId(*identity), *leaf_text)
+                                  : make_kind(kind, *identity);
         Control& control = *built.control;
         control.set_margin({0.0, 0.0, 0.0, 0.0});
-        identities_.push_back(BuiltIdentity{*identity, built.control});
+        identities_.push_back(BuiltIdentity{*identity, built.control, text_leaf});
 
         const std::string* style_text = attribute(element, "style");
         std::string layout_style = style_text == nullptr ? std::string{} : *style_text;
         const TextDeclarations text = take_text_declarations(layout_style, where);
-        const bool text_declared = text.zero_font || text.line_height || text.direction;
-        if (text_declared && kind != FixtureKind::block_panel) {
-            fault(where, "font-size, line-height and direction are built on a block-panel only");
+        const bool strut_declared = text.zero_font || text.line_height;
+        if (strut_declared && kind != FixtureKind::block_panel) {
+            fault(where, "font-size: 0 and a px line-height (the box fixtures' strut) are built on a block-panel only");
+        }
+        const bool text_declared = text.any_font() || text.line_height_number || text.line_height_normal ||
+                                   text.text_align || text.direction;
+        if (text_declared && !reader_kind(kind) && !text_leaf) {
+            fault(where, "text declarations are built on a flex-panel, grid-panel, block-panel or text-block");
         }
         InheritedText own = inherited;
         if (text.zero_font) own.zero_font = true;
-        if (text.line_height) own.line_height = *text.line_height;
+        if (text.font_size) own.font.size = *text.font_size;
+        if (text.font_role) own.font.role = *text.font_role;
+        if (text.font_weight) own.font.weight = *text.font_weight;
+        if (text.italic) own.font.italic = *text.italic;
+        if (text.line_height_normal) {
+            own.line_height = -1.0;
+            own.line_height_number = -1.0;
+        }
+        if (text.line_height) {
+            own.line_height = *text.line_height;
+            own.line_height_number = -1.0;
+        }
+        if (text.line_height_number) {
+            own.line_height_number = *text.line_height_number;
+            own.line_height = -1.0;
+        }
+        if (text.text_align) own.text_align = *text.text_align;
         if (text.direction) control.set_layout_direction(*text.direction);
         if (style_text != nullptr) style_text = &layout_style;
         const bool reader_context = reader_kind(kind) || (parent_kind && reader_kind(*parent_kind));
         if (reader_context) {
             apply_reader_style(control, kind, parent_kind, style_text, built.layout, where);
         }
-        if (kind == FixtureKind::block_panel && own.zero_font) {
-            const double half = own.line_height < 0.0 ? 0.0 : own.line_height / 2.0;
-            static_cast<BlockPanel&>(control).set_line_strut(LineStrut{half, half, 0.0});
+        if (kind == FixtureKind::block_panel) {
+            BlockPanel& panel = static_cast<BlockPanel&>(control);
+            panel.set_text_align(own.text_align);
+            if (own.zero_font) {
+                const double half = own.line_height < 0.0 ? 0.0 : own.line_height / 2.0;
+                panel.set_line_strut(LineStrut{half, half, 0.0});
+            } else {
+                // The strut comes from the panel's font, as CSS's does.
+                panel.set_font(own.font);
+            }
+        }
+        if (text_leaf) {
+            if (own.zero_font || own.line_height >= 0.0) {
+                fault(where, "a text-block takes a font in rem and a unitless line-height, which scale with the text");
+            }
+            TextBlock& leaf = static_cast<TextBlock&>(control);
+            leaf.set_font(own.font);
+            leaf.set_text_align(own.text_align);
+            if (own.line_height_number >= 0.0) leaf.set_line_height(own.line_height_number * own.font.size);
         }
         const std::vector<StyleDeclaration> declarations =
             style_text == nullptr || reader_context ? std::vector<StyleDeclaration>{}
@@ -692,8 +851,15 @@ private:
                 }
             }
             if (kind == FixtureKind::block_panel) {
-                if (child.layout.block_item.level == BlockFlowLevel::inline_level && !own.zero_font) {
-                    fault(where, "inline content needs font-size: 0 (the corpus's strut has no font metrics)");
+                const bool sized_line = own.line_height >= 0.0 || own.line_height_number >= 0.0;
+                const bool inline_child = child.layout.block_item.level == BlockFlowLevel::inline_level;
+                if (inline_child && !own.zero_font && sized_line) {
+                    fault(where, "inline content under a font takes line-height: normal (a font strut with a "
+                                 "set line height is not built by the corpus harness yet)");
+                }
+                if (inline_child && !own.zero_font && !text_fixture_) {
+                    fault(where, "inline content under a font strut needs a text fixture (one with a "
+                                 "text-block), which is laid out through the text engine");
                 }
                 try {
                     static_cast<BlockPanel&>(control).set_item_layout(*child.control,
@@ -953,8 +1119,13 @@ private:
             return make_control<GridPanel>(StableId(identity));
         case FixtureKind::block_panel:
             return make_control<BlockPanel>(StableId(identity));
+        case FixtureKind::text_block:
+            // A text-block needs its text, so the builder makes it itself.
+            throw std::logic_error("a text-block is built with its text");
+        default:
+            // A kind outside the enumeration names no fixture.
+            throw std::logic_error("an unknown fixture kind");
         }
-        throw std::logic_error("unknown fixture kind");
     }
 
     static bool apply_common(Control& control, const StyleDeclaration& declaration,
@@ -1192,11 +1363,62 @@ private:
     }
 
     std::string fixture_name_;
+    // Whether the fixture is laid out through the text engine.
+    bool text_fixture_{};
     std::vector<BuiltIdentity> identities_;
     // Reused for every flex and grid element of the fixture.
     gui_forms::layout_style::LayoutStyleReader style_reader_;
     gui_forms::theme_language::ThemeDiagnosticList diagnostics_;
 };
+
+// ---------------------------------------------------------------------------
+// The text engine
+
+#if defined(GUI_FORMS_LAYOUT_CORPUS_TEXT_ENGINE)
+// The bundled faces the page template declares, registered under the font
+// roles parse_font_family maps their families to, and the window's text
+// provider over them, as the hosts' painters are. Owns the encoded faces
+// for the engine's lifetime.
+class CorpusTextEngine final : public TextMetricsProvider {
+public:
+    explicit CorpusTextEngine(const std::filesystem::path& fonts) {
+        // Five faces; reserved so no face's bytes move once registered.
+        faces_.reserve(5U);
+        register_face(fonts / "Carlito-Regular.ttf", FontRole::content, 400U, false);
+        register_face(fonts / "Carlito-Bold.ttf", FontRole::content, 700U, false);
+        register_face(fonts / "Carlito-Italic.ttf", FontRole::content, 400U, true);
+        register_face(fonts / "PortsmouthRapids.ttf", FontRole::control, 400U, false);
+        register_face(fonts / "PortsmouthRapids-Bold.ttf", FontRole::control, 700U, false);
+    }
+
+    ResolvedTextLayout resolve_text_layout_utf8(std::string_view utf8, FontSpec font) override {
+        const ResolvedTextLayout layout = engine_.resolve(utf8, font);
+        return layout;
+    }
+
+    TextResolutionStatus fill_line_break_opportunities_utf8(
+        std::string_view utf8, std::span<LineBreakOpportunity> opportunities) override {
+        const TextResolutionStatus status =
+            render::text::HarfBuzzFontEngine::fill_line_break_opportunities_utf8(utf8, opportunities);
+        return status;
+    }
+
+private:
+    void register_face(const std::filesystem::path& path, FontRole role, std::uint16_t weight, bool italic) {
+        const std::string encoded = read_file(path);
+        if (encoded.empty() || encoded.size() > 16U * 1024U * 1024U) fault(path.string(), "not a bundled face");
+        std::vector<std::byte>& bytes = faces_.emplace_back(encoded.size());
+        std::memcpy(bytes.data(), encoded.data(), encoded.size());
+        if (!engine_.register_typeface(role, weight, italic, bytes).has_value()) {
+            fault(path.string(), "the text engine refused the face");
+        }
+    }
+
+    // Before engine_, so the bytes outlive the engine's use of them.
+    std::vector<std::vector<std::byte>> faces_;
+    render::text::HarfBuzzFontEngine engine_;
+};
+#endif
 
 // ---------------------------------------------------------------------------
 // Comparison
@@ -1239,7 +1461,31 @@ struct FixtureTally final {
     std::uint64_t over_tolerance{};
     std::uint64_t recorded{};
     double largest_edge{};
+    double largest_baseline{};
 };
+
+// Whether the fixture holds a text leaf, which makes it a text fixture.
+bool holds_text(const XmlElement& element) {
+    std::vector<const XmlElement*> pending{&element};
+    while (!pending.empty()) {
+        const XmlElement* current = pending.back();
+        pending.pop_back();
+        const std::string* kind = attribute(*current, "data-gf-kind");
+        if (kind != nullptr && *kind == "text-block") return true;
+        for (const XmlElement& child : (*current).children) pending.push_back(&child);
+    }
+    return false;
+}
+
+// A text leaf's first baseline in viewport coordinates, or none.
+std::optional<double> leaf_baseline(const BuiltIdentity& built) {
+    if (!built.text_leaf) return std::nullopt;
+    Control& control = *built.control;
+    const Rect bounds = control.absolute_bounds();
+    const std::optional<double> baseline = control.first_baseline(bounds.width);
+    if (!baseline) return std::nullopt;
+    return bounds.y + *baseline;
+}
 
 std::map<std::string, std::string> expected_differences(const XmlElement& element) {
     std::map<std::string, std::string> expected;
@@ -1257,13 +1503,19 @@ std::map<std::string, std::string> expected_differences(const XmlElement& elemen
 
 bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
                  const FixtureEntry& entry, const std::optional<std::filesystem::path>& native_out,
-                 FixtureTally& tally) {
+                 TextMetricsProvider* text_engine, FixtureTally& tally) {
     const std::string& name = entry.name;
     const XmlElement fixture = read_document(corpus_root / "fixtures" / (name + ".html"));
+    const bool text_fixture = holds_text(fixture);
+    if (text_fixture && text_engine == nullptr) {
+        std::cout << name << ": a text fixture, NOT RUN: no text engine (a build without "
+                     "gui_forms_text_engine, or no --fonts)\n";
+        return false;
+    }
     const std::vector<ProfileBoxes> references =
         read_boxes(corpus_root / "references" / (name + ".xml"));
     const std::map<std::string, std::string> expected = expected_differences(fixture);
-    const double tolerance = corpus.tolerances.box_edge;
+    const double tolerance = text_fixture ? corpus.tolerances.text_edge : corpus.tolerances.box_edge;
     bool passed = true;
     std::ostringstream native;
     native << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<layout-native fixture=\"" << name
@@ -1271,6 +1523,7 @@ bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
 
     for (const Profile& profile : corpus.profiles) {
         if (right_to_left(profile) && !entry.bidirectional) continue;
+        if (profile.text_scale != 1.0 && !text_fixture) continue;
         ++tally.profiles;
         const std::vector<ProfileBoxes>::const_iterator reference = std::find_if(
             references.begin(), references.end(), ProfileMatches{profile});
@@ -1279,24 +1532,33 @@ bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
             passed = false;
             continue;
         }
-        FixtureBuilder builder(name);
+        FixtureBuilder builder(name, text_fixture);
         const Control::Ptr root = builder.build(fixture);
         if (right_to_left(profile)) (*root).set_layout_direction(LayoutDirection::right_to_left);
         const std::unique_ptr<Window> held_window = std::make_unique<Window>(
             root, Size{static_cast<double>(profile.width), static_cast<double>(profile.height)});
         Window& window = *held_window;
         window.set_scale(profile.scale);
+        if (text_fixture) {
+            window.set_text_metrics_provider(text_engine);
+            window.set_text_scale(profile.text_scale);
+        }
         window.perform_layout();
         native << "  <profile viewport=\"" << profile.width << 'x' << profile.height
                << "\" scale=\"" << format_number(profile.scale) << '"'
-               << (right_to_left(profile) ? " direction=\"rtl\"" : "") << ">\n";
+               << (right_to_left(profile) ? " direction=\"rtl\"" : "");
+        if (profile.text_scale != 1.0) native << " text-scale=\"" << format_number(profile.text_scale) << '"';
+        native << ">\n";
         const std::span<const BuiltIdentity> built = builder.identities();
         for (const BuiltIdentity& entry : built) {
             const Rect observed = (*entry.control).absolute_bounds();
             native << "    <node id=\"" << entry.identity << "\" x=\"" << format_number(observed.x)
                    << "\" y=\"" << format_number(observed.y) << "\" width=\""
                    << format_number(observed.width) << "\" height=\""
-                   << format_number(observed.height) << "\"/>\n";
+                   << format_number(observed.height) << '"';
+            const std::optional<double> baseline = leaf_baseline(entry);
+            if (baseline) native << " baseline=\"" << format_number(*baseline) << '"';
+            native << "/>\n";
         }
         native << "  </profile>\n";
         for (const NodeBox& node : (*reference).nodes) {
@@ -1314,9 +1576,19 @@ bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
             const Rect observed = (*(*found).control).absolute_bounds();
             const double edge = edge_difference(node.bounds, observed);
             tally.largest_edge = std::max(tally.largest_edge, edge);
-            if (edge <= tolerance) continue;
+            // A baseline on one side only is a difference of its own.
+            const std::optional<double> observed_baseline = leaf_baseline(*found);
+            double baseline = 0.0;
+            if (node.baseline.has_value() != observed_baseline.has_value()) {
+                baseline = std::numeric_limits<double>::infinity();
+            } else if (node.baseline) {
+                baseline = std::abs(*node.baseline - *observed_baseline);
+                tally.largest_baseline = std::max(tally.largest_baseline, baseline);
+            }
+            if (edge <= tolerance && baseline <= corpus.tolerances.baseline) continue;
             std::cout << name << " " << profile_name(profile) << " #" << node.identity
-                      << ": edge difference " << edge << " (Chromium " << node.bounds.x << ','
+                      << ": edge difference " << edge << ", baseline difference " << baseline
+                      << " (Chromium " << node.bounds.x << ','
                       << node.bounds.y << ' ' << node.bounds.width << 'x' << node.bounds.height
                       << ", GUI.Forms " << observed.x << ',' << observed.y << ' '
                       << observed.width << 'x' << observed.height << ')';
@@ -1343,29 +1615,45 @@ bool run_fixture(const std::filesystem::path& corpus_root, const Corpus& corpus,
 } // namespace
 
 int main(int argument_count, char** arguments) {
-    if (argument_count != 2 && argument_count != 4) {
-        std::cerr << "usage: gui_forms_layout_corpus_tests <corpus> [--native-out <dir>]\n";
+    if (argument_count < 2 || argument_count % 2 != 0) {
+        std::cerr << "usage: gui_forms_layout_corpus_tests <corpus> [--native-out <dir>] [--fonts <dir>]\n";
         return 2;
     }
     const std::filesystem::path corpus_root(arguments[1]);
     std::optional<std::filesystem::path> native_out;
-    if (argument_count == 4) {
-        if (std::string_view(arguments[2]) != "--native-out") {
-            std::cerr << "unknown option " << arguments[2] << '\n';
+    std::optional<std::filesystem::path> fonts;
+    for (int index = 2; index + 1 < argument_count; index += 2) {
+        const std::string_view option(arguments[index]);
+        if (option == "--native-out") {
+            native_out = std::filesystem::path(arguments[index + 1]);
+        } else if (option == "--fonts") {
+            fonts = std::filesystem::path(arguments[index + 1]);
+        } else {
+            std::cerr << "unknown option " << option << '\n';
             return 2;
         }
-        native_out = std::filesystem::path(arguments[3]);
     }
     try {
         const Corpus corpus = read_corpus(corpus_root);
+        TextMetricsProvider* text_engine = nullptr;
+#if defined(GUI_FORMS_LAYOUT_CORPUS_TEXT_ENGINE)
+        std::unique_ptr<CorpusTextEngine> held_engine;
+        if (fonts) {
+            held_engine = std::make_unique<CorpusTextEngine>(*fonts);
+            text_engine = held_engine.get();
+        }
+#else
+        if (fonts) std::cout << "--fonts given, but this build has no text engine\n";
+#endif
         bool passed = true;
         FixtureTally total;
         for (const FixtureEntry& entry : corpus.fixtures) {
             FixtureTally tally;
-            const bool fixture_passed = run_fixture(corpus_root, corpus, entry, native_out, tally);
+            const bool fixture_passed = run_fixture(corpus_root, corpus, entry, native_out, text_engine, tally);
             std::cout << entry.name << ": " << tally.profiles << " profiles, " << tally.nodes
                       << " nodes, largest edge difference "
-                      << tally.largest_edge << ", " << tally.over_tolerance
+                      << tally.largest_edge << ", largest baseline difference " << tally.largest_baseline
+                      << ", " << tally.over_tolerance
                       << " over tolerance, " << tally.recorded << " recorded\n";
             passed = passed && fixture_passed;
             total.profiles += tally.profiles;
@@ -1373,12 +1661,13 @@ int main(int argument_count, char** arguments) {
             total.over_tolerance += tally.over_tolerance;
             total.recorded += tally.recorded;
             total.largest_edge = std::max(total.largest_edge, tally.largest_edge);
+            total.largest_baseline = std::max(total.largest_baseline, tally.largest_baseline);
         }
         std::cout << "corpus: " << corpus.fixtures.size() << " fixtures, "
                   << total.profiles << " fixture profiles, " << total.nodes << " nodes, "
                   << total.over_tolerance << " over tolerance, " << total.recorded
                   << " recorded differences, largest edge difference " << total.largest_edge
-                  << '\n';
+                  << ", largest baseline difference " << total.largest_baseline << '\n';
         if (!passed) return EXIT_FAILURE;
     } catch (const CorpusFault& error) {
         std::cerr << "layout corpus fault: " << error.what() << '\n';

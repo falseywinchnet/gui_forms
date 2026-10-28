@@ -323,20 +323,28 @@ Two patterns point to wasted work:
 The CSS containers are checked against a pinned Chromium, which runs only
 when the reference boxes are captured, never inside GUI.Forms. The corpus
 is in `tests/layout_corpus/`.
-- It holds 181 fixtures: flex, grid, block, positioning, and the two
-  compatibility containers.
+- It holds 211 fixtures: flex, grid, block, positioning, the two
+  compatibility containers, and 30 text fixtures whose leaves are
+  `TextBlock`s laid out by the bundled text engine and faces.
 - Every fixture runs at four viewports and two device scales.
 - Every fixture whose layout depends on direction also runs right to left.
+- Every text fixture also runs at a text scale of 150 %.
 - `gui_forms_layout_corpus_tests` compares every box edge with Chromium's
-  on every host, within 0.05 logical px.
+  on every host:
+  - box fixtures within 0.05 logical px;
+  - text fixtures within 0.51 px per edge, and each text leaf's first
+    baseline within 1.0 px.
 - A known difference is recorded on its node with its reason, and the
-  report lists it.
+  report lists it. The text fixtures have one: the line breaker follows
+  UAX #14, which keeps `10-20` whole, where Chromium breaks after the
+  hyphen.
 
 ## Not provided
 
-- **Text in the corpus.** No corpus fixture holds text yet, so the 150 %
-  text scale and the text tolerances are not yet exercised. They come with
-  stage L's next phase.
+- **Baselines of nested containers.** A `FlexPanel`, `GridPanel` or
+  `BlockPanel` inside another container does not answer its first item's
+  baseline; it is aligned by the bottom of its border box, as a box with
+  no text is.
 - **CSS properties outside the subset.** These are not provided:
   - floats;
   - `display: contents`, inline flex and inline grid;

@@ -4,8 +4,11 @@
      direction="rtl" profiles lay the root out right to left (HTML's dir
      attribute; GUI.Forms' LayoutDirection) and apply only to the fixtures
      marked bidirectional="true": those whose Chromium boxes differ between
-     the two directions. Tolerances are logical
-     pixels per box edge (owner decision L-Q9); reference-drift bounds how
+     the two directions. The text-scale="1.5" profiles apply only to
+     text fixtures (those with a text-block): Chromium's root font size is
+     13 px times the scale, and GUI.Forms' window text scale is the scale.
+     Tolerances are logical pixels per box edge, and on a text leaf's first
+     baseline (owner decision L-Q9); reference-drift bounds how
      far a regenerated Chromium reference may move from the checked-in one
      (one LayoutUnit, 1/64 px). -->
 <layout-corpus>
@@ -26,6 +29,22 @@
     <profile viewport="800x600" scale="2" direction="rtl"/>
     <profile viewport="1280x800" scale="2" direction="rtl"/>
     <profile viewport="1440x900" scale="2" direction="rtl"/>
+    <profile viewport="320x240" scale="1" text-scale="1.5"/>
+    <profile viewport="800x600" scale="1" text-scale="1.5"/>
+    <profile viewport="1280x800" scale="1" text-scale="1.5"/>
+    <profile viewport="1440x900" scale="1" text-scale="1.5"/>
+    <profile viewport="320x240" scale="2" text-scale="1.5"/>
+    <profile viewport="800x600" scale="2" text-scale="1.5"/>
+    <profile viewport="1280x800" scale="2" text-scale="1.5"/>
+    <profile viewport="1440x900" scale="2" text-scale="1.5"/>
+    <profile viewport="320x240" scale="1" direction="rtl" text-scale="1.5"/>
+    <profile viewport="800x600" scale="1" direction="rtl" text-scale="1.5"/>
+    <profile viewport="1280x800" scale="1" direction="rtl" text-scale="1.5"/>
+    <profile viewport="1440x900" scale="1" direction="rtl" text-scale="1.5"/>
+    <profile viewport="320x240" scale="2" direction="rtl" text-scale="1.5"/>
+    <profile viewport="800x600" scale="2" direction="rtl" text-scale="1.5"/>
+    <profile viewport="1280x800" scale="2" direction="rtl" text-scale="1.5"/>
+    <profile viewport="1440x900" scale="2" direction="rtl" text-scale="1.5"/>
   </profiles>
   <tolerance box-edge="0.05" text-edge="0.51" baseline="1.0" reference-drift="0.015625"/>
   <fixtures>
@@ -210,5 +229,35 @@
     <fixture name="grid/intrinsic-rows" bidirectional="true"/>
     <fixture name="grid/fraction-content-minimum" bidirectional="true"/>
     <fixture name="grid/nested-grid" bidirectional="true"/>
+    <fixture name="text/block-content-strut" bidirectional="true"/>
+    <fixture name="text/block-empty-and-spaces"/>
+    <fixture name="text/block-inline-text" bidirectional="true"/>
+    <fixture name="text/block-line-height"/>
+    <fixture name="text/block-margins-collapse"/>
+    <fixture name="text/block-paragraphs"/>
+    <fixture name="text/block-strut-large-font" bidirectional="true"/>
+    <fixture name="text/block-text-align"/>
+    <fixture name="text/bold-italic" bidirectional="true"/>
+    <fixture name="text/flex-auto-minimum"/>
+    <fixture name="text/flex-baseline-padding" bidirectional="true"/>
+    <fixture name="text/flex-baseline-sizes" bidirectional="true"/>
+    <fixture name="text/flex-center-items" bidirectional="true"/>
+    <fixture name="text/flex-column-text"/>
+    <fixture name="text/flex-row-grow" bidirectional="true"/>
+    <fixture name="text/flex-shrink" bidirectional="true"/>
+    <fixture name="text/flex-wrap-row" bidirectional="true"/>
+    <fixture name="text/grid-auto-tracks" bidirectional="true"/>
+    <fixture name="text/grid-baseline-row" bidirectional="true"/>
+    <fixture name="text/grid-fit-content" bidirectional="true"/>
+    <fixture name="text/grid-form-labels" bidirectional="true"/>
+    <fixture name="text/grid-fraction-text" bidirectional="true"/>
+    <fixture name="text/grid-min-content" bidirectional="true"/>
+    <fixture name="text/grid-rows-auto" bidirectional="true"/>
+    <fixture name="text/grid-spanning" bidirectional="true"/>
+    <fixture name="text/hyphen-breaks"/>
+    <fixture name="text/nested-card"/>
+    <fixture name="text/nested-flex-in-grid" bidirectional="true"/>
+    <fixture name="text/nested-form-row" bidirectional="true"/>
+    <fixture name="text/portsmouth-rapids" bidirectional="true"/>
   </fixtures>
 </layout-corpus>
