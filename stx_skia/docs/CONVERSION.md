@@ -1784,6 +1784,38 @@ The flattenable `CreateProc` takes the filter, so a malformed record still reads
     the direct path.
   - Negative control: when the refusal returns were removed, the test failed.
 
+## Oracle and consistency checks
+
+These checks do not trust Skia's own answers (track polish item 7a). `tests/oracle.cpp` runs on
+both profiles. Each check prints its worst measured error, so a later change can be compared
+with the margin recorded here. Measured on Windows CLANG64; candidate and reference print the
+same numbers.
+
+| Check | Model or invariant | Bound | Measured |
+| --- | --- | --- | --- |
+| Exact fills | opaque integer rectangles write the colour exactly, with and without AA; source-over matches s·a + d·(1−a) | 1 level | exact; 0 |
+| Analytic coverage | 3/4-pixel edges give 191; a disc of radius 20 has area π·400 | 2 levels; 1% | 1 level; 0.135% |
+| Gradient values | black-to-white over 256 px is 255·(i+½)/256 | 1.5 levels | 0.498 |
+| Matrix mapping | SkMatrix::mapPoint against the double-precision product | 1e-6 relative | 5.5e-8 |
+| Matrix inverse | M·M⁻¹ = I, including a matrix with condition number about 1e6 | 1e-5 | 8.8e-6 |
+| M44 rotation | rows of SkM44::Rotate are orthonormal (the sibling's item A6) | 2e-6 | 9.1e-7 |
+| Premultiply | premultiplying the unpremultiplied pixel is exact; channel error stays within 255/(2a)+1 | exact; bound | exact; 0.988 of the bound |
+| Fast bounds | every pixel a draw touches is inside computeFastBounds, mapped and outset by 1 | containment | holds; overshoot up to 54 px (miter limit), recorded |
+| Clip bounds | a clipped drawPaint touches only pixels inside getDeviceClipBounds, and equals it for an integer rectangle | containment | holds; slack 0 |
+| Byte size | SkMallocPixelRef accepts exactly computeByteSize bytes and refuses one fewer | exact | exact |
+
+The sibling's other reports of wrong numbers are each covered by an existing case:
+- A1, TArray capacity after a move: `tarray-core-capacity.raw`.
+- A2, `SkDoubleToFixed(-32768.0)` is exactly INT32_MIN: `numeric_core.cpp`. The other limits
+  wait for API item 12, the SkFixed policy.
+- A3, `SkAbs32(INT32_MIN)`: `template_core.cpp`.
+- A4, blurred inverse fills and capped points: `canvas_device.cpp`'s blurred-shape cases
+  ("Blurred path and point divergence" above).
+- A5, a determinant that rounds to zero: `matrix-invert-small.raw`.
+- A6: the rotation row above, together with `m44-corrected`.
+
+Still to add: counts and capacities checked against contents, beyond the tarray-core corpus.
+
 ## Still required
 
 Refreshed 2026-10-27 after the support leftovers. The whole-library AST inventory counts 249
