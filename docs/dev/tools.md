@@ -166,6 +166,16 @@ template_harness, checked out beside this repository at the commit
   files, whose hashes it checks.
   `python3 tools/unicode/generate_grapheme_tables.py --grapheme GraphemeBreakProperty.txt --derived DerivedCoreProperties.txt --emoji emoji-data.txt --test GraphemeBreakTest.txt --tables-output src/core/text/unicode/unicode_grapheme_data.hpp --tests-output tests/unicode_grapheme_break_cases.hpp`
 
+`tools/profile_hot_paths.py`
+: Phase E, E5: on Linux, builds the recorded workloads (the Gallery painted
+  through the CPU Skia adapter, `benchmarks/paint_profile_workload.cpp`; the
+  text engine and DocumentView benchmarks) with frame pointers, samples each
+  under `perf record`, and writes `hot-paths.json` and `hot-paths.md`: every
+  function's share of the samples, self and inclusive, and each area's
+  (GUI.Forms, Skia, HarfBuzz, FreeType, runtime, kernel). Shares, not
+  timings. `.github/workflows/profile-linux.yml` runs it weekly and on demand.
+  `python3 gui_forms/tools/profile_hot_paths.py run --output hot-paths --jobs 4`
+
 `tools/linux_vm/`
 : A Lima definition for an Alpine aarch64 (musl) guest with Clang 22, Xvfb
   and Weston, for building and graphically testing the Linux host. It covers

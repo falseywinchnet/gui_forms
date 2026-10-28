@@ -57,6 +57,7 @@ option(GUI_FORMS_BUILD_TEXT_WORKER_PROBE "Build the private text worker lifecycl
 option(GUI_FORMS_BUILD_TEXT_PAINT_PROBE "Build the private prepared glyph raster proof" OFF)
 option(GUI_FORMS_BUILD_TEXT_RASTER_PROFILE_PROBE "Build the diagnostic text rasterization profile probe" OFF)
 option(GUI_FORMS_BUILD_TEXT_ENGINE_BENCHMARK "Build the shared text engine cost benchmark" OFF)
+option(GUI_FORMS_BUILD_PAINT_PROFILE "Build the Gallery paint workload that the Linux profiling job samples" OFF)
 option(GUI_FORMS_BUILD_PREPARED_TEXT "Build the development prepared-text service" OFF)
 option(GUI_FORMS_BUILD_TEXT_MASKS "Build the development logical text-mask service" OFF)
 option(GUI_FORMS_INSTALL_TEXT_STACK "Install and export the pinned FreeType and HarfBuzz (cmake/TextStackExport.cmake)" OFF)
@@ -1921,6 +1922,18 @@ endif()
 if(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK)
     add_executable(gui_forms_document_view_benchmark benchmarks/document_view_benchmark.cpp)
     target_link_libraries(gui_forms_document_view_benchmark PRIVATE gui_forms_core)
+endif()
+
+# Phase E, E5: the Gallery painted through the CPU Skia adapter, for
+# .github/workflows/profile-linux.yml to sample (tools/profile_hot_paths.py).
+if(GUI_FORMS_BUILD_PAINT_PROFILE)
+    if(NOT TARGET gui_forms_skia OR NOT TARGET gui_forms_gallery_model)
+        message(FATAL_ERROR "The paint profile workload requires Skia and GUI_FORMS_BUILD_GALLERY")
+    endif()
+    add_executable(gui_forms_paint_profile_workload benchmarks/paint_profile_workload.cpp)
+    target_compile_definitions(gui_forms_paint_profile_workload PRIVATE
+        GUI_FORMS_PROFILE_FONT_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+    target_link_libraries(gui_forms_paint_profile_workload PRIVATE gui_forms_gallery_model gui_forms_skia)
 endif()
 
 if(GUI_FORMS_BUILD_BENCHMARKS)
