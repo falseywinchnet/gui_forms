@@ -286,7 +286,6 @@ jobs:
       - name: Configure the programs
         run: |
           renderer="-DGUI_FORMS_ENABLE_SKIA=ON"
-          if [ "$RUNNER_OS" = Windows ]; then renderer="-DGUI_FORMS_ENABLE_SKIA=OFF"; fi
           miniaudio="$BUILD_DIR/_deps/gui_forms_miniaudio-src"
           if [ -f "$miniaudio/miniaudio.h" ]; then renderer="$renderer -DFETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO=$PWD/$miniaudio"; fi
           cmake -S gui_forms -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib \

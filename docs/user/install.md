@@ -85,13 +85,13 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DGUI_FORMS_ENABLE_LINUX_HOST=ON
 ```
 
-Windows (in MSYS2 CLANG64, using the DIB renderer):
+Windows (in MSYS2 CLANG64):
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake \
     -DCMAKE_INSTALL_PREFIX="$PWD/sdk" \
-    -DGUI_FORMS_ENABLE_SKIA=OFF -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON
+    -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON
 ```
 
 Build, test and install the selected configuration:

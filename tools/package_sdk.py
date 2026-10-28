@@ -214,10 +214,6 @@ PREBUILT_INPUTS: tuple[dict[str, Any], ...] = (
                "packages in template_harness harness/windows_toolchain.json (the commit harness.lock pins)",
      "note": "cmake/llvm22.cmake requires LLVM 22.1; CMake 3.25 or newer, Ninja, Git and Python 3.12 or "
              "newer are installed beside it"},
-    {"name": "skia-windows-archive", "platforms": ["windows-x64"],
-     "source": "none at this commit",
-     "note": "Windows builds without Skia today (GUI_FORMS_ENABLE_SKIA=OFF); the pinned prebuilt Windows "
-             "Skia archive of stage SK (tools/skia_archive.py) is not yet required"},
 )
 
 

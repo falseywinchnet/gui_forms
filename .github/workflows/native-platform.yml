@@ -292,30 +292,14 @@ jobs:
           else
             python gui_forms/tools/ci_build.py --jobs 4
           fi
-      # Stage SK1: native.yml's skia-windows-x64 job builds the Windows CPU Skia
-      # archive when no archive of its identity exists yet; this job fetches
-      # it (the pinned release, else that artifact) into a new directory, and
-      # the link-map audit below reads its two libraries. GUI.Forms itself does
-      # not yet build with it on Windows (SK1b).
-      - name: Fetch the Windows CPU Skia archive
-        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Windows' && steps.reuse.outputs.reused != 'true')
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
-        run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/skia_archive.py fetch --platform "${{ inputs.platform }}" --into ".build/native-${{ inputs.platform }}/skia-archive" --artifact-fallback'
       - name: Prove one compression and PNG implementation in the link map
         if: steps.promotion.outputs.reused != 'true' && (steps.reuse.outputs.reused != 'true')
         run: |
-          # Every static archive the toolkit links (stx_skia's among them on macOS
-          # and Linux), plus the Windows Skia archive: no C zlib,
-          # FreeType gzip or libpng may remain (Z-stage I5, decision 3A).
+          # Every static archive the toolkit links, stx_skia's among them: no C
+          # zlib, FreeType gzip or libpng may remain (Z-stage I5, decision 3A).
           build=.build/native-${{ inputs.platform }}
           archives=$(find "$build/gui-forms" -name '*.a' -not -path '*/_deps/*' -not -name '*.dll.a')
-          skia=$(find "$build/skia-archive/out" -maxdepth 1 -name '*.a' 2>/dev/null || true)
-          python gui_forms/tools/audit_link_map.py --forbid-foreign $archives $skia
-          # Archive sizes for third_party/SKIA_BUILD_EVIDENCE.md.
-          if [ -n "$skia" ]; then ls -l $skia; fi
+          python gui_forms/tools/audit_link_map.py --forbid-foreign $archives
       - name: Test development text-mask ownership on Windows
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Windows' && steps.reuse.outputs.reused != 'true')
         shell: msys2 {0}
@@ -455,13 +439,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python template_harness/harness/publish_cache.py --platform "${{ inputs.platform }}"
-      # Until tools/skia_archive_release.json pins the current identity, every
-      # push to main publishes the newest artifact of that identity (uploaded
-      # by native.yml's skia-windows-x64 job) in the revision's build release.
-      - name: Publish the Windows CPU Skia archive until it is pinned
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && runner.os == 'Windows'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
-        run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/skia_archive.py publish --platform "${{ inputs.platform }}"'

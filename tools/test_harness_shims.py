@@ -2,8 +2,8 @@
 
 Each shim, run, runs the harness's tool (the release and prune jobs call
 them by these paths), and, imported, is the harness's module (as File
-Manager, package_sdk.py and skia_archive.py import them). Without the
-harness, a shim fails with a message naming the pinned commit.
+Manager and package_sdk.py import them). Without the harness, a shim
+fails with a message naming the pinned commit.
 """
 from __future__ import annotations
 import os

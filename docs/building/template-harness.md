@@ -80,9 +80,6 @@ A change to a moved tool is made in template_harness, then reaches
 GUI.Forms through a `harness.lock` bump in a GUI.Forms pull request, whose
 CI runs the pinned harness's own tests (the house-style job) as well as
 GUI.Forms' build. A bump changes GUI.Forms' tree, so it is validated afresh
-like any other change. Two inputs also name harness files: the Linux
-package cache key hashes `harness/install_linux_ci_packages.sh` and
-`projects/gui_forms.toml`, and the Windows CPU Skia archive's identity
-includes the harness's `windows_toolchain.json` and
-`windows_toolchain_release.json`, so a bump that changes those rebuilds the
-Skia archive.
+like any other change. The Linux package cache key also names harness
+files: it hashes `harness/install_linux_ci_packages.sh` and
+`projects/gui_forms.toml`.

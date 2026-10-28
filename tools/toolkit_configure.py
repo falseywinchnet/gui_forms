@@ -97,9 +97,8 @@ def prepare_host(source: Path, fetch_text: bool) -> None:
 def host_options(host: str) -> list[str]:
     """The configure options that select host's native host and renderer.
 
-    Windows draws with the Win32 host and no Skia; macOS and Linux build the
-    Skia adapters on stx_skia/. Every host uses the HarfBuzz/FreeType text
-    engine.
+    Every host builds the Skia adapters on stx_skia/ and uses the
+    HarfBuzz/FreeType text engine.
     """
     options: list[str] = []
     name: str
@@ -108,10 +107,7 @@ def host_options(host: str) -> list[str]:
         if HOST_OPTION_NAMES[name] == host:
             enabled = 'ON'
         options.append(f'-DGUI_FORMS_ENABLE_{name}_HOST={enabled}')
-    if host == 'windows':
-        options.extend(['-DGUI_FORMS_ENABLE_SKIA=OFF', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON'])
-    else:
-        options.extend(['-DGUI_FORMS_ENABLE_SKIA=ON', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON'])
+    options.extend(['-DGUI_FORMS_ENABLE_SKIA=ON', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON'])
     return options
 
 
