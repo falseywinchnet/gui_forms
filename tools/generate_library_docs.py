@@ -564,10 +564,12 @@ def render(output: Path, examples_path: Path) -> dict[str, int]:
     if output.exists():
         shutil.rmtree(output)
     (output / "generated").mkdir(parents=True)
+    # Written with LF on every host: the committed pages are LF (.gitattributes),
+    # and --check compares bytes, so platform newlines would fail it on Windows.
     for name, text in pages.items():
-        (output / name).write_text(text, encoding="utf-8")
-    examples_path.write_text(examples_source(model), encoding="utf-8")
-    examples_path.with_name(COMPILE_ONLY.name).write_text(compile_only_source(model), encoding="utf-8")
+        (output / name).write_text(text, encoding="utf-8", newline="\n")
+    examples_path.write_text(examples_source(model), encoding="utf-8", newline="\n")
+    examples_path.with_name(COMPILE_ONLY.name).write_text(compile_only_source(model), encoding="utf-8", newline="\n")
     documented = sum(1 for record in own_page if record.name in model.docstrings)
     return {"pages": len(pages), "types": len(model.types), "enums": len(model.enums),
             "own_pages": len(own_page), "docstrings": documented}
