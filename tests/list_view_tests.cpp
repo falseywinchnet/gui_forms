@@ -682,6 +682,74 @@ void label_editing() {
     require(threw, "begin_label_edit refuses an index past the end");
 }
 
+// The slow second click (Windows' list view): a single press on the text of
+// the item that was already focused and selected begins its label edit once
+// the window's double-click interval passes without a second press.
+void slow_click_label_editing() {
+    std::shared_ptr<ListView> view = details_view(20U);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    (*view).set_label_edit(true);
+    require(window.request_focus(view), "the view takes focus");
+    const std::chrono::milliseconds interval(window.presentation_settings().double_click_milliseconds);
+    const std::chrono::milliseconds margin(50);
+    std::vector<ListView::Item> items = (*view).realized_items();
+    const Point second = to_window(*view, centre(items[2].parts.text.bounds));
+    const Point fourth = to_window(*view, centre(items[4].parts.text.bounds));
+
+    click(window, second);
+    static_cast<void>(window.poll_frame_schedule(FrameClock::now() + interval + margin));
+    require((*view).focused_index() == 2U && (*view).is_selected(2U) && !(*view).label_edit_index(),
+            "a press that focuses and selects an item begins no edit");
+
+    click(window, second);
+    static_cast<void>(window.poll_frame_schedule(FrameClock::now() + interval / 2));
+    require(!(*view).label_edit_index(), "the slow click waits for the double-click interval");
+    static_cast<void>(window.poll_frame_schedule(FrameClock::now() + interval + margin));
+    require((*view).label_edit_index() == 2U, "a slow second click on the focused item's text begins its edit");
+    require(key(window, PhysicalKey::escape) && !(*view).label_edit_index(), "Escape cancels the slow click's edit");
+
+    std::vector<std::size_t> activations;
+    SubscriptionToken activated = (*view).item_activated().subscribe(RecordActivation{&activations});
+    click(window, second);
+    click(window, second, Modifier::none, 2U);
+    static_cast<void>(window.poll_frame_schedule(FrameClock::now() + interval + margin));
+    require(activations == std::vector<std::size_t>({2U}) && !(*view).label_edit_index(),
+            "a double click activates the item and begins no edit");
+
+    click(window, second, Modifier::control);
+    static_cast<void>(window.poll_frame_schedule(FrameClock::now() + interval + margin));
+    require(!(*view).label_edit_index(), "a press with a modifier begins no edit");
+
+    click(window, fourth);
+    click(window, fourth);
+    static_cast<void>(key(window, PhysicalKey::a));
+    static_cast<void>(window.poll_frame_schedule(FrameClock::now() + interval + margin));
+    require(!(*view).label_edit_index(), "a key pressed in the wait drops the slow click");
+
+    click(window, fourth);
+    (*view).sort_items(0U, ListViewSortOrder::descending);
+    static_cast<void>(window.poll_frame_schedule(FrameClock::now() + interval + margin));
+    require(!(*view).label_edit_index(), "a changed model drops the slow click");
+
+    window.perform_layout();
+    items = (*view).realized_items();
+    const Point first = to_window(*view, centre(items[0].parts.text.bounds));
+    click(window, first);
+    click(window, first);
+    (*view).set_label_edit(false);
+    (*view).set_label_edit(true);
+    static_cast<void>(window.poll_frame_schedule(FrameClock::now() + interval + margin));
+    require(!(*view).label_edit_index(), "turning label_edit off drops the slow click");
+
+    click(window, first);
+    PointerEvent wheel{PointerAction::wheel, PointerButton::none, first};
+    wheel.wheel_delta = {0.0, -1.0};
+    static_cast<void>(window.dispatch_pointer(wheel));
+    static_cast<void>(window.poll_frame_schedule(FrameClock::now() + interval + margin));
+    require(!(*view).label_edit_index(), "scrolling with the wheel drops the slow click");
+}
+
 void virtual_label_editing() {
     std::shared_ptr<ListView> view = make_control<ListView>(StableId("virtual"));
     (*view).set_columns(sample_columns());
@@ -878,6 +946,7 @@ int main() {
     owner_draw();
     insertion_mark();
     label_editing();
+    slow_click_label_editing();
     virtual_label_editing();
     scrolling();
     virtual_mode();

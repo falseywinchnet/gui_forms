@@ -15,12 +15,14 @@ gui_forms::DataGridView
 
    A data grid view shows rows of cells under a row of column headers, with an
    optional column of row headers at the left. Each :cpp:class:`DataGridViewColumn <gui_forms::DataGridViewColumn>` is a
-   text, check box, combo box, button or image column with a name, header text,
+   text, check box, combo box, button, image or link column with a name, header text,
    width, read-only flag and alignment. An image column's cells hold :cpp:class:`ImageId <gui_forms::ImageId>`
    values, images of the grid's window, placed by the column's ``image_layout``
    (``normal``: at the image's own size, centred and cut at the cell's edges;
    ``stretch``; ``zoom``: as large as fits, its shape kept), and its
-   ``image_description`` stands for the image as the cell's text. The rows come from one of three sources: unbound
+   ``image_description`` stands for the image as the cell's text. A link column's
+   cells show their text as a link, or the column's ``link_text`` when empty, and
+   with ``track_visited_state`` a followed link becomes visited. The rows come from one of three sources: unbound
    rows the grid owns (:cpp:class:`DataGridViewRow <gui_forms::DataGridViewRow>` records with stable IDs and
    ``BindingValue`` cells), virtual rows whose order the application publishes as
    stable row IDs and whose values an application :cpp:class:`DataGridViewCellValueProvider <gui_forms::DataGridViewCellValueProvider>`
@@ -208,8 +210,8 @@ gui_forms::DataGridView
          box, a chosen item or :cpp:func:`set_cell_value <gui_forms::DataGridView::set_cell_value>`.
 
       **cell_content_click** : ``Event<const DataGridViewCellEvent&>``
-         Raised when the user clicks a button cell or an image cell's image, or
-         toggles a check box cell.
+         Raised when the user clicks a button cell, an image cell's image or a
+         link cell's link, or toggles a check box cell.
 
       **row_order_mode_changed** : ``Event<const DataGridViewRowOrderModeChange&>``
          Raised after the virtual rows' order switched mode, with the old and new
@@ -255,7 +257,9 @@ gui_forms::DataGridView
       * - :cpp:func:`cell_value <gui_forms::DataGridView::cell_value>`
         - A cell's value.
       * - :cpp:func:`cell_text <gui_forms::DataGridView::cell_text>`
-        - The text a cell shows: numbers in their shortest exact form, a button column's ``button_text`` for an empty button cell, and an image column's ``image_description`` for an image cell holding an image (empty otherwise).
+        - The text a cell shows: numbers in their shortest exact form, a button column's ``button_text`` for an empty button cell, and an image column's ``image_description`` for an image cell holding an image (empty otherwise), and a link column's ``link_text`` for an empty link cell.
+      * - :cpp:func:`link_visited <gui_forms::DataGridView::link_visited>`
+        - Whether a link cell's link is visited.
       * - :cpp:func:`sort <gui_forms::DataGridView::sort>`
         - Orders unbound rows stably by a column: empty values first, then booleans, numbers and text.
       * - :cpp:func:`insert_virtual_rows <gui_forms::DataGridView::insert_virtual_rows>`
@@ -290,6 +294,8 @@ gui_forms::DataGridView
         - Makes a column's cells read-only, ending an edit in that column.
       * - :cpp:func:`set_rows <gui_forms::DataGridView::set_rows>`
         - Replaces the unbound rows, ending any edit and clearing the selection.
+      * - :cpp:func:`set_link_visited <gui_forms::DataGridView::set_link_visited>`
+        - Marks a link cell's link visited or not and repaints it; the same refusals as :cpp:func:`link_visited <gui_forms::DataGridView::link_visited>`.
       * - :cpp:func:`set_cell_value <gui_forms::DataGridView::set_cell_value>`
         - Stores a value from the program, read-only or not, and raises :cpp:func:`cell_value_changed <gui_forms::DataGridView::cell_value_changed>` when it differs.
       * - :cpp:func:`set_virtual_rows <gui_forms::DataGridView::set_virtual_rows>`
@@ -321,13 +327,14 @@ gui_forms::DataGridView
    realized: the grid publishes them as three item systems, ``row`` (the row
    header with ``row_header``, ``row_header_label``, ``row_glyph`` and
    ``row_rule``), ``cell`` (``cell``, ``cell_selection``, ``cell_content``,
-   ``cell_image``, ``cell_check_well``, ``cell_check_indicator``, ``cell_button_face``,
+   ``cell_image``, ``cell_link``, ``cell_link_underline``, ``cell_check_well``, ``cell_check_indicator``, ``cell_button_face``,
    ``cell_button_label``, ``cell_drop_down``, ``cell_drop_down_glyph``,
    ``cell_vertical_rule``, ``cell_horizontal_rule`` and ``cell_focus``) and
    ``column`` (``column_header``, ``column_label``, ``sort_glyph``,
    ``column_divider`` and ``column_grip``), and paints every part through the
    by-role paint path (``paint_part``). Cells take the states selected, current,
-   read_only, invalid, checked, pressed, open and focus_visible; rows selected,
+   read_only, invalid, checked, pressed, open and focus_visible, and a link
+   cell the grid's own ``visited``; rows selected,
    current and read_only; column headers hot, pressed and captured, and the
    application-defined ``sorted_ascending`` and ``sorted_descending``. The
    column header row and the row header column stay in place while the cells
@@ -377,7 +384,7 @@ gui_forms::DataGridView
    edits a text cell; Enter, Tab, an arrow up or down, a click elsewhere or
    leaving the grid commits, and Escape discards. When focus leaves for another
    control and the text does not commit, the edit is discarded. Space toggles a
-   check box cell and clicks a button cell; F4 or Alt+Down opens a combo box
+   check box cell, clicks a button cell and follows a link cell's link; F4 or Alt+Down opens a combo box
    cell's choices. :cpp:func:`cell_validating <gui_forms::DataGridView::cell_validating>` is raised only for an edit being committed.
 
    The grid publishes the accessibility role ``table``, with the row count and
@@ -391,8 +398,10 @@ gui_forms::DataGridView
    check box cell is ``checkable`` and ``checked``). A cell's stable ID is its
    row's ID, ``.`` and its column's name. Cells take
    :cpp:enumerator:`SemanticAction::set_value <gui_forms::SemanticAction::set_value>` (text through the same validation and conversion
-   as typing), ``press`` (toggle or click) and ``expand`` (open the choices). An
-   image cell's value is its description; it takes no ``set_value``.
+   as typing), ``press`` (toggle, click or follow a link) and ``expand`` (open the
+   choices). An image cell's value is its description; it takes no
+   ``set_value``. A link cell is named by its link's text and its value is
+   ``visited`` or ``unvisited``, as a :cpp:class:`LinkLabel <gui_forms::LinkLabel>`'s is.
 
    An image cell draws its image through the ``image`` role, whole, under a clip
    at the cell's edges, so an image wider than its cell or one partly scrolled
@@ -401,8 +410,18 @@ gui_forms::DataGridView
    empty, is not an :cpp:class:`ImageId <gui_forms::ImageId>`, or names an image the window does not hold
    shows nothing. An image cell neither edits nor toggles.
 
-   Not supported yet: cell styles and their inheritance, link columns (the
-   by-role paint path has no link vocabulary yet), an image column's default
+   A link cell draws its text through the ``content`` role in the ``link``
+   family, or ``visited_link`` once visited (owner decision W-Q5), over the
+   selection plate. Its ``cell_link`` part is the text's extent, placed by the
+   column's alignment and cut at the content area; only a click on it follows
+   the link, and a click beside it makes the cell current. The pointer is the
+   hand over the link. A link cell does not edit. Its ``cell_link_underline``
+   part, one unit high just below the text's baseline and as wide as the link,
+   is drawn by the ``glyph`` role with the ``underline`` mark in the same
+   family, so the underline takes the link's colour.
+
+   Not supported yet: cell styles and their inheritance, ``LinkBehavior`` (the
+   link is always underlined), an image column's default
    image for empty cells and icon values, frozen rows and columns beyond the headers, clipboard copy, sort
    modes (the application sorts, or calls :cpp:func:`sort <gui_forms::DataGridView::sort>` for unbound rows), automatic
    column and row sizing, row height resizing, the new-row and row-deletion
@@ -744,8 +763,8 @@ gui_forms::DataGridView
 
    .. cpp:function:: Event<const DataGridViewCellEvent&>& cell_content_click() noexcept
 
-      Raised when the user clicks a button cell or an image cell's image, or
-      toggles a check box cell.
+      Raised when the user clicks a button cell, an image cell's image or a
+      link cell's link, or toggles a check box cell.
 
    .. cpp:function:: Event<const DataGridViewRowOrderModeChange&>& row_order_mode_changed() noexcept
 
@@ -821,7 +840,14 @@ gui_forms::DataGridView
 
       The text a cell shows: numbers in their shortest exact form, a button
       column's ``button_text`` for an empty button cell, and an image column's
-      ``image_description`` for an image cell holding an image (empty otherwise).
+      ``image_description`` for an image cell holding an image (empty otherwise),
+      and a link column's ``link_text`` for an empty link cell.
+
+   .. cpp:function:: bool link_visited(DataGridViewRowPosition row, std::size_t column) const
+
+      Whether a link cell's link is visited. A cell past the rows or columns
+      throws ``std::out_of_range``, and one outside a link column
+      ``std::invalid_argument``.
 
    .. cpp:function:: bool sort(std::size_t column, DataGridViewSortDirection direction)
 
@@ -909,6 +935,13 @@ gui_forms::DataGridView
    .. cpp:function:: void set_rows(std::vector<DataGridViewRow> rows)
 
       Replaces the unbound rows, ending any edit and clearing the selection.
+
+   .. cpp:function:: void set_link_visited(DataGridViewRowPosition row, std::size_t column, bool visited)
+
+      Marks a link cell's link visited or not and repaints it; the same
+      refusals as :cpp:func:`link_visited <gui_forms::DataGridView::link_visited>`. The state stays on its row when rows move
+      and ends with its row, when the rows or columns are replaced and when a
+      column is removed.
 
    .. cpp:function:: bool set_cell_value(DataGridViewRowPosition row, std::size_t column, BindingValue value)
 

@@ -140,6 +140,17 @@ void test_tree_and_object_views(gui_forms::Window& window) {
                 (*grid).cell_text(*source, *preview).empty(),
             "the PNG file's preview cell must hold the installed image, and a source file's none");
 
+    // The link column: every file's link shows the column's text, and
+    // pressing it follows the link, which is then visited.
+    const std::optional<std::size_t> history = (*grid).column_index("history");
+    require(history && (*grid).columns()[*history].kind == DataGridViewColumnKind::link &&
+                (*grid).cell_text(*source, *history) == "Changes" && !(*grid).link_visited(*source, *history),
+            "the grid must have a link column whose empty cells show its text");
+    require((*grid).on_semantic_child_action("button.cpp.history", SemanticAction::press, {}) &&
+                (*status).text().find("History of button.cpp") == 0U &&
+                (*grid).link_visited(*(*grid).row_position(DataGridViewRowId{"button.cpp"}), *history),
+            "pressing a link cell must report the link and leave it visited");
+
     const std::string semantics = window.semantic_snapshot().to_json();
     require(semantics.find("gallery.tree.folders") != std::string::npos &&
                 semantics.find("\"role\":\"list_item\"") != std::string::npos &&

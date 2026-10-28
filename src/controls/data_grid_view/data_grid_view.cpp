@@ -266,6 +266,9 @@ std::string DataGridView::cell_text(DataGridViewRowPosition row, std::size_t col
     if (text.empty() && columns_[column].kind == DataGridViewColumnKind::button) {
         text = columns_[column].button_text;
     }
+    if (text.empty() && columns_[column].kind == DataGridViewColumnKind::link) {
+        text = columns_[column].link_text;
+    }
     if (columns_[column].kind == DataGridViewColumnKind::image) {
         // An image cell's text is its column's description while it holds an
         // image, and empty otherwise.
@@ -274,6 +277,49 @@ std::string DataGridView::cell_text(DataGridViewRowPosition row, std::size_t col
         text = holds_image ? columns_[column].image_description : std::string{};
     }
     return text;
+}
+
+void DataGridView::require_link_cell(DataGridViewRowPosition row, std::size_t column) const {
+    require_cell(row, column);
+    if (columns_[column].kind != DataGridViewColumnKind::link) {
+        throw std::invalid_argument("DataGridView link state belongs to link columns only");
+    }
+}
+
+bool DataGridView::is_link_visited(std::string_view row_id, std::size_t column) const {
+    const SelectedCells::const_iterator found = visited_links_.find(row_id);
+    if (found == visited_links_.end()) return false;
+    const SelectedColumns& columns = (*found).second;
+    const bool result = std::binary_search(columns.begin(), columns.end(), column);
+    return result;
+}
+
+bool DataGridView::link_visited(DataGridViewRowPosition row, std::size_t column) const {
+    require_link_cell(row, column);
+    const bool result = is_link_visited(row_id_text(row), column);
+    return result;
+}
+
+void DataGridView::set_link_visited(DataGridViewRowPosition row, std::size_t column, bool visited) {
+    require_mutable();
+    require_link_cell(row, column);
+    const std::string row_id = row_id_text(row);
+    SelectedCells::iterator found = visited_links_.find(row_id);
+    if (visited) {
+        if (found == visited_links_.end()) found = visited_links_.emplace(row_id, SelectedColumns{}).first;
+        SelectedColumns& columns = (*found).second;
+        const SelectedColumns::iterator place = std::lower_bound(columns.begin(), columns.end(), column);
+        if (place != columns.end() && *place == column) return;
+        columns.insert(place, column);
+    } else {
+        if (found == visited_links_.end()) return;
+        SelectedColumns& columns = (*found).second;
+        const SelectedColumns::iterator place = std::lower_bound(columns.begin(), columns.end(), column);
+        if (place == columns.end() || *place != column) return;
+        columns.erase(place);
+        if (columns.empty()) visited_links_.erase(found);
+    }
+    invalidate(Dirty::paint | Dirty::semantics);
 }
 
 bool DataGridView::set_cell_value(DataGridViewRowPosition row, std::size_t column, BindingValue value) {
@@ -300,6 +346,7 @@ void DataGridView::reset_row_state() {
     clear_selection_state();
     anchor_.reset();
     pressed_content_.reset();
+    visited_links_.clear();
     first_row_ = 0U;
     apply_current(std::nullopt);
     publish_selection(before);
@@ -408,6 +455,14 @@ void DataGridView::drop_missing_rows(std::optional<std::size_t> former_current) 
     }
     if (anchor_ && !find_row((*anchor_).row_id)) anchor_.reset();
     if (pressed_content_ && !find_row((*pressed_content_).row_id)) pressed_content_.reset();
+    SelectedCells::iterator visited = visited_links_.begin();
+    while (visited != visited_links_.end()) {
+        if (find_row((*visited).first)) {
+            ++visited;
+            continue;
+        }
+        visited = visited_links_.erase(visited);
+    }
     const std::size_t count = row_count();
     if (first_row_ >= count) first_row_ = 0U;
     if (current_ && !find_row((*current_).row_id)) {
@@ -429,7 +484,8 @@ void DataGridView::drop_missing_rows(std::optional<std::size_t> former_current) 
 void DataGridView::validate_column(const DataGridViewColumn& column) const {
     if (column.name.empty() || contains_dot(column.name) || !validate_utf8(column.name).valid() ||
         !validate_utf8(column.header_text).valid() || !validate_utf8(column.button_text).valid() ||
-        !validate_utf8(column.image_description).valid() || !validate_utf8(column.data_property_name).valid()) {
+        !validate_utf8(column.image_description).valid() || !validate_utf8(column.link_text).valid() ||
+        !validate_utf8(column.data_property_name).valid()) {
         throw std::invalid_argument("DataGridView columns require a name without '.' and valid UTF-8");
     }
     if (!std::isfinite(column.width) || !std::isfinite(column.minimum_width) ||
@@ -809,6 +865,7 @@ void DataGridView::remove_virtual_rows(std::vector<DataGridViewRowId> ids) {
         }
         if (anchor_ && (*anchor_).row_id == row.value) anchor_.reset();
         if (pressed_content_ && (*pressed_content_).row_id == row.value) pressed_content_.reset();
+        visited_links_.erase(row.value);
     }
     if (current_removed) {
         const std::size_t count = virtual_order_.count();
@@ -1782,9 +1839,18 @@ bool DataGridView::toggle_check(DataGridViewCellAddress cell) {
 }
 
 void DataGridView::click_content(DataGridViewCellAddress cell) {
-    const DataGridViewColumnKind kind = columns_[cell.column].kind;
-    if (kind != DataGridViewColumnKind::button && kind != DataGridViewColumnKind::image) return;
+    const DataGridViewColumn& column = columns_[cell.column];
+    const DataGridViewColumnKind kind = column.kind;
+    if (kind != DataGridViewColumnKind::button && kind != DataGridViewColumnKind::image &&
+        kind != DataGridViewColumnKind::link) {
+        return;
+    }
     const DataGridViewCellEvent clicked = cell_event(key_of(cell));
+    // A followed link is visited before handlers run, as LinkLabel's is, so
+    // a handler sees the state the click left.
+    if (kind == DataGridViewColumnKind::link && column.track_visited_state) {
+        set_link_visited(cell.row, cell.column, true);
+    }
     cell_content_click_.emit(clicked);
 }
 
@@ -1796,7 +1862,7 @@ bool DataGridView::activate_current() {
     const DataGridViewCellAddress cell = *current;
     const DataGridViewColumnKind kind = columns_[cell.column].kind;
     if (kind == DataGridViewColumnKind::check_box) return toggle_check(cell);
-    if (kind == DataGridViewColumnKind::button) {
+    if (kind == DataGridViewColumnKind::button || kind == DataGridViewColumnKind::link) {
         click_content(cell);
         return true;
     }
@@ -1831,6 +1897,7 @@ void DataGridView::on_pointer(PointerEvent& event) {
             hot_column_.reset();
             invalidate(Dirty::paint);
         }
+        if (cursor() != CursorKind::arrow) set_cursor(CursorKind::arrow);
         return;
     }
     const HitResult hit = hit_test(local);
@@ -1841,6 +1908,15 @@ void DataGridView::on_pointer(PointerEvent& event) {
             hot_column_ = hot;
             invalidate(Dirty::paint);
         }
+        // The hand over a link cell's link, as over a LinkLabel's; the arrow
+        // elsewhere.
+        bool over_link = false;
+        if (hit.zone == HitZone::cell && columns_[hit.column].kind == DataGridViewColumnKind::link) {
+            const CellParts placed = cell_parts(hit.row, hit.column, layout);
+            over_link = placed.cell_link.present && placed.cell_link.bounds.contains(local);
+        }
+        const CursorKind wanted = over_link ? CursorKind::hand : CursorKind::arrow;
+        if (cursor() != wanted) set_cursor(wanted);
         return;
     }
     if (event.action == PointerAction::wheel) {
@@ -1916,7 +1992,9 @@ void DataGridView::on_pointer(PointerEvent& event) {
             static_cast<void>(toggle_check(cell));
         } else if ((kind == DataGridViewColumnKind::button && placed.cell_button_face.bounds.contains(local)) ||
                    (kind == DataGridViewColumnKind::image && placed.cell_image.present &&
-                    placed.cell_image.bounds.contains(local))) {
+                    placed.cell_image.bounds.contains(local)) ||
+                   (kind == DataGridViewColumnKind::link && placed.cell_link.present &&
+                    placed.cell_link.bounds.contains(local))) {
             // Released over the same cell, the press clicks the cell's
             // content (Windows Forms' CellContentClick).
             pressed_content_ = key_of(cell);
@@ -2002,7 +2080,8 @@ void DataGridView::on_key(KeyEvent& event) {
     }
     if (key == PhysicalKey::space && current_) {
         const DataGridViewColumnKind kind = columns_[(*current_).column].kind;
-        if (kind == DataGridViewColumnKind::check_box || kind == DataGridViewColumnKind::button) {
+        if (kind == DataGridViewColumnKind::check_box || kind == DataGridViewColumnKind::button ||
+            kind == DataGridViewColumnKind::link) {
             static_cast<void>(activate_current());
             event.handled = true;
         }
@@ -2302,6 +2381,14 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
                     cell.actions.push_back(SemanticAction::set_value);
                     cell.actions.push_back(SemanticAction::expand);
                 }
+            } else if (definition.kind == DataGridViewColumnKind::link) {
+                // A link cell is named by its link's text, as a button cell is
+                // by its face, and is pressed to follow the link. Its value
+                // says whether the link is visited, as LinkLabel's does (a
+                // cell keeps the cell role: owner decision, stage A gap 1).
+                cell.name = cell.value;
+                cell.value = is_link_visited(row_node.stable_id, column) ? "visited" : "unvisited";
+                cell.actions.push_back(SemanticAction::press);
             } else if (definition.kind == DataGridViewColumnKind::image) {
                 // An image is shown, not typed: the cell's value is its
                 // description and it offers no set_value.
@@ -2367,7 +2454,8 @@ bool DataGridView::on_semantic_child_action(std::string_view id, SemanticAction 
     if (action == SemanticAction::focus || action == SemanticAction::select) return true;
     const DataGridViewColumn& column = columns_[(*cell).column];
     if (action == SemanticAction::press) {
-        if (column.kind != DataGridViewColumnKind::check_box && column.kind != DataGridViewColumnKind::button) {
+        if (column.kind != DataGridViewColumnKind::check_box && column.kind != DataGridViewColumnKind::button &&
+            column.kind != DataGridViewColumnKind::link) {
             return false;
         }
         const bool activated = activate_current();

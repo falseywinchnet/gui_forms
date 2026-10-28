@@ -13,12 +13,38 @@
 #include <functional>
 #include <optional>
 #include <stdexcept>
+#include <string_view>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace gui_forms {
 
 using namespace menu_detail;
+
+namespace {
+
+// The one character a text event types, or none when it types several, is
+// malformed or is still composing.
+[[nodiscard]] std::optional<char32_t> typed_character(
+    const TextInputEvent& event) noexcept {
+    if (event.composing || event.text_utf8.empty()) return std::nullopt;
+    const Utf8ValidationResult validation = validate_utf8(event.text_utf8);
+    if (!validation.valid() || validation.scalar_count != 1U) return std::nullopt;
+    const std::string_view text = event.text_utf8;
+    const char32_t lead = static_cast<unsigned char>(text[0]);
+    char32_t scalar = lead;
+    if (text.size() == 2U) scalar = lead & 0x1FU;
+    else if (text.size() == 3U) scalar = lead & 0x0FU;
+    else if (text.size() == 4U) scalar = lead & 0x07U;
+    for (std::size_t offset = 1U; offset < text.size(); ++offset) {
+        scalar = (scalar << 6U) |
+                 (static_cast<char32_t>(static_cast<unsigned char>(text[offset])) & 0x3FU);
+    }
+    return scalar;
+}
+
+} // namespace
 
 struct ContextMenu::Impl final {
     class MenuLayer;
@@ -139,6 +165,15 @@ struct ContextMenu::Impl final {
                 return;
             }
             event.handled = true;
+        }
+
+        // A plain letter in an open menu acts as that item's mnemonic, as in
+        // a native Windows menu; Alt is not needed.
+        void on_text_input(TextInputEvent& event) override {
+            const std::optional<char32_t> character = typed_character(event);
+            if (character && impl_.type_mnemonic(depth_, std::nullopt, *character)) {
+                event.handled = true;
+            }
         }
 
         [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
@@ -284,6 +319,14 @@ struct ContextMenu::Impl final {
                 return;
             }
             event.handled = true;
+        }
+
+        void on_text_input(TextInputEvent& event) override {
+            if (!focused_) return;
+            const std::optional<char32_t> character = typed_character(event);
+            if (character && impl_.type_mnemonic(depth_, index_, *character)) {
+                event.handled = true;
+            }
         }
 
         void on_focus_changed(bool focused) override {
@@ -707,6 +750,42 @@ struct ContextMenu::Impl final {
             owner.item_invoked_.emit(invocation);
         }
         close();
+    }
+
+    // A typed character in the panel at depth. One enabled item whose
+    // mnemonic matches is activated (a submenu opens); several take the
+    // focus in turn, starting after the focused row. Returns false when no
+    // item matches.
+    bool type_mnemonic(std::size_t depth, std::optional<std::size_t> focused,
+                       char32_t character) {
+        if (depth >= panels.size() || !panels[depth].items) return false;
+        const PanelState& state = panels[depth];
+        const std::size_t count = std::min((*state.items).size(), state.rows.size());
+        std::vector<std::size_t> matches;
+        for (std::size_t index = 0U; index < count; ++index) {
+            const MenuSnapshot& item = (*state.items)[index];
+            if (item.kind != MenuItemKind::separator && snapshot_enabled(item) &&
+                is_mnemonic(character, item.text)) {
+                matches.push_back(index);
+            }
+        }
+        if (matches.empty()) return false;
+        if (matches.size() == 1U) {
+            activate(depth, matches.front());
+            return true;
+        }
+        std::size_t next = matches.front();
+        if (focused) {
+            for (const std::size_t index : matches) {
+                if (index > *focused) {
+                    next = index;
+                    break;
+                }
+            }
+        }
+        ensure_visible(depth, next);
+        if (window) static_cast<void>((*window).request_focus(panels[depth].rows[next]));
+        return true;
     }
 
     [[nodiscard]] bool submenu_open(std::size_t depth,

@@ -35,7 +35,10 @@ class Painter;
 // dock_shape were admitted with the docking plan (owner decision DK-35,
 // §12.10): a panel's pin, drawn pinned when the part is `checked` and
 // unpinned otherwise, and a docking target's shape, a small window with the
-// region a drop gives the panel filled (PartPaint::dock_region).
+// region a drop gives the panel filled (PartPaint::dock_region). underline
+// was admitted for links (owner decision, 2026-10-28): a one-unit rule along
+// the bottom edge of the mark's box, in the recipe's glyph colour, which the
+// link families set to their text colour.
 enum class PartMark : std::uint8_t {
     none,
     check,
@@ -56,6 +59,7 @@ enum class PartMark : std::uint8_t {
     customize,
     pin,
     dock_shape,
+    underline,
     count,
 };
 

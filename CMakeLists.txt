@@ -211,6 +211,8 @@ add_library(gui_forms_core STATIC
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/presets/material_presets.cpp
     src/core/surface_material/types/surface_material_types.cpp
+    src/core/text/rich_text/rich_text_document.cpp
+    src/core/text/rich_text/rich_text_model.cpp
     src/core/text/text_store/text_store.cpp
     src/core/text/prepared/prepared_storage.cpp
     src/core/text/composite/text_composite.cpp
@@ -323,6 +325,8 @@ add_library(gui_forms_core STATIC
 target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib stx_png::stx_png)
 # The interpolation seam's private engine; no stx_conv type is public.
 target_link_libraries(gui_forms_core PRIVATE stx_conv::stx_conv)
+# RichTextModel's reader and writer; no stx_rtf2md type is public.
+target_link_libraries(gui_forms_core PRIVATE stx_rtf2md::stx_rtf2md)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
 set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 # Compatibility properties alone do not traverse LINK_ONLY dependencies of
@@ -682,6 +686,7 @@ add_library(gui_forms_controls STATIC
     src/controls/save_file_dialog/save_file_dialog.cpp
     src/controls/color_dialog/color_dialog.cpp
     src/controls/folder_browser_dialog/folder_browser_dialog.cpp
+    src/controls/message_box/message_box.cpp
     src/controls/thread_exception_dialog/thread_exception_dialog.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
@@ -2651,6 +2656,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_text_store_tests tests/text_store_tests.cpp)
     target_link_libraries(gui_forms_text_store_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_text_store_tests COMMAND gui_forms_text_store_tests)
+    add_executable(gui_forms_rich_text_model_tests tests/rich_text_model_tests.cpp)
+    target_link_libraries(gui_forms_rich_text_model_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_rich_text_model_tests COMMAND gui_forms_rich_text_model_tests)
 
     add_executable(gui_forms_bounded_grapheme_tests tests/bounded_grapheme_tests.cpp)
     target_include_directories(gui_forms_bounded_grapheme_tests PRIVATE src/core/text/unicode)
@@ -3058,6 +3066,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_folder_browser_dialog_tests tests/folder_browser_dialog_tests.cpp)
     target_link_libraries(gui_forms_folder_browser_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_folder_browser_dialog_tests COMMAND gui_forms_folder_browser_dialog_tests)
+    add_executable(gui_forms_message_box_tests tests/message_box_tests.cpp)
+    target_link_libraries(gui_forms_message_box_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_message_box_tests COMMAND gui_forms_message_box_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)

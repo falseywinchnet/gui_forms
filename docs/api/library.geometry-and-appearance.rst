@@ -4840,6 +4840,8 @@ Enumerations
 
    .. cpp:enumerator:: dock_shape
 
+   .. cpp:enumerator:: underline
+
    .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms

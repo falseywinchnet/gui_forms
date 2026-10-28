@@ -87,8 +87,10 @@ enabled items and wrap around, Home and End jump to the first and last, Right
 opens a submenu and selects its first item, Left closes the submenu (or, at
 the top level, the menu), Enter or Space activates the selected item, and
 Escape closes the whole menu. An
-`&` in an item's text marks its mnemonic: Alt with that letter activates the
-item. Moving the pointer over an item selects it and opens or closes
+`&` in an item's text marks its mnemonic: the letter typed alone, or with
+Alt, activates the item (a submenu opens). When several enabled items in the
+menu share the letter, typing it selects the next of them instead, in turn.
+Moving the pointer over an item selects it and opens or closes
 submenus; pressing and releasing the primary button on the same item
 activates it; the wheel scrolls a menu that is taller than the window; and
 pressing outside the menu closes it. A submenu opens beside its item, to the

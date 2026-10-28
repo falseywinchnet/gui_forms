@@ -1576,6 +1576,7 @@ void ListView::on_pointer(PointerEvent& event) {
     }
     if (event.action == PointerAction::wheel) {
         if (event.wheel_delta.y == 0.0 && event.wheel_delta.x == 0.0) return;
+        cancel_label_click();
         const bool sideways = event.wheel_delta.x != 0.0 || has_modifier(event.modifiers, Modifier::shift);
         if (sideways && view_ == ListViewView::details) {
             const double delta = event.wheel_delta.x != 0.0 ? event.wheel_delta.x : event.wheel_delta.y;
@@ -1589,6 +1590,16 @@ void ListView::on_pointer(PointerEvent& event) {
     }
     if (event.action == PointerAction::down) {
         if (event.button != PointerButton::primary && event.button != PointerButton::secondary) return;
+        // Any press ends a pending slow click; this one may start another.
+        // The press is a slow click on a label when it is a single primary
+        // press, without modifiers, on the text of the item that was already
+        // focused and selected while the view had focus.
+        cancel_label_click();
+        const bool slow_click = label_edit_ && focused_ && event.button == PointerButton::primary &&
+                                event.click_count == 1U && event.modifiers == Modifier::none &&
+                                hit.zone == HitZone::item && focused_index_ == hit.index &&
+                                hit.index < selected_.size() && selected_[hit.index] != 0U &&
+                                item_parts(placed, hit.index, placed.viewport).text.bounds.contains(local);
         if (window() != nullptr) static_cast<void>((*window()).request_focus(lifetime));
         if (!is_alive()) return;
         event.handled = true;
@@ -1616,6 +1627,7 @@ void ListView::on_pointer(PointerEvent& event) {
                 activate(hit.index);
             } else {
                 choose(hit.index, event.modifiers, false);
+                if (slow_click && is_alive()) schedule_label_click(hit.index);
             }
         } else if (!placed.viewport.empty() && placed.viewport.contains(local) &&
                    event.modifiers == Modifier::none) {
@@ -1678,6 +1690,8 @@ void ListView::on_key_preview(KeyEvent& event) {
 
 void ListView::on_key(KeyEvent& event) {
     if (!focused_ || !effectively_enabled() || event.action != KeyAction::down) return;
+    // A key ends a pending slow click.
+    cancel_label_click();
     if (event.physical_key == PhysicalKey::escape && resizing_column_) {
         columns_[*resizing_column_].width = resize_start_width_;
         finish_column_resize();
@@ -1773,6 +1787,7 @@ void ListView::on_text_input(TextInputEvent& event) {
 void ListView::on_focus_changed(bool focused) {
     focused_ = focused;
     if (!focused) {
+        cancel_label_click();
         if (resizing_column_) finish_column_resize();
         if (pressed_column_) {
             pressed_column_.reset();
@@ -1793,7 +1808,53 @@ void ListView::set_label_edit(bool enabled) {
     require_mutable();
     if (label_edit_ == enabled) return;
     label_edit_ = enabled;
-    if (!enabled) cancel_label_edit();
+    if (!enabled) {
+        cancel_label_click();
+        cancel_label_edit();
+    }
+}
+
+// The slow click's timer finds the view through a weak reference; a view
+// that is gone or disposed does nothing.
+struct ListView::LabelClickElapsed final {
+    std::weak_ptr<Control> target;
+
+    void operator()(FrameTime) const {
+        const std::shared_ptr<Control> control = target.lock();
+        if (!control || !(*control).is_alive()) return;
+        static_cast<ListView&>(*control).label_click_elapsed();
+    }
+};
+
+// The wait is the double-click interval the window holds (the platform's
+// setting, or GUI.Forms' stated default): a second press within it is a
+// double click, which activates the item instead.
+void ListView::schedule_label_click(std::size_t index) {
+    Window* const host = window();
+    if (host == nullptr) return;
+    const std::chrono::milliseconds wait((*host).presentation_settings().double_click_milliseconds);
+    label_click_ = PendingLabelClick{index, model_revision_};
+    const std::weak_ptr<Control> weak = shared_from_this();
+    label_click_timer_ = (*host).schedule_ui_timer(*this, std::chrono::hours(24), FrameClock::now() + wait,
+                                                   LabelClickElapsed{weak});
+}
+
+void ListView::cancel_label_click() noexcept {
+    label_click_timer_.disconnect();
+    label_click_.reset();
+}
+
+// The edit begins only if nothing has moved on since the press: the same
+// model, the item still focused and selected, the view focused, editing
+// still on, and no edit in progress.
+void ListView::label_click_elapsed() {
+    const std::optional<PendingLabelClick> pending = label_click_;
+    cancel_label_click();
+    if (!pending || !label_edit_ || !focused_ || label_edit_index_) return;
+    const PendingLabelClick& click = *pending;
+    if (click.revision != model_revision_ || focused_index_ != click.index) return;
+    if (click.index >= selected_.size() || selected_[click.index] == 0U || click.index >= item_count()) return;
+    static_cast<void>(begin_label_edit(click.index));
 }
 
 // The editor covers the item's text part, as item_parts places it for the
@@ -1835,6 +1896,7 @@ ListViewLabelEdit ListView::label_edit_event(std::optional<std::string> label) c
 
 bool ListView::begin_label_edit(std::size_t index) {
     require_mutable();
+    cancel_label_click();
     if (index >= item_count()) throw std::out_of_range("ListView item index is past the end");
     if (!label_edit_) return false;
     if (label_edit_index_ && *label_edit_index_ == index) return true;

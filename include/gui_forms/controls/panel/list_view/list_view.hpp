@@ -3,6 +3,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/image_list.hpp"
+#include "gui_forms/scheduler.hpp"
 #include "gui_forms/theme/owner_draw/owner_draw.hpp"
 
 #include <chrono>
@@ -602,6 +603,18 @@ private:
     // editor held it. Raises no label event.
     void close_label_editor();
     void on_label_editor_focus(bool focused);
+    // The slow second click (Windows' list view): a single press on the text
+    // of the item that was already focused and selected begins its label
+    // edit once the double-click interval passes without a second press.
+    struct LabelClickElapsed;
+    struct PendingLabelClick final {
+        std::size_t index{};
+        // The model revision when pressed: a changed model drops the click.
+        std::uint64_t revision{};
+    };
+    void schedule_label_click(std::size_t index);
+    void cancel_label_click() noexcept;
+    void label_click_elapsed();
     [[nodiscard]] std::optional<std::size_t> navigation_target(std::uint32_t key, std::size_t from,
                                                                const Layout& placed) const;
     void type_select(std::string_view text);
@@ -629,6 +642,8 @@ private:
     std::string label_edit_item_id_{};
     std::shared_ptr<TextBox> label_editor_{};
     SubscriptionToken label_editor_focus_{};
+    std::optional<PendingLabelClick> label_click_{};
+    FrameRequestToken label_click_timer_{};
     std::optional<std::size_t> pressed_column_{};
     std::optional<std::size_t> resizing_column_{};
     double resize_start_x_{};

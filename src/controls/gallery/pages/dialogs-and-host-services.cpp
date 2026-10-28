@@ -23,17 +23,17 @@ private:
         std::string_view label;
         HostMessageButtons buttons;
         HostMessageIcon icon;
-        HostDialogChoice default_choice;
+        MessageBoxDefaultButton default_button;
     };
     static constexpr std::array<MessageCase, 4> message_cases{{
         {"Information · OK", HostMessageButtons::ok,
-         HostMessageIcon::information, HostDialogChoice::ok},
+         HostMessageIcon::information, MessageBoxDefaultButton::button1},
         {"Warning · OK/Cancel", HostMessageButtons::ok_cancel,
-         HostMessageIcon::warning, HostDialogChoice::cancel},
+         HostMessageIcon::warning, MessageBoxDefaultButton::button2},
         {"Question · Yes/No", HostMessageButtons::yes_no,
-         HostMessageIcon::question, HostDialogChoice::yes},
+         HostMessageIcon::question, MessageBoxDefaultButton::button1},
         {"Error · Retry/Cancel", HostMessageButtons::retry_cancel,
-         HostMessageIcon::error, HostDialogChoice::retry},
+         HostMessageIcon::error, MessageBoxDefaultButton::button1},
     }};
     static constexpr std::array<std::string_view, 5> path_labels{
         "Open file", "Open multiple", "Save file", "Choose folder", "Choose color"};
@@ -262,6 +262,16 @@ std::string service_result(const HostServiceStatus& status) {
     return host_service_error_name(status.error);
 }
 
+// The DialogResult values a message box returns, as the page reports them.
+std::string_view message_result_name(DialogResult result) {
+    if (result == DialogResult::ok) return "OK";
+    if (result == DialogResult::cancel) return "Cancel";
+    if (result == DialogResult::yes) return "Yes";
+    if (result == DialogResult::no) return "No";
+    if (result == DialogResult::retry) return "Retry";
+    return "None";
+}
+
 } // namespace
 
 // A NotifyIcon: the page's icon in the notification area, where the host
@@ -426,17 +436,27 @@ HostServices* HostServicesPage::services() const {
     return window == nullptr ? nullptr : (*window).host_services();
 }
 
-void HostServicesPage::on_message_dialog(const int index,
-                                         const CommandInvocation& invocation) {
+// Each message case goes through show_message_box, the MessageBox.Show
+// facade over the host's message dialog.
+void HostServicesPage::on_message_dialog(const int index, const CommandInvocation&) {
     const MessageCase& value = message_cases[static_cast<std::size_t>(index)];
-    HostMessageDialogRequest request;
-    request.title = "GUI.Forms message contract";
-    request.message =
-        "This modal result travels through the portable HostServices boundary.";
+    Window* const window = (*status_).attached_window();
+    if (window == nullptr) {
+        (*status_).set_text("Host rejected request · unsupported");
+        return;
+    }
+    MessageBoxRequest request;
+    request.caption = "GUI.Forms message contract";
+    request.text = "This modal result travels through show_message_box and the portable HostServices boundary.";
     request.buttons = value.buttons;
     request.icon = value.icon;
-    request.default_choice = value.default_choice;
-    show_dialog(invocation, std::move(request));
+    request.default_button = value.default_button;
+    const MessageBoxResult result = show_message_box(*window, request);
+    if (!result.shown()) {
+        (*status_).set_text(std::string("Host rejected request · ") + host_service_error_name(result.error()));
+        return;
+    }
+    publish_accepted(std::string("MessageBox ") + std::string(message_result_name(result.result())));
 }
 
 void HostServicesPage::on_path_dialog(const int index,
@@ -576,19 +596,6 @@ void HostServicesPage::publish(const HostDialogResult& result) {
     if (!result.status.accepted()) {
         (*status_).set_text(std::string("Host rejected request · ") +
                             host_service_error_name(result.status.error));
-        return;
-    }
-    if (const HostMessageDialogResult* message =
-            std::get_if<HostMessageDialogResult>(&result.payload)) {
-        const std::string detail = std::string("Message ") +
-            host_dialog_outcome_name((*message).outcome) + " · " +
-            host_dialog_choice_name((*message).choice);
-        if ((*message).outcome == HostDialogOutcome::accepted) {
-            last_acceptance_ = detail;
-        }
-        (*status_).set_text((*message).outcome == HostDialogOutcome::cancelled
-                                ? detail + " · preserved: " + last_acceptance_
-                                : detail);
         return;
     }
     if (const HostPathDialogResult* path =

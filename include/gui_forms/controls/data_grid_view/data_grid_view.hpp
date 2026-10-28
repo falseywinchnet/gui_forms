@@ -29,13 +29,15 @@ class BindingSource;
 
 // The kind of cell a column shows (Windows Forms' DataGridViewTextBoxColumn,
 // DataGridViewCheckBoxColumn, DataGridViewComboBoxColumn,
-// DataGridViewButtonColumn and DataGridViewImageColumn).
+// DataGridViewButtonColumn, DataGridViewImageColumn and
+// DataGridViewLinkColumn).
 enum class DataGridViewColumnKind : std::uint8_t {
     text,
     check_box,
     combo_box,
     button,
     image,
+    link,
 };
 
 // How an image cell places its image (Windows Forms'
@@ -72,6 +74,10 @@ enum class DataGridViewRowSource : std::uint8_t { unbound, virtual_rows, binding
 // `image_layout`; `image_description` is the text an image cell gives in
 // place of its image (Windows Forms' Description), as its cell text and its
 // semantic name.
+// A link column's cells show their text as a link; `link_text` is shown on
+// a link cell whose value is empty (Windows Forms' Text with
+// UseColumnTextForLinkValue). With `track_visited_state` a link the user
+// clicks becomes visited (Windows Forms' TrackVisitedState).
 // `data_property_name` names the BindingSource field a bound column shows.
 struct DataGridViewColumn final {
     std::string name{};
@@ -86,6 +92,8 @@ struct DataGridViewColumn final {
     std::string button_text{};
     DataGridViewImageLayout image_layout{DataGridViewImageLayout::normal};
     std::string image_description{};
+    std::string link_text{};
+    bool track_visited_state{true};
     std::string data_property_name{};
     DataGridViewSortDirection sort_glyph{DataGridViewSortDirection::none};
 };
@@ -225,9 +233,17 @@ public:
     [[nodiscard]] std::optional<DataGridViewRowPosition> row_position(const DataGridViewRowId& row) const;
     // Throws std::out_of_range for a cell past the rows or columns.
     [[nodiscard]] BindingValue cell_value(DataGridViewRowPosition row, std::size_t column) const;
-    // The text a cell shows: its value as text, a button column's text for
-    // an empty button cell, an image column's description.
+    // The text a cell shows: its value as text, a button or link column's
+    // text for an empty button or link cell, an image column's description.
     [[nodiscard]] std::string cell_text(DataGridViewRowPosition row, std::size_t column) const;
+    // Whether a link cell's link is visited (Windows Forms'
+    // DataGridViewLinkCell.LinkVisited). The visited state stays on its row
+    // when rows move; it ends with its row, when the rows or columns are
+    // replaced and when a column is removed. The setter repaints the cell. Both throw std::out_of_range for a cell past
+    // the rows or columns and std::invalid_argument for a cell that is not
+    // in a link column.
+    [[nodiscard]] bool link_visited(DataGridViewRowPosition row, std::size_t column) const;
+    void set_link_visited(DataGridViewRowPosition row, std::size_t column, bool visited);
     // Stores a value from the program (read-only does not apply) and raises
     // cell_value_changed when it differs. Returns false when a provider or
     // binding source refuses it.
@@ -418,8 +434,8 @@ public:
     [[nodiscard]] Event<const DataGridViewCellEvent&>& cell_value_changed() noexcept {
         return cell_value_changed_;
     }
-    // Raised when a button cell or an image cell's image is clicked, or a
-    // check box cell toggled, by the user.
+    // Raised when a button cell, an image cell's image or a link cell's
+    // link is clicked, or a check box cell toggled, by the user.
     [[nodiscard]] Event<const DataGridViewCellEvent&>& cell_content_click() noexcept {
         return cell_content_click_;
     }
@@ -503,6 +519,10 @@ public:
         PartGeometry cell_selection;
         PartGeometry cell_content;
         PartGeometry cell_image;
+        // A link cell's link: its text's extent, which a click must hit.
+        PartGeometry cell_link;
+        // The link's underline: a one-unit rule just below the baseline.
+        PartGeometry cell_link_underline;
         PartGeometry cell_check_well;
         PartGeometry cell_check_indicator;
         PartGeometry cell_button_face;
@@ -522,6 +542,9 @@ public:
         bool pressed{};
         bool open{};
         bool focus_visible{};
+        // A link cell whose link is visited; a cell state of the grid's own
+        // (as LinkLabel's).
+        bool visited{};
     };
     struct Cell final {
         DataGridViewCellAddress address{};
@@ -702,6 +725,20 @@ private:
     [[nodiscard]] RowParts row_parts(DataGridViewRowPosition row, const GridLayout& layout) const;
     [[nodiscard]] CellParts cell_parts(DataGridViewRowPosition row, std::size_t column,
                                        const GridLayout& layout) const;
+    // A link cell's link within the cell's content area: its text's extent,
+    // placed by the column's alignment and cut at the content area's end,
+    // and its underline, one unit high just below the text's baseline.
+    struct CellLink final {
+        Rect text{};
+        Rect underline{};
+    };
+    // None for another kind of cell or a link cell with no text.
+    [[nodiscard]] std::optional<CellLink> cell_link(DataGridViewRowPosition row, std::size_t column,
+                                                    Rect content) const;
+    // Throws std::out_of_range for a cell past the rows or columns and
+    // std::invalid_argument for one outside a link column.
+    void require_link_cell(DataGridViewRowPosition row, std::size_t column) const;
+    [[nodiscard]] bool is_link_visited(std::string_view row_id, std::size_t column) const;
     // Where an image cell draws its image, before the cut at the cell's
     // edges, and the image; none for another kind of cell, an empty value or
     // an image the window does not hold.
@@ -841,6 +878,9 @@ private:
     SelectedCells selected_cells_{};
     // Full-row selections by row ID.
     RowIdSet selected_rows_{};
+    // Visited link cells by row ID, as selected_cells_ keeps cells: sorted
+    // unique column indices, and no entry for a row with none.
+    SelectedCells visited_links_{};
     // Counts selection changes, so an operation raises selection_changed once.
     std::uint64_t selection_revision_{};
 

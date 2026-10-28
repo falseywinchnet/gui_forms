@@ -14,6 +14,7 @@
 #include "gui_forms/date_time_picker.hpp"
 #include "gui_forms/diagnostic_controls.hpp"
 #include "gui_forms/component.hpp"
+#include "gui_forms/components/message_box/message_box.hpp"
 #include "gui_forms/components/notify_icon/notify_icon.hpp"
 #include "gui_forms/components/open_file_dialog/open_file_dialog.hpp"
 #include "gui_forms/components/save_file_dialog/save_file_dialog.hpp"

@@ -170,6 +170,16 @@ void marks() {
     const RecordingPainter tiny_shape = paint_glyph(*control, PartMark::dock_shape, {0.0, 0.0, 7.0, 7.0}, {},
                                                     DockShapeRegion::left);
     require(tiny_pin.operations.empty() && tiny_shape.operations.empty(), "a mark too small to read draws nothing");
+
+    // The underline mark (owner decision, 2026-10-28): one one-unit rule
+    // along the bottom of its box, in the glyph colour.
+    const RecordingPainter underline = paint_glyph(*control, PartMark::underline, {2.0, 10.0, 12.0, 1.0}, {},
+                                                   DockShapeRegion::tab_into);
+    require(part_mark_name(PartMark::underline) == "underline" && underline.operations.size() == 1U &&
+                underline.operations[0].kind == "line" && underline.operations[0].color == recipe.glyph &&
+                underline.operations[0].bounds.x == 2.0 && underline.operations[0].bounds.width == 12.0 &&
+                underline.operations[0].bounds.y == 10.5 && underline.operations[0].bounds.height == 0.0,
+            "the underline is one rule along the bottom of its box in the glyph colour");
 }
 
 PartPaint side_label(TextOrientation orientation, PartTextAlignment alignment) {
