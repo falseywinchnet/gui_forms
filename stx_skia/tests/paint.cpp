@@ -28,6 +28,7 @@
 #include "blur_result.hpp"
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <limits>
@@ -270,8 +271,24 @@ void priv_corpus(Output& output) {
 
 }  // namespace
 
+// setAlphaf pins to [0, 1] and makes NaN zero, as SkPaint.h states.
+bool alpha_pinning() {
+    const std::array<float, 8> given{0.25f, 0.0f, -0.0f, 1.0f, -1.0f, 2.5f, kInf, -kInf};
+    const std::array<float, 8> pinned{0.25f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f};
+    for (size_t index = 0; index < given.size(); ++index) {
+        SkPaint paint;
+        paint.setAlphaf(given[index]);
+        if (paint.getAlphaf() != pinned[index]) return false;
+    }
+    SkPaint paint;
+    paint.setAlphaf(kNaN);
+    const bool nan_is_zero = paint.getAlphaf() == 0.0f && !std::isnan(paint.getColor4f().fA);
+    return nan_is_zero;
+}
+
 int main(int argc, char** argv) {
     if (argc != 1 && argc != 2) return 2;
+    if (!alpha_pinning()) return 3;
     Output output{};
     setter_corpus(output);
     blend_corpus(output);

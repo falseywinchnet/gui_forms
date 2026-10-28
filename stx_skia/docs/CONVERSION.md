@@ -1846,6 +1846,19 @@ its save floor.
   `…restore-to-above`. With the old silent returns restored, all three fail (negative control).
 - **Wider check:** 181 Skia-drawing GUI.Forms tests pass, so no GUI.Forms path over-restores.
 
+## Paint alpha pinning
+
+API item 10 (house style §1). The queue entry said NaN passes through `setAlphaf`. It does not:
+`SkTPin` returns its lower bound for NaN, so NaN becomes 0, and the paint corpus already records
+that row. The defect was the documentation. `SkPaint.h` claimed that an out-of-range value
+asserts in debug builds, but the value is pinned. The comment now states the actual contract:
+- below 0 (including −∞) becomes 0;
+- above 1 (including +∞) becomes 1;
+- NaN becomes 0, which draws nothing.
+
+`paint`'s `alpha_pinning` checks each of these on both profiles. GUI.Forms passes
+`std::clamp(opacity, 0, 1)`, which keeps NaN, so a NaN opacity reaches the paint as 0.
+
 ## Still required
 
 Refreshed 2026-10-27 after the support leftovers. The whole-library AST inventory counts 249
