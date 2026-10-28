@@ -8,7 +8,7 @@ namespace gui_forms {
 // decision 27): the group at its largest layout on a panel that casts the
 // overlay shadow (decision 37). Private to the ribbon, which owns it, makes
 // it on the first popup and disposes it with itself; `ribbon` observes the
-// owner (house style §6: the back link does not extend its lifetime, and the
+// owner (house style §4: the back link does not extend its lifetime, and the
 // ribbon closes the popup before it goes).
 //
 // An AnchoredPopupLayer places the content below the ribbon, its left edge

@@ -31,7 +31,7 @@ struct DockNodePlace final {
 
 // Lookups. Pointers borrow from the state and are invalidated by any change
 // to the vector they point into (adding a node can reallocate nodes). A
-// temporary state is refused (house style section 5).
+// temporary state is refused (house style section 1).
 [[nodiscard]] DockNode* find_dock_node(DockLayoutState& state, DockNodeId id) noexcept;
 [[nodiscard]] const DockNode* find_dock_node(const DockLayoutState& state, DockNodeId id) noexcept;
 const DockNode* find_dock_node(DockLayoutState&& state, DockNodeId id) = delete;
@@ -47,7 +47,7 @@ const DockFloatingSite* find_dock_site(DockLayoutState&& state, DockSiteId id) =
                                                              DockNodeId stack) noexcept;
 const DockAutoHideEntry* find_dock_auto_hidden(DockLayoutState&& state, DockNodeId stack) = delete;
 // The result borrows from `descriptors`; a temporary list is refused (house
-// style section 5).
+// style section 1).
 [[nodiscard]] const DockPanelDescriptor* find_dock_descriptor(
     const std::vector<DockPanelDescriptor>& descriptors, const DockPanelId& id) noexcept;
 const DockPanelDescriptor* find_dock_descriptor(std::vector<DockPanelDescriptor>&& descriptors,

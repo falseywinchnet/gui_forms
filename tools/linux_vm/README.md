@@ -30,7 +30,6 @@ Clang 22 lives in `/usr/lib/llvm22/bin`:
 
 ```sh
 export PATH=/usr/lib/llvm22/bin:$PATH CC=clang CXX=clang++
-export GUI_FORMS_SYSTEM_BUILD_TOOLS=1
 ```
 
 Graphical tests run against a headless server, for example:

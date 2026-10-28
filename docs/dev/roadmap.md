@@ -2,7 +2,7 @@
 
 GUI.Forms is pre-1.0. This page says what is done, what is being worked on
 now, and what has to be true before the API is declared stable. It is a
-summary of the planning documents in the repository's `planning/` directory,
+summary of the planning documents in the [`planning/`](https://github.com/malkuth-software/notes/tree/gui_forms/planning) directory of the project's notes repository,
 which remain the detailed source; where they disagree with the code, the code
 and its tests are the authority.
 
@@ -36,7 +36,7 @@ details are under [Done and tested](#done-and-tested).
   native host advertises the capability.
 - **Font substitution**. Families that applications ask for map to
   bundled faces with matching or nearest metrics, measured on every host
-  (`results/2026-10-23-f-font-substitution`).
+  ([`results/2026-10-23-f-font-substitution`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-23-f-font-substitution)).
 - **Articulated controls**. Every control is built from named parts
   with states and public geometry, described by one schema that the C++ API,
   form documents, themes and the visual tools share.
@@ -51,22 +51,44 @@ details are under [Done and tested](#done-and-tested).
   the engine in C++. An idle window still draws nothing. Its gate is
   recorded: identical pixels on every host and no frames once a window
   settles.
-- **CSS-syntax themes** addressed to the named parts.
+- **CSS-syntax themes** addressed to the named parts (in progress). The
+  tokenizer, syntax tree, selectors, values, the compiler onto the engine,
+  authored materials (recipe fields, filters, images and borders) and
+  transitions are on main. Motion, colour and text roles, inline styles,
+  packages and imports, custom properties and the stage gate remain.
 - **The default theme**, in light and dark, following the
-  design-language specification (`planning/DESIGN_LANGUAGE_SPECIFICATION.md`).
-- **Windows-familiar themes** beside it.
+  design-language specification ([`planning/DESIGN_LANGUAGE_SPECIFICATION.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/DESIGN_LANGUAGE_SPECIFICATION.md))
+  (not started; its design is decided).
+- **Windows-familiar themes** beside it (not started).
 - **Compositor cooperation:** transparency, glass and behind-window materials
-  where the host provides them, with reflection and full-fidelity glass.
+  where the host provides them, with reflection and full-fidelity glass (in
+  progress). The Windows, macOS and X11 adapters, the XWayland probe, the
+  join with the theme engine and full-fidelity glass are on main. Reflection,
+  the stage gate and a rerun of the Mac measurements remain.
+- **Universal Skia:** one CPU Skia renderer on every host. `stx_skia/`, the
+  pruned and converted CPU derivative of Skia, builds with the tree on macOS,
+  Linux and Windows (stage SK1b).
 
 ## 0.4 Flexible
 
-- **Flex and grid layout** containers, checked against a browser's layout.
+- **Flex and grid layout** containers, checked against a browser's layout
+  (in progress). FlexPanel, GridPanel, BlockPanel and the `TextBlock` leaf
+  are on main, with the Windows Forms containers mirrored for right-to-left
+  layout; the box gate passes 181 fixtures with none over tolerance. The
+  text corpus remains.
 - **Form documents that round-trip:** hand edits and visual edits never
-  overwrite each other.
-- **Damage-preserving painting:** each damaged region is painted and presented
-  on its own, not as one bounding box.
+  overwrite each other (not started; the format is decided).
+- **Damage-preserving painting** (done): each damaged region is painted and
+  presented on its own, not as one bounding box. On macOS, AppKit copies the
+  union of the regions over unchanged pixels, which the owner accepted.
 - **More Windows Forms controls:** a data grid, a list view, and complete tool
-  and status strips, built on the theme engine.
+  and status strips, built on the theme engine (in progress). Since v0.2.0:
+  the Open, Save, FolderBrowser and Color dialogs, ThreadExceptionDialog,
+  TabControl images, the DataGridView image column, the ListView insertion
+  mark and label editing, content-only owner drawing and Splitter. MessageBox,
+  the link role and column, menu letter mnemonics, the slow-click label edit,
+  the RichTextBox run model and the remaining ListView and TabControl gaps
+  remain.
 
 ## 0.5 ABI candidate
 
@@ -75,6 +97,9 @@ details are under [Done and tested](#done-and-tested).
   conveniences over them rather than a second contract.
 - **Two independent native consumers** passing the ownership, thread and
   callback conformance tests against the installed SDK.
+
+What is left before 0.5, stage by stage, with dependencies, open owner
+decisions and parked work, is listed in [`planning/ROADMAP_TO_0.5.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/ROADMAP_TO_0.5.md).
 
 ## 0.6 Bindings
 
@@ -109,10 +134,14 @@ The API is declared stable only when all of the following hold:
   of materials ship with every artefact.
 
 The full plan, with a measured gate for each stage, is
-`planning/FORWARD_PROGRAMME.md`.
+[`planning/FORWARD_PROGRAMME.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/FORWARD_PROGRAMME.md).
 
 Future note, not a stage: distribution near 1.0 is expected to move to
 rolling releases with pinnable caches, likely hosted off GitHub.
+
+Planned target, not yet assigned to a release: an Emscripten build, after
+the move from Skia to the owned `stx_skia`. Painting stays on the CPU; WebGL
+is used only to present the finished frame in the browser.
 
 ## Milestones
 
@@ -127,12 +156,13 @@ gates as their own rows. "Done" means the deliverable exists and a test in
 | Display chunks, damage and the CPU renderer | Retained display chunks, bounded multi-rectangle damage per paint plane, a bounded PNG registry with a fuzz target, the renderer-free drawing core (paths, gradients, transforms, clips, images), and the private CPU-only Skia adapter behind symbol audits | done |
 | Portable host protocol and the macOS host | A versioned, capability-reported protocol; on AppKit: lifecycle and close cancellation, monitors, occlusion, capture, cursors, clipboard text and images, inbound typed drops, the five common dialogs, sound cues and IME composition | done; outbound drag and native menus are open |
 | Unicode text, shaping and editing | A strict UTF-8 text store with distinct position types, Unicode grapheme boundaries, HarfBuzz/FreeType shaping over bundled faces with script fallback, bidirectional analysis, and single and multiline editing with selection, clipboard and undo | in progress: preedit on Windows and X11 remains |
-| Layout, scrolling and virtualization | Measure and arrange with Dock/Anchor, flow, table, split and responsive-track containers; scrollable containers with real scrollbars; read barriers and bounded passes; lists and trees that realize only visible rows | in progress: million-item list, tree and grid fixtures are not in place |
+| Layout, scrolling and virtualization | Measure and arrange with Dock/Anchor, flow, table, split and responsive-track containers; scrollable containers with real scrollbars; read barriers and bounded passes; lists and trees that realize only visible rows | in progress: FlexPanel, GridPanel and BlockPanel pass a box gate against a browser layout oracle (181 fixtures); the text corpus and million-item list, tree and grid fixtures are not in place |
 | Basic Forms controls | Panel, GroupBox, Label, LinkLabel, Button, CheckBox, RadioButton, TextBox, ListBox, ComboBox, NumericUpDown, scroll bars, TrackBar, ProgressBar, PictureBox, ContainerControl, UserControl, Timer, ToolTip, ErrorProvider, HelpProvider, ImageList and commands, with initialization scopes, mnemonics and accept/cancel targets | done |
-| Collection, command and data controls | TreeView, ObjectView, CheckedListBox, TabControl, SplitContainer, MasterDetailView, MenuStrip, ContextMenu, CommandBar, DateTimePicker and a metadata-driven PropertyGrid; `Value<T>` and `Command` bindings with record currency and validation | in progress: a data grid and a status strip are not implemented |
+| Collection, command and data controls | TreeView, ObjectView, CheckedListBox, TabControl, SplitContainer, MasterDetailView, MenuStrip, ContextMenu, CommandBar, DateTimePicker and a metadata-driven PropertyGrid; `Value<T>` and `Command` bindings with record currency and validation | in progress: DataGridView, ListView and StatusStrip are implemented; MessageBox, the link column, menu letter mnemonics and the RichTextBox run model are open |
 | Semantic tree | A retained semantic graph with stable-ID snapshots, default adapters for stock controls, virtual children and semantic actions, independent of authored metadata | done |
 | Native accessibility on every host | Publication of the semantic tree through each platform's accessibility API, exercised by tests | done: macOS (NSAccessibility), Windows (MSAA and UI Automation) and Linux (ATK/AT-SPI) publish the tree and editable text ranges, client tests read each through its own API, and every native host advertises the capability |
-| Themes, assets and localization | Immutable theme records with named visual roles and high-contrast recipes, atomic theme replacement, layered surface materials, OKLab/OKLCH colour and a fixed bundled font set | in progress: data-only theme and language packs, message catalogues and runtime configuration are not implemented |
+| Themes, assets and localization | Immutable theme records with named visual roles and high-contrast recipes, atomic theme replacement, layered surface materials, OKLab/OKLCH colour and a fixed bundled font set | in progress: the CSS-syntax theme front end is built through transitions; theme packages, language packs, message catalogues and runtime configuration are not implemented |
+| Compositor cooperation | Transparency, glass and behind-window materials where the host provides them, joined to the theme engine | in progress: the Windows, macOS and X11 adapters, the XWayland probe and full-fidelity glass are done; reflection and the stage gate are open |
 | Authoring manifest for compiled forms | A versioned manifest of controls, properties, events, layout and resources that form compilers consume, with conformance fixtures | in progress: the control registry lists every public control type; member-level entries and conformance fixtures are open |
 | Stable C ABI | Versioned function tables and an error model that pass a breaking-change audit, an export allowlist, and C++ wrappers as RAII conveniences over them | planned; an experimental 0.x C ABI is built and tested but not installed |
 | Windows and Linux hosts | The same protocol on Win32 (DIB presentation, MSAA, dialogs, clipboard, automation channel) and X11 (XDND drops, ATK/AT-SPI, dialogs, clipboard) | in progress: Windows lacks preedit, OLE drag and drop and occlusion; X11 lacks preedit and run-time scale notifications |
@@ -140,7 +170,7 @@ gates as their own rows. "Done" means the deliverable exists and a test in
 | Coherent latest-state presentation | Separate content, rendered and presented revisions; one paint lease, one coalesced wake and one deferred follow-up per window; exact presentation receipts; owner-callback failure restores the previous chunks | done |
 | Pressure, input and stall conformance | Under 100 mutations per frame, nested paints, resize during replay, occlusion, backend faults and owner retirement: one queued drain, latest-state rendering and a return to idle; input deferred outside the paint lease with a fixed bound | in progress: the deterministic gates pass; a native wall-clock soak remains |
 | Atomic candidate raster | Replay into a private candidate raster and publish it only after every backend command succeeds, keeping the last presented raster across allocation, renderer and upload faults | in progress: an opt-in Windows transactional frame store exists; default hosts replay into the live raster |
-| Damage-preserving painting | Painting and presenting each damage rectangle instead of their bounding box | done: every host paints the rectangle set (paint contract version 2), and live frames follow one frame sequence; the gate is recorded on Windows, X11 and macOS (`results/2026-10-25-dp-gate-macos`), where AppKit copies the union of the set over unchanged pixels, accepted by the owner |
+| Damage-preserving painting | Painting and presenting each damage rectangle instead of their bounding box | done: every host paints the rectangle set (paint contract version 2), and live frames follow one frame sequence; the gate is recorded on Windows, X11 and macOS ([`results/2026-10-25-dp-gate-macos`](https://github.com/malkuth-software/notes/tree/gui_forms/results/2026-10-25-dp-gate-macos)), where AppKit copies the union of the set over unchanged pixels, accepted by the owner; paint edges snap to whole device pixels |
 | Presentation availability record | Publishing the mandatory paint-contract version and optional host extensions (partial present, zero-copy import, presentation fences) | done: `Window::presentation_availability()` reports contract version 2 (partial present is now part of the contract), the extensions and the live paint lease; no host offers zero-copy import or fences yet |
 | API stability (1.0) | The conditions listed under "Before 1.0" below | planned |
 
@@ -182,9 +212,25 @@ gates as their own rows. "Done" means the deliverable exists and a test in
   bindings, record currency and binding-aware validation.
 - An installed CMake SDK consumed by standalone examples on every CI platform,
   with generation-time rejection of unsafe linking combinations.
-- A compiler-cache pipeline that publishes tested object caches per platform.
+- A compiler-cache pipeline that publishes tested object caches per
+  platform, with pinned revisions that pruning keeps for consumers.
 - This documentation site, with control indexes and an API reference
-  generated from the control registry and the public headers.
+  generated from the control registry and the public headers, rebuilt on
+  Read the Docs only after CI passes on main or on a release tag.
+- Merges to main go through a merge queue whose required checks include a
+  state-machine gate that fails on findings.
+- The host protocol versions are one table in the public header, now at
+  version 10.
+- Flex, grid and block layout panels and a `TextBlock` leaf, checked against
+  a browser layout oracle, and the Windows Forms containers with full
+  right-to-left mirroring.
+- Damage-preserving painting on every host (paint contract version 2).
+- The CSS-syntax theme front end through authored materials and
+  transitions.
+- Compositor adapters on Windows, macOS and X11, with full-fidelity glass.
+- `stx_rtf2md`, the first-party rich-text library: one document model, a
+  markdown-like dialect, and RTF read and written by meaning.
+- `stx_skia/`, the CPU renderer, built with the tree on every host.
 - Three demonstration programs (the Gallery and the Explore and
   Correspondence previews) on macOS, Windows and Linux, and a release
   pipeline that builds, tests, packages and launch-tests each of them before
@@ -203,6 +249,26 @@ Demonstration programs
 Hosts
 : Input-method preedit on Windows and X11, drag and drop on Windows, and
   outbound drag on every host.
+
+Themes
+: The rest of the CSS-syntax front end: motion, colour and text roles,
+  `@media`, inline styles, packages and imports, custom properties and its
+  gate. Then the default and Windows-familiar themes.
+
+Compositor cooperation
+: Reflection, the stage gate (a compositor lab program on each host) and a
+  rerun of the Mac measurements with an active-window probe.
+
+Layout
+: The text corpus for the layout gate (parked).
+
+Windows Forms controls
+: MessageBox (parked), the link role and column, menu letter mnemonics, the
+  slow-click label edit, the RichTextBox run model and the remaining ListView
+  and TabControl gaps.
+
+Skia
+: Making CPU Skia mandatory on every host is paused by the owner.
 
 ## Not planned
 
@@ -225,8 +291,7 @@ Outbound drag initiation on every host, and inbound drag and drop on Windows;
 preedit composition on
 Windows and X11; occlusion notifications on Windows and run-time scale
 notifications on X11; native menu-bar publication; per-monitor DPI policy as
-a host service beyond scale notifications; designer serialization; preserving
-sparse damage regions through painting. Linux already publishes accessibility through ATK/AT-SPI, and
+a host service beyond scale notifications; designer serialization. Linux already publishes accessibility through ATK/AT-SPI, and
 table cells already align and stretch children through Dock and Anchor. The
 detailed planning records may describe earlier states; check the current
 implementation and tests when assessing a remaining gap.

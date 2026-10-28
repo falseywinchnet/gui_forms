@@ -8,6 +8,9 @@ import shutil
 import subprocess
 import tempfile
 
+# The components tools/build_sdk.py --features all adds to the default SDK.
+FEATURE_COMPONENTS: tuple[str, ...] = ("TextMasks", "AudioLoopTransport", "FreeType", "HarfBuzz")
+
 
 def run(command: list[str], expected_success: bool = True) -> str:
     result: subprocess.CompletedProcess[str] = subprocess.run(command, text=True, encoding='utf-8', stdout=subprocess.PIPE,
@@ -24,7 +27,12 @@ def main() -> None:
     parser.add_argument("--toolchain", type=Path, help="Target CMake toolchain for cross-build verification")
     parser.add_argument("--runner", help="CTest cross-compiling emulator command, such as wine")
     parser.add_argument("--relocate", action="store_true", help="Copy the installed SDK to a new prefix before verification")
+    parser.add_argument("--feature-components", action="store_true",
+                        help="The prefix holds build_sdk.py --features all's components: build and run a consumer "
+                             "of Application, TextMasks, Audio and AudioLoopTransport (requires --native)")
     args: argparse.Namespace = parser.parse_args()
+    if args.feature_components and not args.native:
+        parser.error("--feature-components requires --native: TextMasks lives in Application")
     prefix: Path = args.prefix.resolve(strict=True)
     project: Path = Path(__file__).resolve().parent.parent
     scratch: str
@@ -53,11 +61,22 @@ def main() -> None:
         run(["cmake", "--build", str(build), "--parallel", "2"])
         test_output: str = run(["ctest", "--test-dir", str(build), "--output-on-failure"])
         print(test_output)
+        if args.feature_components:
+            features: Path = scratch_path / "feature-consumer"
+            shutil.copytree(project / "tests" / "installed_feature_consumer", features)
+            main_source: Path = project / "tests" / "application_text_consumer" / "main.cpp"
+            feature_build: Path = scratch_path / "feature-build"
+            run(["cmake", "-S", str(features), "-B", str(feature_build),
+                 "-DGUI_FORMS_CONSUMER_MAIN=" + str(main_source)] + package_arguments)
+            run(["cmake", "--build", str(feature_build), "--parallel", "2"])
+            print(run(["ctest", "--test-dir", str(feature_build), "--output-on-failure"]))
         invalid: Path = scratch_path / "invalid"
         invalid.mkdir()
         components: list[str] = ["NotAComponent"]
         if not args.native:
             components.append("Application")
+        if not args.feature_components:
+            components.extend(FEATURE_COMPONENTS)
         component: str
         for component in components:
             invalid_configuration: Path = invalid / "CMakeLists.txt"

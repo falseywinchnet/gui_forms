@@ -147,7 +147,7 @@ enum class FlexSolveOutcome : std::uint8_t {
 };
 
 // Caller-owned storage both calls fill, reused from layout to layout (house
-// style section 5): `items` has one record per input item, in input order;
+// style section 1): `items` has one record per input item, in input order;
 // `order` the input positions in (order, position) order; `lines` the lines
 // in order. Its storage grows only when the item count does.
 class FlexLayoutWorkspace final {

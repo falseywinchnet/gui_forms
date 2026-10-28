@@ -614,7 +614,7 @@ void RibbonGallery::on_popup_revoked() {
 // The gallery owns its layer (layer_), and while open the layer holds the
 // gallery as its content. Closed, the gallery leaves the layer, so the two
 // never hold each other and both are freed when the gallery's owner lets
-// go (house style §5, §6). A layer already being disposed refuses the
+// go (house style §1, §4). A layer already being disposed refuses the
 // change; on_dispose then drops the layer instead.
 void RibbonGallery::release_layer_content() noexcept {
     if (!layer_ || !(*layer_).content()) return;

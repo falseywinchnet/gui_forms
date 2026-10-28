@@ -85,6 +85,7 @@ gui_forms::Window
          The host's compositor state as last reported. Before any report: compositing unknown and only ``opaque`` supported.
 
       **backdrop_request** : ``WindowBackdropRequest``, read-only
+         The request in force: the application's, else the theme's.
 
       **backdrop_grant** : ``WindowBackdropGrant``, read-only
 
@@ -297,7 +298,7 @@ gui_forms::Window
       * - :cpp:func:`shares_resources_with <gui_forms::Window::shares_resources_with>`
         -  
       * - :cpp:func:`declare_non_opaque <gui_forms::Window::declare_non_opaque>`
-        - Compositor cooperation (stage T5, planning/stages/T5-compositor/ PLAN.md §2).
+        - Compositor cooperation (stage T5, notes:planning/stages/T5-compositor/ PLAN.md §2).
       * - :cpp:func:`request_backdrop <gui_forms::Window::request_backdrop>`
         - Asks for a backdrop (owner decisions T5-Q3 and T5-Q5) and returns the grant now in force: the request's first entry this window may be given under the host's state and its presentation settings, else ``opaque``, with the reason the preferred entry was or was not given.
       * - :cpp:func:`rebind_key_command <gui_forms::Window::rebind_key_command>`
@@ -664,6 +665,8 @@ gui_forms::Window
 
    .. cpp:function:: const WindowBackdropRequest& backdrop_request() const noexcept
 
+      The request in force: the application's, else the theme's.
+
    .. cpp:function:: const WindowBackdropGrant& backdrop_grant() const noexcept
 
    .. cpp:function:: HostServices* host_services() const noexcept
@@ -944,11 +947,11 @@ gui_forms::Window
 
    .. cpp:function:: bool declare_non_opaque()
 
-      Compositor cooperation (stage T5, planning/stages/T5-compositor/ PLAN.md §2). Declares, before a host attaches, that this window may be presented non-opaque (owner decision T5-Q4); ApplicationWindowOptions::non_opaque does it for an application window. False, changing nothing, once a host session has been bound to the window: a host fixes what a native window can show when it creates it. UI thread.
+      Compositor cooperation (stage T5, notes:planning/stages/T5-compositor/ PLAN.md §2). Declares, before a host attaches, that this window may be presented non-opaque (owner decision T5-Q4); ApplicationWindowOptions::non_opaque does it for an application window. False, changing nothing, once a host session has been bound to the window: a host fixes what a native window can show when it creates it. UI thread.
 
    .. cpp:function:: WindowBackdropGrant request_backdrop(const WindowBackdropRequest& request)
 
-      Asks for a backdrop (owner decisions T5-Q3 and T5-Q5) and returns the grant now in force: the request's first entry this window may be given under the host's state and its presentation settings, else ``opaque``, with the reason the preferred entry was or was not given. The request stands: the grant is resolved again whenever the state, the settings or the declaration change. std::invalid_argument, changing nothing, for a request window_backdrop_request_valid refuses. UI thread.
+      Asks for a backdrop (owner decisions T5-Q3 and T5-Q5) and returns the grant now in force: the request's first entry this window may be given under the host's state and its presentation settings, else ``opaque``, with the reason the preferred entry was or was not given. The request stands: the grant is resolved again whenever the state, the settings or the declaration change. Until the application makes one, the window makes its theme's (ThemeWindowBackdrop::request) and follows each new theme's. std::invalid_argument, changing nothing, for a request window_backdrop_request_valid refuses. UI thread.
 
    .. cpp:function:: void rebind_key_command(KeyCommand command, KeyBinding binding)
 
@@ -1314,7 +1317,7 @@ gui_forms::Window
 
    .. cpp:function:: void set_dispatch_wake_handler(std::function<void()> wake)
 
-      Host adapters install a thread-safe wake primitive. Installing a handler after work was queued immediately publishes one coalesced wake. The handler runs under the dispatcher's lock, on whichever thread posted: it may only signal (set a flag, post a message, write a pipe) and must never call back into the window. In return, once this call replaces or removes a handler, no wake through the old one is under way or to come, so its target may be destroyed.
+      Host adapters install a thread-safe wake primitive. Installing a handler after work was queued immediately publishes one coalesced wake. The handler runs under the dispatcher's lock, on whichever thread posted: it may only signal (set a flag, post a message, write a pipe) and must never call back into the window. In return, once this call replaces or removes a handler, no wake through the old one is under way or to come, so its target may be destroyed. A thread may post (begin_invoke, invoke) while holding locks of its own, so the lock order is the poster's locks, then the dispatcher's, then any the handler takes: the handler must take no lock that a posting thread may hold. The stock hosts' handlers take none of GUI.Forms' or the application's.
 
    .. cpp:function:: void set_paint_wake_handler(std::function<void()> wake)
 

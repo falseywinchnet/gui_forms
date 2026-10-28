@@ -1,9 +1,10 @@
 name: State-machine gate
-# House style section 9 for new code (owner, 2026-10-23): fails on any F1
+# House style section 2 for new code (owner, 2026-10-23): fails on any F1
 # (switch without a default, not in the compliant form) or F2 (a default
 # that hides enumerators without a stated reason) in the translation units a
-# change can affect. tools/check_state_machines.py documents the rules;
-# results/2026-10-25-state-machine-hunt-2/README.md records the gate.
+# change can affect. template_harness's harness/check_state_machines.py
+# (at the commit gui_forms/harness.lock pins) documents the rules;
+# notes:results/2026-10-25-state-machine-hunt-2/README.md records the gate.
 #
 # Scopes: a pull request checks the translation units its C and C++ changes
 # can affect (check_state_machines.py --changed-from), and passes at once when
@@ -47,12 +48,15 @@ jobs:
         with:
           path: gui_forms
           fetch-depth: 0
+      # template_harness beside gui_forms, at the commit gui_forms/harness.lock
+      # pins: the checker (docs/building/template-harness.md).
+      - uses: ./gui_forms/.github/actions/harness-checkout
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       # The checker's own fixtures (rules, tuning, the changed-code scope).
       - name: Test the checker
-        run: python3 -B -m unittest discover -s gui_forms/tools -p test_state_machines.py
+        run: python3 -B -m unittest discover -s template_harness/harness -p test_state_machines.py
       # A pull request compares with its base, a merge group with the main
       # commit it extends, a push to main with the commit it replaced. The schedule, a manual run and a push without a usable
       # base check the whole tree, as does a change to the checker itself.
@@ -63,7 +67,7 @@ jobs:
         run: |
           scope=full
           if [ "$GITHUB_EVENT_NAME" != schedule ] && [ -n "$BASE" ] && git -C gui_forms cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            listed=$(python3 -B gui_forms/tools/check_state_machines.py --root gui_forms \
+            listed=$(python3 -B template_harness/harness/check_state_machines.py --root gui_forms \
               --changed-from "$BASE" --list-changed)
             if [ -z "$listed" ]; then
               scope=none
@@ -102,15 +106,17 @@ jobs:
             -DGUI_FORMS_ENABLE_LINUX_HOST=OFF -DGUI_FORMS_ENABLE_SKIA=OFF -DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON
       - name: Check the state machines
         if: steps.scope.outputs.scope != 'none'
+        shell: bash
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           SCOPE: ${{ steps.scope.outputs.scope }}
         run: |
+          set -o pipefail
           changed=""
           if [ "$SCOPE" = changed ]; then
             changed="--changed-from $BASE"
           fi
-          python3 -B gui_forms/tools/check_state_machines.py --root gui_forms --build-dir build --jobs 4 \
+          python3 -B template_harness/harness/check_state_machines.py --root gui_forms --build-dir build --jobs 4 \
             --gate --json state-machines.json $changed | tee state-machines.txt
       - name: Show the findings
         if: always() && steps.scope.outputs.scope != 'none'

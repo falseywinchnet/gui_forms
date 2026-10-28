@@ -12,6 +12,7 @@
 #include "gui_forms/live_surface/wake_connection/live_surface_wake_connection.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/metrics.hpp"
+#include "gui_forms/paint_framebuffer.hpp"
 #include "gui_forms/host/compositor/window_backdrop.hpp"
 #include "gui_forms/host/cursor_interaction/cursor_interaction.hpp"
 #include "gui_forms/layout/diagnostics/layout_diagnostics.hpp"
@@ -367,7 +368,7 @@ public:
     [[nodiscard]] Event<bool>& active_changed() noexcept {
         return active_changed_;
     }
-    // Compositor cooperation (stage T5, planning/stages/T5-compositor/
+    // Compositor cooperation (stage T5, notes:planning/stages/T5-compositor/
     // PLAN.md §2). Declares, before a host attaches, that this window may
     // be presented non-opaque (owner decision T5-Q4);
     // ApplicationWindowOptions::non_opaque does it for an application
@@ -391,10 +392,12 @@ public:
     // given under the host's state and its presentation settings, else
     // `opaque`, with the reason the preferred entry was or was not given.
     // The request stands: the grant is resolved again whenever the state,
-    // the settings or the declaration change. std::invalid_argument,
-    // changing nothing, for a request window_backdrop_request_valid
-    // refuses. UI thread.
+    // the settings or the declaration change. Until the application makes
+    // one, the window makes its theme's (ThemeWindowBackdrop::request) and
+    // follows each new theme's. std::invalid_argument, changing nothing,
+    // for a request window_backdrop_request_valid refuses. UI thread.
     WindowBackdropGrant request_backdrop(const WindowBackdropRequest& request);
+    // The request in force: the application's, else the theme's.
     [[nodiscard]] const WindowBackdropRequest& backdrop_request() const noexcept { return backdrop_request_; }
     [[nodiscard]] const WindowBackdropGrant& backdrop_grant() const noexcept { return backdrop_grant_; }
     // Raised on the UI thread after the grant's backdrop, reason or request
@@ -531,7 +534,11 @@ public:
     // it may only signal (set a flag, post a message, write a pipe) and must
     // never call back into the window. In return, once this call replaces or
     // removes a handler, no wake through the old one is under way or to come,
-    // so its target may be destroyed.
+    // so its target may be destroyed. A thread may post (begin_invoke, invoke)
+    // while holding locks of its own, so the lock order is the poster's locks,
+    // then the dispatcher's, then any the handler takes: the handler must take
+    // no lock that a posting thread may hold. The stock hosts' handlers take
+    // none of GUI.Forms' or the application's.
     void set_dispatch_wake_handler(std::function<void()> wake);
     // Host adapters also install a paint wake seam. Retained invalidation may
     // originate from another Window's callback, so relying only on the host
@@ -896,9 +903,11 @@ private:
     // window's device pixels and `generation` the backplane's damage
     // generation it was made at. Held in the engine table's shared cache
     // per region (EnginePartTable::held_backplane) and made on first need:
-    // the window's backplane material, then the backplane plane's engine
-    // part rasters (option 1; everything else is skipped and counted).
-    // `image` is null when no image can be made.
+    // the window's backplane base, then the backplane plane's commands,
+    // replayed whole by the window's renderer (stage T5, C6: text and
+    // application drawing included) when it can make a framebuffer, else
+    // only their engine part rasters (option 1; everything else skipped
+    // and counted). `image` is null when no image can be made.
     struct EngineBackplane final {
         std::shared_ptr<const PartRaster> image{};
         Point origin{};
@@ -934,6 +943,15 @@ private:
     // covering `region`; adds the commands skipped to `skipped`.
     void composite_backplane_subtree(const Control::Ptr& control, Rect clip, const BackplaneRegion& region,
                                      const PartRasterView& image, std::uint64_t& skipped) const;
+    // The full-fidelity backplane (stage T5, C6; PLAN.md §4.3): replays
+    // the backplane plane's display chunks, clipped to `covered` (window
+    // logical units), over `image`, which covers `region` and already
+    // holds the base, through a framebuffer of the window's renderer, with
+    // the saves, translations and clips the window paint uses. False,
+    // leaving `image` as it was, without a renderer that makes a
+    // framebuffer of the region's exact extent.
+    [[nodiscard]] bool replay_backplane(Rect covered, const BackplaneRegion& region, const PartRasterView& image);
+    void replay_backplane_subtree(const Control::Ptr& control, Rect clip, Painter& painter) const;
     struct EngineDamage final {
         std::uint64_t parts{};
         double area{};
@@ -1203,6 +1221,11 @@ private:
     PresentationSettings presentation_settings_{};
     TextMetricsProvider* text_metrics_provider_{};
     Painter* framebuffer_painter_{};
+    // The backplane replay's framebuffer (C6), made from the framebuffer
+    // painter and reused while the region's extent and scale stay the
+    // same; released when the painter changes.
+    std::unique_ptr<PaintFramebuffer> backplane_framebuffer_{};
+    double backplane_framebuffer_scale_{};
     Event<const PresentationSettings&> presentation_changed_;
     std::shared_ptr<const Theme> theme_;
     Event<const Theme&> theme_changed_;
@@ -1425,12 +1448,21 @@ private:
     bool non_opaque_declared_{};
     CompositorState compositor_state_{};
     WindowBackdropRequest backdrop_request_{};
+    // Whether backdrop_request_ is the application's (request_backdrop)
+    // rather than the theme's.
+    bool application_backdrop_request_{};
     WindowBackdropGrant backdrop_grant_{};
     Event<const WindowBackdropGrant&> backdrop_changed_;
     // Resolves the grant from the request, the compositor state, the
     // declaration and the presentation settings, applies a changed backdrop
     // through the host services, and raises backdrop_changed when it changed.
     void refresh_backdrop();
+    // The material the window's backplane is drawn from (PLAN.md §4.1), by
+    // the presentation and the engine's backplane image alike: the theme's
+    // base for the granted backdrop when it has one, else the window
+    // recipe's material for `context`. Borrowed from theme_, valid until
+    // the theme is replaced.
+    [[nodiscard]] const SurfaceMaterial& backplane_base(const ControlVisualContext& context) const noexcept;
     // The keyboard commands' keys, shared with the application's other
     // windows (see key_map); never null.
     std::shared_ptr<KeyBindings> key_bindings_{std::make_shared<KeyBindings>()};

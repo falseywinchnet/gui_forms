@@ -1,4 +1,4 @@
-// Stage T5, phase C2's measurement (planning/stages/T5-compositor/PLAN.md
+// Stage T5, phase C2's measurement (notes:planning/stages/T5-compositor/PLAN.md
 // §1.1 and §5 C2): what the Desktop Window Manager composes from a window
 // whose client area is a premultiplied 32-bit DIB, through each documented
 // route, with the native caption kept. Nothing of GUI.Forms is used: the

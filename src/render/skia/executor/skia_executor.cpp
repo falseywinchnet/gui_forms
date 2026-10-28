@@ -305,8 +305,11 @@ std::vector<SkScalar> preset_dash_pattern(DashStyle style, SkScalar width) {
     return {};
 }
 
-void configure_pen(SkPaint& paint, const PenSnapshot& pen,
-                   const GraphicsState& state) {
+// Configures paint to stroke with pen. False when stx_skia refuses the pen's
+// dash pattern (an entry that overflows float, for example); the command must
+// then fail rather than draw a solid line.
+[[nodiscard]] bool configure_pen(SkPaint& paint, const PenSnapshot& pen,
+                                 const GraphicsState& state) {
     configure_paint(paint, state);
     paint.setColor(to_sk_color(pen.color));
     paint.setStyle(SkPaint::kStroke_Style);
@@ -321,9 +324,12 @@ void configure_pen(SkPaint& paint, const PenSnapshot& pen,
         pattern = preset_dash_pattern(pen.dash_style, static_cast<SkScalar>(pen.width));
     }
     if (pattern.size() >= 2U && pattern.size() % 2U == 0U) {
-        paint.setPathEffect(SkDashPathEffect::Make(
-            SkSpan<const SkScalar>(pattern.data(), pattern.size()), 0.0F));
+        SkDashPathEffectResult made = SkDashPathEffect::Make(
+            SkSpan<const SkScalar>(pattern.data(), pattern.size()), 0.0F);
+        if (made.rejection != SkDashRejection::kNone) return false;
+        paint.setPathEffect(std::move(made.effect));
     }
+    return true;
 }
 
 [[nodiscard]] SkTileMode tile_mode(WrapMode mode) noexcept {
@@ -349,13 +355,16 @@ void configure_pen(SkPaint& paint, const PenSnapshot& pen,
         : mode == WrapMode::clamp ? SkTileMode::kClamp : SkTileMode::kRepeat;
 }
 
-void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
-                     const GraphicsState& state) {
+// Configures paint to fill with brush. False when stx_skia refuses the brush's
+// gradient (its geometry overflows float, for example); paint is then unusable
+// and the command must fail rather than fill with the paint's plain color.
+[[nodiscard]] bool configure_brush(SkPaint& paint, const BrushSnapshot& brush,
+                                   const GraphicsState& state) {
     configure_paint(paint, state);
     paint.setStyle(SkPaint::kFill_Style);
     if (brush.kind == BrushKind::solid) {
         paint.setColor(to_sk_color(brush.primary));
-        return;
+        return true;
     }
     if (brush.kind == BrushKind::hatch) {
         constexpr int extent = 8;
@@ -399,12 +408,12 @@ void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
                 SkTileMode::kRepeat, SkTileMode::kRepeat,
                 SkSamplingOptions(SkFilterMode::kNearest)));
         }
-        return;
+        return true;
     }
     if (brush.kind == BrushKind::texture) {
         if (!brush.image.has_pixels()) {
             paint.setColor(SK_ColorTRANSPARENT);
-            return;
+            return true;
         }
         const SkImageInfo info = image_info(
             brush.image.width, brush.image.height, brush.image.pixel_format);
@@ -414,14 +423,14 @@ void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
             info, std::move(data), brush.image.row_bytes());
         if (!image) {
             paint.setColor(SK_ColorTRANSPARENT);
-            return;
+            return true;
         }
         const SkMatrix local = to_sk_matrix(brush.transform);
         paint.setShader((*image).makeShader(
             texture_tile_mode_x(brush.wrap_mode),
             texture_tile_mode_y(brush.wrap_mode),
             sampling_for(state), local));
-        return;
+        return true;
     }
 
     std::vector<SkColor4f> colors;
@@ -436,7 +445,7 @@ void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
     }
     if (colors.size() < 2U || colors.size() != positions.size()) {
         paint.setColor(to_sk_color(brush.primary));
-        return;
+        return true;
     }
     const SkGradient::Colors gradient_colors(
         SkSpan<const SkColor4f>(colors.data(), colors.size()),
@@ -456,8 +465,10 @@ void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
             {static_cast<SkScalar>(center.x + std::cos(radians) * half_length),
              static_cast<SkScalar>(center.y + std::sin(radians) * half_length)},
         };
-        paint.setShader(SkShaders::LinearGradient(points, gradient));
-        return;
+        SkGradientShaderResult made = SkShaders::LinearGradient(points, gradient);
+        if (made.rejection != SkGradientRejection::kNone) return false;
+        paint.setShader(std::move(made.shader));
+        return true;
     }
     double radius{};
     for (const PointF point : brush.points) {
@@ -466,12 +477,15 @@ void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
     }
     if (radius <= 0.0) {
         paint.setColor(to_sk_color(brush.primary));
-        return;
+        return true;
     }
-    paint.setShader(SkShaders::RadialGradient(
+    SkGradientShaderResult made = SkShaders::RadialGradient(
         {static_cast<SkScalar>(brush.center.x),
          static_cast<SkScalar>(brush.center.y)},
-        static_cast<SkScalar>(radius), gradient));
+        static_cast<SkScalar>(radius), gradient);
+    if (made.rejection != SkGradientRejection::kNone) return false;
+    paint.setShader(std::move(made.shader));
+    return true;
 }
 
 class BitmapUnlock final {
@@ -977,15 +991,21 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 (*canvas).clear(to_sk_color(command.color));
                 break;
             case CommandKind::fill_rectangle:
-                configure_brush(paint, command.brush, command.state);
+                if (!configure_brush(paint, command.brush, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawRect(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::draw_rectangle:
-                configure_pen(paint, command.pen, command.state);
+                if (!configure_pen(paint, command.pen, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawRect(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::draw_line:
-                configure_pen(paint, command.pen, command.state);
+                if (!configure_pen(paint, command.pen, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawLine(static_cast<SkScalar>(command.first.x),
                                  static_cast<SkScalar>(command.first.y),
                                  static_cast<SkScalar>(command.second.x),
@@ -995,11 +1015,15 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 (*impl_).draw_text(command, text_target);
                 break;
             case CommandKind::draw_ellipse:
-                configure_pen(paint, command.pen, command.state);
+                if (!configure_pen(paint, command.pen, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawOval(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::fill_ellipse:
-                configure_brush(paint, command.brush, command.state);
+                if (!configure_brush(paint, command.brush, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawOval(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::fill_polygon: {
@@ -1012,16 +1036,22 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                                    static_cast<SkScalar>(command.points[index].y));
                 }
                 builder.close();
-                configure_brush(paint, command.brush, command.state);
+                if (!configure_brush(paint, command.brush, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawPath(builder.detach(), paint);
                 break;
             }
             case CommandKind::draw_path:
-                configure_pen(paint, command.pen, command.state);
+                if (!configure_pen(paint, command.pen, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawPath(to_sk_path(command.path), paint);
                 break;
             case CommandKind::fill_path:
-                configure_brush(paint, command.brush, command.state);
+                if (!configure_brush(paint, command.brush, command.state)) {
+                    return {RasterError::invalid_argument, executed};
+                }
                 (*canvas).drawPath(to_sk_path(command.path), paint);
                 break;
             case CommandKind::draw_image: {

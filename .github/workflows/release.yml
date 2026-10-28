@@ -64,8 +64,16 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       publish: ${{ steps.version.outputs.publish }}
       matrix: ${{ steps.platforms.outputs.matrix }}
+    # gui_forms at gui_forms/ with template_harness beside it: the packaging
+    # tools import the harness's (tools/harness_link.py).
+    defaults:
+      run:
+        working-directory: gui_forms
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: gui_forms
+      - uses: ./gui_forms/.github/actions/harness-checkout
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -73,7 +81,9 @@ jobs:
         run: |
           python3 -B -m unittest discover -s tools -p test_publication_version.py
           python3 -B -m unittest discover -s tools -p test_package_programs.py
-          python3 -B -m unittest discover -s tools -p test_prune_cache_releases.py
+          python3 -B -m unittest discover -s tools -p test_package_sdk.py
+          python3 -B -m unittest discover -s tools -p test_build_sdk.py
+          python3 -B -m unittest discover -s ../template_harness/harness -p test_prune_cache_releases.py
           python3 -B -m unittest discover -s tools -p test_release_tests.py
       - name: Select one tested publication version
         id: version
@@ -131,6 +141,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: gui_forms
+      # template_harness beside gui_forms, at the commit gui_forms/harness.lock
+      # pins; the gui_forms/tools paths below forward to it
+      # (docs/building/template-harness.md).
+      - uses: ./gui_forms/.github/actions/harness-checkout
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -171,8 +185,8 @@ jobs:
         if: runner.os == 'Linux'
         with:
           path: ${{ runner.temp }}/apt-archives
-          key: linux-debs-v1-programs-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-${{ steps.linux-image.outputs.image }}
-          restore-keys: linux-debs-v1-programs-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-
+          key: linux-debs-v1-programs-${{ runner.arch }}-${{ hashFiles('template_harness/harness/install_linux_ci_packages.sh', 'template_harness/projects/gui_forms.toml') }}-${{ steps.linux-image.outputs.image }}
+          restore-keys: linux-debs-v1-programs-${{ runner.arch }}-${{ hashFiles('template_harness/harness/install_linux_ci_packages.sh', 'template_harness/projects/gui_forms.toml') }}-
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: sh gui_forms/tools/install_linux_ci_packages.sh programs "$RUNNER_TEMP/apt-archives"
@@ -199,7 +213,7 @@ jobs:
         if: runner.os == 'macOS'
         with:
           path: .build/toolchain/llvm-22.1.8-macos14
-          key: gui-runtimes-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/tools/build_macos_runtimes.py', 'gui_forms/tools/macos_runtime_manifest.py') }}
+          key: gui-runtimes-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('template_harness/harness/build_macos_runtimes.py', 'template_harness/harness/macos_runtime_manifest.py') }}
       - name: Build minimum-compatible macOS runtimes
         if: runner.os == 'macOS'
         run: |
@@ -240,12 +254,10 @@ jobs:
         id: dependencies
         with:
           path: |
-            gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
             gui_forms/third_party/libunibreak
             .build/native-${{ matrix.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
-            .build/native-${{ matrix.platform }}/skia
           key: gui-deps-v3-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn', 'gui_forms/cmake/Audio.cmake') }}
       # Called from native.yml: this run's native job for the platform compiled
       # the toolkit and tests of this very tree and archived its .ccache (or,
@@ -266,23 +278,14 @@ jobs:
           tar -xzf .ci/native-cache/gui-forms-cache-${{ matrix.platform }}.tar.gz -O cache-manifest.json > .ci/native-manifest.json
           rm -rf .ci/native-cache
       # --- build, as tools/ci_build.py configures it, plus the programs ------------
-      - name: Fetch pinned text sources and build the CPU renderer
+      # The CPU renderer, stx_skia/, is part of the tree and builds with it.
+      - name: Fetch pinned text sources
         run: |
           sh gui_forms/third_party/fetch_text_stack.sh
           sh gui_forms/third_party/fetch_linebreak.sh
-          if [ "$RUNNER_OS" != Windows ]; then
-            if [ "$RUNNER_OS" = Linux ]; then export GUI_FORMS_SYSTEM_BUILD_TOOLS=1; fi
-            sh gui_forms/third_party/fetch_skia_cpu.sh
-            if [ "$RUNNER_OS" = Linux ]; then
-              BUILD_JOBS=4 sh gui_forms/third_party/build_skia_cpu_linux.sh "$PWD/.build/native-${{ matrix.platform }}/skia"
-            else
-              BUILD_JOBS=4 sh gui_forms/third_party/build_skia_cpu.sh "$PWD/.build/native-${{ matrix.platform }}/skia"
-            fi
-          fi
       - name: Configure the programs
         run: |
-          renderer="-DGUI_FORMS_ENABLE_SKIA=ON -DGUI_FORMS_SKIA_PREBUILT=ON -DGUI_FORMS_SKIA_OUT=$PWD/.build/native-${{ matrix.platform }}/skia"
-          if [ "$RUNNER_OS" = Windows ]; then renderer="-DGUI_FORMS_ENABLE_SKIA=OFF"; fi
+          renderer="-DGUI_FORMS_ENABLE_SKIA=ON"
           miniaudio="$BUILD_DIR/_deps/gui_forms_miniaudio-src"
           if [ -f "$miniaudio/miniaudio.h" ]; then renderer="$renderer -DFETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO=$PWD/$miniaudio"; fi
           cmake -S gui_forms -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib \
@@ -308,15 +311,13 @@ jobs:
         if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.compile.outcome == 'success' && steps.dependencies.outputs.cache-hit != 'true'
         with:
           path: |
-            gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
             gui_forms/third_party/libunibreak
             .build/native-${{ matrix.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
-            .build/native-${{ matrix.platform }}/skia
           key: ${{ steps.dependencies.outputs.cache-primary-key }}
       # The saved cache is this build's working set, not every generation up
-      # to CCACHE_MAXSIZE (planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1).
+      # to CCACHE_MAXSIZE (notes:planning/BUILD_SIZE_PLAN_2026-10-23.md, step 1).
       # The programs build compiles everything, so the set is complete.
       - name: Keep only the compiler cache entries this build used
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.objects.outputs.cache-hit != 'true'
@@ -384,6 +385,18 @@ jobs:
           else
             python gui_forms/tools/smoke_package.py --platform "${{ matrix.platform }}" --dist dist --build-dir "$BUILD_DIR" --install
           fi
+      # The source SDK is platform-neutral, so one leg writes it: this tested
+      # commit's tree plus the pinned sources the build above configured from.
+      # In the push to main that runs the native jobs, each of them has
+      # published its platform's build-<sha> compiler cache before the release
+      # this SDK joins, so the manifest names that release (--compiler-cache).
+      - name: Package the source SDK
+        if: matrix.platform == 'linux-x64'
+        env:
+          COMPILER_CACHE: ${{ inputs.from_native && github.event_name == 'push' && github.ref == 'refs/heads/main' && '--compiler-cache' || '' }}
+        run: |
+          python gui_forms/tools/package_sdk.py --version "$RELEASE_VERSION" --revision "${{ github.sha }}" --out dist \
+            --checkout "miniaudio=$BUILD_DIR/_deps/gui_forms_miniaudio-src" --fetch-missing $COMPILER_CACHE
       - uses: actions/upload-artifact@v4
         with:
           name: gui-forms-programs-${{ matrix.platform }}
@@ -434,7 +447,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: gui_forms
+      - uses: ./gui_forms/.github/actions/harness-checkout
       - name: Report prunable compiler-cache pre-releases
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 tools/prune_cache_releases.py --repo "${{ github.repository }}"
+        run: python3 template_harness/harness/prune_cache_releases.py --repo "${{ github.repository }}"

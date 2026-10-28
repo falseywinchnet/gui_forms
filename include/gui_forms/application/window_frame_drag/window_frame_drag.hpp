@@ -21,7 +21,7 @@ enum class WindowFrameDragMode : std::uint8_t {
 
 [[nodiscard]] const char* window_frame_drag_mode_name(WindowFrameDragMode mode) noexcept;
 
-// What a drag achieved, for the per-host measurement (results/).
+// What a drag achieved, for the per-host measurement (notes:results/).
 // Timestamps are the caller's monotonic clock, in nanoseconds.
 struct WindowFrameDragStatistics final {
     std::uint64_t pointer_moves{};

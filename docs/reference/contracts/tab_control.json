@@ -112,10 +112,6 @@
       "reviewed": false,
       "summary": "Records the tab frame, all headers, selected/focused cues, captions, and current appearance."
     },
-    "gui_forms::TabControl::on_pointer|void (PointerEvent &)": {
-      "reviewed": false,
-      "summary": "Tracks primary-pointer engagement and selects the released header only when the gesture remains qualified."
-    },
     "gui_forms::TabControl::on_key_preview|void (KeyEvent &)": {
       "reviewed": false,
       "summary": "Handles Control-Tab traversal and orientation-aware arrow selection before descendant dispatch."

@@ -531,8 +531,9 @@ std::shared_ptr<const PartRaster> EnginePartTable::held_backplane(const Backplan
 
 void EnginePartTable::hold_backplane(const BackplaneRegion& region, const std::uint64_t generation,
                                      const std::shared_ptr<const PartRaster>& image, const std::uint64_t skipped,
-                                     const std::uint64_t paint_sequence) {
+                                     const bool replayed, const std::uint64_t paint_sequence) {
     statistics_.backplane_bakes = statistics_.backplane_bakes + 1U;
+    if (replayed) statistics_.backplane_replays = statistics_.backplane_replays + 1U;
     statistics_.backplane_skipped_commands = statistics_.backplane_skipped_commands + skipped;
     if (generation != backplane_generation_) {
         clear_backplanes();

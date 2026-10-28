@@ -259,7 +259,7 @@ void released_after_shutdown_mid_drag() {
     window.shutdown_dispatcher();
     window.release_pointer();
     require((*(*fixture).site).drag_phase() != DockDragPhase::dragging && (*fixture).outcomes.size() == 1U &&
-                (*fixture).outcomes[0].end == DockDragEnd::capture_lost,
+                (*fixture).outcomes[0].end() == DockDragEnd::capture_lost,
             "a release after shutdown ends the drag at once as capture lost");
 }
 

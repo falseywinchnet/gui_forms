@@ -1,4 +1,4 @@
-// Stage T5, phase C2's gate (planning/stages/T5-compositor/PLAN.md §5 C2):
+// Stage T5, phase C2's gate (notes:planning/stages/T5-compositor/PLAN.md §5 C2):
 // a GUI.Forms window on the Windows host, declared non-opaque, through each
 // grant its machine allows, read off the composed screen.
 //
@@ -328,6 +328,11 @@ void read_step(GateContext& gate) {
         break;
     case WindowBackdrop::opaque:
         if (green) fail(gate, "an opaque window shows nothing behind it");
+        break;
+    default:
+        // Every WindowBackdrop is listed above. A value outside them is no
+        // grant the window gives, so there is no screen reading to judge; the
+        // step checks below still compare the grant with the step.
         break;
     }
     if (gate.step == GateStep::material) {

@@ -1,3 +1,0 @@
-implementation,workload,bytes,level,compressed,median_mib_s,min_mib_s,max_mib_s,work_units
-owned,entropy,262144,6,262190,43.998,34.845,46.508,3639613
-upstream,entropy,262144,6,262230,47.532,40.234,50.921,0

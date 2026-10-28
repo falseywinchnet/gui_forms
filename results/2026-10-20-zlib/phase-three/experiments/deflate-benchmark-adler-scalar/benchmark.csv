@@ -1,3 +1,0 @@
-implementation,workload,bytes,level,compressed,median_mib_s,min_mib_s,max_mib_s,work_units,paired_owned_speed_ratio
-owned,zero,262144,0,262190,2560.478,1920.648,3134.694,1245266,0.902
-upstream,zero,262144,0,262175,2798.059,2147.909,3360.874,0,0.902

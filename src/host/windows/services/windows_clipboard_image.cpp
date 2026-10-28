@@ -53,26 +53,25 @@ private:
 };
 }
 HostClipboardImageResult read_windows_clipboard_image(HWND owner) {
-    HostClipboardImageResult result;
     const UINT exact = raw_format();
     const ClipboardLease lease(owner);
-    if (!lease.opened() || exact == 0U) { result.status.error = HostServiceError::backend_failure; return result; }
-    result.generation = GetClipboardSequenceNumber();
+    if (!lease.opened() || exact == 0U) return HostClipboardImageResult::failed(HostServiceError::backend_failure);
+    const std::uint64_t generation = GetClipboardSequenceNumber();
     const UINT format = IsClipboardFormatAvailable(exact) ? exact :
         IsClipboardFormatAvailable(CF_DIBV5) ? CF_DIBV5 :
         IsClipboardFormatAvailable(CF_DIB) ? CF_DIB : 0U;
-    if (format == 0U) return result;
+    if (format == 0U) return HostClipboardImageResult::nothing_read(generation);
     HANDLE memory = GetClipboardData(format);
     const SIZE_T size = memory == nullptr ? 0U : GlobalSize(memory);
     const GlobalRead locked(memory);
-    if (locked.data() == nullptr || size == 0U) { result.status.error = HostServiceError::backend_failure; return result; }
-    if (size > HostImage::maximum_bytes + 4096U) { result.status.error = HostServiceError::too_large; return result; }
+    if (locked.data() == nullptr || size == 0U) {
+        return HostClipboardImageResult::failed(HostServiceError::backend_failure);
+    }
+    if (size > HostImage::maximum_bytes + 4096U) return HostClipboardImageResult::failed(HostServiceError::too_large);
     const std::span<const std::byte> bytes(static_cast<const std::byte*>(locked.data()), size);
-    const std::uint64_t generation = result.generation;
-    result = format == exact ? gui_forms::detail::decode_clipboard_image(bytes, true) :
-                              gui_forms::detail::decode_clipboard_dib(bytes);
-    result.generation = generation;
-    return result;
+    // A global allocation may be rounded up past the private format's pixels.
+    if (format == exact) return gui_forms::detail::decode_clipboard_image(bytes, generation, true);
+    return gui_forms::detail::decode_clipboard_dib(bytes, generation);
 }
 HostServiceStatus write_windows_clipboard_image(HWND owner, HostImageView image) {
     const UINT exact = raw_format();

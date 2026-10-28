@@ -76,27 +76,22 @@ cmake -S . -B build -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$PWD/sdk"
 ```
 
-Linux (build Skia with the system GN and Ninja first):
+Linux:
 
 ```sh
-export GUI_FORMS_SYSTEM_BUILD_TOOLS=1
-sh third_party/fetch_skia_cpu.sh
-sh third_party/build_skia_cpu_linux.sh "$PWD/build-skia-linux"
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake \
     -DCMAKE_INSTALL_PREFIX="$PWD/sdk" \
-    -DGUI_FORMS_ENABLE_LINUX_HOST=ON \
-    -DGUI_FORMS_SKIA_PREBUILT=ON \
-    -DGUI_FORMS_SKIA_OUT="$PWD/build-skia-linux"
+    -DGUI_FORMS_ENABLE_LINUX_HOST=ON
 ```
 
-Windows (in MSYS2 CLANG64, using the DIB renderer):
+Windows (in MSYS2 CLANG64):
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake \
     -DCMAKE_INSTALL_PREFIX="$PWD/sdk" \
-    -DGUI_FORMS_ENABLE_SKIA=OFF -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON
+    -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON
 ```
 
 Build, test and install the selected configuration:
@@ -107,9 +102,8 @@ ctest --test-dir build --output-on-failure
 cmake --install build
 ```
 
-On macOS the first build fetches and builds the private CPU-only Skia;
-configure does not build it. HarfBuzz and FreeType come from the explicit text
-fetch above. SheenBidi is vendored; libunibreak is needed only for the optional
+The CPU renderer, `stx_skia/`, builds with the tree. HarfBuzz and FreeType
+come from the explicit text fetch above. SheenBidi is vendored; libunibreak is needed only for the optional
 development text-mask profile. Linux native tests need an X11 display;
 use `xvfb-run -a ctest --test-dir build --output-on-failure` on a headless runner.
 
@@ -130,6 +124,180 @@ consumer built with different settings is not binary compatible.
 
 Nothing from Skia, AppKit, Win32 or X11 appears in the installed headers;
 those remain private adapters inside the `Application` library.
+
+### Package components
+
+`find_package(GUIForms CONFIG REQUIRED COMPONENTS ...)` accepts these
+components. A component the prefix lacks fails at configure time with a
+message saying which build provides it.
+
+| Component | Target | Installed when |
+|---|---|---|
+| `Core`, `Controls`, `Drawing`, `Threading` | `GUIForms::Core`, `::Controls`, `::Drawing`, `::Threading` | Always |
+| `Application` | `GUIForms::Application` | A native host is enabled |
+| `Audio` | `GUIForms::Audio` | `GUI_FORMS_BUILD_AUDIO` (on in CI and in `build_sdk.py`) |
+| `TextMasks` | `GUIForms::TextMasks` | `GUI_FORMS_BUILD_TEXT_MASKS` with a native host (`build_sdk.py --features all`) |
+| `AudioLoopTransport` | `GUIForms::AudioLoopTransport` | `GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT` with audio (`build_sdk.py --features all`) |
+| `FreeType`, `HarfBuzz` | `GUIForms::FreeType`, `GUIForms::HarfBuzz` | `GUI_FORMS_INSTALL_TEXT_STACK` with the text engine (`build_sdk.py --features all`) |
+
+`TextMasks` is an interface on `Application`, which already contains the
+text-mask service. Link it beside `Application`, never beside `Core`; see
+[Consume the SDK](consume-the-sdk). It installs `gui_forms/text_mask.hpp`
+and `gui_forms/text_mask/`. It also installs the prepared-text types, layout
+and service headers that the text-mask API includes for its vocabulary;
+the prepared-text service itself is not installed.
+
+`AudioLoopTransport` names an `Audio` library built with the loop transport.
+That `Audio` carries the `GUI_FORMS_AUDIO_LOOP_TRANSPORT` definition, which
+`audio.hpp` needs to declare the transport, and installs
+`gui_forms/audio/loop_transport/`.
+
+```cmake
+find_package(GUIForms 0.2 CONFIG REQUIRED COMPONENTS Application TextMasks Audio AudioLoopTransport)
+target_link_libraries(my_app PRIVATE GUIForms::Application GUIForms::TextMasks GUIForms::AudioLoopTransport)
+```
+
+`FreeType` and `HarfBuzz` are the pinned FreeType 2.14.2 and HarfBuzz 14.6.0
+that GUI.Forms' text engine links, for a product that calls them directly.
+They install as the static libraries GUI.Forms builds, with its options:
+FreeType without zlib, so it refuses gzip-compressed fonts, and HarfBuzz with
+its FreeType functions (`hb-ft.h`). Their headers keep the upstream layouts,
+`include/freetype2/` and `include/harfbuzz/`, and each target puts its
+directory on the include path, so `#include <ft2build.h>` and
+`#include <hb.h>` work. `GUIForms::HarfBuzz` links `GUIForms::FreeType`.
+GUI.Forms' own libraries hold their own copies, so pass no FreeType or
+HarfBuzz object between them and your code. The licences are
+`FreeType-FTL.txt` and `HarfBuzz-COPYING.txt` in `share/licenses/GUIForms/`.
+FreeType's licence asks a product that ships it to credit it in its
+documentation; `THIRD_PARTY_NOTICES.md` there carries the credit.
+
+```cmake
+find_package(GUIForms 0.2 CONFIG REQUIRED COMPONENTS FreeType HarfBuzz)
+target_link_libraries(my_compositor PRIVATE GUIForms::HarfBuzz GUIForms::FreeType)
+```
+
+## The source SDK
+
+Each tested release publishes one platform-neutral source SDK,
+`gui-forms-sdk-<version>-source.tar.gz`, listed in its `SHA256SUMS.txt`. It
+holds one directory, `gui-forms-sdk-<version>/`, containing:
+
+- the release commit's tree, as `git archive` writes it;
+- the pinned third-party sources the build would otherwise fetch, each at
+  the path its fetch script or CMake file reads first, so configuring from
+  the archive fetches none of them:
+
+  | Path | Source | Pinned in |
+  |---|---|---|
+  | `third_party/harfbuzz/` | HarfBuzz (without its `test/` and `perf/` data, which no GUI.Forms build reads) | `third_party/fetch_text_stack.sh` |
+  | `third_party/freetype/` | FreeType | `third_party/fetch_text_stack.sh` |
+  | `third_party/libunibreak/` | libunibreak | `third_party/fetch_linebreak.sh` |
+  | `third_party/miniaudio/` | miniaudio | `cmake/Audio.cmake` |
+
+- `SDK_MANIFEST.json`, which names the build entry point (`"build":
+  "tools/build_sdk.py"`) and the top directory. It also gives each vendored
+  source's path, upstream, pinned commit and tree digest, and lists what a
+  build still downloads (`network_inputs`) or needs installed
+  (`prebuilt_inputs`). Its `revision` is the release commit, and
+  `compiler_cache` names that commit's compiler-cache pre-release (see
+  [Build with CI's compiler cache](#build-with-cis-compiler-cache)).
+
+The archive carries no Git metadata and no build output. Build and install
+GUI.Forms for your host from it:
+
+```sh
+tar -xzf gui-forms-sdk-<version>-source.tar.gz
+cd gui-forms-sdk-<version>
+python3 tools/build_sdk.py --target <platform> --prefix "$HOME/gui-forms-sdk"
+```
+
+`<platform>` is one of `macos-arm64`, `windows-x64`, `linux-x64` and
+`linux-arm64`. Only the platform of the machine running the build is
+accepted until per-target cross-compile toolchains exist.
+
+`build_sdk.py` runs the target's own preparation (the pinned text sources,
+unless the source SDK archive already holds them). It then configures the toolkit with
+the options CI uses, minus the tests and the demonstration programs, builds
+it with `--jobs` jobs in `--work` (default `.build/sdk-<platform>`), and
+installs it into `--prefix`. The [Prerequisites](#prerequisites) still apply,
+including `GUI_FORMS_LLVM_RUNTIME` on macOS. Consume the installed prefix
+as in [Verify the installation](#verify-the-installation).
+
+`--features` chooses which optional components are built:
+
+`default`
+: The components CI builds and tests: `Core`, `Controls`, `Drawing`,
+  `Threading`, the host's `Application` with the HarfBuzz/FreeType text
+  engine, and `Audio` with the stx Vorbis decoder.
+
+`all`
+: The default set, plus every optional component a product may link:
+  `TextMasks` (`GUI_FORMS_BUILD_TEXT_MASKS`), `AudioLoopTransport`
+  (`GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT`), and `FreeType` and `HarfBuzz`
+  (`GUI_FORMS_INSTALL_TEXT_STACK`). One such install serves every
+  product; template_harness's lockstep build uses it.
+
+The prepared-text service (`GUI_FORMS_BUILD_PREPARED_TEXT`) is in neither
+set. It cannot be installed, and it changes `Application`'s declarations for
+every consumer. The probes, benchmarks, fuzzers and diagnostics build
+programs or change behaviour rather than adding a component, so they are left
+out as well.
+
+### What a source build still downloads
+
+| Input | Platforms | From |
+|---|---|---|
+| The LLVM 22.1.8 source tarball, digest pinned in `tools/macos_runtime_manifest.py` | macOS, once | github.com/llvm/llvm-project releases, by `tools/build_macos_runtimes.py`, to build the macOS 14 runtime |
+
+The CPU renderer, `stx_skia/`, is part of the source tree, so nothing is
+downloaded for it. On every platform the toolchain itself (LLVM 22.1, CMake,
+Ninja, Git and Python) is installed as in [Prerequisites](#prerequisites),
+not shipped.
+
+A fully offline build therefore needs only the installed toolchain, and on
+macOS an already built `GUI_FORMS_LLVM_RUNTIME` prefix.
+
+### Build with CI's compiler cache
+
+CI compiles every tested commit, and each platform's native job of the push
+to main publishes its ccache directory in the commit's compiler-cache
+pre-release, `build-<commit>`, as `gui-forms-cache-<platform>.tar.gz`
+(`.ccache/` and `cache-manifest.json`). It does so as soon as that platform
+passes, and the release that carries the source SDK is published only after
+all four have passed. `SDK_MANIFEST.json` records it:
+
+```json
+"compiler_cache": {
+  "release": "build-<revision>",
+  "asset": "gui-forms-cache-{platform}.tar.gz",
+  "platforms": ["macos-arm64", "windows-x64", "linux-x64", "linux-arm64"],
+  "layout": {"ccache_basedir": "the workspace", "source": "gui_forms",
+             "work": ".build/native-{platform}", "note": "..."}
+}
+```
+
+`release` is `null` when the SDK was packaged outside that push (a tag
+build), which cannot promise the caches. A build from the SDK hits the cache
+only in CI's layout, with the same LLVM 22.1.8 toolchain:
+
+- the SDK's top directory unpacked as `<workspace>/gui_forms`;
+- the cache archive extracted into `<workspace>` (it creates `.ccache/`);
+- `CCACHE_DIR=<workspace>/.ccache`, `CCACHE_BASEDIR=<workspace>`,
+  `CCACHE_COMPILERCHECK=content`, and `ccache` as the compiler launcher
+  (`CMAKE_C_COMPILER_LAUNCHER` and `CMAKE_CXX_COMPILER_LAUNCHER`);
+- `python3 gui_forms/tools/build_sdk.py --target <platform> --prefix <dir>
+  --work <workspace>/.build/native-<platform>`, which compiles in
+  `.build/native-<platform>/gui-forms`,
+  as CI does;
+- the toolchain's own headers at CI's paths, since they lie outside the
+  workspace and their absolute paths are hashed: Homebrew's `llvm@22` on
+  macOS, `/usr/lib/llvm-22` on Linux, and on Windows the CLANG64 toolchain
+  extracted at `D:\a\_temp\msys64`, where CI's runners restore it.
+
+The cache only accelerates: the source stays authoritative, and a missing
+archive, a wrong digest or another layout just means compiling more, with
+the same result. Check the archive against the digest GitHub lists for the
+asset before extracting it.
 
 ## Verify the installation
 

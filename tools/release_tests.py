@@ -14,7 +14,7 @@ installs and launches what it packaged: the version enters only the
 package metadata, so the tested binaries are the ones packaged.
 
 `merged` does the same for a push to main that merges a pull request
-(the owner's choice of 2026-10-23, planning/BUILD_SIZE_PLAN_2026-10-23.md).
+(the owner's choice of 2026-10-23, notes:planning/BUILD_SIZE_PLAN_2026-10-23.md).
 Through the merge queue, main's new commit is the one its merge group's
 native.yml run tested, so that run is taken first. Merged without the
 queue, a pull request is up to date with main, so the merge commit's

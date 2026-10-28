@@ -1,4 +1,4 @@
-// E9.6, filters and blend (planning/stages/T2-engine-core/CSS_COVERAGE.md,
+// E9.6, filters and blend (notes:planning/stages/T2-engine-core/CSS_COVERAGE.md,
 // rows 6 to 8): the colour matrix and its CSS factories, the material's
 // part filters (the colour filter, the drop shadow and the blur), glass's
 // recipe colour filter on its backdrop, fill blend modes, and the rule
@@ -248,6 +248,14 @@ void drop_shadows() {
     const std::array<std::uint8_t, 4> below = drawn.pixel(20U, 26U);
     require(below[3] > 0U && below[0] == 0U, "the shadow shows below the part, in its colour");
     require(drawn.pixel(4U, 4U)[3] == 0U, "the shadow does not reach above and left of the part");
+    // A negative offset moves the shadow above and left of the part, and none
+    // of it is left below and right.
+    SurfaceMaterial raised = lifted;
+    raised.drop_shadow = MaterialDropShadow{Point{-3.0, -3.0}, 2.0, Color{0, 0, 0, 128}};
+    const TestRaster up = draw(raised, logical, 1.0);
+    require(up.pixel(6U, 6U)[3] > 0U && up.pixel(6U, 6U)[0] == 0U,
+            "a negative offset shows the shadow above and left of the part");
+    require(up.pixel(36U, 28U)[3] == 0U, "a negative offset leaves no shadow below and right of the part");
     const bool first = next_matches(drawn, "drop_shadow_1");
     const bool second = next_matches(draw(lifted, logical, 2.0), "drop_shadow_2");
     require(first && second, "the drop shadows match their references");
@@ -295,10 +303,10 @@ void glass_recipe() {
     const EnginePrimitive& glass = primitive_named("glass");
     const PrimitiveDescriptor& descriptor = glass.descriptor();
     PrimitiveParameterBlock parameters = default_parameters(descriptor);
-    require(!glass.theme_material(parameters).has_value(), "by default glass reads no recipe");
+    require(!glass.theme_material(parameters, ControlVisualRole::button).has_value(), "by default glass reads no recipe");
     require(set_choice_parameter(parameters, descriptor, "recipe", "button") == ParameterAssignment::assigned,
             "a recipe is a choice");
-    const std::optional<ControlVisualRole> role = glass.theme_material(parameters);
+    const std::optional<ControlVisualRole> role = glass.theme_material(parameters, ControlVisualRole::button);
     require(role.has_value() && *role == ControlVisualRole::button, "the choice names the recipe's role");
     parameters.values[1].colour = Color::rgba(0, 0, 0, 0);
 

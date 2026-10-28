@@ -17,7 +17,7 @@ Types
    * - :cpp:class:`DisplayByteOffset <gui_forms::DisplayByteOffset>`
      -  
    * - :cpp:class:`DisplayMappingResult <gui_forms::DisplayMappingResult>`
-     -  
+     - A source position mapped to the display.
    * - :cpp:class:`DocumentMapSpan <gui_forms::DocumentMapSpan>`
      -  
    * - :cpp:class:`DocumentPage <gui_forms::DocumentPage>`
@@ -25,7 +25,7 @@ Types
    * - :cpp:class:`DocumentPageRequest <gui_forms::DocumentPageRequest>`
      -  
    * - :cpp:class:`DocumentRequestResult <gui_forms::DocumentRequestResult>`
-     -  
+     - A page request's result: the request the document side fulfils, or why there is none.
    * - :cpp:class:`DocumentRevision <gui_forms::DocumentRevision>`
      -  
    * - :cpp:class:`DocumentViewLimits <gui_forms::DocumentViewLimits>`
@@ -101,7 +101,7 @@ Types
    * - :cpp:class:`SourceByteRange <gui_forms::SourceByteRange>`
      -  
    * - :cpp:class:`SourceMappingResult <gui_forms::SourceMappingResult>`
-     -  
+     - A display position mapped to the source.
    * - :cpp:class:`TextEditResult <gui_forms::TextEditResult>`
      - TextEditResult records exact removed/inserted UTF-8 ranges, scalar counts, resulting revision, and whether content changed.
    * - :cpp:class:`TextMaskBudgetSnapshot <gui_forms::TextMaskBudgetSnapshot>`
@@ -168,15 +168,29 @@ Types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: DisplayMappingResult final
+.. cpp:class:: DisplayMappingResult final
 
    ``#include <gui_forms/document_view/types/document_view_types.hpp>``
 
-   .. cpp:member:: DocumentViewStatus status
+   A source position mapped to the display. One alternative per state (house form for results).
 
-      Default: ``{DocumentViewStatus::unavailable}``.
 
-   .. cpp:member:: std::optional<DisplayByteOffset> position
+   .. rubric:: Properties
+
+   .. cpp:function:: DocumentViewStatus status() const noexcept
+
+   .. cpp:function:: const DisplayByteOffset* position() const noexcept
+
+      The mapped position, for ``success``; null otherwise.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static DisplayMappingResult mapped(DisplayByteOffset position) noexcept
+
+   .. cpp:function:: static DisplayMappingResult refused(DocumentViewStatus status) noexcept
+
+      A refusal. ``success`` refuses nothing, so it is read as ``unavailable``.
 
 .. cpp:namespace:: gui_forms
 
@@ -238,15 +252,29 @@ Types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: DocumentRequestResult final
+.. cpp:class:: DocumentRequestResult final
 
    ``#include <gui_forms/document_view/types/document_view_types.hpp>``
 
-   .. cpp:member:: DocumentViewStatus status
+   A page request's result: the request the document side fulfils, or why there is none. One alternative per state (house form for results).
 
-      Default: ``{DocumentViewStatus::unavailable}``.
 
-   .. cpp:member:: std::optional<DocumentPageRequest> request
+   .. rubric:: Properties
+
+   .. cpp:function:: DocumentViewStatus status() const noexcept
+
+   .. cpp:function:: const DocumentPageRequest* request() const noexcept
+
+      The request, for ``success``; null otherwise.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static DocumentRequestResult requested(DocumentPageRequest request) noexcept
+
+   .. cpp:function:: static DocumentRequestResult refused(DocumentViewStatus status) noexcept
+
+      A refusal. ``success`` refuses nothing, so it is read as ``unavailable``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1038,15 +1066,29 @@ Types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: SourceMappingResult final
+.. cpp:class:: SourceMappingResult final
 
    ``#include <gui_forms/document_view/types/document_view_types.hpp>``
 
-   .. cpp:member:: DocumentViewStatus status
+   A display position mapped to the source. One alternative per state (house form for results).
 
-      Default: ``{DocumentViewStatus::unavailable}``.
 
-   .. cpp:member:: std::optional<SourceByteOffset> position
+   .. rubric:: Properties
+
+   .. cpp:function:: DocumentViewStatus status() const noexcept
+
+   .. cpp:function:: const SourceByteOffset* position() const noexcept
+
+      The mapped position, for ``success``; null otherwise.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static SourceMappingResult mapped(SourceByteOffset position) noexcept
+
+   .. cpp:function:: static SourceMappingResult refused(DocumentViewStatus status) noexcept
+
+      A refusal. ``success`` refuses nothing, so it is read as ``unavailable``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2180,7 +2222,7 @@ Functions, constants and aliases
 
 .. cpp:function:: LineBoxMetrics line_box_metrics(const ResolvedTextLayout& primary, std::optional<double> used_line_height) noexcept
 
-   The line box of ``primary`` (a resolution of any text in the used font). The face's ascent, descent and line gap are each rounded to a whole logical pixel; ``normal`` (no used_line_height) is their sum. The leading (the gap, or a used line height's excess over the rounded ascent and descent, negative when it is less) goes half above the text, rounded down, and the rest below: Chromium's rounding, measured against Chrome 155 from 12 to 21 px (planning/stages/L-layout/PLAN.md section 12.5). Without design metrics (an estimate) it uses the resolution's ascent, descent and line gap.
+   The line box of ``primary`` (a resolution of any text in the used font). The face's ascent, descent and line gap are each rounded to a whole logical pixel; ``normal`` (no used_line_height) is their sum. The leading (the gap, or a used line height's excess over the rounded ascent and descent, negative when it is less) goes half above the text, rounded down, and the rest below: Chromium's rounding, measured against Chrome 155 from 12 to 21 px (notes:planning/stages/L-layout/PLAN.md section 12.5). Without design metrics (an estimate) it uses the resolution's ascent, descent and line gap.
 
 .. cpp:function:: double snap_text_baseline(double logical_baseline, double device_scale) noexcept
 

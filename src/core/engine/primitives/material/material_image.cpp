@@ -1,6 +1,7 @@
 #include "material_image.hpp"
 
 #include "../../../image/resource_pixels.hpp"
+#include "stx_skia/swizzle.hpp"
 
 #include <algorithm>
 #include <array>
@@ -139,22 +140,16 @@ bool read_material_image(const ImageRegistry& registry, const ImageId image, con
             return false;
         }
     } else {
-        // Premultiplied BGRA rows of view.row_bytes each: swap to RGBA.
-        if (view.row_bytes < row_bytes || view.encoded.size() < view.row_bytes * (height - 1U) + row_bytes) {
-            return false;
-        }
-        for (std::uint32_t row = 0U; row < height; ++row) {
-            const std::size_t from = static_cast<std::size_t>(view.row_bytes) * row;
-            const std::size_t to = row_bytes * row;
-            for (std::uint32_t column = 0U; column < width; ++column) {
-                const std::size_t source = from + static_cast<std::size_t>(column) * 4U;
-                const std::size_t target = to + static_cast<std::size_t>(column) * 4U;
-                bytes[target] = static_cast<std::uint8_t>(view.encoded[source + 2U]);
-                bytes[target + 1U] = static_cast<std::uint8_t>(view.encoded[source + 1U]);
-                bytes[target + 2U] = static_cast<std::uint8_t>(view.encoded[source]);
-                bytes[target + 3U] = static_cast<std::uint8_t>(view.encoded[source + 3U]);
-            }
-        }
+        // Premultiplied BGRA rows of view.row_bytes each: swap to tightly packed
+        // RGBA rows. The kernel checks the stride and both extents before it
+        // writes, so a short or narrow resource leaves bytes zeroed and fails.
+        if (view.row_bytes > std::numeric_limits<std::size_t>::max()) return false;
+        const std::span<std::byte> destination = std::as_writable_bytes(std::span<std::uint8_t>(bytes));
+        const stx_skia::SwizzleResult swapped = stx_skia::swap_red_blue_rows(
+            destination, stx_skia::RowBytes(row_bytes), view.encoded,
+            stx_skia::RowBytes(static_cast<std::size_t>(view.row_bytes)), stx_skia::PixelCount(width),
+            stx_skia::RowCount(height));
+        if (swapped != stx_skia::SwizzleResult::ok) return false;
     }
     pixels.bytes = std::move(bytes);
     pixels.width = width;
@@ -189,7 +184,7 @@ ImageVariantRequest image_variant_request(const MaterialFillLayer& fill, const s
     request.scale = DeviceScale{scale};
     const ImageAxisPlacement across = image_placement_across(fill, box.x, box.width, scale, fill.image_pixel_size.width);
     const ImageAxisPlacement down = image_placement_down(fill, box.y, box.height, scale, fill.image_pixel_size.height);
-    if (fill.image_mode == MaterialImageMode::tile) {
+    if (fill.image_mode == MaterialImageMode::tile || fill.image_mode == MaterialImageMode::single) {
         request.extent = DeviceExtent{variant_length(across.tile_length), variant_length(down.tile_length)};
         return request;
     }
@@ -218,6 +213,18 @@ void map_image_variant(const ImageAxisPlacement& placement, const std::uint32_t 
             const double along = static_cast<double>(output) + 0.5 - placement.tile_origin;
             const double within = along - tile * std::floor(along / tile);
             const double index = std::clamp(std::floor(within * pixels / tile), 0.0, pixels - 1.0);
+            map[output] = static_cast<std::uint32_t>(index);
+        }
+        return;
+    }
+    if (placement.mode == MaterialImageMode::single) {
+        // Only the centres within the one tile show it.
+        const double tile = placement.tile_length;
+        for (std::uint32_t output = 0U; output < outputs; ++output) {
+            map[output] = outside_image;
+            const double along = static_cast<double>(output) + 0.5 - placement.tile_origin;
+            if (!(tile > 0.0) || along < 0.0 || along >= tile) continue;
+            const double index = std::clamp(std::floor(along * pixels / tile), 0.0, pixels - 1.0);
             map[output] = static_cast<std::uint32_t>(index);
         }
         return;

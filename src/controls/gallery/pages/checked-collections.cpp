@@ -140,13 +140,34 @@ private:
         (*list_group).add_at(list_view_, {22.0, 36.0, 640.0, 196.0});
         on((*list_view_).column_click(), *this, &CheckedCollectionsPage::on_column_click);
         on((*list_view_).item_checked(), *this, &CheckedCollectionsPage::on_list_view_checked);
+        (*list_view_).set_label_edit(true);
+        on((*list_view_).after_label_edit(), *this, &CheckedCollectionsPage::on_list_view_renamed);
         std::shared_ptr<Label> note = label(
             "gallery.checked.list-view.note",
-            "Click a header to sort through the sort_items helper; drag a divider to resize. Space or a click on the box toggles a check.",
+            "Click a header to sort through the sort_items helper; drag a divider to resize. Space or a click on the box toggles a check; F2 renames the focused task.",
             10.0, 400, muted);
         (*note).set_text_wrapping(TextWrapping::word);
         (*note).set_vertical_alignment(VerticalAlignment::near);
         (*list_group).add_at(note, {686.0, 36.0, 220.0, 120.0});
+        mark_toggle_ = make_control<Button>(StableId("gallery.checked.list-view.mark"), "Show insertion mark");
+        (*mark_toggle_).set_style(page_style());
+        (*list_group).add_at(mark_toggle_, {686.0, 166.0, 200.0, 30.0});
+        on((*mark_toggle_).clicked(), *this, &CheckedCollectionsPage::on_mark_toggled);
+    }
+
+    // The insertion mark an application shows while an item is dragged:
+    // here before the third row, until the toggle clears it.
+    void on_mark_toggled(ButtonBase&) {
+        if ((*list_view_).insertion_mark().has_value()) {
+            (*list_view_).clear_insertion_mark();
+            (*mark_toggle_).set_text("Show insertion mark");
+            (*status_).set_text("ListView insertion mark cleared");
+            return;
+        }
+        const bool shown = (*list_view_).show_insertion_mark({.index = 2U, .after = false});
+        (*mark_toggle_).set_text(shown ? "Clear insertion mark" : "Show insertion mark");
+        (*status_).set_text(shown ? "ListView insertion mark before the third row · drop role"
+                                  : "ListView has no third row to mark");
     }
 
     void on_column_click(const ListViewColumnClick& click) {
@@ -160,6 +181,14 @@ private:
 
     void on_list_view_checked(const ListViewItemCheck& check) {
         (*status_).set_text("ListView item " + check.item_id + (check.new_value ? " checked" : " unchecked"));
+    }
+
+    void on_list_view_renamed(ListViewLabelEdit& edit) {
+        if (!edit.label) {
+            (*status_).set_text("ListView rename of " + edit.item_id + " cancelled");
+            return;
+        }
+        (*status_).set_text("ListView item " + edit.item_id + " renamed to " + *edit.label);
     }
 
     // Bound value 0/1 names the list; both lists share one handler.
@@ -186,6 +215,7 @@ private:
 
     std::shared_ptr<CheckedListBox> immediate_;
     std::shared_ptr<ListView> list_view_;
+    std::shared_ptr<Button> mark_toggle_;
     std::shared_ptr<Label> status_;
 };
 

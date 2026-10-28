@@ -1558,6 +1558,7 @@ std::vector<SemanticNode> TreeListView::semantic_virtual_children() const {
     const Rect absolute = absolute_bounds();
     const std::string view_id(stable_id().value());
     const bool enabled = effectively_enabled();
+    const SemanticState enabled_state = enabled ? SemanticState::enabled : SemanticState::none;
     // Column headers first, in display order; a header's press sorts.
     for (const std::size_t column : column_order_) {
         if (!column_visible(placed, column)) continue;
@@ -1571,8 +1572,7 @@ std::vector<SemanticNode> TreeListView::semantic_virtual_children() const {
         if (sort_column_ == column && sort_order_ == TreeListSortOrder::ascending) node.value = "ascending";
         if (sort_column_ == column && sort_order_ == TreeListSortOrder::descending) node.value = "descending";
         node.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
-        node.states = SemanticState::visible;
-        if (enabled) node.states |= SemanticState::enabled;
+        node.states = SemanticState::visible | enabled_state;
         node.actions = {SemanticAction::press};
         children.push_back(std::move(node));
     }
@@ -1615,6 +1615,7 @@ void TreeListView::append_row_cells(const Layout& placed, std::size_t row, Seman
     const Rect absolute = absolute_bounds();
     const Rect line = row_bounds(placed, row);
     const bool enabled = effectively_enabled() && item.enabled;
+    const SemanticState enabled_state = enabled ? SemanticState::enabled : SemanticState::none;
     for (const std::size_t column : column_order_) {
         const Rect extent = column_cell(placed, column);
         const Rect cell_rect{extent.x, line.y, extent.width, line.height};
@@ -1629,8 +1630,7 @@ void TreeListView::append_row_cells(const Layout& placed, std::size_t row, Seman
         cell.row_index = row + 1U;
         cell.column_index = column_position_[column] + 1U;
         cell.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
-        cell.states = SemanticState::visible;
-        if (enabled) cell.states |= SemanticState::enabled;
+        cell.states = SemanticState::visible | enabled_state;
         row_node.children.push_back(std::move(cell));
     }
 }

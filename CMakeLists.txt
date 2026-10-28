@@ -57,8 +57,10 @@ option(GUI_FORMS_BUILD_TEXT_WORKER_PROBE "Build the private text worker lifecycl
 option(GUI_FORMS_BUILD_TEXT_PAINT_PROBE "Build the private prepared glyph raster proof" OFF)
 option(GUI_FORMS_BUILD_TEXT_RASTER_PROFILE_PROBE "Build the diagnostic text rasterization profile probe" OFF)
 option(GUI_FORMS_BUILD_TEXT_ENGINE_BENCHMARK "Build the shared text engine cost benchmark" OFF)
+option(GUI_FORMS_BUILD_PAINT_PROFILE "Build the Gallery paint workload that the Linux profiling job samples" OFF)
 option(GUI_FORMS_BUILD_PREPARED_TEXT "Build the development prepared-text service" OFF)
 option(GUI_FORMS_BUILD_TEXT_MASKS "Build the development logical text-mask service" OFF)
+option(GUI_FORMS_INSTALL_TEXT_STACK "Install and export the pinned FreeType and HarfBuzz (cmake/TextStackExport.cmake)" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS "Instrument private text shaping phases" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE "Record private run directions for geometry comparison" OFF)
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
@@ -94,8 +96,16 @@ add_subdirectory(stx_zlib)
 add_subdirectory(stx_png)
 add_subdirectory(stx_conv)
 # The rich-text library: one document model, the markdown-like dialect and
-# RTF (planning/stages/RT-rich-text/PLAN.md).
+# RTF (notes:planning/stages/RT-rich-text/PLAN.md).
 add_subdirectory(stx_rtf2md)
+# stx_skia/ is the CPU Skia derivative the Skia adapters draw with, built from source as part
+# of this tree; its headers are system headers here, as the imported Skia's were. Without the
+# adapters only its red/blue swap kernel, stx_skia::swizzle, is built: it links no Skia code,
+# and the core, the controls and the hosts swap RGBA and BGRA rows with it.
+if(NOT GUI_FORMS_ENABLE_SKIA)
+    set(STX_SKIA_SWIZZLE_ONLY ON)
+endif()
+add_subdirectory(stx_skia SYSTEM)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -151,6 +161,7 @@ add_library(gui_forms_core STATIC
     src/core/theme/owner_draw/owner_draw.cpp
     src/core/engine/types/engine_types.cpp
     src/core/engine/engine_math/engine_math.cpp
+    src/core/engine/authored_gradient/authored_gradient.cpp
     src/core/engine/engine_expression/engine_expression.cpp
     src/core/engine/primitive_registry/primitive_registry.cpp
     src/core/engine/feature_samples/engine_feature_samples.cpp
@@ -224,6 +235,8 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/selector/theme_selector.cpp
     src/core/theme_language/custom_properties/theme_custom_properties.cpp
     src/core/theme_language/value/theme_value.cpp
+    src/core/theme_language/material/theme_material_lowering.cpp
+    src/core/theme_language/motion/theme_motion_lowering.cpp
     src/core/theme_language/compiler/theme_compiler.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
@@ -329,6 +342,10 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
     set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
     set(FT_ENABLE_ERROR_STRINGS OFF CACHE BOOL "" FORCE)
+    # Neither subproject's own install rules are used (EXCLUDE_FROM_ALL keeps
+    # them out of the install); skipping them also keeps their export sets
+    # from claiming freetype, which cmake/TextStackExport.cmake exports.
+    set(SKIP_INSTALL_ALL ON)
     add_subdirectory("${GUI_FORMS_FREETYPE_ROOT}"
                      "${CMAKE_CURRENT_BINARY_DIR}/third_party/freetype"
                      EXCLUDE_FROM_ALL)
@@ -356,6 +373,7 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     add_subdirectory("${GUI_FORMS_HARFBUZZ_ROOT}"
                      "${CMAKE_CURRENT_BINARY_DIR}/third_party/harfbuzz"
                      EXCLUDE_FROM_ALL)
+    unset(SKIP_INSTALL_ALL)
 
     add_library(gui_forms_bidi STATIC third_party/sheenbidi/Source/SheenBidi.c)
     target_include_directories(gui_forms_bidi PUBLIC third_party/sheenbidi/Headers)
@@ -636,6 +654,8 @@ add_library(gui_forms_controls STATIC
     src/controls/file_dialog/file_dialog_types.cpp
     src/controls/open_file_dialog/open_file_dialog.cpp
     src/controls/save_file_dialog/save_file_dialog.cpp
+    src/controls/color_dialog/color_dialog.cpp
+    src/controls/folder_browser_dialog/folder_browser_dialog.cpp
     src/controls/thread_exception_dialog/thread_exception_dialog.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
@@ -663,6 +683,7 @@ add_library(gui_forms_controls STATIC
     src/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.cpp
     src/controls/scrollable_control/container_control/split_container/splitter_grip.cpp
     src/controls/scrollable_control/container_control/split_container/split_container.cpp
+    src/controls/splitter/splitter.cpp
     src/controls/panel/date_time_picker/date_time_utilities.cpp
     src/controls/panel/date_time_picker/calendar_grid/calendar_grid.cpp
     src/controls/panel/date_time_picker/date_time_value/date_time_value.cpp
@@ -769,13 +790,12 @@ set_target_properties(gui_drawing_core PROPERTIES EXPORT_NAME Drawing)
 if(GUI_FORMS_BUILD_PREPARED_TEXT)
     install(CODE "message(FATAL_ERROR \"The development prepared-text interface is not admitted for SDK installation\")")
 endif()
-if(GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT)
-    install(CODE "message(FATAL_ERROR \"The development audio loop transport is not admitted for SDK installation\")")
-endif()
-if(GUI_FORMS_BUILD_TEXT_MASKS)
-    install(CODE "message(FATAL_ERROR \"The development text-mask interface is not admitted for SDK installation\")")
-endif()
-install(TARGETS gui_forms_threading gui_forms_core gui_forms_controls gui_drawing_core
+# The audio loop transport and the text masks install as the AudioLoopTransport
+# and TextMasks components (cmake/Audio.cmake, cmake/ApplicationText.cmake),
+# with their headers; the main header install below leaves them to those files.
+# stx_skia_swizzle installs with them (as GUIForms::swizzle): the core and the controls link it
+# privately, so a consumer of their static archives links its archive too.
+install(TARGETS gui_forms_threading gui_forms_core gui_forms_controls gui_drawing_core stx_skia_swizzle
         EXPORT GUIFormsTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -909,63 +929,15 @@ elseif(UNIX)
 endif()
 
 if(GUI_FORMS_ENABLE_SKIA)
-    set(GUI_FORMS_SKIA_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia)
-    set(GUI_FORMS_SKIA_OUT
-        "${GUI_FORMS_SKIA_ROOT}/out/gui_forms-cpu-release"
-        CACHE PATH "Directory containing the pinned CPU-only Skia archives")
-    option(GUI_FORMS_SKIA_PREBUILT
-           "Use already-built Skia archives instead of invoking the host build"
-           OFF)
-    set(GUI_FORMS_SKIA_ARCHIVES
-        ${GUI_FORMS_SKIA_OUT}/libskia.a
-        ${GUI_FORMS_SKIA_OUT}/libskcms.a
-    )
-
-    if(GUI_FORMS_SKIA_PREBUILT)
-        foreach(archive_path IN LISTS GUI_FORMS_SKIA_ARCHIVES)
-            if(NOT EXISTS "${archive_path}")
-                message(FATAL_ERROR "Missing prebuilt Skia archive: ${archive_path}")
-            endif()
-        endforeach()
-    else()
-        add_custom_command(
-            OUTPUT ${GUI_FORMS_SKIA_ARCHIVES}
-            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
-            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh ${GUI_FORMS_SKIA_OUT}
-            DEPENDS
-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh
-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_cpu_args.gn
-                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_png_only.patch
-            COMMENT "Building pinned CPU-only, codec-free Skia"
-            VERBATIM
-        )
-    endif()
-    add_custom_target(gui_forms_skia_dependency DEPENDS ${GUI_FORMS_SKIA_ARCHIVES})
-
-    foreach(archive IN ITEMS skia skcms)
-        add_library(gui_forms_${archive}_archive STATIC IMPORTED GLOBAL)
-        set_target_properties(gui_forms_${archive}_archive PROPERTIES
-            IMPORTED_LOCATION ${GUI_FORMS_SKIA_OUT}/lib${archive}.a
-        )
-        add_dependencies(gui_forms_${archive}_archive gui_forms_skia_dependency)
-    endforeach()
-
     add_library(gui_forms_skia STATIC
         src/render/skia/raster/skia_raster.cpp
     )
-    add_dependencies(gui_forms_skia gui_forms_skia_dependency)
     target_include_directories(gui_forms_skia
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia/raster
     )
-    target_include_directories(gui_forms_skia SYSTEM PRIVATE
-        ${GUI_FORMS_SKIA_ROOT}
-    )
     target_link_libraries(gui_forms_skia
         PUBLIC gui_forms_core
-        PRIVATE
-            gui_forms_skia_archive
-            gui_forms_skcms_archive
+        PRIVATE stx_skia::stx_skia
     )
     # ADR-004: the Skia painter draws text only through the shared
     # HarfBuzz/FreeType engine; Skia itself has no font backend.
@@ -987,9 +959,6 @@ if(GUI_FORMS_ENABLE_SKIA)
             ${GUI_FORMS_COREGRAPHICS}
         )
     endif()
-    target_compile_definitions(gui_forms_skia PRIVATE
-        SK_DISABLE_TRACING
-    )
 
     add_library(gui_drawing_skia STATIC
         src/render/skia/executor/skia_executor.cpp
@@ -999,12 +968,8 @@ if(GUI_FORMS_ENABLE_SKIA)
         target_sources(gui_drawing_skia PRIVATE
             src/render/skia/executor/core_text_font_bytes.cpp)
     endif()
-    add_dependencies(gui_drawing_skia gui_forms_skia_dependency)
     target_include_directories(gui_drawing_skia
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia/executor
-    )
-    target_include_directories(gui_drawing_skia SYSTEM PRIVATE
-        ${GUI_FORMS_SKIA_ROOT}
     )
     # ADR-004: the C drawing API draws text with the shared HarfBuzz/FreeType
     # engine and compositor.
@@ -1017,8 +982,7 @@ if(GUI_FORMS_ENABLE_SKIA)
             gui_forms_text_engine
             gui_forms_core
             freetype
-            gui_forms_skia_archive
-            gui_forms_skcms_archive
+            stx_skia::stx_skia
     )
     if(APPLE)
         target_link_libraries(gui_drawing_skia PRIVATE
@@ -1027,9 +991,6 @@ if(GUI_FORMS_ENABLE_SKIA)
             ${GUI_FORMS_CORETEXT}
         )
     endif()
-    target_compile_definitions(gui_drawing_skia PRIVATE
-        SK_DISABLE_TRACING
-    )
 
     add_library(gui_drawing_raster_c_api SHARED
         src/abi/drawing_skia_c_api.cpp
@@ -1099,6 +1060,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         src/host/macos/services/appkit_host_services.mm
         src/host/macos/services/appkit_clipboard_image.mm
         src/host/macos/services/appkit_status_items.mm
+        src/host/macos/compositor/macos_compositor.mm
     )
     target_include_directories(gui_forms_host_macos PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/macos
@@ -1140,8 +1102,6 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         gui_forms_controls
         gui_forms_skia
         gui_forms_host_macos
-        gui_forms_skia_archive
-        gui_forms_skcms_archive
         ${GUI_FORMS_APPKIT}
         ${GUI_FORMS_QUARTZCORE}
         ${GUI_FORMS_COREGRAPHICS}
@@ -1183,16 +1143,25 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     if(TARGET X11::Xcursor)
         set(GUI_FORMS_XCURSOR_AVAILABLE ON)
     endif()
+    # Stage T5 (owner decision T5-Q9): XFixes follows the compositing
+    # manager's selection and XRender names the ARGB visual's alpha.
+    if(NOT TARGET X11::Xfixes OR NOT TARGET X11::Xrender)
+        message(FATAL_ERROR "The Linux X11 host requires libXfixes and libXrender")
+    endif()
     add_library(gui_forms_host_linux STATIC
         src/host/linux/application/linux_host.cpp
         src/host/linux/application/x11_windowing.cpp
+        src/host/linux/settings/xsettings_parse.cpp
+        src/host/linux/settings/xsettings_watch.cpp
         src/host/linux/accessibility/linux_accessibility.cpp
         src/host/linux/services/linux_services.cpp
         src/host/linux/services/x11_tray_icons.cpp
         src/host/linux/services/linux_drag_drop.cpp
-        src/host/linux/services/linux_dialogs.cpp)
+        src/host/linux/services/linux_dialogs.cpp
+        src/host/linux/compositor/x11_compositor.cpp)
     set_target_properties(gui_forms_host_linux PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_link_libraries(gui_forms_host_linux PUBLIC gui_forms_core gui_forms_controls gui_forms_skia PRIVATE X11::X11 PkgConfig::GUI_FORMS_ATK)
+    target_link_libraries(gui_forms_host_linux PUBLIC gui_forms_core gui_forms_controls gui_forms_skia
+        PRIVATE X11::X11 X11::Xfixes X11::Xrender PkgConfig::GUI_FORMS_ATK)
     if(GUI_FORMS_XCURSOR_AVAILABLE)
         target_link_libraries(gui_forms_host_linux PUBLIC X11::Xcursor)
         target_compile_definitions(gui_forms_host_linux PRIVATE GUI_FORMS_HAS_XCURSOR=1)
@@ -1206,7 +1175,7 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     target_compile_definitions(gui_forms_application PRIVATE GUI_FORMS_APPLICATION_LINUX=1)
     target_link_libraries(gui_forms_application PRIVATE
         "-Wl,--whole-archive" gui_forms_core gui_drawing_core gui_forms_controls gui_forms_host_linux gui_forms_skia
-        "-Wl,--no-whole-archive" X11::X11)
+        "-Wl,--no-whole-archive" X11::X11 X11::Xfixes X11::Xrender)
     if(GUI_FORMS_XCURSOR_AVAILABLE)
         target_link_libraries(gui_forms_application PRIVATE X11::Xcursor)
     endif()
@@ -1320,6 +1289,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         gui_drawing_c_api gdi32 user32
     )
     if(GUI_FORMS_BUILD_TESTS)
+        add_test(NAME gui_drawing_windows_probe COMMAND gui_drawing_windows_probe)
         add_executable(gui_forms_windows_live_surface_endpoint_tests
             tests/windows_live_surface_endpoint_tests.cpp
         )
@@ -1904,6 +1874,18 @@ if(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK)
     target_link_libraries(gui_forms_document_view_benchmark PRIVATE gui_forms_core)
 endif()
 
+# Phase E, E5: the Gallery painted through the CPU Skia adapter, for
+# .github/workflows/profile-linux.yml to sample (tools/profile_hot_paths.py).
+if(GUI_FORMS_BUILD_PAINT_PROFILE)
+    if(NOT TARGET gui_forms_skia OR NOT TARGET gui_forms_gallery_model)
+        message(FATAL_ERROR "The paint profile workload requires Skia and GUI_FORMS_BUILD_GALLERY")
+    endif()
+    add_executable(gui_forms_paint_profile_workload benchmarks/paint_profile_workload.cpp)
+    target_compile_definitions(gui_forms_paint_profile_workload PRIVATE
+        GUI_FORMS_PROFILE_FONT_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+    target_link_libraries(gui_forms_paint_profile_workload PRIVATE gui_forms_gallery_model gui_forms_skia)
+endif()
+
 if(GUI_FORMS_BUILD_BENCHMARKS)
     if(NOT APPLE OR NOT TARGET gui_forms_skia OR NOT TARGET gui_forms_coregraphics OR
        NOT TARGET gui_forms_gallery_model)
@@ -1929,7 +1911,7 @@ if(GUI_FORMS_BUILD_BENCHMARKS)
             -DCOREGRAPHICS_ADAPTER=$<TARGET_FILE:gui_forms_coregraphics>
             -DBENCHMARK_BINARY=$<TARGET_FILE:gui_forms_renderer_benchmark>
             -DPUBLIC_INCLUDE_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/include
-            -DSKIA_ARCHIVE=${GUI_FORMS_SKIA_OUT}/libskia.a
+            -DSKIA_ARCHIVE=$<TARGET_FILE:stx_skia>
             -DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/renderer-boundary-audit.txt
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_renderer_boundaries.cmake
         DEPENDS gui_forms_renderer_benchmark
@@ -1987,10 +1969,8 @@ if(GUI_FORMS_BUILD_TESTS)
             COMMAND gui_forms_prepared_text_raster_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         if(TARGET gui_forms_skia)
             add_executable(gui_forms_prepared_text_skia_tests tests/prepared_text_skia_tests.cpp)
-            target_include_directories(gui_forms_prepared_text_skia_tests SYSTEM PRIVATE
-                ${GUI_FORMS_SKIA_ROOT})
             target_link_libraries(gui_forms_prepared_text_skia_tests PRIVATE
-                gui_forms_skia gui_forms_prepared_text_impl)
+                gui_forms_skia gui_forms_prepared_text_impl stx_skia::stx_skia)
             add_test(NAME gui_forms_prepared_text_skia_tests
                 COMMAND gui_forms_prepared_text_skia_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
             set_tests_properties(gui_forms_prepared_text_skia_tests PROPERTIES TIMEOUT 30)
@@ -2130,6 +2110,24 @@ if(GUI_FORMS_BUILD_TESTS)
             target_link_libraries(gui_forms_x11_cursor_tests PRIVATE gui_forms_core X11::Xcursor X11::Xfixes X11::X11)
             add_test(NAME gui_forms_x11_cursors COMMAND gui_forms_x11_cursor_tests)
         endif()
+        # Stage T5, C4's measurement: what the X server and a compositing
+        # manager do with premultiplied alpha, the 32-bit visual and the
+        # _NET_WM_CM_Sn selection (XWayland included). Xlib, XFixes and XInput;
+        # prints JSON lines (kept in CI's LastTest.log evidence) and fails
+        # only when it cannot open the display. Serial: it reads the screen
+        # and may start xcompmgr.
+        if(TARGET X11::Xfixes AND TARGET X11::Xi)
+            add_executable(gui_forms_x11_compositor_probe tests/x11_compositor_probe.cpp)
+            target_link_libraries(gui_forms_x11_compositor_probe PRIVATE X11::Xfixes X11::Xi X11::X11)
+            add_test(NAME gui_forms_x11_compositor_probe COMMAND gui_forms_x11_compositor_probe)
+            set_tests_properties(gui_forms_x11_compositor_probe PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE)
+            # The same probe under a headless Weston's Xwayland; it reports
+            # the case not exercised where Weston is missing.
+            add_test(NAME gui_forms_xwayland_compositor_probe
+                COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/xwayland_compositor_probe.sh
+                    $<TARGET_FILE:gui_forms_x11_compositor_probe>)
+            set_tests_properties(gui_forms_xwayland_compositor_probe PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
+        endif()
     endif()
     add_executable(gui_forms_cursor_image_tests tests/cursor_image_tests.cpp)
     target_link_libraries(gui_forms_cursor_image_tests PRIVATE gui_forms_core)
@@ -2145,16 +2143,38 @@ if(GUI_FORMS_BUILD_TESTS)
         set_tests_properties(gui_forms_application_native_tests PROPERTIES TIMEOUT 30)
         if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST)
             # Stage T5, phase C2's gate: a non-opaque window on the Windows
-            # host through each grant, read off the composed screen.
+            # host through each grant, read off the composed screen. Serial,
+            # as on Linux and macOS: another test's window over the sampled
+            # points changes the composed colour.
             add_executable(gui_forms_windows_compositor_tests tests/windows_compositor_tests.cpp)
             target_compile_definitions(gui_forms_windows_compositor_tests PRIVATE
                 WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
             target_link_libraries(gui_forms_windows_compositor_tests PRIVATE gui_forms_application dwmapi
                 runtimeobject)
             add_test(NAME gui_forms_windows_compositor_tests COMMAND gui_forms_windows_compositor_tests)
-            set_tests_properties(gui_forms_windows_compositor_tests PROPERTIES TIMEOUT 60)
+            set_tests_properties(gui_forms_windows_compositor_tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
         endif()
-        # Stage DK W0 measurement (results/2026-10-18-dk-w0-capture-drag/): it
+        if(GUI_FORMS_ENABLE_LINUX_HOST)
+            # Stage T5, phase C4's gate: a non-opaque window under Xvfb with no
+            # compositing manager, then with xcompmgr started, stopped and
+            # started again. Serial: it starts a compositor for the display.
+            add_executable(gui_forms_linux_compositor_tests tests/linux_compositor_tests.cpp)
+            target_link_libraries(gui_forms_linux_compositor_tests PRIVATE gui_forms_application X11::X11)
+            add_test(NAME gui_forms_linux_compositor_tests COMMAND gui_forms_linux_compositor_tests)
+            set_tests_properties(gui_forms_linux_compositor_tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+        endif()
+        if(GUI_FORMS_ENABLE_MACOS_HOST)
+            # Stage T5, phase C3's gate: a non-opaque window over a green
+            # backdrop, read back from AppKit and off the composed screen.
+            # Serial: it floats its windows over the desktop while it reads.
+            add_executable(gui_forms_macos_compositor_tests tests/macos_compositor_tests.mm)
+            target_compile_options(gui_forms_macos_compositor_tests PRIVATE -fobjc-arc)
+            target_link_libraries(gui_forms_macos_compositor_tests PRIVATE gui_forms_application
+                ${GUI_FORMS_APPKIT} ${GUI_FORMS_COREGRAPHICS})
+            add_test(NAME gui_forms_macos_compositor_tests COMMAND gui_forms_macos_compositor_tests)
+            set_tests_properties(gui_forms_macos_compositor_tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+        endif()
+        # Stage DK W0 measurement (notes:results/2026-10-18-dk-w0-capture-drag/): it
         # puts windows on the desktop, so it is built but never run by ctest.
         add_executable(gui_forms_frame_drag_probe tests/frame_drag_probe.cpp)
         target_link_libraries(gui_forms_frame_drag_probe PRIVATE gui_forms_application)
@@ -2194,9 +2214,16 @@ if(GUI_FORMS_BUILD_TESTS)
                 ${GUI_FORMS_REFERENCE_CLANG} ${CMAKE_CURRENT_SOURCE_DIR}/include)
         add_test(NAME gui_forms_api_reference_tests
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/api_reference_tests.py)
+        # The include directories a consumer of the public headers compiles
+        # with: gui_forms_core's own and those of its public dependencies
+        # (stx_zlib, stx_png, ...), evaluated transitively by CMake, one per
+        # line. tools/api_reference.py --build reads them from here.
+        file(GENERATE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/api_reference_include_directories.txt
+            CONTENT "$<JOIN:$<TARGET_PROPERTY:gui_forms_core,INTERFACE_INCLUDE_DIRECTORIES>,\n>\n")
         add_custom_target(gui_forms_api_reference
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/api_reference.py
                 --clang ${GUI_FORMS_REFERENCE_CLANG}
+                --build ${CMAKE_CURRENT_BINARY_DIR}
                 --output ${CMAKE_CURRENT_BINARY_DIR}/reference
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             COMMENT "Extracting native C++ API and rendering authored contracts"
@@ -2240,6 +2267,13 @@ if(GUI_FORMS_BUILD_TESTS)
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_text_tests COMMAND gui_forms_windows_text_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        add_executable(gui_forms_windows_backplane_replay_tests tests/windows_backplane_replay_tests.cpp)
+        target_compile_definitions(gui_forms_windows_backplane_replay_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_backplane_replay_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_backplane_replay_tests COMMAND gui_forms_windows_backplane_replay_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         add_executable(gui_forms_windows_part_composite_tests tests/windows_part_composite_tests.cpp)
         target_compile_definitions(gui_forms_windows_part_composite_tests PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
@@ -2249,12 +2283,14 @@ if(GUI_FORMS_BUILD_TESTS)
         # Stage T5, phase C2's measurement: what DWM composes from a
         # premultiplied client through each documented route. Prints JSON
         # lines (kept in CI's LastTest.log evidence); fails only when it
-        # cannot make its windows or read the screen.
+        # cannot make its windows or read the screen. Serial: it reads the
+        # composed screen too.
         add_executable(gui_forms_windows_compositor_probe tests/windows_compositor_probe.cpp)
         target_compile_definitions(gui_forms_windows_compositor_probe PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
         target_link_libraries(gui_forms_windows_compositor_probe PRIVATE dwmapi runtimeobject)
         add_test(NAME gui_forms_windows_compositor_probe COMMAND gui_forms_windows_compositor_probe)
+        set_tests_properties(gui_forms_windows_compositor_probe PROPERTIES RUN_SERIAL TRUE)
         add_executable(gui_forms_windows_content_pixels_tests tests/windows_content_pixels_tests.cpp)
         target_compile_definitions(gui_forms_windows_content_pixels_tests PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
@@ -2422,6 +2458,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_material_tests tests/engine_material_tests.cpp)
     target_link_libraries(gui_forms_engine_material_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_material_tests COMMAND gui_forms_engine_material_tests)
+    add_executable(gui_forms_engine_authored_material_tests tests/engine_authored_material_tests.cpp)
+    target_link_libraries(gui_forms_engine_authored_material_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_authored_material_tests COMMAND gui_forms_engine_authored_material_tests)
+    add_executable(gui_forms_engine_recipe_field_tests tests/engine_recipe_field_tests.cpp)
+    target_link_libraries(gui_forms_engine_recipe_field_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_recipe_field_tests COMMAND gui_forms_engine_recipe_field_tests)
     add_executable(gui_forms_engine_procedural_tests tests/engine_procedural_tests.cpp)
     target_link_libraries(gui_forms_engine_procedural_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_procedural_tests COMMAND gui_forms_engine_procedural_tests)
@@ -2436,6 +2478,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_glass_tests tests/engine_glass_tests.cpp)
     target_link_libraries(gui_forms_engine_glass_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_glass_tests COMMAND gui_forms_engine_glass_tests)
+    add_executable(gui_forms_engine_backdrop_tests tests/engine_backdrop_tests.cpp)
+    target_link_libraries(gui_forms_engine_backdrop_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_backdrop_tests COMMAND gui_forms_engine_backdrop_tests)
+    add_executable(gui_forms_engine_backplane_replay_tests tests/engine_backplane_replay_tests.cpp)
+    target_link_libraries(gui_forms_engine_backplane_replay_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_backplane_replay_tests COMMAND gui_forms_engine_backplane_replay_tests)
     add_executable(gui_forms_engine_light_tests tests/engine_light_tests.cpp)
     target_link_libraries(gui_forms_engine_light_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_light_tests COMMAND gui_forms_engine_light_tests)
@@ -2586,6 +2634,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_compiler_tests tests/theme_language/theme_compiler_tests.cpp)
     target_link_libraries(gui_forms_theme_compiler_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_theme_compiler_tests COMMAND gui_forms_theme_compiler_tests)
+    add_executable(gui_forms_theme_material_css_tests tests/theme_language/theme_material_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_material_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_material_css_tests COMMAND gui_forms_theme_material_css_tests)
+    add_executable(gui_forms_theme_motion_css_tests tests/theme_language/theme_motion_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_motion_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_motion_css_tests COMMAND gui_forms_theme_motion_css_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
@@ -2803,6 +2857,11 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_key_commands_tests tests/key_commands_tests.cpp)
     target_link_libraries(gui_forms_key_commands_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_key_commands_tests COMMAND gui_forms_key_commands_tests)
+    # The X11 host's XSETTINGS parser takes plain bytes and no Xlib, so it is
+    # tested on every platform.
+    add_executable(gui_forms_xsettings_parse_tests
+        tests/xsettings_parse_tests.cpp src/host/linux/settings/xsettings_parse.cpp)
+    add_test(NAME gui_forms_xsettings_parse_tests COMMAND gui_forms_xsettings_parse_tests)
     add_executable(gui_forms_page_view_document_tests tests/page_view_document_tests.cpp)
     target_link_libraries(gui_forms_page_view_document_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_page_view_document_tests COMMAND gui_forms_page_view_document_tests)
@@ -2919,6 +2978,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_save_file_dialog_tests tests/save_file_dialog_tests.cpp)
     target_link_libraries(gui_forms_save_file_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_save_file_dialog_tests COMMAND gui_forms_save_file_dialog_tests)
+    add_executable(gui_forms_color_dialog_tests tests/color_dialog_tests.cpp)
+    target_link_libraries(gui_forms_color_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_color_dialog_tests COMMAND gui_forms_color_dialog_tests)
+    add_executable(gui_forms_folder_browser_dialog_tests tests/folder_browser_dialog_tests.cpp)
+    target_link_libraries(gui_forms_folder_browser_dialog_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_folder_browser_dialog_tests COMMAND gui_forms_folder_browser_dialog_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)
@@ -2947,6 +3012,9 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_split_container_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_split_container_tests
              COMMAND gui_forms_split_container_tests)
+    add_executable(gui_forms_splitter_tests tests/splitter_tests.cpp)
+    target_link_libraries(gui_forms_splitter_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_splitter_tests COMMAND gui_forms_splitter_tests)
 
     add_executable(gui_forms_layout_contract_tests
         tests/layout_contract_tests.cpp
@@ -3060,7 +3128,7 @@ if(GUI_FORMS_BUILD_TESTS)
              COMMAND gui_forms_layout_direction_tests)
 
     # The layout fixture corpus against checked-in Chromium references
-    # (planning/stages/L-layout/PLAN.md section 6). The corpus path on the
+    # (notes:planning/stages/L-layout/PLAN.md section 6). The corpus path on the
     # command line also selects this test when the corpus changes.
     add_executable(gui_forms_layout_corpus_tests
         tests/layout_corpus_tests.cpp
@@ -3597,7 +3665,7 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_macos_exposure_tests PRIVATE gui_forms_host_macos)
         add_test(NAME gui_forms_macos_exposure_tests COMMAND gui_forms_macos_exposure_tests)
 
-        # Stage DP gate on macOS (results/2026-10-25-dp-gate-macos).
+        # Stage DP gate on macOS (notes:results/2026-10-25-dp-gate-macos).
         add_executable(gui_forms_macos_damage_rectangles_tests tests/macos_damage_rectangles_tests.mm)
         target_compile_options(gui_forms_macos_damage_rectangles_tests PRIVATE -fobjc-arc)
         target_link_libraries(gui_forms_macos_damage_rectangles_tests PRIVATE gui_forms_host_macos)
@@ -3765,6 +3833,11 @@ if(GUI_FORMS_BUILD_TESTS)
             target_compile_definitions(gui_forms_text_identity_raster_tests PRIVATE
                 GUI_FORMS_TEST_CONTROL_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf")
             add_test(NAME gui_forms_text_identity_raster_tests COMMAND gui_forms_text_identity_raster_tests)
+            add_executable(gui_forms_backplane_replay_identity_tests tests/backplane_replay_identity_tests.cpp)
+            target_link_libraries(gui_forms_backplane_replay_identity_tests PRIVATE gui_forms_controls gui_forms_skia)
+            target_compile_definitions(gui_forms_backplane_replay_identity_tests PRIVATE
+                GUI_FORMS_TEST_CONTENT_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf")
+            add_test(NAME gui_forms_backplane_replay_identity_tests COMMAND gui_forms_backplane_replay_identity_tests)
         endif()
         add_executable(gui_forms_retained_draw_cache_raster_tests tests/retained_draw_cache_raster_tests.cpp)
         target_link_libraries(gui_forms_retained_draw_cache_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
@@ -3793,7 +3866,7 @@ if(GUI_FORMS_BUILD_TESTS)
         add_test(
             NAME gui_forms_skia_archive_policy
             COMMAND ${CMAKE_COMMAND}
-                -DSKIA_ARCHIVE=${GUI_FORMS_SKIA_OUT}/libskia.a
+                -DSKIA_ARCHIVE=$<TARGET_FILE:stx_skia>
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_skia_archive.cmake
         )
     endif()
@@ -3852,7 +3925,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 -DCOREGRAPHICS_ADAPTER=$<TARGET_FILE:gui_forms_coregraphics>
                 -DBENCHMARK_BINARY=$<TARGET_FILE:gui_forms_renderer_benchmark>
                 -DPUBLIC_INCLUDE_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/include
-                -DSKIA_ARCHIVE=${GUI_FORMS_SKIA_OUT}/libskia.a
+                -DSKIA_ARCHIVE=$<TARGET_FILE:stx_skia>
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_renderer_boundaries.cmake
         )
     endif()
@@ -4046,6 +4119,7 @@ if(TARGET gui_forms_application)
 endif()
 
 include(cmake/ApplicationText.cmake)
+include(cmake/TextStackExport.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
@@ -4071,7 +4145,8 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/freetype/docs/FTL.TXT" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME FreeType-FTL.txt)
 endif()
 if(GUI_FORMS_ENABLE_SKIA)
-    install(FILES "${GUI_FORMS_SKIA_ROOT}/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Skia-LICENSE.txt)
+    install(FILES stx_skia/LICENSE-Skia DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Skia-LICENSE.txt)
+    install(FILES stx_skia/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_skia-LICENSE.txt)
 endif()
 
 install(FILES third_party/sheenbidi/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME SheenBidi-LICENSE.txt)
@@ -4172,6 +4247,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
 endif()
 
 if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
+    add_executable(gui_forms_windows_input_settings_tests tests/windows_input_settings_tests.cpp)
+    target_link_libraries(gui_forms_windows_input_settings_tests PRIVATE GUIForms::Application)
+    add_test(NAME gui_forms_windows_input_settings_tests COMMAND gui_forms_windows_input_settings_tests)
+    set_tests_properties(gui_forms_windows_input_settings_tests PROPERTIES TIMEOUT 60)
     add_executable(gui_forms_windows_accessibility_tests tests/windows_accessibility_tests.cpp)
     target_link_libraries(gui_forms_windows_accessibility_tests PRIVATE GUIForms::Application oleacc uiautomationcore oleaut32 uuid)
     add_test(NAME gui_forms_windows_accessibility_tests COMMAND gui_forms_windows_accessibility_tests)
@@ -4301,6 +4380,22 @@ if(gui_forms_font_programs)
         add_dependencies(${font_target} gui_forms_program_fonts)
     endforeach()
 endif()
+
+# The targets that compile the red/blue swap loops' replacements link stx_skia::swizzle: the
+# core (material images), the controls (the raster canvas), the CoreGraphics raster, the
+# Windows drawing C API, and the Windows host with the tests that compile windows_host.cpp,
+# the last seven by including it textually.
+foreach(gui_forms_swizzle_target IN ITEMS gui_forms_core gui_forms_controls
+        gui_forms_coregraphics gui_drawing_c_api gui_forms_host_windows
+        gui_forms_windows_dib_lifecycle_tests gui_forms_windows_tooltip_tests
+        gui_forms_windows_prepared_text_tests gui_forms_windows_backplane_replay_tests
+        gui_forms_windows_canvas_raster_tests gui_forms_windows_content_pixels_tests
+        gui_forms_windows_control_snapshot_tests gui_forms_windows_damage_rectangles_tests
+        gui_forms_windows_part_composite_tests gui_forms_windows_text_tests)
+    if(TARGET ${gui_forms_swizzle_target})
+        target_link_libraries(${gui_forms_swizzle_target} PRIVATE stx_skia::swizzle)
+    endif()
+endforeach()
 
 # Every test carries one area label (cmake/TestAreas.cmake, tools/test_areas.json).
 if(GUI_FORMS_BUILD_TESTS)

@@ -3,7 +3,7 @@
 // chains of them), horizontal margins, line breaking and text-align, the
 // strut and vertical-align, right-to-left, intrinsic widths and the
 // refusal. Expected values are Chromium's, from the calibration probes
-// recorded in results/2026-10-25-l5-block/README.md.
+// recorded in notes:results/2026-10-25-l5-block/README.md.
 
 #include "gui_forms/layout/block_flow_solver/block_flow_solver.hpp"
 

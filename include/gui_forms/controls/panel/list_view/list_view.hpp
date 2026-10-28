@@ -3,6 +3,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/image_list.hpp"
+#include "gui_forms/theme/owner_draw/owner_draw.hpp"
 
 #include <chrono>
 #include <cstddef>
@@ -18,6 +19,7 @@
 namespace gui_forms {
 
 class HScrollBar;
+class TextBox;
 class VScrollBar;
 
 // How a ListView arranges its items (Windows Forms' View; Tile is not
@@ -128,6 +130,32 @@ struct ListViewColumnWidthChange final {
     double width{};
 };
 
+// Where a ListView's insertion mark stands (Windows Forms'
+// ListViewInsertionMark Index and AppearsAfterItem): beside the item at
+// model index `index`, before it or, with `after`, after it.
+struct ListViewInsertionMark final {
+    std::size_t index{};
+    bool after{};
+    friend constexpr bool operator==(const ListViewInsertionMark& left,
+                                     const ListViewInsertionMark& right) noexcept {
+        return left.index == right.index && left.after == right.after;
+    }
+};
+
+// One label edit (Windows Forms' LabelEditEventArgs). In before_label_edit
+// `label` is none, and a handler sets `cancel` to keep the item out of edit.
+// In after_label_edit `label` is the edited text, or none when the edit was
+// cancelled; a handler sets `cancel` to refuse the text, and the item keeps
+// the text it had. A handler's change to `label` is ignored. `index` is the
+// item's position when its edit began.
+struct ListViewLabelEdit final {
+    std::string list_id{};
+    std::size_t index{};
+    std::string item_id{};
+    std::optional<std::string> label{};
+    bool cancel{};
+};
+
 // A retained item list with details, list, small-icon and large-icon views
 // (Windows Forms' ListView). Items are records, not child controls; only the
 // visible ones are laid out, painted and described, so a virtual view of
@@ -138,8 +166,9 @@ struct ListViewColumnWidthChange final {
 // Selection, focus and check boxes are kept by index. Replacing the items
 // of an ordinary view carries the selection, the focused item and the anchor
 // over by stable ID; a virtual view keeps them by index, clamped to the new
-// count. Columns are resized by dragging a header's divider. Groups, the
-// tile view, label editing, the insertion mark, owner drawing, tooltips and
+// count. Columns are resized by dragging a header's divider, items'
+// labels are edited in place (label_edit), and an application may draw
+// items' content itself (draw_mode). Groups, the tile view, tooltips and
 // hot-tracking activation are not supported yet.
 class ListView final : public Control {
 public:
@@ -253,8 +282,78 @@ public:
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
 
+    // Content-only owner drawing (owner decision W-Q6; Windows Forms'
+    // OwnerDraw with DrawItem and DrawSubItem). In ItemDrawMode::owner_draw
+    // the view raises draw_item_content for each painted item's own content
+    // (column 0: its icon and text) and, in the details view, for each
+    // visible sub-item cell (its column), in paint order; the item's plate,
+    // check box and focus cue stay painted by role, and a handler's
+    // draw_default adds the default content. Column headers are not
+    // owner-drawn. A handler that changes the view's items, order, columns
+    // or view, or disposes it, ends that paint at once; the view is painted
+    // again with the change. Throws std::invalid_argument for an unknown
+    // mode.
+    [[nodiscard]] ItemDrawMode draw_mode() const noexcept { return draw_mode_; }
+    void set_draw_mode(ItemDrawMode mode);
+    [[nodiscard]] Event<ItemContentPaint&>& draw_item_content() noexcept { return draw_item_content_; }
+
     // The item under a point in window coordinates, if any.
     [[nodiscard]] std::optional<std::size_t> item_index_at(Point window_point) const;
+
+    // The insertion mark (Windows Forms' InsertionMark), for an application
+    // that reorders items by dragging: a bar in the gap beside an item, the
+    // `insertion_mark` part, painted by the drop role, until
+    // clear_insertion_mark() or any change to the items or their order.
+    // Before or after the item is above or below it in the details and list
+    // views, and left or right of it in the icon views. False, with any mark
+    // cleared, for an index past the items; true otherwise, also while the
+    // item is scrolled out of view (the mark shows when it returns). The
+    // mark's colour is the theme's: Windows Forms' InsertionMark.Color is
+    // not admitted.
+    bool show_insertion_mark(ListViewInsertionMark mark);
+    void clear_insertion_mark() noexcept;
+    [[nodiscard]] std::optional<ListViewInsertionMark> insertion_mark() const noexcept { return insertion_mark_; }
+    // The mark nearest a point in window coordinates (Windows Forms'
+    // InsertionMark.NearestIndex): beside the shown item under the point,
+    // or nearest it once the point is clamped into the viewport, after the
+    // item when the point is past the item's middle across the gap. None
+    // when the view shows no items.
+    [[nodiscard]] std::optional<ListViewInsertionMark> insertion_mark_at(Point window_point) const;
+
+    // Label editing (Windows Forms' LabelEdit, ListViewItem.BeginEdit,
+    // BeforeLabelEdit and AfterLabelEdit). While label_edit is on, F2 on the
+    // focused item, or begin_label_edit, places a TextBox (the
+    // `label_editor` part) over the item's text with its text selected.
+    // Enter, a press elsewhere in the view, or focus leaving the editor
+    // commits the edit; Escape and cancel_label_edit cancel it. Each ended
+    // edit raises after_label_edit once, after the editor has closed. A
+    // committed label after_label_edit does not cancel becomes an ordinary
+    // item's text; in a virtual view the application stores it while
+    // handling after_label_edit, and the view shows what the source then
+    // retrieves. Replacing or sorting the items, a new virtual source or
+    // refresh_virtual_items cancels the edit once the change is made, before
+    // any selection event; scrolling keeps it, the editor following its item.
+    // A slow second click on the focused item does not begin an edit yet: the
+    // host does not report its double-click interval. Turning label_edit off
+    // cancels an edit in progress.
+    [[nodiscard]] bool label_edit() const noexcept { return label_edit_; }
+    void set_label_edit(bool enabled);
+    // Begins editing the label of the item at `index`, after committing any
+    // other edit in progress: raises before_label_edit, scrolls the item into
+    // view and focuses the editor. True when the item is in edit (also when
+    // it already was); false when label_edit is off, the view does not show
+    // the item (a details view without columns), or a handler cancelled,
+    // changed the items or disposed the view. Throws std::out_of_range for an
+    // index past the end.
+    bool begin_label_edit(std::size_t index);
+    // Commits the edit in progress, if any.
+    void end_label_edit();
+    // Cancels the edit in progress, if any.
+    void cancel_label_edit();
+    // The item in edit, if any.
+    [[nodiscard]] std::optional<std::size_t> label_edit_index() const noexcept { return label_edit_index_; }
+    // The editor; null until the view's first edit.
+    [[nodiscard]] std::shared_ptr<TextBox> label_editor() const noexcept { return label_editor_; }
 
     [[nodiscard]] Event<const ListViewSelectionChange&>& selection_changed() noexcept {
         return selection_changed_;
@@ -268,10 +367,13 @@ public:
     [[nodiscard]] Event<const ListViewColumnWidthChange&>& column_width_changed() noexcept {
         return column_width_changed_;
     }
+    [[nodiscard]] Event<ListViewLabelEdit&>& before_label_edit() noexcept { return before_label_edit_; }
+    [[nodiscard]] Event<ListViewLabelEdit&>& after_label_edit() noexcept { return after_label_edit_; }
 
     void arrange(Rect final_bounds) override;
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_pointer(PointerEvent& event) override;
+    void on_key_preview(KeyEvent& event) override;
     void on_key(KeyEvent& event) override;
     void on_text_input(TextInputEvent& event) override;
     void on_focus_changed(bool focused) override;
@@ -293,6 +395,10 @@ public:
         PartGeometry horizontal_scroll_bar;
         PartGeometry scroll_corner;
         PartGeometry focus;
+        // The bar of the insertion mark; absent without a shown mark.
+        PartGeometry insertion_mark;
+        // The TextBox of a label edit; absent while no item is in edit.
+        PartGeometry label_editor;
     };
     [[nodiscard]] Parts parts() const;
 
@@ -451,7 +557,12 @@ private:
     [[nodiscard]] std::size_t realized_sub_item_count(const Layout& placed) const noexcept;
     [[nodiscard]] std::size_t realized_sub_item_column(const Layout& placed, std::size_t position) const noexcept;
 
-    void paint_item(Painter& painter, const Layout& placed, std::size_t index);
+    // Paints one item; false when an owner-draw handler changed the model
+    // or disposed the view, so that the paint stops.
+    [[nodiscard]] bool paint_item(Painter& painter, const Layout& placed, std::size_t index);
+    // Whether the view is alive and its model is the one `revision` named
+    // before an owner-draw handler ran.
+    [[nodiscard]] bool model_unchanged(std::uint64_t revision) const noexcept;
     void paint_column(Painter& painter, const Layout& placed, std::size_t column);
 
     void set_top_line(std::size_t line);
@@ -480,6 +591,17 @@ private:
     void activate(std::size_t index);
     void request_column_click(std::size_t column);
     void finish_column_resize();
+    [[nodiscard]] Rect insertion_mark_bounds(const Layout& placed) const noexcept;
+    // Label editing. label_editor_bounds is the edited item's text part,
+    // empty while the item is scrolled out of view.
+    [[nodiscard]] Rect label_editor_bounds(const Layout& placed) const;
+    void place_label_editor(const Layout& placed);
+    void create_label_editor();
+    [[nodiscard]] ListViewLabelEdit label_edit_event(std::optional<std::string> label) const;
+    // Hides the editor and leaves edit, returning focus to the view when the
+    // editor held it. Raises no label event.
+    void close_label_editor();
+    void on_label_editor_focus(bool focused);
     [[nodiscard]] std::optional<std::size_t> navigation_target(std::uint32_t key, std::size_t from,
                                                                const Layout& placed) const;
     void type_select(std::string_view text);
@@ -498,6 +620,15 @@ private:
     std::optional<std::size_t> anchor_index_{};
     std::optional<std::size_t> hot_index_{};
     std::optional<std::size_t> hot_column_{};
+    std::optional<ListViewInsertionMark> insertion_mark_{};
+    bool label_edit_{};
+    // Set while close_label_editor moves focus, so that the editor's focus
+    // loss does not end the edit a second time.
+    bool closing_label_editor_{};
+    std::optional<std::size_t> label_edit_index_{};
+    std::string label_edit_item_id_{};
+    std::shared_ptr<TextBox> label_editor_{};
+    SubscriptionToken label_editor_focus_{};
     std::optional<std::size_t> pressed_column_{};
     std::optional<std::size_t> resizing_column_{};
     double resize_start_x_{};
@@ -508,6 +639,10 @@ private:
     ListViewView view_{ListViewView::details};
     std::optional<std::size_t> sort_column_{};
     ListViewSortOrder sort_order_{ListViewSortOrder::none};
+    ItemDrawMode draw_mode_{ItemDrawMode::normal};
+    // Moves with every change to the items, their order, the columns or the
+    // view, so that a paint can tell an owner-draw handler changed them.
+    std::uint64_t model_revision_{};
     bool check_boxes_{};
     bool multi_select_{true};
     bool full_row_select_{};
@@ -525,6 +660,8 @@ private:
     // Paint scratch, reused for every item of a paint pass.
     ListViewItem paint_item_{};
     std::string paint_text_{};
+    // The painted item's identity while owner-draw handlers run.
+    std::string paint_stable_id_{};
     // Type-ahead.
     std::string type_prefix_{};
     std::chrono::steady_clock::time_point last_type_time_{};
@@ -534,6 +671,9 @@ private:
     Event<const ListViewItemCheck&> item_checked_{};
     Event<const ListViewColumnClick&> column_click_{};
     Event<const ListViewColumnWidthChange&> column_width_changed_{};
+    Event<ListViewLabelEdit&> before_label_edit_{};
+    Event<ListViewLabelEdit&> after_label_edit_{};
+    Event<ItemContentPaint&> draw_item_content_{};
 };
 
 } // namespace gui_forms

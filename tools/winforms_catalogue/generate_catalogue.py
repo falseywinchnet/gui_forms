@@ -948,7 +948,7 @@ def write_summary(path: Path, rows: list[dict[str, str]]) -> None:
         "",
         "## Regeneration",
         "",
-        "See `tools/winforms_catalogue/README.md`. Regeneration is deterministic for the pinned inputs and writes `planning/generated/WINFORMS_API_CATALOGUE.tsv` plus this summary.",
+        "See `tools/winforms_catalogue/README.md`. Regeneration is deterministic for the pinned inputs and writes `planning/generated/WINFORMS_API_CATALOGUE.tsv` plus this summary, both kept on the `gui_forms` branch of `malkuth-software/notes`.",
         "",
     ]
     path.write_text("\n".join(lines), encoding="utf-8")

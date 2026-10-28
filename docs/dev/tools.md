@@ -4,6 +4,13 @@ The scripts and programs under `tools/` that a contributor runs. Commands run
 from the repository root. Each Python script prints its full options with
 `--help`.
 
+The shared CI tools and the checkers (`check_house_style.py`,
+`check_lifetime_rules.py`, `check_state_machines.py`, `windows_toolchain.py`,
+the `ci_*.py` tools and the rest that `tools/harness_link.py` lists) live in
+template_harness, checked out beside this repository at the commit
+`harness.lock` pins. Their `tools/` paths below are forwarding shims to it:
+[GUI.Forms builds through template_harness](../building/template-harness.md).
+
 ## Documentation and the control registry
 
 `tools/control_registry.py`
@@ -26,7 +33,10 @@ from the repository root. Each Python script prints its full options with
   `docs/reference/contracts/`. Without options it rewrites the inventory;
   `--check` fails on a stale inventory or an invalid contract. The dump
   depends on the compiler build, so run it with LLVM 22.1.8 (`--clang`).
-  `python3 tools/api_reference.py --check --clang /path/to/clang++`
+  The headers compile with the include directories a configured build tree
+  records (`--build`): gui_forms_core's and its public dependencies', which
+  CMake writes to `api_reference_include_directories.txt` in that tree.
+  `python3 tools/api_reference.py --check --build /path/to/build --clang /path/to/clang++`
 
 ## House style
 
@@ -38,12 +48,12 @@ from the repository root. Each Python script prints its full options with
 
 `tools/check_lifetime_rules.py`
 : The borrow and foreign-type checks the `house-style` job runs (house style
-  sections 5 and 9). Heuristics over masked source, like the spelling
+  sections 1 and 2). Heuristics over masked source, like the spelling
   scanner; they do not check destruction order.
   `python3 -B tools/check_lifetime_rules.py tests/semantic_tests.cpp`
 
 `tools/check_state_machines.py`
-: The state-machine checker (house style sections 1 and 9). With
+: The state-machine checker (house style sections 2 and 3). With
   `--build-dir`, it runs the compiler's switch warnings over a configured
   ninja tree. The `state-machine-gate` CI job
   (`.github/workflows/state-machines.yml`) runs it with `--gate`, which
@@ -85,7 +95,10 @@ from the repository root. Each Python script prints its full options with
   that requests for missing CMake components fail. `--native` exercises the
   `Application` component, `--relocate` copies the SDK to a new prefix first,
   and `--toolchain` and `--runner` build the consumer with another CMake
-  toolchain and run its tests through an emulator.
+  toolchain and run its tests through an emulator. `--feature-components`
+  (with `--native`) also builds and runs `tests/installed_feature_consumer/`
+  against a `build_sdk.py --features all` prefix, through the `TextMasks` and
+  `AudioLoopTransport` components. Without it, those two must be rejected.
   `python3 tools/verify_install.py /path/to/prefix --native`
 
 `tools/package_programs.py`
@@ -155,6 +168,16 @@ from the repository root. Each Python script prints its full options with
   (`tests/unicode_grapheme_break_cases.hpp`) from the downloaded Unicode data
   files, whose hashes it checks.
   `python3 tools/unicode/generate_grapheme_tables.py --grapheme GraphemeBreakProperty.txt --derived DerivedCoreProperties.txt --emoji emoji-data.txt --test GraphemeBreakTest.txt --tables-output src/core/text/unicode/unicode_grapheme_data.hpp --tests-output tests/unicode_grapheme_break_cases.hpp`
+
+`tools/profile_hot_paths.py`
+: Phase E, E5: on Linux, builds the recorded workloads (the Gallery painted
+  through the CPU Skia adapter, `benchmarks/paint_profile_workload.cpp`; the
+  text engine and DocumentView benchmarks) with frame pointers, samples each
+  under `perf record`, and writes `hot-paths.json` and `hot-paths.md`: every
+  function's share of the samples, self and inclusive, and each area's
+  (GUI.Forms, Skia, HarfBuzz, FreeType, runtime, kernel). Shares, not
+  timings. `.github/workflows/profile-linux.yml` runs it weekly and on demand.
+  `python3 gui_forms/tools/profile_hot_paths.py run --output hot-paths --jobs 4`
 
 `tools/linux_vm/`
 : A Lima definition for an Alpine aarch64 (musl) guest with Clang 22, Xvfb

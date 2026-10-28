@@ -1,4 +1,4 @@
-// E9.6, fills and shape (planning/stages/T2-engine-core/CSS_COVERAGE.md,
+// E9.6, fills and shape (notes:planning/stages/T2-engine-core/CSS_COVERAGE.md,
 // rows 1 to 4): the material primitive's repeating radial and conic
 // gradients, per-corner radii, its `shape` parameter, and dashed and dotted
 // borders. Each is checked by what it draws at chosen pixels, and by

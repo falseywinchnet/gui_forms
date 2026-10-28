@@ -29,7 +29,8 @@ gui_forms::ListView
       **stable_id** : ``StableId``
          Identity of the view, unique within its window. Its scroll bars are
          child controls named ``<stable_id>.vertical_scroll_bar`` and
-         ``<stable_id>.horizontal_scroll_bar``.
+         ``<stable_id>.horizontal_scroll_bar``; the label editor, made on the
+         view's first label edit, is ``<stable_id>.label_editor``.
 
    :Properties:
 
@@ -105,6 +106,26 @@ gui_forms::ListView
       **font** : ``FontSpec``
          The font of item and header text.
 
+      **draw_mode** : ``ItemDrawMode``, default ``ItemDrawMode::normal``
+         With ``ItemDrawMode::owner_draw`` the application draws the items'
+         content (Windows Forms' ``OwnerDraw``): see :cpp:func:`draw_item_content <gui_forms::ListView::draw_item_content>`. Throws
+         ``std::invalid_argument`` for an unknown mode.
+
+      **insertion_mark** : ``std::optional<ListViewInsertionMark>``, default none, read-only
+         Where the insertion mark stands, as an item's index and whether the mark
+         is after it, or none. See :cpp:func:`show_insertion_mark <gui_forms::ListView::show_insertion_mark>`.
+
+      **label_edit** : ``bool``, default ``false``
+         Whether the user may edit items' labels in place (Windows Forms'
+         ``LabelEdit``): F2 on the focused item begins an edit. Turning it off
+         cancels an edit in progress.
+
+      **label_edit_index** : ``std::optional<std::size_t>``, read-only
+         The item in edit, or none.
+
+      **label_editor** : ``std::shared_ptr<TextBox>``, read-only
+         The :cpp:class:`TextBox <gui_forms::TextBox>` of a label edit, or null before the view's first edit.
+
       **parts** : ``Parts``, read-only
 
       **realized_items** : ``std::vector<Item>``, read-only
@@ -117,6 +138,19 @@ gui_forms::ListView
          The visible column headers.
 
    :Events:
+
+      **draw_item_content** : ``Event<ItemContentPaint&>``
+         Raised while the view paints in the owner-draw mode, with an
+         :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>`: once for each painted item's own content (column 0,
+         its icon and text area) and, in the details view, once for each visible
+         sub-item cell (its column), in paint order (Windows Forms' ``DrawItem`` and
+         ``DrawSubItem``). The painter is clipped to the content rectangle; the
+         item's plate, check box and focus cue are already painted by role.
+         ``text`` and :cpp:func:`font <gui_forms::ListView::font>` are the default content's. Set ``draw_default`` to add
+         the default content. Column headers are not owner-drawn. A handler
+         paints only; one that changes the items, their order, the columns or
+         the view, or disposes the view, ends that paint, and the view is painted
+         again.
 
       **selection_changed** : ``Event<const ListViewSelectionChange&>``
          Raised after the set of selected items changes, by the user or the
@@ -142,6 +176,17 @@ gui_forms::ListView
       **column_width_changed** : ``Event<const ListViewColumnWidthChange&>``
          Raised when a divider drag ends with a new width, or :cpp:func:`set_column_width <gui_forms::ListView::set_column_width>`
          changes one.
+
+      **before_label_edit** : ``Event<ListViewLabelEdit&>``
+         Raised before an item enters label edit, with its index and ID and no
+         label. A handler may cancel, and the item stays out of edit.
+
+      **after_label_edit** : ``Event<ListViewLabelEdit&>``
+         Raised once for each ended label edit, after the editor has closed, with
+         the edited text as the label, or no label when the edit was cancelled. A
+         handler may cancel to refuse the text, and the item keeps its text;
+         otherwise the label becomes an ordinary item's text. In virtual mode the
+         handler stores the label in the application's data.
 
    :Inherited:
 
@@ -173,6 +218,18 @@ gui_forms::ListView
         - A helper for a column_click handler: stable-sorts an ordinary view's items by one column's text (ASCII case folded, then byte order) and shows the sort glyph.
       * - :cpp:func:`item_index_at <gui_forms::ListView::item_index_at>`
         - The item under a point in window coordinates, or none.
+      * - :cpp:func:`show_insertion_mark <gui_forms::ListView::show_insertion_mark>`
+        - Shows the insertion mark, the bar an application shows in the gap where a dragged item would drop: before or after an item, which is above or below it in the details and list views and left or right of it in the icon views.
+      * - :cpp:func:`clear_insertion_mark <gui_forms::ListView::clear_insertion_mark>`
+        - Removes the insertion mark.
+      * - :cpp:func:`insertion_mark_at <gui_forms::ListView::insertion_mark_at>`
+        - The mark nearest a point in window coordinates (Windows Forms' ``InsertionMark.NearestIndex``), with the point clamped into the item area: the item under or nearest it, and after it when the point is past the item's middle across the gap.
+      * - :cpp:func:`begin_label_edit <gui_forms::ListView::begin_label_edit>`
+        - Puts an item in label edit (Windows Forms' ``ListViewItem.BeginEdit``), after committing any other edit: raises :cpp:func:`before_label_edit <gui_forms::ListView::before_label_edit>`, scrolls the item into view and places the editor, with the item's text selected, over its ``text`` part.
+      * - :cpp:func:`end_label_edit <gui_forms::ListView::end_label_edit>`
+        - Commits the edit in progress, if any.
+      * - :cpp:func:`cancel_label_edit <gui_forms::ListView::cancel_label_edit>`
+        - Cancels the edit in progress, if any.
       * - :cpp:func:`set_column_width <gui_forms::ListView::set_column_width>`
         - Sets one column's width in logical units.
       * - :cpp:func:`set_item_checked <gui_forms::ListView::set_item_checked>`
@@ -201,7 +258,7 @@ gui_forms::ListView
    Items are records, not child controls, and every part is painted through the
    by-role paint path (``paint_part``). The view publishes ``region``, ``well``,
    ``header``, ``vertical_scroll_bar``, ``horizontal_scroll_bar``,
-   ``scroll_corner`` and ``focus``. Three item systems describe the visible
+   ``scroll_corner``, ``focus``, ``insertion_mark`` and ``label_editor``. Three item systems describe the visible
    items: ``item`` (``cell``, ``item_face``, ``check_well``, ``check``,
    ``icon``, ``text`` and ``cell_focus``, with the states selected, hot,
    current, checked, disabled and focus_visible), ``sub_item`` (``sub_item_cell``
@@ -228,6 +285,13 @@ gui_forms::ListView
    activates. Typing the first letters of an item's text selects the next
    matching item; virtual views do not search yet.
 
+   With :cpp:func:`label_edit <gui_forms::ListView::label_edit>` on, F2 begins editing the focused item's label in a
+   :cpp:class:`TextBox <gui_forms::TextBox>` over its text. Enter, a press elsewhere in the view, or focus
+   leaving the editor commits the edit; Escape cancels it. Replacing or
+   sorting the items, a new virtual source or :cpp:func:`refresh_virtual_items <gui_forms::ListView::refresh_virtual_items>` cancels
+   an edit once the change is made. Scrolling keeps the edit: the editor
+   follows its item, at no size while the item is out of view.
+
    In the details view the control publishes the accessibility role ``table``,
    with the item count and the column count; in the other views it publishes
    ``list``. It is ``multiselectable`` while :cpp:func:`multi_select <gui_forms::ListView::multi_select>` is on. In the details
@@ -239,9 +303,10 @@ gui_forms::ListView
    The select action selects an item; press activates it, or toggles a
    check-box item.
 
-   Not supported yet: groups, the tile view, label editing, the insertion mark,
-   owner drawing, item tooltips, hot-tracking activation, column reordering,
-   type-ahead in virtual mode, and wrapping large-icon labels over two lines.
+   Not supported yet: groups, the tile view, item tooltips, hot-tracking
+   activation, column reordering, type-ahead in virtual mode, wrapping
+   large-icon labels over two lines, and beginning a label edit with a slow
+   second click on the focused item.
 
    .. rubric:: Examples
 
@@ -409,6 +474,39 @@ gui_forms::ListView
 
       Sets :cpp:func:`font <gui_forms::ListView::font>`; see the property's description above.
 
+   .. cpp:function:: ItemDrawMode draw_mode() const noexcept
+
+      With ``ItemDrawMode::owner_draw`` the application draws the items'
+      content (Windows Forms' ``OwnerDraw``): see :cpp:func:`draw_item_content <gui_forms::ListView::draw_item_content>`. Throws
+      ``std::invalid_argument`` for an unknown mode.
+
+   .. cpp:function:: void set_draw_mode(ItemDrawMode mode)
+
+      Sets :cpp:func:`draw_mode <gui_forms::ListView::draw_mode>`; see the property's description above.
+
+   .. cpp:function:: std::optional<ListViewInsertionMark> insertion_mark() const noexcept
+
+      Where the insertion mark stands, as an item's index and whether the mark
+      is after it, or none. See :cpp:func:`show_insertion_mark <gui_forms::ListView::show_insertion_mark>`.
+
+   .. cpp:function:: bool label_edit() const noexcept
+
+      Whether the user may edit items' labels in place (Windows Forms'
+      ``LabelEdit``): F2 on the focused item begins an edit. Turning it off
+      cancels an edit in progress.
+
+   .. cpp:function:: void set_label_edit(bool enabled)
+
+      Sets :cpp:func:`label_edit <gui_forms::ListView::label_edit>`; see the property's description above.
+
+   .. cpp:function:: std::optional<std::size_t> label_edit_index() const noexcept
+
+      The item in edit, or none.
+
+   .. cpp:function:: std::shared_ptr<TextBox> label_editor() const noexcept
+
+      The :cpp:class:`TextBox <gui_forms::TextBox>` of a label edit, or null before the view's first edit.
+
    .. cpp:function:: Parts parts() const
 
    .. cpp:function:: std::vector<Item> realized_items() const
@@ -425,6 +523,20 @@ gui_forms::ListView
 
 
    .. rubric:: Events
+
+   .. cpp:function:: Event<ItemContentPaint&>& draw_item_content() noexcept
+
+      Raised while the view paints in the owner-draw mode, with an
+      :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>`: once for each painted item's own content (column 0,
+      its icon and text area) and, in the details view, once for each visible
+      sub-item cell (its column), in paint order (Windows Forms' ``DrawItem`` and
+      ``DrawSubItem``). The painter is clipped to the content rectangle; the
+      item's plate, check box and focus cue are already painted by role.
+      ``text`` and :cpp:func:`font <gui_forms::ListView::font>` are the default content's. Set ``draw_default`` to add
+      the default content. Column headers are not owner-drawn. A handler
+      paints only; one that changes the items, their order, the columns or
+      the view, or disposes the view, ends that paint, and the view is painted
+      again.
 
    .. cpp:function:: Event<const ListViewSelectionChange&>& selection_changed() noexcept
 
@@ -456,6 +568,19 @@ gui_forms::ListView
 
       Raised when a divider drag ends with a new width, or :cpp:func:`set_column_width <gui_forms::ListView::set_column_width>`
       changes one.
+
+   .. cpp:function:: Event<ListViewLabelEdit&>& before_label_edit() noexcept
+
+      Raised before an item enters label edit, with its index and ID and no
+      label. A handler may cancel, and the item stays out of edit.
+
+   .. cpp:function:: Event<ListViewLabelEdit&>& after_label_edit() noexcept
+
+      Raised once for each ended label edit, after the editor has closed, with
+      the edited text as the label, or no label when the edit was cancelled. A
+      handler may cancel to refuse the text, and the item keeps its text;
+      otherwise the label becomes an ordinary item's text. In virtual mode the
+      handler stores the label in the application's data.
 
 
    .. rubric:: Methods
@@ -507,6 +632,43 @@ gui_forms::ListView
 
       The item under a point in window coordinates, or none.
 
+   .. cpp:function:: bool show_insertion_mark(ListViewInsertionMark mark)
+
+      Shows the insertion mark, the bar an application shows in the gap where
+      a dragged item would drop: before or after an item, which is above or
+      below it in the details and list views and left or right of it in the
+      icon views. It is painted by the theme's drop role and published as the
+      :cpp:func:`insertion_mark <gui_forms::ListView::insertion_mark>` part. Any change to the items or their order clears
+      it. Returns false, clearing any mark, for an index past the items.
+
+   .. cpp:function:: void clear_insertion_mark() noexcept
+
+      Removes the insertion mark.
+
+   .. cpp:function:: std::optional<ListViewInsertionMark> insertion_mark_at(Point window_point) const
+
+      The mark nearest a point in window coordinates (Windows Forms'
+      ``InsertionMark.NearestIndex``), with the point clamped into the item
+      area: the item under or nearest it, and after it when the point is past
+      the item's middle across the gap. None when no item is shown.
+
+   .. cpp:function:: bool begin_label_edit(std::size_t index)
+
+      Puts an item in label edit (Windows Forms' ``ListViewItem.BeginEdit``),
+      after committing any other edit: raises :cpp:func:`before_label_edit <gui_forms::ListView::before_label_edit>`, scrolls the
+      item into view and places the editor, with the item's text selected,
+      over its ``text`` part. Returns false when :cpp:func:`label_edit <gui_forms::ListView::label_edit>` is off, the view
+      does not show the item, or a handler cancelled or changed the items.
+      Throws ``std::out_of_range`` for an index past the end.
+
+   .. cpp:function:: void end_label_edit()
+
+      Commits the edit in progress, if any.
+
+   .. cpp:function:: void cancel_label_edit()
+
+      Cancels the edit in progress, if any.
+
    .. cpp:function:: void set_column_width(std::size_t column, double width)
 
       Sets one column's width in logical units. Throws ``std::out_of_range`` for
@@ -533,6 +695,8 @@ gui_forms::ListView
    .. cpp:function:: void on_paint(Painter& painter, Rect local_damage) override
 
    .. cpp:function:: void on_pointer(PointerEvent& event) override
+
+   .. cpp:function:: void on_key_preview(KeyEvent& event) override
 
    .. cpp:function:: void on_key(KeyEvent& event) override
 

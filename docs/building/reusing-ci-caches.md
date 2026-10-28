@@ -217,7 +217,7 @@ revision to `packaging/pinned_cache_revisions.json`.
 ## CI job times
 
 Hosted job durations from the Actions API, excluding queue time, recorded
-in `docs/notes/CI_TIMING_2026-10-08.md`. A fresh job builds the Release
+in [`docs/notes/CI_TIMING_2026-10-08.md`](https://github.com/malkuth-software/notes/blob/gui_forms/docs-notes/CI_TIMING_2026-10-08.md). A fresh job builds the Release
 toolkit, runs all tests, installs the SDK, builds and tests the installed
 examples and runs the development text profiles. The workflow has gained
 steps since; these are the recorded numbers, not a promise.

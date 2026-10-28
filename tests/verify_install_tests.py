@@ -53,13 +53,42 @@ class VerifyInstallTests(unittest.TestCase):
             with patch.object(sys, 'argv', arguments):
                 with patch('verify_install.run', side_effect=recorder.run):
                     verify_install.main()
-            self.assertEqual(len(recorder.commands), 5)
+            self.assertEqual(len(recorder.commands), 9)
             self.assertEqual(recorder.commands[0][0:2], ['cmake', '-S'])
             self.assertEqual(recorder.commands[1][0:2], ['cmake', '--build'])
             self.assertEqual(recorder.commands[2][0:2], ['ctest', '--test-dir'])
-            self.assertEqual(recorder.expected_success, [True, True, True, False, False])
+            self.assertEqual(recorder.expected_success, [True, True, True, False, False, False, False, False, False])
+            rejected: list[str] = [Path(command[command.index('-B') + 1]).name for command in recorder.commands[3:]]
+            self.assertEqual(rejected, ['NotAComponent', 'Application', 'TextMasks', 'AudioLoopTransport',
+                                        'FreeType', 'HarfBuzz'])
             self.assertIn('-DCMAKE_CROSSCOMPILING_EMULATOR=wine64;--fixture', recorder.commands[0])
             self.assertEqual(marker.read_text(encoding='utf-8'), 'unchanged fixture')
+
+    def test_feature_components_build_their_consumer(self) -> None:
+        temporary: str
+        with tempfile.TemporaryDirectory() as temporary:
+            prefix: Path = Path(temporary) / 'fixture-sdk'
+            prefix.mkdir()
+            recorder: CommandRecorder = CommandRecorder()
+            arguments: list[str] = ['verify_install.py', str(prefix), '--native', '--feature-components']
+            with patch.object(sys, 'argv', arguments):
+                with patch('verify_install.run', side_effect=recorder.run):
+                    verify_install.main()
+            self.assertEqual(recorder.expected_success, [True, True, True, True, True, True, False])
+            feature_configure: list[str] = recorder.commands[3]
+            self.assertTrue(feature_configure[2].endswith('feature-consumer'))
+            self.assertTrue(any(argument.startswith('-DGUI_FORMS_CONSUMER_MAIN=') and
+                                argument.endswith('main.cpp') for argument in feature_configure))
+            self.assertEqual(Path(recorder.commands[6][recorder.commands[6].index('-B') + 1]).name, 'NotAComponent')
+
+    def test_feature_components_need_the_native_host(self) -> None:
+        temporary: str
+        with tempfile.TemporaryDirectory() as temporary:
+            arguments: list[str] = ['verify_install.py', temporary, '--feature-components']
+            with patch.object(sys, 'argv', arguments):
+                with self.assertRaises(SystemExit):
+                    with patch('sys.stderr'):
+                        verify_install.main()
 
 
 if __name__ == '__main__':

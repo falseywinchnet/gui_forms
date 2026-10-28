@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 // A material's image fill (owner, 2026-10-22: supported, never used by a
@@ -16,6 +17,10 @@
 // a fill needs and how its pixels map onto the destination.
 
 namespace gui_forms::engine_primitives {
+
+// A mapped destination pixel that shows no image: one beyond a single
+// tile (MaterialImageMode::single).
+inline constexpr std::uint32_t outside_image = std::numeric_limits<std::uint32_t>::max();
 
 // An image's pixels as premultiplied RGBA8, rows packed: `width` × `height`
 // × 4 live bytes.
@@ -67,7 +72,8 @@ struct ImageAxisPlacement final {
 
 // The variant `fill` (fill layer `layer`) needs for a box of `box` device
 // pixels at `scale`: one tile for a tiled image, else the box's length
-// along each axis, rounded, at least 1; a nine-patch's fixed segments at
+// along each axis, rounded, at least 1 (one tile for a single image too);
+// a nine-patch's fixed segments at
 // their device lengths, rounded and kept within the variant. `fill` is an
 // image fill with a positive declared pixel size.
 [[nodiscard]] ImageVariantRequest image_variant_request(const MaterialFillLayer& fill, std::size_t layer, Rect box,
@@ -79,7 +85,8 @@ struct ImageAxisPlacement final {
 // pixels (both 0 but for a nine-patch). Each destination pixel's centre is
 // mapped proportionally within its segment (within its tile, for a tile)
 // and the variant pixel it falls on is taken; centres before or beyond the
-// box take the first or last pixel. `variant_length` is at least 1.
+// box take the first or last pixel, and those outside a single image's
+// tile take outside_image. `variant_length` is at least 1.
 void map_image_variant(const ImageAxisPlacement& placement, std::uint32_t variant_length, std::uint32_t fixed_start,
                        std::uint32_t fixed_end, std::uint32_t outputs, std::vector<std::uint32_t>& map);
 

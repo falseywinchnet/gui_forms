@@ -23,13 +23,19 @@ if(GUI_FORMS_EXAMPLE_NATIVE)
     target_link_libraries(paint_contract PRIVATE GUIForms::Application)
     if(WIN32)
         add_custom_command(TARGET paint_contract POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_FILE:GUIForms::Application> $<TARGET_FILE_DIR:paint_contract>
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${GUIForms_FONT_DIR}" "$<TARGET_FILE_DIR:paint_contract>/fonts")
     endif()
 else()
     target_link_libraries(paint_contract PRIVATE GUIForms::Controls GUIForms::Drawing)
+endif()
+if(WIN32)
+    # Every installed DLL the program loads (Threading always, Application when
+    # native) beside it, so it runs without the SDK's bin/ on PATH.
+    add_custom_command(TARGET paint_contract POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:paint_contract> $<TARGET_FILE_DIR:paint_contract>
+        COMMAND_EXPAND_LISTS)
 endif()
 enable_testing()
 add_test(NAME paint_contract COMMAND paint_contract)

@@ -56,36 +56,40 @@ std::vector<std::byte> encode_clipboard_dib(HostImageView image) {
     }
     return bytes;
 }
-HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes) {
-    HostClipboardImageResult result;
-    result.status.error = HostServiceError::backend_failure;
-    if (bytes.size() < 40U) return result;
+HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes, std::uint64_t generation) {
+    // Malformed bytes are a backend failure; an image this decoder cannot
+    // represent is unsupported, and one over the pixel bound too large.
+    const HostClipboardImageResult malformed = HostClipboardImageResult::failed(HostServiceError::backend_failure);
+    const HostClipboardImageResult unsupported = HostClipboardImageResult::failed(HostServiceError::unsupported);
+    if (bytes.size() < 40U) return malformed;
     const std::uint32_t header = u32(bytes, 0);
-    if ((header != 40U && header != 108U && header != 124U) || bytes.size() < header) return result;
+    if ((header != 40U && header != 108U && header != 124U) || bytes.size() < header) return malformed;
     const std::uint32_t width = u32(bytes, 4);
     const std::uint32_t signed_height = u32(bytes, 8);
     const bool top_down = (signed_height & 0x80000000U) != 0U;
     const std::uint32_t height = top_down ? 0U - signed_height : signed_height;
-    if (width == 0U || width > 0x7fffffffU || height == 0U || height > 0x7fffffffU || u16(bytes, 12) != 1U) return result;
+    if (width == 0U || width > 0x7fffffffU || height == 0U || height > 0x7fffffffU || u16(bytes, 12) != 1U) {
+        return malformed;
+    }
     const std::uint64_t pixel_count = static_cast<std::uint64_t>(width) * height;
-    if (pixel_count > HostImage::maximum_pixels) { result.status.error = HostServiceError::too_large; return result; }
+    if (pixel_count > HostImage::maximum_pixels) return HostClipboardImageResult::failed(HostServiceError::too_large);
     const std::uint16_t bits = u16(bytes, 14);
     const std::uint32_t compression = u32(bytes, 16);
     std::size_t start = header;
     std::uint32_t masks[4]{0x00ff0000U, 0x0000ff00U, 0x000000ffU, 0U};
     if ((bits != 24U && bits != 32U) || (compression != 0U && compression != 3U) ||
         (bits == 24U && compression != 0U)) {
-        result.status.error = HostServiceError::unsupported; return result;
+        return unsupported;
     }
     if (header >= 108U) {
         const std::uint32_t color_space = u32(bytes, 56);
         if (color_space != 0x73524742U && color_space != 0x57696e20U) {
-            result.status.error = HostServiceError::unsupported; return result;
+            return unsupported;
         }
     }
     if (compression == 3U) {
         if (header == 40U) {
-            if (bytes.size() < 52U) return result;
+            if (bytes.size() < 52U) return malformed;
             start += 12U;
         }
         for (std::size_t index = 0; index < 3U; ++index) masks[index] = u32(bytes, 40U + index * 4U);
@@ -94,42 +98,59 @@ HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes) 
         for (std::size_t index = 0; index < 4U; ++index) {
             if (index == 3U && masks[index] == 0U) continue;
             if (!byte_mask(masks[index]) || (occupied & masks[index]) != 0U) {
-                result.status.error = HostServiceError::unsupported; return result;
+                return unsupported;
             }
             occupied |= masks[index];
         }
     }
     const std::uint32_t palette = u32(bytes, 32);
-    if (palette > 256U || palette * 4U > bytes.size() - start) return result;
+    if (palette > 256U || palette * 4U > bytes.size() - start) return malformed;
     start += palette * 4U;
     const std::uint64_t stride = ((static_cast<std::uint64_t>(width) * bits + 31U) / 32U) * 4U;
-    if (stride * height > bytes.size() - start) return result;
+    if (stride * height > bytes.size() - start) return malformed;
     HostImage image{};
     image.width = width;
     image.height = height;
     image.row_bytes = static_cast<std::uint64_t>(width) * 4U;
     image.pixels.resize(static_cast<std::size_t>(pixel_count * 4U));
-    for (std::uint32_t y = 0; y < height; ++y) {
-        const std::uint32_t source_y = top_down ? y : height - 1U - y;
-        const std::byte* source = bytes.data() + start + static_cast<std::size_t>(stride) * source_y;
-        std::byte* target = image.pixels.data() + static_cast<std::size_t>(image.row_bytes) * y;
-        for (std::uint32_t x = 0; x < width; ++x) {
-            const std::size_t dest = static_cast<std::size_t>(x) * 4U;
-            if (bits == 24U) {
+    // A bottom-up DIB stores the image's last row first: its rows are walked
+    // from the end of the pixel data backwards. stride * height fits the
+    // bytes (checked above), so both walks stay inside them.
+    const std::ptrdiff_t row_step = static_cast<std::ptrdiff_t>(stride);
+    const std::ptrdiff_t source_step = top_down ? row_step : -row_step;
+    const std::byte* const first_source_row =
+        bytes.data() + start + (top_down ? 0U : static_cast<std::size_t>(stride) * (height - 1U));
+    if (bits == 24U) {
+        for (std::uint32_t y = 0; y < height; ++y) {
+            const std::byte* source = first_source_row + source_step * static_cast<std::ptrdiff_t>(y);
+            std::byte* target = image.pixels.data() + static_cast<std::size_t>(image.row_bytes) * y;
+            for (std::uint32_t x = 0; x < width; ++x) {
+                const std::size_t dest = static_cast<std::size_t>(x) * 4U;
                 const std::size_t offset = static_cast<std::size_t>(x) * 3U;
                 target[dest] = source[offset + 2U]; target[dest + 1U] = source[offset + 1U];
                 target[dest + 2U] = source[offset]; target[dest + 3U] = std::byte{255};
-            } else {
-                const std::uint32_t pixel = u32({source + dest, 4U}, 0);
-                for (std::size_t channel = 0; channel < 4U; ++channel) {
-                    target[dest + channel] = channel == 3U && masks[3] == 0U ? std::byte{255} :
-                        static_cast<std::byte>((pixel & masks[channel]) >> shift_for(masks[channel]));
-                }
             }
         }
+        return HostClipboardImageResult::image_read(std::move(image), generation);
     }
-    result.status = {};
-    result.image = std::move(image);
-    return result;
+    // 32 bits: every mask is one whole byte of the pixel (checked above), read
+    // at its shift. Without an alpha mask the alpha reads as zero and the
+    // fill makes it opaque.
+    unsigned shifts[4]{};
+    for (std::size_t channel = 0; channel < 4U; ++channel) shifts[channel] = shift_for(masks[channel]);
+    const std::byte alpha_fill = masks[3] == 0U ? std::byte{255} : std::byte{0};
+    for (std::uint32_t y = 0; y < height; ++y) {
+        const std::byte* source = first_source_row + source_step * static_cast<std::ptrdiff_t>(y);
+        std::byte* target = image.pixels.data() + static_cast<std::size_t>(image.row_bytes) * y;
+        for (std::uint32_t x = 0; x < width; ++x) {
+            const std::size_t dest = static_cast<std::size_t>(x) * 4U;
+            const std::uint32_t pixel = u32({source + dest, 4U}, 0);
+            for (std::size_t channel = 0; channel < 3U; ++channel) {
+                target[dest + channel] = static_cast<std::byte>((pixel & masks[channel]) >> shifts[channel]);
+            }
+            target[dest + 3U] = static_cast<std::byte>((pixel & masks[3]) >> shifts[3]) | alpha_fill;
+        }
+    }
+    return HostClipboardImageResult::image_read(std::move(image), generation);
 }
 } // namespace gui_forms::detail

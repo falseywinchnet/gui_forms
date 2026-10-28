@@ -2,7 +2,7 @@
 # --sanitize). Only system libraries the tests load, and their internal
 # allocation sites, are listed: their process-lifetime caches are not
 # GUI.Forms leaks. Never add a first-party frame here; a GUI.Forms leak is a
-# defect to fix (house style section 5). docs/building/index.md says how the
+# defect to fix (house style section 1). docs/building/index.md says how the
 # macOS baseline was checked.
 #
 # Function rules name only frames inside system libraries, and use the

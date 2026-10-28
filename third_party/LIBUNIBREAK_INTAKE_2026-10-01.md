@@ -52,7 +52,7 @@ house-style review; upstream code and data retain their original licenses.
 development text-mask profile to the text engine ("libunibreak is fine, can
 admit it"). Stage L's `TextBlock` wraps at UAX #14 opportunities through the
 text engine's `TextMetricsProvider`, and a control cannot otherwise reach the
-breaker (`planning/stages/L-layout/PLAN.md`, section 12.9). From that date:
+breaker ([`planning/stages/L-layout/PLAN.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/stages/L-layout/PLAN.md), section 12.9). From that date:
 
 - `gui_forms_linebreak` is built wherever `GUI_FORMS_ENABLE_HARFBUZZ_TEXT` is
   on (`cmake/LineBreak.cmake`, formerly `cmake/TextMaskLineBreak.cmake`), and

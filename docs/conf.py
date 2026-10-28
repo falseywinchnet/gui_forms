@@ -80,8 +80,6 @@ exclude_patterns = [
     "README.md",
     # Maintainer notes for the generated control indexes; not a user page.
     "controls/generated/README.md",
-    # Dated internal working notes moved out of the user tree (W2.4).
-    "notes/**",
     # Hand-written narratives and capture evidence read by
     # tools/generate_library_docs.py; not pages.
     "library/**",
@@ -189,7 +187,9 @@ MOVED_PAGES: dict[str, str] = {
     **{f"concepts/{page}": f"user/{page}" for page in USER_GUIDE_PAGES},
     **{f"api/{area}": f"api/library.{area}" for area in LIBRARY_AREAS},
     **{f"api/{category}-controls": f"api/controls.{category}" for category in CONTROL_CATEGORIES},
-    **{f"project/adr/ADR-{number}": f"dev/adr/ADR-{number}" for number in DECISION_RECORDS},
+    # The records moved to the notes repository; dev/decisions links to each.
+    **{f"project/adr/ADR-{number}": "dev/decisions" for number in DECISION_RECORDS},
+    **{f"dev/adr/ADR-{number}": "dev/decisions" for number in DECISION_RECORDS},
 }
 
 REDIRECT_PAGE: str = """<!DOCTYPE html>

@@ -227,7 +227,7 @@ private:
 //
 // A handler that throws while `close` publishes hands its exception to
 // close's caller. While the destructor publishes, the exception is contained
-// there (a destructor publishes without throwing, house style section 9) and
+// there (a destructor publishes without throwing, house style section 2) and
 // is lost; there is no error channel to report it on, so call `close` where a
 // handler may throw. Either way the batch's edits stand, the batch is closed,
 // the set stays consistent and usable, and the notifications of that

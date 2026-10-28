@@ -33,6 +33,8 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
      - Two panels separated by a seam that the user drags to share the space between them.
    * - :cpp:class:`SplitterPanel <gui_forms::SplitterPanel>`
      - One of the two panes of a :cpp:class:`SplitContainer <gui_forms::SplitContainer>`, which holds that pane's content.
+   * - :cpp:class:`Splitter <gui_forms::Splitter>`
+     - A bar docked after a docked control that resizes it by dragging.
    * - :cpp:class:`CommandOverflowPanel <gui_forms::CommandOverflowPanel>`
      - A horizontal row of command groups that hides whole groups, in an order you set, when the row is too narrow.
    * - :cpp:class:`MasterDetailView <gui_forms::MasterDetailView>`
@@ -52,6 +54,7 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
    generated/gui_forms.ScaledPanel
    generated/gui_forms.SplitContainer
    generated/gui_forms.SplitterPanel
+   generated/gui_forms.Splitter
    generated/gui_forms.CommandOverflowPanel
    generated/gui_forms.MasterDetailView
 
@@ -73,7 +76,7 @@ Related types
    * - :cpp:class:`CommandOverflowSnapshot <gui_forms::CommandOverflowSnapshot>`
      -  
    * - :cpp:class:`DockDragOutcome <gui_forms::DockDragOutcome>`
-     -  
+     - How a drag ended, with the subject dragged.
    * - :cpp:class:`DockFlyoutChange <gui_forms::DockFlyoutChange>`
      - Raised after a flyout opened (open true) or closed.
    * - :cpp:class:`DockNavigator::Item <gui_forms::DockNavigator::Item>`
@@ -134,6 +137,12 @@ Related types
      -  
    * - :cpp:class:`SplitSeamSnapshot <gui_forms::SplitSeamSnapshot>`
      -  
+   * - :cpp:class:`Splitter::Parts <gui_forms::Splitter::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`Splitter::States <gui_forms::Splitter::States>`
+     -  
+   * - :cpp:class:`SplitterMoveEvent <gui_forms::SplitterMoveEvent>`
+     - A move of a Splitter by the user.
    * - :cpp:class:`SplitterPanel::Parts <gui_forms::SplitterPanel::Parts>`
      - Stage T1 anatomy, as dot members: the scrollable parts and the face.
    * - :cpp:class:`TableLayoutCellPosition <gui_forms::TableLayoutCellPosition>`
@@ -257,31 +266,49 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: DockDragOutcome final
+.. cpp:class:: DockDragOutcome final
 
    ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
 
-   .. cpp:member:: DockDragEnd end
+   How a drag ended, with the subject dragged. Only a drop has a target and only a float a frame; the subject is common to every end. One alternative per state (house form for results).
 
-      Default: ``{DockDragEnd::escaped}``.
 
-   .. cpp:member:: DockSubject subject
+   .. rubric:: Properties
 
-   .. cpp:member:: std::optional<DockDropTarget> target
+   .. cpp:function:: DockDragEnd end() const noexcept
 
-      The target dropped on, for ``dropped``, in the coordinates of the site that showed it.
+   .. cpp:function:: const DockSubject& subject() const noexcept
 
-   .. cpp:member:: DockTransactionResult result
+   .. cpp:function:: const DockDropTarget* target() const noexcept
 
-      The layout transaction's result, for ``dropped`` and ``floated``.
+      The target dropped on, for :cpp:func:`dropped <gui_forms::DockDragOutcome::dropped>`, in the coordinates of the site that showed it; null otherwise.
 
-   .. cpp:member:: bool across_windows
+   .. cpp:function:: const DockTransactionResult* result() const noexcept
 
-      For ``dropped``: whether the target was in another site's window (a drag across windows, phase D4).
+      The layout transaction's result, for :cpp:func:`dropped <gui_forms::DockDragOutcome::dropped>` and :cpp:func:`floated <gui_forms::DockDragOutcome::floated>`; null otherwise.
 
-   .. cpp:member:: Rect frame
+   .. cpp:function:: bool across_windows() const noexcept
 
-      For ``floated``: the new floating window's client area, in desktop logical units.
+      For :cpp:func:`dropped <gui_forms::DockDragOutcome::dropped>`: whether the target was in another site's window (a drag across windows, phase D4); false otherwise.
+
+   .. cpp:function:: const Rect* frame() const noexcept
+
+      For :cpp:func:`floated <gui_forms::DockDragOutcome::floated>`: the new floating window's client area, in desktop logical units; null otherwise.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static DockDragOutcome dropped(DockSubject subject, DockDropTarget target, DockTransactionResult result, bool across_windows) noexcept
+
+      :cpp:func:`across_windows <gui_forms::DockDragOutcome::across_windows>`: whether the target was in another site's window (a drag across windows, phase D4).
+
+   .. cpp:function:: static DockDragOutcome floated(DockSubject subject, DockTransactionResult result, Rect frame) noexcept
+
+      :cpp:func:`frame <gui_forms::DockDragOutcome::frame>`: the new floating window's client area, in desktop logical units.
+
+   .. cpp:function:: static DockDragOutcome ended(DockDragEnd end, DockSubject subject) noexcept
+
+      Every other end. A drop or a float without its parts is read as ``rejected``.
 
 .. cpp:namespace:: gui_forms
 
@@ -957,6 +984,48 @@ Related types
       Default: ``{1.0}``.
 
    .. cpp:member:: bool transition_active
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Splitter::Parts final
+
+   ``#include <gui_forms/controls/splitter/splitter.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Splitter::States final
+
+   ``#include <gui_forms/controls/splitter/splitter.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: SplitterMoveEvent final
+
+   ``#include <gui_forms/controls/splitter/splitter.hpp>``
+
+   A move of a Splitter by the user. ``pointer`` is the pointer in the parent's coordinates. In splitter_moving, ``split_position`` is the target's proposed extent, which a handler may change (it is clamped again to the limits); in splitter_moved it is the extent the target took.
+
+   .. cpp:member:: Point pointer
+
+   .. cpp:member:: double split_position
 
 .. cpp:namespace:: gui_forms
 

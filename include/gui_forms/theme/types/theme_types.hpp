@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/engine/theme_rules/theme_rules.hpp"
+#include "gui_forms/host/compositor/window_backdrop.hpp"
 #include "gui_forms/surface_material.hpp"
 
 #include <array>
@@ -72,13 +73,12 @@ struct ControlVisualContext final {
     }
 };
 // A text shadow (E9.6, CSS `text-shadow`): the text's glyphs, moved by
-// `offset` logical units, blurred by `blur_radius` (the shadows'
-// blur-radius convention, 0 to maximum_text_shadow_blur) and drawn in
+// `offset` logical units (each axis within ±maximum_text_shadow_offset),
+// blurred by `blur_radius` (the shadows' blur-radius convention, 0 to
+// maximum_text_shadow_blur; both limits are the theme rules') and drawn in
 // `color` under the glyphs. Data only in T2: the theme carries it, and the
 // text stage (M4/M9) draws it, with a first-party blur so that it is the
 // same on every host.
-inline constexpr double maximum_text_shadow_blur = 8.0;
-inline constexpr double maximum_text_shadow_offset = 16.0;
 struct ControlTextShadow final {
     Point offset{};
     double blur_radius{};
@@ -129,6 +129,37 @@ struct ControlVisualRecipe final {
                left.pressed_content_offset == right.pressed_content_offset &&
                left.text_shadow == right.text_shadow;
     }
+};
+
+// A control's recipe for one role and state (T3 P6f): the theme's built-in
+// recipe (the floor, Theme::resolve(role, context), borrowed from the
+// theme) or, when the theme's rules set a recipe field for the control
+// (RecipeField), the floor's copy with those fields in place, which this
+// value owns. The copy is made only then, so a theme whose rules set no
+// recipe field costs nothing. A value for one paint or measurement: it
+// borrows the theme, so it is not kept past the theme's use. `recipe()`
+// borrows from the value, so it is read from a named value and never from
+// a temporary.
+class ResolvedControlRecipe final {
+public:
+    explicit ResolvedControlRecipe(const ControlVisualRecipe& floor) noexcept : floor_(&floor) {}
+    ResolvedControlRecipe(const ControlVisualRecipe& floor, ControlVisualRecipe&& authored) noexcept
+        : floor_(&floor), authored_(std::move(authored)) {}
+    // The floor is borrowed, so it is never a temporary.
+    explicit ResolvedControlRecipe(const ControlVisualRecipe&& floor) = delete;
+    ResolvedControlRecipe(const ControlVisualRecipe&& floor, ControlVisualRecipe&& authored) = delete;
+
+    [[nodiscard]] const ControlVisualRecipe& recipe() const& noexcept {
+        if (authored_) return *authored_;
+        return *floor_;
+    }
+    const ControlVisualRecipe& recipe() const&& = delete;
+    // Whether a rule's recipe field changed the floor.
+    [[nodiscard]] bool authored() const noexcept { return authored_.has_value(); }
+
+private:
+    const ControlVisualRecipe* floor_;
+    std::optional<ControlVisualRecipe> authored_{};
 };
 
 inline constexpr std::size_t control_visual_role_count =
@@ -346,6 +377,48 @@ struct ThemeStructureTokens final {
     return layers;
 }
 
+// One backplane base: the material a window's backplane is drawn from
+// while it is granted `backdrop` (ThemeWindowBackdrop).
+struct ThemeBackdropBase final {
+    WindowBackdrop backdrop{WindowBackdrop::transparent};
+    SurfaceMaterial material{};
+
+    friend bool operator==(const ThemeBackdropBase& left, const ThemeBackdropBase& right) noexcept {
+        return left.backdrop == right.backdrop && left.material == right.material;
+    }
+};
+
+// The theme's window backdrop (stage T5, owner decision T5-Q8, option 1):
+// what a window showing the theme asks the compositor for, and the base its
+// backplane is drawn from over each backdrop the window may be granted
+// (notes:planning/stages/T5-compositor/PLAN.md §4.1).
+struct ThemeWindowBackdrop final {
+    // The request a window makes while its application has made none
+    // (Window::request_backdrop). Value-initialized: `opaque` alone, so a
+    // theme that says nothing asks for nothing. Theme::create refuses a
+    // request window_backdrop_request_valid refuses.
+    WindowBackdropRequest request{};
+    // At most one base per non-opaque backdrop, in any order; held out of
+    // line, so the definition stays small. Over a granted non-opaque
+    // backdrop the window's backplane is drawn from that backdrop's base,
+    // typically a partly clear tint over a material, or clear around a
+    // drawn shape over `transparent`. Without one it is drawn from the
+    // window recipe's material, as over `opaque`, which has no base.
+    std::vector<ThemeBackdropBase> bases{};
+
+    // The base for `backdrop`, or null when the theme gives none.
+    [[nodiscard]] const SurfaceMaterial* base_for(WindowBackdrop backdrop) const noexcept {
+        for (const ThemeBackdropBase& base : bases) {
+            if (base.backdrop == backdrop) return &base.material;
+        }
+        return nullptr;
+    }
+
+    friend bool operator==(const ThemeWindowBackdrop& left, const ThemeWindowBackdrop& right) noexcept {
+        return left.request == right.request && left.bases == right.bases;
+    }
+};
+
 // A theme's whole authored description. Its role recipes are held out of
 // line (ControlRoleTable), so the definition itself is a small value, but
 // copying one still copies every recipe: pass it by reference, and let
@@ -369,6 +442,9 @@ struct ThemeDefinition final {
     // compiled when the theme is made; an invalid rule or declaration is
     // dropped with a diagnostic (Theme::engine().rules().diagnostics()).
     ThemeRuleSheet rules{};
+    // The backdrop request and backplane bases (stage T5). Empty by
+    // default: an opaque window, drawn as before.
+    ThemeWindowBackdrop window_backdrop{};
     friend bool operator==(const ThemeDefinition& left,
                            const ThemeDefinition& right) noexcept(noexcept(
         left.id == right.id && left.compatibility == right.compatibility &&
@@ -379,7 +455,7 @@ struct ThemeDefinition final {
                left.accent_ramp == right.accent_ramp &&
                left.overlay_shadow == right.overlay_shadow &&
                left.high_contrast_overlay_shadow == right.high_contrast_overlay_shadow &&
-               left.rules == right.rules;
+               left.rules == right.rules && left.window_backdrop == right.window_backdrop;
     }
 };
 

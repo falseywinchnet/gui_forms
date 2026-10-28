@@ -16,7 +16,7 @@
 #include <span>
 
 // The presented frame of a window by its backdrop grant (stage T5, phase
-// C1; planning/stages/T5-compositor/PLAN.md §3), through a host painter's
+// C1; notes:planning/stages/T5-compositor/PLAN.md §3), through a host painter's
 // framebuffer: windows_part_composite_tests for the Windows DIB and
 // part_composite_identity_tests for Skia run the same check.
 //

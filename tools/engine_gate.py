@@ -13,7 +13,7 @@ jobs' evidence artifacts). It checks that every host lists the same
 primitives, samples and features with the same hashes, and that every idle
 counter is zero. It
 then writes the comparison as JSON and as the record filled from
-results/2026-10-22-t2-engine-gate/record.template.md.
+tools/engine_gate_record.template.md.
 
 The exit status is 1 on any difference between hosts, any non-zero idle
 counter, or any platform of PLATFORMS without a manifest (none found at
@@ -43,7 +43,7 @@ PLATFORMS: tuple[str, ...] = ('windows-x64', 'macos-arm64', 'linux-x64', 'linux-
 MANIFEST_NAME: re.Pattern[str] = re.compile(r'engine-gate-([a-z0-9-]+)\.tsv')
 HEADER: str = '# gui_forms engine gate manifest v1'
 ROOT: Path = Path(__file__).resolve().parents[1]
-TEMPLATE: Path = ROOT / 'results/2026-10-22-t2-engine-gate/record.template.md'
+TEMPLATE: Path = ROOT / 'tools/engine_gate_record.template.md'
 
 
 class Manifest:

@@ -1,5 +1,0 @@
-{"gate":"windows_compositor","state":{"generation":1,"compositing":"present","support":{"opaque":"supported","transparent":"supported","window_material":"supported","transient_material":"supported"},"transparency_enabled":true,"reduced_transparency":false,"high_contrast":false}}
-{"gate":"windows_compositor","step":"material","granted":"window_material","reason":"granted","clear":[240,244,249],"clear_hits_window":true}
-{"gate":"windows_compositor","step":"transparent","granted":"transparent","reason":"granted","clear":[0,160,0],"clear_hits_window":true}
-{"gate":"windows_compositor","step":"opaque","granted":"opaque","reason":"granted","clear":[0,0,0],"clear_hits_window":true}
-windows compositor tests passed

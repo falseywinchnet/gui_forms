@@ -114,7 +114,7 @@ public:
     // transfer authority.
     [[nodiscard]] std::string_view item_id_at(Point absolute) const noexcept;
     void set_items(std::vector<ObjectViewItem> items);
-    // UI-thread complete replacement. See docs/notes/OBJECT_VIEW_DETAILS_DEVELOPMENT_001.md.
+    // UI-thread complete replacement. See notes:docs-notes/OBJECT_VIEW_DETAILS_DEVELOPMENT_001.md.
     // Validation/preparation failure preserves the prior model. Spans borrow
     // this control and expire at replacement/disposal or column mutation.
     void set_details_model(std::vector<ObjectDetailsColumn> columns,

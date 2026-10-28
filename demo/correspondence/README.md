@@ -1,7 +1,7 @@
 # GUI.Forms Correspondence
 
 A mail-client mockup built from public GUI.Forms seams only: the
-Modern.Forms "Outlaw" equivalent named in `planning/POLISH_STAGE_PLAN_2026-10-11.md`
+Modern.Forms "Outlaw" equivalent named in [`planning/POLISH_STAGE_PLAN_2026-10-11.md`](https://github.com/malkuth-software/notes/blob/gui_forms/planning/POLISH_STAGE_PLAN_2026-10-11.md)
 (W5.3). Owner decision F.2 admits its three-pane layout as a *gallery
 demonstration of reusable panel controls*; it is not a consumer product and
 ADR-013 recorded that classification (ADR-013 was retired on 2026-10-13).

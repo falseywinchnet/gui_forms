@@ -1,7 +1,7 @@
 // The engine's primitive registry and its first primitives (T2 plan, phase
 // E1): registration, parameter and preparation checks refuse without
 // changing anything, a destination is validated before any byte is written,
-// and the ribbon's bulge and dithered bulge (planning/stages/T4-default-theme/
+// and the ribbon's bulge and dithered bulge (notes:planning/stages/T4-default-theme/
 // RENDERING_REFERENCE.md §2, §3, with the T2 round 001 decisions G1-3 and
 // G3-3) draw what the reference describes, with the same bytes on every CI
 // platform.

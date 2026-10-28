@@ -102,6 +102,11 @@ gui_forms::PageStrip
          ``std::invalid_argument`` for a disposed list or one that belongs to
          another window.
 
+      **draw_mode** : ``ItemDrawMode``, default ``ItemDrawMode::normal``
+         With ``ItemDrawMode::owner_draw`` the application draws the tabs'
+         content: see :cpp:func:`draw_item_content <gui_forms::PageStrip::draw_item_content>`. Throws ``std::invalid_argument`` for an
+         unknown mode.
+
       **overflowing** : ``bool``, read-only
          Whether the tabs do not all fit, so the scroll and list buttons (under
          ``shrink_then_list``, the list button) show.
@@ -137,6 +142,17 @@ gui_forms::PageStrip
          The tabs laid out (not those scrolled out of view or hidden), in the order they are shown.
 
    :Events:
+
+      **draw_item_content** : ``Event<ItemContentPaint&>``
+         Raised while the strip paints in the owner-draw mode (owner decision
+         W-Q6), once per painted tab that has an icon or a label, with an
+         :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>`: the tab's position, its page's ID, and its icon and
+         label area as the content rectangle, to which the painter is clipped.
+         The tab's plate, close button, pin, modified mark and focus cue stay
+         painted by role. Set ``draw_default`` to add the default content. A
+         handler paints only; one that changes the strip's pages, settings or
+         scroll position, or disposes it, ends that paint, and the strip is
+         painted again.
 
       **page_invoked** : ``Event<const PageInvocation&>``
          Raised when a tab is clicked, chosen with the keyboard, by its mnemonic,
@@ -454,6 +470,16 @@ gui_forms::PageStrip
 
       Sets :cpp:func:`image_list <gui_forms::PageStrip::image_list>`; see the property's description above.
 
+   .. cpp:function:: ItemDrawMode draw_mode() const noexcept
+
+      With ``ItemDrawMode::owner_draw`` the application draws the tabs'
+      content: see :cpp:func:`draw_item_content <gui_forms::PageStrip::draw_item_content>`. Throws ``std::invalid_argument`` for an
+      unknown mode.
+
+   .. cpp:function:: void set_draw_mode(ItemDrawMode mode)
+
+      Sets :cpp:func:`draw_mode <gui_forms::PageStrip::draw_mode>`; see the property's description above.
+
    .. cpp:function:: bool overflowing() const
 
       Whether the tabs do not all fit, so the scroll and list buttons (under
@@ -500,6 +526,18 @@ gui_forms::PageStrip
 
 
    .. rubric:: Events
+
+   .. cpp:function:: Event<ItemContentPaint&>& draw_item_content() noexcept
+
+      Raised while the strip paints in the owner-draw mode (owner decision
+      W-Q6), once per painted tab that has an icon or a label, with an
+      :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>`: the tab's position, its page's ID, and its icon and
+      label area as the content rectangle, to which the painter is clipped.
+      The tab's plate, close button, pin, modified mark and focus cue stay
+      painted by role. Set ``draw_default`` to add the default content. A
+      handler paints only; one that changes the strip's pages, settings or
+      scroll position, or disposes it, ends that paint, and the strip is
+      painted again.
 
    .. cpp:function:: Event<const PageInvocation&>& page_invoked() noexcept
 

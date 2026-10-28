@@ -816,11 +816,12 @@ void ComboBox::on_paint(Painter& painter, Rect damage) {
     const double center_x = bounds.width - button_width * 0.5;
     const double center_y = bounds.height * 0.5 + (dropped_down_ ? 2.0 : -1.0);
     const double direction = dropped_down_ ? -1.0 : 1.0;
+    const Color arrow = themed ? button_recipe.glyph : style().dark_border;
     for (int row = 0; row < 4; ++row) {
         painter.fill_rect({std::floor(center_x) - 3.0 + row,
                            std::floor(center_y) + direction * (row - 1.0),
                            7.0 - row * 2.0, 1.0},
-                          themed ? button_recipe.glyph : style().dark_border);
+                          arrow);
     }
     // The drop_down style's editor shows its own text; otherwise the field
     // shows the selected item, or the placeholder without one.

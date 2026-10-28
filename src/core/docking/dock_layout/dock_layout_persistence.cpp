@@ -401,7 +401,11 @@ public:
         const XmlAttribute* next = root_.find_attribute("next_id");
         if (next != nullptr) {
             const std::optional<std::uint32_t> value = parse_unsigned((*next).value);
-            if (!value.has_value()) return invalid("dock_layout", "next_id", (*next).value);
+            // An exhausted layout saves next_id at the limit; beyond it, the
+            // count would wrap to the null ID.
+            if (!value.has_value() || *value > dock_identity_limit) {
+                return invalid("dock_layout", "next_id", (*next).value);
+            }
             saved_next = *value;
         }
         bool main_seen = false;
@@ -426,6 +430,8 @@ public:
             ++known;
         }
         if (!main_seen) return structure("dock_layout has no main site");
+        // read_id keeps every ID below dock_identity_limit, so this sum is at
+        // most the limit and cannot wrap.
         const std::uint32_t after_largest = largest_id_ + 1U;
         state_.next_id = std::max(saved_next, after_largest);
         ensure_records();
@@ -528,7 +534,7 @@ private:
         const XmlAttribute* attribute = element.find_attribute("id");
         if (attribute == nullptr) return invalid(element.name, "id", "");
         const std::optional<std::uint32_t> value = parse_unsigned((*attribute).value);
-        if (!value.has_value() || *value == 0U || *value == 0xFFFFFFFFU) {
+        if (!value.has_value() || *value == 0U || *value >= dock_identity_limit) {
             return invalid(element.name, "id", (*attribute).value);
         }
         const bool repeated = std::find(used_ids_.begin(), used_ids_.end(), *value) != used_ids_.end();
@@ -912,11 +918,12 @@ private:
     void ensure_records() {
         for (const DockNode& node : state_.nodes) {
             if (!detail::is_dock_stack(node.kind)) continue;
+            const DockPanelKind kind = node.kind == DockNodeKind::tool_stack ? DockPanelKind::tool : DockPanelKind::document;
             for (const DockPanelId& panel : node.panels) {
                 if (detail::find_dock_record(state_, panel) != nullptr) continue;
                 DockPanelRecord record{};
                 record.id = panel;
-                record.kind = node.kind == DockNodeKind::tool_stack ? DockPanelKind::tool : DockPanelKind::document;
+                record.kind = kind;
                 pending_records_.push_back(std::move(record));
             }
         }

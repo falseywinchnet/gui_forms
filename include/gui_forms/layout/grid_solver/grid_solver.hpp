@@ -182,7 +182,7 @@ enum class GridSolveOutcome : std::uint8_t {
 };
 
 // Caller-owned storage the four calls fill, reused from layout to layout
-// (house style section 5): `items` has one record per input item, in input
+// (house style section 1): `items` has one record per input item, in input
 // order; `columns` and `rows` the tracks of the implicit grid in line
 // order. Its storage grows only when the item or track count does.
 class GridLayoutWorkspace final {

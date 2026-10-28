@@ -23,6 +23,7 @@
 #include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
+#include "stx_skia/swizzle.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
 #include "../../../render/text/glyph_run/glyph_run_raster.hpp"
 #include "../../../render/text/harfbuzz/harfbuzz_font_engine.hpp"
@@ -90,6 +91,31 @@ bool trace_win32_input() noexcept {
     static const bool enabled =
         environment_flag("GUI_FORMS_TRACE_WIN32_INPUT");
     return enabled;
+}
+
+// An input trace line prints at most this many bytes of a stable ID, so the
+// `%.*s` precision always fits in int (a stable ID has no length limit of its
+// own). A longer ID is printed cut to this length, and the line then carries
+// `target_cut_from:<full length in bytes>` so the cut is never silent.
+constexpr std::size_t maximum_traced_stable_id_bytes = 1024;
+
+struct TracedStableId {
+    // The `%.*s` precision: the number of bytes printed, at most
+    // maximum_traced_stable_id_bytes.
+    int printed_bytes = 0;
+    // The full length when the ID was cut, otherwise 0.
+    std::size_t cut_from_bytes = 0;
+};
+
+TracedStableId traced_stable_id(std::string_view id) noexcept {
+    TracedStableId traced;
+    std::size_t printed = id.size();
+    if (printed > maximum_traced_stable_id_bytes) {
+        traced.cut_from_bytes = printed;
+        printed = maximum_traced_stable_id_bytes;
+    }
+    traced.printed_bytes = static_cast<int>(printed);
+    return traced;
 }
 
 std::uint64_t now_nanoseconds() noexcept {
@@ -431,7 +457,7 @@ bool apply_system_cursor(CursorKind kind) noexcept {
     return applied;
 }
 
-// Shcore's entry point, typed from its declaration (house style section 9).
+// Shcore's entry point, typed from its declaration (house style section 2).
 using GetDpiForMonitorFunction = decltype(&::GetDpiForMonitor);
 
 GetDpiForMonitorFunction load_get_dpi_for_monitor() noexcept {
@@ -1141,10 +1167,18 @@ public:
         const Rect inner{rect.x + line, rect.y + line,
                          rect.width - line * 2.0, rect.height - line * 2.0};
         const double inner_radius = std::max(0.0, radius - line);
+        // A stroke as wide as the rectangle leaves no inside: every row is filled.
+        if (inner.empty()) {
+            for (int y = area.top; y < area.bottom; ++y) {
+                std::uint32_t* row = row_at(y);
+                fill_span(row, rounded_row_span(rect, radius, y, clipped_row_span(area, y)), color, color.alpha);
+            }
+            return;
+        }
         for (int y = area.top; y < area.bottom; ++y) {
             std::uint32_t* row = row_at(y);
             const PixelSpan outer = rounded_row_span(rect, radius, y, clipped_row_span(area, y));
-            const PixelSpan inset = inner.empty() ? PixelSpan{} : rounded_row_span(inner, inner_radius, y, outer);
+            const PixelSpan inset = rounded_row_span(inner, inner_radius, y, outer);
             if (inset.right > inset.left) {
                 fill_span(row, {outer.left, inset.left}, color, color.alpha);
                 fill_span(row, {inset.right, outer.right}, color, color.alpha);
@@ -1194,22 +1228,34 @@ public:
                 columns.push_back(gradient_color(stops, amount));
             }
         }
-        for (int y = area.top; y < area.bottom; ++y) {
-            std::uint32_t* row = row_at(y);
-            const PixelSpan span = clipped_row_span(area, y);
-            if (dx == 0.0) {
+        // A vertical gradient has one colour per row.
+        if (dx == 0.0) {
+            for (int y = area.top; y < area.bottom; ++y) {
+                std::uint32_t* row = row_at(y);
+                const PixelSpan span = clipped_row_span(area, y);
                 const double amount = spread_gradient_coordinate(
                     (((y + 0.5) / scale_ - start.y) * dy) / length_squared, spread);
                 const Color color = gradient_color(stops, amount);
                 fill_span(row, span, color, color.alpha);
-                continue;
             }
-            for (int x = span.left; x < span.right; ++x) {
-                if (!columns.empty()) {
+            return;
+        }
+        // A horizontal one has one colour per column, computed above.
+        if (!columns.empty()) {
+            for (int y = area.top; y < area.bottom; ++y) {
+                std::uint32_t* row = row_at(y);
+                const PixelSpan span = clipped_row_span(area, y);
+                for (int x = span.left; x < span.right; ++x) {
                     const Color color = columns[static_cast<std::size_t>(x - area.left)];
                     blend_pixel(row[x], color, color.alpha);
-                    continue;
                 }
+            }
+            return;
+        }
+        for (int y = area.top; y < area.bottom; ++y) {
+            std::uint32_t* row = row_at(y);
+            const PixelSpan span = clipped_row_span(area, y);
+            for (int x = span.left; x < span.right; ++x) {
                 const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
                 const double amount = spread_gradient_coordinate(
                     ((sample.x - start.x) * dx +
@@ -1515,13 +1561,9 @@ public:
             // The raster owns reusable conversion storage. Convert before any
             // DC mutation; allocation failure leaves the active frame intact.
             live_bgra_scratch_.resize(frame.pixels().size());
-            const std::size_t byte_count = live_bgra_scratch_.size();
-            for (std::size_t index = 0U; index < byte_count; index += 4U) {
-                live_bgra_scratch_[index] = source[index + 2U];
-                live_bgra_scratch_[index + 1U] = source[index + 1U];
-                live_bgra_scratch_[index + 2U] = source[index];
-                live_bgra_scratch_[index + 3U] = source[index + 3U];
-            }
+            const stx_skia::SwizzleResult swapped =
+                stx_skia::swap_red_blue(live_bgra_scratch_, frame.pixels());
+            if (swapped != stx_skia::SwizzleResult::ok) return;
             source = live_bgra_scratch_.data();
         }
         const int saved = SaveDC(memory_dc_);
@@ -1738,6 +1780,12 @@ private:
         return PreparedTextStatus::success;
     }
 #endif
+    // A colour as a gradient raster stores it: 0xAARRGGBB.
+    [[nodiscard]] static std::uint32_t packed_argb(Color color) noexcept {
+        const std::uint32_t packed = color.blue | (static_cast<std::uint32_t>(color.green) << 8U) |
+            (static_cast<std::uint32_t>(color.red) << 16U) | (static_cast<std::uint32_t>(color.alpha) << 24U);
+        return packed;
+    }
     [[nodiscard]] static std::uint32_t sample_image_pixel(
         const DecodedImage& image, Rect bounds, double x, double y,
         ImageSampling sampling) noexcept {
@@ -1929,21 +1977,26 @@ private:
         const double dx = second.x - first.x;
         const double dy = second.y - first.y;
         const double squared = dx * dx + dy * dy;
-        for (int y = area.top; y < area.bottom; ++y) {
-            for (int x = area.left; x < area.right; ++x) {
-                const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
-                double amount{};
-                if (radial) {
+        // A radial raster's amount is the distance from the centre in radii;
+        // a linear one's is the position along the gradient's line.
+        if (radial) {
+            for (int y = area.top; y < area.bottom; ++y) {
+                for (int x = area.left; x < area.right; ++x) {
+                    const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
                     const double rx = (sample.x - first.x) / second.x;
                     const double ry = (sample.y - first.y) / second.y;
-                    amount = std::sqrt(rx * rx + ry * ry);
-                } else {
-                    amount = spread_gradient_coordinate(
-                        ((sample.x - first.x) * dx + (sample.y - first.y) * dy) / squared, spread);
+                    const double amount = std::sqrt(rx * rx + ry * ry);
+                    raster.pixels.push_back(packed_argb(gradient_color(stops, amount)));
                 }
-                const Color color = gradient_color(stops, amount);
-                raster.pixels.push_back(color.blue | (static_cast<std::uint32_t>(color.green) << 8U) |
-                    (static_cast<std::uint32_t>(color.red) << 16U) | (static_cast<std::uint32_t>(color.alpha) << 24U));
+            }
+        } else {
+            for (int y = area.top; y < area.bottom; ++y) {
+                for (int x = area.left; x < area.right; ++x) {
+                    const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
+                    const double amount = spread_gradient_coordinate(
+                        ((sample.x - first.x) * dx + (sample.y - first.y) * dy) / squared, spread);
+                    raster.pixels.push_back(packed_argb(gradient_color(stops, amount)));
+                }
             }
         }
         gradient_cache_pixels_ += count;
@@ -1953,16 +2006,23 @@ private:
     void paint_gradient_raster(const GradientRaster& raster) {
         const PixelRect area = raster.area;
         const int stride = area.right - area.left;
+        // An opaque raster replaces the pixels under it: each row is a copy.
+        if (raster.opaque) {
+            for (int y = area.top; y < area.bottom; ++y) {
+                const PixelSpan span = clipped_row_span(area, y);
+                if (span.right <= span.left) continue;
+                const std::uint32_t* source = raster.pixels.data() +
+                    static_cast<std::size_t>(y - area.top) * stride;
+                std::copy(source + span.left - area.left, source + span.right - area.left, row_at(y) + span.left);
+            }
+            return;
+        }
         for (int y = area.top; y < area.bottom; ++y) {
             const PixelSpan span = clipped_row_span(area, y);
             if (span.right <= span.left) continue;
             const std::uint32_t* source = raster.pixels.data() +
                 static_cast<std::size_t>(y - area.top) * stride;
             std::uint32_t* row = row_at(y);
-            if (raster.opaque) {
-                std::copy(source + span.left - area.left, source + span.right - area.left, row + span.left);
-                continue;
-            }
             for (int x = span.left; x < span.right; ++x) {
                 const std::uint32_t pixel = source[x - area.left];
                 const Color color = Color::rgba((pixel >> 16U) & 255U, (pixel >> 8U) & 255U, pixel & 255U, pixel >> 24U);
@@ -2728,6 +2788,7 @@ public:
         if (!attached.accepted()) return false;
         native_phase_ = NativePhase::attached;
         report_compositor_state();
+        report_input_settings();
         accessibility_.attach(hwnd_, *model_, scale_);
         (*model_).set_dispatch_wake_handler(
             gui_forms::detail::BoundMemberFunction<
@@ -2899,6 +2960,12 @@ public:
         }
         switch (message) {
         case WM_SETTINGCHANGE:
+            // Broadcast to top-level windows for any system setting; the
+            // double-click interval is read again and reported if it moved,
+            // and the compositor state when the setting is one it reads.
+            report_input_settings();
+            if (detail::windows_compositor_message(message, wparam, lparam)) report_compositor_state();
+            break;
         case WM_THEMECHANGED:
         case WM_DWMCOMPOSITIONCHANGED:
             if (detail::windows_compositor_message(message, wparam, lparam)) report_compositor_state();
@@ -3350,6 +3417,19 @@ private:
                         static_cast<std::size_t>(tooltip_.width) * 4U);
         }
         return true;
+    }
+
+    // The system's double-click interval (GetDoubleClickTime, which Windows
+    // keeps between 1 and 5000 milliseconds), reported after attach and on
+    // WM_SETTINGCHANGE whenever it differs from the last report.
+    void report_input_settings() {
+        const UINT read = GetDoubleClickTime();
+        std::uint32_t interval = static_cast<std::uint32_t>(read);
+        if (interval == 0U) interval = 1U;
+        if (interval > maximum_double_click_milliseconds) interval = maximum_double_click_milliseconds;
+        if (interval == reported_double_click_milliseconds_) return;
+        const HostDispatchResult reported = dispatch(HostInputSettingsEvent{interval, SettingOrigin::host});
+        if (reported.accepted()) reported_double_click_milliseconds_ = interval;
     }
 
     void resize() {
@@ -3888,12 +3968,23 @@ private:
         if (trace_win32_input()) {
             const Control::Ptr target = (*model_).hit_test(event.position);
             const std::string_view target_id = target ? (*target).stable_id().value() : std::string_view{"<none>"};
-            std::fprintf(stderr,
-                         "win32-input=pointer|message:%u|action:%u|x:%.2f|y:%.2f|target:%.*s|active:%d|focus:%d|capture:%d\n",
-                         static_cast<unsigned>(message), static_cast<unsigned>(action),
-                         event.position.x, event.position.y,
-                         static_cast<int>(target_id.size()), target_id.data(),
-                         GetActiveWindow() == hwnd_, GetFocus() == hwnd_, GetCapture() == hwnd_);
+            const TracedStableId traced = traced_stable_id(target_id);
+            if (traced.cut_from_bytes != 0) {
+                std::fprintf(stderr,
+                             "win32-input=pointer|message:%u|action:%u|x:%.2f|y:%.2f|target:%.*s|target_cut_from:%zu|"
+                             "active:%d|focus:%d|capture:%d\n",
+                             static_cast<unsigned>(message), static_cast<unsigned>(action),
+                             event.position.x, event.position.y,
+                             traced.printed_bytes, target_id.data(), traced.cut_from_bytes,
+                             GetActiveWindow() == hwnd_, GetFocus() == hwnd_, GetCapture() == hwnd_);
+            } else {
+                std::fprintf(stderr,
+                             "win32-input=pointer|message:%u|action:%u|x:%.2f|y:%.2f|target:%.*s|active:%d|focus:%d|capture:%d\n",
+                             static_cast<unsigned>(message), static_cast<unsigned>(action),
+                             event.position.x, event.position.y,
+                             traced.printed_bytes, target_id.data(),
+                             GetActiveWindow() == hwnd_, GetFocus() == hwnd_, GetCapture() == hwnd_);
+            }
             std::fflush(stderr);
         }
         dispatch(std::move(event));
@@ -4326,6 +4417,8 @@ private:
 #endif
     double scale_{1.0};
     std::uint64_t next_sequence_{1};
+    // The double-click interval last reported; 0 before the first report.
+    std::uint32_t reported_double_click_milliseconds_{};
     std::uint64_t native_callback_faults_{};
     wchar_t pending_high_surrogate_{};
     bool render_dispatch_pending_{};

@@ -1,6 +1,6 @@
 #pragma once
 
-// Stage F's metrics differential (planning/stages/F-font-substitution). It
+// Stage F's metrics differential (notes:planning/stages/F-font-substitution). It
 // measures a reference face and a candidate substitute with the bundled
 // HarfBuzz/FreeType engine and compares the two under the tolerance of the
 // mapping's class (owner decisions 8 and 9 of 2026-10-23). GDI's measurements

@@ -516,29 +516,32 @@ HostServiceStatus HostServices::write_clipboard_text(std::string_view text_utf8)
 }
 
 HostClipboardImageResult HostServices::read_clipboard_image() {
-    HostClipboardImageResult result;
-    result.status = validate_request(HostCapability::clipboard_images);
-    if (!result.status.accepted()) return result;
+    const HostServiceStatus request = validate_request(HostCapability::clipboard_images);
+    if (!request.accepted()) return HostClipboardImageResult::failed(request.error);
     ++snapshot_.clipboard_reads;
+    // A backend's failure, an image that fails validation, or exhausted
+    // storage: the consumer gets the error and never the pixels.
+    HostServiceError error = HostServiceError::none;
     try {
-        result = read_clipboard_image_impl();
-        if (result.status.accepted() && result.image.has_value()) {
-            const HostImageError error = validate_host_image((*result.image).view());
-            if (error != HostImageError::none) {
-                result.status.error = error == HostImageError::too_large
+        HostClipboardImageResult read = read_clipboard_image_impl();
+        error = read.status().error;
+        const HostImage* const image = read.image();
+        if (error == HostServiceError::none && image != nullptr) {
+            const HostImageError invalid = validate_host_image((*image).view());
+            if (invalid != HostImageError::none) {
+                error = invalid == HostImageError::too_large
                     ? HostServiceError::too_large : HostServiceError::backend_failure;
             }
         }
+        if (error == HostServiceError::none) {
+            snapshot_.clipboard_generation = read.generation();
+            return read;
+        }
     } catch (const std::bad_alloc&) {
-        result.status.error = HostServiceError::backend_failure;
+        error = HostServiceError::backend_failure;
     }
-    if (!result.status.accepted()) {
-        result.image.reset();
-        ++snapshot_.rejected_requests;
-    } else {
-        snapshot_.clipboard_generation = result.generation;
-    }
-    return result;
+    ++snapshot_.rejected_requests;
+    return HostClipboardImageResult::failed(error);
 }
 
 HostClipboardFilesResult HostServices::read_clipboard_files() {
@@ -657,9 +660,7 @@ HostServiceStatus HostServices::write_clipboard_image(HostImageView image) {
 }
 
 HostClipboardImageResult HostServices::read_clipboard_image_impl() {
-    HostClipboardImageResult result;
-    result.status.error = HostServiceError::unsupported;
-    return result;
+    return HostClipboardImageResult::failed(HostServiceError::unsupported);
 }
 
 HostServiceStatus HostServices::write_clipboard_image_impl(HostImageView) {

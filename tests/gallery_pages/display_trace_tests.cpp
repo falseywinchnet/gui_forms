@@ -338,13 +338,28 @@ struct PageDigest final {
 // typography-and-inspection were recorded again, and every other page kept
 // L3's digest.
 //
+// Main's ListView insertion-mark toggle on checked-collections adds one
+// control: merged with main, against L8a's traces only
+// states-and-diagnostics (1285 controls) and typography-and-inspection
+// (#1318) differ, in those numbers alone, and were recorded again.
+// Main's FolderBrowserDialog and ColorDialog rows on
+// dialogs-and-host-services add two more: merged again, that page (the
+// two rows, and the later rows moved down), states-and-diagnostics (1287
+// controls) and typography-and-inspection (#1320 and two layout
+// generations) differ and were recorded again; no other page moved.
+// Main's Splitter specimen on dock-and-anchor adds eight more: merged
+// again, that page (the Splitter group's caption and the page header's
+// Splitter entry), states-and-diagnostics (1295 controls) and
+// typography-and-inspection (#1328 and one layout generation) differ and
+// were recorded again; no other page moved.
+//
 // Each later phase, rebased onto those main pages, recorded again the
 // pages whose digests the combination moved: the counts on
 // states-and-diagnostics and the RuntimeId on typography-and-inspection,
 // and, where the phase had recorded every page, the two main pages too.
 //
 // typography-and-inspection's entry is the trace with the RuntimeId the
-// specimen has when this test runs first (#1317 since L8a on main); the digest
+// specimen has when this test runs first (#1328 since L8a on main); the digest
 // changes whenever a page made before it makes a control more or less.
 constexpr std::array<PageDigest, 30> expected_digests{{
     {"basics", 0x8ad3bd64955e6995ULL},
@@ -355,7 +370,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"ranges-and-progress", 0x2a06ace770e13138ULL},
     {"containers-and-focus", 0x4bd8a3f439f8078cULL},
     {"animation-laboratory", 0xd22492f193fdb022ULL},
-    {"states-and-diagnostics", 0x1223886a1399df43ULL},
+    {"states-and-diagnostics", 0x414816db6ff9a681ULL},
     {"text-and-input", 0x6cea6c153578579dULL},
     {"collections-and-popups", 0x5b75d7735fed6b79ULL},
     {"values-and-spinners", 0x53974a1f042eaa19ULL},
@@ -364,10 +379,10 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"checked-collections", 0xbcc8dc7a616e1b8fULL},
     {"timing-and-tooltips", 0x99f306d142ff03deULL},
     {"dates-and-calendar", 0x6f1eb88a51fed7cfULL},
-    {"dialogs-and-host-services", 0x5b7235ff76025a51ULL},
+    {"dialogs-and-host-services", 0x8dedb342fa21371eULL},
     {"css-layout-panels", 0x13ab5d90ddefe752ULL},
     {"retained-layout-panels", 0x9468a4553545fddeULL},
-    {"dock-and-anchor", 0x8f0e6fa2ea1031b2ULL},
+    {"dock-and-anchor", 0x746764bb743113cfULL},
     {"commands-and-menus", 0xeefd420533055ee2ULL},
     {"tree-and-object-views", 0x805651f12056426eULL},
     {"choices-and-sections", 0x4e79ecf5a4a5e0c8ULL},
@@ -375,7 +390,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"responsive-layouts", 0x3f60bc621cdf06c9ULL},
     {"anchored-popups", 0x898b0bfbbfdcc181ULL},
     {"live-surfaces", 0xf100f9eb79b7356eULL},
-    {"typography-and-inspection", 0x20f818876c5de4cfULL},
+    {"typography-and-inspection", 0x6513f6614af56254ULL},
     {"semantic-feedback", 0x52902fede7280d09ULL},
 }};
 

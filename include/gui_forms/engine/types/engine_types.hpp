@@ -8,7 +8,7 @@
 
 namespace gui_forms {
 
-// Shared types of the theme engine (stage T2, planning/stages/T2-engine-core/
+// Shared types of the theme engine (stage T2, notes:planning/stages/T2-engine-core/
 // PLAN.md). The engine rasterizes parts with first-party kernels into
 // premultiplied RGBA8 pixels and gives identical bytes on every host.
 
@@ -29,11 +29,12 @@ struct EngineVersion final {
 
 // The version this build of the engine implements. E1 (the kernels, the
 // registry and the bulge pair) is 0.1; E8 (the relief primitives, shapes and
-// choice parameters) is 0.2.
-inline constexpr EngineVersion current_engine_version{0, 2};
+// choice parameters) is 0.2; T3's EC1 (authored material fields and the
+// material primitive's `family` recipe) is 0.3.
+inline constexpr EngineVersion current_engine_version{0, 3};
 
 // Device pixels per logical unit. Kept apart from plain doubles so that a
-// logical length is never passed where a scale is meant (house style §1).
+// logical length is never passed where a scale is meant (house style §3).
 struct DeviceScale final {
     double value{1.0};
 

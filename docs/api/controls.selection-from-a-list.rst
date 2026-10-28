@@ -180,6 +180,8 @@ Related types
      - A click on a column header.
    * - :cpp:class:`ListViewColumnWidthChange <gui_forms::ListViewColumnWidthChange>`
      - A column's new width in logical units, after a divider drag ends or set_column_width() changes it.
+   * - :cpp:class:`ListViewInsertionMark <gui_forms::ListViewInsertionMark>`
+     - Where a ListView's insertion mark stands (Windows Forms' ListViewInsertionMark Index and AppearsAfterItem): beside the item at model index ``index``, before it or, with ``after``, after it.
    * - :cpp:class:`ListViewItem <gui_forms::ListViewItem>`
      - One item.
    * - :cpp:class:`ListViewItemActivation <gui_forms::ListViewItemActivation>`
@@ -188,6 +190,8 @@ Related types
      - A check box toggled by the user.
    * - :cpp:class:`ListViewItemSource <gui_forms::ListViewItemSource>`
      - The items of a virtual ListView (Windows Forms' VirtualMode with RetrieveVirtualItem).
+   * - :cpp:class:`ListViewLabelEdit <gui_forms::ListViewLabelEdit>`
+     - One label edit (Windows Forms' LabelEditEventArgs).
    * - :cpp:class:`ListViewSelectionChange <gui_forms::ListViewSelectionChange>`
      - A change of the selected items, after it happened.
    * - :cpp:class:`ObjectColumnId <gui_forms::ObjectColumnId>`
@@ -1382,6 +1386,14 @@ Related types
 
    .. cpp:member:: PartGeometry focus
 
+   .. cpp:member:: PartGeometry insertion_mark
+
+      The bar of the insertion mark; absent without a shown mark.
+
+   .. cpp:member:: PartGeometry label_editor
+
+      The TextBox of a label edit; absent while no item is in edit.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: ListView::SubItem final
@@ -1470,6 +1482,18 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ListViewInsertionMark final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   Where a ListView's insertion mark stands (Windows Forms' ListViewInsertionMark Index and AppearsAfterItem): beside the item at model index ``index``, before it or, with ``after``, after it.
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: bool after
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ListViewItem final
 
    ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
@@ -1536,6 +1560,24 @@ Related types
    .. cpp:function:: virtual void retrieve_item(std::size_t index, ListViewItem& item) const = 0
 
       Fills ``item`` for ``index`` (below the last count the view read). ``item`` is reused between calls: overwrite every field. An empty stable ID is replaced by "#" and the index; text that is not valid UTF-8 is shown empty.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListViewLabelEdit final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   One label edit (Windows Forms' LabelEditEventArgs). In before_label_edit ``label`` is none, and a handler sets ``cancel`` to keep the item out of edit. In after_label_edit ``label`` is the edited text, or none when the edit was cancelled; a handler sets ``cancel`` to refuse the text, and the item keeps the text it had. A handler's change to ``label`` is ignored. ``index`` is the item's position when its edit began.
+
+   .. cpp:member:: std::string list_id
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string item_id
+
+   .. cpp:member:: std::optional<std::string> label
+
+   .. cpp:member:: bool cancel
 
 .. cpp:namespace:: gui_forms
 

@@ -1,0 +1,277 @@
+{
+  "about": "Recorded decisions for code_integrity_checker/check.py. A finding that matches an entry (path, rule and evidence line) is listed as reviewed and never raised again; edit the line and it is raised afresh. excluded_scopes are never read: the Skia renderer and its C ABI, which are being replaced.",
+  "excluded_scopes": [
+    "src/render/skia/",
+    "src/abi/drawing_skia_c_api.cpp"
+  ],
+  "reviews": [
+    {
+      "path": "src/controls/data_grid_view/data_grid_view_parts.cpp",
+      "rule": "I06",
+      "evidence": "records.reserve(rows * columns);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "rows and columns are the realized (visible) window's counts, bounded by the viewport",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/core/engine/primitives/kernel/box_blur.cpp",
+      "rule": "I06",
+      "evidence": "work.sums.resize(columns * lanes);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "callers pass PartRaster extents (glass_primitive.cpp:171, material_primitive.cpp:1249); PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/core/engine/primitives/material/image_variant.cpp",
+      "rule": "I06",
+      "evidence": "work.line.resize(longest * lanes);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "the comment above states it: the registry bounds image sides and PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
+      "rule": "I06",
+      "evidence": "scratch.across_cells.resize(set.count * width);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "set.count <= maximum_octaves (a std::array extent); width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
+      "rule": "I06",
+      "evidence": "scratch.across_weights.resize(set.count * width);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "set.count <= maximum_octaves (a std::array extent); width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
+      "rule": "I06",
+      "evidence": "scratch.down_cells.resize(set.count * height);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "set.count <= maximum_octaves (a std::array extent); height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
+      "rule": "I06",
+      "evidence": "scratch.down_weights.resize(set.count * height);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "set.count <= maximum_octaves (a std::array extent); height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
+      "rule": "I06",
+      "evidence": "scratch.across_weights.resize(fresco_blooms * inputs.width);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "fresco_blooms is a constant; inputs.width is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/core/engine/primitives/procedural/procedural_pattern.cpp",
+      "rule": "I06",
+      "evidence": "scratch.down_weights.resize(fresco_blooms * inputs.height);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "fresco_blooms is a constant; inputs.height is a PartRaster side; PartRaster::create bounds both sides by maximum_part_raster_side (part_raster.cpp:17)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/core/layout/style_reader/layout_style_reader.cpp",
+      "rule": "I06",
+      "evidence": "destination.reserve(first_repeated + repeated * copies);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "total = counted_before + repeated * copies is refused above maximum_grid_tracks (line 1129); both factors are at most maximum_grid_tracks, as the comment states",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/host/linux/accessibility/linux_accessibility.cpp",
+      "rule": "I05",
+      "evidence": "count = g_main_context_query(context, priority, &timeout, native.data(), static_cast<int>(native.size()));",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "native was sized from an int count (line 1035), so its size fits int",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/host/linux/accessibility/linux_accessibility.cpp",
+      "rule": "I05",
+      "evidence": "if (count > static_cast<int>(native.size())) { g_main_context_release(context); return; }",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "native was sized from an int count (line 1035), so its size fits int",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/host/linux/services/linux_services.cpp",
+      "rule": "I05",
+      "evidence": "static_cast<int>(targets.size()));",
+      "decision": "false_shape",
+      "reason": "targets holds three atoms, built in the lines above",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/host/windows/services/windows_notify_icons.cpp",
+      "rule": "I05",
+      "evidence": "static_cast<int>(text.size()), nullptr, 0);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "NotifyIcon refuses text above HostServices::maximum_tray_tooltip_bytes before it reaches the host (src/controls/notify_icon/notify_icon.cpp:90)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/host/windows/services/windows_notify_icons.cpp",
+      "rule": "I05",
+      "evidence": "MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), wide.data(), length);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "NotifyIcon refuses text above HostServices::maximum_tray_tooltip_bytes before it reaches the host (src/controls/notify_icon/notify_icon.cpp:90)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
+      "rule": "I05",
+      "evidence": "hb_buffer_add_utf8(buffer, utf8.data(), static_cast<int>(utf8.size()),",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "the shaping entry refuses input above limits.input_bytes or INT_MAX (line 863)",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "path": "stx_skia/skia/include/core/SkUnPreMultiply.h",
+      "rule": "I03",
+      "evidence": "SkASSERT(alpha <= 255);",
+      "decision": "defect",
+      "reason": "public GetScale(U8CPU) indexes the 256-entry gTable with only a debug bound; the one internal caller passes SkGetPackedA32 (8 bits), but the public entry needs a Release bound (API-behaviour queue)",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/skia/src/core/SkAlphaRuns.cpp",
+      "rule": "I03",
+      "evidence": "SkASSERT(width > 0);",
+      "decision": "guarded",
+      "reason": "the only caller is RunBasedAdditiveBlitter::advanceRuns with fWidth from sectBounds; SkScan::AntiFillPath returns before AAAFillPath when the path bounds or their clip intersection is empty or clipped out, so the width is positive",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/skia/src/core/SkBlitRow_D32.cpp",
+      "rule": "I03",
+      "evidence": "SkASSERT(flags < std::size(kProcs));",
+      "decision": "guarded",
+      "reason": "the next statement masks flags with std::size(kProcs) - 1 (a power of two) before the table read",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/skia/src/core/SkLatticeIter.cpp",
+      "rule": "I03",
+      "evidence": "SkASSERT(x >= 0 && x < fSrcX.size() - 1);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "next() returns at currRect == fNumRectsInLattice ((xCount+1)*(yCount+1), or 9 with four entries for the nine-patch form) and fCurrX wraps at fSrcX.size() - 1, so x indexes within the xCount+2 divisions",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/skia/src/core/SkLatticeIter.cpp",
+      "rule": "I03",
+      "evidence": "SkASSERT(y >= 0 && y < fSrcY.size() - 1);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "next() returns at currRect == fNumRectsInLattice, and y advances only when x wraps, so y stays below fSrcY.size() - 1",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/src/swizzle.cpp",
+      "rule": "I06",
+      "evidence": "std::memcpy(&pixel, src + i * kPixelBytes, kPixelBytes);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "swap_red_blue rejects spans that are not whole pixels or differ in size, and count is dst.size() / kPixelBytes, so i * kPixelBytes stays inside the span",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/src/swizzle.cpp",
+      "rule": "I06",
+      "evidence": "std::memcpy(dst + i * kPixelBytes, &swapped, kPixelBytes);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "swap_red_blue rejects spans that are not whole pixels or differ in size, and count is dst.size() / kPixelBytes, so i * kPixelBytes stays inside the span",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/arena_core.cpp",
+      "rule": "I05",
+      "evidence": "append(output, static_cast<int32_t>(gDestroyed.size()));",
+      "decision": "false_shape",
+      "reason": "test probe output: gDestroyed holds the few destructor ids one arena case records",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/block_list_core.cpp",
+      "rule": "I05",
+      "evidence": "append(output, static_cast<int32_t>(list.count()));",
+      "decision": "false_shape",
+      "reason": "SkTBlockList::count() already returns int; the cast only names the output width",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/buffer_core.cpp",
+      "rule": "I05",
+      "evidence": "append(output, static_cast<int32_t>(table.count()));",
+      "decision": "false_shape",
+      "reason": "SkDataTable::count() already returns int; the cast only names the output width",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/mask_cache.cpp",
+      "rule": "I05",
+      "evidence": "if (filter.size() < 1 || filter.size() > 5 || filter.radius() + 1 != static_cast<int>(filter.size()) ||",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "the earlier operands of the same condition bound filter.size() to 1..5 before the cast",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/mipmap.cpp",
+      "rule": "I01",
+      "evidence": "client = sk_ref_sp(cache);",
+      "decision": "false_shape",
+      "reason": "attachToCacheAndRef keeps a cache reference, so the object outlives client.reset(); the test then re-references it on purpose to probe the purge path",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/tarray_core.cpp",
+      "rule": "I05",
+      "evidence": "append(output, static_cast<int32_t>(array.size()));",
+      "decision": "false_shape",
+      "reason": "TArray::size() already returns int; the cast only names the output width",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/tarray_core.cpp",
+      "rule": "I05",
+      "evidence": "append(gCapacities, static_cast<int32_t>(array.size()));",
+      "decision": "false_shape",
+      "reason": "TArray::size() already returns int; the cast only names the output width",
+      "reviewed": "2026-10-28"
+    },
+    {
+      "path": "stx_skia/tests/tarray_core.cpp",
+      "rule": "I05",
+      "evidence": "append(gCapacities, static_cast<int32_t>(array.capacity()));",
+      "decision": "false_shape",
+      "reason": "TArray::capacity() already returns int; the cast only names the output width",
+      "reviewed": "2026-10-28"
+    }
+  ]
+}

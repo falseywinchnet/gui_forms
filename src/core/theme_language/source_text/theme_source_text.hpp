@@ -8,7 +8,7 @@
 
 namespace gui_forms::theme_language {
 
-// The theme language's source text (stage T3, planning/stages/
+// The theme language's source text (stage T3, notes:planning/stages/
 // T3-theme-language/PLAN.md, phase P1): a sheet's bytes as written, and the
 // positions diagnostics report. Internal to the library until stage V (T3
 // decision E3).

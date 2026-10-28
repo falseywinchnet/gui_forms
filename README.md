@@ -11,7 +11,7 @@ runs the same control tree on macOS, Windows and Linux.
 Windows hosts are native; the Linux X11 host is opt-in. GUI.Forms is CPU-only
 by design and has no GPU backend. Text is drawn by one HarfBuzz/FreeType
 engine from bundled fonts, so the same string renders identically on every
-platform ([ADR-004](decisions/ADR-004-one-text-rasterization-engine.md)).**
+platform ([ADR-004](https://github.com/malkuth-software/notes/blob/gui_forms/decisions/ADR-004-one-text-rasterization-engine.md)).**
 
 ## First window
 
@@ -173,6 +173,7 @@ Every stock control, grouped by function; the table is generated from
 | [`ResponsiveTrackPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ResponsiveTrackPanel.html) |  | Track-based container that places each child in one authored track and collapses tracks as an effective-layout state without changing author visibility. |
 | [`ScaledPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ScaledPanel.html) |  | Panel that maps caller-authored design-space child rectangles into the current content bounds while retaining slot identity independently of child order. |
 | [`SplitContainer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.SplitContainer.html) |  | Two-pane allocation container with bounded splitter distance, fixed-pane resize preservation, pointer and keyboard seam input, and collapse. |
+| [`Splitter`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.Splitter.html) |  | Windows Forms migration facade: a bar docked after a docked sibling that resizes it by dragging, within MinSize and MinExtra, over the dock layout; new code uses SplitContainer. |
 | [`SplitterPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.SplitterPanel.html) |  | Allocated pane surface owned by SplitContainer that paints its own background from committed bounds. |
 | [`TableLayoutPanelCompat`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.TableLayoutPanelCompat.html) |  | For Windows Forms migration, the Windows Forms TableLayoutPanel: bounded rows and columns, absolute/percent/auto tracks, explicit or automatic placement and row/column spans; use GridPanel for new work. |
 | [`HScrollBar`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.HScrollBar.html) | Scrolling | Explicit horizontal ScrollBar leaf type. |
@@ -197,6 +198,8 @@ Every stock control, grouped by function; the table is generated from
 | [`ToolStripContainer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ToolStripContainer.html) |  | Four ToolStripPanels around a content panel; the edge panels take the room their strips need and the content takes the rest. |
 | [`ToolStripPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ToolStripPanel.html) |  | Band along one edge that stacks joined ToolStrips in rows (top, bottom) or vertical columns (left, right), as thick as its strips. |
 | [`AnchoredPopupLayer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.AnchoredPopupLayer.html) | Dialogs and popups | Full-client overlay that owns one retained popup content subtree, re-resolves anchored bounds on resize, and reports click-away and Escape requests. |
+| [`ColorDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ColorDialog.html) |  | The host's dialog for choosing a color, opaque unless alpha is allowed, shown modally through HostServices. |
+| [`FolderBrowserDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.FolderBrowserDialog.html) |  | The host's dialog for choosing a folder, with a description and a starting folder, shown modally through HostServices. |
 | [`FontDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.FontDialog.html) |  | In-window owned dialog choosing a bundled face by role, a style the face has, and a size, with a preview and Apply, OK and Cancel; returns a FontSpec. |
 | [`RibbonToolTip`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.RibbonToolTip.html) |  | Nonvisual provider of enhanced tooltips on controls and ToolStrip items: title, description, shortcut, image, a disabled command's reason, and an F1 help topic reported as an event. |
 | [`SaveFileDialog`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.SaveFileDialog.html) |  | The host's dialog for choosing where to save a file, with a Windows Forms filter string, a default extension, an overwrite prompt and a cancellable file_ok, shown modally through HostServices. |
@@ -296,9 +299,10 @@ in CI.
   control, its WinForms counterpart and a one-line description.
 - [API reference](https://gui-forms.readthedocs.io/en/latest/api/index.html): every public type, member and
   enumeration, generated from the headers.
-- [`decisions/`](decisions/): architecture decision records.
-- [`planning/`](planning/): internal plans and working notes, kept as records
-  rather than user documentation.
+- [`malkuth-software/notes`, branch `gui_forms`](https://github.com/malkuth-software/notes/tree/gui_forms):
+  architecture decision records, plans, stage briefs, measurements,
+  experiments and working notes, kept as records rather than user
+  documentation.
 
 ## Project boundaries
 
@@ -312,7 +316,7 @@ boundaries.
 ## Contributing
 
 CI ([`native.yml`](.github/workflows/native.yml)) must pass on every platform.
-C++ follows [`planning/PROGRAMMING_HOUSE_STYLE.md`](planning/PROGRAMMING_HOUSE_STYLE.md);
+C++ follows the house style, [`HOUSE_STYLE.md`](https://github.com/malkuth-software/notes/blob/main/HOUSE_STYLE.md);
 CI fails on any spelling finding from
 `python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis`,
 so run it before you push. Build the docs with `sphinx-build -W docs <out>` so

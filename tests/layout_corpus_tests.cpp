@@ -1,5 +1,5 @@
 // The layout fixture corpus against Chromium's checked-in reference boxes
-// (planning/stages/L-layout/PLAN.md section 6, owner decisions L-Q9 and
+// (notes:planning/stages/L-layout/PLAN.md section 6, owner decisions L-Q9 and
 // L-Q11). No Chromium runs here: every host compares GUI.Forms' own layout
 // against tests/layout_corpus/references/, written by
 // tools/layout_oracle/capture.py.

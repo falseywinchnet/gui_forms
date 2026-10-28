@@ -681,6 +681,17 @@
       "doc": "api/generated/gui_forms.SplitterPanel.rst"
     },
     {
+      "id": "splitter",
+      "type": "Splitter",
+      "header": "gui_forms/controls/splitter/splitter.hpp",
+      "category": "Layout",
+      "purpose": "Windows Forms migration facade: a bar docked after a docked sibling that resizes it by dragging, within MinSize and MinExtra, over the dock layout; new code uses SplitContainer.",
+      "winforms": "Splitter",
+      "status": "provisional",
+      "gallery_page": "dock-and-anchor",
+      "doc": "api/generated/gui_forms.Splitter.rst"
+    },
+    {
       "id": "command_overflow_panel",
       "type": "CommandOverflowPanel",
       "header": "gui_forms/controls/scrollable_control/container_control/command_overflow_panel/command_overflow_panel.hpp",
@@ -987,6 +998,28 @@
       "status": "provisional",
       "gallery_page": "dialogs-and-host-services",
       "doc": "api/generated/gui_forms.ThreadExceptionDialog.rst"
+    },
+    {
+      "id": "folder_browser_dialog",
+      "type": "FolderBrowserDialog",
+      "header": "gui_forms/components/folder_browser_dialog/folder_browser_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "The host's dialog for choosing a folder, with a description and a starting folder, shown modally through HostServices.",
+      "winforms": "FolderBrowserDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.FolderBrowserDialog.rst"
+    },
+    {
+      "id": "color_dialog",
+      "type": "ColorDialog",
+      "header": "gui_forms/components/color_dialog/color_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "The host's dialog for choosing a color, opaque unless alpha is allowed, shown modally through HostServices.",
+      "winforms": "ColorDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.ColorDialog.rst"
     },
     {
       "id": "tool_tip",

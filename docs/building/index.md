@@ -8,8 +8,8 @@ All commands run from the repository root.
 ## Standard native build
 
 First follow [Installation](../user/install.md#configure-build-install) to fetch the text
-sources and configure for your platform. Linux requires a separately prepared
-Skia archive and an enabled X11 host; Windows uses `GUI_FORMS_ENABLE_SKIA=OFF`.
+sources and configure for your platform. Linux requires an enabled X11 host;
+the CPU renderer, `stx_skia/`, builds with the tree on every platform.
 Then:
 
 ```sh
@@ -46,14 +46,11 @@ probes. They are not installed.
 ## Third-party dependencies
 
 Dependencies are pinned. Fetch HarfBuzz and FreeType explicitly before
-configuration. CMake schedules the default Skia fetch/build at build time;
-Linux native builds use the platform-specific script and prebuilt options
-shown in [Installation](../user/install). SheenBidi is already vendored in the repository.
+configuration. The CPU renderer, `stx_skia/` (a pruned CPU Skia derivative),
+is part of the repository and builds with the tree, as SheenBidi is vendored.
 
 | Script | Purpose |
 |---|---|
-| `fetch_skia_cpu.sh` | Fetch Skia and its pinned FreeType source (no libpng or zlib: PNG is stx_png on stx_zlib), with the decoder-removal patch applied |
-| `build_skia_cpu.sh`, `build_skia_cpu_linux.sh` | Build the fetched CPU-only Skia for macOS or Linux; they do not fetch sources |
 | `fetch_text_stack.sh` | HarfBuzz and FreeType |
 | `fetch_linebreak.sh` | libunibreak (UAX #14 line breaking), required with `fetch_text_stack.sh` before configuring `GUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON` |
 
@@ -228,6 +225,8 @@ miss is an ordinary compilation. [Fast, reproducible builds](fast-builds) explai
 the whole method (the pinned configuration, exact reuse of tested trees and
 the published caches), and [Reusing CI caches](reusing-ci-caches) covers the
 archive layout, the manifest, restoring a cache and copying the method.
+The CI tools that do this live in template_harness, pinned by `harness.lock`
+([GUI.Forms builds through template_harness](template-harness)).
 
 ## Dependency boundaries
 
@@ -242,4 +241,5 @@ A change that violates one of these fails `ctest` before it reaches review.
 
 fast-builds
 reusing-ci-caches
+template-harness
 ```

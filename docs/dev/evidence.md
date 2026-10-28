@@ -1,51 +1,43 @@
 # Evidence index
 
-GUI.Forms keeps its measurements, experiment reports and plans in the
-repository rather than in a wiki, and it keeps negative results next to
-positive ones. These directories are internal working material: their tone
-is terse, they use the project's internal labels for claims, and they are
-not rebuilt into this site. They are listed here so that a reader who wants
-the data behind a statement in the user documentation knows where to look.
+GUI.Forms keeps its measurements, experiment reports and plans in a separate
+repository, [`malkuth-software/notes`](https://github.com/malkuth-software/notes/tree/gui_forms), on its
+`gui_forms` branch, and it keeps negative results next to positive ones. That
+material is internal: its tone is terse, it uses the project's internal
+labels for claims, and it is not rebuilt into this site. It is listed here so
+that a reader who wants the data behind a statement in the user documentation
+knows where to look. A source comment that cites `notes:<path>` names a path
+on that branch.
 
-`results/`
+[`results/`](https://github.com/malkuth-software/notes/tree/gui_forms/results)
 : Dated measurement folders, one per experiment or checkpoint. Each contains
   the raw numbers (JSON, CSV or logs), the exact commands, the environment
-  and a short README. Examples: label layout and wrap reuse, raster-cache
-  checkpoints, prepared-window shaping and placement, Windows text latency,
-  and the host-service and dialog traces for the AppKit adapter. When a
-  concept page says a counter proves something, the proof is here.
+  and a short README. When a concept page says a counter proves something,
+  the proof is here.
 
-`experiments/`
-: Narrative reports (about 150 files) recording what was tried, what was
-  observed, what was measured and what was rejected, in the order it
-  happened. They cover text rasterization profiles, Unicode text store and
-  grapheme conformance, the compiler-cache proof, audio decoding and
-  transport, the compatibility facade and its Wine runs, the drawing core,
-  initialization ownership, document-view benchmarks and many smaller
-  probes. A report is evidence only for the behaviours it exercised.
+[`experiments/`](https://github.com/malkuth-software/notes/tree/gui_forms/experiments)
+: Narrative reports recording what was tried, what was observed, what was
+  measured and what was rejected, in the order it happened. A report is
+  evidence only for the behaviours it exercised.
 
-`planning/`
-: The implementation programme and its ledgers: the master plan with its
-  dependency-ordered milestones, the control completeness matrix (the
-  authoritative supported / deferred / excluded ledger), the Forms API
-  catalogue and behaviour-gap catalogue, the paint-pipeline availability
-  matrix, the consumer capability profiles, the programming house style, and
-  dated stage plans such as the current polish-stage plan. When this site's
-  [Roadmap](roadmap) summarises a gate, the full statement is in one of
-  these files.
+[`planning/`](https://github.com/malkuth-software/notes/tree/gui_forms/planning)
+: The implementation programme and its ledgers: the forward programme and
+  its stage briefs, the control completeness matrix, the Forms API catalogue
+  and behaviour-gap catalogue, the consumer capability profiles and the
+  design language. When this site's [Roadmap](roadmap) summarises a gate, the
+  full statement is in one of these files.
+
+[`decisions/`](https://github.com/malkuth-software/notes/tree/gui_forms/decisions)
+: The architecture decision records, listed under
+  [Architecture decisions](decisions).
+
+[`docs-notes/`](https://github.com/malkuth-software/notes/tree/gui_forms/docs-notes)
+: Dated working notes: interface negotiations, proposals, audits and
+  development records.
 
 `manifests/`
-: Machine-readable consumption snapshots for downstream projects, with
-  artefact digests and the commands that produced them.
-
-`docs/notes/`
-: Dated working notes that were once mixed with the user documentation:
-  interface negotiations, proposals, audits and development records. They are
-  kept for provenance and are excluded from this site.
-
-`decisions/`
-: The architecture decision records, rendered under
-  [Architecture decisions](decisions).
+: In this repository: machine-readable consumption snapshots for downstream
+  projects, with artefact digests and the commands that produced them.
 
 ## How to read a claim
 
@@ -54,5 +46,5 @@ observed (seen but not measured), measured (numbers with a recorded method),
 hypothesis, candidate, rejected or decided. This site uses plain prose, but
 the distinction still applies: a sentence here that describes behaviour is
 backed by a test under `tests/`; a sentence that describes cost is backed by
-a folder under `results/`; and a sentence that describes intent points at
-`planning/`.
+a folder under `results/` in the notes repository; and a sentence that
+describes intent points at its `planning/`.

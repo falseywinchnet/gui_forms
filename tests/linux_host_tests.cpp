@@ -270,8 +270,8 @@ void incoming(Runtime &runtime, NativeWindow &window, const char *type,
   if (image) {
     const HostClipboardImageResult result =
         (*window.services).read_clipboard_image();
-    require(result.image.has_value() && (*result.image).width == 256 &&
-                (*result.image).height == 256,
+    require(result.image() != nullptr && (*result.image()).width == 256 &&
+                (*result.image()).height == 256,
             "External PNG clipboard decode failed");
   } else if (std::string_view(type) == "text/uri-list" ||
              std::string_view(type) == "x-special/gnome-copied-files") {
@@ -475,7 +475,7 @@ void live_frame_sequence(Runtime &runtime) {
 // Stage DP gate on X11: two distant damaged rectangles paint their sum, not
 // their bounding box; the host copies exactly that rectangle set to the
 // window; and no pixel outside them changes, in the raster or on the X
-// server. The record is results/2026-10-25-dp-gate-x11.
+// server. The record is notes:results/2026-10-25-dp-gate-x11.
 class ColorBlock final : public Control {
 public:
   ColorBlock(StableId id, const Color color) : Control(std::move(id)), color_(color) {}

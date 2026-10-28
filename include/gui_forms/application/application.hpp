@@ -110,7 +110,11 @@ struct ApplicationWindowOptions final {
     std::function<void(Window&, ApplicationWindowHandle)> ready{};
     // Published on the UI thread before ready. The supplied wake may be called
     // by workers while this window is alive; workers must stop before closed.
-    // Wake schedules work only. dispatch_pending executes on the UI thread.
+    // Wake schedules work only: it posts a message, writes a pipe or queues a
+    // main-thread task, and returns. It takes no lock a caller could hold and
+    // never calls dispatch_pending or anything else of the caller's, so a
+    // worker may call it while holding its own lock. dispatch_pending executes
+    // on the UI thread.
     std::function<void(std::function<void()>)> wake_ready{};
     std::function<void()> dispatch_pending{};
     std::function<void(HostCloseRequest&)> closing{};

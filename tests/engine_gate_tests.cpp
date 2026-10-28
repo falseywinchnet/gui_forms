@@ -33,7 +33,7 @@
 //   until its name is added, and fails the test until a sample draws it.
 //
 // The other two halves are proved by the primitives' own tests and listed
-// in results/2026-10-22-t2-engine-gate/README.md: cost fallback (a part
+// in notes:results/2026-10-22-t2-engine-gate/README.md: cost fallback (a part
 // whose cost cannot be bounded is drawn by the built-in recipe) and
 // reduced motion.
 
@@ -760,6 +760,7 @@ std::string_view image_mode_name(MaterialImageMode mode) {
     case MaterialImageMode::stretch: return "stretch";
     case MaterialImageMode::tile: return "tile";
     case MaterialImageMode::nine_patch: return "nine_patch";
+    case MaterialImageMode::single: return "single";
     }
     return {};
 }

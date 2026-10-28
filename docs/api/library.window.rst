@@ -734,6 +734,14 @@ Related types
 
       Reduced transparency (stage T5, owner decision T5-Q7): the host's setting where the host reports it (capability presentation_preferences), or the application's. With it, or with high_contrast, a window's backdrop is opaque (WindowBackdropReason).
 
+   .. cpp:member:: std::uint32_t double_click_milliseconds
+
+      The system's double-click interval, a perceptual duration in milliseconds: the longest gap between two clicks that the platform counts as one double-click. A control that tells a slow second click from a double-click (a list's label edit) compares against it. The host reports it at attach and again when the system setting changes (HostInputSettingsEvent); each host's source is listed under "Input settings" in docs/user/hosts-and-capabilities.md. ``double_click_origin`` says whether it is that host value or the stated default. Between 1 and maximum_double_click_milliseconds. Default: ``{default_double_click_milliseconds}``.
+
+   .. cpp:member:: SettingOrigin double_click_origin
+
+      Default: ``{SettingOrigin::default_value}``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PresentedArea final
@@ -863,6 +871,16 @@ Enumerations
 
    .. cpp:enumerator:: overlay
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: SettingOrigin
+
+   ``#include <gui_forms/window/presentation/input_settings.hpp>``
+
+   .. cpp:enumerator:: default_value
+
+   .. cpp:enumerator:: host
+
 Functions, constants and aliases
 --------------------------------
 
@@ -974,11 +992,23 @@ Functions, constants and aliases
 
 .. cpp:namespace:: gui_forms
 
+``#include <gui_forms/window/presentation/input_settings.hpp>``
+
+.. cpp:var:: constexpr std::uint32_t default_double_click_milliseconds
+
+   The double-click interval GUI.Forms states where the host has none, and the longest one admitted (Windows' own limit). Perceptual durations, in milliseconds. Value: ``400U``.
+
+.. cpp:var:: constexpr std::uint32_t maximum_double_click_milliseconds
+
+   Value: ``5000U``.
+
+.. cpp:namespace:: gui_forms
+
 ``#include <gui_forms/window/presentation/presentation_types.hpp>``
 
 .. cpp:var:: constexpr std::uint32_t paint_contract_version
 
-   The presentation availability record (stage DP; planning/ PAINT_PIPELINE_AVAILABILITY.md, M11h-P4 / M12-P4). The baseline contract (coherent latest-state presentation: mutation may outpace rendering and rendering may outpace presentation, with no unbounded queue and no incomplete frame visible) is reported as a version, never as a capability: a host that cannot meet it fails attachment. Only optional extensions are reported as available or not, and only truthfully. Version 2 (2026-10-13) adds damage-preserving partial present to the contract: the host presents the bounded rectangle set it paints, not their union. Value: ``2U``.
+   The presentation availability record (stage DP; notes:planning/ PAINT_PIPELINE_AVAILABILITY.md, M11h-P4 / M12-P4). The baseline contract (coherent latest-state presentation: mutation may outpace rendering and rendering may outpace presentation, with no unbounded queue and no incomplete frame visible) is reported as a version, never as a capability: a host that cannot meet it fails attachment. Only optional extensions are reported as available or not, and only truthfully. Version 2 (2026-10-13) adds damage-preserving partial present to the contract: the host presents the bounded rectangle set it paints, not their union. Value: ``2U``.
 
 .. cpp:namespace:: gui_forms
 

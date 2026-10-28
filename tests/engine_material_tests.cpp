@@ -198,14 +198,21 @@ void choices_are_the_recipe_roles() {
     require(descriptor.parameters.size() == 2U && descriptor.parameters[0].name == "recipe",
             "the material's first parameter is its recipe (its shape is E9.6's)");
     const std::span<const std::string_view> choices = descriptor.parameters[0].choices;
-    require(choices.size() == static_cast<std::size_t>(ControlVisualRole::count), "one choice per recipe role");
-    for (std::size_t index = 0U; index < choices.size(); ++index) {
+    const std::size_t roles = static_cast<std::size_t>(ControlVisualRole::count);
+    require(choices.size() == roles + 1U, "one choice per recipe role, then the part's family");
+    for (std::size_t index = 0U; index < roles; ++index) {
         const ControlVisualRole role = static_cast<ControlVisualRole>(index);
         require(choices[index] == control_visual_role_name(role), "the choices are the roles' names in enum order");
         const PrimitiveParameterBlock parameters = recipe(choices[index]);
-        const std::optional<ControlVisualRole> chosen = material_primitive().theme_material(parameters);
-        require(chosen && *chosen == role, "the chosen recipe is the theme material's role");
+        const std::optional<ControlVisualRole> chosen =
+            material_primitive().theme_material(parameters, ControlVisualRole::panel);
+        require(chosen && *chosen == role, "the chosen recipe is the theme material's role, whatever the family");
     }
+    require(choices[roles] == "family", "the last choice is the part's family (EC1)");
+    const PrimitiveParameterBlock defaults = default_parameters(descriptor);
+    const std::optional<ControlVisualRole> family =
+        material_primitive().theme_material(defaults, ControlVisualRole::menu_item);
+    require(family && *family == ControlVisualRole::menu_item, "by default the material draws the part's family");
     require(descriptor.outsets == (Insets{8.0, 8.0, 8.0, 8.0}), "the material draws 8 units outside its box");
     require(descriptor.inputs_read.empty(), "a material reads no inputs, so it never bakes per frame");
     for (const PrimitiveParameterDeclaration& parameter : descriptor.parameters) {
@@ -214,7 +221,7 @@ void choices_are_the_recipe_roles() {
     const EnginePrimitive* const plate = builtin_primitive_registry().find("pill_plate");
     require(plate != nullptr, "the registry has the pill plate");
     const std::optional<ControlVisualRole> pill =
-        (*plate).theme_material(default_parameters((*plate).descriptor()));
+        (*plate).theme_material(default_parameters((*plate).descriptor()), ControlVisualRole::button);
     require(!pill, "a relief primitive draws no theme material");
 }
 
@@ -867,6 +874,16 @@ void image_fills() {
             "a tile anchored at the end is flush with the box's end");
     require(anchored.pixel(8U, 8U) == tiled.pixel(10U, 10U), "the anchored tiling runs back to the box's corner");
     hashes.push_back(raster_hash(anchored));
+
+    // One tile alone (E9.6, CSS `no-repeat`): the offset tile's first
+    // tile, at units (1, 2) to (5, 6), and nothing around it.
+    SurfaceMaterial single_tile = offset_tile;
+    single_tile.fills.back().image_mode = MaterialImageMode::single;
+    const TestRaster single = draw(single_tile, Size{16.0, 16.0}, 1.0, &registry);
+    require(single.pixel(9U, 10U) == offset.pixel(9U, 10U) && single.pixel(12U, 13U) == offset.pixel(12U, 13U),
+            "a single image is drawn where its tile lies");
+    require(single.pixel(13U, 10U)[3] == 0U && single.pixel(9U, 14U)[3] == 0U && single.pixel(8U, 8U)[3] == 0U,
+            "and nothing beyond its tile");
 
     if (print_mode()) {
         for (std::size_t index = 0U; index < hashes.size(); ++index) {

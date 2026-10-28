@@ -45,6 +45,32 @@ void test_checked_collections(gui_forms::Window& window) {
     click(window, window.find("gallery.checked.command.item.3"));
     require((*checked).item_check_state(3U) == CheckState::indeterminate,
             "Set mixed must restore the indeterminate row");
+
+    // The toggle sits below the fold, so it is pressed through its public
+    // activation rather than a hit-tested click.
+    std::shared_ptr<gui_forms::ListView> list_view =
+        std::dynamic_pointer_cast<ListView>(window.find("gallery.checked.list-view.list"));
+    std::shared_ptr<gui_forms::Button> mark =
+        std::dynamic_pointer_cast<Button>(window.find("gallery.checked.list-view.mark"));
+    require(list_view && mark && !(*list_view).insertion_mark().has_value(),
+            "the gallery ListView starts without an insertion mark");
+    (*mark).perform_click();
+    require((*list_view).insertion_mark() == std::optional<ListViewInsertionMark>(ListViewInsertionMark{2U, false}),
+            "the gallery toggle shows the insertion mark before the third row");
+    (*mark).perform_click();
+    require(!(*list_view).insertion_mark().has_value(), "the gallery toggle clears the insertion mark");
+
+    // F2's label edit, opened through its public entry point for the same
+    // reason. The edits leave the task's text as it was.
+    require((*list_view).label_edit() && (*list_view).begin_label_edit(0U) &&
+                window.dispatch_text({"Discarded"}) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
+                (*status).text() == "ListView rename of task.anatomy cancelled",
+            "Escape cancels the gallery ListView's rename and the page reports it");
+    require((*list_view).begin_label_edit(0U) && window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                (*status).text() == "ListView item task.anatomy renamed to Publish item anatomy" &&
+                (*list_view).items()[0].text == "Publish item anatomy",
+            "Enter commits the gallery ListView's label and the page reports it");
 }
 
 } // namespace gallery_pages_tests

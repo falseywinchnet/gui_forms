@@ -14,6 +14,7 @@
 #include "gui_forms/theme/types/theme_types.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -36,12 +37,15 @@ namespace {
 
 // -- the descriptor ----------------------------------------------------------------
 
-constexpr std::array<std::string_view, 14> recipe_names{
-    "window", "panel", "card", "button", "accent_button", "command_button",
-    "choice", "editor", "menu_item", "selection", "progress", "tool_tip",
-    "link", "visited_link"};
-static_assert(recipe_names.size() == static_cast<std::size_t>(ControlVisualRole::count),
-              "one choice per recipe role");
+// The recipe roles in ControlVisualRole's order, then `family`: the recipe
+// of the part's own family (PartPaint::family, T3 EC1), so that a theme's
+// material fields on any part keep that part's recipe as their floor.
+constexpr std::array<std::string_view, 15> recipe_names{
+    "window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor",
+    "menu_item", "selection", "progress", "tool_tip", "link", "visited_link", "family"};
+constexpr double family_recipe = 14.0;
+static_assert(recipe_names.size() == static_cast<std::size_t>(ControlVisualRole::count) + 1U,
+              "one choice per recipe role, then the family's");
 
 const PartRole material_roles[] = {PartRole::region, PartRole::face,  PartRole::actuator, PartRole::well,
                                    PartRole::track,  PartRole::thumb, PartRole::chip};
@@ -59,10 +63,11 @@ enum MaterialParameter : std::size_t {
     material_parameter_count,
 };
 
-// The default recipe is the button's (position 3). The shape (E9.6) is the
-// box's outline; a rounded rectangle takes its radii from the material.
+// The default recipe is the part's family's (EC1; the button's, position 3,
+// before engine 0.3). The shape (E9.6) is the box's outline; a rounded
+// rectangle takes its radii from the material.
 const PrimitiveParameterDeclaration material_parameters[] = {
-    {"recipe", PrimitiveParameterKind::choice, 0.0, 0.0, 3.0, {}, false, recipe_names},
+    {"recipe", PrimitiveParameterKind::choice, 0.0, 0.0, family_recipe, {}, false, recipe_names},
     {"shape", PrimitiveParameterKind::choice, 0.0, 0.0, 0.0, {}, false, part_shape_names},
 };
 static_assert(std::size(material_parameters) == material_parameter_count, "one declaration per material parameter");
@@ -617,9 +622,20 @@ MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget
 
 // Each image fill's lent variant and where its pixels show, by fill index:
 // for destination column x and row y, the variant's byte at rows[y] +
-// columns[x]. `variant` is null for a fill that is not an image, or whose
+// columns[x], or none where either is outside_offset (beyond a single
+// image's tile). `variant` is null for a fill that is not an image, or whose
 // variant was not lent or whose maps could not be stored (it then draws
 // nothing). Borrowed from the target for the bake.
+// The offset of a column or row that shows no image.
+constexpr std::size_t outside_offset = std::numeric_limits<std::size_t>::max();
+
+// A variant pixel index as a byte offset at `stride` bytes per index.
+std::size_t image_offset(std::uint32_t index, std::size_t stride) noexcept {
+    if (index == outside_image) return outside_offset;
+    const std::size_t offset = static_cast<std::size_t>(index) * stride;
+    return offset;
+}
+
 struct MaterialImageLayer final {
     const PartRaster* variant{};
     std::vector<std::size_t> columns;
@@ -687,14 +703,14 @@ void map_image(const MaterialFillLayer& layer, std::size_t index, Rect box, doub
         map_image_variant(across, wanted.extent.width, wanted.fixed[0], wanted.fixed[2], extent.width, map);
         mapped.columns.resize(map.size());
         for (std::size_t column = 0U; column < map.size(); ++column) {
-            mapped.columns[column] = static_cast<std::size_t>(map[column]) * part_raster_bytes_per_pixel;
+            mapped.columns[column] = image_offset(map[column], part_raster_bytes_per_pixel);
         }
         const ImageAxisPlacement down =
             image_placement_down(layer, box.y, box.height, scale, layer.image_pixel_size.height);
         map_image_variant(down, wanted.extent.height, wanted.fixed[1], wanted.fixed[3], extent.height, map);
         mapped.rows.resize(map.size());
         for (std::size_t row = 0U; row < map.size(); ++row) {
-            mapped.rows[row] = static_cast<std::size_t>(map[row]) * variant.row_bytes();
+            mapped.rows[row] = image_offset(map[row], variant.row_bytes());
         }
         mapped.variant = &variant;
     } catch (const std::bad_alloc&) {
@@ -925,6 +941,7 @@ Unit fill_colour(const ResolvedFill& fill, const MaterialImages& images, std::si
     case MaterialFillKind::image: {
         const MaterialImageLayer& layer = images.layers[fill.image];
         if (layer.variant == nullptr) return Unit{};
+        if (layer.rows[y] == outside_offset || layer.columns[x] == outside_offset) return Unit{};
         const std::span<const std::uint8_t> pixels = (*layer.variant).pixels();
         const std::size_t at = layer.rows[y] + layer.columns[x];
         // The variant's bytes to [0, 1], weighted by coverage and opacity.
@@ -1254,18 +1271,21 @@ void add_drop_shadow(const PartFilters& filters, const PartRasterView& destinati
     const std::size_t stride = columns;
     const std::int64_t wide = static_cast<std::int64_t>(width);
     const std::int64_t high = static_cast<std::int64_t>(height);
-    for (std::int64_t row = 0; row < high; ++row) {
+    const std::int64_t shift_x = filters.shadow_x;
+    const std::int64_t shift_y = filters.shadow_y;
+    // Only pixels whose shifted source lies inside the blurred alpha can be
+    // covered: rows [first_row, end_row) and columns [first_column,
+    // end_column). Every other pixel has no shadow and is left as it is.
+    const std::int64_t first_row = std::max<std::int64_t>(0, shift_y);
+    const std::int64_t end_row = std::min<std::int64_t>(high, high + shift_y);
+    const std::int64_t first_column = std::max<std::int64_t>(0, shift_x);
+    const std::int64_t end_column = std::min<std::int64_t>(wide, wide + shift_x);
+    for (std::int64_t row = first_row; row < end_row; ++row) {
         const std::size_t start = static_cast<std::size_t>(row) * destination.row_bytes;
-        const std::int64_t source_row = row - filters.shadow_y;
-        for (std::int64_t column = 0; column < wide; ++column) {
-            const std::int64_t source_column = column - filters.shadow_x;
-            const bool within = source_row >= 0 && source_row < high && source_column >= 0 && source_column < wide;
-            double coverage = 0.0;
-            if (within) {
-                const std::size_t at = static_cast<std::size_t>(source_row) * stride +
-                                       static_cast<std::size_t>(source_column);
-                coverage = static_cast<double>(first[at]) / 255.0;
-            }
+        const std::size_t source_start = static_cast<std::size_t>(row - shift_y) * stride;
+        for (std::int64_t column = first_column; column < end_column; ++column) {
+            const std::size_t at = source_start + static_cast<std::size_t>(column - shift_x);
+            const double coverage = static_cast<double>(first[at]) / 255.0;
             if (coverage <= 0.0) continue;
             const std::size_t offset = start + static_cast<std::size_t>(column) * part_raster_bytes_per_pixel;
             const Unit drawn{static_cast<double>(destination.pixels[offset]) / 255.0,
@@ -1720,9 +1740,10 @@ const PrimitiveDescriptor& MaterialPrimitive::descriptor() const noexcept {
     return material_descriptor;
 }
 
-std::optional<ControlVisualRole> MaterialPrimitive::theme_material(
-    const PrimitiveParameterBlock& parameters) const noexcept {
+std::optional<ControlVisualRole> MaterialPrimitive::theme_material(const PrimitiveParameterBlock& parameters,
+                                                                   ControlVisualRole family) const noexcept {
     const double position = parameters.values[material_recipe].number;
+    if (position == family_recipe) return family;
     const ControlVisualRole role = static_cast<ControlVisualRole>(static_cast<std::uint8_t>(position));
     return role;
 }

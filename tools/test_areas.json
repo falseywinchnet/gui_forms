@@ -25,11 +25,12 @@
   {"area": "controls", "pattern": "."}
  ],
  "path_rules": [
-  {"paths": ["planning/", "decisions/", "results/", "experiments/", "docs/", "packaging/", "benchmarks/",
+  {"paths": ["docs/", "packaging/", "benchmarks/",
              "sdrsharp_reflection_system/", "*.md", "LICENSE", ".gitignore", ".gitattributes"],
    "areas": []},
   {"paths": ["CMakeLists.txt", "cmake/", "third_party/", ".github/", "assets/", "include/gui_forms/",
              "tools/ci_build.py", "tools/change_selection.py", "tools/test_areas.json", "tools/sanitizer/",
+             "harness.lock", "tools/harness_link.py",
              "tests/support/", "tests/fixtures/"],
    "areas": ["*"]},
   {"paths": ["docs/library/", "generated/", "examples/", "tools/"], "areas": ["docs"]},

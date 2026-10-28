@@ -31,14 +31,15 @@ source files carry "Copyright (C) 1996-2025".)
 |---|---|---|---|---|---|
 | GUI.Forms | this release | MIT | all | `licenses/GUIForms.txt` | `LICENSE` |
 | threadpool_atomic_fast (the owner's thread pool) | falseywinchnet/backend `6eb51f84` | MIT | all (in `libgui_forms_threading`) | `licenses/threadpool_atomic_fast.txt` | `threadpool_atomic_fast-LICENSE.txt` |
-| HarfBuzz | 14.6.0, `c7a7457b` | HarfBuzz licence ("Old MIT") | all | `licenses/HarfBuzz.txt` | `HarfBuzz-COPYING.txt` |
-| FreeType | 2.14.2, `f4205da1` | FreeType License (FTL), elected from FTL/GPLv2 | all | `licenses/FreeType-FTL.txt` | `FreeType-FTL.txt` |
+| HarfBuzz | 14.6.0, `c7a7457b` | HarfBuzz licence ("Old MIT") | all (the `--features all` SDK also installs the static library and headers) | `licenses/HarfBuzz.txt` | `HarfBuzz-COPYING.txt` |
+| FreeType | 2.14.2, `f4205da1` | FreeType License (FTL), elected from FTL/GPLv2 | all (the `--features all` SDK also installs the static library and headers) | `licenses/FreeType-FTL.txt` | `FreeType-FTL.txt` |
 | SheenBidi | 2.9.0, `829d9991` | Apache-2.0 | all | `licenses/SheenBidi.txt` | `SheenBidi-LICENSE.txt` |
 | stx_zlib (the owned zlib codec) | in this repository | MIT; the zlib License notices of the puff-derived inflate and the zlib-informed deflate are retained | all | `licenses/stx_zlib.txt`, `licenses/stx_zlib-puff.txt` and `licenses/stx_zlib-zlib.txt` | `stx_zlib-LICENSE.txt`, `stx_zlib-LICENSE-puff.txt` and `stx_zlib-LICENSE-zlib.txt` (and `share/licenses/stx_zlib/`) |
 | stx_png (the owned PNG codec) | in this repository | MIT | all | `licenses/stx_png.txt` | `stx_png-LICENSE.txt` (and `share/licenses/stx_png/`) |
 | stx_conv (the owner's CONV resampler) | in this repository | MIT | all | `licenses/stx_conv.txt` | `stx_conv-LICENSE.txt` (and `share/licenses/stx_conv/`) |
 | Unicode Character Database (grapheme tables) | Unicode 17.0.0 | Unicode License v3 | all | `licenses/Unicode.txt` | `Unicode-LICENSE.txt` |
-| Skia | `chrome/m152`, `2a9b593b` | BSD-3-Clause | macOS, Linux | `licenses/Skia.txt` | `Skia-LICENSE.txt` |
+| Skia (in stx_skia) | `chrome/m152`, `2a9b593b`, pruned and converted in `stx_skia/` | BSD-3-Clause | all | `licenses/Skia.txt` | `Skia-LICENSE.txt` |
+| stx_skia (the CPU renderer derived from Skia) | in this repository | MIT; Skia's BSD-3-Clause notices are retained | all | `licenses/stx_skia.txt` | `stx_skia-LICENSE.txt` |
 | LLVM libc++ and libc++abi | 22.1.8 | Apache-2.0 WITH LLVM-exception | macOS (bundled dylibs), Windows (statically linked) | Windows `licenses/LLVM/libc++-LICENSE.TXT`; macOS `licenses/LLVM/libcxx-LICENSE.TXT` and `licenses/LLVM/libcxxabi-LICENSE.TXT` | `libc++-LICENSE.txt` (Windows) |
 | LLVM libunwind | 22.1.8 | Apache-2.0 WITH LLVM-exception | macOS (bundled dylib), Windows (statically linked) | `licenses/LLVM/libunwind-LICENSE.TXT` | `libunwind-LICENSE.txt` (Windows) |
 | LLVM compiler-rt builtins | 22.1.8 | Apache-2.0 WITH LLVM-exception | Windows (statically linked) | `licenses/LLVM/compiler-rt-LICENSE.TXT` | `compiler-rt-LICENSE.txt` |

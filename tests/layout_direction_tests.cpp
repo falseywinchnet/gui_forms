@@ -1,5 +1,5 @@
 // Right-to-left layout outside the CSS containers (stage L, phase L6): the
-// owner's full mirroring (planning/stages/L-layout/README.md, "Decisions in
+// owner's full mirroring (notes:planning/stages/L-layout/README.md, "Decisions in
 // force"). Dock, Anchor and requested bounds in a right-to-left parent, the
 // Windows Forms flow and table containers, scrolling, and the containers'
 // reused workspaces under a measure that lays the panel out again.

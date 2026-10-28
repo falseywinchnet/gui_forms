@@ -1021,12 +1021,14 @@ void SkiaRaster::fill_linear_gradient_spread(
                              static_cast<SkScalar>(start.y)},
                             {static_cast<SkScalar>(end.x),
                              static_cast<SkScalar>(end.y)}};
-    sk_sp<SkShader> shader = SkShaders::LinearGradient(
+    // The painter contract draws nothing for geometry stx_skia refuses (points
+    // that overflow float, for example), as for the invalid input checked above.
+    SkGradientShaderResult made = SkShaders::LinearGradient(
         points, make_sk_gradient(data, spread));
-    if (!shader) return;
+    if (made.rejection != SkGradientRejection::kNone) return;
     SkPaint paint;
     paint.setAntiAlias(true);
-    paint.setShader(std::move(shader));
+    paint.setShader(std::move(made.shader));
     const SkRect box = snapped_box((*impl_).snap_transform_of(*canvas), rect, paint);
     (*canvas).drawRect(box, paint);
 }
@@ -1040,12 +1042,12 @@ void SkiaRaster::fill_radial_gradient(
         return;
     }
     const SkGradientData data = to_sk_gradient(stops);
-    sk_sp<SkShader> shader = SkShaders::RadialGradient(
+    SkGradientShaderResult made = SkShaders::RadialGradient(
         {0.0F, 0.0F}, 1.0F, make_sk_gradient(data));
-    if (!shader) return;
+    if (made.rejection != SkGradientRejection::kNone) return;
     SkPaint paint;
     paint.setAntiAlias(true);
-    paint.setShader(std::move(shader));
+    paint.setShader(std::move(made.shader));
     (*canvas).save();
     SkRect box = to_sk_rect(rect);
     const bool snapped = snapped_local_rect((*impl_).snap_transform_of(*canvas), rect, box);
@@ -1727,10 +1729,12 @@ bool SkiaRaster::draw_live_surface_frame(const LiveSurfaceFrame& frame,
                                                    stride, clipped.left(), clipped.top());
         return written;
     }
-    sk_sp<SkData> data = SkData::MakeWithoutCopy(
-        frame.pixels().data(), frame.pixels().size());
+    // The frame's pixels are lent to the image for this draw only. borrowed is
+    // declared first so the image is released before it; it stops the program if
+    // anything (a cache, say) still holds the pixels when the draw returns.
+    const SkBorrowedData borrowed(frame.pixels().data(), frame.pixels().size());
     sk_sp<SkImage> image = SkImages::RasterFromData(
-        info, std::move(data), static_cast<size_t>(frame.row_bytes()));
+        info, borrowed.data(), static_cast<size_t>(frame.row_bytes()));
     if (!image) return false;
 
     SkPaint paint{};

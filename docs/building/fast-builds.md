@@ -128,11 +128,9 @@ echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
 
 `CCACHE_COMPILERCHECK=content` hashes the compiler binary itself, not its
 path or timestamp. No sloppiness options are set. The Objective-C++ launcher
-matters on macOS, where the AppKit host is Objective-C++. On macOS and Linux,
-Skia is built by its own GN build: `third_party/build_skia_cpu.sh` and
-`build_skia_cpu_linux.sh` add `cc_wrapper = "ccache"` to `args.gn` when the
-environment variable `CMAKE_CXX_COMPILER_LAUNCHER` is `ccache`, so Skia's
-objects land in the same cache. A build then runs as:
+matters on macOS, where the AppKit host is Objective-C++. The CPU renderer,
+`stx_skia/`, builds as part of the tree, so its objects land in the same
+cache. A build then runs as:
 
 ```sh
 ccache --zero-stats
@@ -148,7 +146,7 @@ in both with one cache, and requires byte-identical executables. It then
 edits one source file, one header and one compiler option, and fails unless
 each causes misses. `.github/workflows/cache-proof.yml` runs it weekly on
 Linux x64 and on demand. Recorded run, LLVM 22.1.8 on an Apple M4 Mac mini
-(`experiments/llvm22-platform-contract/cache-proof-summary.json`):
+([`experiments/llvm22-platform-contract/cache-proof-summary.json`](https://github.com/malkuth-software/notes/blob/gui_forms/experiments/llvm22-platform-contract/cache-proof-summary.json)):
 
 | Step | Change | Missed compilations | Build time |
 |---|---|---:|---:|

@@ -305,6 +305,8 @@ Related types
 
       A primitive refused to draw a part (EnginePrimitive::accepts), which the built-in recipe drew instead.
 
+   .. cpp:function:: void record_engine_material_assembly() noexcept
+
    .. cpp:function:: void record_paint_group_refusals(std::uint64_t refusals) noexcept
 
    .. cpp:function:: void record_frame_callback_fault() noexcept
@@ -356,6 +358,10 @@ Related types
    .. cpp:function:: void set_renderer(std::string_view name, bool cpu_only)
 
       Sets renderer identity and the explicit CPU-only assertion.
+
+   .. cpp:function:: void set_backplane_replay(bool replayed) noexcept
+
+      Whether the window's renderer replayed its last backplane image whole (stage T5, C6; owner decision T5-Q13).
 
 .. cpp:namespace:: gui_forms
 
@@ -588,6 +594,10 @@ Related types
 
       Parts a primitive refused to draw (E8c, EnginePrimitive::accepts), such as a material whose bake would exceed its bound: drawn by the built-in recipe instead. Counted when a keyed part's refusal begins, and at every paint of a part without a key.
 
+   .. cpp:member:: std::uint64_t engine_material_assemblies
+
+      Materials assembled from a recipe's material and the material fields a theme's rules set (T3 EC1): once per distinct assembly for a keyed part (AssembledPartMaterial), and at every paint of a part without a key.
+
    .. cpp:member:: std::uint64_t paint_group_refusals
 
       Paint groups begun deeper than maximum_paint_group_depth, drawn without isolation (Painter::begin_group).
@@ -599,6 +609,10 @@ Related types
    .. cpp:member:: bool cpu_only
 
       Default: ``{true}``.
+
+   .. cpp:member:: bool backplane_replay
+
+      The renderer's backplane replay (stage T5, C6; owner decision T5-Q13): true once the window's renderer replayed a backplane image whole, false while it has not or could not (the part-raster image of E9-B is used instead). Kept across resets, as the renderer is.
 
 .. cpp:namespace:: gui_forms
 

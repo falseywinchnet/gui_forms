@@ -1,5 +1,5 @@
 // Stage T5 phase C0: the portable compositor model, headless
-// (planning/stages/T5-compositor/PLAN.md §2 and §5 C0). Grant resolution
+// (notes:planning/stages/T5-compositor/PLAN.md §2 and §5 C0). Grant resolution
 // against every state, the window's request, grant and backdrop_changed
 // order, the host's compositor reports through the session, and byte-stable
 // headless traces of a declared and an undeclared window through a
@@ -218,7 +218,9 @@ void test_state_validation_and_json() {
                     "\"reduced_transparency\":false,\"high_contrast\":false}",
             "the state's JSON names every field");
     const HostCapabilities capabilities = host::headless_capabilities();
-    require(capabilities.protocol_version == 9U, "protocol version 9 carries the compositor report");
+    require(capabilities.protocol_version >= 9U && host_protocol_revisions.size() >= 2U &&
+                host_protocol_revisions[1].version == 9U,
+            "protocol version 9 carries the compositor report");
     const std::string capability_json = capabilities.to_json();
     require(capability_json.find("\"transparent_windows\",\"window_backdrops\",\"compositor_notifications\","
                                  "\"presentation_preferences\"") != std::string::npos,

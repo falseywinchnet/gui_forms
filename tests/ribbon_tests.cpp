@@ -108,7 +108,7 @@ std::shared_ptr<Ribbon> sample_ribbon(const Commands& commands) {
 }
 
 // A borrow into `items`, which must outlive it: temporaries are refused
-// (house style §5).
+// (house style §1).
 const Ribbon::CommandItem* find_command(const std::vector<Ribbon::CommandItem>& items, std::string_view id) {
     for (const Ribbon::CommandItem& item : items) {
         if (item.stable_id == id) return &item;
