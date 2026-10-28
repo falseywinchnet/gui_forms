@@ -20,7 +20,7 @@ is a simpler implementation whose validity is evident from its construction.
 Run a focused review from the GUI.Forms root:
 
 ```sh
-python3 -B code_integrity_checker/check.py include src --json build/code-integrity.json
+python3 -B code_integrity_checker/check.py include src stx_skia --json build/code-integrity.json
 python3 -B code_integrity_checker/check.py src/core/changed.cpp --gate
 python3 -B -m unittest discover -s code_integrity_checker -p test_check.py
 ```
