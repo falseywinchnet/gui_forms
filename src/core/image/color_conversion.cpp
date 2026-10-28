@@ -190,11 +190,18 @@ bool convert_samples_to_srgb(const ColorEncoding& encoding, unsigned depth,
     const std::size_t entries = wide ? 65536U : 256U;
     const std::uint32_t step = wide ? 1U : 257U;
     work.linear.resize(entries);
-    const bool stated_gamma = encoding.gamma.has_value();
-    const double exponent = stated_gamma ? 100000.0 / static_cast<double>(*encoding.gamma) : 0.0;
-    for (std::size_t index = 0; index < entries; ++index) {
-        const double encoded = static_cast<double>(index * step) / 65535.0;
-        work.linear[index] = stated_gamma ? engine_power(encoded, exponent) : srgb_decode(encoded);
+    // A stated gamma decodes by its exponent; otherwise the sRGB curve.
+    if (encoding.gamma.has_value()) {
+        const double exponent = 100000.0 / static_cast<double>(*encoding.gamma);
+        for (std::size_t index = 0; index < entries; ++index) {
+            const double encoded = static_cast<double>(index * step) / 65535.0;
+            work.linear[index] = engine_power(encoded, exponent);
+        }
+    } else {
+        for (std::size_t index = 0; index < entries; ++index) {
+            const double encoded = static_cast<double>(index * step) / 65535.0;
+            work.linear[index] = srgb_decode(encoded);
+        }
     }
 
     // 2. Gamut matrix, or none.

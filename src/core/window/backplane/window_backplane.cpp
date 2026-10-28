@@ -36,14 +36,24 @@ void copy_framebuffer_rows(const PartRasterView& image, PaintFramebuffer& frameb
     const std::size_t framebuffer_row = framebuffer.row_bytes();
     const bool swap = framebuffer.channel_order() == FramebufferChannelOrder::bgra;
     const std::size_t row_length = static_cast<std::size_t>(width) * 4U;
+    // The lanes of a source pixel that hold the destination's red and blue:
+    // exchanged for a BGRA framebuffer.
+    const std::size_t red_lane = swap ? 2U : 0U;
+    const std::size_t blue_lane = swap ? 0U : 2U;
+    // The direction picks which buffer is written, and each buffer's row pitch.
+    std::uint8_t* const raster_start = image.pixels.data();
+    std::uint8_t* const native_start = reinterpret_cast<std::uint8_t*>(pixels.data());
+    const bool into_framebuffer = direction == FramebufferCopy::into_framebuffer;
+    std::uint8_t* const to_start = into_framebuffer ? native_start : raster_start;
+    const std::uint8_t* const from_start = into_framebuffer ? raster_start : native_start;
+    const std::size_t to_row_bytes = into_framebuffer ? framebuffer_row : image.row_bytes;
+    const std::size_t from_row_bytes = into_framebuffer ? image.row_bytes : framebuffer_row;
     for (std::size_t row = 0U; row < rows; ++row) {
-        std::uint8_t* const raster = image.pixels.data() + row * image.row_bytes;
-        std::uint8_t* const native = reinterpret_cast<std::uint8_t*>(pixels.data() + row * framebuffer_row);
-        std::uint8_t* const to = direction == FramebufferCopy::into_framebuffer ? native : raster;
-        const std::uint8_t* const from = direction == FramebufferCopy::into_framebuffer ? raster : native;
+        std::uint8_t* const to = to_start + row * to_row_bytes;
+        const std::uint8_t* const from = from_start + row * from_row_bytes;
         for (std::size_t lane = 0U; lane < row_length; lane += 4U) {
-            const std::uint8_t red = swap ? from[lane + 2U] : from[lane];
-            const std::uint8_t blue = swap ? from[lane] : from[lane + 2U];
+            const std::uint8_t red = from[lane + red_lane];
+            const std::uint8_t blue = from[lane + blue_lane];
             to[lane] = red;
             to[lane + 1U] = from[lane + 1U];
             to[lane + 2U] = blue;

@@ -248,6 +248,14 @@ void drop_shadows() {
     const std::array<std::uint8_t, 4> below = drawn.pixel(20U, 26U);
     require(below[3] > 0U && below[0] == 0U, "the shadow shows below the part, in its colour");
     require(drawn.pixel(4U, 4U)[3] == 0U, "the shadow does not reach above and left of the part");
+    // A negative offset moves the shadow above and left of the part, and none
+    // of it is left below and right.
+    SurfaceMaterial raised = lifted;
+    raised.drop_shadow = MaterialDropShadow{Point{-3.0, -3.0}, 2.0, Color{0, 0, 0, 128}};
+    const TestRaster up = draw(raised, logical, 1.0);
+    require(up.pixel(6U, 6U)[3] > 0U && up.pixel(6U, 6U)[0] == 0U,
+            "a negative offset shows the shadow above and left of the part");
+    require(up.pixel(36U, 28U)[3] == 0U, "a negative offset leaves no shadow below and right of the part");
     const bool first = next_matches(drawn, "drop_shadow_1");
     const bool second = next_matches(draw(lifted, logical, 2.0), "drop_shadow_2");
     require(first && second, "the drop shadows match their references");

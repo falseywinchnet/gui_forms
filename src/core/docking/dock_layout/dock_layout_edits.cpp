@@ -225,31 +225,42 @@ private:
         const DockNode& stack = *find_dock_node(state_, stack_id);
         const DockAutoHideEntry* entry = find_dock_auto_hidden(state_, stack_id);
         const DockFloatingSite* site = find_dock_site(state_, place.site);
+        // The place decides the memory once; every panel of the stack gets it.
+        if (place.region == DockRegion::auto_hidden && entry != nullptr) {
+            const DockAutoHideMemory memory{.stack = stack_id, .edge = (*entry).edge, .extent = (*entry).extent};
+            for (const DockPanelId& panel : stack.panels) {
+                DockPanelRecord* record = find_dock_record(state_, panel);
+                if (record == nullptr) continue;
+                (*record).auto_hidden = memory;
+                (*record).last_placement = DockPlacementKind::auto_hidden;
+            }
+            return;
+        }
+        if (place.region == DockRegion::floating && site != nullptr) {
+            DockFloatingMemory memory{};
+            memory.site = (*site).id;
+            memory.frame = (*site).frame;
+            memory.monitor_id = (*site).monitor_id;
+            for (const DockPanelId& panel : stack.panels) {
+                DockPanelRecord* record = find_dock_record(state_, panel);
+                if (record == nullptr) continue;
+                (*record).floating = memory;
+                (*record).last_placement = DockPlacementKind::floating;
+            }
+            return;
+        }
+        if (place.region != DockRegion::main_tools && place.region != DockRegion::document_area) return;
+        // A docked panel also remembers its index in the stack.
         for (std::size_t index = 0; index < stack.panels.size(); ++index) {
             DockPanelRecord* record = find_dock_record(state_, stack.panels[index]);
             if (record == nullptr) continue;
-            if (place.region == DockRegion::auto_hidden && entry != nullptr) {
-                const DockAutoHideMemory memory{
-                    .stack = stack_id, .edge = (*entry).edge, .extent = (*entry).extent};
-                (*record).auto_hidden = memory;
-                (*record).last_placement = DockPlacementKind::auto_hidden;
-            } else if (place.region == DockRegion::floating && site != nullptr) {
-                DockFloatingMemory memory{};
-                memory.site = (*site).id;
-                memory.frame = (*site).frame;
-                memory.monitor_id = (*site).monitor_id;
-                (*record).floating = std::move(memory);
-                (*record).last_placement = DockPlacementKind::floating;
-            } else if (place.region == DockRegion::main_tools ||
-                       place.region == DockRegion::document_area) {
-                const DockDockedMemory memory{.stack = stack_id,
-                                              .index = static_cast<std::uint32_t>(index),
-                                              .neighbour = surroundings.neighbour,
-                                              .side = surroundings.side,
-                                              .ratio = surroundings.ratio};
-                (*record).docked = memory;
-                (*record).last_placement = DockPlacementKind::docked;
-            }
+            const DockDockedMemory memory{.stack = stack_id,
+                                          .index = static_cast<std::uint32_t>(index),
+                                          .neighbour = surroundings.neighbour,
+                                          .side = surroundings.side,
+                                          .ratio = surroundings.ratio};
+            (*record).docked = memory;
+            (*record).last_placement = DockPlacementKind::docked;
         }
     }
 

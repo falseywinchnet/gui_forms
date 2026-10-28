@@ -224,17 +224,20 @@ std::optional<std::size_t> find_dock_drop_target(std::span<const DockDropTarget>
                                                  const DockDropHit& hit) noexcept {
     if (!hit.over_site) return std::nullopt;
     if (!hit.edge && !hit.pane) return std::nullopt;
+    // An edge hit looks only for the zone's edge target; a pane hit only for
+    // the zone's target on that pane.
+    if (hit.edge) {
+        for (std::size_t index = 0; index < targets.size(); ++index) {
+            const DockDropTarget& target = targets[index];
+            if (target.zone == hit.zone && target.kind == DockDropTargetKind::edge) return index;
+        }
+        return std::nullopt;
+    }
+    if (*hit.pane >= panes.size()) return std::nullopt;
+    const DockNodeId pane = panes[*hit.pane].node;
     for (std::size_t index = 0; index < targets.size(); ++index) {
         const DockDropTarget& target = targets[index];
-        if (target.zone != hit.zone) continue;
-        if (hit.edge) {
-            if (target.kind == DockDropTargetKind::edge) return index;
-            continue;
-        }
-        if (target.kind == DockDropTargetKind::pane && *hit.pane < panes.size() &&
-            target.pane == panes[*hit.pane].node) {
-            return index;
-        }
+        if (target.zone == hit.zone && target.kind == DockDropTargetKind::pane && target.pane == pane) return index;
     }
     return std::nullopt;
 }
