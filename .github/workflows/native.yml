@@ -64,6 +64,7 @@ jobs:
         run: |
           python3 -B -m unittest discover -s tools -p test_readthedocs_build.py
           python3 -B -m unittest discover -s tools -p test_stack_frames.py
+          python3 -B -m unittest discover -s tools -p test_workflow_pipelines.py
           python3 -B -m unittest discover -s tools -p test_control_registry.py
           python3 tools/control_registry.py check
           python3 tools/control_registry.py emit-cpp --check
@@ -79,6 +80,7 @@ jobs:
           python3 -B tools/check_stx_skia_style.py
           python3 -B -m unittest discover -s tools -p test_ci_build.py
           python3 -B -m unittest discover -s tools -p test_engine_gate.py
+          python3 -B -m unittest discover -s tools -p test_profile_hot_paths.py
           python3 -B -m unittest discover -s tools/layout_oracle -p test_layout_oracle.py
           python3 -B ../template_harness/harness/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png stx_conv stx_rtf2md stx_skia fuzz
   # The site depends only on the tree (docs/requirements.txt pins its

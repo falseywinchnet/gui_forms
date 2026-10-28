@@ -88,8 +88,8 @@ void measure(std::uint32_t count) {
         const Clock::time_point request_start = Clock::now();
         const DocumentRequestResult request = state.request_page(viewport, permitted);
         const Clock::time_point request_end = Clock::now();
-        require(request.status == DocumentViewStatus::success, "request");
-        last_token = *request.request;
+        require(request.status() == DocumentViewStatus::success, "request");
+        last_token = *request.request();
         DocumentPage page = make_page(last_token, count);
         const char* original_display = page.display_utf8.data();
         const DocumentMapSpan* original_mapping = page.mapping.data();
@@ -117,10 +117,10 @@ void measure(std::uint32_t count) {
     for (std::uint32_t index = 0; index <= count; ++index) {
         const std::uint32_t display = index * 9;
         const SourceMappingResult actual = state.source_position(last_token, DisplayByteOffset(display));
-        require(actual.status == DocumentViewStatus::success && (*actual.position).value == index,
+        require(actual.status() == DocumentViewStatus::success && (*actual.position()).value == index,
                 "binary endpoint oracle");
         const DisplayMappingResult reverse = state.display_position(last_token, SourceByteOffset(index));
-        require(reverse.status == DocumentViewStatus::success && (*reverse.position).value == display,
+        require(reverse.status() == DocumentViewStatus::success && (*reverse.position()).value == display,
                 "reverse endpoint oracle");
     }
     std::uint64_t checksum = 0;
@@ -131,7 +131,7 @@ void measure(std::uint32_t count) {
         const DisplayByteOffset position(display);
         const SourceByteOffset expected = reference_position(page, position);
         const SourceMappingResult actual = state.source_position(last_token, position);
-        require(actual.status == DocumentViewStatus::success && (*actual.position).value == expected.value,
+        require(actual.status() == DocumentViewStatus::success && (*actual.position()).value == expected.value,
                 "independent linear reference");
     }
     // Warm resident pages; per-operation clock overhead is included. Building
@@ -149,7 +149,7 @@ void measure(std::uint32_t count) {
         const Clock::time_point linear_end = Clock::now();
         binary[index] = elapsed_ns(binary_start, binary_end);
         linear[index] = elapsed_ns(linear_start, linear_end);
-        checksum += (*actual.position).value;
+        checksum += (*actual.position()).value;
         checksum += reference.value;
     }
     report("request_warm", count, requests);

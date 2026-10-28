@@ -15,8 +15,9 @@ gui_forms::HostServiceStatus paste_pixels(gui_forms::HostServices& services,
                                          bool& changed) {
     changed = false;
     gui_forms::HostClipboardImageResult result = services.read_clipboard_image();
-    if (!result.status.accepted() || !result.image.has_value()) return result.status;
-    document = std::move(*result.image);
+    const gui_forms::HostServiceStatus status = result.status();
+    if (!status.accepted() || result.image() == nullptr) return status;
+    document = *std::move(result).release_image();
     changed = true;
-    return result.status;
+    return status;
 }

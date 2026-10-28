@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <type_traits>
+#include <variant>
 #include <vector>
 
 namespace gui_forms {
@@ -70,17 +72,131 @@ struct DocumentPage final {
     void swap(DocumentPage& other) noexcept;
 };
 
-struct DocumentRequestResult final {
-    DocumentViewStatus status{DocumentViewStatus::unavailable};
-    std::optional<DocumentPageRequest> request{};
+// A page request's result: the request the document side fulfils, or why
+// there is none. One alternative per state (house form for results).
+class DocumentRequestResult final {
+public:
+    [[nodiscard]] static DocumentRequestResult requested(DocumentPageRequest request) noexcept {
+        DocumentRequestResult result{Requested{std::move(request)}};
+        return result;
+    }
+    // A refusal. `success` refuses nothing, so it is read as `unavailable`.
+    [[nodiscard]] static DocumentRequestResult refused(DocumentViewStatus status) noexcept {
+        const DocumentViewStatus reason = status == DocumentViewStatus::success ? DocumentViewStatus::unavailable
+                                                                                : status;
+        DocumentRequestResult result{Refused{reason}};
+        return result;
+    }
+
+    [[nodiscard]] DocumentViewStatus status() const noexcept {
+        const Refused* const refusal = std::get_if<Refused>(&state_);
+        const DocumentViewStatus status = refusal != nullptr ? (*refusal).status : DocumentViewStatus::success;
+        return status;
+    }
+    // The request, for `success`; null otherwise.
+    [[nodiscard]] const DocumentPageRequest* request() const noexcept {
+        const Requested* const requested = std::get_if<Requested>(&state_);
+        const DocumentPageRequest* const found = requested != nullptr ? &(*requested).request : nullptr;
+        return found;
+    }
+
+private:
+    struct Requested final {
+        DocumentPageRequest request{};
+    };
+    struct Refused final {
+        DocumentViewStatus status{DocumentViewStatus::unavailable};
+    };
+    // A throwing move would leave the variant valueless, a state no query
+    // describes.
+    static_assert(std::is_nothrow_move_constructible_v<Requested>);
+
+    explicit DocumentRequestResult(Requested requested) noexcept : state_(std::move(requested)) {}
+    explicit DocumentRequestResult(Refused refused) noexcept : state_(refused) {}
+
+    std::variant<Requested, Refused> state_;
 };
-struct SourceMappingResult final {
-    DocumentViewStatus status{DocumentViewStatus::unavailable};
-    std::optional<SourceByteOffset> position{};
+// A display position mapped to the source.
+// One alternative per state (house form for results).
+class SourceMappingResult final {
+public:
+    [[nodiscard]] static SourceMappingResult mapped(SourceByteOffset position) noexcept {
+        SourceMappingResult result{Mapped{position}};
+        return result;
+    }
+    // A refusal. `success` refuses nothing, so it is read as `unavailable`.
+    [[nodiscard]] static SourceMappingResult refused(DocumentViewStatus status) noexcept {
+        const DocumentViewStatus reason = status == DocumentViewStatus::success ? DocumentViewStatus::unavailable
+                                                                                : status;
+        SourceMappingResult result{Refused{reason}};
+        return result;
+    }
+
+    [[nodiscard]] DocumentViewStatus status() const noexcept {
+        const Refused* const refusal = std::get_if<Refused>(&state_);
+        const DocumentViewStatus status = refusal != nullptr ? (*refusal).status : DocumentViewStatus::success;
+        return status;
+    }
+    // The mapped position, for `success`; null otherwise.
+    [[nodiscard]] const SourceByteOffset* position() const noexcept {
+        const Mapped* const mapped = std::get_if<Mapped>(&state_);
+        const SourceByteOffset* const found = mapped != nullptr ? &(*mapped).position : nullptr;
+        return found;
+    }
+
+private:
+    struct Mapped final {
+        SourceByteOffset position{0};
+    };
+    struct Refused final {
+        DocumentViewStatus status{DocumentViewStatus::unavailable};
+    };
+
+    explicit SourceMappingResult(Mapped mapped) noexcept : state_(mapped) {}
+    explicit SourceMappingResult(Refused refused) noexcept : state_(refused) {}
+
+    std::variant<Mapped, Refused> state_;
 };
-struct DisplayMappingResult final {
-    DocumentViewStatus status{DocumentViewStatus::unavailable};
-    std::optional<DisplayByteOffset> position{};
+// A source position mapped to the display.
+// One alternative per state (house form for results).
+class DisplayMappingResult final {
+public:
+    [[nodiscard]] static DisplayMappingResult mapped(DisplayByteOffset position) noexcept {
+        DisplayMappingResult result{Mapped{position}};
+        return result;
+    }
+    // A refusal. `success` refuses nothing, so it is read as `unavailable`.
+    [[nodiscard]] static DisplayMappingResult refused(DocumentViewStatus status) noexcept {
+        const DocumentViewStatus reason = status == DocumentViewStatus::success ? DocumentViewStatus::unavailable
+                                                                                : status;
+        DisplayMappingResult result{Refused{reason}};
+        return result;
+    }
+
+    [[nodiscard]] DocumentViewStatus status() const noexcept {
+        const Refused* const refusal = std::get_if<Refused>(&state_);
+        const DocumentViewStatus status = refusal != nullptr ? (*refusal).status : DocumentViewStatus::success;
+        return status;
+    }
+    // The mapped position, for `success`; null otherwise.
+    [[nodiscard]] const DisplayByteOffset* position() const noexcept {
+        const Mapped* const mapped = std::get_if<Mapped>(&state_);
+        const DisplayByteOffset* const found = mapped != nullptr ? &(*mapped).position : nullptr;
+        return found;
+    }
+
+private:
+    struct Mapped final {
+        DisplayByteOffset position{0};
+    };
+    struct Refused final {
+        DocumentViewStatus status{DocumentViewStatus::unavailable};
+    };
+
+    explicit DisplayMappingResult(Mapped mapped) noexcept : state_(mapped) {}
+    explicit DisplayMappingResult(Refused refused) noexcept : state_(refused) {}
+
+    std::variant<Mapped, Refused> state_;
 };
 
 } // namespace gui_forms

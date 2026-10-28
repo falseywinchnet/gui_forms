@@ -226,12 +226,13 @@ HostClipboardImageResult Services::read_clipboard_image_impl() {
       runtime.read_selection(window_, runtime.atom("CLIPBOARD"),
                              runtime.atom("application/x-gui-forms-rgba"));
   if (!bytes.empty())
-    return detail::decode_clipboard_image(bytes);
+    return detail::decode_clipboard_image(bytes, runtime.clipboard_generation,
+                                          false);
   bytes = runtime.read_selection(window_, runtime.atom("CLIPBOARD"),
                                  runtime.atom("image/png"));
   if (!bytes.empty())
-    return detail::decode_clipboard_png(bytes);
-  return {};
+    return detail::decode_clipboard_png(bytes, runtime.clipboard_generation);
+  return HostClipboardImageResult::nothing_read(runtime.clipboard_generation);
 }
 HostServiceStatus Services::write_clipboard_image_impl(HostImageView image) {
   Runtime &runtime = window_.runtime;
