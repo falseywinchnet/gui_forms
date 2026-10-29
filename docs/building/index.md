@@ -111,6 +111,13 @@ libdispatch at exit owns. When a new macOS release adds reports, name the
 internal allocation site that holds them, never a library that calls into
 GUI.Forms or a function on the path from it, and check that the deliberate
 leaks above are still reported.
+On 2026-10-28 two application start-up sites were added after one run in 21
+of `gui_forms_application_native_tests` reported them:
+`_NSInitializeAppContext` (the HIToolbox application object made by
+`-[NSApplication init]`) and `aeInitializeFromHIToolbox` (AppleEvents
+set-up on the first event fetch). Leaks added in `main` and in a
+window-close callback run from the main dispatch queue inside the AppKit run
+loop were still reported.
 
 The baseline's first run also found a GUI.Forms leak, now fixed: a
 completed `DispatchWork` kept its callable, because moving a

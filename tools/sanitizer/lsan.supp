@@ -117,6 +117,17 @@ leak:-[NSApplication(NSPersistentUISupport)
 leak:IMKClient
 leak:IMKInputSession
 leak:CreateEventLoop
+# Application start-up, once per process (seen 2026-10-28, macOS 26.5, once in
+# 21 sanitized runs of gui_forms_application_native_tests): NSApplication's
+# HIToolbox application object, from +[NSApplication sharedApplication] ->
+# -[NSApplication init] -> _NSInitializeAppContext -> HIApplication::
+# GetApplication -> HIObjectCreate -> CreateEvent (184 bytes, with 200 bytes
+# its event handler stored); and the AppleEvents set-up on the first event
+# fetch, -[NSApplication run] -> ... -> _CheckEventsInited ->
+# INIT_AppleEvents -> aeInitializeFromHIToolbox -> CreateHighLevelEvent ->
+# SetEventParameter (24 bytes). Neither calls into GUI.Forms.
+leak:_NSInitializeAppContext
+leak:aeInitializeFromHIToolbox
 # QuartzCore: per-thread transactions and cached contexts. The one rule
 # spelled with a namespace: its last identifier alone (create) would match
 # far too much. It names a frame inside QuartzCore, which LeakSanitizer
