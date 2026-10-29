@@ -22,7 +22,7 @@ Lists, trees, combo boxes, choice groups and breadcrumbs.
    * - :cpp:class:`ObjectView <gui_forms::ObjectView>`
      - A view of many items, shown as a grid of icons or as rows with details columns.
    * - :cpp:class:`ListView <gui_forms::ListView>`
-     - A list of items shown as details rows, a list, small icons or large icons.
+     - A list of items shown as details rows, a list, small icons, large icons or tiles.
    * - :cpp:class:`TreeListView <gui_forms::TreeListView>`
      - A tree with tabular columns: nodes in a hierarchy, each with cells beside it.
    * - :cpp:class:`CorrespondenceView <gui_forms::CorrespondenceView>`
@@ -160,6 +160,12 @@ Related types
      - The "column" item system, named as ObjectView's: one visible column header of the details view.
    * - :cpp:class:`ListView::ColumnStates <gui_forms::ListView::ColumnStates>`
      -  
+   * - :cpp:class:`ListView::Group <gui_forms::ListView::Group>`
+     -  
+   * - :cpp:class:`ListView::GroupParts <gui_forms::ListView::GroupParts>`
+     - The "group" item system: one shown group header line.
+   * - :cpp:class:`ListView::GroupStates <gui_forms::ListView::GroupStates>`
+     -  
    * - :cpp:class:`ListView::Item <gui_forms::ListView::Item>`
      -  
    * - :cpp:class:`ListView::ItemParts <gui_forms::ListView::ItemParts>`
@@ -180,6 +186,8 @@ Related types
      - A click on a column header.
    * - :cpp:class:`ListViewColumnWidthChange <gui_forms::ListViewColumnWidthChange>`
      - A column's new width in logical units, after a divider drag ends or set_column_width() changes it.
+   * - :cpp:class:`ListViewGroup <gui_forms::ListViewGroup>`
+     - One group of a ListView (Windows Forms' ListViewGroup): a header over its items.
    * - :cpp:class:`ListViewInsertionMark <gui_forms::ListViewInsertionMark>`
      - Where a ListView's insertion mark stands (Windows Forms' ListViewInsertionMark Index and AppearsAfterItem): beside the item at model index ``index``, before it or, with ``after``, after it.
    * - :cpp:class:`ListViewItem <gui_forms::ListViewItem>`
@@ -1328,6 +1336,42 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ListView::Group final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: GroupParts parts
+
+   .. cpp:member:: GroupStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::GroupParts final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   The "group" item system: one shown group header line. Its identity is the view's stable ID, ".group.", and the group's ID; the default group's is the view's stable ID and ".default_group". ``index`` is the group's position in groups(), or groups().size() for the default group.
+
+   .. cpp:member:: PartGeometry group_band
+
+   .. cpp:member:: PartGeometry group_caption
+
+   .. cpp:member:: PartGeometry group_divider
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::GroupStates final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ListView::Item final
 
    ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
@@ -1500,6 +1544,22 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ListViewGroup final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   One group of a ListView (Windows Forms' ListViewGroup): a header over its items. ``stable_id`` is unique within the view; items name it in ``group``.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string header
+
+   .. cpp:member:: ListViewAlignment header_alignment
+
+      Default: ``{ListViewAlignment::left}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ListViewInsertionMark final
 
    ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
@@ -1516,7 +1576,7 @@ Related types
 
    ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
 
-   One item. ``text`` is shown in the first column (and as the label in the other views); ``sub_items[n]`` in column n + 1 of the details view. Sub-items past the last column are kept but not shown. ``image_key`` names an image in the small image list (details, list and small-icon views) or the large one (large-icon view); an empty or unknown key shows no image. ``checked`` is shown while the view has check boxes.
+   One item. ``text`` is shown in the first column (and as the label in the other views); ``sub_items[n]`` in column n + 1 of the details view. Sub-items past the last column are kept but not shown. ``image_key`` names an image in the small image list (details, list and small-icon views) or the large one (large-icon and tile views); an empty or unknown key shows no image. ``checked`` is shown while the view has check boxes. ``group`` names the ListViewGroup the item is shown in; an empty or unknown name puts it in the default group. A virtual view's items are never grouped.
 
    .. cpp:member:: std::string stable_id
 
@@ -1527,6 +1587,8 @@ Related types
    .. cpp:member:: std::string image_key
 
    .. cpp:member:: bool checked
+
+   .. cpp:member:: std::string group
 
 .. cpp:namespace:: gui_forms
 
@@ -2467,6 +2529,8 @@ Enumerations
    .. cpp:enumerator:: small_icon
 
    .. cpp:enumerator:: large_icon
+
+   .. cpp:enumerator:: tile
 
 .. cpp:namespace:: gui_forms
 

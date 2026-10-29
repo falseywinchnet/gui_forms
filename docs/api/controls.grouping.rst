@@ -124,6 +124,10 @@ Related types
      -  
    * - :cpp:class:`TabControl::Parts <gui_forms::TabControl::Parts>`
      - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`TabControlCancelEvent <gui_forms::TabControlCancelEvent>`
+     - A page about to be left or chosen (Windows Forms' TabControlCancelEventArgs): ``page`` at ``index``.
+   * - :cpp:class:`TabControlEvent <gui_forms::TabControlEvent>`
+     - A page left or chosen (Windows Forms' TabControlEventArgs).
    * - :cpp:class:`TabSelectionChange <gui_forms::TabSelectionChange>`
      - TabSelectionChange reports previous/current tab indices and stable page identities after one accepted selection.
 
@@ -709,6 +713,40 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: TabControlCancelEvent final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
+
+   A page about to be left or chosen (Windows Forms' TabControlCancelEventArgs): ``page`` at ``index``. A handler sets ``cancel`` to keep the selected page.
+
+   .. cpp:member:: std::shared_ptr<TabPage> page
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: TabControlAction action
+
+      Default: ``{TabControlAction::selecting}``.
+
+   .. cpp:member:: bool cancel
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TabControlEvent final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
+
+   A page left or chosen (Windows Forms' TabControlEventArgs).
+
+   .. cpp:member:: std::shared_ptr<TabPage> page
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: TabControlAction action
+
+      Default: ``{TabControlAction::selected}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: TabSelectionChange final
 
    ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
@@ -909,6 +947,20 @@ Enumerations
    .. cpp:enumerator:: buttons
 
    .. cpp:enumerator:: flat_buttons
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TabControlAction
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
+
+   .. cpp:enumerator:: deselecting
+
+   .. cpp:enumerator:: selecting
+
+   .. cpp:enumerator:: deselected
+
+   .. cpp:enumerator:: selected
 
 .. cpp:namespace:: gui_forms
 

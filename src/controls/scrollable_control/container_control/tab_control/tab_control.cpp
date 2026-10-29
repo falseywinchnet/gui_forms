@@ -311,8 +311,32 @@ void TabControl::show_selected(std::size_t index, const std::vector<std::shared_
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
     restore_page_focus(live[index], selection_owned_focus);
+    if (old_page && old_index) {
+        const TabControlEvent left{old_page, *old_index, TabControlAction::deselected};
+        publish_change(deselected_, left);
+    }
+    const TabControlEvent chosen{live[index], index, TabControlAction::selected};
+    publish_change(selected_, chosen);
     const TabSelectionChange change{old_index, index};
     publish_change(selected_index_changed_, change);
+}
+
+bool TabControl::selection_allowed(const std::shared_ptr<TabPage>& target) {
+    const Control::Ptr lifetime = shared_from_this();
+    const std::shared_ptr<TabPage> current = selected_page_.lock();
+    const std::optional<std::size_t> current_index = index_of(current);
+    if (current && current_index) {
+        TabControlCancelEvent leaving{current, *current_index, TabControlAction::deselecting, false};
+        deselecting_.emit(leaving);
+        if (!is_alive() || leaving.cancel) return false;
+    }
+    const std::optional<std::size_t> target_index = index_of(target);
+    if (!target_index) return false;
+    TabControlCancelEvent choosing{target, *target_index, TabControlAction::selecting, false};
+    selecting_.emit(choosing);
+    if (!is_alive() || choosing.cancel) return false;
+    const bool result = index_of(target).has_value();
+    return result;
 }
 
 void TabControl::set_selected_index(std::size_t index) {
@@ -321,7 +345,13 @@ void TabControl::set_selected_index(std::size_t index) {
     if (index >= live.size()) throw std::out_of_range("TabControl selected index");
     const std::optional<std::size_t> old_index = selected_index();
     if (old_index && *old_index == index) return;
-    show_selected(index, live);
+    const std::shared_ptr<TabPage> target = live[index];
+    if (!selection_allowed(target)) return;
+    // The handlers may have moved the page or selected it themselves.
+    const std::vector<std::shared_ptr<TabPage>> now = pages();
+    const std::optional<std::size_t> placed = index_of(target);
+    if (!placed || selected_page_.lock() == target) return;
+    show_selected(*placed, now);
 }
 
 void TabControl::set_selected_tab(const std::shared_ptr<TabPage>& page) {
@@ -501,8 +531,17 @@ void TabControl::select_in_tab_set(const std::shared_ptr<TabPage>& page) {
 // A press on a tab focuses the control before the page changes, so the old
 // page's focus is not remembered (the order Windows Forms users know).
 void TabControl::on_set_selecting(PageSelectingEvent& event) {
-    if (editing_tab_set_ || event.cause != PageSelectionCause::pointer || window() == nullptr) return;
-    static_cast<void>((*window()).request_focus(shared_from_this()));
+    if (editing_tab_set_ || !is_alive()) return;
+    if (event.cause == PageSelectionCause::pointer && window() != nullptr) {
+        static_cast<void>((*window()).request_focus(shared_from_this()));
+    }
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
+    for (const std::shared_ptr<TabPage>& page : live) {
+        if (tab_page_id(*page) != event.new_page) continue;
+        if (page == selected_page_.lock()) return;
+        if (!selection_allowed(page)) event.cancel = true;
+        return;
+    }
 }
 
 // The strip selected a page (a click, a key, the page list): show it. A
@@ -904,9 +943,13 @@ std::vector<TabControl::Item> TabControl::realized_items() const {
 namespace {
 
 // The events TabControl adds to those of ContainerControl, in declaration order.
-constexpr std::array<InteractionDeclaration, 2> tab_control_interactions{{
+constexpr std::array<InteractionDeclaration, 6> tab_control_interactions{{
     {.name = "draw_item_content", .payload = "ItemContentPaint", .mutable_payload = true},
     {.name = "selected_index_changed", .payload = "TabSelectionChange", .mutable_payload = false},
+    {.name = "deselecting", .payload = "TabControlCancelEvent", .mutable_payload = true},
+    {.name = "selecting", .payload = "TabControlCancelEvent", .mutable_payload = true},
+    {.name = "deselected", .payload = "TabControlEvent", .mutable_payload = false},
+    {.name = "selected", .payload = "TabControlEvent", .mutable_payload = false},
 }};
 
 } // namespace

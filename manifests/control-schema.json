@@ -1532,6 +1532,16 @@
           ],
           "states": ["hot", "pressed", "captured"],
           "custom_states": ["sorted_ascending", "sorted_descending"]
+        },
+        {
+          "name": "group",
+          "parts": [
+            {"name": "group_band", "role": "region", "composed_from": null, "states": []},
+            {"name": "group_caption", "role": "caption", "composed_from": null, "states": []},
+            {"name": "group_divider", "role": "divider", "composed_from": null, "states": []}
+          ],
+          "states": ["disabled"],
+          "custom_states": []
         }
       ],
       "properties": [
@@ -3507,7 +3517,11 @@
         {"name": "scroll", "payload": "ScrollEvent", "mutable_payload": true},
         {"name": "auto_validate_changed", "payload": "AutoValidate", "mutable_payload": false},
         {"name": "draw_item_content", "payload": "ItemContentPaint", "mutable_payload": true},
-        {"name": "selected_index_changed", "payload": "TabSelectionChange", "mutable_payload": false}
+        {"name": "selected_index_changed", "payload": "TabSelectionChange", "mutable_payload": false},
+        {"name": "deselecting", "payload": "TabControlCancelEvent", "mutable_payload": true},
+        {"name": "selecting", "payload": "TabControlCancelEvent", "mutable_payload": true},
+        {"name": "deselected", "payload": "TabControlEvent", "mutable_payload": false},
+        {"name": "selected", "payload": "TabControlEvent", "mutable_payload": false}
       ]
     },
     {

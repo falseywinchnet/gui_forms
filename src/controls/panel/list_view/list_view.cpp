@@ -35,6 +35,13 @@ constexpr double row_text_padding = 6.0;
 constexpr double sub_item_padding = 6.0;
 constexpr double list_cell_width = 160.0;
 constexpr double large_cell_width = 80.0;
+// The default tile: the large icon, then this much text beside it, as tall
+// as the icon or three lines of text, whichever is taller.
+constexpr double tile_text_width = 168.0;
+constexpr std::size_t tile_text_lines = 3U;
+// A group header line: a line of bold text and this padding.
+constexpr double group_header_padding = 10.0;
+constexpr double group_caption_inset = 4.0;
 constexpr double default_small_icon = 16.0;
 constexpr double default_large_icon = 32.0;
 constexpr double divider_reach = 4.0;
@@ -81,12 +88,28 @@ bool valid_alignment(ListViewAlignment alignment) noexcept {
 
 bool valid_view(ListViewView view) noexcept {
     const bool result = view == ListViewView::details || view == ListViewView::list ||
-                        view == ListViewView::small_icon || view == ListViewView::large_icon;
+                        view == ListViewView::small_icon || view == ListViewView::large_icon ||
+                        view == ListViewView::tile;
+    return result;
+}
+
+bool valid_group(const ListViewGroup& group) {
+    const bool result = !group.stable_id.empty() && validate_utf8(group.stable_id).valid() &&
+                        validate_utf8(group.header).valid() && valid_alignment(group.header_alignment);
+    return result;
+}
+
+bool valid_tile_side(double side) noexcept {
+    const bool result = std::isfinite(side) && side >= ListView::minimum_tile_side &&
+                        side <= ListView::maximum_tile_side;
     return result;
 }
 
 bool valid_item_text(const ListViewItem& item) {
-    if (!validate_utf8(item.text).valid() || !validate_utf8(item.image_key).valid()) return false;
+    if (!validate_utf8(item.text).valid() || !validate_utf8(item.image_key).valid() ||
+        !validate_utf8(item.group).valid()) {
+        return false;
+    }
     for (const std::string& sub_item : item.sub_items) {
         if (!validate_utf8(sub_item).valid()) return false;
     }
@@ -99,6 +122,16 @@ std::string_view column_text(const ListViewItem& item, std::size_t column) noexc
     if (column == 0U) return item.text;
     if (column - 1U < item.sub_items.size()) return item.sub_items[column - 1U];
     return {};
+}
+
+// The lines a tile shows: the item's text, then one per column after the
+// first whose sub-item is not empty, at most `fitting`.
+std::size_t tile_line_count(const ListViewItem& item, std::size_t columns, std::size_t fitting) noexcept {
+    std::size_t lines = 1U;
+    for (std::size_t column = 1; column < columns && lines < fitting; ++column) {
+        if (!column_text(item, column).empty()) ++lines;
+    }
+    return lines;
 }
 
 // The order sort_items applies to item positions: by one column's text,
@@ -480,6 +513,30 @@ bool ListView::assign_selected(std::size_t index, bool selected) {
 }
 
 bool ListView::select_range(std::size_t anchor, std::size_t index, bool keep_existing) {
+    const Layout placed = layout();
+    if (placed.grouped) {
+        // The range runs through the shown order.
+        const std::size_t from = position_of(placed, anchor);
+        const std::size_t to = position_of(placed, index);
+        const std::size_t first = std::min(from, to);
+        const std::size_t last = std::max(from, to);
+        const std::size_t length = last - first + 1U;
+        std::size_t already = 0U;
+        for (std::size_t position = first; position <= last; ++position) {
+            if (selected_[index_at(placed, position)] != 0U) ++already;
+        }
+        const bool changed = keep_existing ? already != length
+                                           : (already != length || selected_count_ != length);
+        if (!changed) return false;
+        if (!keep_existing) static_cast<void>(select_none());
+        for (std::size_t position = first; position <= last; ++position) {
+            std::uint8_t& flag = selected_[index_at(placed, position)];
+            if (flag != 0U) continue;
+            flag = 1U;
+            ++selected_count_;
+        }
+        return true;
+    }
     const std::size_t first = std::min(anchor, index);
     const std::size_t last = std::max(anchor, index);
     const std::size_t length = last - first + 1U;
@@ -586,6 +643,7 @@ void ListView::activate(std::size_t index) {
 
 std::size_t ListView::top_index() const {
     const Layout placed = layout();
+    if (placed.grouped) return index_at(placed, first_realized(placed));
     const std::size_t result = std::min(placed.shown_count, placed.top_line * placed.per_line);
     return result;
 }
@@ -593,6 +651,31 @@ std::size_t ListView::top_index() const {
 void ListView::ensure_visible(std::size_t index) {
     if (index >= item_count()) throw std::out_of_range("ListView item index is past the end");
     const Layout placed = layout();
+    if (placed.grouped) {
+        // A group's first line brings its header into view with it.
+        const std::size_t line = position_line(placed, position_of(placed, index));
+        const GroupBand& band = placed.bands[band_of_line(placed, line)];
+        const std::size_t wanted = line == band.first_line + 1U ? band.first_line : line;
+        const double bottom = line_offset(placed, line + 1U);
+        const double room = placed.viewport.height + 0.5;
+        std::size_t top = placed.top_line;
+        if (wanted < top) {
+            top = wanted;
+        } else if (bottom - line_offset(placed, top) > room) {
+            // The first top line from which the line's bottom shows.
+            std::size_t high = line;
+            while (top < high) {
+                const std::size_t middle = top + (high - top) / 2U;
+                if (bottom - line_offset(placed, middle) <= room) {
+                    high = middle;
+                } else {
+                    top = middle + 1U;
+                }
+            }
+        }
+        if (top != placed.top_line) set_top_line(top);
+        return;
+    }
     const std::size_t line = index / placed.per_line;
     std::size_t top = placed.top_line;
     if (line < top) {
@@ -606,9 +689,15 @@ void ListView::ensure_visible(std::size_t index) {
 void ListView::set_top_line(std::size_t line) {
     const Layout placed = layout();
     const std::size_t clamped = std::min(line, maximum_top_line(placed));
-    const std::size_t item = clamped * placed.per_line;
-    if (item == top_item_ && clamped == placed.top_line) return;
-    top_item_ = item;
+    if (placed.grouped) {
+        if (clamped == placed.top_line) return;
+        store_top_line(placed, clamped);
+    } else {
+        const std::size_t item = clamped * placed.per_line;
+        if (item == top_item_ && clamped == placed.top_line) return;
+        top_item_ = item;
+        top_header_ = false;
+    }
     hot_index_.reset();
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
     const Layout scrolled = layout();
@@ -810,6 +899,242 @@ void ListView::set_font(FontSpec font) {
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
+void ListView::set_tile_size(Size size) {
+    require_mutable();
+    const bool automatic = size.width == 0.0 && size.height == 0.0;
+    if (!automatic && (!valid_tile_side(size.width) || !valid_tile_side(size.height))) {
+        throw std::invalid_argument("ListView tile size is outside the tile side bounds");
+    }
+    if (tile_size_ == size) return;
+    tile_size_ = size;
+    if (view_ != ListViewView::tile) return;
+    invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+// -- groups ------------------------------------------------------------------
+
+void ListView::set_groups(std::vector<ListViewGroup> groups) {
+    require_mutable();
+    if (groups.size() > maximum_groups) throw std::invalid_argument("ListView has more groups than maximum_groups");
+    std::unordered_set<std::string> identities{};
+    for (const ListViewGroup& group : groups) {
+        if (!valid_group(group) || !identities.insert(group.stable_id).second) {
+            throw std::invalid_argument("ListView groups require unique stable IDs, valid UTF-8 and an alignment");
+        }
+    }
+    groups_ = std::move(groups);
+    ++model_revision_;
+    hot_index_.reset();
+    invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void ListView::set_show_groups(bool shown) {
+    require_mutable();
+    if (show_groups_ == shown) return;
+    show_groups_ = shown;
+    ++model_revision_;
+    hot_index_.reset();
+    invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void ListView::set_default_group_header(std::string header) {
+    require_mutable();
+    if (!validate_utf8(header).valid()) throw std::invalid_argument("ListView group header is not valid UTF-8");
+    if (default_group_header_ == header) return;
+    default_group_header_ = std::move(header);
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+bool ListView::grouped() const noexcept {
+    const bool result = show_groups_ && !groups_.empty() && !source_ && view_ != ListViewView::list;
+    return result;
+}
+
+const std::string& ListView::group_header(std::size_t group) const noexcept {
+    if (group < groups_.size()) return groups_[group].header;
+    return default_group_header_;
+}
+
+std::string ListView::group_identity(std::size_t group) const {
+    std::string identity(stable_id().value());
+    if (group < groups_.size()) {
+        identity.append(".group.");
+        identity.append(groups_[group].stable_id);
+    } else {
+        identity.append(".default_group");
+    }
+    return identity;
+}
+
+// The default group comes first, as Windows Forms' DefaultGroup does, then
+// the groups in their order; items keep their model order within a group.
+void ListView::refresh_display_order() const {
+    if (display_valid_ && display_revision_ == model_revision_) return;
+    std::unordered_map<std::string, std::size_t> group_of{};
+    group_of.reserve(groups_.size());
+    for (std::size_t group = 0; group < groups_.size(); ++group) group_of.emplace(groups_[group].stable_id, group);
+    const std::size_t fallback = groups_.size();
+    std::vector<std::size_t> membership(items_.size(), fallback);
+    display_counts_.assign(groups_.size() + 1U, 0U);
+    for (std::size_t index = 0; index < items_.size(); ++index) {
+        const std::unordered_map<std::string, std::size_t>::const_iterator found = group_of.find(items_[index].group);
+        if (found != group_of.end()) membership[index] = (*found).second;
+        ++display_counts_[membership[index]];
+    }
+    // Each group's first position: the default group's at 0.
+    std::vector<std::size_t> next(groups_.size() + 1U, 0U);
+    std::size_t position = display_counts_[fallback];
+    for (std::size_t group = 0; group < groups_.size(); ++group) {
+        next[group] = position;
+        position += display_counts_[group];
+    }
+    display_order_.assign(items_.size(), 0U);
+    display_position_.assign(items_.size(), 0U);
+    for (std::size_t index = 0; index < items_.size(); ++index) {
+        const std::size_t at = next[membership[index]]++;
+        display_order_[at] = index;
+        display_position_[index] = at;
+    }
+    display_revision_ = model_revision_;
+    display_valid_ = true;
+}
+
+std::size_t ListView::index_at(const Layout& placed, std::size_t position) const noexcept {
+    if (!placed.grouped) return position;
+    return display_order_[position];
+}
+
+std::size_t ListView::position_of(const Layout& placed, std::size_t index) const noexcept {
+    if (!placed.grouped) return index;
+    return display_position_[index];
+}
+
+// The bands of the groups that hold items, and the line count, for the
+// layout's items per line.
+void ListView::place_groups(Layout& placed) const {
+    placed.bands.clear();
+    std::size_t first = 0U;
+    std::size_t line = 0U;
+    const std::size_t fallback = groups_.size();
+    for (std::size_t step = 0; step <= groups_.size(); ++step) {
+        // The default group first, then the groups in order.
+        const std::size_t group = step == 0U ? fallback : step - 1U;
+        const std::size_t count = display_counts_[group];
+        if (count == 0U) continue;
+        placed.bands.push_back({.group = group, .first = first, .count = count, .first_line = line});
+        first += count;
+        line += 1U + ceiling_quotient(count, placed.per_line);
+    }
+    placed.line_count = line;
+}
+
+std::size_t ListView::band_of_line(const Layout& placed, std::size_t line) const noexcept {
+    std::size_t low = 0U;
+    std::size_t high = placed.bands.size();
+    // The last band whose header line is at or before `line`.
+    while (high - low > 1U) {
+        const std::size_t middle = low + (high - low) / 2U;
+        if (placed.bands[middle].first_line <= line) {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    return low;
+}
+
+std::size_t ListView::band_of_position(const Layout& placed, std::size_t position) const noexcept {
+    std::size_t low = 0U;
+    std::size_t high = placed.bands.size();
+    while (high - low > 1U) {
+        const std::size_t middle = low + (high - low) / 2U;
+        if (placed.bands[middle].first <= position) {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    return low;
+}
+
+bool ListView::header_line(const Layout& placed, std::size_t line) const noexcept {
+    if (!placed.grouped || placed.bands.empty()) return false;
+    const bool result = placed.bands[band_of_line(placed, line)].first_line == line;
+    return result;
+}
+
+std::size_t ListView::line_first(const Layout& placed, std::size_t line) const noexcept {
+    if (!placed.grouped) return std::min(placed.shown_count, line * placed.per_line);
+    const GroupBand& band = placed.bands[band_of_line(placed, line)];
+    if (line == band.first_line) return band.first;
+    const std::size_t result = band.first + (line - band.first_line - 1U) * placed.per_line;
+    return result;
+}
+
+std::size_t ListView::line_items(const Layout& placed, std::size_t line) const noexcept {
+    if (!placed.grouped) {
+        const std::size_t first = line_first(placed, line);
+        return std::min(placed.per_line, placed.shown_count - first);
+    }
+    const GroupBand& band = placed.bands[band_of_line(placed, line)];
+    if (line == band.first_line) return 0U;
+    const std::size_t first = line_first(placed, line);
+    const std::size_t result = std::min(placed.per_line, band.first + band.count - first);
+    return result;
+}
+
+std::size_t ListView::position_line(const Layout& placed, std::size_t position) const noexcept {
+    if (!placed.grouped) return position / placed.per_line;
+    const GroupBand& band = placed.bands[band_of_position(placed, position)];
+    const std::size_t result = band.first_line + 1U + (position - band.first) / placed.per_line;
+    return result;
+}
+
+double ListView::line_offset(const Layout& placed, std::size_t line) const noexcept {
+    const double extent = view_ == ListViewView::list ? placed.cell.width : placed.cell.height;
+    if (!placed.grouped || placed.bands.empty()) return static_cast<double>(line) * extent;
+    const std::size_t band = band_of_line(placed, line);
+    const std::size_t headers = band + (line > placed.bands[band].first_line ? 1U : 0U);
+    const double result = static_cast<double>(headers) * placed.header_extent +
+                          static_cast<double>(line - headers) * extent;
+    return result;
+}
+
+std::size_t ListView::line_at_offset(const Layout& placed, double offset) const noexcept {
+    if (placed.line_count == 0U) return 0U;
+    // The last line whose top is at or before the offset.
+    std::size_t low = 0U;
+    std::size_t high = placed.line_count;
+    while (high - low > 1U) {
+        const std::size_t middle = low + (high - low) / 2U;
+        if (line_offset(placed, middle) <= offset) {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    return low;
+}
+
+std::size_t ListView::next_item_line(const Layout& placed, std::size_t line, bool forward) const noexcept {
+    std::size_t next = line;
+    while (true) {
+        if (forward) {
+            if (next + 1U >= placed.line_count) return line;
+            ++next;
+        } else {
+            if (next == 0U) return line;
+            --next;
+        }
+        if (!header_line(placed, next)) return next;
+    }
+}
+
+void ListView::store_top_line(const Layout& placed, std::size_t line) {
+    top_header_ = header_line(placed, line);
+    top_item_ = line_first(placed, line);
+}
+
 // -- layout ------------------------------------------------------------------
 
 double ListView::text_line_height() const {
@@ -840,6 +1165,7 @@ ListView::Layout ListView::layout_for(Rect client) const {
     const Rect content{client.x + inset, client.y + inset, std::max(0.0, client.width - inset * 2.0),
                        std::max(0.0, client.height - inset * 2.0)};
     const double line = text_line_height();
+    placed.text_line = line;
     double row = std::max(minimum_row_height * scale, line + row_text_padding * scale);
     if (check_boxes_) row = std::max(row, (check_size + cell_padding) * scale);
     if (small_images_) row = std::max(row, icon_size(false).height + cell_padding * scale);
@@ -858,10 +1184,25 @@ ListView::Layout ListView::layout_for(Rect client) const {
         const Size large = icon_size(true);
         placed.cell = {std::max(large_cell_width * scale, large.width + cell_padding * 4.0 * scale),
                        large.height + line + (cell_padding * 3.0 + row_text_padding) * scale};
+    } else if (view_ == ListViewView::tile) {
+        if (tile_size_.width > 0.0) {
+            placed.cell = {tile_size_.width * scale, tile_size_.height * scale};
+        } else {
+            const Size large = icon_size(true);
+            const double text_height = line * static_cast<double>(tile_text_lines);
+            placed.cell = {large.width + (tile_text_width + cell_padding * 3.0) * scale,
+                           std::max(large.height, text_height) + cell_padding * 2.0 * scale};
+        }
+        placed.tile_lines = fitting_lines(placed.cell.height - cell_padding * 2.0 * scale, line);
     } else {
         placed.cell = {list_cell_width * scale, row};
     }
     const double line_extent = list ? placed.cell.width : placed.cell.height;
+    placed.grouped = grouped() && placed.shown_count > 0U;
+    if (placed.grouped) {
+        refresh_display_order();
+        placed.header_extent = line + group_header_padding * scale;
+    }
     // Showing one bar can shrink the area enough to need the other. A bar
     // only shrinks the area, and a smaller area never needs fewer bars, so
     // each flag turns on at most once: two changes and a confirming pass
@@ -881,9 +1222,14 @@ ListView::Layout ListView::layout_for(Rect client) const {
         } else {
             placed.per_line = fitting_lines(area.width, placed.cell.width);
         }
-        placed.line_count = ceiling_quotient(placed.shown_count, placed.per_line);
+        if (placed.grouped) {
+            place_groups(placed);
+        } else {
+            placed.line_count = ceiling_quotient(placed.shown_count, placed.per_line);
+        }
         placed.page_lines = fitting_lines(list ? area.width : area.height, line_extent);
-        const bool overflows = placed.line_count > placed.page_lines;
+        const bool overflows = placed.grouped ? line_offset(placed, placed.line_count) > area.height + 0.5
+                                              : placed.line_count > placed.page_lines;
         const bool next_vertical = !list && overflows;
         const bool next_horizontal = (list && overflows) || (details && columns_width > area.width + 0.5);
         if (next_vertical == vertical && next_horizontal == horizontal) break;
@@ -906,9 +1252,24 @@ ListView::Layout ListView::layout_for(Rect client) const {
         placed.corner = {content.x + content.width - scroll_bar_extent,
                          content.y + content.height - scroll_bar_extent, scroll_bar_extent, scroll_bar_extent};
     }
-    placed.visible_lines = touched_lines(list ? area.width : area.height, line_extent);
-    const std::size_t top_line = top_item_ / placed.per_line;
-    placed.top_line = std::min(top_line, maximum_top_line(placed));
+    if (placed.grouped) {
+        const std::size_t position = std::min(top_item_, placed.shown_count - 1U);
+        const GroupBand& band = placed.bands[band_of_position(placed, position)];
+        const std::size_t top_line =
+            top_header_ && position == band.first ? band.first_line : position_line(placed, position);
+        placed.top_line = std::min(top_line, maximum_top_line(placed));
+        const double top = line_offset(placed, placed.top_line);
+        std::size_t lines = 0U;
+        while (placed.top_line + lines < placed.line_count &&
+               line_offset(placed, placed.top_line + lines) - top < area.height) {
+            ++lines;
+        }
+        placed.visible_lines = lines;
+    } else {
+        placed.visible_lines = touched_lines(list ? area.width : area.height, line_extent);
+        const std::size_t top_line = top_item_ / placed.per_line;
+        placed.top_line = std::min(top_line, maximum_top_line(placed));
+    }
     if (details) {
         const double maximum_offset = std::max(0.0, (columns_width - area.width) / scale);
         placed.horizontal_offset = std::clamp(horizontal_offset_, 0.0, maximum_offset);
@@ -917,23 +1278,60 @@ ListView::Layout ListView::layout_for(Rect client) const {
 }
 
 std::size_t ListView::maximum_top_line(const Layout& placed) const noexcept {
+    if (placed.grouped) {
+        // The first line from which the rest fits.
+        const double total = line_offset(placed, placed.line_count);
+        const double room = placed.viewport.height;
+        if (total <= room + 0.5) return 0U;
+        std::size_t low = 0U;
+        std::size_t high = placed.line_count;
+        while (low < high) {
+            const std::size_t middle = low + (high - low) / 2U;
+            if (total - line_offset(placed, middle) <= room + 0.5) {
+                high = middle;
+            } else {
+                low = middle + 1U;
+            }
+        }
+        return low;
+    }
     if (placed.line_count <= placed.page_lines) return 0U;
     const std::size_t result = placed.line_count - placed.page_lines;
     return result;
 }
 
 std::size_t ListView::first_realized(const Layout& placed) const noexcept {
+    if (placed.grouped) return line_first(placed, placed.top_line);
     const std::size_t result = std::min(placed.shown_count, placed.top_line * placed.per_line);
     return result;
 }
 
 std::size_t ListView::end_realized(const Layout& placed) const noexcept {
+    if (placed.grouped) {
+        if (placed.visible_lines == 0U) return first_realized(placed);
+        const std::size_t last = placed.top_line + placed.visible_lines - 1U;
+        const std::size_t result = line_first(placed, last) + line_items(placed, last);
+        return result;
+    }
     const std::size_t lines = placed.top_line + placed.visible_lines;
     const std::size_t result = std::min(placed.shown_count, lines * placed.per_line);
     return result;
 }
 
 Rect ListView::item_bounds(const Layout& placed, std::size_t index) const noexcept {
+    if (placed.grouped) {
+        const std::size_t position = position_of(placed, index);
+        const std::size_t line = position_line(placed, position);
+        const double along = static_cast<double>(position - line_first(placed, line));
+        const double y = placed.viewport.y + line_offset(placed, line) - line_offset(placed, placed.top_line);
+        if (view_ == ListViewView::details) {
+            const Rect row{placed.viewport.x - placed.horizontal_offset * placed.scale, y, placed.cell.width,
+                           placed.cell.height};
+            return row;
+        }
+        const Rect cell{placed.viewport.x + along * placed.cell.width, y, placed.cell.width, placed.cell.height};
+        return cell;
+    }
     const std::size_t line = index / placed.per_line;
     const std::size_t position = index % placed.per_line;
     const double relative = static_cast<double>(line) - static_cast<double>(placed.top_line);
@@ -1009,6 +1407,29 @@ ListView::ItemParts ListView::item_parts(const Layout& placed, std::size_t index
         const double text_top = top + image.height + cell_padding * scale;
         text = {cell.x + 2.0 * scale, text_top, std::max(0.0, cell.width - 4.0 * scale),
                 std::max(0.0, cell.y + cell.height - 2.0 * scale - text_top)};
+        face = {cell.x + scale, cell.y + scale, std::max(0.0, cell.width - 2.0 * scale),
+                std::max(0.0, cell.height - 2.0 * scale)};
+    } else if (view_ == ListViewView::tile) {
+        // The check box and icon sit at the tile's left, centred on it; the
+        // text block beside them is centred too.
+        const double middle = cell.y + cell.height * 0.5;
+        double x = cell.x + cell_padding * scale;
+        if (check_boxes_) {
+            const double side = check_size * scale;
+            check_well = {x, std::floor(middle - side * 0.5), side, side};
+            x += side + cell_padding * scale;
+        }
+        if (large_images_) {
+            const Size image = icon_size(true);
+            icon = {x, std::floor(middle - image.height * 0.5), image.width, image.height};
+            x += image.width + cell_padding * scale;
+        }
+        ListViewItem scratch;
+        const ListViewItem& item = item_at(index, scratch);
+        const std::size_t lines = tile_line_count(item, columns_.size(), placed.tile_lines);
+        const double block = placed.text_line * static_cast<double>(lines);
+        const double top = std::max(cell.y + cell_padding * scale, std::floor(middle - block * 0.5));
+        text = {x, top, std::max(0.0, cell.x + cell.width - cell_padding * scale - x), placed.text_line};
         face = {cell.x + scale, cell.y + scale, std::max(0.0, cell.width - 2.0 * scale),
                 std::max(0.0, cell.height - 2.0 * scale)};
     } else {
@@ -1132,7 +1553,11 @@ void ListView::arrange(Rect final_bounds) {
         if (shown) set_child_layout(horizontal_bar_, placed.horizontal_bar);
     }
     // Keep the stored scroll within the new bounds.
-    top_item_ = std::min(top_item_, placed.top_line * placed.per_line);
+    if (placed.grouped) {
+        store_top_line(placed, placed.top_line);
+    } else {
+        top_item_ = std::min(top_item_, placed.top_line * placed.per_line);
+    }
     horizontal_offset_ = placed.horizontal_offset;
     place_label_editor(placed);
     sync_scroll_bars(placed);
@@ -1235,7 +1660,7 @@ bool ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
     }
     if (default_content && parts.icon.present && !item.image_key.empty()) {
         const std::shared_ptr<ImageList>& images =
-            view_ == ListViewView::large_icon ? large_images_ : small_images_;
+            view_ == ListViewView::large_icon || view_ == ListViewView::tile ? large_images_ : small_images_;
         const Window* const host = attached_window();
         const double density = host != nullptr ? (*host).scale() : 1.0;
         const ImageListResolution resolved = (*images).resolve(item.image_key, image_state(states), density);
@@ -1291,10 +1716,116 @@ bool ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
         part.states = states;
         part.alignment = PartTextAlignment::start;
     }
+    if (view_ == ListViewView::tile && !paint_tile_lines(painter, placed, index, parts, states)) return false;
     part.role = PartRole::focus;
     part.bounds = parts.cell_focus.bounds;
     paint_part(painter, *this, part);
     return true;
+}
+
+// The tile view's sub-item lines under the item's text: one per column
+// after the first with a non-empty sub-item, while the tile has room. False
+// when an owner-draw handler changed the model or disposed the view.
+bool ListView::paint_tile_lines(Painter& painter, const Layout& placed, std::size_t index,
+                                const ItemParts& parts, AnatomyStateSet states) {
+    const ListViewItem& item = item_at(index, paint_item_);
+    const std::size_t lines = tile_line_count(item, columns_.size(), placed.tile_lines);
+    const Rect first = parts.text.bounds;
+    PartPaint part;
+    part.font = effective_font(font_);
+    part.states = states;
+    part.family = ControlVisualRole::selection;
+    part.role = PartRole::content;
+    part.alignment = PartTextAlignment::start;
+    std::size_t shown = 1U;
+    for (std::size_t column = 1; column < columns_.size() && shown < lines; ++column) {
+        if (column_text(item, column).empty()) continue;
+        const Rect bounds{first.x, first.y + placed.text_line * static_cast<double>(shown), first.width,
+                          placed.text_line};
+        ++shown;
+        if (draw_mode_ == ItemDrawMode::owner_draw) {
+            ItemContentPaint request{.painter = painter,
+                                     .index = index,
+                                     .column = column,
+                                     .stable_id = paint_stable_id_,
+                                     .content = bounds,
+                                     .states = states,
+                                     .font = part.font,
+                                     .text = item_content_text(*this, ControlVisualRole::selection, states)};
+            const std::uint64_t revision = model_revision_;
+            const bool line_default = raise_item_content_paint(draw_item_content_, request);
+            if (!model_unchanged(revision)) return false;
+            if (!line_default) continue;
+        }
+        details_detail::elide_to_width(painter, column_text(item, column), part.font, bounds.width, paint_text_);
+        part.bounds = bounds;
+        part.text = paint_text_;
+        paint_part(painter, *this, part);
+        part.text = {};
+    }
+    return true;
+}
+
+// A group header line: the header's text, bold, over a rule.
+void ListView::paint_group(Painter& painter, const Layout& placed, std::size_t band) {
+    const GroupParts parts = group_parts(placed, band, placed.viewport);
+    const std::size_t group = placed.bands[band].group;
+    PartPaint part;
+    FontSpec font = effective_font(font_);
+    font.weight = 700;
+    part.font = font;
+    if (!effectively_enabled()) part.states.insert(AnatomyState::disabled);
+    part.family = ControlVisualRole::panel;
+    part.role = PartRole::caption;
+    part.bounds = parts.group_caption.bounds;
+    part.alignment = group < groups_.size() ? text_alignment(groups_[group].header_alignment)
+                                            : PartTextAlignment::start;
+    details_detail::elide_to_width(painter, group_header(group), part.font, part.bounds.width, paint_text_);
+    part.text = paint_text_;
+    paint_part(painter, *this, part);
+    part.text = {};
+    part.role = PartRole::divider;
+    part.bounds = parts.group_divider.bounds;
+    paint_part(painter, *this, part);
+}
+
+// The header lines among the visible lines, in order.
+std::size_t ListView::realized_group_count(const Layout& placed) const noexcept {
+    if (!placed.grouped) return 0U;
+    std::size_t count = 0U;
+    for (std::size_t line = placed.top_line; line < placed.top_line + placed.visible_lines; ++line) {
+        if (header_line(placed, line)) ++count;
+    }
+    return count;
+}
+
+std::size_t ListView::realized_group_band(const Layout& placed, std::size_t position) const noexcept {
+    std::size_t seen = 0U;
+    for (std::size_t line = placed.top_line; line < placed.top_line + placed.visible_lines; ++line) {
+        if (!header_line(placed, line)) continue;
+        if (seen == position) return band_of_line(placed, line);
+        ++seen;
+    }
+    return placed.bands.size();
+}
+
+// A header line's parts: the band across the viewport, the caption inset
+// in it, and the rule along its foot.
+ListView::GroupParts ListView::group_parts(const Layout& placed, std::size_t band, Rect clip) const {
+    const GroupBand& record = placed.bands[band];
+    const double y = placed.viewport.y + line_offset(placed, record.first_line) - line_offset(placed, placed.top_line);
+    const Rect area{placed.viewport.x, y, placed.viewport.width, placed.header_extent};
+    const double inset = group_caption_inset * placed.scale;
+    const double rule = placed.scale;
+    const Rect caption{area.x + inset, area.y, std::max(0.0, area.width - inset * 2.0),
+                       std::max(0.0, area.height - rule * 2.0)};
+    const Rect divider{area.x + inset, area.y + area.height - rule * 2.0, std::max(0.0, area.width - inset * 2.0),
+                       rule};
+    GroupParts parts;
+    parts.group_band = PartGeometry::from_bounds(Rect::intersection(area, clip));
+    parts.group_caption = PartGeometry::from_bounds(Rect::intersection(caption, clip));
+    parts.group_divider = PartGeometry::from_bounds(Rect::intersection(divider, clip));
+    return parts;
 }
 
 void ListView::on_paint(Painter& painter, Rect) {
@@ -1325,11 +1856,15 @@ void ListView::on_paint(Painter& painter, Rect) {
     if (!placed.viewport.empty()) {
         painter.save();
         painter.clip_rect(placed.viewport);
+        const std::size_t groups = realized_group_count(placed);
+        for (std::size_t group = 0; group < groups; ++group) {
+            paint_group(painter, placed, realized_group_band(placed, group));
+        }
         const std::size_t end = end_realized(placed);
-        for (std::size_t index = first_realized(placed); index < end; ++index) {
+        for (std::size_t position = first_realized(placed); position < end; ++position) {
             // An owner-draw handler that changed the model ends this paint;
             // the change has already asked for the next one.
-            if (!paint_item(painter, placed, index)) {
+            if (!paint_item(painter, placed, index_at(placed, position))) {
                 painter.restore();
                 return;
             }
@@ -1392,20 +1927,29 @@ ListView::Hit ListView::hit_test(const Layout& placed, Point local) const {
     if (placed.viewport.empty() || !placed.viewport.contains(local)) return hit;
     const double across = local.x - placed.viewport.x;
     const double down = local.y - placed.viewport.y;
-    std::size_t line = 0U;
-    std::size_t position = 0U;
-    if (view_ == ListViewView::details) {
-        line = placed.top_line + static_cast<std::size_t>(down / placed.row_height);
-    } else if (view_ == ListViewView::list) {
-        line = placed.top_line + static_cast<std::size_t>(across / placed.cell.width);
-        position = static_cast<std::size_t>(down / placed.cell.height);
+    std::size_t index = 0U;
+    if (placed.grouped) {
+        const std::size_t line = line_at_offset(placed, line_offset(placed, placed.top_line) + down);
+        const std::size_t along =
+            view_ == ListViewView::details ? 0U : static_cast<std::size_t>(across / placed.cell.width);
+        if (along >= line_items(placed, line)) return hit;
+        index = index_at(placed, line_first(placed, line) + along);
     } else {
-        line = placed.top_line + static_cast<std::size_t>(down / placed.cell.height);
-        position = static_cast<std::size_t>(across / placed.cell.width);
+        std::size_t line = 0U;
+        std::size_t position = 0U;
+        if (view_ == ListViewView::details) {
+            line = placed.top_line + static_cast<std::size_t>(down / placed.row_height);
+        } else if (view_ == ListViewView::list) {
+            line = placed.top_line + static_cast<std::size_t>(across / placed.cell.width);
+            position = static_cast<std::size_t>(down / placed.cell.height);
+        } else {
+            line = placed.top_line + static_cast<std::size_t>(down / placed.cell.height);
+            position = static_cast<std::size_t>(across / placed.cell.width);
+        }
+        if (position >= placed.per_line) return hit;
+        index = line * placed.per_line + position;
+        if (index >= placed.shown_count) return hit;
     }
-    if (position >= placed.per_line) return hit;
-    const std::size_t index = line * placed.per_line + position;
-    if (index >= placed.shown_count) return hit;
     if (!item_bounds(placed, index).contains(local)) return hit;
     hit.index = index;
     hit.zone = HitZone::item;
@@ -1469,19 +2013,30 @@ std::optional<ListViewInsertionMark> ListView::insertion_mark_at(Point window_po
     const Rect area = placed.viewport;
     const double across = std::clamp(local.x - area.x, 0.0, std::max(area.width - 1.0, 0.0));
     const double down = std::clamp(local.y - area.y, 0.0, std::max(area.height - 1.0, 0.0));
-    std::size_t line = placed.top_line;
-    std::size_t position = 0U;
-    if (view_ == ListViewView::details) {
-        line += static_cast<std::size_t>(down / placed.row_height);
-    } else if (view_ == ListViewView::list) {
-        line += static_cast<std::size_t>(across / placed.cell.width);
-        position = static_cast<std::size_t>(down / placed.cell.height);
+    std::size_t index = 0U;
+    if (placed.grouped) {
+        std::size_t line = line_at_offset(placed, line_offset(placed, placed.top_line) + down);
+        // A header names its group's first line.
+        if (header_line(placed, line)) ++line;
+        std::size_t along =
+            view_ == ListViewView::details ? 0U : static_cast<std::size_t>(across / placed.cell.width);
+        along = std::min(along, line_items(placed, line) - 1U);
+        index = index_at(placed, line_first(placed, line) + along);
     } else {
-        line += static_cast<std::size_t>(down / placed.cell.height);
-        position = static_cast<std::size_t>(across / placed.cell.width);
+        std::size_t line = placed.top_line;
+        std::size_t position = 0U;
+        if (view_ == ListViewView::details) {
+            line += static_cast<std::size_t>(down / placed.row_height);
+        } else if (view_ == ListViewView::list) {
+            line += static_cast<std::size_t>(across / placed.cell.width);
+            position = static_cast<std::size_t>(down / placed.cell.height);
+        } else {
+            line += static_cast<std::size_t>(down / placed.cell.height);
+            position = static_cast<std::size_t>(across / placed.cell.width);
+        }
+        position = std::min(position, placed.per_line - 1U);
+        index = std::min(line * placed.per_line + position, placed.shown_count - 1U);
     }
-    position = std::min(position, placed.per_line - 1U);
-    const std::size_t index = std::min(line * placed.per_line + position, placed.shown_count - 1U);
     const Rect cell = item_bounds(placed, index);
     const bool between_rows = view_ == ListViewView::details || view_ == ListViewView::list;
     const Point clamped{area.x + across, area.y + down};
@@ -1648,6 +2203,7 @@ void ListView::on_pointer(PointerEvent& event) {
 
 std::optional<std::size_t> ListView::navigation_target(std::uint32_t key, std::size_t from,
                                                        const Layout& placed) const {
+    if (placed.grouped) return grouped_navigation_target(key, from, placed);
     const std::size_t count = placed.shown_count;
     const std::size_t last = count - 1U;
     const std::size_t per = placed.per_line;
@@ -1671,6 +2227,40 @@ std::optional<std::size_t> ListView::navigation_target(std::uint32_t key, std::s
     if (horizontal == 0U) return std::nullopt;
     if (key == PhysicalKey::left) return from >= horizontal ? from - horizontal : from;
     if (key == PhysicalKey::right) return std::min(from + horizontal, last);
+    return std::nullopt;
+}
+
+// The arrows in a grouped view move through the shown order: Up and Down
+// to the item line above or below, across group headers, keeping the place
+// along the line; Left and Right to the previous or next shown item in the
+// icon and tile views.
+std::optional<std::size_t> ListView::grouped_navigation_target(std::uint32_t key, std::size_t from,
+                                                               const Layout& placed) const {
+    const std::size_t last = placed.shown_count - 1U;
+    const std::size_t position = position_of(placed, from);
+    if (key == PhysicalKey::home) return index_at(placed, 0U);
+    if (key == PhysicalKey::end) return index_at(placed, last);
+    const bool up = key == PhysicalKey::up || key == PhysicalKey::page_up;
+    const bool down = key == PhysicalKey::down || key == PhysicalKey::page_down;
+    if (up || down) {
+        const bool page = key == PhysicalKey::page_up || key == PhysicalKey::page_down;
+        const std::size_t steps = page ? placed.page_lines : 1U;
+        const std::size_t line = position_line(placed, position);
+        const std::size_t along = position - line_first(placed, line);
+        std::size_t target = line;
+        for (std::size_t step = 0; step < steps; ++step) {
+            const std::size_t next = next_item_line(placed, target, down);
+            if (next == target) break;
+            target = next;
+        }
+        // A page key with no line left goes to the first or last item.
+        if (page && target == line) return index_at(placed, down ? last : 0U);
+        const std::size_t moved = line_first(placed, target) + std::min(along, line_items(placed, target) - 1U);
+        return index_at(placed, moved);
+    }
+    if (view_ == ListViewView::details) return std::nullopt;
+    if (key == PhysicalKey::left) return index_at(placed, position > 0U ? position - 1U : position);
+    if (key == PhysicalKey::right) return index_at(placed, std::min(position + 1U, last));
     return std::nullopt;
 }
 
@@ -1758,12 +2348,14 @@ void ListView::type_select(std::string_view text) {
     const std::size_t count = items_.size();
     if (count == 0U) return;
     // A repeated first letter steps to the next match; a longer prefix
-    // starts its search at the focused item.
+    // starts its search at the focused item. The search follows the shown
+    // order.
+    const Layout placed = layout();
     const bool single = type_prefix_.size() == 1U;
-    const std::size_t focus = focused_index_.value_or(count - 1U);
+    const std::size_t focus = focused_index_ ? position_of(placed, *focused_index_) : count - 1U;
     const std::size_t start = single ? (focus + 1U) % count : focus % count;
     for (std::size_t offset = 0; offset < count; ++offset) {
-        const std::size_t index = (start + offset) % count;
+        const std::size_t index = index_at(placed, (start + offset) % count);
         if (collection_detail::starts_with_folded(items_[index].text, type_prefix_)) {
             choose(index, Modifier::none, false);
             return;
@@ -2046,7 +2638,12 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
     const std::size_t first = first_realized(placed);
     const std::size_t end = end_realized(placed);
     ListViewItem scratch;
-    for (std::size_t index = first; index < end; ++index) {
+    // A grouped view's items are the children of a `group` node per shown
+    // group, named by its header.
+    std::optional<std::size_t> open_band{};
+    SemanticNode group_node{};
+    for (std::size_t position = first; position < end; ++position) {
+        const std::size_t index = index_at(placed, position);
         const ListViewItem& item = item_at(index, scratch);
         const Rect bounds = Rect::intersection(item_bounds(placed, index), placed.viewport);
         SemanticNode node{};
@@ -2055,7 +2652,7 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
         node.name = item.text;
         if (view_ == ListViewView::details) {
             node.role = SemanticRole::row;
-            node.row_index = index + 1U;
+            node.row_index = position + 1U;
             append_row_cells(placed, index, item, node);
         } else {
             node.role = check_boxes_ ? SemanticRole::check_list_item : SemanticRole::list_item;
@@ -2070,8 +2667,33 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
             if (item.checked) node.states |= SemanticState::checked;
         }
         node.actions = {SemanticAction::focus, SemanticAction::select, SemanticAction::press};
-        nodes.push_back(std::move(node));
+        if (!placed.grouped) {
+            nodes.push_back(std::move(node));
+            continue;
+        }
+        const std::size_t band = band_of_position(placed, position);
+        if (open_band != band) {
+            if (open_band) nodes.push_back(std::move(group_node));
+            open_band = band;
+            const GroupBand& record = placed.bands[band];
+            const std::size_t lines = 1U + ceiling_quotient(record.count, placed.per_line);
+            const double top = placed.viewport.y + line_offset(placed, record.first_line) -
+                               line_offset(placed, placed.top_line);
+            const double height = line_offset(placed, record.first_line + lines) -
+                                  line_offset(placed, record.first_line);
+            const Rect extent = Rect::intersection({placed.viewport.x, top, placed.viewport.width, height},
+                                                   placed.viewport);
+            group_node = SemanticNode{};
+            group_node.stable_id = group_identity(record.group);
+            group_node.runtime_id = virtual_semantic_runtime_id(group_node.stable_id);
+            group_node.role = SemanticRole::group;
+            group_node.name = group_header(record.group);
+            group_node.bounds = {absolute.x + extent.x, absolute.y + extent.y, extent.width, extent.height};
+            group_node.states = SemanticState::visible | enabled_state;
+        }
+        group_node.children.push_back(std::move(node));
     }
+    if (open_band) nodes.push_back(std::move(group_node));
     return nodes;
 }
 
@@ -2095,7 +2717,7 @@ void ListView::append_row_cells(const Layout& placed, std::size_t index, const L
         cell.role = SemanticRole::cell;
         cell.name = columns_[column].text;
         cell.value = std::string(column_text(item, column));
-        cell.row_index = index + 1U;
+        cell.row_index = position_of(placed, index) + 1U;
         cell.column_index = column + 1U;
         cell.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
         cell.states = SemanticState::visible | enabled_state;
@@ -2109,7 +2731,8 @@ std::optional<std::size_t> ListView::realized_index_of(std::string_view item_id)
     const Layout placed = layout();
     const std::size_t end = end_realized(placed);
     ListViewItem scratch;
-    for (std::size_t index = first_realized(placed); index < end; ++index) {
+    for (std::size_t position = first_realized(placed); position < end; ++position) {
+        const std::size_t index = index_at(placed, position);
         if (item_at(index, scratch).stable_id == item_id) return index;
     }
     return std::nullopt;
@@ -2239,6 +2862,19 @@ constexpr std::array<CustomStateDeclaration, 2> list_view_column_custom_states{{
     {.name = "sorted_descending"},
 }};
 
+constexpr std::array<PartField<ListView::GroupParts>, 3> list_view_group_part_fields{{
+    {.declaration = {.name = "group_band", .role = PartRole::region, .composed_from = {}},
+     .member = &ListView::GroupParts::group_band},
+    {.declaration = {.name = "group_caption", .role = PartRole::caption, .composed_from = {}},
+     .member = &ListView::GroupParts::group_caption},
+    {.declaration = {.name = "group_divider", .role = PartRole::divider, .composed_from = {}},
+     .member = &ListView::GroupParts::group_divider},
+}};
+
+constexpr std::array<StateField<ListView::GroupStates>, 1> list_view_group_state_fields{{
+    {.state = AnatomyState::disabled, .member = &ListView::GroupStates::disabled},
+}};
+
 constexpr std::array<PartDeclaration, 9> list_view_parts = part_declarations(list_view_part_fields);
 constexpr std::array<PartDeclaration, 7> list_view_item_parts = part_declarations(list_view_item_part_fields);
 constexpr std::array<AnatomyState, 6> list_view_item_states = state_declarations(list_view_item_state_fields);
@@ -2248,6 +2884,8 @@ constexpr std::array<AnatomyState, 2> list_view_sub_item_states =
     state_declarations(list_view_sub_item_state_fields);
 constexpr std::array<PartDeclaration, 5> list_view_column_parts = part_declarations(list_view_column_part_fields);
 constexpr std::array<AnatomyState, 3> list_view_column_states = state_declarations(list_view_column_state_fields);
+constexpr std::array<PartDeclaration, 3> list_view_group_parts = part_declarations(list_view_group_part_fields);
+constexpr std::array<AnatomyState, 1> list_view_group_states = state_declarations(list_view_group_state_fields);
 constexpr std::array<AnatomyState, 5> list_view_states{
     AnatomyState::normal, AnatomyState::enabled, AnatomyState::disabled,
     AnatomyState::focused, AnatomyState::focus_visible,
@@ -2256,13 +2894,15 @@ constexpr std::array<AnatomyState, 5> list_view_states{
 constexpr ItemSystemIndex item_system{0U};
 constexpr ItemSystemIndex sub_item_system{1U};
 constexpr ItemSystemIndex column_system{2U};
+constexpr ItemSystemIndex group_system{3U};
 
-constexpr std::array<ItemSystemDeclaration, 3> list_view_item_systems{{
+constexpr std::array<ItemSystemDeclaration, 4> list_view_item_systems{{
     {.name = "item", .parts = list_view_item_parts, .states = list_view_item_states, .custom_states = {}},
     {.name = "sub_item", .parts = list_view_sub_item_parts, .states = list_view_sub_item_states,
      .custom_states = {}},
     {.name = "column", .parts = list_view_column_parts, .states = list_view_column_states,
      .custom_states = list_view_column_custom_states},
+    {.name = "group", .parts = list_view_group_parts, .states = list_view_group_states, .custom_states = {}},
 }};
 
 constexpr ControlAnatomy list_view_anatomy{
@@ -2326,7 +2966,8 @@ std::size_t ListView::realized_sub_item_column(const Layout& placed, std::size_t
 std::size_t ListView::realized_item_count() const {
     const Layout placed = layout();
     const std::size_t columns = view_ == ListViewView::details ? visible_column_count(placed) : 0U;
-    const std::size_t result = realized_row_count(placed) + realized_sub_item_count(placed) + columns;
+    const std::size_t result =
+        realized_row_count(placed) + realized_sub_item_count(placed) + columns + realized_group_count(placed);
     return result;
 }
 
@@ -2337,7 +2978,7 @@ ListView::RealizedSlot ListView::realized_slot(const Layout& placed, std::size_t
     RealizedSlot slot;
     if (item < rows) {
         slot.system = item_system;
-        slot.index = first + item;
+        slot.index = index_at(placed, first + item);
         return slot;
     }
     if (item < rows + sub_items) {
@@ -2346,12 +2987,19 @@ ListView::RealizedSlot ListView::realized_slot(const Layout& placed, std::size_t
         const std::size_t per_row = sub_items / rows;
         const std::size_t position = item - rows;
         slot.system = sub_item_system;
-        slot.index = first + position / per_row;
+        slot.index = index_at(placed, first + position / per_row);
         slot.column = realized_sub_item_column(placed, position % per_row);
         return slot;
     }
-    slot.system = column_system;
-    slot.column = visible_column(placed, item - rows - sub_items);
+    const std::size_t columns = view_ == ListViewView::details ? visible_column_count(placed) : 0U;
+    if (item < rows + sub_items + columns) {
+        slot.system = column_system;
+        slot.column = visible_column(placed, item - rows - sub_items);
+        return slot;
+    }
+    // A group's slot names its band.
+    slot.system = group_system;
+    slot.index = realized_group_band(placed, item - rows - sub_items - columns);
     return slot;
 }
 
@@ -2362,6 +3010,7 @@ std::string ListView::realized_item_stable_id(std::size_t item) const {
         std::string identity = column_identity(stable_id().value(), columns_[slot.column].stable_id);
         return identity;
     }
+    if (slot.system == group_system) return group_identity(placed.bands[slot.index].group);
     ListViewItem scratch;
     const ListViewItem& realized = item_at(slot.index, scratch);
     if (slot.system == item_system) return realized.stable_id;
@@ -2385,6 +3034,9 @@ void ListView::publish_realized_item_geometry(std::size_t item, std::span<PartGe
     } else if (slot.system == sub_item_system) {
         const SubItemParts record = sub_item_parts(placed, slot.index, slot.column, placed.viewport);
         write_item_parts(system, list_view_sub_item_part_fields, record, geometry);
+    } else if (slot.system == group_system) {
+        const GroupParts record = group_parts(placed, slot.index, placed.viewport);
+        write_item_parts(system, list_view_group_part_fields, record, geometry);
     } else {
         const ColumnParts record = column_parts(placed, slot.column, placed.header);
         write_item_parts(system, list_view_column_part_fields, record, geometry);
@@ -2395,6 +3047,11 @@ AnatomyStateSet ListView::realized_item_anatomy_states(std::size_t item) const {
     const Layout placed = layout();
     const RealizedSlot slot = realized_slot(placed, item);
     if (slot.system == column_system) return column_states(slot.column);
+    if (slot.system == group_system) {
+        AnatomyStateSet group_states;
+        if (!effectively_enabled()) group_states.insert(AnatomyState::disabled);
+        return group_states;
+    }
     if (slot.system == item_system) {
         ListViewItem scratch;
         const bool checked = item_at(slot.index, scratch).checked;
@@ -2416,7 +3073,7 @@ std::vector<ListView::Item> ListView::realized_items() const {
     for (std::size_t item = 0; item < count; ++item) {
         const PartGeometryBuffer published = published_realized_item_geometry(item);
         Item record;
-        record.index = first + item;
+        record.index = index_at(placed, first + item);
         record.stable_id = realized_item_stable_id(item);
         read_item_parts(anatomy().item_systems[item_system.value], list_view_item_part_fields, published.parts(),
                         record.parts);
@@ -2463,6 +3120,27 @@ std::vector<ListView::Column> ListView::realized_columns() const {
         read_states(list_view_column_state_fields, states, record.states);
         record.states.sorted_ascending = states.contains(sorted_ascending_state);
         record.states.sorted_descending = states.contains(sorted_descending_state);
+        records.push_back(record);
+    }
+    return records;
+}
+
+std::vector<ListView::Group> ListView::realized_groups() const {
+    const Layout placed = layout();
+    const std::size_t count = realized_group_count(placed);
+    const std::size_t before = realized_item_count() - count;
+    std::vector<Group> records;
+    records.reserve(count);
+    for (std::size_t position = 0; position < count; ++position) {
+        const std::size_t item = before + position;
+        const PartGeometryBuffer published = published_realized_item_geometry(item);
+        const std::size_t band = realized_group_band(placed, position);
+        Group record;
+        record.index = placed.bands[band].group;
+        record.stable_id = realized_item_stable_id(item);
+        read_item_parts(anatomy().item_systems[group_system.value], list_view_group_part_fields, published.parts(),
+                        record.parts);
+        read_states(list_view_group_state_fields, realized_item_anatomy_states(item), record.states);
         records.push_back(record);
     }
     return records;

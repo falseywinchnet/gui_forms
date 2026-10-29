@@ -167,6 +167,103 @@ void test_keyboard_pointer_and_focus_restoration() {
             "focused tabs must support Home/End boundary traversal");
 }
 
+// Records each page event as "<action>:<index>"; cancels the event whose
+// action and index match `cancel_action` and `cancel_index`.
+class RecordPageEvents final {
+public:
+    RecordPageEvents(std::vector<std::string>& seen, std::string& cancel) : seen_(seen), cancel_(cancel) {}
+
+    void operator()(TabControlCancelEvent& event) const {
+        const std::string entry = name(event.action) + ":" + std::to_string(event.index);
+        seen_.push_back(entry);
+        if (entry == cancel_) event.cancel = true;
+    }
+    void operator()(const TabControlEvent& event) const {
+        seen_.push_back(name(event.action) + ":" + std::to_string(event.index));
+    }
+
+private:
+    static std::string name(TabControlAction action) {
+        if (action == TabControlAction::deselecting) return "deselecting";
+        if (action == TabControlAction::selecting) return "selecting";
+        if (action == TabControlAction::deselected) return "deselected";
+        return "selected";
+    }
+
+    std::vector<std::string>& seen_;
+    std::string& cancel_;
+};
+
+class RecordIndexChange final {
+public:
+    explicit RecordIndexChange(std::vector<std::string>& seen) : seen_(seen) {}
+    void operator()(const TabSelectionChange& change) const {
+        seen_.push_back("changed:" + std::to_string(change.new_index.value_or(99U)));
+    }
+
+private:
+    std::vector<std::string>& seen_;
+};
+
+// Windows Forms' Deselecting, Selecting, Deselected and Selected: the two
+// cancellable events come before any change, by any route; the two after
+// it, then selected_index_changed.
+void test_selecting_events() {
+    Fixture fixture = make_fixture();
+    Window window(fixture.tabs, {480.0, 260.0});
+    window.perform_layout();
+    std::vector<std::string> seen;
+    std::string cancel;
+    const RecordPageEvents record(seen, cancel);
+    SubscriptionToken deselecting = (*fixture.tabs).deselecting().subscribe(record);
+    SubscriptionToken selecting = (*fixture.tabs).selecting().subscribe(record);
+    SubscriptionToken deselected = (*fixture.tabs).deselected().subscribe(record);
+    SubscriptionToken selected = (*fixture.tabs).selected().subscribe(record);
+    SubscriptionToken changed = (*fixture.tabs).selected_index_changed().subscribe(RecordIndexChange(seen));
+
+    (*fixture.tabs).set_selected_index(1U);
+    const std::vector<std::string> order{"deselecting:0", "selecting:1", "deselected:0", "selected:1", "changed:1"};
+    require(seen == order && (*fixture.tabs).selected_index() == 1U,
+            "a change raises deselecting, selecting, deselected, selected, then selected_index_changed");
+
+    seen.clear();
+    cancel = "selecting:2";
+    (*fixture.tabs).set_selected_index(2U);
+    require(seen == std::vector<std::string>{"deselecting:1", "selecting:2"} &&
+                (*fixture.tabs).selected_index() == 1U && (*fixture.second).visible(),
+            "a cancelled selecting keeps the page");
+
+    seen.clear();
+    cancel = "deselecting:1";
+    const Rect third = (*fixture.tabs).tab_bounds(2U);
+    const Point click{third.x + third.width * 0.5, third.y + third.height * 0.5};
+    static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, click}));
+    static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, click}));
+    window.perform_layout();
+    require(seen == std::vector<std::string>{"deselecting:1"} && (*fixture.tabs).selected_index() == 1U,
+            "a cancelled deselecting refuses a click on another tab");
+
+    seen.clear();
+    cancel.clear();
+    require(window.request_focus(fixture.tabs), "the control takes focus");
+    KeyEvent next{KeyAction::down, PhysicalKey::tab, Modifier::control};
+    require(window.dispatch_key(next) && (*fixture.tabs).selected_index() == 2U &&
+                seen == std::vector<std::string>{"deselecting:1", "selecting:2", "deselected:1", "selected:2",
+                                                 "changed:2"},
+            "Ctrl+Tab raises the same events");
+
+    seen.clear();
+    KeyEvent home{KeyAction::down, PhysicalKey::home};
+    require(window.dispatch_key(home) && (*fixture.tabs).selected_index() == 0U && seen.size() == 5U &&
+                seen[1] == "selecting:0",
+            "the strip's keys raise them too");
+
+    seen.clear();
+    std::shared_ptr<TabPage> removed = (*fixture.tabs).remove_page(*fixture.first);
+    require(removed && seen == std::vector<std::string>{"changed:0"},
+            "the page replacing a removed selected page raises only selected_index_changed");
+}
+
 void test_alignment_appearance_and_semantics() {
     Fixture fixture = make_fixture();
     Window window(fixture.tabs, {480.0, 260.0});
@@ -405,6 +502,7 @@ int main() {
         test_page_removal_and_disposal_reconciliation();
         test_owner_draw();
         test_tab_images();
+        test_selecting_events();
         std::cout << "gui_forms_tab_control_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

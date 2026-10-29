@@ -89,6 +89,25 @@ selected_index_changed
     Removing a page raises it when the selected page or its index changes,
     so removing a page before the selected one raises it although the same
     page stays selected.
+deselecting
+    Raised with a `TabControlCancelEvent` for the selected page before a
+    change of page by the user (a click, a key, the strip's list) or by
+    `set_selected_index` (Windows Forms' `Deselecting`). Set `cancel` to keep
+    the page; nothing has changed yet.
+selecting
+    Raised after `deselecting`, for the page about to be chosen (Windows
+    Forms' `Selecting`). Set `cancel` to keep the selected page. A handler
+    that disposes the control or removes the page ends the change.
+deselected
+    Raised with a `TabControlEvent` for the page left, once the new page is
+    shown (Windows Forms' `Deselected`).
+selected
+    Raised after `deselected` for the page chosen (Windows Forms'
+    `Selected`), before `selected_index_changed`. The first page added, and
+    the page that replaces a removed selected page, raise only
+    `selected_index_changed`. Windows Forms raises `Deselected` before
+    `Selecting`; here both cancellable events come first, so a cancelled
+    change raises nothing after them.
 
 Methods
 -------

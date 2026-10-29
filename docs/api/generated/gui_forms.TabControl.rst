@@ -123,6 +123,29 @@ gui_forms::TabControl
          so removing a page before the selected one raises it although the same
          page stays selected.
 
+      **deselecting** : ``Event<TabControlCancelEvent&>``
+         Raised with a :cpp:class:`TabControlCancelEvent <gui_forms::TabControlCancelEvent>` for the selected page before a
+         change of page by the user (a click, a key, the strip's list) or by
+         :cpp:func:`set_selected_index <gui_forms::TabControl::set_selected_index>` (Windows Forms' ``Deselecting``). Set ``cancel`` to keep
+         the page; nothing has changed yet.
+
+      **selecting** : ``Event<TabControlCancelEvent&>``
+         Raised after :cpp:func:`deselecting <gui_forms::TabControl::deselecting>`, for the page about to be chosen (Windows
+         Forms' ``Selecting``). Set ``cancel`` to keep the selected page. A handler
+         that disposes the control or removes the page ends the change.
+
+      **deselected** : ``Event<const TabControlEvent&>``
+         Raised with a :cpp:class:`TabControlEvent <gui_forms::TabControlEvent>` for the page left, once the new page is
+         shown (Windows Forms' ``Deselected``).
+
+      **selected** : ``Event<const TabControlEvent&>``
+         Raised after :cpp:func:`deselected <gui_forms::TabControl::deselected>` for the page chosen (Windows Forms'
+         ``Selected``), before :cpp:func:`selected_index_changed <gui_forms::TabControl::selected_index_changed>`. The first page added, and
+         the page that replaces a removed selected page, raise only
+         :cpp:func:`selected_index_changed <gui_forms::TabControl::selected_index_changed>`. Windows Forms raises ``Deselected`` before
+         ``Selecting``; here both cancellable events come first, so a cancelled
+         change raises nothing after them.
+
    :Inherited:
 
       From :cpp:class:`ContainerControl <gui_forms::ContainerControl>`: properties :cpp:func:`active_control <gui_forms::ContainerControl::active_control>`, :cpp:func:`auto_validate <gui_forms::ContainerControl::auto_validate>`, :cpp:func:`effective_auto_validate <gui_forms::ContainerControl::effective_auto_validate>`; events :cpp:func:`auto_validate_changed <gui_forms::ContainerControl::auto_validate_changed>`; methods :cpp:func:`clear_active_control <gui_forms::ContainerControl::clear_active_control>`, :cpp:func:`contains_descendant <gui_forms::ContainerControl::contains_descendant>`, :cpp:func:`request_active_control <gui_forms::ContainerControl::request_active_control>`, :cpp:func:`validate <gui_forms::ContainerControl::validate>`, :cpp:func:`validate_children <gui_forms::ContainerControl::validate_children>`.
@@ -421,6 +444,33 @@ gui_forms::TabControl
       Removing a page raises it when the selected page or its index changes,
       so removing a page before the selected one raises it although the same
       page stays selected.
+
+   .. cpp:function:: Event<TabControlCancelEvent&>& deselecting() noexcept
+
+      Raised with a :cpp:class:`TabControlCancelEvent <gui_forms::TabControlCancelEvent>` for the selected page before a
+      change of page by the user (a click, a key, the strip's list) or by
+      :cpp:func:`set_selected_index <gui_forms::TabControl::set_selected_index>` (Windows Forms' ``Deselecting``). Set ``cancel`` to keep
+      the page; nothing has changed yet.
+
+   .. cpp:function:: Event<TabControlCancelEvent&>& selecting() noexcept
+
+      Raised after :cpp:func:`deselecting <gui_forms::TabControl::deselecting>`, for the page about to be chosen (Windows
+      Forms' ``Selecting``). Set ``cancel`` to keep the selected page. A handler
+      that disposes the control or removes the page ends the change.
+
+   .. cpp:function:: Event<const TabControlEvent&>& deselected() noexcept
+
+      Raised with a :cpp:class:`TabControlEvent <gui_forms::TabControlEvent>` for the page left, once the new page is
+      shown (Windows Forms' ``Deselected``).
+
+   .. cpp:function:: Event<const TabControlEvent&>& selected() noexcept
+
+      Raised after :cpp:func:`deselected <gui_forms::TabControl::deselected>` for the page chosen (Windows Forms'
+      ``Selected``), before :cpp:func:`selected_index_changed <gui_forms::TabControl::selected_index_changed>`. The first page added, and
+      the page that replaces a removed selected page, raise only
+      :cpp:func:`selected_index_changed <gui_forms::TabControl::selected_index_changed>`. Windows Forms raises ``Deselected`` before
+      ``Selecting``; here both cancellable events come first, so a cancelled
+      change raises nothing after them.
 
 
    .. rubric:: Methods

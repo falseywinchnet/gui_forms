@@ -23,8 +23,7 @@ class HScrollBar;
 class TextBox;
 class VScrollBar;
 
-// How a ListView arranges its items (Windows Forms' View; Tile is not
-// supported yet).
+// How a ListView arranges its items (Windows Forms' View).
 //
 // - details: one row per item, with the columns' headers above and each
 //   column's text (the item's text, then its sub-items) in the row;
@@ -32,8 +31,12 @@ class VScrollBar;
 //   the right; the view scrolls sideways;
 // - small_icon: small-icon cells filled left to right, then in further rows;
 // - large_icon: large-icon cells with the text under the icon, filled left to
-//   right, then in further rows.
-enum class ListViewView : std::uint8_t { details, list, small_icon, large_icon };
+//   right, then in further rows;
+// - tile: tiles of `tile_size` filled left to right, then in further rows,
+//   each with the large icon at its left and, beside it, the item's text over
+//   one line per column after the first holding a sub-item, as far as the
+//   tile's height allows.
+enum class ListViewView : std::uint8_t { details, list, small_icon, large_icon, tile };
 
 // How a column's text sits in its cells. The first column's text always
 // starts at the left, after the check box and icon, as in Windows Forms.
@@ -56,14 +59,25 @@ struct ListViewColumn final {
 // other views); `sub_items[n]` in column n + 1 of the details view. Sub-items
 // past the last column are kept but not shown. `image_key` names an image
 // in the small image list (details, list and small-icon views) or the large
-// one (large-icon view); an empty or unknown key shows no image. `checked`
-// is shown while the view has check boxes.
+// one (large-icon and tile views); an empty or unknown key shows no image.
+// `checked` is shown while the view has check boxes. `group` names the
+// ListViewGroup the item is shown in; an empty or unknown name puts it in
+// the default group. A virtual view's items are never grouped.
 struct ListViewItem final {
     std::string stable_id{};
     std::string text{};
     std::vector<std::string> sub_items{};
     std::string image_key{};
     bool checked{};
+    std::string group{};
+};
+
+// One group of a ListView (Windows Forms' ListViewGroup): a header over its
+// items. `stable_id` is unique within the view; items name it in `group`.
+struct ListViewGroup final {
+    std::string stable_id{};
+    std::string header{};
+    ListViewAlignment header_alignment{ListViewAlignment::left};
 };
 
 // The items of a virtual ListView (Windows Forms' VirtualMode with
@@ -169,8 +183,8 @@ struct ListViewLabelEdit final {
 // over by stable ID; a virtual view keeps them by index, clamped to the new
 // count. Columns are resized by dragging a header's divider, items'
 // labels are edited in place (label_edit), and an application may draw
-// items' content itself (draw_mode). Groups, the tile view, tooltips and
-// hot-tracking activation are not supported yet.
+// items' content itself (draw_mode), and items are shown in groups (groups,
+// show_groups). Tooltips and hot-tracking activation are not supported yet.
 class ListView final : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
@@ -179,6 +193,7 @@ public:
     static constexpr std::size_t maximum_columns = 64U;
     static constexpr double minimum_column_width = 20.0;
     static constexpr double maximum_column_width = 4096.0;
+    static constexpr std::size_t maximum_groups = 4096U;
 
     explicit ListView(StableId stable_id);
     ~ListView() override;
@@ -207,6 +222,27 @@ public:
     // The index of the item with this ID in an ordinary view; none in
     // virtual mode or when no item has it.
     [[nodiscard]] std::optional<std::size_t> index_of(std::string_view item_id) const;
+
+    // Groups (Windows Forms' Groups, ShowGroups and DefaultGroup). While
+    // show_groups is on, the view has groups, it is not virtual and not the
+    // list view, it shows each group that holds items as a header line (the
+    // header's text over a rule) followed by its items, in the groups'
+    // order, after the default group of the items whose `group` is empty or
+    // names no group. Items keep their model order within a group; keys,
+    // ranges of selection and type-ahead follow the shown order. Groups do
+    // not collapse. set_groups throws std::invalid_argument for an empty or
+    // repeated ID, invalid UTF-8, an unknown alignment, or more than
+    // maximum_groups groups.
+    [[nodiscard]] std::span<const ListViewGroup> groups() const noexcept { return groups_; }
+    void set_groups(std::vector<ListViewGroup> groups);
+    [[nodiscard]] bool show_groups() const noexcept { return show_groups_; }
+    void set_show_groups(bool shown);
+    // The default group's header; "Default" until set. Throws
+    // std::invalid_argument for invalid UTF-8.
+    [[nodiscard]] const std::string& default_group_header() const noexcept { return default_group_header_; }
+    void set_default_group_header(std::string header);
+    // Whether the items are shown in groups now.
+    [[nodiscard]] bool grouped() const noexcept;
 
     // Virtual mode. Setting a source drops the ordinary items and reads the
     // source's count; null returns to an ordinary, empty view. Throws
@@ -283,11 +319,22 @@ public:
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
 
+    // The tile view's tile, in logical units at text scale 1 (Windows Forms'
+    // TileSize). The default, an empty size, sizes tiles from the large
+    // icon and three lines of text. Throws std::invalid_argument unless
+    // both sides are zero, or both are finite and between minimum_tile_side
+    // and maximum_tile_side.
+    static constexpr double minimum_tile_side = 24.0;
+    static constexpr double maximum_tile_side = 2048.0;
+    [[nodiscard]] Size tile_size() const noexcept { return tile_size_; }
+    void set_tile_size(Size size);
+
     // Content-only owner drawing (owner decision W-Q6; Windows Forms'
     // OwnerDraw with DrawItem and DrawSubItem). In ItemDrawMode::owner_draw
     // the view raises draw_item_content for each painted item's own content
     // (column 0: its icon and text) and, in the details view, for each
-    // visible sub-item cell (its column), in paint order; the item's plate,
+    // visible sub-item cell (its column), and in the tile view for each
+    // sub-item line shown (its column), in paint order; the item's plate,
     // check box and focus cue stay painted by role, and a handler's
     // draw_default adds the default content. Column headers are not
     // owner-drawn. A handler that changes the view's items, order, columns
@@ -477,6 +524,27 @@ public:
     };
     [[nodiscard]] std::vector<Column> realized_columns() const;
 
+    // The "group" item system: one shown group header line. Its identity is
+    // the view's stable ID, ".group.", and the group's ID; the default
+    // group's is the view's stable ID and ".default_group". `index` is the
+    // group's position in groups(), or groups().size() for the default
+    // group.
+    struct GroupParts final {
+        PartGeometry group_band;
+        PartGeometry group_caption;
+        PartGeometry group_divider;
+    };
+    struct GroupStates final {
+        bool disabled{};
+    };
+    struct Group final {
+        std::size_t index{};
+        std::string stable_id;
+        GroupParts parts;
+        GroupStates states;
+    };
+    [[nodiscard]] std::vector<Group> realized_groups() const;
+
 protected:
     void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_attached_to_window() override;
@@ -485,6 +553,14 @@ protected:
     void publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const override;
 
 private:
+    // One group shown by a grouped view, in display order: a header line
+    // and then the lines of its items.
+    struct GroupBand final {
+        std::size_t group{};      // its position in groups_, or groups_.size() for the default group
+        std::size_t first{};      // its first item's display position
+        std::size_t count{};      // its items
+        std::size_t first_line{}; // its header line
+    };
     // Where everything sits for the current bounds, view and model, from one
     // pass (see layout()). A "line" is the unit the view scrolls by: a row
     // of the details and icon views, a column of items in the list view.
@@ -497,6 +573,8 @@ private:
         Rect corner{};          // between two shown bars
         double scale{1.0};
         double row_height{};    // details, list and small-icon rows
+        double text_line{};     // one line of the font's text
+        std::size_t tile_lines{1U}; // the lines of text a tile has room for
         Size cell{};            // one item's cell; a details row spans the columns
         double columns_width{}; // the details columns' total scaled width
         double horizontal_offset{}; // clamped, logical units
@@ -506,6 +584,11 @@ private:
         std::size_t page_lines{1U}; // fully visible lines
         std::size_t visible_lines{}; // lines at least partly visible
         std::size_t top_line{};     // clamped
+        // A grouped view's groups and header line extent; a grouped view's
+        // lines differ in extent, so its offsets come from line_offset().
+        bool grouped{};
+        double header_extent{};
+        std::vector<GroupBand> bands{};
     };
     // Which part of the view a point is on.
     enum class HitZone : std::uint8_t { none, item, check, header, divider };
@@ -520,7 +603,39 @@ private:
     [[nodiscard]] double text_line_height() const;
     [[nodiscard]] Size icon_size(bool large) const noexcept;
     [[nodiscard]] std::size_t maximum_top_line(const Layout& placed) const noexcept;
-    // The realized items: model indices [first, end).
+    // Display positions: the order the items are shown in. Ungrouped, a
+    // position is the item's index.
+    void refresh_display_order() const;
+    [[nodiscard]] std::size_t index_at(const Layout& placed, std::size_t position) const noexcept;
+    [[nodiscard]] std::size_t position_of(const Layout& placed, std::size_t index) const noexcept;
+    // A grouped view's lines.
+    void place_groups(Layout& placed) const;
+    [[nodiscard]] std::size_t band_of_line(const Layout& placed, std::size_t line) const noexcept;
+    [[nodiscard]] std::size_t band_of_position(const Layout& placed, std::size_t position) const noexcept;
+    [[nodiscard]] bool header_line(const Layout& placed, std::size_t line) const noexcept;
+    // The first display position on an item line, and its item count.
+    [[nodiscard]] std::size_t line_first(const Layout& placed, std::size_t line) const noexcept;
+    [[nodiscard]] std::size_t line_items(const Layout& placed, std::size_t line) const noexcept;
+    [[nodiscard]] std::size_t position_line(const Layout& placed, std::size_t position) const noexcept;
+    // The extent of the lines before `line`, along the scroll.
+    [[nodiscard]] double line_offset(const Layout& placed, std::size_t line) const noexcept;
+    // The line holding an offset along the scroll, the last when past it.
+    [[nodiscard]] std::size_t line_at_offset(const Layout& placed, double offset) const noexcept;
+    // The item line after (forward) or before `line`, skipping headers;
+    // `line` itself at an end.
+    [[nodiscard]] std::size_t next_item_line(const Layout& placed, std::size_t line, bool forward) const noexcept;
+    // Scrolls so `line` is the top line.
+    void store_top_line(const Layout& placed, std::size_t line);
+    [[nodiscard]] std::optional<std::size_t> grouped_navigation_target(std::uint32_t key, std::size_t from,
+                                                                       const Layout& placed) const;
+    [[nodiscard]] std::size_t realized_group_count(const Layout& placed) const noexcept;
+    // The band of the realized group at `position` among the shown headers.
+    [[nodiscard]] std::size_t realized_group_band(const Layout& placed, std::size_t position) const noexcept;
+    [[nodiscard]] GroupParts group_parts(const Layout& placed, std::size_t band, Rect clip) const;
+    [[nodiscard]] std::string group_identity(std::size_t group) const;
+    [[nodiscard]] const std::string& group_header(std::size_t group) const noexcept;
+    void paint_group(Painter& painter, const Layout& placed, std::size_t band);
+    // The realized items: display positions [first, end).
     [[nodiscard]] std::size_t first_realized(const Layout& placed) const noexcept;
     [[nodiscard]] std::size_t end_realized(const Layout& placed) const noexcept;
     [[nodiscard]] Rect item_bounds(const Layout& placed, std::size_t index) const noexcept;
@@ -561,6 +676,8 @@ private:
     // Paints one item; false when an owner-draw handler changed the model
     // or disposed the view, so that the paint stops.
     [[nodiscard]] bool paint_item(Painter& painter, const Layout& placed, std::size_t index);
+    [[nodiscard]] bool paint_tile_lines(Painter& painter, const Layout& placed, std::size_t index,
+                                        const ItemParts& parts, AnatomyStateSet states);
     // Whether the view is alive and its model is the one `revision` named
     // before an owner-draw handler ran.
     [[nodiscard]] bool model_unchanged(std::uint64_t revision) const noexcept;
@@ -648,8 +765,22 @@ private:
     std::optional<std::size_t> resizing_column_{};
     double resize_start_x_{};
     double resize_start_width_{};
-    // The first visible item; the layout shows the line holding it.
+    // The first visible item's display position; the layout shows the line
+    // holding it, or with top_header_ its group's header line above it.
     std::size_t top_item_{};
+    bool top_header_{};
+    std::vector<ListViewGroup> groups_{};
+    std::string default_group_header_{"Default"};
+    bool show_groups_{true};
+    // The grouped display order, rebuilt when model_revision_ moves:
+    // display_order_[position] is an index, display_position_[index] a
+    // position, and display_counts_[group] the items of each group in
+    // groups_ (the default group's last).
+    mutable std::vector<std::size_t> display_order_{};
+    mutable std::vector<std::size_t> display_position_{};
+    mutable std::vector<std::size_t> display_counts_{};
+    mutable std::uint64_t display_revision_{};
+    mutable bool display_valid_{};
     double horizontal_offset_{};
     ListViewView view_{ListViewView::details};
     std::optional<std::size_t> sort_column_{};
@@ -664,6 +795,7 @@ private:
     bool focused_{};
     bool synchronizing_scroll_{};
     FontSpec font_{FontRole::content, 10.5, 400, false};
+    Size tile_size_{};
     std::shared_ptr<ImageList> small_images_{};
     std::shared_ptr<ImageList> large_images_{};
     SubscriptionToken small_images_changed_{};

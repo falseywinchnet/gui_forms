@@ -1,10 +1,10 @@
-A list of items shown as details rows, a list, small icons or large icons.
+A list of items shown as details rows, a list, small icons, large icons or tiles.
 
 A list view shows records described by `ListViewItem`: a stable ID, the
 item's text, its sub-items (the further columns of the details view), an
 image key and a checked state. The details view shows `ListViewColumn`
-headers above the rows; the list, small-icon and large-icon views show one
-cell per item. Only the visible items are laid out, painted and described to
+headers above the rows; the list, small-icon, large-icon and tile views show
+one cell per item. Only the visible items are laid out, painted and described to
 accessibility. In virtual mode the application keeps the items and the view
 asks a `ListViewItemSource` for the visible ones only, so a list of millions
 of rows costs a screenful.
@@ -21,8 +21,11 @@ Properties
 ----------
 view : default ``ListViewView::details``
     How the items are arranged: ``details``, ``list`` (columns filled top to
-    bottom, scrolled sideways), ``small_icon`` or ``large_icon`` (rows
-    filled left to right).
+    bottom, scrolled sideways), ``small_icon``, ``large_icon`` or ``tile``
+    (rows filled left to right). A tile shows the large icon at its left
+    and, beside it, the item's text over one line for each column after the
+    first whose sub-item is not empty, as many as the tile's height has
+    room for; the block of lines is centred on the tile.
 columns
     The details view's columns. `set_columns` replaces them and throws
     `std::invalid_argument` for an empty or repeated ID, invalid UTF-8, a
@@ -42,6 +45,19 @@ virtual_mode
 virtual_source
     The source, or null. `set_virtual_source` drops the ordinary items,
     clears the selection and reads the source's count.
+groups
+    The groups (`ListViewGroup`: an ID, a header and its alignment). Items
+    name their group in `ListViewItem::group`. `set_groups` throws
+    `std::invalid_argument` for an empty or repeated ID, invalid UTF-8, an
+    unknown alignment, or more than `maximum_groups` groups.
+show_groups : default ``true``
+    Whether the view shows its items in groups while it has groups. Groups
+    are not shown in the list view or in virtual mode.
+default_group_header : default ``"Default"``
+    The header of the default group, which holds the items whose group is
+    empty or names no group. Invalid UTF-8 throws `std::invalid_argument`.
+grouped
+    Whether the items are shown in groups now.
 check_boxes : default ``false``
     Whether each item shows a check box.
 multi_select : default ``true``
@@ -69,9 +85,16 @@ small_image_list
     The images of the details, list and small-icon views, looked up by
     each item's `image_key`. Without it those views show no icons.
 large_image_list
-    The images of the large-icon view.
+    The images of the large-icon and tile views.
 font
     The font of item and header text.
+tile_size : default empty (automatic)
+    The tile view's tile, in logical units at text scale 1 (Windows Forms'
+    `TileSize`). An empty size makes tiles as wide as the large icon and
+    168 units of text, and as tall as the icon or three lines of text,
+    whichever is taller. `set_tile_size` throws `std::invalid_argument`
+    unless both sides are zero, or both are finite and between
+    `minimum_tile_side` and `maximum_tile_side`.
 draw_mode : default ``ItemDrawMode::normal``
     With ``ItemDrawMode::owner_draw`` the application draws the items'
     content (Windows Forms' `OwnerDraw`): see `draw_item_content`. Throws
@@ -93,6 +116,8 @@ realized_sub_items
     The visible details cells past the first column.
 realized_columns
     The visible column headers.
+realized_groups
+    The visible group header lines: each group's band, caption and rule.
 
 Events
 ------
@@ -100,7 +125,8 @@ draw_item_content
     Raised while the view paints in the owner-draw mode, with an
     `ItemContentPaint`: once for each painted item's own content (column 0,
     its icon and text area) and, in the details view, once for each visible
-    sub-item cell (its column), in paint order (Windows Forms' `DrawItem` and
+    sub-item cell (its column), and in the tile view once for each sub-item
+    line shown (its column), in paint order (Windows Forms' `DrawItem` and
     `DrawSubItem`). The painter is clipped to the content rectangle; the
     item's plate, check box and focus cue are already painted by role.
     `text` and `font` are the default content's. Set `draw_default` to add
@@ -263,9 +289,21 @@ sub-item text. In the other views the items are `list_item`, or
 The select action selects an item; press activates it, or toggles a
 check-box item.
 
-Not supported yet: groups, the tile view, item tooltips, hot-tracking
-activation, column reordering, type-ahead in virtual mode, and wrapping
-large-icon labels over two lines.
+In a grouped view each group that holds items has a header line: its
+header in bold, aligned as the group asks, over a rule across the view.
+The default group comes first, then the groups in their order; a group
+without items is not shown. A group always starts a new line, and the
+items keep their model order within it. Up and Down move to the item line
+above or below, across headers, and Left and Right through the shown
+order in the icon and tile views; a Shift range, Home, End and type-ahead
+follow the shown order. Accessibility publishes each shown group as a
+``group`` node, named by its header, holding its items; details rows count
+in the shown order. Groups do not collapse, and group footers, subtitles
+and task links are not provided.
+
+Not supported yet: item tooltips, hot-tracking activation, column
+reordering, type-ahead in virtual mode, and wrapping large-icon labels
+over two lines.
 
 Examples
 --------
