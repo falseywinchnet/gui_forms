@@ -519,7 +519,7 @@ void groups() {
     require((*view).show_groups() && (*view).grouped() && (*view).default_group_header() == "Default",
             "a view with groups shows them by default");
     const std::vector<ListView::Group> groups = (*view).realized_groups();
-    require(groups.size() == 3U && groups[0].index == 3U && groups[0].stable_id == "list.default_group" &&
+    require(groups.size() == 3U && groups[0].index == 3U && groups[0].stable_id == "list.default-group" &&
                 groups[1].index == 0U && groups[1].stable_id == "list.group.a" && groups[2].index == 1U &&
                 groups[2].stable_id == "list.group.b",
             "the default group comes first, then the groups that hold items, in order");

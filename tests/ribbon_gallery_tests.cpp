@@ -116,7 +116,7 @@ bool key(Window& window, std::uint32_t physical) {
 }
 
 std::shared_ptr<RibbonGallery> in_ribbon_gallery(const char* id, std::size_t count) {
-    std::shared_ptr<RibbonGallery> gallery = make_control<RibbonGallery>(StableId(id));
+    std::shared_ptr<RibbonGallery> gallery = make_control<RibbonGallery>(StableId(std::string(id)));
     (*gallery).set_item_size({40.0, 40.0});
     (*gallery).set_visible_rows(2U);
     (*gallery).set_column_range(3U, 6U);

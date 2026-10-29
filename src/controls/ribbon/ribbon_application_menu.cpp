@@ -324,7 +324,7 @@ std::vector<SemanticNode> RibbonApplicationMenu::semantic_virtual_children() con
     if (!ribbon_alive()) return nodes;
     const Ribbon& ribbon = *ribbon_;
     const Layout placed = layout();
-    const std::string menu_id = std::string(ribbon.stable_id().value()) + ".application_menu";
+    const std::string menu_id = std::string(ribbon.stable_id().value()) + ".application-menu";
     std::size_t commands = 0U;
     std::size_t recent = 0U;
     for (const Row& row : placed.rows) {

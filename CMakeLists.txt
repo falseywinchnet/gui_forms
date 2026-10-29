@@ -2263,6 +2263,10 @@ if(GUI_FORMS_BUILD_TESTS)
             COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/owned_event_compile_failures.py
                 ${GUI_FORMS_REFERENCE_CLANG} ${CMAKE_CURRENT_SOURCE_DIR}/include)
+        add_test(NAME gui_forms_stable_id_compile_failures
+            COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/stable_id_compile_failures.py
+                ${GUI_FORMS_REFERENCE_CLANG} ${CMAKE_CURRENT_SOURCE_DIR}/include)
         add_test(NAME gui_forms_api_reference_tests
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/api_reference_tests.py)
         # The include directories a consumer of the public headers compiles

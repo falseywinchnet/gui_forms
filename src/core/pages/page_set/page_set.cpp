@@ -1,5 +1,7 @@
 #include "gui_forms/pages/page_set/page_set.hpp"
 
+#include "gui_forms/control/stable_id/stable_id.hpp"
+
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
@@ -99,6 +101,9 @@ PageEditStatus PageSet::validate_entry(const PageRecord& record,
                                        PagePlacement placement) const {
     if (record.id.value.empty()) {
         return PageEditStatus::empty_id;
+    }
+    if (!valid_stable_id(record.id.value)) {
+        return PageEditStatus::invalid_id;
     }
     if (find(record.id).has_value()) {
         return PageEditStatus::duplicate_page;

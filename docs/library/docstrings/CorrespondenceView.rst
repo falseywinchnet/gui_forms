@@ -22,8 +22,8 @@ stable_id
 Properties
 ----------
 items
-    The records in display order. Empty by default. IDs must be nonempty,
-    unique and valid UTF-8, every text field valid UTF-8, and every
+    The records in display order. Empty by default. IDs must be unique and
+    follow the `StableId` segment rule, every text field valid UTF-8, and every
     information tag and emphasis term nonempty, or `set_items` throws
     `std::invalid_argument`. Replacing the records keeps the selected,
     focused and pinned IDs that are still present, ends any hover

@@ -180,6 +180,8 @@ Related types
      - RuntimeId is the monotonic process-local identity used for exact retained instances and child operations.
    * - :cpp:class:`SizeValue <gui_forms::SizeValue>`
      -  
+   * - :cpp:class:`StableIdLiteral <gui_forms::StableIdLiteral>`
+     - A stable ID written as a string literal, checked when the program is compiled.
    * - :cpp:class:`StateField <gui_forms::StateField>`
      - One member of a states record and the standard state it reports.
    * - :cpp:class:`StaticNode <gui_forms::StaticNode>`
@@ -1743,6 +1745,24 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: StableIdLiteral final
+
+   ``#include <gui_forms/control/stable_id/stable_id.hpp>``
+
+   A stable ID written as a string literal, checked when the program is compiled. It borrows the literal's static storage.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: template <std::size_t Size> consteval StableIdLiteral(const char (&literal)[Size])
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: constexpr std::string_view value() const noexcept
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: template <typename Record> StateField final
 
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
@@ -2702,6 +2722,14 @@ Functions, constants and aliases
 .. cpp:function:: constexpr bool has_anchor(AnchorStyles value, AnchorStyles flag) noexcept
 
 .. cpp:function:: template <typename ControlType, typename... Arguments> std::shared_ptr<ControlType> make_control(StableId stable_id, Arguments&&... arguments)
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/control/stable_id/stable_id.hpp>``
+
+.. cpp:function:: constexpr bool valid_stable_id(std::string_view value) noexcept
+
+   Whether ``value`` is a stable ID: one or more segments separated by '.', each one or more runs of lowercase ASCII letters and digits joined by single '-' ([a-z0-9]+(-[a-z0-9]+)*). The dots are hierarchy; theme selectors and locale files name controls by these segments.
 
 .. cpp:namespace:: gui_forms
 

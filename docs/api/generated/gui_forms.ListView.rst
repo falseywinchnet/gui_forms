@@ -28,9 +28,9 @@ gui_forms::ListView
 
       **stable_id** : ``StableId``
          Identity of the view, unique within its window. Its scroll bars are
-         child controls named ``<stable_id>.vertical_scroll_bar`` and
-         ``<stable_id>.horizontal_scroll_bar``; the label editor, made on the
-         view's first label edit, is ``<stable_id>.label_editor``.
+         child controls named ``<stable_id>.vertical-scroll-bar`` and
+         ``<stable_id>.horizontal-scroll-bar``; the label editor, made on the
+         view's first label edit, is ``<stable_id>.label-editor``.
 
    :Properties:
 
@@ -44,16 +44,17 @@ gui_forms::ListView
 
       **columns** : ``std::span<const ListViewColumn>``
          The details view's columns. :cpp:func:`set_columns <gui_forms::ListView::set_columns>` replaces them and throws
-         ``std::invalid_argument`` for an empty or repeated ID, invalid UTF-8, a
-         width outside ``minimum_column_width`` and ``maximum_column_width``, or more
-         than ``maximum_columns`` columns. The details view shows nothing without
-         columns.
+         ``std::invalid_argument`` for a repeated ID or one that breaks the
+         :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8, a width outside
+         ``minimum_column_width`` and ``maximum_column_width``, or more than
+         ``maximum_columns`` columns. The details view shows nothing without columns.
 
       **items** : ``std::span<const ListViewItem>``
          The items of an ordinary view; empty in virtual mode. :cpp:func:`set_items <gui_forms::ListView::set_items>`
          replaces them, keeps the selection, the focused item and the anchor on
-         their items by stable ID, and throws ``std::invalid_argument`` for an empty
-         or repeated ID or invalid UTF-8, and ``std::logic_error`` in virtual mode.
+         their items by stable ID, and throws ``std::invalid_argument`` for a
+         repeated ID or one that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule or invalid
+         UTF-8, and ``std::logic_error`` in virtual mode.
 
       **item_count** : ``std::size_t``, read-only
          The number of items: the ordinary items, or the count the source last
@@ -62,8 +63,9 @@ gui_forms::ListView
       **groups** : ``std::span<const ListViewGroup>``
          The groups (:cpp:class:`ListViewGroup <gui_forms::ListViewGroup>`: an ID, a header and its alignment). Items
          name their group in ``ListViewItem::group``. :cpp:func:`set_groups <gui_forms::ListView::set_groups>` throws
-         ``std::invalid_argument`` for an empty or repeated ID, invalid UTF-8, an
-         unknown alignment, or more than ``maximum_groups`` groups.
+         ``std::invalid_argument`` for a repeated ID or one that breaks the
+         :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8, an unknown alignment, or more than
+         ``maximum_groups`` groups.
 
       **show_groups** : ``bool``, default ``true``
          Whether the view shows its items in groups while it has groups. Groups
@@ -402,10 +404,10 @@ gui_forms::ListView
    .. cpp:function:: std::span<const ListViewColumn> columns() const noexcept
 
       The details view's columns. :cpp:func:`set_columns <gui_forms::ListView::set_columns>` replaces them and throws
-      ``std::invalid_argument`` for an empty or repeated ID, invalid UTF-8, a
-      width outside ``minimum_column_width`` and ``maximum_column_width``, or more
-      than ``maximum_columns`` columns. The details view shows nothing without
-      columns.
+      ``std::invalid_argument`` for a repeated ID or one that breaks the
+      :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8, a width outside
+      ``minimum_column_width`` and ``maximum_column_width``, or more than
+      ``maximum_columns`` columns. The details view shows nothing without columns.
 
    .. cpp:function:: void set_columns(std::vector<ListViewColumn> columns)
 
@@ -415,8 +417,9 @@ gui_forms::ListView
 
       The items of an ordinary view; empty in virtual mode. :cpp:func:`set_items <gui_forms::ListView::set_items>`
       replaces them, keeps the selection, the focused item and the anchor on
-      their items by stable ID, and throws ``std::invalid_argument`` for an empty
-      or repeated ID or invalid UTF-8, and ``std::logic_error`` in virtual mode.
+      their items by stable ID, and throws ``std::invalid_argument`` for a
+      repeated ID or one that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule or invalid
+      UTF-8, and ``std::logic_error`` in virtual mode.
 
    .. cpp:function:: void set_items(std::vector<ListViewItem> items)
 
@@ -431,8 +434,9 @@ gui_forms::ListView
 
       The groups (:cpp:class:`ListViewGroup <gui_forms::ListViewGroup>`: an ID, a header and its alignment). Items
       name their group in ``ListViewItem::group``. :cpp:func:`set_groups <gui_forms::ListView::set_groups>` throws
-      ``std::invalid_argument`` for an empty or repeated ID, invalid UTF-8, an
-      unknown alignment, or more than ``maximum_groups`` groups.
+      ``std::invalid_argument`` for a repeated ID or one that breaks the
+      :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8, an unknown alignment, or more than
+      ``maximum_groups`` groups.
 
    .. cpp:function:: void set_groups(std::vector<ListViewGroup> groups)
 

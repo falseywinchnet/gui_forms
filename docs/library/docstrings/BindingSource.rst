@@ -20,13 +20,14 @@ Properties
 ----------
 records
     The records, in order. `set_records(records, metadata_changed = false)`
-    replaces them all. Every record needs a nonempty stable ID, unique in the
-    list, and its field and error names must not collide after trimming and
+    replaces them all. Every record needs a stable ID, unique in the list and
+    following the `StableId` segment rule (a bound grid names its row after
+    it), and its field and error names must not collide after trimming and
     ASCII case folding; otherwise `std::invalid_argument` is thrown and
     nothing changes. The record with the previous current stable ID stays
     current; otherwise the first record becomes current. It raises
-    `data_source_changed`, then `list_changed` with `reset`, then the
-    position events if the current record changed.
+    `data_source_changed`, then `list_changed` with `reset`, then the position
+    events if the current record changed.
 count
     The number of records.
 position : default ``-1``

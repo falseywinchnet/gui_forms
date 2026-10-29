@@ -35,13 +35,14 @@ gui_forms::BindingSource
 
       **records** : ``std::span<const BindingRecord>``
          The records, in order. ``set_records(records, metadata_changed = false)``
-         replaces them all. Every record needs a nonempty stable ID, unique in the
-         list, and its field and error names must not collide after trimming and
+         replaces them all. Every record needs a stable ID, unique in the list and
+         following the :cpp:class:`StableId <gui_forms::StableId>` segment rule (a bound grid names its row after
+         it), and its field and error names must not collide after trimming and
          ASCII case folding; otherwise ``std::invalid_argument`` is thrown and
          nothing changes. The record with the previous current stable ID stays
          current; otherwise the first record becomes current. It raises
-         :cpp:func:`data_source_changed <gui_forms::BindingSource::data_source_changed>`, then :cpp:func:`list_changed <gui_forms::BindingSource::list_changed>` with ``reset``, then the
-         position events if the current record changed.
+         :cpp:func:`data_source_changed <gui_forms::BindingSource::data_source_changed>`, then :cpp:func:`list_changed <gui_forms::BindingSource::list_changed>` with ``reset``, then the position
+         events if the current record changed.
 
       **count** : ``std::size_t``, read-only
          The number of records.
@@ -280,13 +281,14 @@ gui_forms::BindingSource
    .. cpp:function:: std::span<const BindingRecord> records() const noexcept
 
       The records, in order. ``set_records(records, metadata_changed = false)``
-      replaces them all. Every record needs a nonempty stable ID, unique in the
-      list, and its field and error names must not collide after trimming and
+      replaces them all. Every record needs a stable ID, unique in the list and
+      following the :cpp:class:`StableId <gui_forms::StableId>` segment rule (a bound grid names its row after
+      it), and its field and error names must not collide after trimming and
       ASCII case folding; otherwise ``std::invalid_argument`` is thrown and
       nothing changes. The record with the previous current stable ID stays
       current; otherwise the first record becomes current. It raises
-      :cpp:func:`data_source_changed <gui_forms::BindingSource::data_source_changed>`, then :cpp:func:`list_changed <gui_forms::BindingSource::list_changed>` with ``reset``, then the
-      position events if the current record changed.
+      :cpp:func:`data_source_changed <gui_forms::BindingSource::data_source_changed>`, then :cpp:func:`list_changed <gui_forms::BindingSource::list_changed>` with ``reset``, then the position
+      events if the current record changed.
 
    .. cpp:function:: void set_records(std::vector<BindingRecord> records, bool metadata_changed = false)
 

@@ -49,9 +49,10 @@ void BackstageView::set_items(std::vector<BackstageItemSpec> items) {
     std::unordered_set<std::string> identities{};
     std::unordered_set<const Control*> pages{};
     for (const BackstageItemSpec& item : items) {
-        if (item.stable_id.empty() || !validate_utf8(item.stable_id).valid() || !validate_utf8(item.text).valid() ||
+        if (!valid_stable_id(item.stable_id) || !validate_utf8(item.text).valid() ||
             !identities.insert(item.stable_id).second) {
-            throw std::invalid_argument("BackstageView items require unique stable IDs and valid UTF-8");
+            throw std::invalid_argument(
+                "BackstageView items require unique stable IDs following the StableId segment rule and valid UTF-8");
         }
         if (item.kind == BackstageItemKind::command && (!item.command || item.page)) {
             throw std::invalid_argument("BackstageView commands require a Command and take no page");

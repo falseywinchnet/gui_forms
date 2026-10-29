@@ -13,8 +13,8 @@ its top-level items.
 Parameters
 ----------
 stable_id
-    Identity of the menu, a nonempty UTF-8 string, or the constructor throws
-    `std::invalid_argument`. The popup's controls are named after it:
+    Identity of the menu, following the `StableId` segment rule, or the
+    constructor throws `std::invalid_argument`. The popup's controls are named after it:
     ``<stable_id>.popup.panel.<depth>`` for each open menu level and
     ``<stable_id>.popup.row.<item id>`` for each row.
 
@@ -25,7 +25,8 @@ stable_id
 items
     The menu's item tree; empty by default. `set_items` validates the whole
     tree before changing anything and throws `std::invalid_argument` unless
-    every item has a nonempty stable ID that is unique in the tree and valid
+    every item has a stable ID that is unique in the tree and follows the
+    `StableId` segment rule (its row's control is named after it), and valid
     UTF-8 text; a separator has no command and no children; a submenu has
     text and children but no command; every other item has exactly one
     command and no children; nesting is at most 8 levels deep; and there are

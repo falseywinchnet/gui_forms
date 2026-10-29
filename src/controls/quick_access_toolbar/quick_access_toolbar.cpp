@@ -81,9 +81,13 @@ void QuickAccessToolbar::set_commands(std::vector<QuickAccessToolbarCommand> com
     }
     std::unordered_set<std::string> ids{};
     for (const QuickAccessToolbarCommand& declared : commands) {
-        if (!declared.command || (*declared.command).stable_id().empty() ||
+        // Toolbar items and customize rows carry the command ID in a
+        // StableId, so it follows the StableId segment rule.
+        if (!declared.command || !valid_stable_id((*declared.command).stable_id()) ||
             !ids.insert((*declared.command).stable_id()).second) {
-            throw std::invalid_argument("QuickAccessToolbar commands require unique, non-empty command IDs");
+            throw std::invalid_argument(
+                "QuickAccessToolbar commands require unique command IDs of '.'-separated lowercase dash "
+                "segments");
         }
     }
     close_customize_menu();

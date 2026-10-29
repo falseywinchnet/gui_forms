@@ -285,6 +285,8 @@ Enumerations
 
    .. cpp:enumerator:: empty_id
 
+   .. cpp:enumerator:: invalid_id
+
    .. cpp:enumerator:: unknown_page
 
    .. cpp:enumerator:: duplicate_page

@@ -36,10 +36,11 @@ gui_forms::MenuStrip
          The top-level menus, empty by default. Each :cpp:class:`MenuStripItemSpec <gui_forms::MenuStripItemSpec>` has a
          stable ID, the text shown on the bar, its menu's :cpp:class:`MenuItemSpec <gui_forms::MenuItemSpec>` items, and
          ``enabled`` and ``visible`` flags. :cpp:func:`set_items <gui_forms::MenuStrip::set_items>` throws ``std::invalid_argument``
-         unless every top-level item has a nonempty, unique stable ID, nonempty
-         text, both valid UTF-8, and at least one menu item, and each menu is a
-         valid :cpp:class:`ContextMenu <gui_forms::ContextMenu>` item tree. Replacing the items closes an open menu and
-         clears :cpp:func:`selected_item_id <gui_forms::MenuStrip::selected_item_id>` if that item is gone or hidden.
+         unless every top-level item has a unique stable ID following the
+         :cpp:class:`StableId <gui_forms::StableId>` segment rule, nonempty valid UTF-8 text, and at least one menu
+         item, and each menu is a valid :cpp:class:`ContextMenu <gui_forms::ContextMenu>` item tree. Replacing the
+         items closes an open menu and clears :cpp:func:`selected_item_id <gui_forms::MenuStrip::selected_item_id>` if that item is
+         gone or hidden.
 
       **use_mnemonic** : ``bool``, default ``true``
          Whether an ``&`` in an item's text marks its mnemonic. When false, the
@@ -209,10 +210,11 @@ gui_forms::MenuStrip
       The top-level menus, empty by default. Each :cpp:class:`MenuStripItemSpec <gui_forms::MenuStripItemSpec>` has a
       stable ID, the text shown on the bar, its menu's :cpp:class:`MenuItemSpec <gui_forms::MenuItemSpec>` items, and
       ``enabled`` and ``visible`` flags. :cpp:func:`set_items <gui_forms::MenuStrip::set_items>` throws ``std::invalid_argument``
-      unless every top-level item has a nonempty, unique stable ID, nonempty
-      text, both valid UTF-8, and at least one menu item, and each menu is a
-      valid :cpp:class:`ContextMenu <gui_forms::ContextMenu>` item tree. Replacing the items closes an open menu and
-      clears :cpp:func:`selected_item_id <gui_forms::MenuStrip::selected_item_id>` if that item is gone or hidden.
+      unless every top-level item has a unique stable ID following the
+      :cpp:class:`StableId <gui_forms::StableId>` segment rule, nonempty valid UTF-8 text, and at least one menu
+      item, and each menu is a valid :cpp:class:`ContextMenu <gui_forms::ContextMenu>` item tree. Replacing the
+      items closes an open menu and clears :cpp:func:`selected_item_id <gui_forms::MenuStrip::selected_item_id>` if that item is
+      gone or hidden.
 
    .. cpp:function:: void set_items(std::vector<MenuStripItemSpec> items)
 

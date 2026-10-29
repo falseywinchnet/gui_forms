@@ -34,7 +34,9 @@ gui_forms::ToolStrip
 
       **items** : ``std::vector<ToolStripItemSpec>``
          The items, in strip order. :cpp:func:`set_items <gui_forms::ToolStrip::set_items>` replaces them and throws
-         ``std::invalid_argument`` for an empty or repeated ID, invalid UTF-8, a
+         ``std::invalid_argument`` for a repeated ID or one that breaks the
+         :cpp:class:`StableId <gui_forms::StableId>` segment rule (hosted controls and overflow menu rows are named
+         after it), invalid UTF-8, a
          menu on an item that has none, a drop-down or split button without one,
          a menu item ID that repeats an item ID, a hosted item with a command or
          check, choices on an item that is not a combo box, or a width outside 0
@@ -202,7 +204,9 @@ gui_forms::ToolStrip
    .. cpp:function:: const std::vector<ToolStripItemSpec>& items() const noexcept
 
       The items, in strip order. :cpp:func:`set_items <gui_forms::ToolStrip::set_items>` replaces them and throws
-      ``std::invalid_argument`` for an empty or repeated ID, invalid UTF-8, a
+      ``std::invalid_argument`` for a repeated ID or one that breaks the
+      :cpp:class:`StableId <gui_forms::StableId>` segment rule (hosted controls and overflow menu rows are named
+      after it), invalid UTF-8, a
       menu on an item that has none, a drop-down or split button without one,
       a menu item ID that repeats an item ID, a hosted item with a command or
       check, choices on an item that is not a combo box, or a width outside 0

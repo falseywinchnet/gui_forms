@@ -386,6 +386,39 @@ void test_context_menu_scroll_and_validation_bounds() {
             "menu model validation must reject duplicate stable identities");
 }
 
+// Item IDs that become part of a StableId are checked when they are set,
+// not later, when a popup row or hosted control is made from them.
+void test_item_ids_follow_the_stable_id_segment_rule() {
+    bool identity_refused{};
+    try {
+        const ContextMenu refused_menu("menu_id");
+    } catch (const std::invalid_argument&) {
+        identity_refused = true;
+    }
+    require(identity_refused, "a ContextMenu identity follows the segment rule");
+
+    ContextMenu menu("rule.menu");
+    const std::shared_ptr<Command> copy = std::make_shared<Command>("rule.copy", "Copy");
+    bool menu_item_refused{};
+    try {
+        menu.set_items({{"copy_path", MenuItemKind::command, copy}});
+    } catch (const std::invalid_argument&) {
+        menu_item_refused = true;
+    }
+    require(menu_item_refused, "a menu item ID follows the segment rule");
+    menu.set_items({{"copy-path", MenuItemKind::command, copy}});
+
+    const std::shared_ptr<ToolStrip> strip = make_control<ToolStrip>(StableId("rule.strip"));
+    bool strip_item_refused{};
+    try {
+        (*strip).set_items({{.stable_id = "move_first", .kind = ToolStripItemKind::label, .text = "First"}});
+    } catch (const std::invalid_argument&) {
+        strip_item_refused = true;
+    }
+    require(strip_item_refused, "a ToolStrip item ID follows the segment rule, since overflow rows carry it");
+    (*strip).set_items({{.stable_id = "move-first", .kind = ToolStripItemKind::label, .text = "First"}});
+}
+
 void test_menu_strip_retained_switching_commands_and_semantics() {
     std::shared_ptr<gui_forms::TableLayoutPanelCompat> root = make_control<TableLayoutPanelCompat>(StableId("menustrip.root"));
     (*root).set_column_count(1U);
@@ -791,6 +824,7 @@ int main() {
     try {
         test_context_menu_command_snapshot_keyboard_nesting_and_restore();
         test_context_menu_scroll_and_validation_bounds();
+        test_item_ids_follow_the_stable_id_segment_rule();
         test_menu_strip_retained_switching_commands_and_semantics();
         test_menu_mnemonics_strip_markers_and_popup_activation();
         test_menu_plain_letter_mnemonics();

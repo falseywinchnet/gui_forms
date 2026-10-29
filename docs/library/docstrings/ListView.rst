@@ -13,9 +13,9 @@ Parameters
 ----------
 stable_id
     Identity of the view, unique within its window. Its scroll bars are
-    child controls named ``<stable_id>.vertical_scroll_bar`` and
-    ``<stable_id>.horizontal_scroll_bar``; the label editor, made on the
-    view's first label edit, is ``<stable_id>.label_editor``.
+    child controls named ``<stable_id>.vertical-scroll-bar`` and
+    ``<stable_id>.horizontal-scroll-bar``; the label editor, made on the
+    view's first label edit, is ``<stable_id>.label-editor``.
 
 Properties
 ----------
@@ -28,15 +28,16 @@ view : default ``ListViewView::details``
     room for; the block of lines is centred on the tile.
 columns
     The details view's columns. `set_columns` replaces them and throws
-    `std::invalid_argument` for an empty or repeated ID, invalid UTF-8, a
-    width outside `minimum_column_width` and `maximum_column_width`, or more
-    than `maximum_columns` columns. The details view shows nothing without
-    columns.
+    `std::invalid_argument` for a repeated ID or one that breaks the
+    `StableId` segment rule, invalid UTF-8, a width outside
+    `minimum_column_width` and `maximum_column_width`, or more than
+    `maximum_columns` columns. The details view shows nothing without columns.
 items
     The items of an ordinary view; empty in virtual mode. `set_items`
     replaces them, keeps the selection, the focused item and the anchor on
-    their items by stable ID, and throws `std::invalid_argument` for an empty
-    or repeated ID or invalid UTF-8, and `std::logic_error` in virtual mode.
+    their items by stable ID, and throws `std::invalid_argument` for a
+    repeated ID or one that breaks the `StableId` segment rule or invalid
+    UTF-8, and `std::logic_error` in virtual mode.
 item_count
     The number of items: the ordinary items, or the count the source last
     reported.
@@ -48,8 +49,9 @@ virtual_source
 groups
     The groups (`ListViewGroup`: an ID, a header and its alignment). Items
     name their group in `ListViewItem::group`. `set_groups` throws
-    `std::invalid_argument` for an empty or repeated ID, invalid UTF-8, an
-    unknown alignment, or more than `maximum_groups` groups.
+    `std::invalid_argument` for a repeated ID or one that breaks the
+    `StableId` segment rule, invalid UTF-8, an unknown alignment, or more than
+    `maximum_groups` groups.
 show_groups : default ``true``
     Whether the view shows its items in groups while it has groups. Groups
     are not shown in the list view or in virtual mode.

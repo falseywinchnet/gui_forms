@@ -2109,7 +2109,7 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
     const std::string strip_id(stable_id().value());
     if (overflow_ == PageStripOverflow::scroll) {
         const std::array<Rect, 2> scroll_bounds{placed.scroll_back, placed.scroll_forward};
-        const std::array<const char*, 2> scroll_ids{".scroll_back", ".scroll_forward"};
+        const std::array<const char*, 2> scroll_ids{".scroll-back", ".scroll-forward"};
         const std::array<const char*, 2> scroll_names{"Scroll tabs back", "Scroll tabs forward"};
         const std::array<bool, 2> scroll_possible{can_scroll_backward(), can_scroll_forward()};
         for (std::size_t index = 0; index < scroll_bounds.size(); ++index) {
@@ -2126,7 +2126,7 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
         }
     }
     SemanticNode list{};
-    list.stable_id = strip_id + ".list_button";
+    list.stable_id = strip_id + ".list-button";
     list.runtime_id = virtual_semantic_runtime_id(list.stable_id);
     list.role = SemanticRole::menu_button;
     list.name = "All pages";
@@ -2144,12 +2144,12 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
 bool PageStrip::on_semantic_child_action(std::string_view id, SemanticAction action, std::string_view) {
     if (pages_ == nullptr) return false;
     const std::string strip_id(stable_id().value());
-    if (id == strip_id + ".scroll_back" || id == strip_id + ".scroll_forward") {
+    if (id == strip_id + ".scroll-back" || id == strip_id + ".scroll-forward") {
         if (action != SemanticAction::press) return false;
-        const bool scrolled = scroll_by(id == strip_id + ".scroll_back" ? -1 : 1);
+        const bool scrolled = scroll_by(id == strip_id + ".scroll-back" ? -1 : 1);
         return scrolled;
     }
-    if (id == strip_id + ".list_button") {
+    if (id == strip_id + ".list-button") {
         if (action == SemanticAction::collapse) {
             if (!list_open_) return false;
             close_page_list();

@@ -44,9 +44,10 @@ void Ribbon::set_recent_items(std::vector<RibbonRecentItem> items) {
     for (const RibbonRecentItem& item : items) {
         const bool single_line = item.text.find('\n') == std::string::npos &&
                                  item.description.find('\n') == std::string::npos;
-        if (item.stable_id.empty() || !validate_utf8(item.stable_id).valid() || !validate_utf8(item.text).valid() ||
+        if (!valid_stable_id(item.stable_id) || !validate_utf8(item.text).valid() ||
             !validate_utf8(item.description).valid() || !single_line || !identities.insert(item.stable_id).second) {
-            throw std::invalid_argument("Ribbon recent items require unique IDs and single-line UTF-8");
+            throw std::invalid_argument(
+                "Ribbon recent items require unique IDs following the StableId segment rule and single-line UTF-8");
         }
     }
     validate_two_pane(application_menu_, items.size());
@@ -77,7 +78,7 @@ bool Ribbon::show_application_popup(MenuOpenMode mode) {
     const Control::Ptr self = shared_from_this();
     if (!application_popup_) {
         application_popup_ =
-            make_control<RibbonApplicationMenu>(StableId(std::string(stable_id().value()) + ".application_menu"), *this);
+            make_control<RibbonApplicationMenu>(StableId(std::string(stable_id().value()) + ".application-menu"), *this);
     }
     const Layout placed = layout();
     const Rect absolute = absolute_bounds();

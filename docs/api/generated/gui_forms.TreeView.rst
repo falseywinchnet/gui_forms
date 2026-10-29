@@ -37,7 +37,8 @@ gui_forms::TreeView
          The items in preorder: each :cpp:class:`TreeViewItem <gui_forms::TreeViewItem>` is followed by its
          descendants, at one more ``depth`` for each level. The first item must
          have depth 0 and no item may be more than one level deeper than the
-         item before it. IDs must be nonempty, unique and valid UTF-8, the text
+         item before it. IDs must be unique and follow the
+         :cpp:class:`StableId <gui_forms::StableId>` segment rule, the text
          valid UTF-8, and an ``image_key`` at most 256 bytes, or :cpp:func:`set_items <gui_forms::TreeView::set_items>`
          throws ``std::invalid_argument``. Only items marked ``expandable`` can be
          collapsed; the descendants of an expandable item that is not
@@ -229,7 +230,8 @@ gui_forms::TreeView
       The items in preorder: each :cpp:class:`TreeViewItem <gui_forms::TreeViewItem>` is followed by its
       descendants, at one more ``depth`` for each level. The first item must
       have depth 0 and no item may be more than one level deeper than the
-      item before it. IDs must be nonempty, unique and valid UTF-8, the text
+      item before it. IDs must be unique and follow the
+      :cpp:class:`StableId <gui_forms::StableId>` segment rule, the text
       valid UTF-8, and an ``image_key`` at most 256 bytes, or :cpp:func:`set_items <gui_forms::TreeView::set_items>`
       throws ``std::invalid_argument``. Only items marked ``expandable`` can be
       collapsed; the descendants of an expandable item that is not

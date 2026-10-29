@@ -1748,7 +1748,7 @@ void example() {
     std::shared_ptr<gf::Command> font = std::make_shared<gf::Command>("doc.font", "Font");
     std::shared_ptr<gf::FontCommand> command = std::make_shared<gf::FontCommand>(font);
     (*command).set_value({"Portsmouth Rapids", 11.0});   // value_changed, no invocation
-    (*command).commit({"Carlito", 11.0}, "doc.font_control");   // value_changed, then font's invoked
+    (*command).commit({"Carlito", 11.0}, "doc.font-control");   // value_changed, then font's invoked
 }
 }  // namespace doc_example_FontCommand_1
 
@@ -3011,7 +3011,7 @@ void example() {
     std::shared_ptr<gf::ColorCommand> command =
         std::make_shared<gf::ColorCommand>(std::make_shared<gf::Command>("doc.colour", "Font colour"));
     std::shared_ptr<gf::RibbonColorPicker> picker =
-        gf::make_control<gf::RibbonColorPicker>(gf::StableId("doc.colour_picker"));
+        gf::make_control<gf::RibbonColorPicker>(gf::StableId("doc.colour-picker"));
     (*picker).set_text("Font &colour");
     (*picker).set_command(command);
 }
@@ -3022,7 +3022,7 @@ void example() {
     std::shared_ptr<gf::FontCommand> command =
         std::make_shared<gf::FontCommand>(std::make_shared<gf::Command>("doc.font", "Font"));
     std::shared_ptr<gf::RibbonFontControl> font =
-        gf::make_control<gf::RibbonFontControl>(gf::StableId("doc.font_control"));
+        gf::make_control<gf::RibbonFontControl>(gf::StableId("doc.font-control"));
     (*font).set_families({"Portsmouth Rapids", "Carlito"});
     (*font).set_command(command);
 }

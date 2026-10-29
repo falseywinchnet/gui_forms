@@ -64,4 +64,4 @@ A font command an application applies when it is committed:
    std::shared_ptr<gf::Command> font = std::make_shared<gf::Command>("doc.font", "Font");
    std::shared_ptr<gf::FontCommand> command = std::make_shared<gf::FontCommand>(font);
    (*command).set_value({"Portsmouth Rapids", 11.0});   // value_changed, no invocation
-   (*command).commit({"Carlito", 11.0}, "doc.font_control");   // value_changed, then font's invoked
+   (*command).commit({"Carlito", 11.0}, "doc.font-control");   // value_changed, then font's invoked

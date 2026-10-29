@@ -668,7 +668,7 @@ TileFrame tile_frame(Window& window, const DockSite& site) {
     VisualInspectionOptions options{};
     options.maximum_operations_per_control = VisualInspectionOptions::maximum_allowed_operations_per_control;
     const VisualInspectionSnapshot snapshot = window.visual_inspection_snapshot(options);
-    const VisualControlInspection* const layer = snapshot.find("site.drag_layer");
+    const VisualControlInspection* const layer = snapshot.find("site.drag-layer");
     require(layer != nullptr && !(*layer).display_operations_truncated, "the drag layer's commands are inspected");
     BitHash hash{};
     for (const VisualPaintOperationSnapshot& operation : (*layer).display_operations) {

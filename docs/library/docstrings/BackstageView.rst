@@ -19,11 +19,11 @@ items
     The column (`BackstageItemSpec`: ID, kind, Command, text with an
     optional mnemonic, image, definitive flag, page). `set_items` keeps the
     selection on a topic with the same ID, else the first topic, and throws
-    `std::invalid_argument`, keeping the old items, for an empty or repeated
-    ID, invalid UTF-8, a command without a `Command`, a topic without a page
-    or text, a page given twice or owned elsewhere, a page or definitive flag
-    where it does not belong, or more than `BackstageView::maximum_items`
-    (64).
+    `std::invalid_argument`, keeping the old items, for a repeated ID or one
+    that breaks the `StableId` segment rule, invalid UTF-8, a command without
+    a `Command`, a topic without a page or text, a page given twice or owned
+    elsewhere, a page or definitive flag where it does not belong, or more
+    than `BackstageView::maximum_items` (64).
 selected_topic
     The topic whose page shows. `set_selected_topic` throws
     `std::out_of_range` past the end and `std::invalid_argument` for an item

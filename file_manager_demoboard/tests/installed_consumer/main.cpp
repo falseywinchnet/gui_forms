@@ -82,18 +82,18 @@ int main() {
     (*root).add_child(popup_owner);
     std::shared_ptr<gui_forms::ListBox> stable_list =
         std::make_shared<gui_forms::ListBox>(
-            gui_forms::StableId("installed.stable_list"));
+            gui_forms::StableId("installed.stable-list"));
     (*stable_list).set_requested_bounds({320, 244, 192, 82});
     (*stable_list).set_items({"Alpha", "Beta"});
     (*stable_list).set_item_stable_ids(
-        {"installed.stable_list.alpha", "installed.stable_list.beta"});
+        {"installed.stable-list.alpha", "installed.stable-list.beta"});
     (*root).add_child(stable_list);
     gui_forms::ContextMenu menu("installed.menu");
     menu.set_items({{"installed.menu.command",
                      gui_forms::MenuItemKind::command, command}});
     std::shared_ptr<gui_forms::MenuStrip> menu_strip =
         std::make_shared<gui_forms::MenuStrip>(
-            gui_forms::StableId("installed.menu_strip"));
+            gui_forms::StableId("installed.menu-strip"));
     (*menu_strip).set_requested_bounds({0, 152, 320, 24});
     (*menu_strip).set_items({{"installed.menu.file", "File", {
         {"installed.menu.file.command", gui_forms::MenuItemKind::command,
@@ -146,7 +146,7 @@ int main() {
     (*root).add_child(correspondence);
     std::shared_ptr<gui_forms::InstrumentRack> rack =
         std::make_shared<gui_forms::InstrumentRack>(
-            gui_forms::StableId("installed.instrument_rack"));
+            gui_forms::StableId("installed.instrument-rack"));
     (*rack).set_requested_bounds({8, 516, 504, 100});
     (*rack).set_modules({
         {"installed.criterion.kind", "Kind criterion",
@@ -199,7 +199,7 @@ int main() {
     const bool menu_visible = window.find("installed.menu.popup.panel.0") != nullptr;
     menu.close();
     const bool strip_open = (*menu_strip).open(0U) &&
-        window.find("installed.menu_strip.menu.popup.panel.0") != nullptr;
+        window.find("installed.menu-strip.menu.popup.panel.0") != nullptr;
     (*menu_strip).close();
     const bool property_edit = (*properties).set_validation(
         "installed.properties.name", "Installed validation") &&
@@ -237,7 +237,7 @@ int main() {
             (*rack).field_editor("installed.criterion.kind", "property")) &&
         std::dynamic_pointer_cast<gui_forms::TextBox>(
             (*rack).field_editor("installed.criterion.content", "value")) &&
-        (*stable_list).item_stable_id(1U) == "installed.stable_list.beta" &&
+        (*stable_list).item_stable_id(1U) == "installed.stable-list.beta" &&
         (*popup_owner).expanded_state() == false &&
         (*button).text() == "Installed command" &&
         (*button).accessible_description() ==

@@ -44,9 +44,10 @@ gui_forms::RibbonGallery
 
       **items** : ``std::span<const RibbonGalleryItem>``
          The items. :cpp:func:`set_items <gui_forms::RibbonGallery::set_items>` replaces the categories and items: items without a
-         category show first, then category by category in category order. An
-         empty or repeated ID, an item naming an unknown category, or invalid
-         UTF-8 throws ``std::invalid_argument``.
+         category show first, then category by category in category order. A
+         repeated ID or one that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule, an item
+         naming an unknown category, or invalid UTF-8 throws
+         ``std::invalid_argument``.
 
       **command** : ``std::shared_ptr<GalleryCommand>``
          The :cpp:class:`GalleryCommand <gui_forms::GalleryCommand>` whose value the selection follows, which a click or
@@ -233,9 +234,10 @@ gui_forms::RibbonGallery
    .. cpp:function:: std::span<const RibbonGalleryItem> items() const noexcept
 
       The items. :cpp:func:`set_items <gui_forms::RibbonGallery::set_items>` replaces the categories and items: items without a
-      category show first, then category by category in category order. An
-      empty or repeated ID, an item naming an unknown category, or invalid
-      UTF-8 throws ``std::invalid_argument``.
+      category show first, then category by category in category order. A
+      repeated ID or one that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule, an item
+      naming an unknown category, or invalid UTF-8 throws
+      ``std::invalid_argument``.
 
    .. cpp:function:: void set_items(std::vector<RibbonGalleryCategory> categories, std::vector<RibbonGalleryItem> items)
 

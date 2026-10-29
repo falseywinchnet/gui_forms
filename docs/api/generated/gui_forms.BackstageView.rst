@@ -34,11 +34,11 @@ gui_forms::BackstageView
          The column (:cpp:class:`BackstageItemSpec <gui_forms::BackstageItemSpec>`: ID, kind, Command, text with an
          optional mnemonic, image, definitive flag, page). :cpp:func:`set_items <gui_forms::BackstageView::set_items>` keeps the
          selection on a topic with the same ID, else the first topic, and throws
-         ``std::invalid_argument``, keeping the old items, for an empty or repeated
-         ID, invalid UTF-8, a command without a :cpp:class:`Command <gui_forms::Command>`, a topic without a page
-         or text, a page given twice or owned elsewhere, a page or definitive flag
-         where it does not belong, or more than ``BackstageView::maximum_items``
-         (64).
+         ``std::invalid_argument``, keeping the old items, for a repeated ID or one
+         that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8, a command without
+         a :cpp:class:`Command <gui_forms::Command>`, a topic without a page or text, a page given twice or owned
+         elsewhere, a page or definitive flag where it does not belong, or more
+         than ``BackstageView::maximum_items`` (64).
 
       **selected_topic** : ``std::optional<std::size_t>``
          The topic whose page shows. :cpp:func:`set_selected_topic <gui_forms::BackstageView::set_selected_topic>` throws
@@ -128,11 +128,11 @@ gui_forms::BackstageView
       The column (:cpp:class:`BackstageItemSpec <gui_forms::BackstageItemSpec>`: ID, kind, Command, text with an
       optional mnemonic, image, definitive flag, page). :cpp:func:`set_items <gui_forms::BackstageView::set_items>` keeps the
       selection on a topic with the same ID, else the first topic, and throws
-      ``std::invalid_argument``, keeping the old items, for an empty or repeated
-      ID, invalid UTF-8, a command without a :cpp:class:`Command <gui_forms::Command>`, a topic without a page
-      or text, a page given twice or owned elsewhere, a page or definitive flag
-      where it does not belong, or more than ``BackstageView::maximum_items``
-      (64).
+      ``std::invalid_argument``, keeping the old items, for a repeated ID or one
+      that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8, a command without
+      a :cpp:class:`Command <gui_forms::Command>`, a topic without a page or text, a page given twice or owned
+      elsewhere, a page or definitive flag where it does not belong, or more
+      than ``BackstageView::maximum_items`` (64).
 
    .. cpp:function:: void set_items(std::vector<BackstageItemSpec> items)
 

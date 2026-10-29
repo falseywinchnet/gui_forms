@@ -129,9 +129,10 @@ std::vector<std::optional<std::size_t>> validate_tab_sets(const std::vector<Ribb
                                                           const std::vector<RibbonTabSetSpec>& sets,
                                                           std::unordered_set<std::string>& identities) {
     for (const RibbonTabSetSpec& set : sets) {
-        if (set.stable_id.empty() || !validate_utf8(set.stable_id).valid() || !validate_utf8(set.caption).valid() ||
+        if (!valid_stable_id(set.stable_id) || !validate_utf8(set.caption).valid() ||
             !identities.insert(set.stable_id).second) {
-            throw std::invalid_argument("Ribbon tab sets require unique stable IDs and valid UTF-8");
+            throw std::invalid_argument(
+                "Ribbon tab sets require unique stable IDs following the StableId segment rule and valid UTF-8");
         }
     }
     std::vector<std::optional<std::size_t>> tab_set_of(tabs.size());
@@ -171,9 +172,10 @@ std::vector<std::optional<std::size_t>> validate_tab_sets(const std::vector<Ribb
 // (`ribbon`) or its group popup's (`popup`). Throws std::invalid_argument.
 void validate_command(const RibbonCommandSpec& command, std::unordered_set<std::string>& identities,
                       std::unordered_set<const Control*>& authored, const Control* ribbon, const Control* popup) {
-    if (command.stable_id.empty() || !validate_utf8(command.stable_id).valid() ||
+    if (!valid_stable_id(command.stable_id) ||
         !validate_utf8(command.text).valid() || !identities.insert(command.stable_id).second) {
-        throw std::invalid_argument("Ribbon commands require unique stable IDs and valid UTF-8");
+        throw std::invalid_argument(
+            "Ribbon commands require unique stable IDs following the StableId segment rule and valid UTF-8");
     }
     if (needs_command(command.kind) && !command.command) {
         throw std::invalid_argument("Ribbon buttons, toggles and splits require a Command");
@@ -240,18 +242,20 @@ Ribbon::PreparedTabs Ribbon::prepare_tabs(const std::vector<RibbonTabSpec>& tabs
     prepared.layouts.resize(tabs.size());
     for (std::size_t tab_index = 0; tab_index < tabs.size(); ++tab_index) {
         const RibbonTabSpec& tab = tabs[tab_index];
-        if (tab.stable_id.empty() || !validate_utf8(tab.stable_id).valid() || !validate_utf8(tab.text).valid() ||
+        if (!valid_stable_id(tab.stable_id) || !validate_utf8(tab.text).valid() ||
             !identities.insert(tab.stable_id).second) {
-            throw std::invalid_argument("Ribbon tabs require unique stable IDs and valid UTF-8");
+            throw std::invalid_argument(
+                "Ribbon tabs require unique stable IDs following the StableId segment rule and valid UTF-8");
         }
         if (tab.groups.size() > maximum_groups_per_tab) {
             throw std::invalid_argument("Ribbon tab has more groups than maximum_groups_per_tab");
         }
         prepared.layouts[tab_index].reserve(tab.groups.size());
         for (const RibbonGroupSpec& group : tab.groups) {
-            if (group.stable_id.empty() || !validate_utf8(group.stable_id).valid() ||
+            if (!valid_stable_id(group.stable_id) ||
                 !validate_utf8(group.caption).valid() || !identities.insert(group.stable_id).second) {
-                throw std::invalid_argument("Ribbon groups require unique stable IDs and valid UTF-8");
+                throw std::invalid_argument(
+                    "Ribbon groups require unique stable IDs following the StableId segment rule and valid UTF-8");
             }
             if (group.commands.size() > maximum_commands_per_group) {
                 throw std::invalid_argument("Ribbon group has more commands than maximum_commands_per_group");
@@ -1874,8 +1878,8 @@ bool Ribbon::show_group_popup(std::string_view group_id, MenuOpenMode mode) {
     const std::string ribbon_id(stable_id().value());
     const Control::Ptr self = shared_from_this();
     if (!group_popup_) {
-        group_popup_ = make_control<RibbonGroupPopup>(StableId(ribbon_id + ".group_popup"), *this);
-        group_layer_ = make_control<AnchoredPopupLayer>(StableId(ribbon_id + ".group_popup.layer"), self);
+        group_popup_ = make_control<RibbonGroupPopup>(StableId(ribbon_id + ".group-popup"), *this);
+        group_layer_ = make_control<AnchoredPopupLayer>(StableId(ribbon_id + ".group-popup.layer"), self);
         (*group_layer_).set_content(group_popup_);
         group_layer_dismissed_ = (*group_layer_).dismiss_requested().subscribe(
             Delegate<PopupDismissReason>::bind<Ribbon, &Ribbon::on_group_layer_dismissed>(*this));
@@ -2127,7 +2131,7 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
     nodes.push_back(std::move(application));
 
     SemanticNode row{};
-    row.stable_id = ribbon_id + ".tab_row";
+    row.stable_id = ribbon_id + ".tab-row";
     row.role = SemanticRole::tab_group;
     row.name = "Ribbon tabs";
     row.orientation = SemanticOrientation::horizontal;
@@ -2153,7 +2157,7 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
         // The selected tab shows the command plane, its panel (owner
         // decision DK-40). Tabs publish select, not press (DK-35); a press
         // sent anyway still clicks the tab (on_semantic_child_action).
-        if (selected_tab_ == tab && !placed.plane.empty()) node.controlled_panel = ribbon_id + ".command_plane";
+        if (selected_tab_ == tab && !placed.plane.empty()) node.controlled_panel = ribbon_id + ".command-plane";
         node.actions = {SemanticAction::select};
         row.children.push_back(std::move(node));
     }
@@ -2165,7 +2169,7 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
     // invoke, so clicking the selected tab is no path for them (owner
     // decision 46). Expand and collapse drive the same minimize and restore.
     SemanticNode plane{};
-    plane.stable_id = ribbon_id + ".command_plane";
+    plane.stable_id = ribbon_id + ".command-plane";
     plane.role = SemanticRole::tab_panel;
     plane.name = parse_mnemonic_text(tabs_[*selected_tab_].text).display_text;
     plane.bounds = to_window(absolute, placed.plane);
@@ -2178,7 +2182,7 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
     }
     if (!placed.scroll_left.empty()) {
         SemanticNode scroll{};
-        scroll.stable_id = ribbon_id + ".scroll_left";
+        scroll.stable_id = ribbon_id + ".scroll-left";
         scroll.role = SemanticRole::button;
         scroll.name = "Scroll groups left";
         scroll.bounds = to_window(absolute, placed.scroll_left);
@@ -2191,7 +2195,7 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
     }
     if (!placed.scroll_right.empty()) {
         SemanticNode scroll{};
-        scroll.stable_id = ribbon_id + ".scroll_right";
+        scroll.stable_id = ribbon_id + ".scroll-right";
         scroll.role = SemanticRole::button;
         scroll.name = "Scroll groups right";
         scroll.bounds = to_window(absolute, placed.scroll_right);
@@ -2233,13 +2237,13 @@ bool Ribbon::on_semantic_child_action(std::string_view id, SemanticAction action
         }
         return show_application_menu();
     }
-    if (id == ribbon_id + ".command_plane" && (action == SemanticAction::expand || action == SemanticAction::collapse)) {
+    if (id == ribbon_id + ".command-plane" && (action == SemanticAction::expand || action == SemanticAction::collapse)) {
         if (!selected_tab_) return false;
         set_minimized(action == SemanticAction::collapse);
         return true;
     }
-    if (action == SemanticAction::press && (id == ribbon_id + ".scroll_left" || id == ribbon_id + ".scroll_right")) {
-        scroll_groups(id == ribbon_id + ".scroll_right");
+    if (action == SemanticAction::press && (id == ribbon_id + ".scroll-left" || id == ribbon_id + ".scroll-right")) {
+        scroll_groups(id == ribbon_id + ".scroll-right");
         return true;
     }
     const std::string_view tab_id = node_suffix(id, ribbon_id, "tab");

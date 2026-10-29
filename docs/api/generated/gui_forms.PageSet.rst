@@ -122,7 +122,9 @@ gui_forms::PageSet
    Every edit returns a :cpp:enum:`PageEditStatus <gui_forms::PageEditStatus>`. ``applied`` and ``unchanged`` succeed;
    any other value is a refusal that left the set, its selection, its history and
    the caller's arguments exactly as they were. Refusals are ordinary results,
-   not exceptions.
+   not exceptions. A page's id follows the :cpp:class:`StableId <gui_forms::StableId>` segment rule, since
+   controls name their parts after it; an insert or put of an id that breaks it
+   is refused with ``invalid_id``.
 
    The pinned group is opt-in (``PageSetOptions::pinning_enabled``). No edit
    moves a page across the boundary between pinned and ordinary pages: an insert,

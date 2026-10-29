@@ -144,8 +144,8 @@ TreeListView::~TreeListView() {}
 
 void TreeListView::initialize_control_tree() {
     const std::string prefix(stable_id().value());
-    vertical_bar_ = make_control<VScrollBar>(StableId(prefix + ".vertical_scroll_bar"));
-    horizontal_bar_ = make_control<HScrollBar>(StableId(prefix + ".horizontal_scroll_bar"));
+    vertical_bar_ = make_control<VScrollBar>(StableId(prefix + ".vertical-scroll-bar"));
+    horizontal_bar_ = make_control<HScrollBar>(StableId(prefix + ".horizontal-scroll-bar"));
     // The bars scroll with the pointer; the keyboard scrolls the view itself.
     (*vertical_bar_).set_focusable(false);
     (*horizontal_bar_).set_focusable(false);
@@ -322,10 +322,11 @@ void TreeListView::set_columns(std::vector<TreeListColumn> columns) {
     std::vector<std::string_view> identities;
     identities.reserve(columns.size());
     for (const TreeListColumn& column : columns) {
-        if (column.stable_id.empty() || !validate_utf8(column.stable_id).valid() ||
+        if (!valid_stable_id(column.stable_id) ||
             !validate_utf8(column.text).valid() ||
             std::find(identities.begin(), identities.end(), column.stable_id) != identities.end()) {
-            throw std::invalid_argument("TreeListView columns require unique stable IDs and valid UTF-8");
+            throw std::invalid_argument(
+                "TreeListView columns require unique stable IDs following the StableId segment rule and valid UTF-8");
         }
         if (!std::isfinite(column.width) || column.width < minimum_column_width ||
             column.width > maximum_column_width || !valid_alignment(column.alignment)) {
@@ -400,8 +401,10 @@ void TreeListView::set_nodes(std::vector<TreeListNode> nodes) {
     next_indices.reserve(nodes.size());
     for (std::size_t index = 0; index < nodes.size(); ++index) {
         const TreeListNode& node = nodes[index];
-        if (node.stable_id.empty() || !validate_utf8(node.stable_id).valid() || !valid_node_text(node)) {
-            throw std::invalid_argument("TreeListView nodes require stable IDs, valid UTF-8 and bounded image keys");
+        if (!valid_stable_id(node.stable_id) || !valid_node_text(node)) {
+            throw std::invalid_argument(
+                "TreeListView nodes require stable IDs following the StableId segment rule, valid UTF-8 and bounded "
+                "image keys");
         }
         const bool first_is_root = index != 0U || node.depth == 0U;
         const bool one_level_deeper = index == 0U || node.depth <= nodes[index - 1U].depth + 1U;

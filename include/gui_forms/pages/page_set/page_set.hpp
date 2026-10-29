@@ -90,7 +90,7 @@ public:
     [[nodiscard]] PageContent* content(const PageId& id) const;
 
     // Adds a page without content at `placement`. Refusals: `empty_id`,
-    // `duplicate_page`, `capacity_reached`, `pinning_disabled`,
+    // `invalid_id`, `duplicate_page`, `capacity_reached`, `pinning_disabled`,
     // `position_out_of_range`, `crosses_pinned_boundary`,
     // `selecting_in_progress`. The first page of an empty set is selected
     // (cause `first_page`).

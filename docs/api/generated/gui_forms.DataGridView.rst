@@ -39,8 +39,8 @@ gui_forms::DataGridView
 
       **stable_id** : ``StableId``
          Identity of the grid, unique within its window. The editor is created as
-         ``<stable_id>.editor``, the scroll bars as ``<stable_id>.vertical_scroll``
-         and ``<stable_id>.horizontal_scroll``, and combo box choices are shown by
+         ``<stable_id>.editor``, the scroll bars as ``<stable_id>.vertical-scroll``
+         and ``<stable_id>.horizontal-scroll``, and combo box choices are shown by
          a :cpp:class:`ContextMenu <gui_forms::ContextMenu>` named ``<stable_id>.choices``.
 
    :Properties:
@@ -392,7 +392,7 @@ gui_forms::DataGridView
    visible column headers are ``column_header`` children, and each visible row
    is a ``row`` holding its row header (a ``row_header`` with its row index,
    while row headers are shown; its stable ID is the grid's ID,
-   ``.row_header.`` and the row's ID, and ``press`` clicks it) and then its
+   ``.row-header.`` and the row's ID, and ``press`` clicks it) and then its
    cells: each a ``cell`` with its row and column index (counting from 1),
    whatever its kind, keeping its kind's behaviour as states and actions (a
    check box cell is ``checkable`` and ``checked``). A cell's stable ID is its
@@ -801,10 +801,11 @@ gui_forms::DataGridView
    .. cpp:function:: DataGridViewRowPosition add_row(DataGridViewRow row)
 
       Appends an unbound row and returns its position. An empty stable ID is
-      replaced by a generated one (``row.1``, ``row.2``, ...); a repeated ID,
-      invalid UTF-8 or more values than columns throws ``std::invalid_argument``.
-      Virtual and bound rows refuse it with ``std::logic_error``, as they do
-      :cpp:func:`insert_row <gui_forms::DataGridView::insert_row>`, :cpp:func:`set_rows <gui_forms::DataGridView::set_rows>` and :cpp:func:`remove_row_at <gui_forms::DataGridView::remove_row_at>`.
+      replaced by a generated one (``row.1``, ``row.2``, ...); a repeated ID, one
+      that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8 or more values than
+      columns throws ``std::invalid_argument``. Virtual and bound rows refuse it
+      with ``std::logic_error``, as they do :cpp:func:`insert_row <gui_forms::DataGridView::insert_row>`, :cpp:func:`set_rows <gui_forms::DataGridView::set_rows>` and
+      :cpp:func:`remove_row_at <gui_forms::DataGridView::remove_row_at>`.
 
    .. cpp:function:: void insert_row(DataGridViewRowPosition position, DataGridViewRow row)
 

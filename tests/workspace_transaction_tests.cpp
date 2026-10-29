@@ -85,7 +85,7 @@ ApplicationWindow make_entry(const char* id, const char* owner, HostWindowFloati
 }
 
 std::shared_ptr<Panel> make_panel(const char* id, Rect bounds) {
-    const std::shared_ptr<Panel> panel = make_control<Panel>(StableId(id));
+    const std::shared_ptr<Panel> panel = make_control<Panel>(StableId(std::string(id)));
     (*panel).set_requested_bounds(bounds);
     return panel;
 }

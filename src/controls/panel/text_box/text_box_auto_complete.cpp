@@ -411,8 +411,8 @@ void TextBox::open_auto_complete_list() {
     if (!anchor || !contains_or_is(*anchor, *this)) anchor = shared_from_this();
     const std::string prefix(stable_id().value());
     std::shared_ptr<AnchoredPopupLayer> layer =
-        make_control<AnchoredPopupLayer>(StableId(prefix + ".auto_complete"), anchor);
-    std::shared_ptr<DropDownList> list = make_control<DropDownList>(StableId(prefix + ".auto_complete.list"));
+        make_control<AnchoredPopupLayer>(StableId(prefix + ".auto-complete"), anchor);
+    std::shared_ptr<DropDownList> list = make_control<DropDownList>(StableId(prefix + ".auto-complete.list"));
     // The list never takes focus: typing stays in this box.
     (*list).set_focusable(false);
     (*list).set_paint_plane(PaintPlane::overlay);

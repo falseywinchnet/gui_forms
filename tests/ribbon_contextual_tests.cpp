@@ -52,7 +52,7 @@ std::vector<RibbonTabSpec> sample_tabs() {
     tabs.push_back(tab("format", "Format", "picture"));
     tabs.push_back(tab("arrange", "Arrange", "picture"));
     tabs.push_back(tab("design", "Design", "table"));
-    tabs.push_back(tab("chart_tab", "Chart", "chart"));
+    tabs.push_back(tab("chart-tab", "Chart", "chart"));
     return tabs;
 }
 
@@ -298,10 +298,10 @@ void semantics_and_keyboard() {
         KeyEvent right{KeyAction::down, PhysicalKey::right};
         static_cast<void>((*fixture.window).dispatch_key(right));
     }
-    require(selected(ribbon) == "chart_tab", "Right moves along the shown tabs, skipping hidden ones");
+    require(selected(ribbon) == "chart-tab", "Right moves along the shown tabs, skipping hidden ones");
     KeyEvent right{KeyAction::down, PhysicalKey::right};
     static_cast<void>((*fixture.window).dispatch_key(right));
-    require(selected(ribbon) == "chart_tab", "and stops at the last shown tab");
+    require(selected(ribbon) == "chart-tab", "and stops at the last shown tab");
 }
 
 // Owner decision 46: the command plane's expand and collapse actions
@@ -310,11 +310,11 @@ void plane_expand_collapse() {
     Fixture fixture = make_fixture();
     Ribbon& ribbon = *fixture.ribbon;
     std::vector<SemanticNode> nodes = ribbon.semantic_virtual_children();
-    require(nodes.size() == 3U && nodes[2].stable_id == "ribbon.command_plane" &&
+    require(nodes.size() == 3U && nodes[2].stable_id == "ribbon.command-plane" &&
                 has_semantic_state(nodes[2].states, SemanticState::expanded) &&
                 nodes[2].actions == std::vector<SemanticAction>{SemanticAction::collapse},
             "the shown plane is expanded and offers collapse");
-    require(ribbon.on_semantic_child_action("ribbon.command_plane", SemanticAction::collapse, {}) &&
+    require(ribbon.on_semantic_child_action("ribbon.command-plane", SemanticAction::collapse, {}) &&
                 ribbon.minimized(),
             "collapse minimizes the plane");
     (*fixture.window).perform_layout();
@@ -322,7 +322,7 @@ void plane_expand_collapse() {
     require(nodes.size() == 3U && !has_semantic_state(nodes[2].states, SemanticState::expanded) &&
                 nodes[2].actions == std::vector<SemanticAction>{SemanticAction::expand} && nodes[2].children.empty(),
             "the minimized plane stays published, collapsed, offering expand");
-    require(ribbon.on_semantic_child_action("ribbon.command_plane", SemanticAction::expand, {}) && !ribbon.minimized(),
+    require(ribbon.on_semantic_child_action("ribbon.command-plane", SemanticAction::expand, {}) && !ribbon.minimized(),
             "expand restores it");
     (*fixture.window).perform_layout();
     click_tab(fixture, "home");

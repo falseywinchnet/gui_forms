@@ -271,12 +271,12 @@ std::shared_ptr<ScaledPanel> make_ribbon(ProductRefs& refs) {
     std::shared_ptr<DrawingSurface> ribbon_lines =
         material("fm.ribbon.keylines", paint_ribbon_keylines);
     (*panel).add_at(ribbon_lines, {0.0, 0.0, 1450.0, 66.0});
-    refs.ribbon_move_copy = button("fm.ribbon.move_copy", "Move / copy", {10, 6, 96, 42}, ButtonVisualStyle::command);
+    refs.ribbon_move_copy = button("fm.ribbon.move-copy", "Move / copy", {10, 6, 96, 42}, ButtonVisualStyle::command);
     (*panel).add_at(refs.ribbon_move_copy, {10, 6, 96, 42});
     refs.ribbon_delete = button("fm.ribbon.delete", "Delete", {110, 6, 72, 42}, ButtonVisualStyle::command);
     (*panel).add_at(refs.ribbon_delete, {110, 6, 72, 42});
     (*panel).add_at(label("fm.ribbon.group.selection", "SELECTION", {10, 49, 172, 14}, {FontRole::control, 8, 600, false, .35}), {10, 49, 172, 14});
-    refs.ribbon_view = button("fm.ribbon.view_mode", "Icons  ▼", {202, 6, 85, 42}, ButtonVisualStyle::command);
+    refs.ribbon_view = button("fm.ribbon.view-mode", "Icons  ▼", {202, 6, 85, 42}, ButtonVisualStyle::command);
     (*panel).add_at(refs.ribbon_view, {202, 6, 85, 42});
     refs.ribbon_sort = button("fm.ribbon.sort", "Sort A→Z  ▼", {291, 6, 116, 42}, ButtonVisualStyle::command);
     (*panel).add_at(refs.ribbon_sort, {291, 6, 116, 42});
@@ -901,9 +901,9 @@ std::shared_ptr<Panel> make_selection_pane(ProductRefs& refs) {
     (*properties).set_dock(DockStyle::fill);
     std::shared_ptr<gui_forms::ScaledPanel> header = std::make_shared<ScaledPanel>(
         StableId("fm.selection.summary"), Size{288, 212});
-    refs.selection_name = label("fm.selection.object_name", "Facade Study.png", {10,35,268,25}, {FontRole::content,12,700,false});
+    refs.selection_name = label("fm.selection.object-name", "Facade Study.png", {10,35,268,25}, {FontRole::content,12,700,false});
     (*header).add_at(refs.selection_name, {10, 4, 224, 25});
-    refs.preview_disclosure = button("fm.selection.preview_disclosure", "▼",
+    refs.preview_disclosure = button("fm.selection.preview-disclosure", "▼",
                                      {244, 4, 34, 24}, ButtonVisualStyle::flat);
     (*header).add_at(refs.preview_disclosure, {244, 4, 34, 24});
     std::shared_ptr<DrawingSurface> preview =
@@ -955,7 +955,7 @@ std::shared_ptr<SplitContainer> make_workspace(ProductRefs& refs) {
     (*(*outer).first_panel()).add_child(make_tree_pane(refs));
     (*(*(*outer).first_panel()).children().back()).set_dock(DockStyle::fill);
 
-    std::shared_ptr<gui_forms::SplitContainer> inner = std::make_shared<SplitContainer>(StableId("fm.workspace.content_selection"));
+    std::shared_ptr<gui_forms::SplitContainer> inner = std::make_shared<SplitContainer>(StableId("fm.workspace.content-selection"));
     (*inner).initialize_control_tree();
     refs.selection_split = inner;
     (*inner).set_splitter_width(3);
@@ -2035,9 +2035,9 @@ private:
         context_menu_ = std::make_shared<ContextMenu>("fm.search.context");
         (*context_menu_).set_items({
             {"open", MenuItemKind::command, open_},
-            {"open_containing", MenuItemKind::command, containing_},
+            {"open-containing", MenuItemKind::command, containing_},
             {"separator", MenuItemKind::separator},
-            {"copy_path", MenuItemKind::command, copy_path_},
+            {"copy-path", MenuItemKind::command, copy_path_},
             {"properties", MenuItemKind::command, properties_},
         });
     }
@@ -3512,7 +3512,7 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
 
     (*refs.menu_strip).set_items({
         {"fm.menu.file", "File", {
-            {"file.new_folder", MenuItemKind::command, new_folder},
+            {"file.new-folder", MenuItemKind::command, new_folder},
             {"file.open", MenuItemKind::command, open},
             {"file.separator.properties", MenuItemKind::separator},
             {"file.properties", MenuItemKind::command, folder_properties},
@@ -3522,7 +3522,7 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
             {"home.separator.clipboard", MenuItemKind::separator},
             {"home.cut", MenuItemKind::command, cut},
             {"home.copy", MenuItemKind::command, copy},
-            {"home.move_copy", MenuItemKind::submenu, {}, "Move / copy", {
+            {"home.move-copy", MenuItemKind::submenu, {}, "Move / copy", {
                 {"home.move.orchard", MenuItemKind::command, move_orchard},
                 {"home.move.reference", MenuItemKind::command, move_reference},
             }},
@@ -3532,7 +3532,7 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
             {"home.properties", MenuItemKind::command, properties},
         }},
         {"fm.menu.edit", "Edit", {
-            {"edit.select_all", MenuItemKind::command, select_all},
+            {"edit.select-all", MenuItemKind::command, select_all},
             {"edit.separator.clipboard", MenuItemKind::separator},
             {"edit.cut", MenuItemKind::command, cut},
             {"edit.copy", MenuItemKind::command, copy},
@@ -3550,10 +3550,10 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
             {"go.up", MenuItemKind::command, nav_up},
         }},
         {"fm.menu.commands", "Commands", {
-            {"commands.new_folder", MenuItemKind::command, new_folder},
-            {"commands.select_all", MenuItemKind::command, select_all},
+            {"commands.new-folder", MenuItemKind::command, new_folder},
+            {"commands.select-all", MenuItemKind::command, select_all},
             {"commands.separator.properties", MenuItemKind::separator},
-            {"commands.folder_properties", MenuItemKind::command,
+            {"commands.folder-properties", MenuItemKind::command,
              folder_properties},
         }},
         {"fm.menu.help", "Help", {
@@ -3564,16 +3564,16 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
     std::shared_ptr<gui_forms::ContextMenu> object_menu = std::make_shared<ContextMenu>("fm.context.object");
     (*object_menu).set_items({
         {"open", MenuItemKind::command, open},
-        {"open_with", MenuItemKind::submenu, {}, "Open with", {
-            {"open_with.preview", MenuItemKind::radio, open_preview},
-            {"open_with.image_lab", MenuItemKind::radio, open_image_lab},
+        {"open-with", MenuItemKind::submenu, {}, "Open with", {
+            {"open-with.preview", MenuItemKind::radio, open_preview},
+            {"open-with.image-lab", MenuItemKind::radio, open_image_lab},
         }},
         {"separator.clipboard", MenuItemKind::separator},
         {"cut", MenuItemKind::command, cut},
         {"copy", MenuItemKind::command, copy},
-        {"move_copy", MenuItemKind::submenu, {}, "Move / copy", {
-            {"move_copy.orchard", MenuItemKind::command, move_orchard},
-            {"move_copy.reference", MenuItemKind::command, move_reference},
+        {"move-copy", MenuItemKind::submenu, {}, "Move / copy", {
+            {"move-copy.orchard", MenuItemKind::command, move_orchard},
+            {"move-copy.reference", MenuItemKind::command, move_reference},
         }},
         {"separator.edit", MenuItemKind::separator},
         {"rename", MenuItemKind::command, rename},
@@ -3583,7 +3583,7 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
     });
     std::shared_ptr<gui_forms::ContextMenu> background_menu = std::make_shared<ContextMenu>("fm.context.background");
     (*background_menu).set_items({
-        {"new_folder", MenuItemKind::command, new_folder},
+        {"new-folder", MenuItemKind::command, new_folder},
         {"paste", MenuItemKind::command, paste},
         {"separator.properties", MenuItemKind::separator},
         {"properties", MenuItemKind::command, folder_properties},

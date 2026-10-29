@@ -135,9 +135,13 @@ void ToolStrip::set_items(std::vector<ToolStripItemSpec> items) {
     std::unordered_set<std::string> item_ids{};
     std::unordered_set<std::string> menu_ids{};
     for (const ToolStripItemSpec& item : items) {
-        if (item.stable_id.empty() || !validate_utf8(item.stable_id).valid() ||
-            !validate_utf8(item.text).valid() || !item_ids.insert(item.stable_id).second) {
-            throw std::invalid_argument("ToolStrip items require unique stable IDs and valid UTF-8");
+        // Hosted items and overflow menu rows carry the item ID in a
+        // StableId, so every item ID follows the StableId segment rule.
+        if (!valid_stable_id(item.stable_id) || !validate_utf8(item.text).valid() ||
+            !item_ids.insert(item.stable_id).second) {
+            throw std::invalid_argument(
+                "ToolStrip items require unique stable IDs of '.'-separated lowercase dash segments "
+                "and valid UTF-8");
         }
         if (hosted(item.kind) && (item.command || item.check_on_click || item.checked)) {
             throw std::invalid_argument("ToolStrip hosted items take no command or check");

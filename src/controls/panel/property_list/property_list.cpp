@@ -548,10 +548,10 @@ void PropertyList::set_groups(std::vector<PropertyGroupSpec> groups) {
     for (const gui_forms::PropertyGroupSpec& group : groups) {
         require_property_text(group.stable_id, "group ID");
         require_property_text(group.title, "group title");
-        if (group.stable_id.empty() || group.title.empty() ||
+        if (!valid_stable_id(group.stable_id) || group.title.empty() ||
             !identities.insert(group.stable_id).second) {
             throw std::invalid_argument(
-                "PropertyList groups require unique nonempty identities and titles");
+                "PropertyList groups require unique identities following the StableId segment rule and titles");
         }
         std::unordered_map<std::string, const PropertyRowSpec*> prior_rows;
         for (const gui_forms::PropertyRowSpec& row : group.rows) {
@@ -560,10 +560,10 @@ void PropertyList::set_groups(std::vector<PropertyGroupSpec> groups) {
             require_property_text(row.value, "row value");
             require_property_text(row.description, "row description");
             require_property_text(row.validation_message, "validation message");
-            if (row.stable_id.empty() || row.name.empty() ||
+            if (!valid_stable_id(row.stable_id) || row.name.empty() ||
                 !identities.insert(row.stable_id).second) {
                 throw std::invalid_argument(
-                    "PropertyList rows require unique nonempty identities and names");
+                    "PropertyList rows require unique identities following the StableId segment rule and names");
             }
             if (row.depth > 8U ||
                 (row.expanded && !row.expandable) ||

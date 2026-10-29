@@ -147,7 +147,7 @@ public:
 };
 
 std::shared_ptr<CountingControl> counting_control(const char* id, double width, double height) {
-    std::shared_ptr<CountingControl> control = std::make_shared<CountingControl>(StableId(id));
+    std::shared_ptr<CountingControl> control = std::make_shared<CountingControl>(StableId(std::string(id)));
     (*control).set_requested_bounds({0.0, 0.0, width, height});
     return control;
 }
@@ -493,7 +493,7 @@ void test_layout_direction_inheritance_and_invalidation() {
 }
 
 std::shared_ptr<Label> wrapping_label(const char* id, const char* text) {
-    std::shared_ptr<Label> label = std::make_shared<Label>(StableId(id), text);
+    std::shared_ptr<Label> label = std::make_shared<Label>(StableId(std::string(id)), text);
     (*label).set_text_wrapping(TextWrapping::word);
     return label;
 }

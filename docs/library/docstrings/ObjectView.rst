@@ -24,7 +24,8 @@ Properties
 items
     The items in display order. Empty by default. `set_items` replaces the
     items and keeps the current `details_columns`, so every item needs one
-    cell per column. Item IDs must be nonempty, unique and valid UTF-8; the
+    cell per column. Item IDs must be unique and follow the
+    `StableId` segment rule; the
     ID, name, secondary text and description at most 65536 bytes each and
     valid UTF-8; an `image_key` at most 256 bytes; at most 1,000,000 items;
     and all text together at most `maximum_details_text_bytes`. Otherwise
@@ -137,7 +138,8 @@ set_details_model
     Replaces the columns and the items together. Each item must have
     exactly one cell for each column, naming the column by ID in any
     order; the cells are stored in column order. There may be at most 64
-    columns, with nonempty unique IDs of at most 256 bytes, a minimum width
+    columns, with unique IDs of at most 256 bytes that follow the
+    `StableId` segment rule, a minimum width
     of at least 40, a maximum width of at most 4096, and a width between
     them; a cell that is not `ObjectCellAvailability::available` must have
     text. The item rules of `items` apply. With an `accepted_sort`, the

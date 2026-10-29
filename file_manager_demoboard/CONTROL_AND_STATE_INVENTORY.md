@@ -244,7 +244,7 @@ content summary bar above the object field.
 | `demo.atmosphere.choice` | twelve-way atmosphere selector |
 | `demo.construction.choice` | twelve-way construction selector |
 | `demo.fixture.condition` | deterministic condition choice |
-| `demo.accommodation.text_scale` | text-scale selector |
+| `demo.accommodation.text-scale` | text-scale selector |
 | `demo.accommodation.contrast` | high-contrast toggle |
 | `demo.accommodation.motion` | reduced-motion toggle |
 | `demo.accommodation.sound` | sound enable toggle |

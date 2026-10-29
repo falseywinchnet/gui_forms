@@ -225,7 +225,7 @@ public:
         for (const int direction : {-1, 1}) {
             SemanticNode node;
             node.stable_id = std::string(stable_id().value()) +
-                (direction < 0 ? ".previous_month" : ".next_month");
+                (direction < 0 ? ".previous-month" : ".next-month");
             node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
             node.role = SemanticRole::button;
             node.name = direction < 0 ? "Previous month" : "Next month";
@@ -273,13 +273,13 @@ public:
                                   std::string_view) override {
         const std::string prefix((*this).stable_id().value());
         if (action == SemanticAction::press &&
-            stable_id == prefix + ".previous_month") {
+            stable_id == prefix + ".previous-month") {
             if (!can_change_month(-1)) return false;
             change_month(-1);
             return true;
         }
         if (action == SemanticAction::press &&
-            stable_id == prefix + ".next_month") {
+            stable_id == prefix + ".next-month") {
             if (!can_change_month(1)) return false;
             change_month(1);
             return true;

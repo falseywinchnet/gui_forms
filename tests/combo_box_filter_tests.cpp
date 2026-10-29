@@ -44,7 +44,7 @@ struct Fixture final {
 Fixture make_fixture(const char* id, ComboBoxFilter filter) {
     Fixture fixture;
     fixture.root = make_control<Panel>(StableId(std::string(id) + ".root"));
-    fixture.combo = make_control<ComboBox>(StableId(id));
+    fixture.combo = make_control<ComboBox>(StableId(std::string(id)));
     (*fixture.combo).set_requested_bounds({10.0, 10.0, 220.0, 30.0});
     (*fixture.combo).set_items({"Calgary", "California", "Cambridge", "Dover", "Cape Town", "Arcadia"});
     (*fixture.combo).set_drop_down_style(ComboBoxStyle::drop_down);
@@ -235,7 +235,7 @@ void suggestions_highlight_the_typed_prefix() {
     Window window(root, Size{320.0, 300.0});
     window.perform_layout();
     require(window.request_focus(box) && type(window, "cal") && (*box).auto_complete_open(), "suggesting");
-    const Control::Ptr list = window.find("suggest.box.auto_complete.list");
+    const Control::Ptr list = window.find("suggest.box.auto-complete.list");
     window.perform_layout();
     const PartGeometry match = item_part(*list, 0U, "match");
     const PartGeometry label = item_part(*list, 0U, "label");

@@ -27,7 +27,7 @@ struct RecordSelection final {
 };
 
 std::shared_ptr<DomainUpDown> make_domain(const char* id) {
-    std::shared_ptr<DomainUpDown> domain = make_control<DomainUpDown>(StableId(id));
+    std::shared_ptr<DomainUpDown> domain = make_control<DomainUpDown>(StableId(std::string(id)));
     (*domain).set_requested_bounds({0.0, 0.0, 180.0, 32.0});
     (*domain).set_items({"AM", "FM", "WFM"});
     return domain;

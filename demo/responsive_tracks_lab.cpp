@@ -417,7 +417,7 @@ std::unique_ptr<Window> make_responsive_tracks_lab() {
         const std::string label =
             std::to_string(static_cast<int>(scale * 100.0)) + "%";
         std::shared_ptr<Button> button = make_control<Button>(
-            StableId("responsive.scale." + label), label);
+            StableId("responsive.scale." + std::to_string(static_cast<int>(scale * 100.0))), label);
         (*button).set_font({FontRole::control, 8.0, 700, false});
         (*root).add_child(button);
         (*root).add_controller(button);

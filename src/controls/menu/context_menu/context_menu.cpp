@@ -816,8 +816,10 @@ struct ContextMenu::Impl final {
 
 ContextMenu::ContextMenu(std::string stable_id)
     : stable_id_(std::move(stable_id)), impl_(std::make_unique<Impl>(*this)) {
-    if (stable_id_.empty() || !validate_utf8(stable_id_).valid()) {
-        throw std::invalid_argument("ContextMenu identity must be valid UTF-8");
+    if (!valid_stable_id(stable_id_)) {
+        throw std::invalid_argument(
+            "ContextMenu identity must be '.'-separated segments of lowercase ASCII letters and digits "
+            "joined by single '-'");
     }
 }
 

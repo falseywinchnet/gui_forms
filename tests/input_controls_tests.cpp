@@ -196,7 +196,7 @@ void test_placeholder_and_validation() {
 }
 
 void test_text_box_maximum_length_bounds_user_edits() {
-    std::shared_ptr<gui_forms::TextBox> field = make_control<TextBox>(StableId("input.maximum_length"));
+    std::shared_ptr<gui_forms::TextBox> field = make_control<TextBox>(StableId("input.maximum-length"));
     (*field).set_maximum_length(3U);
     (*field).set_requested_bounds({0.0, 0.0, 180.0, 30.0});
     Window window(field, {180.0, 30.0});

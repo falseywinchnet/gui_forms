@@ -53,7 +53,7 @@ struct Fixture final {
 Fixture make_fixture(const char* id, double width = 300.0, double height = 60.0) {
     Fixture fixture;
     fixture.root = make_control<Panel>(StableId(std::string(id) + ".root"));
-    fixture.box = make_control<TokenBox>(StableId(id));
+    fixture.box = make_control<TokenBox>(StableId(std::string(id)));
     (*fixture.box).set_requested_bounds({10.0, 10.0, width, height});
     fixture.other = make_control<TextBox>(StableId(std::string(id) + ".other"));
     (*fixture.other).set_requested_bounds({10.0, 280.0, 200.0, 28.0});
@@ -357,7 +357,7 @@ void auto_complete_makes_tokens() {
             "the settings are the editor's");
     require(type(window, "d") && (*box.editor()).auto_complete_open(), "typing suggests");
     window.perform_layout();
-    const Rect list = (*window.find("tokens.complete.editor.auto_complete.list")).absolute_bounds();
+    const Rect list = (*window.find("tokens.complete.editor.auto-complete.list")).absolute_bounds();
     require(list.width == 360.0, "the suggestions span the whole box");
     require(press(window, PhysicalKey::down) && press(window, PhysicalKey::down) &&
                 press(window, PhysicalKey::enter) && texts_are(box, {"Derby"}) &&

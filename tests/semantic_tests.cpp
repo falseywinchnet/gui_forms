@@ -12,6 +12,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 
 namespace {
@@ -735,6 +736,60 @@ void test_unnumbered_virtual_children_get_runtime_ids() {
             "a nested virtual child is reached through its owner's runtime identity");
 }
 
+// A control whose virtual child's ID, or the panel a node names as
+// controlled, breaks the StableId segment rule.
+class MisnamedVirtualChild final : public Control {
+public:
+    MisnamedVirtualChild(StableId stable_id, std::string child_id, std::string controlled)
+        : Control(std::move(stable_id)), child_id_(std::move(child_id)), controlled_(std::move(controlled)) {}
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+        SemanticDescriptor descriptor;
+        descriptor.role = SemanticRole::group;
+        descriptor.exposed = true;
+        return descriptor;
+    }
+    [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override {
+        SemanticNode child;
+        child.stable_id = child_id_;
+        child.role = SemanticRole::tab;
+        child.controlled_panel = controlled_;
+        std::vector<SemanticNode> nodes;
+        nodes.push_back(child);
+        return nodes;
+    }
+
+private:
+    std::string child_id_;
+    std::string controlled_;
+};
+
+bool snapshot_refused(const std::string& child_id, const std::string& controlled) {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("misnamed.root"));
+    std::shared_ptr<MisnamedVirtualChild> owner =
+        make_control<MisnamedVirtualChild>(StableId("misnamed.owner"), child_id, controlled);
+    (*owner).set_requested_bounds({0.0, 0.0, 80.0, 40.0});
+    (*root).add_child(owner);
+    Window window(root, {100.0, 60.0});
+    bool refused{};
+    try {
+        static_cast<void>(window.semantic_snapshot());
+    } catch (const std::invalid_argument& error) {
+        refused = std::string_view(error.what()).find("misnamed.owner") != std::string_view::npos;
+    }
+    return refused;
+}
+
+// Virtual semantic node IDs follow the StableId segment rule, as control IDs
+// do; the window checks them when a control publishes them.
+void test_virtual_node_ids_follow_the_segment_rule() {
+    require(!snapshot_refused("misnamed.owner.tab-row", "misnamed.owner.command-plane"),
+            "dash-segment virtual IDs are published");
+    require(snapshot_refused("misnamed.owner.tab_row", ""), "an underscore virtual ID is refused, naming its control");
+    require(snapshot_refused("misnamed.owner.tab-row", "misnamed.owner.command_plane"),
+            "a controlled panel that breaks the rule is refused");
+    require(snapshot_refused("", ""), "an empty virtual ID is refused");
+}
+
 } // namespace
 
 int main() {
@@ -748,6 +803,7 @@ int main() {
         test_runtime_identity_semantic_actions();
         test_trees_sharing_item_identities_route_by_owner();
         test_unnumbered_virtual_children_get_runtime_ids();
+        test_virtual_node_ids_follow_the_segment_rule();
         test_semantic_focus_reaches_composites();
         test_hidden_focus_is_published_on_the_composite();
         test_stage_a_vocabulary_reaches_the_snapshot();

@@ -72,6 +72,6 @@ A font control bound to a font command:
    std::shared_ptr<gf::FontCommand> command =
        std::make_shared<gf::FontCommand>(std::make_shared<gf::Command>("doc.font", "Font"));
    std::shared_ptr<gf::RibbonFontControl> font =
-       gf::make_control<gf::RibbonFontControl>(gf::StableId("doc.font_control"));
+       gf::make_control<gf::RibbonFontControl>(gf::StableId("doc.font-control"));
    (*font).set_families({"Portsmouth Rapids", "Carlito"});
    (*font).set_command(command);

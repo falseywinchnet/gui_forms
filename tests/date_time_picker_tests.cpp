@@ -286,9 +286,9 @@ void test_semantic_month_navigation_and_range_capability() {
     (*fixture.picker).set_dropped_down(true);
     SemanticSnapshot snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* previous =
-        find_node(snapshot.roots, "date.picker.popup.calendar.previous_month");
+        find_node(snapshot.roots, "date.picker.popup.calendar.previous-month");
     const SemanticNode* next =
-        find_node(snapshot.roots, "date.picker.popup.calendar.next_month");
+        find_node(snapshot.roots, "date.picker.popup.calendar.next-month");
     require(previous && next &&
                 has_semantic_state((*previous).states, SemanticState::enabled) &&
                 has_semantic_state((*next).states, SemanticState::enabled) &&
@@ -296,7 +296,7 @@ void test_semantic_month_navigation_and_range_capability() {
                           SemanticAction::press) != (*next).actions.end(),
             "calendar header navigation must be exposed as enabled semantic buttons");
     require(fixture.window.perform_semantic_action(
-                "date.picker.popup.calendar.next_month", SemanticAction::press),
+                "date.picker.popup.calendar.next-month", SemanticAction::press),
             "semantic next-month press must execute the calendar navigation path");
     snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* calendar =
@@ -316,18 +316,18 @@ void test_semantic_month_navigation_and_range_capability() {
     (*fixture.picker).set_dropped_down(true);
     snapshot = fixture.window.semantic_snapshot();
     previous = find_node(snapshot.roots,
-                         "date.picker.popup.calendar.previous_month");
+                         "date.picker.popup.calendar.previous-month");
     next = find_node(snapshot.roots,
-                     "date.picker.popup.calendar.next_month");
+                     "date.picker.popup.calendar.next-month");
     require(previous && next &&
                 !has_semantic_state((*previous).states, SemanticState::enabled) &&
                 !has_semantic_state((*next).states, SemanticState::enabled) &&
                 (*previous).actions.empty() && (*next).actions.empty() &&
                 !fixture.window.perform_semantic_action(
-                    "date.picker.popup.calendar.previous_month",
+                    "date.picker.popup.calendar.previous-month",
                     SemanticAction::press) &&
                 !fixture.window.perform_semantic_action(
-                    "date.picker.popup.calendar.next_month",
+                    "date.picker.popup.calendar.next-month",
                     SemanticAction::press),
             "a single-month range must disable and reject both month buttons");
 }

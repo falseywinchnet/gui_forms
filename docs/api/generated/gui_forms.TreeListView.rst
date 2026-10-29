@@ -29,17 +29,17 @@ gui_forms::TreeListView
 
       **stable_id** : ``StableId``
          Identity of the view, unique within its window. Its scroll bars are
-         child controls named ``<stable_id>.vertical_scroll_bar`` and
-         ``<stable_id>.horizontal_scroll_bar``.
+         child controls named ``<stable_id>.vertical-scroll-bar`` and
+         ``<stable_id>.horizontal-scroll-bar``.
 
    :Properties:
 
       **columns** : ``std::span<const TreeListColumn>``
          The columns, column 0 first. :cpp:func:`set_columns <gui_forms::TreeListView::set_columns>` replaces them, resets the
-         display order and throws ``std::invalid_argument`` for an empty or
-         repeated ID, invalid UTF-8, a width outside ``minimum_column_width`` and
-         ``maximum_column_width``, or more than ``maximum_columns`` columns. The view
-         shows no rows without columns.
+         display order and throws ``std::invalid_argument`` for a repeated ID or one
+         that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8, a width outside
+         ``minimum_column_width`` and ``maximum_column_width``, or more than
+         ``maximum_columns`` columns. The view shows no rows without columns.
 
       **column_order** : ``std::span<const std::size_t>``, read-only
          The columns in display order: ``column_order()[position]`` is the column
@@ -48,10 +48,11 @@ gui_forms::TreeListView
       **nodes** : ``std::span<const TreeListNode>``
          The nodes in the order given, whatever the sort. :cpp:func:`set_nodes <gui_forms::TreeListView::set_nodes>` replaces
          them, keeps the selection and the current node on their IDs, and throws
-         ``std::invalid_argument`` for an empty or repeated ID, invalid UTF-8, an
-         image key longer than 256 bytes, more than ``maximum_nodes`` nodes, or a
-         depth sequence that is not a preorder (the first node at depth 0, each
-         next node at most one level deeper); the old nodes then stay.
+         ``std::invalid_argument`` for a repeated ID or one that breaks the
+         :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8, an image key longer than 256
+         bytes, more than ``maximum_nodes`` nodes, or a depth sequence that is not a
+         preorder (the first node at depth 0, each next node at most one level
+         deeper); the old nodes then stay.
 
       **row_count** : ``std::size_t``, read-only
          The number of rows: the nodes not hidden under a collapsed node.
@@ -264,10 +265,10 @@ gui_forms::TreeListView
    .. cpp:function:: std::span<const TreeListColumn> columns() const noexcept
 
       The columns, column 0 first. :cpp:func:`set_columns <gui_forms::TreeListView::set_columns>` replaces them, resets the
-      display order and throws ``std::invalid_argument`` for an empty or
-      repeated ID, invalid UTF-8, a width outside ``minimum_column_width`` and
-      ``maximum_column_width``, or more than ``maximum_columns`` columns. The view
-      shows no rows without columns.
+      display order and throws ``std::invalid_argument`` for a repeated ID or one
+      that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8, a width outside
+      ``minimum_column_width`` and ``maximum_column_width``, or more than
+      ``maximum_columns`` columns. The view shows no rows without columns.
 
    .. cpp:function:: void set_columns(std::vector<TreeListColumn> columns)
 
@@ -282,10 +283,11 @@ gui_forms::TreeListView
 
       The nodes in the order given, whatever the sort. :cpp:func:`set_nodes <gui_forms::TreeListView::set_nodes>` replaces
       them, keeps the selection and the current node on their IDs, and throws
-      ``std::invalid_argument`` for an empty or repeated ID, invalid UTF-8, an
-      image key longer than 256 bytes, more than ``maximum_nodes`` nodes, or a
-      depth sequence that is not a preorder (the first node at depth 0, each
-      next node at most one level deeper); the old nodes then stay.
+      ``std::invalid_argument`` for a repeated ID or one that breaks the
+      :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid UTF-8, an image key longer than 256
+      bytes, more than ``maximum_nodes`` nodes, or a depth sequence that is not a
+      preorder (the first node at depth 0, each next node at most one level
+      deeper); the old nodes then stay.
 
    .. cpp:function:: void set_nodes(std::vector<TreeListNode> nodes)
 

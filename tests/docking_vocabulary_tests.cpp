@@ -243,7 +243,7 @@ public:
 };
 
 void turned_text_is_retained_and_replayed() {
-    std::shared_ptr<SideTab> tab = make_control<SideTab>(StableId("side_tab"));
+    std::shared_ptr<SideTab> tab = make_control<SideTab>(StableId("side-tab"));
     (*tab).set_requested_bounds({0.0, 0.0, 24.0, 120.0});
     Window window(tab, {24.0, 120.0});
     window.perform_layout();
@@ -256,7 +256,7 @@ void turned_text_is_retained_and_replayed() {
     }
     require(turned, "the window replays a retained turned run through draw_turned_text_utf8");
     const VisualInspectionSnapshot snapshot = window.visual_inspection_snapshot();
-    const VisualControlInspection* inspected = snapshot.find("side_tab");
+    const VisualControlInspection* inspected = snapshot.find("side-tab");
     require(inspected != nullptr, "the side tab is inspected");
     bool reported = false;
     for (const VisualPaintOperationSnapshot& operation : (*inspected).display_operations) {
@@ -380,7 +380,7 @@ void ribbon_tabs() {
     const SemanticNode* plane = nullptr;
     for (const SemanticNode& node : nodes) {
         if (node.role == SemanticRole::tab_group) row = &node;
-        if (node.stable_id == "ribbon.command_plane") plane = &node;
+        if (node.stable_id == "ribbon.command-plane") plane = &node;
     }
     require(row != nullptr && plane != nullptr, "the ribbon publishes its tab row and command plane");
     require((*row).orientation == SemanticOrientation::horizontal, "the ribbon's tab row is horizontal");
@@ -390,7 +390,7 @@ void ribbon_tabs() {
                            tab.actions.end();
         require(!press, "ribbon tabs publish select and no longer press");
     }
-    require((*row).children.size() == 2U && (*row).children[0].controlled_panel == "ribbon.command_plane" &&
+    require((*row).children.size() == 2U && (*row).children[0].controlled_panel == "ribbon.command-plane" &&
                 (*row).children[1].controlled_panel.empty(),
             "only the selected ribbon tab names the command plane");
 }

@@ -18,6 +18,8 @@
 #include <exception>
 #include <functional>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <thread>
 #include <type_traits>
 #include <unordered_set>
@@ -118,6 +120,27 @@ void assign_missing_virtual_runtime_ids(std::vector<SemanticNode>& nodes) {
     }
 }
 
+// A virtual child's stable ID, and the panel it names as controlled, follow
+// the StableId segment rule like a control's: hosts and theme selectors
+// address them the same way. Throws std::invalid_argument naming the
+// publishing control.
+void require_valid_virtual_ids(const Control& owner, const std::vector<SemanticNode>& nodes) {
+    for (const SemanticNode& node : nodes) {
+        const bool valid = valid_stable_id(node.stable_id) &&
+                           (node.controlled_panel.empty() || valid_stable_id(node.controlled_panel));
+        if (!valid) {
+            const std::string_view shown = valid_stable_id(node.stable_id) ? std::string_view(node.controlled_panel)
+                                                                           : std::string_view(node.stable_id);
+            throw std::invalid_argument("GUI.Forms control \"" + std::string(owner.stable_id().value()) +
+                                        "\" published a semantic node ID \"" +
+                                        std::string(shown.substr(0U, 80U)) +
+                                        "\" that is not '.'-separated segments of lowercase ASCII letters and "
+                                        "digits joined by single '-'");
+        }
+        require_valid_virtual_ids(owner, node.children);
+    }
+}
+
 // Focus held by controls that the semantic tree does not publish as nodes of
 // their own and that therefore belong to the node of their nearest exposed
 // ancestor: a composite's inner editor, splitter or other part.
@@ -181,6 +204,7 @@ void append_semantic_nodes(const Control::Ptr& control,
         std::vector<SemanticNode> virtual_children =
             (*control).semantic_virtual_children();
         if (!current_semantic_identity(control, expected_parent, owner)) return;
+        require_valid_virtual_ids(*control, virtual_children);
         assign_missing_virtual_runtime_ids(virtual_children);
         count += virtual_children.size();
         descendants.insert(descendants.end(),

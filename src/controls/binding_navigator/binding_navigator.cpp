@@ -60,27 +60,27 @@ std::optional<std::size_t> typed_position(std::string_view text, std::size_t cou
 
 BindingNavigator::BindingNavigator(StableId navigator_id) : ToolStrip(std::move(navigator_id)) {
     const std::string identity(stable_id().value());
-    move_first_ = make_action(identity, "move_first", "First");
-    move_previous_ = make_action(identity, "move_previous", "Previous");
-    move_next_ = make_action(identity, "move_next", "Next");
-    move_last_ = make_action(identity, "move_last", "Last");
-    add_new_ = make_action(identity, "add_new", "Add");
+    move_first_ = make_action(identity, "move-first", "First");
+    move_previous_ = make_action(identity, "move-previous", "Previous");
+    move_next_ = make_action(identity, "move-next", "Next");
+    move_last_ = make_action(identity, "move-last", "Last");
+    add_new_ = make_action(identity, "add-new", "Add");
     delete_ = make_action(identity, "delete", "Delete");
 }
 
 void BindingNavigator::initialize_control_tree() {
     std::vector<ToolStripItemSpec> items;
-    items.push_back({.stable_id = "move_first", .command = move_first_});
-    items.push_back({.stable_id = "move_previous", .command = move_previous_});
-    items.push_back({.stable_id = "separator_position", .kind = ToolStripItemKind::separator});
+    items.push_back({.stable_id = "move-first", .command = move_first_});
+    items.push_back({.stable_id = "move-previous", .command = move_previous_});
+    items.push_back({.stable_id = "separator-position", .kind = ToolStripItemKind::separator});
     items.push_back({.stable_id = std::string(position_item), .kind = ToolStripItemKind::text_box,
                      .text = "Position", .width = position_width});
     items.push_back({.stable_id = std::string(count_item), .kind = ToolStripItemKind::label, .text = "of 0"});
-    items.push_back({.stable_id = "separator_move", .kind = ToolStripItemKind::separator});
-    items.push_back({.stable_id = "move_next", .command = move_next_});
-    items.push_back({.stable_id = "move_last", .command = move_last_});
-    items.push_back({.stable_id = "separator_edit", .kind = ToolStripItemKind::separator});
-    items.push_back({.stable_id = "add_new", .command = add_new_});
+    items.push_back({.stable_id = "separator-move", .kind = ToolStripItemKind::separator});
+    items.push_back({.stable_id = "move-next", .command = move_next_});
+    items.push_back({.stable_id = "move-last", .command = move_last_});
+    items.push_back({.stable_id = "separator-edit", .kind = ToolStripItemKind::separator});
+    items.push_back({.stable_id = "add-new", .command = add_new_});
     items.push_back({.stable_id = "delete", .command = delete_});
     set_items(std::move(items));
     using Action = Delegate<const CommandInvocation&>;

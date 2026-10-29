@@ -4,15 +4,26 @@ Every control is constructed with a stable ID, and keeps it for its whole
 life. Logs, the instrumentation snapshot, the semantic (accessibility) tree,
 automation and `Window::find` all address a control by this string, so a test
 can say "press `dialog.ok`" without coordinates. Choose IDs that describe the
-control's role in the form, such as `"settings.wrap"`; the toolkit attaches
-no meaning to dots or other characters. For a display name that may change,
-use the control's `name` property instead.
+control's role in the form, such as `"settings.wrap"`. An ID is one or more
+segments separated by `.`, each made of lowercase ASCII letters and digits
+joined by single `-` (`"files.list-view"`); the dots are hierarchy, and theme
+selectors and locale files name controls by these segments. For a display
+name that may change, use the control's `name` property instead.
+
+The rule also covers the semantic node IDs controls publish for their parts
+(a ribbon's ``.command-plane``, a list view's items): the window checks them
+when it builds a semantic snapshot and throws `std::invalid_argument` naming
+the control, and the controls check the item, row, column and page IDs they
+take from you when you set them.
 
 Parameters
 ----------
 value
-    The identity. Any nonempty string is accepted; an empty string throws
-    `std::invalid_argument`.
+    The identity. A string literal is checked when the program compiles: an
+    invalid literal does not compile. A `std::string` or `std::string_view`
+    built at run time is checked when the ID is constructed and throws
+    `std::invalid_argument` when it breaks the rule (`valid_stable_id`). A
+    bare `const char*` is refused at compile time; wrap it in `std::string`.
 
 Properties
 ----------

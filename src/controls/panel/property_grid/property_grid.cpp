@@ -322,14 +322,38 @@ struct PropertyGrid::Impl final {
             left.readable == right.readable && left.browsable == right.browsable;
     }
 
+    // A property path or category as stable ID segments: its registered
+    // name in CSS spelling ("accessible-description", "settings.threshold"),
+    // with any other character an application's category may hold (a space,
+    // a bracket) as a single '-' between letters and digits.
+    [[nodiscard]] static std::string id_segments(std::string_view name) {
+        const std::string spelled = css_spelling(registered_name(name));
+        std::string segments;
+        segments.reserve(spelled.size());
+        bool dash_pending = false;
+        for (const char character : spelled) {
+            const bool alphanumeric = (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9');
+            if (alphanumeric) {
+                if (dash_pending && !segments.empty() && segments.back() != '.') segments += '-';
+                dash_pending = false;
+                segments += character;
+            } else if (character == '.') {
+                dash_pending = false;
+                if (!segments.empty() && segments.back() != '.') segments += '.';
+            } else {
+                dash_pending = true;
+            }
+        }
+        while (!segments.empty() && segments.back() == '.') segments.pop_back();
+        return segments.empty() ? std::string("unnamed") : segments;
+    }
+
     [[nodiscard]] std::string row_id(std::string_view property_name) const {
-        return std::string(owner.stable_id().value()) + ".property." +
-               registered_name(property_name);
+        return std::string(owner.stable_id().value()) + ".property." + id_segments(property_name);
     }
 
     [[nodiscard]] std::string group_id(std::string_view category) const {
-        return std::string(owner.stable_id().value()) + ".category." +
-               registered_name(category);
+        return std::string(owner.stable_id().value()) + ".category." + id_segments(category);
     }
 
     [[nodiscard]] std::string display_value(

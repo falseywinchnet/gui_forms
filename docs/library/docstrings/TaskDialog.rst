@@ -19,7 +19,7 @@ Parameters
 stable_id
     Identity of the dialog. Its children are named after it:
     ``<stable_id>.heading``, ``.text``, ``.button.<id>``, ``.radio.<id>``,
-    ``.verification``, ``.expander``, ``.expanded_text``, ``.progress`` and
+    ``.verification``, ``.expander``, ``.expanded-text``, ``.progress`` and
     ``.footnote``; the layer it sits in while shown is ``<stable_id>.layer``.
 
 Properties

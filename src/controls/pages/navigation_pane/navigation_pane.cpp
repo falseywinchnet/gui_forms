@@ -233,9 +233,9 @@ NavigationPane::NavigationPane(StableId stable_id) : Control(std::move(stable_id
         *this, Delegate<const MenuItemInvocation&>::bind<NavigationPane, &NavigationPane::on_menu_item_invoked>(*this));
     menu_changed_ = (*menu_).open_changed().subscribe(
         *this, Delegate<bool>::bind<NavigationPane, &NavigationPane::on_menu_open_changed>(*this));
-    show_more_command_ = std::make_shared<Command>(prefix + ".show_more", std::string(show_more_text));
-    show_fewer_command_ = std::make_shared<Command>(prefix + ".show_fewer", std::string(show_fewer_text));
-    hidden_heading_command_ = std::make_shared<Command>(prefix + ".hidden_heading", std::string(hidden_heading_text));
+    show_more_command_ = std::make_shared<Command>(prefix + ".show-more", std::string(show_more_text));
+    show_fewer_command_ = std::make_shared<Command>(prefix + ".show-fewer", std::string(show_fewer_text));
+    hidden_heading_command_ = std::make_shared<Command>(prefix + ".hidden-heading", std::string(hidden_heading_text));
     (*hidden_heading_command_).set_enabled(false);
     options_command_ = std::make_shared<Command>(prefix + ".options", std::string(options_text));
     selection_token_ = pages_.selected_page_changed().subscribe(
@@ -1466,13 +1466,13 @@ bool NavigationPane::show_configure_menu(MenuOpenMode mode) {
     (*show_more_command_).set_enabled(placed.large_count < maximum);
     (*show_fewer_command_).set_enabled(placed.large_count > 0U);
     std::vector<MenuItemSpec> items{};
-    items.emplace_back(prefix + ".show_more", MenuItemKind::command, show_more_command_, std::string(show_more_text));
-    items.emplace_back(prefix + ".show_fewer", MenuItemKind::command, show_fewer_command_,
+    items.emplace_back(prefix + ".show-more", MenuItemKind::command, show_more_command_, std::string(show_more_text));
+    items.emplace_back(prefix + ".show-fewer", MenuItemKind::command, show_fewer_command_,
                        std::string(show_fewer_text));
     page_commands_.clear();
     // The pages with neither a large button nor an icon, then the pages the
     // user hid; choosing one selects it (and shows a hidden one again).
-    if (!placed.unfit.empty()) items.emplace_back(prefix + ".unfit_separator", MenuItemKind::separator);
+    if (!placed.unfit.empty()) items.emplace_back(prefix + ".unfit-separator", MenuItemKind::separator);
     for (const std::size_t position : placed.unfit) {
         const std::string id = prefix + ".page." + pages_.record_at(PagePosition{position}).id.value;
         const std::string text = page_text(position);
@@ -1481,9 +1481,9 @@ bool NavigationPane::show_configure_menu(MenuOpenMode mode) {
     }
     const std::vector<PageId> hidden = hidden_pages();
     if (!hidden.empty()) {
-        items.emplace_back(prefix + ".hidden_separator", MenuItemKind::separator);
+        items.emplace_back(prefix + ".hidden-separator", MenuItemKind::separator);
         // No menu row kind is a section heading: a disabled row stands in.
-        items.emplace_back(prefix + ".hidden_heading", MenuItemKind::command, hidden_heading_command_,
+        items.emplace_back(prefix + ".hidden-heading", MenuItemKind::command, hidden_heading_command_,
                            std::string(hidden_heading_text));
     }
     for (const PageId& page : hidden) {
@@ -1494,7 +1494,7 @@ bool NavigationPane::show_configure_menu(MenuOpenMode mode) {
         page_commands_.push_back(std::make_shared<Command>(id, text));
         items.emplace_back(id, MenuItemKind::command, page_commands_.back(), text);
     }
-    items.emplace_back(prefix + ".options_separator", MenuItemKind::separator);
+    items.emplace_back(prefix + ".options-separator", MenuItemKind::separator);
     items.emplace_back(prefix + ".options", MenuItemKind::command, options_command_, std::string(options_text));
     (*menu_).set_items(std::move(items));
     const Rect absolute = absolute_bounds();
@@ -1512,11 +1512,11 @@ void NavigationPane::on_menu_open_changed(bool) {
 void NavigationPane::on_menu_item_invoked(const MenuItemInvocation& invocation) {
     const std::string prefix(stable_id().value());
     const std::string& item = invocation.item_id;
-    if (item == prefix + ".show_more") {
+    if (item == prefix + ".show-more") {
         static_cast<void>(step_buttons(1));
         return;
     }
-    if (item == prefix + ".show_fewer") {
+    if (item == prefix + ".show-fewer") {
         static_cast<void>(step_buttons(-1));
         return;
     }
