@@ -1927,6 +1927,13 @@ if(GUI_FORMS_BUILD_PAINT_PROFILE)
     target_link_libraries(gui_forms_paint_profile_workload PRIVATE gui_forms_gallery_model gui_forms_skia)
 endif()
 
+# SK2: the time each host spends presenting a frame, which the native jobs
+# measure (.github/workflows/native-platform.yml). Built only when asked for.
+if(TARGET gui_forms_application)
+    add_executable(gui_forms_present_profile_workload EXCLUDE_FROM_ALL benchmarks/present_profile_workload.cpp)
+    target_link_libraries(gui_forms_present_profile_workload PRIVATE gui_forms_application)
+endif()
+
 if(GUI_FORMS_BUILD_BENCHMARKS)
     if(NOT APPLE OR NOT TARGET gui_forms_skia OR NOT TARGET gui_forms_coregraphics OR
        NOT TARGET gui_forms_gallery_model)
