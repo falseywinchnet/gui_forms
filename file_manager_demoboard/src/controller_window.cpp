@@ -130,7 +130,7 @@ std::unique_ptr<gui_forms::Window> make_controller_window(
     (*root).add_child(accommodation);
 
     std::shared_ptr<gui_forms::ComboBox> text_scale = std::make_shared<ComboBox>(
-        StableId("demo.accommodation.text_scale"));
+        StableId("demo.accommodation.text-scale"));
     (*text_scale).set_requested_bounds({0,0,430,30});
     (*text_scale).set_accessible_name("Product text size");
     (*text_scale).set_accessible_description(
@@ -142,7 +142,7 @@ std::unique_ptr<gui_forms::Window> make_controller_window(
     (*root).add_child(text_scale);
 
     std::shared_ptr<gui_forms::Label> density = std::make_shared<Label>(
-        StableId("demo.accommodation.display_scale"),
+        StableId("demo.accommodation.display-scale"),
         "Display scale: host-derived · text scale: 100%");
     (*density).set_requested_bounds({0,0,430,24});
     (*density).set_font({FontRole::content,10,400,false});
@@ -158,7 +158,7 @@ std::unique_ptr<gui_forms::Window> make_controller_window(
     (*root).add_child(sound);
 
     std::shared_ptr<gui_forms::CheckBox> reduced_motion = std::make_shared<CheckBox>(
-        StableId("demo.accommodation.reduced_motion"), "Reduced motion");
+        StableId("demo.accommodation.reduced-motion"), "Reduced motion");
     (*reduced_motion).set_requested_bounds({0,0,430,28});
     (*reduced_motion).set_accessible_description(
         "Keeps live animation active at a calmer cadence and reduced excursion");

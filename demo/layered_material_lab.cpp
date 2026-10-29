@@ -398,7 +398,7 @@ std::unique_ptr<Window> make_layered_material_lab() {
     }};
     for (const Spec& spec : specs) {
         std::shared_ptr<Control> specimen = make_control<Control>(
-            StableId(spec.id));
+            StableId(std::string(spec.id)));
         (*specimen).set_authored_surface_material(spec.material);
         add_at(root, specimen, spec.bounds);
         add_specimen_copy(specimen, spec.id, spec.title, spec.detail,

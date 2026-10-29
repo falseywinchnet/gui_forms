@@ -22,7 +22,8 @@ items
     The items in preorder: each `TreeViewItem` is followed by its
     descendants, at one more `depth` for each level. The first item must
     have depth 0 and no item may be more than one level deeper than the
-    item before it. IDs must be nonempty, unique and valid UTF-8, the text
+    item before it. IDs must be unique and follow the
+    `StableId` segment rule, the text
     valid UTF-8, and an `image_key` at most 256 bytes, or `set_items`
     throws `std::invalid_argument`. Only items marked `expandable` can be
     collapsed; the descendants of an expandable item that is not

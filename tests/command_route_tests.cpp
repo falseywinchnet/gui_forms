@@ -260,12 +260,12 @@ void shortcut_from_a_tool_reaches_the_document() {
     // A tool strip and a ribbon route their commands the same way.
     std::shared_ptr<ToolStrip> strip = make_control<ToolStrip>(StableId("root.strip"));
     std::vector<ToolStripItemSpec> items;
-    items.push_back({.stable_id = "strip_save", .text = "Save", .command = save});
+    items.push_back({.stable_id = "strip-save", .text = "Save", .command = save});
     (*strip).set_items(std::move(items));
     (*strip).set_requested_bounds({0.0, 270.0, 600.0, 25.0});
     (*workspace.root).add_child(strip);
     window.perform_layout();
-    require(window.perform_semantic_action("strip_save", SemanticAction::press) && journal.entries.size() == 2U &&
+    require(window.perform_semantic_action("strip-save", SemanticAction::press) && journal.entries.size() == 2U &&
                 journal.entries[1] == "document:save:root.strip" && invoked == 0,
             "a tool strip button routes its command to the active document");
 
@@ -273,7 +273,7 @@ void shortcut_from_a_tool_reaches_the_document() {
     std::vector<RibbonTabSpec> tabs;
     RibbonTabSpec home{.stable_id = "home", .text = "&Home"};
     RibbonGroupSpec file{.stable_id = "file", .caption = "File"};
-    file.commands.push_back({.stable_id = "ribbon_save", .command = save});
+    file.commands.push_back({.stable_id = "ribbon-save", .command = save});
     home.groups.push_back(std::move(file));
     tabs.push_back(std::move(home));
     (*ribbon).set_tabs(std::move(tabs));
@@ -281,7 +281,7 @@ void shortcut_from_a_tool_reaches_the_document() {
     Window ribbon_window(ribbon, {600.0, 140.0});
     ribbon_window.perform_layout();
     ribbon_window.set_command_target(CommandRouteStage::active_document, document_target);
-    require((*ribbon).on_semantic_child_action("ribbon.command.ribbon_save", SemanticAction::press, {}) &&
+    require((*ribbon).on_semantic_child_action("ribbon.command.ribbon-save", SemanticAction::press, {}) &&
                 journal.entries.size() == 3U && journal.entries[2] == "document:save:ribbon" && invoked == 0,
             "a ribbon command routes to the active document named on its window");
 }

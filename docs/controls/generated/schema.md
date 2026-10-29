@@ -282,6 +282,52 @@ Properties beyond every control's: none.
 | `overwrite_mode_changed` | `bool` |
 | `type_validation_completed` | `MaskValidation` |
 
+## `rich_text_box` (RichTextBox, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `viewport` | region |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+| `face` | face |  |  |
+| `edge` | edge |  |  |
+| `well` | well |  |  |
+| `bar` | region |  |  |
+| `content` | content |  |  |
+| `caret` | caret |  |  |
+| `selection` | selection |  |  |
+
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `read_only`, `invalid`, `pending`.
+
+Item system `bar_button`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `button` | face |  |  |
+| `button_label` | label |  |  |
+| `button_glyph` | glyph |  |  |
+
+Item states: `hot`, `pressed`, `checked`, `indeterminate`, `disabled`, `open`.
+
+Properties beyond every control's: `text` (text).
+
+| Interaction | Payload |
+|---|---|
+| `scroll` | `ScrollEvent`, by reference |
+| `text_changed` | `std::string` |
+| `content_changed` | none |
+| `selection_changed` | `TextSelection` |
+| `link_clicked` | `std::string` |
+
 ## `label` (Label, control)
 
 | Part | Role | Reuses | Own states |

@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <string>
 
 namespace gui_forms::host::linux_detail {
 namespace {
@@ -291,7 +292,7 @@ void DialogClose::operator()() const { (*state).done = true; }
 std::shared_ptr<Label> label(DialogState &state, const char *id,
                              std::string text, Rect bounds) {
   const std::shared_ptr<Label> control =
-      make_control<Label>(StableId(id), std::move(text));
+      make_control<Label>(StableId(std::string(id)), std::move(text));
   (*control).set_font({FontRole::content, 15, 400, false});
   (*control).set_text_wrapping(TextWrapping::word);
   (*control).set_bounds(bounds);

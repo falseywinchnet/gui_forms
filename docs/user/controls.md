@@ -50,7 +50,15 @@ lab
 ## Conventions shared by every control
 
 - Construct with `make_control<T>(StableId, ...)`; the parent owns the result
-  once you `add_child` it.
+  once you `add_child` it. A stable ID is one or more segments separated by
+  `.`, each made of lowercase ASCII letters and digits joined by single `-`
+  (`files.list-view`). A literal such as `StableId("files.list-view")` is
+  checked when the program compiles; a `std::string` or `std::string_view`
+  built at run time throws `std::invalid_argument` when it breaks the rule.
+  The same rule covers the IDs a control builds from yours (menu rows, item
+  and row nodes, hosted parts) and the semantic node IDs a control publishes
+  for its parts, so item, row, column and page IDs you supply follow it too;
+  the setters that take them throw `std::invalid_argument` otherwise.
 - Setting an equal value does nothing. State events fire for every actual
   change, whether it came from input or from a setter. Input events
   (`clicked`, `scroll`, `item_activated`) fire for user input only and are

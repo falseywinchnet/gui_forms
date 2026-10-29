@@ -299,7 +299,7 @@ void TaskDialog::rebuild_children() {
         add_child(expander_button_);
         child_tokens_.push_back((*expander_button_).clicked().subscribe(
             *this, Delegate<ButtonBase&>::bind<TaskDialog, &TaskDialog::on_expander>(*this)));
-        expanded_text_ = make_paragraph(".expanded_text", expander.text, font_);
+        expanded_text_ = make_paragraph(".expanded-text", expander.text, font_);
         set_child_layout_collapsed(expanded_text_, !expander.expanded);
     }
     if (!page_.verification_text.empty()) {

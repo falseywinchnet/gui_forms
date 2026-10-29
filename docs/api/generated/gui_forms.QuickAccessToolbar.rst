@@ -36,8 +36,10 @@ gui_forms::QuickAccessToolbar
          Each has its :cpp:class:`Command <gui_forms::Command>`, an optional image (a command with an image shows
          only its icon, one without its text) and whether the toolbar shows it
          before the user customizes. Setting them shows those marked shown and
-         replaces any customization; a missing command, an empty or repeated
-         command ID, or more than 20 commands throws ``std::invalid_argument``.
+         replaces any customization; a missing command, a repeated command ID or
+         one that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule (its toolbar item and
+         customize row are named after it), or more than 20 commands throws
+         ``std::invalid_argument``.
 
       **shown_command_ids** : ``std::vector<std::string>``
          The IDs of the commands the toolbar shows, in toolbar order.
@@ -165,8 +167,10 @@ gui_forms::QuickAccessToolbar
       Each has its :cpp:class:`Command <gui_forms::Command>`, an optional image (a command with an image shows
       only its icon, one without its text) and whether the toolbar shows it
       before the user customizes. Setting them shows those marked shown and
-      replaces any customization; a missing command, an empty or repeated
-      command ID, or more than 20 commands throws ``std::invalid_argument``.
+      replaces any customization; a missing command, a repeated command ID or
+      one that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule (its toolbar item and
+      customize row are named after it), or more than 20 commands throws
+      ``std::invalid_argument``.
 
    .. cpp:function:: void set_commands(std::vector<QuickAccessToolbarCommand> commands)
 

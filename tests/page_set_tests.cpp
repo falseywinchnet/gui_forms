@@ -323,6 +323,8 @@ void refusals_leave_the_set_unchanged() {
     std::vector<Case> cases;
     cases.push_back({set.insert(page(""), PagePlacement::end_of_group()),
                      PageEditStatus::empty_id, "an empty id is refused"});
+    cases.push_back({set.insert(page("new_page"), PagePlacement::end_of_group()),
+                     PageEditStatus::invalid_id, "an id that breaks the StableId segment rule is refused"});
     cases.push_back({set.insert(page("a"), PagePlacement::end_of_group()),
                      PageEditStatus::duplicate_page, "a duplicate id is refused"});
     cases.push_back({set.insert(page("c"), PagePlacement::at(PagePosition{4U})),

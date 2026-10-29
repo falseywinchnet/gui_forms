@@ -526,7 +526,7 @@ public:
 
     // The "group" item system: one shown group header line. Its identity is
     // the view's stable ID, ".group.", and the group's ID; the default
-    // group's is the view's stable ID and ".default_group". `index` is the
+    // group's is the view's stable ID and ".default-group". `index` is the
     // group's position in groups(), or groups().size() for the default
     // group.
     struct GroupParts final {

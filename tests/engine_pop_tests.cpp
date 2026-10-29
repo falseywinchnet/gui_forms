@@ -218,7 +218,7 @@ std::unique_ptr<Fixture> make_fixture(bool reduced_motion, Insets middle_overflo
     made.root = make_control<Panel>(StableId("root"));
     const char* const names[] = {"left", "middle", "right"};
     for (std::size_t index = 0U; index < 3U; ++index) {
-        std::shared_ptr<Tile> tile = make_control<Tile>(StableId(names[index]));
+        std::shared_ptr<Tile> tile = make_control<Tile>(StableId(std::string(names[index])));
         (*tile).set_requested_bounds(Rect{static_cast<double>(index) * 100.0, 0.0, 100.0, 80.0});
         (*made.root).add_child(tile);
         made.tiles.push_back(tile);

@@ -866,8 +866,8 @@ Dump check_text_ranges(const std::string& path, AXUIElementRef application, Dump
     dump = settled_dump(path, report, "text ranges");
     if (report.settle_failed) return dump;
     AxElement surface = find_surface(application);
-    AxElement field = find_identified(surface.get(), "text_box");
-    const SemanticNode* node = find_semantic_node(dump.snapshot.roots, "text_box");
+    AxElement field = find_identified(surface.get(), "text-box");
+    const SemanticNode* node = find_semantic_node(dump.snapshot.roots, "text-box");
     if (field.get() == nullptr || node == nullptr || !(*node).text_selection) {
         report.failures.push_back("text ranges: the fixture's text box is not published with a selection");
         return dump;
@@ -922,7 +922,7 @@ Dump check_text_ranges(const std::string& path, AXUIElementRef application, Dump
     CfValue wanted_range(AXValueCreate(kAXValueTypeCFRange, &wanted));
     const AXError set = AXUIElementSetAttributeValue(field.get(), kAXSelectedTextRangeAttribute, wanted_range.get());
     Dump after = wait_for_new_dump(path, dump, 1500);
-    const SemanticNode* changed = find_semantic_node(after.snapshot.roots, "text_box");
+    const SemanticNode* changed = find_semantic_node(after.snapshot.roots, "text-box");
     const bool selected = set == kAXErrorSuccess && changed != nullptr && (*changed).text_selection &&
                           (*(*changed).text_selection).anchor.value() == 1U &&
                           (*(*changed).text_selection).caret.value() == 2U;

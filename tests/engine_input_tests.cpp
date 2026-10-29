@@ -154,9 +154,9 @@ std::unique_ptr<ThemeDefinition> input_theme() {
     sheet.published_values = {"level", "other"};
     sheet.rules.push_back(bulge_rule("still", fixed_amplitude(0.5)));
     sheet.rules.push_back(bulge_rule("reader", amplitude_from(pointer_x, 1.0 / 40.0, 0.0625)));
-    sheet.rules.push_back(bulge_rule("idle_reader", amplitude_from(pointer_x, 1.0 / 40.0, 0.0625)));
-    sheet.rules.push_back(bulge_rule("level_reader", amplitude_from(published_value_position(0U), 1.0, 0.125)));
-    sheet.rules.push_back(bulge_rule("other_reader", amplitude_from(published_value_position(1U), 1.0, 0.125)));
+    sheet.rules.push_back(bulge_rule("idle-reader", amplitude_from(pointer_x, 1.0 / 40.0, 0.0625)));
+    sheet.rules.push_back(bulge_rule("level-reader", amplitude_from(published_value_position(0U), 1.0, 0.125)));
+    sheet.rules.push_back(bulge_rule("other-reader", amplitude_from(published_value_position(1U), 1.0, 0.125)));
     sheet.rules.push_back(
         bulge_rule("clock", amplitude_from(engine_input_position(EngineInput::time_in_state), 1.0, 0.0625, 0.125)));
     sheet.rules.push_back(
@@ -196,9 +196,9 @@ std::unique_ptr<Fixture> make_fixture() {
     Panel& root = *made.root;
     made.still = add_pad(root, "still", {0.0, 0.0, 100.0, 80.0});
     made.reader = add_pad(root, "reader", {100.0, 0.0, 100.0, 80.0});
-    made.idle_reader = add_pad(root, "idle_reader", {200.0, 0.0, 100.0, 80.0});
-    made.level_reader = add_pad(root, "level_reader", {300.0, 0.0, 100.0, 80.0});
-    made.other_reader = add_pad(root, "other_reader", {400.0, 0.0, 100.0, 80.0});
+    made.idle_reader = add_pad(root, "idle-reader", {200.0, 0.0, 100.0, 80.0});
+    made.level_reader = add_pad(root, "level-reader", {300.0, 0.0, 100.0, 80.0});
+    made.other_reader = add_pad(root, "other-reader", {400.0, 0.0, 100.0, 80.0});
     made.clock = add_pad(root, "clock", {500.0, 0.0, 100.0, 80.0});
     made.scaled = add_pad(root, "scaled", {600.0, 0.0, 100.0, 80.0});
     made.host = add_pad(root, "host", {700.0, 0.0, 100.0, 80.0});
@@ -336,12 +336,12 @@ void painted_on_behalf_is_damaged_where_drawn() {
 void published_value_reaches_only_its_readers() {
     std::unique_ptr<Fixture> fixture = make_fixture();
     Window& window = *(*fixture).window;
-    require(drawn_amplitude(window, "level_reader") == 0.125, "an unpublished value gives the fallback");
+    require(drawn_amplitude(window, "level-reader") == 0.125, "an unpublished value gives the fallback");
     window.reset_activity_metrics();
     require(window.publish_value("level", 0.75), "a value is published");
     const DamageRegion damage = repaint(*fixture);
     require(covers_only(damage, Rect{320.0, 20.0, 40.0, 30.0}), "the published value reaches only its reader");
-    require(drawn_amplitude(window, "level_reader") == 0.75 && drawn_amplitude(window, "other_reader") == 0.125,
+    require(drawn_amplitude(window, "level-reader") == 0.75 && drawn_amplitude(window, "other-reader") == 0.125,
             "its reader shows it; the other value's reader does not change");
     require(window.publish_value("level", 0.75) && window.take_damage().empty(),
             "publishing the same value damages nothing");
@@ -354,7 +354,7 @@ void published_value_reaches_only_its_readers() {
             "three changes, two parts damaged");
     window.withdraw_value("level");
     static_cast<void>(repaint(*fixture));
-    require(drawn_amplitude(window, "level_reader") == 0.125 && !window.published_value("level"),
+    require(drawn_amplitude(window, "level-reader") == 0.125 && !window.published_value("level"),
             "a withdrawn value reads as unpublished");
     require(!window.publish_value("Level", 1.0) && !window.publish_value("level", std::nan("")) &&
                 !window.publish_value("", 1.0) && !window.published_value("Level"),

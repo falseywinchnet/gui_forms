@@ -137,6 +137,10 @@ enum class PageEditStatus : std::uint8_t {
     applied,
     unchanged,
     empty_id,
+    // The id is not '.'-separated segments of lowercase ASCII letters and
+    // digits joined by single '-': controls name their parts after the page
+    // with it, so it follows the `StableId` segment rule.
+    invalid_id,
     unknown_page,
     duplicate_page,
     capacity_reached,

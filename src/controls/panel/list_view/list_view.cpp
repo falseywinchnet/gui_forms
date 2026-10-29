@@ -94,7 +94,7 @@ bool valid_view(ListViewView view) noexcept {
 }
 
 bool valid_group(const ListViewGroup& group) {
-    const bool result = !group.stable_id.empty() && validate_utf8(group.stable_id).valid() &&
+    const bool result = valid_stable_id(group.stable_id) &&
                         validate_utf8(group.header).valid() && valid_alignment(group.header_alignment);
     return result;
 }
@@ -183,8 +183,8 @@ ListView::~ListView() {}
 
 void ListView::initialize_control_tree() {
     const std::string prefix(stable_id().value());
-    vertical_bar_ = make_control<VScrollBar>(StableId(prefix + ".vertical_scroll_bar"));
-    horizontal_bar_ = make_control<HScrollBar>(StableId(prefix + ".horizontal_scroll_bar"));
+    vertical_bar_ = make_control<VScrollBar>(StableId(prefix + ".vertical-scroll-bar"));
+    horizontal_bar_ = make_control<HScrollBar>(StableId(prefix + ".horizontal-scroll-bar"));
     // The bars scroll with the pointer; the keyboard scrolls the view itself.
     (*vertical_bar_).set_focusable(false);
     (*horizontal_bar_).set_focusable(false);
@@ -218,9 +218,10 @@ void ListView::set_columns(std::vector<ListViewColumn> columns) {
     }
     std::unordered_set<std::string> identities{};
     for (const ListViewColumn& column : columns) {
-        if (column.stable_id.empty() || !validate_utf8(column.stable_id).valid() ||
+        if (!valid_stable_id(column.stable_id) ||
             !validate_utf8(column.text).valid() || !identities.insert(column.stable_id).second) {
-            throw std::invalid_argument("ListView columns require unique stable IDs and valid UTF-8");
+            throw std::invalid_argument(
+                "ListView columns require unique stable IDs following the StableId segment rule and valid UTF-8");
         }
         if (!std::isfinite(column.width) || column.width < minimum_column_width ||
             column.width > maximum_column_width || !valid_alignment(column.alignment)) {
@@ -273,8 +274,9 @@ void ListView::set_items(std::vector<ListViewItem> items) {
     next_indices.reserve(items.size());
     for (std::size_t index = 0; index < items.size(); ++index) {
         const ListViewItem& item = items[index];
-        if (item.stable_id.empty() || !validate_utf8(item.stable_id).valid() || !valid_item_text(item)) {
-            throw std::invalid_argument("ListView items require stable IDs and valid UTF-8");
+        if (!valid_stable_id(item.stable_id) || !valid_item_text(item)) {
+            throw std::invalid_argument(
+                "ListView items require stable IDs following the StableId segment rule and valid UTF-8");
         }
         const std::pair<ItemIndices::iterator, bool> inserted = next_indices.emplace(item.stable_id, index);
         if (!inserted.second) throw std::invalid_argument("ListView item IDs must be unique");
@@ -373,7 +375,7 @@ void ListView::refresh_virtual_items() {
 const ListViewItem& ListView::item_at(std::size_t index, ListViewItem& scratch) const {
     if (!source_) return items_[index];
     (*source_).retrieve_item(index, scratch);
-    if (scratch.stable_id.empty() || !validate_utf8(scratch.stable_id).valid()) {
+    if (!valid_stable_id(scratch.stable_id)) {
         scratch.stable_id = "#" + std::to_string(index);
     }
     if (!valid_item_text(scratch)) {
@@ -919,7 +921,9 @@ void ListView::set_groups(std::vector<ListViewGroup> groups) {
     std::unordered_set<std::string> identities{};
     for (const ListViewGroup& group : groups) {
         if (!valid_group(group) || !identities.insert(group.stable_id).second) {
-            throw std::invalid_argument("ListView groups require unique stable IDs, valid UTF-8 and an alignment");
+            throw std::invalid_argument(
+                "ListView groups require unique stable IDs following the StableId segment rule, valid UTF-8 and an "
+                "alignment");
         }
     }
     groups_ = std::move(groups);
@@ -961,7 +965,7 @@ std::string ListView::group_identity(std::size_t group) const {
         identity.append(".group.");
         identity.append(groups_[group].stable_id);
     } else {
-        identity.append(".default_group");
+        identity.append(".default-group");
     }
     return identity;
 }
@@ -2467,7 +2471,7 @@ void ListView::place_label_editor(const Layout& placed) {
 // edited carries no TextBox.
 void ListView::create_label_editor() {
     const std::string prefix(stable_id().value());
-    label_editor_ = make_control<TextBox>(StableId(prefix + ".label_editor"));
+    label_editor_ = make_control<TextBox>(StableId(prefix + ".label-editor"));
     TextBox& editor = *label_editor_;
     editor.set_border_style(BorderStyle::none);
     editor.set_font(font_);

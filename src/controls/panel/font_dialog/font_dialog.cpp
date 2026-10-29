@@ -97,11 +97,11 @@ FontDialog::~FontDialog() {
 
 void FontDialog::initialize_control_tree() {
     const std::string prefix(stable_id().value());
-    face_caption_ = make_control<Label>(StableId(prefix + ".face_caption"), "Font:");
-    style_caption_ = make_control<Label>(StableId(prefix + ".style_caption"), "Font style:");
-    size_caption_ = make_control<Label>(StableId(prefix + ".size_caption"), "Size:");
-    face_list_ = make_control<ListBox>(StableId(prefix + ".face_list"));
-    style_list_ = make_control<ListBox>(StableId(prefix + ".style_list"));
+    face_caption_ = make_control<Label>(StableId(prefix + ".face-caption"), "Font:");
+    style_caption_ = make_control<Label>(StableId(prefix + ".style-caption"), "Font style:");
+    size_caption_ = make_control<Label>(StableId(prefix + ".size-caption"), "Size:");
+    face_list_ = make_control<ListBox>(StableId(prefix + ".face-list"));
+    style_list_ = make_control<ListBox>(StableId(prefix + ".style-list"));
     size_box_ = make_control<NumericUpDown>(StableId(prefix + ".size"));
     ok_button_ = make_control<Button>(StableId(prefix + ".ok"), "OK");
     cancel_button_ = make_control<Button>(StableId(prefix + ".cancel"), "Cancel");

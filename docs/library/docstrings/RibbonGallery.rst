@@ -26,9 +26,10 @@ categories
     The categories in display order.
 items
     The items. `set_items` replaces the categories and items: items without a
-    category show first, then category by category in category order. An
-    empty or repeated ID, an item naming an unknown category, or invalid
-    UTF-8 throws `std::invalid_argument`.
+    category show first, then category by category in category order. A
+    repeated ID or one that breaks the `StableId` segment rule, an item
+    naming an unknown category, or invalid UTF-8 throws
+    `std::invalid_argument`.
 command
     The `GalleryCommand` whose value the selection follows, which a click or
     Enter commits and which receives previews. `set_command` sets it; without

@@ -35,7 +35,8 @@ gui_forms::Ribbon
       **stable_id** : ``StableId``
          Identity of the ribbon, unique within its window. Its menus are shown by
          a :cpp:class:`ContextMenu <gui_forms::ContextMenu>` named ``<stable_id>.menu``; hosted controls are named
-         ``<stable_id>.<command id>``.
+         ``<stable_id>.<command id>``, so a hosted command's ID follows the
+         :cpp:class:`StableId <gui_forms::StableId>` segment rule.
 
    :Properties:
 
@@ -46,19 +47,20 @@ gui_forms::Ribbon
          availability by ID, keeps the selection on a shown tab with the same ID
          (else the first core tab shown), keeps a
          hosted control while a command of the same ID and kind remains, and
-         throws ``std::invalid_argument`` for an empty or repeated ID (one namespace
-         across tabs, groups and commands), invalid UTF-8, a button, toggle or
-         split without a :cpp:class:`Command <gui_forms::Command>`, a menu on a kind that has none or a split or
-         drop-down without one, an icon-only command that is not small or has no
-         image, choices on a command that is not a combo box, a width outside 0
-         to 1024, an invalid menu, a gallery command without an in-ribbon gallery
-         (or with one used twice or owned elsewhere), two galleries in a group, an
-         invalid layout (a collapsed layout that is not last or in a group of one
-         command, sizes that grow, a size count other than the command count, rows
-         outside 1 to 3, an icon-only command made large), a reduction step naming
-         a group not on its tab or shrinking a group past its last layout or its
-         gallery past its minimum (owner decision 29), or more than the
-         development bounds. A refused definition leaves the previous tabs.
+         throws ``std::invalid_argument`` for a repeated ID or one that breaks the
+         :cpp:class:`StableId <gui_forms::StableId>` segment rule (one namespace across tabs, groups and commands),
+         invalid UTF-8, a button, toggle or split without a :cpp:class:`Command <gui_forms::Command>`, a menu on a
+         kind that has none or a split or drop-down without one, an icon-only
+         command that is not small or has no image, choices on a command that is
+         not a combo box, a width outside 0 to 1024, an invalid menu, a gallery
+         command without an in-ribbon gallery (or with one used twice or owned
+         elsewhere), two galleries in a group, an invalid layout (a collapsed
+         layout that is not last or in a group of one command, sizes that grow, a
+         size count other than the command count, rows outside 1 to 3, an icon-only
+         command made large), a reduction step naming a group not on its tab or
+         shrinking a group past its last layout or its gallery past its minimum
+         (owner decision 29), or more than the development bounds. A refused
+         definition leaves the previous tabs.
 
       **tab_sets** : ``std::span<const RibbonTabSetSpec>``, read-only
          The contextual tab sets (:cpp:class:`RibbonTabSetSpec <gui_forms::RibbonTabSetSpec>`: ID and caption).
@@ -114,10 +116,10 @@ gui_forms::Ribbon
          description such as its folder), numbered under :cpp:func:`recent_caption <gui_forms::Ribbon::recent_caption>`. While
          there are recent items the File tab opens a two-pane menu: the
          application menu's commands on the left, the recent items on the right.
-         :cpp:func:`set_recent_items <gui_forms::Ribbon::set_recent_items>` throws ``std::invalid_argument`` for an empty or
-         repeated ID, invalid or multi-line UTF-8, more than
-         ``Ribbon::maximum_recent_items`` (50), or an application menu holding other
-         kinds than commands and separators.
+         :cpp:func:`set_recent_items <gui_forms::Ribbon::set_recent_items>` throws ``std::invalid_argument`` for a repeated ID or one
+         that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid or multi-line UTF-8, more
+         than ``Ribbon::maximum_recent_items`` (50), or an application menu holding
+         other kinds than commands and separators.
 
       **recent_caption** : ``std::string``, default ``"Recent documents"``
          The recent pane's caption.
@@ -418,19 +420,20 @@ gui_forms::Ribbon
       availability by ID, keeps the selection on a shown tab with the same ID
       (else the first core tab shown), keeps a
       hosted control while a command of the same ID and kind remains, and
-      throws ``std::invalid_argument`` for an empty or repeated ID (one namespace
-      across tabs, groups and commands), invalid UTF-8, a button, toggle or
-      split without a :cpp:class:`Command <gui_forms::Command>`, a menu on a kind that has none or a split or
-      drop-down without one, an icon-only command that is not small or has no
-      image, choices on a command that is not a combo box, a width outside 0
-      to 1024, an invalid menu, a gallery command without an in-ribbon gallery
-      (or with one used twice or owned elsewhere), two galleries in a group, an
-      invalid layout (a collapsed layout that is not last or in a group of one
-      command, sizes that grow, a size count other than the command count, rows
-      outside 1 to 3, an icon-only command made large), a reduction step naming
-      a group not on its tab or shrinking a group past its last layout or its
-      gallery past its minimum (owner decision 29), or more than the
-      development bounds. A refused definition leaves the previous tabs.
+      throws ``std::invalid_argument`` for a repeated ID or one that breaks the
+      :cpp:class:`StableId <gui_forms::StableId>` segment rule (one namespace across tabs, groups and commands),
+      invalid UTF-8, a button, toggle or split without a :cpp:class:`Command <gui_forms::Command>`, a menu on a
+      kind that has none or a split or drop-down without one, an icon-only
+      command that is not small or has no image, choices on a command that is
+      not a combo box, a width outside 0 to 1024, an invalid menu, a gallery
+      command without an in-ribbon gallery (or with one used twice or owned
+      elsewhere), two galleries in a group, an invalid layout (a collapsed
+      layout that is not last or in a group of one command, sizes that grow, a
+      size count other than the command count, rows outside 1 to 3, an icon-only
+      command made large), a reduction step naming a group not on its tab or
+      shrinking a group past its last layout or its gallery past its minimum
+      (owner decision 29), or more than the development bounds. A refused
+      definition leaves the previous tabs.
 
    .. cpp:function:: void set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetSpec> sets = {})
 
@@ -527,10 +530,10 @@ gui_forms::Ribbon
       description such as its folder), numbered under :cpp:func:`recent_caption <gui_forms::Ribbon::recent_caption>`. While
       there are recent items the File tab opens a two-pane menu: the
       application menu's commands on the left, the recent items on the right.
-      :cpp:func:`set_recent_items <gui_forms::Ribbon::set_recent_items>` throws ``std::invalid_argument`` for an empty or
-      repeated ID, invalid or multi-line UTF-8, more than
-      ``Ribbon::maximum_recent_items`` (50), or an application menu holding other
-      kinds than commands and separators.
+      :cpp:func:`set_recent_items <gui_forms::Ribbon::set_recent_items>` throws ``std::invalid_argument`` for a repeated ID or one
+      that breaks the :cpp:class:`StableId <gui_forms::StableId>` segment rule, invalid or multi-line UTF-8, more
+      than ``Ribbon::maximum_recent_items`` (50), or an application menu holding
+      other kinds than commands and separators.
 
    .. cpp:function:: void set_recent_items(std::vector<RibbonRecentItem> items)
 

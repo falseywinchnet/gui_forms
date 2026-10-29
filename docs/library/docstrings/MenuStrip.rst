@@ -21,10 +21,11 @@ items
     The top-level menus, empty by default. Each `MenuStripItemSpec` has a
     stable ID, the text shown on the bar, its menu's `MenuItemSpec` items, and
     `enabled` and `visible` flags. `set_items` throws `std::invalid_argument`
-    unless every top-level item has a nonempty, unique stable ID, nonempty
-    text, both valid UTF-8, and at least one menu item, and each menu is a
-    valid `ContextMenu` item tree. Replacing the items closes an open menu and
-    clears `selected_item_id` if that item is gone or hidden.
+    unless every top-level item has a unique stable ID following the
+    `StableId` segment rule, nonempty valid UTF-8 text, and at least one menu
+    item, and each menu is a valid `ContextMenu` item tree. Replacing the
+    items closes an open menu and clears `selected_item_id` if that item is
+    gone or hidden.
 use_mnemonic : default ``true``
     Whether an `&` in an item's text marks its mnemonic. When false, the
     `&` is shown literally and Alt with a letter opens nothing.

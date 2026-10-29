@@ -79,11 +79,11 @@ void MenuStrip::set_items(std::vector<MenuStripItemSpec> items) {
     for (const gui_forms::MenuStripItemSpec& item : items) {
         const std::pair<std::unordered_set<std::string>::iterator, bool> insertion =
             identities.insert(item.stable_id);
-        if (item.stable_id.empty() || !validate_utf8(item.stable_id).valid() ||
+        if (!valid_stable_id(item.stable_id) ||
             item.text.empty() || !validate_utf8(item.text).valid() ||
             item.items.empty() || !insertion.second) {
             throw std::invalid_argument(
-                "MenuStrip items require unique IDs, text, and menu contents");
+                "MenuStrip items require unique IDs following the StableId segment rule, text, and menu contents");
         }
         std::unordered_set<std::string> child_identities{};
         std::size_t count{};

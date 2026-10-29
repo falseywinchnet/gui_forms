@@ -57,11 +57,13 @@ inline void validate_specs(const std::vector<MenuItemSpec>& items,
             throw std::invalid_argument(
                 "ContextMenu exceeds the bounded item count");
         }
-        if (item.stable_id.empty() || !validate_utf8(item.stable_id).valid() ||
-            !validate_utf8(item.text).valid() ||
+        // Each row's StableId ends in its item ID, so the ID follows the
+        // StableId segment rule.
+        if (!valid_stable_id(item.stable_id) || !validate_utf8(item.text).valid() ||
             !identities.insert(item.stable_id).second) {
             throw std::invalid_argument(
-                "ContextMenu items require unique stable IDs and valid UTF-8");
+                "ContextMenu items require unique stable IDs of '.'-separated lowercase dash segments "
+                "and valid UTF-8");
         }
         if (item.kind == MenuItemKind::separator) {
             if (item.command || !item.children.empty()) {

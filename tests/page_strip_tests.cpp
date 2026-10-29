@@ -670,8 +670,8 @@ void semantics() {
             "only a closable tab offers close");
     require(hidden != nullptr && !has_semantic_state((*hidden).states, SemanticState::visible),
             "a tab scrolled out of view is not visible");
-    const SemanticNode* const list_button = find_node(snapshot.roots, "strip.list_button");
-    const SemanticNode* const back = find_node(snapshot.roots, "strip.scroll_back");
+    const SemanticNode* const list_button = find_node(snapshot.roots, "strip.list-button");
+    const SemanticNode* const back = find_node(snapshot.roots, "strip.scroll-back");
     require(list_button != nullptr && (*list_button).role == SemanticRole::menu_button && (*list_button).has_popup &&
                 back != nullptr && (*back).role == SemanticRole::button,
             "an overflowing strip publishes its scroll buttons and its list button");

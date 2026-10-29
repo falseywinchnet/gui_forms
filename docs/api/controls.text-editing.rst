@@ -17,6 +17,8 @@ Text entry.
      - A text field that turns each accepted entry into a removable token.
    * - :cpp:class:`MaskedTextBox <gui_forms::MaskedTextBox>`
      - A text box that takes input through a mask.
+   * - :cpp:class:`RichTextBox <gui_forms::RichTextBox>`
+     - A rich text field whose document is markdown, shown styled as it is edited.
    * - :cpp:class:`AutoCompleteStringCollection <gui_forms::AutoCompleteStringCollection>`
      - An ordered list of completion candidates for a text box or combo box.
    * - :cpp:class:`MaskedTextProvider <gui_forms::MaskedTextProvider>`
@@ -28,6 +30,7 @@ Text entry.
    generated/gui_forms.TextBox
    generated/gui_forms.TokenBox
    generated/gui_forms.MaskedTextBox
+   generated/gui_forms.RichTextBox
    generated/gui_forms.AutoCompleteStringCollection
    generated/gui_forms.MaskedTextProvider
 
@@ -50,6 +53,18 @@ Related types
      - Input the mask refused: the position the character was tested at, why, and the refused text (one character typed, or the whole value offered).
    * - :cpp:class:`MaskValidation <gui_forms::MaskValidation>`
      - One run of the validation hook (Windows Forms' TypeValidationCompleted).
+   * - :cpp:class:`RichTextBox::Item <gui_forms::RichTextBox::Item>`
+     -  
+   * - :cpp:class:`RichTextBox::ItemParts <gui_forms::RichTextBox::ItemParts>`
+     - A bar button's parts: its face, its label and, on the heading button, the drop-down arrow.
+   * - :cpp:class:`RichTextBox::ItemStates <gui_forms::RichTextBox::ItemStates>`
+     -  
+   * - :cpp:class:`RichTextBox::Parts <gui_forms::RichTextBox::Parts>`
+     - Stage T1 anatomy, as dot members: TextBox's parts and the bar.
+   * - :cpp:class:`RichTextBox::States <gui_forms::RichTextBox::States>`
+     -  
+   * - :cpp:class:`RichTextFormat <gui_forms::RichTextFormat>`
+     - The markdown formatting at a RichTextBox's selection, as its control bar shows it.
    * - :cpp:class:`TextBox::Parts <gui_forms::TextBox::Parts>`
      - Stage T1 anatomy, as dot members.
    * - :cpp:class:`TextBox::States <gui_forms::TextBox::States>`
@@ -199,6 +214,146 @@ Related types
    .. cpp:member:: std::string message
 
    .. cpp:member:: bool cancel
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RichTextBox::Item final
+
+   ``#include <gui_forms/controls/panel/rich_text_box/rich_text_box.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: RichTextBarButton button
+
+      Default: ``{RichTextBarButton::bold}``.
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RichTextBox::ItemParts final
+
+   ``#include <gui_forms/controls/panel/rich_text_box/rich_text_box.hpp>``
+
+   A bar button's parts: its face, its label and, on the heading button, the drop-down arrow.
+
+   .. cpp:member:: PartGeometry button
+
+   .. cpp:member:: PartGeometry button_label
+
+   .. cpp:member:: PartGeometry button_glyph
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RichTextBox::ItemStates final
+
+   ``#include <gui_forms/controls/panel/rich_text_box/rich_text_box.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool indeterminate
+
+      The button's format holds for part of the selection.
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool open
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RichTextBox::Parts final
+
+   ``#include <gui_forms/controls/panel/rich_text_box/rich_text_box.hpp>``
+
+   Stage T1 anatomy, as dot members: TextBox's parts and the bar.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry bar
+
+   .. cpp:member:: PartGeometry content
+
+   .. cpp:member:: PartGeometry caret
+
+   .. cpp:member:: PartGeometry selection
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RichTextBox::States final
+
+   ``#include <gui_forms/controls/panel/rich_text_box/rich_text_box.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool read_only
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool pending
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RichTextFormat final
+
+   ``#include <gui_forms/controls/panel/rich_text_box/rich_text_box.hpp>``
+
+   The markdown formatting at a RichTextBox's selection, as its control bar shows it. A span style is on when every selected content character has it, mixed when some do, and off when none does; an empty selection reads the character before its caret (on or off). A line format reads the non-blank lines the selection touches the same way. heading is on when every touched line is a heading of one level, held in heading_level; it is mixed when the lines differ and at least one is a heading, and heading_level is then 0, as it is for body text.
+
+   .. cpp:member:: RichTextFormatState bold
+
+      Default: ``{RichTextFormatState::off}``.
+
+   .. cpp:member:: RichTextFormatState italic
+
+      Default: ``{RichTextFormatState::off}``.
+
+   .. cpp:member:: RichTextFormatState code
+
+      Default: ``{RichTextFormatState::off}``.
+
+   .. cpp:member:: RichTextFormatState link
+
+      Default: ``{RichTextFormatState::off}``.
+
+   .. cpp:member:: RichTextFormatState bulleted
+
+      Default: ``{RichTextFormatState::off}``.
+
+   .. cpp:member:: RichTextFormatState numbered
+
+      Default: ``{RichTextFormatState::off}``.
+
+   .. cpp:member:: RichTextFormatState heading
+
+      Default: ``{RichTextFormatState::off}``.
+
+   .. cpp:member:: std::size_t heading_level
 
 .. cpp:namespace:: gui_forms
 
@@ -505,6 +660,38 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: RichTextBarButton
+
+   ``#include <gui_forms/controls/panel/rich_text_box/rich_text_box.hpp>``
+
+   .. cpp:enumerator:: bold
+
+   .. cpp:enumerator:: italic
+
+   .. cpp:enumerator:: heading
+
+   .. cpp:enumerator:: bulleted_list
+
+   .. cpp:enumerator:: numbered_list
+
+   .. cpp:enumerator:: link
+
+   .. cpp:enumerator:: code
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RichTextFormatState
+
+   ``#include <gui_forms/controls/panel/rich_text_box/rich_text_box.hpp>``
+
+   .. cpp:enumerator:: off
+
+   .. cpp:enumerator:: on
+
+   .. cpp:enumerator:: mixed
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: TextBox::MultilineValidation
 
    ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
@@ -565,6 +752,14 @@ Functions, constants and aliases
 .. cpp:type:: MaskPosition = TextUnitIndex<MaskPositionTag>
 
    A position in a mask: the index of one slot, editable or literal. Every slot shows as exactly one Unicode scalar in the display text, so a position is also the scalar index of its slot in display_text(). It is not a byte offset; display_offset converts.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/controls/panel/rich_text_box/rich_text_box.hpp>``
+
+.. cpp:var:: constexpr std::size_t rich_text_bar_button_count
+
+   Value: ``7U``.
 
 .. cpp:namespace:: gui_forms
 

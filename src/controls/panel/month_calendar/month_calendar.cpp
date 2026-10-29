@@ -891,7 +891,7 @@ std::vector<SemanticNode> MonthCalendar::semantic_virtual_children() const {
     const std::array<int, 2> directions{-1, 1};
     for (const int direction : directions) {
         SemanticNode node{};
-        node.stable_id = prefix + (direction < 0 ? ".previous_month" : ".next_month");
+        node.stable_id = prefix + (direction < 0 ? ".previous-month" : ".next-month");
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.name = direction < 0 ? "Previous month" : "Next month";
@@ -945,8 +945,8 @@ bool MonthCalendar::on_semantic_action(SemanticAction action, std::string_view v
 bool MonthCalendar::on_semantic_child_action(std::string_view id, SemanticAction action, std::string_view) {
     if (!effectively_enabled()) return false;
     const std::string prefix(stable_id().value());
-    const std::string previous_id = prefix + ".previous_month";
-    const std::string next_id = prefix + ".next_month";
+    const std::string previous_id = prefix + ".previous-month";
+    const std::string next_id = prefix + ".next-month";
     if (action == SemanticAction::press && (id == previous_id || id == next_id)) {
         const std::int32_t direction = id == previous_id ? -1 : 1;
         if (!can_scroll(direction)) return false;

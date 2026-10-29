@@ -82,9 +82,9 @@ std::vector<RibbonTabSpec> sample_tabs(const Commands& commands) {
                                   .size = RibbonCommandSize::small, .command = commands.bold,
                                   .image = ImageId{6}, .show_label = false});
     RibbonGroupSpec font{.stable_id = "font", .caption = "Font"};
-    font.commands.push_back({.stable_id = "font_name", .kind = RibbonCommandKind::combo_box, .text = "Font",
+    font.commands.push_back({.stable_id = "font-name", .kind = RibbonCommandKind::combo_box, .text = "Font",
                              .choices = {"Portsmouth", "Carlito"}});
-    font.commands.push_back({.stable_id = "font_size", .kind = RibbonCommandKind::numeric_up_down, .text = "Size"});
+    font.commands.push_back({.stable_id = "font-size", .kind = RibbonCommandKind::numeric_up_down, .text = "Size"});
     font.commands.push_back({.stable_id = "strike", .kind = RibbonCommandKind::check_box, .text = "Strike"});
     home.groups.push_back(std::move(clipboard));
     home.groups.push_back(std::move(font));
@@ -258,7 +258,7 @@ void tab_navigation() {
                 key(window, PhysicalKey::enter) && launches.size() == 1U,
             "Tab reaches the group's launcher after its commands, and Enter launches it");
     static_cast<void>(key(window, PhysicalKey::tab));
-    require(window.focused_control() == (*ribbon).combo_box("font_name"),
+    require(window.focused_control() == (*ribbon).combo_box("font-name"),
             "Tab after the last stop leaves the ribbon for the next Tab stop, its first hosted control");
 }
 
@@ -284,7 +284,7 @@ void minimize_by_tab_click() {
     std::shared_ptr<Ribbon> ribbon = sample_ribbon(commands);
     Window window(ribbon, {900.0, 112.0});
     window.perform_layout();
-    const std::shared_ptr<ComboBox> font = (*ribbon).combo_box("font_name");
+    const std::shared_ptr<ComboBox> font = (*ribbon).combo_box("font-name");
     const std::vector<Ribbon::Tab> tabs = (*ribbon).realized_tabs();
     click(window, centre(tabs[0].parts.tab.bounds));
     window.perform_layout();
@@ -310,14 +310,14 @@ void hosted_controls() {
     std::shared_ptr<Ribbon> ribbon = sample_ribbon(commands);
     Window window(ribbon, {900.0, 112.0});
     window.perform_layout();
-    const std::shared_ptr<ComboBox> font = (*ribbon).combo_box("font_name");
-    const std::shared_ptr<NumericUpDown> size = (*ribbon).numeric_up_down("font_size");
+    const std::shared_ptr<ComboBox> font = (*ribbon).combo_box("font-name");
+    const std::shared_ptr<NumericUpDown> size = (*ribbon).numeric_up_down("font-size");
     const std::shared_ptr<CheckBox> strike = (*ribbon).check_box("strike");
     const std::vector<Ribbon::CommandItem> items = (*ribbon).realized_commands();
     require((*font).items().size() == 2U && (*strike).text() == "Strike" &&
-                command_named(items, "font_name").parts.command_combo_box.bounds ==
+                command_named(items, "font-name").parts.command_combo_box.bounds ==
                     (*font).committed_arranged_bounds() &&
-                command_named(items, "font_size").parts.command_numeric_up_down.present &&
+                command_named(items, "font-size").parts.command_numeric_up_down.present &&
                 command_named(items, "strike").parts.command_check_box.present,
             "hosted controls sit where the ribbon's layout puts their commands");
     require(window.request_focus(font) && window.focused_control() == font, "a hosted control is focusable");
@@ -325,7 +325,7 @@ void hosted_controls() {
             "only the selected tab's hosted controls show");
     bool threw = false;
     try {
-        static_cast<void>((*ribbon).text_box("font_name"));
+        static_cast<void>((*ribbon).text_box("font-name"));
     } catch (const std::out_of_range&) {
         threw = true;
     }
@@ -406,8 +406,8 @@ void arranged_within_maximum_size() {
     window.perform_layout();
     require((*ribbon).committed_arranged_bounds().width == 150.0, "the ribbon is arranged at its maximum width");
     const std::vector<Ribbon::CommandItem> items = (*ribbon).realized_commands();
-    const std::shared_ptr<ComboBox> font = (*ribbon).combo_box("font_name");
-    const Ribbon::CommandItem* item = find_command(items, "font_name");
+    const std::shared_ptr<ComboBox> font = (*ribbon).combo_box("font-name");
+    const Ribbon::CommandItem* item = find_command(items, "font-name");
     const bool shown = item != nullptr && (*item).parts.command_combo_box.present;
     require(shown == (*font).effectively_visible(), "a hosted control shows exactly where its command is published");
     require(!shown || (*item).parts.command_combo_box.bounds == (*font).committed_arranged_bounds(),

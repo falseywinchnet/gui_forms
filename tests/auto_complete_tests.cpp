@@ -65,7 +65,7 @@ struct Fixture final {
 Fixture make_fixture(const char* id, AutoCompleteMode mode) {
     Fixture fixture;
     fixture.root = make_control<Panel>(StableId(std::string(id) + ".root"));
-    fixture.box = make_control<TextBox>(StableId(id));
+    fixture.box = make_control<TextBox>(StableId(std::string(id)));
     (*fixture.box).set_requested_bounds({10.0, 10.0, 200.0, 28.0});
     fixture.other = make_control<TextBox>(StableId(std::string(id) + ".other"));
     (*fixture.other).set_requested_bounds({10.0, 260.0, 200.0, 28.0});
@@ -170,10 +170,10 @@ void suggest_keyboard_trace() {
                 shown[2] == "Cambridge" && shown[3] == "calgary" && shown[4] == "Caen",
             "the list shows matches in source order, each text once");
     require(box.text() == "c" && !box.auto_complete_highlighted(), "suggest mode does not change the text");
-    require(window.find("ac.suggest.auto_complete.list") != nullptr && window.focused_control() == fixture.box,
+    require(window.find("ac.suggest.auto-complete.list") != nullptr && window.focused_control() == fixture.box,
             "the list is a popup and the box keeps the focus");
     window.perform_layout();
-    const Rect list_bounds = (*window.find("ac.suggest.auto_complete.list")).absolute_bounds();
+    const Rect list_bounds = (*window.find("ac.suggest.auto-complete.list")).absolute_bounds();
     require(list_bounds.y >= 38.0 && list_bounds.width == 200.0,
             "the list opens under the box, as wide as it");
     const SemanticDescriptor open_semantics = box.semantic_descriptor();
@@ -214,7 +214,7 @@ void suggest_keyboard_trace() {
     require(trace.size() == 4U && trace[0] == "text Calgary" && trace[1] == "text California" &&
                 trace[2] == "close" && trace[3] == "accepted California",
             "accepting shows the text, then closes, then reports the accepted text; Enter commits nothing");
-    require(!window.find("ac.suggest.auto_complete.list") && !has_semantic_state(box.semantic_descriptor().states,
+    require(!window.find("ac.suggest.auto-complete.list") && !has_semantic_state(box.semantic_descriptor().states,
                                                                                    SemanticState::expanded),
             "the closed list leaves the window and the box is no longer expanded");
 
@@ -364,7 +364,7 @@ void pointer_and_dismissal() {
     SubscriptionToken accepts = box.auto_complete_accepted().subscribe(TraceAccepted{&trace});
     require(type(window, "c"), "typed");
     window.perform_layout();
-    const Rect list = (*window.find("ac.pointer.auto_complete.list")).absolute_bounds();
+    const Rect list = (*window.find("ac.pointer.auto-complete.list")).absolute_bounds();
     const Point third{list.x + 20.0, list.y + 2.0 + 2.0 * 26.0 + 13.0};
     require(window.dispatch_pointer({PointerAction::down, PointerButton::primary, third}) &&
                 box.auto_complete_highlighted() == 2U && box.text() == "Cambridge" &&
@@ -397,7 +397,7 @@ void pointer_and_dismissal() {
     require(window.request_focus(fixture.box) && type(window, "g") && box.auto_complete_open(),
             "the list opens again");
     box.set_visible(false);
-    require(!box.auto_complete_open() && !window.find("ac.pointer.auto_complete"),
+    require(!box.auto_complete_open() && !window.find("ac.pointer.auto-complete"),
             "hiding the box revokes its list");
 }
 
@@ -581,7 +581,7 @@ struct ComboFixture final {
 ComboFixture make_combo(const char* id) {
     ComboFixture fixture;
     fixture.root = make_control<Panel>(StableId(std::string(id) + ".root"));
-    fixture.combo = make_control<ComboBox>(StableId(id));
+    fixture.combo = make_control<ComboBox>(StableId(std::string(id)));
     (*fixture.combo).set_requested_bounds({10.0, 10.0, 220.0, 30.0});
     (*fixture.combo).set_items({"Calgary", "California", "Cambridge", "Dover"});
     fixture.other = make_control<TextBox>(StableId(std::string(id) + ".other"));
@@ -709,7 +709,7 @@ void combo_auto_complete() {
             "list_items completes from the items: the first is appended and the matches suggested");
     require(combo.selected_index() == 0U, "the appended completion equals an item, so it is selected");
     window.perform_layout();
-    const Rect list = (*window.find("combo.ac.editor.auto_complete.list")).absolute_bounds();
+    const Rect list = (*window.find("combo.ac.editor.auto-complete.list")).absolute_bounds();
     require(list.width == 220.0 && list.y >= 40.0, "the suggestion list opens under the whole field");
     require(press(window, PhysicalKey::down) && press(window, PhysicalKey::down) &&
                 combo.text() == "California" && combo.selected_index() == 1U && !combo.dropped_down(),

@@ -137,7 +137,7 @@ void subscribe(BackgroundWorker& worker, Recorder& recorder, std::vector<Subscri
 }
 
 std::shared_ptr<Panel> root(const char* id) {
-    std::shared_ptr<Panel> panel = make_control<Panel>(StableId(id));
+    std::shared_ptr<Panel> panel = make_control<Panel>(StableId(std::string(id)));
     return panel;
 }
 

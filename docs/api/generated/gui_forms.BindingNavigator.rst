@@ -25,8 +25,8 @@ gui_forms::BindingNavigator
 
       **stable_id** : ``StableId``
          Identity of the navigator, unique within its window. Its commands are
-         named ``<stable_id>.move_first``, ``.move_previous``, ``.move_next``,
-         ``.move_last``, ``.add_new`` and ``.delete``.
+         named ``<stable_id>.move-first``, ``.move-previous``, ``.move-next``,
+         ``.move-last``, ``.add-new`` and ``.delete``.
 
    :Properties:
 

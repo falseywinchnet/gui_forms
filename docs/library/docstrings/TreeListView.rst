@@ -14,27 +14,28 @@ Parameters
 ----------
 stable_id
     Identity of the view, unique within its window. Its scroll bars are
-    child controls named ``<stable_id>.vertical_scroll_bar`` and
-    ``<stable_id>.horizontal_scroll_bar``.
+    child controls named ``<stable_id>.vertical-scroll-bar`` and
+    ``<stable_id>.horizontal-scroll-bar``.
 
 Properties
 ----------
 columns
     The columns, column 0 first. `set_columns` replaces them, resets the
-    display order and throws `std::invalid_argument` for an empty or
-    repeated ID, invalid UTF-8, a width outside `minimum_column_width` and
-    `maximum_column_width`, or more than `maximum_columns` columns. The view
-    shows no rows without columns.
+    display order and throws `std::invalid_argument` for a repeated ID or one
+    that breaks the `StableId` segment rule, invalid UTF-8, a width outside
+    `minimum_column_width` and `maximum_column_width`, or more than
+    `maximum_columns` columns. The view shows no rows without columns.
 column_order
     The columns in display order: ``column_order()[position]`` is the column
     shown at that position. Position 0 always holds the tree column.
 nodes
     The nodes in the order given, whatever the sort. `set_nodes` replaces
     them, keeps the selection and the current node on their IDs, and throws
-    `std::invalid_argument` for an empty or repeated ID, invalid UTF-8, an
-    image key longer than 256 bytes, more than `maximum_nodes` nodes, or a
-    depth sequence that is not a preorder (the first node at depth 0, each
-    next node at most one level deeper); the old nodes then stay.
+    `std::invalid_argument` for a repeated ID or one that breaks the
+    `StableId` segment rule, invalid UTF-8, an image key longer than 256
+    bytes, more than `maximum_nodes` nodes, or a depth sequence that is not a
+    preorder (the first node at depth 0, each next node at most one level
+    deeper); the old nodes then stay.
 row_count
     The number of rows: the nodes not hidden under a collapsed node.
 top_row

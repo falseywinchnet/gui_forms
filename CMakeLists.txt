@@ -212,8 +212,8 @@ add_library(gui_forms_core STATIC
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/presets/material_presets.cpp
     src/core/surface_material/types/surface_material_types.cpp
-    src/core/text/rich_text/rich_text_document.cpp
-    src/core/text/rich_text/rich_text_model.cpp
+    src/core/text/markdown/markdown.cpp
+    src/core/text/markdown/rtf_conversion.cpp
     src/core/text/text_store/text_store.cpp
     src/core/text/prepared/prepared_storage.cpp
     src/core/text/composite/text_composite.cpp
@@ -329,8 +329,16 @@ add_library(gui_forms_core STATIC
 target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib stx_png::stx_png)
 # The interpolation seam's private engine; no stx_conv type is public.
 target_link_libraries(gui_forms_core PRIVATE stx_conv::stx_conv)
-# RichTextModel's reader and writer; no stx_rtf2md type is public.
+# rtf_conversion's reader and writer; no stx_rtf2md type is public.
 target_link_libraries(gui_forms_core PRIVATE stx_rtf2md::stx_rtf2md)
+# MD4C 0.6.0 (third_party/md4c, MIT; third_party/MD4C_INTAKE_2026-10-28.md), the
+# markdown framework's CommonMark parser. Its objects are part of Core, so no
+# target is added to the exports; its header stays private to markdown.cpp.
+add_library(gui_forms_md4c OBJECT third_party/md4c/md4c.c third_party/md4c/entity.c)
+set_target_properties(gui_forms_md4c PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_sources(gui_forms_core PRIVATE $<TARGET_OBJECTS:gui_forms_md4c>)
+set_source_files_properties(src/core/text/markdown/markdown.cpp PROPERTIES
+    INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/third_party/md4c)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
 set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 # Compatibility properties alone do not traverse LINK_ONLY dependencies of
@@ -733,6 +741,11 @@ add_library(gui_forms_controls STATIC
     src/controls/typography_specimen/typography_specimen.cpp
     src/controls/easing_preview/easing_preview.cpp
     src/controls/panel/text_box/text_box.cpp
+    src/controls/panel/text_editing/text_editing_engine.cpp
+    src/controls/panel/rich_text_box/rich_text_box.cpp
+    src/controls/panel/rich_text_box/rich_text_box_bar.cpp
+    src/controls/panel/rich_text_box/rich_text_box_format.cpp
+    src/controls/panel/rich_text_box/rich_text_box_layout.cpp
     src/controls/panel/text_box/text_box_scroll.cpp
     src/controls/panel/text_box/text_box_auto_complete.cpp
     src/controls/panel/text_box/auto_complete/auto_complete.cpp
@@ -2263,6 +2276,10 @@ if(GUI_FORMS_BUILD_TESTS)
             COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/owned_event_compile_failures.py
                 ${GUI_FORMS_REFERENCE_CLANG} ${CMAKE_CURRENT_SOURCE_DIR}/include)
+        add_test(NAME gui_forms_stable_id_compile_failures
+            COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/stable_id_compile_failures.py
+                ${GUI_FORMS_REFERENCE_CLANG} ${CMAKE_CURRENT_SOURCE_DIR}/include)
         add_test(NAME gui_forms_api_reference_tests
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/api_reference_tests.py)
         # The include directories a consumer of the public headers compiles
@@ -2668,9 +2685,16 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_text_store_tests tests/text_store_tests.cpp)
     target_link_libraries(gui_forms_text_store_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_text_store_tests COMMAND gui_forms_text_store_tests)
-    add_executable(gui_forms_rich_text_model_tests tests/rich_text_model_tests.cpp)
-    target_link_libraries(gui_forms_rich_text_model_tests PRIVATE gui_forms_core)
-    add_test(NAME gui_forms_rich_text_model_tests COMMAND gui_forms_rich_text_model_tests)
+    # The markdown framework: parsing, source ranges, the cross-check against
+    # stx_rtf2md's normative reader over its dialect corpus, and RTF round trips.
+    add_executable(gui_forms_markdown_tests tests/markdown_tests.cpp)
+    target_link_libraries(gui_forms_markdown_tests PRIVATE gui_forms_core stx_rtf2md::stx_rtf2md)
+    add_test(NAME gui_forms_markdown_tests
+        COMMAND gui_forms_markdown_tests ${CMAKE_CURRENT_SOURCE_DIR}/stx_rtf2md/tests/corpus)
+    add_executable(gui_forms_markdown_fuzz_tests fuzz/markdown_fuzz.cpp)
+    target_link_libraries(gui_forms_markdown_fuzz_tests PRIVATE gui_forms_core)
+    target_compile_definitions(gui_forms_markdown_fuzz_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    add_test(NAME gui_forms_markdown_fuzz_tests COMMAND gui_forms_markdown_fuzz_tests)
 
     add_executable(gui_forms_bounded_grapheme_tests tests/bounded_grapheme_tests.cpp)
     target_include_directories(gui_forms_bounded_grapheme_tests PRIVATE src/core/text/unicode)
@@ -3009,6 +3033,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_masked_text_box_tests tests/masked_text_box_tests.cpp)
     target_link_libraries(gui_forms_masked_text_box_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_masked_text_box_tests COMMAND gui_forms_masked_text_box_tests)
+    add_executable(gui_forms_rich_text_box_tests tests/rich_text_box_tests.cpp)
+    target_link_libraries(gui_forms_rich_text_box_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_rich_text_box_tests COMMAND gui_forms_rich_text_box_tests)
 
     add_executable(gui_forms_month_calendar_tests tests/month_calendar_tests.cpp)
     target_link_libraries(gui_forms_month_calendar_tests PRIVATE gui_forms_controls)
@@ -4326,6 +4353,7 @@ if(GUI_FORMS_ENABLE_SKIA)
 endif()
 
 install(FILES third_party/sheenbidi/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME SheenBidi-LICENSE.txt)
+install(FILES third_party/md4c/LICENSE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME MD4C-LICENSE.txt)
 
 # Windows: the installed DLLs embed the LLVM runtimes, winpthreads and the
 # MinGW-w64 CRT (add_link_options(-static) above). Their licences come from

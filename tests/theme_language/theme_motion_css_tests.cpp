@@ -301,7 +301,7 @@ std::unique_ptr<PopWindow> make_pop_window(const ThemeRuleSheet& rules) {
     made.root = make_control<Panel>(StableId("root"));
     const std::array<const char*, 3> names{{"left", "middle", "right"}};
     for (std::size_t index = 0U; index < names.size(); ++index) {
-        std::shared_ptr<Tile> tile = make_control<Tile>(StableId(names[index]));
+        std::shared_ptr<Tile> tile = make_control<Tile>(StableId(std::string(names[index])));
         (*tile).set_requested_bounds(Rect{static_cast<double>(index) * 100.0, 0.0, 100.0, 80.0});
         (*made.root).add_child(tile);
     }

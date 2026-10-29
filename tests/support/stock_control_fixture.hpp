@@ -13,14 +13,15 @@ namespace gui_forms::test_support {
 
 // One window holding one instance of every stock control type that takes a
 // place in the control tree, for host accessibility tests (stage A). Each
-// placed control's stable id is its id in manifests/controls.json, so a
-// semantic node is attributed to the stock control whose subtree it belongs
-// to. The fixture uses portable controls only; a host test supplies the
-// native window.
+// placed control's stable id spells its id in manifests/controls.json with
+// '-' for '_' ("list-view" for "list_view"), so a semantic node is attributed
+// to the stock control whose subtree it belongs to. The fixture uses portable
+// controls only; a host test supplies the native window.
 
 // One placed stock control.
 struct StockControlEntry final {
     std::string manifest_id;
+    std::string stable_id;
     Control::Ptr control;
 };
 
@@ -87,12 +88,12 @@ inline constexpr Size stock_control_fixture_size{1900.0, 1200.0};
 // Builds the fixture. Throws only where a control's own setup throws.
 [[nodiscard]] StockControlFixture make_stock_control_fixture();
 
-// The entry whose control has this manifest id, or nullptr. The result
+// The entry whose control has this stable id, or nullptr. The result
 // borrows from `fixture` and is invalidated when an entry is added; a
 // temporary fixture is refused.
 [[nodiscard]] const StockControlEntry* find_stock_control(
-    const StockControlFixture& fixture, std::string_view manifest_id);
+    const StockControlFixture& fixture, std::string_view stable_id);
 const StockControlEntry* find_stock_control(
-    StockControlFixture&& fixture, std::string_view manifest_id) = delete;
+    StockControlFixture&& fixture, std::string_view stable_id) = delete;
 
 } // namespace gui_forms::test_support

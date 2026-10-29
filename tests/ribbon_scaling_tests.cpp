@@ -122,9 +122,9 @@ RibbonTabSpec wordpad_home(bool authored_order) {
     clipboard.commands.push_back(small_button("cut", "Cut", 11U));
     clipboard.commands.push_back(small_button("copy", "Copy", 12U));
     RibbonGroupSpec font{.stable_id = "font", .caption = "Font", .dialog_launcher = true};
-    font.commands.push_back({.stable_id = "font_family", .kind = RibbonCommandKind::combo_box, .text = "Font family",
+    font.commands.push_back({.stable_id = "font-family", .kind = RibbonCommandKind::combo_box, .text = "Font family",
                              .choices = {"Portsmouth", "Carlito"}, .width = 120.0});
-    font.commands.push_back({.stable_id = "font_size", .kind = RibbonCommandKind::combo_box, .text = "Font size",
+    font.commands.push_back({.stable_id = "font-size", .kind = RibbonCommandKind::combo_box, .text = "Font size",
                              .choices = {"10", "12"}, .width = 40.0});
     font.commands.push_back(icon_toggle("bold", "Bold"));
     font.commands.push_back(icon_toggle("italic", "Italic"));
@@ -132,7 +132,7 @@ RibbonTabSpec wordpad_home(bool authored_order) {
     font.commands.push_back(icon_toggle("strike", "Strikethrough"));
     font.commands.push_back(icon_toggle("subscript", "Subscript"));
     font.commands.push_back(icon_toggle("superscript", "Superscript"));
-    font.commands.push_back(icon_menu("text_color", "Text color"));
+    font.commands.push_back(icon_menu("text-color", "Text color"));
     font.commands.push_back(icon_menu("highlight", "Text highlight color"));
     RibbonGroupSpec paragraph{.stable_id = "paragraph", .caption = "Paragraph", .dialog_launcher = true};
     paragraph.commands.push_back(icon_toggle("outdent", "Decrease indent"));
@@ -145,12 +145,12 @@ RibbonTabSpec wordpad_home(bool authored_order) {
     paragraph.commands.push_back(icon_toggle("justify", "Justify"));
     RibbonGroupSpec insert{.stable_id = "insert", .caption = "Insert"};
     insert.commands.push_back(large_button("picture", "Picture", 20U));
-    insert.commands.push_back(large_button("date_time", "Date and time", 21U));
+    insert.commands.push_back(large_button("date-time", "Date and time", 21U));
     insert.commands.push_back(large_button("object", "Insert object", 22U));
     RibbonGroupSpec editing{.stable_id = "editing", .caption = "Editing"};
     editing.commands.push_back(small_button("find", "Find", 30U));
     editing.commands.push_back(small_button("replace", "Replace", 31U));
-    editing.commands.push_back(small_button("select_all", "Select all", 32U));
+    editing.commands.push_back(small_button("select-all", "Select all", 32U));
     if (authored_order) {
         clipboard.layouts = {layout_of(RibbonGroupSize::large), layout_of(RibbonGroupSize::collapsed)};
         font.layouts = {layout_of(RibbonGroupSize::large, 2U), layout_of(RibbonGroupSize::collapsed)};
@@ -172,25 +172,25 @@ RibbonTabSpec wordpad_home(bool authored_order) {
 RibbonTabSpec wordpad_view() {
     RibbonTabSpec view{.stable_id = "view", .text = "&View"};
     RibbonGroupSpec zoom{.stable_id = "zoom", .caption = "Zoom"};
-    zoom.commands.push_back(large_button("zoom_in", "Zoom in", 40U));
-    zoom.commands.push_back(large_button("zoom_out", "Zoom out", 41U));
-    zoom.commands.push_back(large_button("zoom_100", "100%", 42U));
+    zoom.commands.push_back(large_button("zoom-in", "Zoom in", 40U));
+    zoom.commands.push_back(large_button("zoom-out", "Zoom out", 41U));
+    zoom.commands.push_back(large_button("zoom-100", "100%", 42U));
     RibbonGroupLayout medium = layout_of(RibbonGroupSize::medium);
     medium.command_sizes = {RibbonCommandSize::small, RibbonCommandSize::small, RibbonCommandSize::small};
     zoom.layouts = {layout_of(RibbonGroupSize::large), medium, layout_of(RibbonGroupSize::collapsed)};
-    RibbonGroupSpec show{.stable_id = "show_hide", .caption = "Show or hide"};
+    RibbonGroupSpec show{.stable_id = "show-hide", .caption = "Show or hide"};
     show.commands.push_back({.stable_id = "ruler", .kind = RibbonCommandKind::check_box, .text = "Ruler"});
-    show.commands.push_back({.stable_id = "status_bar", .kind = RibbonCommandKind::check_box, .text = "Status bar"});
+    show.commands.push_back({.stable_id = "status-bar", .kind = RibbonCommandKind::check_box, .text = "Status bar"});
     show.layouts = {layout_of(RibbonGroupSize::large), layout_of(RibbonGroupSize::collapsed)};
     RibbonGroupSpec settings{.stable_id = "settings", .caption = "Settings"};
-    RibbonCommandSpec wrap = icon_menu("word_wrap", "Word wrap");
+    RibbonCommandSpec wrap = icon_menu("word-wrap", "Word wrap");
     wrap.show_label = true;
     RibbonCommandSpec units = icon_menu("units", "Measurement units");
     units.show_label = true;
     settings.commands.push_back(wrap);
     settings.commands.push_back(units);
     settings.layouts = {layout_of(RibbonGroupSize::large), layout_of(RibbonGroupSize::collapsed)};
-    view.reduction_order = {{"zoom"}, {"zoom"}, {"show_hide"}, {"settings"}};
+    view.reduction_order = {{"zoom"}, {"zoom"}, {"show-hide"}, {"settings"}};
     view.groups.push_back(std::move(zoom));
     view.groups.push_back(std::move(show));
     view.groups.push_back(std::move(settings));
@@ -396,7 +396,7 @@ void refusals() {
     require(refused(ribbon, std::move(no_gallery)), "a gallery step on a group without a gallery is refused");
     std::vector<RibbonTabSpec> other_tab;
     other_tab.push_back(three_groups({}));
-    RibbonTabSpec second{.stable_id = "second_tab", .text = "Second"};
+    RibbonTabSpec second{.stable_id = "second-tab", .text = "Second"};
     RibbonGroupSpec lone{.stable_id = "lone", .caption = "Lone"};
     lone.commands.push_back(large_button("lone.a", "Alpha"));
     lone.commands.push_back(large_button("lone.b", "Beta"));
@@ -554,7 +554,7 @@ void wordpad_ladders() {
     check_lines(transitions(*fixture.ribbon, 0U), expected,
                 "the WordPad Home ladder repeats every observed step but the label drop");
     check_lines(transitions(*fixture.ribbon, 1U),
-                {"zoom:medium", "zoom:collapsed", "show_hide:collapsed", "settings:collapsed"},
+                {"zoom:medium", "zoom:collapsed", "show-hide:collapsed", "settings:collapsed"},
                 "the WordPad View ladder repeats every observed step");
     std::vector<RibbonTabSpec> defaults;
     defaults.push_back(wordpad_home(false));
@@ -584,15 +584,15 @@ void golden_ladder() {
         "paste 4.00,27.00 42.00x66.00",
         "cut 48.00,27.00 43.75x22.00",
         "copy 48.00,49.00 49.00x22.00",
-        "font_family 106.00,32.50 120.00x22.00",
-        "font_size 106.00,65.50 40.00x22.00",
+        "font-family 106.00,32.50 120.00x22.00",
+        "font-size 106.00,65.50 40.00x22.00",
         "bold 228.00,32.50 22.00x22.00",
         "italic 228.00,65.50 22.00x22.00",
         "underline 252.00,32.50 22.00x22.00",
         "strike 252.00,65.50 22.00x22.00",
         "subscript 276.00,32.50 22.00x22.00",
         "superscript 276.00,65.50 22.00x22.00",
-        "text_color 300.00,32.50 34.00x22.00",
+        "text-color 300.00,32.50 34.00x22.00",
         "highlight 300.00,65.50 34.00x22.00",
         "outdent 343.00,32.50 22.00x22.00",
         "indent 343.00,65.50 22.00x22.00",
@@ -603,11 +603,11 @@ void golden_ladder() {
         "right 427.00,32.50 22.00x22.00",
         "justify 427.00,65.50 22.00x22.00",
         "picture 458.00,27.00 46.75x66.00",
-        "date_time 506.75,27.00 78.25x66.00",
+        "date-time 506.75,27.00 78.25x66.00",
         "object 587.00,27.00 78.25x66.00",
         "find 674.25,27.00 49.00x22.00",
         "replace 674.25,49.00 64.75x22.00",
-        "select_all 674.25,71.00 80.50x22.00",
+        "select-all 674.25,71.00 80.50x22.00",
     };
     const std::vector<std::string> expected_one{
         "w=1000.00 step=0 clipboard L0 0.00+102.00 font L0 102.00+237.00 paragraph L0 339.00+115.00 insert L0 454.00+216.25 editing L0 670.25+89.50",
@@ -632,15 +632,15 @@ void golden_ladder() {
         "paste 6.00,40.50 63.00x99.00",
         "cut 72.00,40.50 65.63x33.00",
         "copy 72.00,73.50 73.50x33.00",
-        "font_family 158.50,48.75 180.00x33.00",
-        "font_size 158.50,98.25 60.00x33.00",
+        "font-family 158.50,48.75 180.00x33.00",
+        "font-size 158.50,98.25 60.00x33.00",
         "bold 341.50,48.75 33.00x33.00",
         "italic 341.50,98.25 33.00x33.00",
         "underline 377.50,48.75 33.00x33.00",
         "strike 377.50,98.25 33.00x33.00",
         "subscript 413.50,48.75 33.00x33.00",
         "superscript 413.50,98.25 33.00x33.00",
-        "text_color 449.50,48.75 51.00x33.00",
+        "text-color 449.50,48.75 51.00x33.00",
         "highlight 449.50,98.25 51.00x33.00",
         "outdent 513.50,48.75 33.00x33.00",
         "indent 513.50,98.25 33.00x33.00",
@@ -651,11 +651,11 @@ void golden_ladder() {
         "right 639.50,48.75 33.00x33.00",
         "justify 639.50,98.25 33.00x33.00",
         "picture 685.50,40.50 70.13x99.00",
-        "date_time 758.63,40.50 117.38x99.00",
+        "date-time 758.63,40.50 117.38x99.00",
         "object 879.00,40.50 117.38x99.00",
         "find 1009.38,40.50 73.50x33.00",
         "replace 1009.38,73.50 97.13x33.00",
-        "select_all 1009.38,106.50 120.75x33.00",
+        "select-all 1009.38,106.50 120.75x33.00",
     };
     const std::vector<std::string> expected_one_and_half{
         "w=1000.00 step=1 clipboard L0 0.00+152.50 font L0 152.50+355.00 paragraph L0 507.50+172.00 insert C 679.50+76.00 editing L0 755.50+133.75",
@@ -758,7 +758,7 @@ void scrolling_never_hides() {
     require(ribbon.first_visible_group() == 1U && ribbon.parts().scroll_left.present &&
                 ribbon.realized_groups()[0].stable_id == "font",
             "the right scroll button scrolls by one group and the left button appears");
-    require(ribbon.on_semantic_child_action("ribbon.scroll_left", SemanticAction::press, {}) &&
+    require(ribbon.on_semantic_child_action("ribbon.scroll-left", SemanticAction::press, {}) &&
                 ribbon.first_visible_group() == 0U,
             "the scroll buttons are pressable through accessibility");
     (*fixture.window).perform_layout();
@@ -872,7 +872,7 @@ void group_popup() {
     NullPainter painter;
     static_cast<void>(window.paint(painter, {0.0, 0.0, ladder.back().width, 400.0}));
     require(painted(painter, "Font") && !painted(painter, "Bold"), "the collapsed button paints its caption");
-    const std::shared_ptr<ComboBox> family = ribbon.combo_box("font_family");
+    const std::shared_ptr<ComboBox> family = ribbon.combo_box("font-family");
     require(!(*family).effectively_visible(), "a collapsed group's hosted controls are not shown in the plane");
 
     const Rect button = groups[1].parts.group_button.bounds;
@@ -894,7 +894,7 @@ void group_popup() {
     const Ribbon::CommandItem* bold = nullptr;
     for (const Ribbon::CommandItem& item : popup_commands) {
         if (item.stable_id == "bold") bold = &item;
-        if (item.stable_id == "font_family") {
+        if (item.stable_id == "font-family") {
             require(item.parts.command_combo_box.bounds == (*family).committed_arranged_bounds(),
                     "a hosted control sits at its place in the popup");
         }

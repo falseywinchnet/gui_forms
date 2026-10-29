@@ -27,7 +27,7 @@ gui_forms::FontDialog
 
       **stable_id** : ``StableId``
          Identity of the control, unique within its window. Its controls are
-         ``<stable_id>.face_list``, ``.style_list``, ``.size``, ``.ok``,
+         ``<stable_id>.face-list``, ``.style-list``, ``.size``, ``.ok``,
          ``.cancel`` and ``.apply``; the layer under an open dialog is
          ``<stable_id>.layer``.
 

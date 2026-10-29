@@ -14,6 +14,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <utility>
 #include <string_view>
 #include <vector>
 
@@ -157,8 +158,10 @@ ControlTally& tally_for(Report& report, std::string_view manifest_id) {
     return report.controls.back();
 }
 
-bool is_entry(const StockControlFixture& fixture, std::string_view stable_id) {
-    return gui_forms::test_support::find_stock_control(fixture, stable_id) != nullptr;
+// The placed control's manifest id when `stable_id` names one, else empty.
+std::string entry_manifest_id(const StockControlFixture& fixture, std::string_view stable_id) {
+    const StockControlEntry* entry = gui_forms::test_support::find_stock_control(fixture, stable_id);
+    return entry == nullptr ? std::string{} : (*entry).manifest_id;
 }
 
 class TreeComparison final {
@@ -168,8 +171,8 @@ public:
 
     void compare(const SemanticNode& node, id element, const std::string& inherited_owner) {
         std::string owner = inherited_owner;
-        if (is_entry(fixture_, node.stable_id)) {
-            owner = node.stable_id;
+        if (std::string placed = entry_manifest_id(fixture_, node.stable_id); !placed.empty()) {
+            owner = std::move(placed);
         } else if (owner.empty()) {
             owner = owner_by_prefix(node.stable_id);
         }
@@ -202,15 +205,17 @@ public:
     }
 
 private:
-    // The placed control whose stable id prefixes this one ("list_box" for
-    // "list_box.item.0"), for a node whose control publishes no node of its
-    // own; the longest such prefix, or empty.
+    // The manifest id of the placed control whose stable id prefixes this
+    // one ("list-box" for "list-box.item.0"), for a node whose control
+    // publishes no node of its own; the longest such prefix, or empty.
     std::string owner_by_prefix(const std::string& stable_id) const {
         std::string owner;
+        std::size_t owner_prefix = 0U;
         for (const StockControlEntry& entry : fixture_.controls) {
-            const std::string prefix = entry.manifest_id + ".";
-            if (stable_id.compare(0U, prefix.size(), prefix) == 0 && entry.manifest_id.size() > owner.size()) {
+            const std::string prefix = entry.stable_id + ".";
+            if (stable_id.compare(0U, prefix.size(), prefix) == 0 && prefix.size() > owner_prefix) {
                 owner = entry.manifest_id;
+                owner_prefix = prefix.size();
             }
         }
         return owner;
@@ -306,7 +311,7 @@ id find_element(NSArray* elements, NSString* identifier) {
 }
 
 // The first node, in tree order, whose stable id begins with the control's
-// ("property_grid.row.0"), for a control that publishes no node of its own
+// ("property-grid.row.0"), for a control that publishes no node of its own
 // but publishes its parts. Returns a borrow into `nodes`.
 const SemanticNode* first_prefixed_node(const std::vector<SemanticNode>& nodes, const std::string& control_id) {
     const std::string prefix = control_id + ".";
@@ -392,8 +397,8 @@ void perform_default_actions(StockControlFixture& fixture, gui_forms::Window& wi
                              Report& report) {
     for (const StockControlEntry& entry : fixture.controls) {
         const SemanticSnapshot before = window.semantic_snapshot();
-        const SemanticNode* control_node = find_semantic_node(before.roots, entry.manifest_id);
-        if (control_node == nullptr) control_node = first_prefixed_node(before.roots, entry.manifest_id);
+        const SemanticNode* control_node = find_semantic_node(before.roots, entry.stable_id);
+        if (control_node == nullptr) control_node = first_prefixed_node(before.roots, entry.stable_id);
         if (control_node == nullptr) continue;
         SemanticAction action = SemanticAction::focus;
         const SemanticNode* target = default_action_node(*control_node, action);
@@ -411,11 +416,11 @@ void perform_default_actions(StockControlFixture& fixture, gui_forms::Window& wi
             continue;
         }
         const std::uint64_t effects_before = (*fixture.effects).total();
-        const std::string signature_before = control_signature(before.roots, entry.manifest_id);
+        const std::string signature_before = control_signature(before.roots, entry.stable_id);
         const bool performed = perform_through_element(element, action, target_before);
         const SemanticSnapshot after = window.semantic_snapshot();
         const bool effect = (*fixture.effects).total() > effects_before;
-        const bool changed = control_signature(after.roots, entry.manifest_id) != signature_before;
+        const bool changed = control_signature(after.roots, entry.stable_id) != signature_before;
         tally.action_observed = performed && (effect || changed);
         restore_after_action(window, target_before.stable_id, before);
         if (!tally.action_observed) {

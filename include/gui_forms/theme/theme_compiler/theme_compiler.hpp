@@ -124,12 +124,32 @@ private:
     std::variant<Applied, Refused> state_;
 };
 
-// A theme, or the refusal's diagnostics. Warnings come with a theme too.
-struct ThemeCompileResult final {
-    std::shared_ptr<const Theme> theme{};
-    std::vector<ThemeCompileDiagnostic> diagnostics{};
+// What compiling a theme package gave: compiled, a theme with any
+// warnings, or refused with its diagnostics.
+class ThemeCompileResult final {
+public:
+    [[nodiscard]] static ThemeCompileResult compiled(std::shared_ptr<const Theme> theme,
+                                                     std::vector<ThemeCompileDiagnostic> warnings) noexcept;
+    [[nodiscard]] static ThemeCompileResult refused(std::vector<ThemeCompileDiagnostic> diagnostics) noexcept;
 
-    [[nodiscard]] explicit operator bool() const noexcept { return theme != nullptr; }
+    [[nodiscard]] bool succeeded() const noexcept;
+    // The theme of a compilation that succeeded; null for a refusal.
+    [[nodiscard]] std::shared_ptr<const Theme> theme() const noexcept;
+    // The warnings of a compilation that succeeded, or the diagnostics of
+    // one refused.
+    [[nodiscard]] std::span<const ThemeCompileDiagnostic> diagnostics() const noexcept;
+
+private:
+    struct Compiled final {
+        std::shared_ptr<const Theme> theme{};
+        std::vector<ThemeCompileDiagnostic> warnings{};
+    };
+    struct Refused final {
+        std::vector<ThemeCompileDiagnostic> diagnostics{};
+    };
+    explicit ThemeCompileResult(std::variant<Compiled, Refused> state) noexcept;
+
+    std::variant<Compiled, Refused> state_;
 };
 
 // Compiles `package` with its `@import` closure among `library`'s packages

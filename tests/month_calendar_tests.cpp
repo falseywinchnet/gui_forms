@@ -52,7 +52,7 @@ Rect day_bounds(const MonthCalendar& calendar, DateTimeValue date) {
 }
 
 std::shared_ptr<MonthCalendar> make_calendar(const char* id) {
-    std::shared_ptr<MonthCalendar> calendar = make_control<MonthCalendar>(StableId(id));
+    std::shared_ptr<MonthCalendar> calendar = make_control<MonthCalendar>(StableId(std::string(id)));
     (*calendar).set_requested_bounds({0.0, 0.0, 520.0, 260.0});
     (*calendar).set_today_date(august(12U));
     (*calendar).set_date(august(12U));
@@ -254,7 +254,7 @@ void semantics() {
     require((*calendar).on_semantic_child_action("calendar.semantics.day.2026-08-14", SemanticAction::select, {}) &&
                 (*calendar).selection_start() == august(14U) && selected.size() == 1U,
             "selecting a date cell selects its day and reports it");
-    require((*calendar).on_semantic_child_action("calendar.semantics.next_month", SemanticAction::press, {}) &&
+    require((*calendar).on_semantic_child_action("calendar.semantics.next-month", SemanticAction::press, {}) &&
                 (*calendar).first_displayed_month() == DateTimeValue{2026, 9U, 1U},
             "the next-month button scrolls");
     require((*calendar).on_semantic_action(SemanticAction::set_value, "2026-08-20") &&

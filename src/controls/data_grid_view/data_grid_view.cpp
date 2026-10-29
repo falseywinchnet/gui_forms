@@ -109,8 +109,8 @@ void DataGridView::initialize_control_tree() {
     editor_ = make_control<TextBox>(StableId(prefix + ".editor"));
     (*editor_).set_border_style(BorderStyle::none);
     (*editor_).set_font(font_);
-    vertical_bar_ = make_control<VScrollBar>(StableId(prefix + ".vertical_scroll"));
-    horizontal_bar_ = make_control<HScrollBar>(StableId(prefix + ".horizontal_scroll"));
+    vertical_bar_ = make_control<VScrollBar>(StableId(prefix + ".vertical-scroll"));
+    horizontal_bar_ = make_control<HScrollBar>(StableId(prefix + ".horizontal-scroll"));
     // The bars scroll the grid; keyboard focus stays on the grid.
     (*vertical_bar_).set_focusable(false);
     (*horizontal_bar_).set_focusable(false);
@@ -482,11 +482,13 @@ void DataGridView::drop_missing_rows(std::optional<std::size_t> former_current) 
 // -- columns -----------------------------------------------------------------
 
 void DataGridView::validate_column(const DataGridViewColumn& column) const {
-    if (column.name.empty() || contains_dot(column.name) || !validate_utf8(column.name).valid() ||
+    // The name is one segment of its header's and cells' semantic node IDs.
+    if (contains_dot(column.name) || !valid_stable_id(column.name) ||
         !validate_utf8(column.header_text).valid() || !validate_utf8(column.button_text).valid() ||
         !validate_utf8(column.image_description).valid() || !validate_utf8(column.link_text).valid() ||
         !validate_utf8(column.data_property_name).valid()) {
-        throw std::invalid_argument("DataGridView columns require a name without '.' and valid UTF-8");
+        throw std::invalid_argument(
+            "DataGridView columns require a name that is one StableId segment, and valid UTF-8");
     }
     if (!std::isfinite(column.width) || !std::isfinite(column.minimum_width) ||
         column.minimum_width < 1.0 || column.width < column.minimum_width) {
@@ -596,8 +598,12 @@ std::string DataGridView::generated_row_id(const RowPositions& used) {
 }
 
 void DataGridView::validate_row_text(const DataGridViewRow& row) const {
-    if (!validate_utf8(row.stable_id.value).valid() || !validate_utf8(row.header_text).valid()) {
-        throw std::invalid_argument("DataGridView rows require valid UTF-8");
+    // A row's ID names its semantic node, so a given one follows the
+    // StableId segment rule.
+    if ((!row.stable_id.value.empty() && !valid_stable_id(row.stable_id.value)) ||
+        !validate_utf8(row.header_text).valid()) {
+        throw std::invalid_argument(
+            "DataGridView rows require IDs following the StableId segment rule and valid UTF-8");
     }
     if (row.cells.size() > columns_.size()) {
         throw std::invalid_argument("DataGridView row has more values than columns");
@@ -2234,7 +2240,7 @@ std::string DataGridView::column_stable_id(std::size_t column) const {
 // is no row's identity followed by a column name.
 std::string DataGridView::row_header_prefix() const {
     std::string prefix(stable_id().value());
-    prefix += ".row_header.";
+    prefix += ".row-header.";
     return prefix;
 }
 

@@ -175,10 +175,7 @@ These are outside the library by design, not missing work:
 
 ## Not yet available
 
-These Forms types have no GUI.Forms counterpart yet: `DataGridView`,
-`RichTextBox`, `MaskedTextBox`, `DomainUpDown`, `MonthCalendar` (the
-`DateTimePicker` calendar is part of that control), `StatusStrip`,
-`ToolStripContainer`, `BindingNavigator`, `NotifyIcon` and `FontDialog`.
-The host auto-complete sources (file system, history, URLs) report unsupported on every host. Outbound drag and native menu-bar
-publication are not available on any host. The [roadmap](../dev/roadmap)
+The host auto-complete sources (file system, history, URLs) report
+unsupported on every host. Outbound drag and native menu-bar publication
+are not available on any host. The [roadmap](../dev/roadmap)
 tracks what is in progress.

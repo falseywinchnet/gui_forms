@@ -1,6 +1,7 @@
 #include "gui_forms/controls/panel/text_box/text_box.hpp"
 
 #include "text_box_auto_complete_session.hpp"
+#include "../text_editing/text_editing_engine.hpp"
 
 #include "../input_control_utilities.hpp"
 #include "gui_forms/detail/algorithm/binary_search.hpp"
@@ -35,13 +36,75 @@ TextBox::MultilineValidation TextBox::validate_multiline_text(std::string_view t
     return MultilineValidation::valid;
 }
 
+// -- the editing engine's host -----------------------------------------------
+
+// How TextBox's editing engine reaches the box: each call forwards to the
+// box's own reaction, so the box keeps its cache updates, invalidation and
+// event order. The box owns the host and outlives the engine that borrows it.
+class TextBox::EditingHost final : public detail::TextEditingHost {
+public:
+    explicit EditingHost(TextBox& box) noexcept : box_(box) {}
+
+    void editing_require_mutable() const override;
+    void editing_restoring() override;
+    void editing_text_changed() override;
+    void editing_select(TextSelection selection) override;
+    void editing_navigating() override;
+    void editing_user_edit(TextEditKind kind, bool composing) override;
+    [[nodiscard]] HostServices* editing_host_services() const override;
+    [[nodiscard]] bool editing_password_protected() const override;
+
+private:
+    TextBox& box_;
+};
+
+void TextBox::EditingHost::editing_require_mutable() const {
+    box_.require_mutable();
+}
+
+void TextBox::EditingHost::editing_restoring() {
+    box_.end_auto_complete(false);
+}
+
+void TextBox::EditingHost::editing_text_changed() {
+    box_.text_edited();
+}
+
+void TextBox::EditingHost::editing_select(TextSelection selection) {
+    box_.set_selection(selection);
+}
+
+void TextBox::EditingHost::editing_navigating() {
+    // Moving the caret ends a completion and keeps the text.
+    box_.end_auto_complete(false);
+}
+
+void TextBox::EditingHost::editing_user_edit(TextEditKind kind, bool composing) {
+    box_.auto_complete_after_edit(kind, composing);
+}
+
+HostServices* TextBox::EditingHost::editing_host_services() const {
+    Window* owner = box_.window();
+    if (owner == nullptr) return nullptr;
+    HostServices* services = (*owner).host_services();
+    return services;
+}
+
+bool TextBox::EditingHost::editing_password_protected() const {
+    const bool masked = box_.password_protected();
+    return masked;
+}
+
+// -- TextBox -------------------------------------------------------------------
+
 TextBox::TextBox(StableId stable_id, std::string text)
-    : Panel(std::move(stable_id)), store_(text) {
+    : Panel(std::move(stable_id)),
+      editing_host_(std::make_unique<EditingHost>(*this)),
+      editing_(std::make_unique<detail::TextEditingEngine>(*editing_host_, text)) {
     set_paint_plane(PaintPlane::control);
     set_border_style(BorderStyle::sunken);
     set_focusable(true);
     set_cursor(CursorKind::text);
-    selection_ = {store_.utf8_size(), store_.utf8_size()};
     auto_complete_custom_source_ = std::make_shared<AutoCompleteStringCollection>();
     define_bindable_property({
         {"text", BindingValueKind::text, "Appearance",
@@ -55,8 +118,52 @@ TextBox::TextBox(StableId stable_id, std::string text)
         detail::EventChangeConnector<const std::string&>(text_changed_), {}, {}});
 }
 
+TextBox::~TextBox() {
+    // The window may close the list after this box is gone; its revocation
+    // and collection callbacks must not reach a destroyed box.
+    if (auto_complete_session_) {
+        detail::TextBoxAutoCompleteSession& session = *auto_complete_session_;
+        session.revocation.disconnect();
+        session.collection_change.disconnect();
+    }
+}
+
+std::string_view TextBox::text() const noexcept {
+    const std::string_view result = (*editing_).text();
+    return result;
+}
+
+bool TextBox::read_only() const noexcept {
+    const bool result = (*editing_).read_only();
+    return result;
+}
+
+std::size_t TextBox::maximum_length() const noexcept {
+    const std::size_t result = (*editing_).maximum_length();
+    return result;
+}
+
+TextSelection TextBox::selection() const noexcept {
+    const TextSelection result = (*editing_).selection();
+    return result;
+}
+
+bool TextBox::can_undo() const noexcept {
+    const bool result = (*editing_).can_undo();
+    return result;
+}
+
+bool TextBox::can_redo() const noexcept {
+    const bool result = (*editing_).can_redo();
+    return result;
+}
+
+void TextBox::set_edit_filter(Delegate<TextEdit&> filter) noexcept {
+    (*editing_).set_edit_filter(filter);
+}
+
 BindingValue TextBox::text_property_value() const {
-    const std::string value(store_.utf8());
+    const std::string value((*editing_).text());
     const BindingValue result{value};
     return result;
 }
@@ -66,26 +173,31 @@ void TextBox::set_text(std::string text) {
     if (multiline_ && validate_multiline_text(text) != MultilineValidation::valid) {
         throw std::invalid_argument("Multiline TextBox requires valid UTF-8, at most 1 MiB total and 4096 bytes per line");
     }
-    if (text == store_.utf8()) {
+    if (text == (*editing_).text()) {
         return;
     }
     end_auto_complete(false);
-    // Replacing the whole text abandons any composition it held.
-    composing_ = false;
-    store_.set_text(text);
-    selection_ = {store_.utf8_size(), store_.utf8_size()};
+    // The engine ends any composition and the history with the old text.
+    (*editing_).set_text(text);
     layout_positions_.clear();
     layout_offsets_.clear();
-    undo_.clear();
-    redo_.clear();
-    history_bytes_ = 0U;
     horizontal_offset_ = 0.0;
     vertical_offset_ = 0.0;
     reset_caret_blink();
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-    const std::string value(store_.utf8());
+    const std::string value((*editing_).text());
     publish_change(text_changed_, value);
-    publish_change(selection_changed_, selection_);
+    publish_change(selection_changed_, (*editing_).selection());
+}
+
+void TextBox::text_edited() {
+    layout_positions_.clear();
+    layout_offsets_.clear();
+    reset_caret_blink();
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+    const std::string value((*editing_).text());
+    publish_change(text_changed_, value);
+    publish_change(selection_changed_, (*editing_).selection());
 }
 
 void TextBox::set_placeholder_text(std::string text) {
@@ -102,11 +214,11 @@ void TextBox::set_placeholder_text(std::string text) {
 
 void TextBox::set_read_only(bool read_only) {
     require_mutable();
-    if (read_only_ == read_only) {
+    if ((*editing_).read_only() == read_only) {
         return;
     }
     end_auto_complete(false);
-    read_only_ = read_only;
+    (*editing_).set_read_only(read_only);
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
@@ -118,6 +230,7 @@ void TextBox::set_multiline(bool enabled_value) {
     }
     end_auto_complete(false);
     multiline_ = enabled_value;
+    (*editing_).set_multiline(enabled_value);
     multiline_width_ = -1.0;
     horizontal_offset_ = 0.0;
     vertical_offset_ = 0.0;
@@ -164,8 +277,8 @@ void TextBox::set_maximum_length(std::size_t length) {
         throw std::out_of_range(
             "TextBox maximum length must be zero or no greater than 16 Mi scalars");
     }
-    if (maximum_length_ == length) return;
-    maximum_length_ = length;
+    if ((*editing_).maximum_length() == length) return;
+    (*editing_).set_maximum_length(length);
     invalidate(Dirty::semantics);
 }
 
@@ -217,250 +330,66 @@ void TextBox::set_font(FontSpec font) {
 
 void TextBox::select(Utf8Offset anchor, Utf8Offset caret) {
     require_mutable();
-    if (!store_.is_grapheme_boundary(anchor) ||
-        !store_.is_grapheme_boundary(caret)) {
+    const TextStore& store = (*editing_).store();
+    if (!store.is_grapheme_boundary(anchor) ||
+        !store.is_grapheme_boundary(caret)) {
         throw std::out_of_range("TextBox selection must use grapheme boundaries");
     }
     set_selection({anchor, caret});
 }
 
 void TextBox::select_all() {
-    set_selection({Utf8Offset(0U), store_.utf8_size()});
+    set_selection({Utf8Offset(0U), (*editing_).store().utf8_size()});
 }
 
 std::string TextBox::selected_text() const {
-    const Utf8Offset start = selection_.start();
-    const std::size_t length = selection_.length();
-    const std::string_view source = store_.utf8();
-    const std::string_view selected = source.substr(start.value(), length);
-    const std::string result(selected);
+    const std::string result = (*editing_).selected_text();
     return result;
-}
-
-TextBox::Snapshot TextBox::snapshot() const {
-    const std::string value(store_.utf8());
-    const Snapshot result{.text = value, .selection = selection_};
-    return result;
-}
-
-void TextBox::apply_snapshot(Snapshot snapshot) {
-    end_auto_complete(false);
-    store_.set_text(snapshot.text);
-    selection_ = snapshot.selection;
-    layout_positions_.clear();
-    layout_offsets_.clear();
-    reset_caret_blink();
-    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-    const std::string value(store_.utf8());
-    publish_change(text_changed_, value);
-    publish_change(selection_changed_, selection_);
-}
-
-void TextBox::push_history(std::deque<Snapshot>& history, Snapshot snapshot) {
-    history_bytes_ += snapshot.text.size();
-    history.push_back(std::move(snapshot));
-    while (undo_.size() + redo_.size() > maximum_history_entries_ ||
-           history_bytes_ > maximum_history_bytes_) {
-        std::deque<Snapshot>* source = !undo_.empty() ? &undo_ : &redo_;
-        history_bytes_ -= (*source).front().text.size();
-        (*source).pop_front();
-    }
-}
-
-void TextBox::clear_redo() noexcept {
-    for (const Snapshot& snapshot : redo_) {
-        history_bytes_ -= snapshot.text.size();
-    }
-    redo_.clear();
 }
 
 void TextBox::clear_undo_history() {
     require_mutable();
-    undo_.clear();
-    redo_.clear();
-    history_bytes_ = 0U;
+    (*editing_).clear_history();
 }
 
 bool TextBox::undo() {
-    require_mutable();
-    if (read_only_ || undo_.empty()) {
-        return false;
-    }
-    if (multiline_ && validate_multiline_text(undo_.back().text) != MultilineValidation::valid) return false;
-    Snapshot target = std::move(undo_.back());
-    history_bytes_ -= target.text.size();
-    undo_.pop_back();
-    push_history(redo_, snapshot());
-    apply_snapshot(std::move(target));
-    return true;
+    const bool result = (*editing_).undo();
+    return result;
 }
 
 bool TextBox::redo() {
-    require_mutable();
-    if (read_only_ || redo_.empty()) {
-        return false;
-    }
-    if (multiline_ && validate_multiline_text(redo_.back().text) != MultilineValidation::valid) return false;
-    Snapshot target = std::move(redo_.back());
-    history_bytes_ -= target.text.size();
-    redo_.pop_back();
-    push_history(undo_, snapshot());
-    apply_snapshot(std::move(target));
-    return true;
-}
-
-bool TextBox::replace(Utf8Offset start, Utf8Offset end,
-                      std::string_view replacement, TextEditKind kind) {
-    require_mutable();
-    const Utf8ValidationResult replacement_validation =
-        validate_utf8(replacement);
-    if (read_only_ || start.value() > end.value() ||
-        !store_.is_grapheme_boundary(start) ||
-        !store_.is_grapheme_boundary(end) ||
-        !replacement_validation.valid()) {
-        return false;
-    }
-    if (edit_filter_) {
-        TextEdit edit{.kind = kind, .start = start, .end = end, .replacement = replacement};
-        const std::uint64_t revision = store_.revision();
-        edit_filter_(edit);
-        // A refusing filter may have shown a looked-up value; whatever the
-        // verdict, the proposal no longer describes a changed text.
-        if (store_.revision() != revision) return false;
-        if (edit.verdict == TextEditVerdict::refuse) return false;
-        if (edit.verdict == TextEditVerdict::rewrite) {
-            const bool rewritten = apply_rewrite(edit.rewritten_text, edit.rewritten_caret);
-            return rewritten;
-        }
-    }
-    if (multiline_ && replacement.size() > maximum_multiline_bytes -
-            (text().size() - (end.value() - start.value()))) return false;
-    if (multiline_) {
-        std::string candidate(text());
-        candidate.replace(start.value(), end.value() - start.value(), replacement);
-        if (validate_multiline_text(candidate) != MultilineValidation::valid) return false;
-    }
-    const std::size_t removed_scalars =
-        store_.scalar_index(end).value() - store_.scalar_index(start).value();
-    if (maximum_length_ != 0U &&
-        store_.scalar_count().value() - removed_scalars +
-                replacement_validation.scalar_count >
-            maximum_length_) {
-        return false;
-    }
-    const std::string_view existing = store_.utf8().substr(
-        start.value(), end.value() - start.value());
-    if (existing == replacement) {
-        set_selection({Utf8Offset(start.value() + replacement.size()),
-                       Utf8Offset(start.value() + replacement.size())});
-        return true;
-    }
-    Snapshot previous = snapshot();
-    static_cast<void>(store_.replace({start, end}, replacement));
-    clear_redo();
-    push_history(undo_, std::move(previous));
-    Utf8Offset next(start.value() + replacement.size());
-    // An insertion may join a following combining sequence or CRLF. Keep the
-    // resulting caret on a boundary of the new text, not merely the old text.
-    while (!store_.is_grapheme_boundary(next)) next = store_.next_scalar_boundary(next);
-    selection_ = {next, next};
-    layout_positions_.clear();
-    layout_offsets_.clear();
-    reset_caret_blink();
-    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-    const std::string value(store_.utf8());
-    publish_change(text_changed_, value);
-    publish_change(selection_changed_, selection_);
-    return true;
-}
-
-bool TextBox::apply_rewrite(std::string_view rewritten, Utf8Offset caret) {
-    const Utf8ValidationResult validation = validate_utf8(rewritten);
-    if (!validation.valid()) return false;
-    if (multiline_ && validate_multiline_text(rewritten) != MultilineValidation::valid) return false;
-    if (maximum_length_ != 0U && validation.scalar_count > maximum_length_) return false;
-    const bool changes = rewritten != store_.utf8();
-    if (changes) {
-        Snapshot previous = snapshot();
-        store_.set_text(rewritten);
-        clear_redo();
-        push_history(undo_, std::move(previous));
-    }
-    // The caret lands on a grapheme boundary at or after the requested one.
-    Utf8Offset next = store_.utf8_size();
-    if (caret.value() < next.value() && store_.is_scalar_boundary(caret)) next = caret;
-    while (!store_.is_grapheme_boundary(next)) next = store_.next_scalar_boundary(next);
-    if (!changes) {
-        // Only the caret moves (input that matched a literal, for example).
-        set_selection({next, next});
-        return true;
-    }
-    selection_ = {next, next};
-    layout_positions_.clear();
-    layout_offsets_.clear();
-    reset_caret_blink();
-    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-    const std::string value(store_.utf8());
-    publish_change(text_changed_, value);
-    publish_change(selection_changed_, selection_);
-    return true;
+    const bool result = (*editing_).redo();
+    return result;
 }
 
 bool TextBox::replace_selection(std::string_view replacement) {
-    const Utf8Offset start = selection_.start();
-    const Utf8Offset end = selection_.end();
-    const TextEditKind kind = replacement.empty() ? TextEditKind::deletion : TextEditKind::typing;
-    const bool result = replace(start, end, replacement, kind);
+    const bool result = (*editing_).replace_selection(replacement);
     return result;
 }
 
 bool TextBox::delete_selection() {
-    if (selection_.empty()) return false;
-    const bool result = replace_selection({});
+    const bool result = (*editing_).delete_selection();
     return result;
 }
 
 bool TextBox::copy() {
-    require_mutable();
-    if (selection_.empty() || password_protected() || window() == nullptr ||
-        (*window()).host_services() == nullptr) {
-        return false;
-    }
-    HostServices& services = *(*window()).host_services();
-    const std::string value = selected_text();
-    const HostServiceStatus operation = services.write_clipboard_text(value);
-    const bool result = operation.accepted();
+    const bool result = (*editing_).copy();
     return result;
 }
 
 bool TextBox::cut() {
-    require_mutable();
-    if (read_only_ || password_protected() || selection_.empty()) {
-        return false;
-    }
-    const bool copied = copy();
-    if (!copied) return false;
-    const bool result = delete_selection();
+    const bool result = (*editing_).cut();
     return result;
 }
 
 bool TextBox::paste() {
-    require_mutable();
-    if (read_only_ || window() == nullptr || (*window()).host_services() == nullptr) {
-        return false;
-    }
-    const HostClipboardTextResult result =
-        (*(*window()).host_services()).read_clipboard_text();
-    if (!result.status.accepted() || !result.has_text) return false;
-    const Utf8Offset start = selection_.start();
-    const Utf8Offset end = selection_.end();
-    const bool replaced = replace(start, end, result.text_utf8, TextEditKind::paste);
-    return replaced;
+    const bool result = (*editing_).paste();
+    return result;
 }
 
 void TextBox::set_selection(TextSelection selection, bool reveal_caret) {
     const bool upstream = std::exchange(next_upstream_, false);
-    if (selection_ == selection) {
+    if ((*editing_).selection() == selection) {
         if (reveal_caret) {
             reset_caret_blink();
         }
@@ -468,20 +397,20 @@ void TextBox::set_selection(TextSelection selection, bool reveal_caret) {
         invalidate(Dirty::paint);
         return;
     }
-    selection_ = selection;
+    (*editing_).set_selection_value(selection);
     if (reveal_caret) {
         reset_caret_blink();
     }
     caret_upstream_ = upstream;
     invalidate(Dirty::paint | Dirty::semantics);
-    publish_change(selection_changed_, selection_);
+    publish_change(selection_changed_, (*editing_).selection());
 }
 
 double TextBox::boundary_x(Utf8Offset offset) const noexcept {
     if (layout_positions_.empty() ||
         layout_positions_.size() != layout_offsets_.size() ||
         layout_text_scale_ != effective_text_scale()) {
-        const GraphemeIndex index = store_.grapheme_index(offset);
+        const GraphemeIndex index = (*editing_).store().grapheme_index(offset);
         const FontSpec font = effective_font(font_);
         const double grapheme_count = static_cast<double>(index.value());
         const double position = grapheme_count * font.size * 0.55;
@@ -495,54 +424,16 @@ double TextBox::boundary_x(Utf8Offset offset) const noexcept {
     return layout_positions_[index];
 }
 
-Utf8Offset TextBox::previous_word_boundary(Utf8Offset offset) const {
-    if (offset.value() == 0U) return offset;
-    Utf8Offset cursor = store_.previous_grapheme_boundary(offset);
-    WordClass category = word_class(store_.scalar_at(cursor));
-    while (cursor.value() > 0U) {
-        const Utf8Offset previous = store_.previous_grapheme_boundary(cursor);
-        if (word_class(store_.scalar_at(previous)) != category) break;
-        cursor = previous;
-    }
-    if (category == WordClass::spacing && cursor.value() > 0U) {
-        cursor = store_.previous_grapheme_boundary(cursor);
-        category = word_class(store_.scalar_at(cursor));
-        while (cursor.value() > 0U) {
-            const Utf8Offset previous = store_.previous_grapheme_boundary(cursor);
-            if (word_class(store_.scalar_at(previous)) != category) break;
-            cursor = previous;
-        }
-    }
-    return cursor;
-}
-
-Utf8Offset TextBox::next_word_boundary(Utf8Offset offset) const {
-    const Utf8Offset end = store_.utf8_size();
-    if (offset == end) return end;
-    WordClass category = word_class(store_.scalar_at(offset));
-    Utf8Offset cursor = offset;
-    while (cursor != end && word_class(store_.scalar_at(cursor)) == category) {
-        cursor = store_.next_grapheme_boundary(cursor);
-    }
-    if (category != WordClass::spacing) {
-        while (cursor != end &&
-               word_class(store_.scalar_at(cursor)) == WordClass::spacing) {
-            cursor = store_.next_grapheme_boundary(cursor);
-        }
-    }
-    return cursor;
-}
-
 std::string TextBox::display_text() const {
     if (!password_protected()) {
-        const std::string result(store_.utf8());
+        const std::string result((*editing_).store().utf8());
         return result;
     }
     const char32_t mask = use_system_password_character_
         ? U'\u2022' : password_character_;
     const std::string encoded = utf8_scalar(mask);
     std::string result{};
-    const std::size_t count = store_.grapheme_count().value();
+    const std::size_t count = (*editing_).store().grapheme_count().value();
     const std::size_t maximum_count = result.max_size() / encoded.size();
     if (count > maximum_count) throw std::length_error("TextBox mask exceeds string capacity");
     const std::size_t capacity = encoded.size() * count;
@@ -564,7 +455,7 @@ void TextBox::rebuild_multiline_rows(const double width) {
         device_scale = (*owner).scale();
         provider = (*owner).text_metrics_provider();
     }
-    if (!visual_lines_.empty() && multiline_revision_ == store_.revision() &&
+    if (!visual_lines_.empty() && multiline_revision_ == (*editing_).store().revision() &&
         multiline_font_ == font && multiline_width_ == width &&
         multiline_provider_ == provider && multiline_device_scale_ == device_scale) return;
     // Invalidate before modifying retained rows: an allocation/metrics failure
@@ -580,10 +471,10 @@ void TextBox::rebuild_multiline_rows(const double width) {
     const ResolvedTextLayout tab_metrics = resolve_text_layout_utf8("    ", font);
     const double tab_width = std::max(1.0, tab_metrics.logical_size.width);
     const std::string_view source = text();
-    const std::size_t logical_count = store_.line_count();
+    const std::size_t logical_count = (*editing_).store().line_count();
     std::size_t maximum_line_bytes = 0U;
     for (std::size_t logical = 0U; logical < logical_count; ++logical) {
-        const Utf8Range range = store_.line_content_range(LineIndex(logical));
+        const Utf8Range range = (*editing_).store().line_content_range(LineIndex(logical));
         const std::size_t line_bytes = range.end.value() - range.start.value();
         maximum_line_bytes = std::max(maximum_line_bytes, line_bytes);
     }
@@ -601,7 +492,7 @@ void TextBox::rebuild_multiline_rows(const double width) {
     // within the admitted 4096-byte logical-line bound, cached across paints.
     // Tabs are explicit shaping boundaries; arbitrary chunk cuts are forbidden.
     for (std::size_t logical = 0U; logical < logical_count; ++logical) {
-        const Utf8Range range = store_.line_content_range(LineIndex(logical));
+        const Utf8Range range = (*editing_).store().line_content_range(LineIndex(logical));
         std::size_t cursor = range.start.value();
         do {
             line.offsets.clear();
@@ -622,7 +513,7 @@ void TextBox::rebuild_multiline_rows(const double width) {
                         break;
                     }
                     const Utf8Offset position(cursor);
-                    const Utf8Offset following = store_.next_grapheme_boundary(position);
+                    const Utf8Offset following = (*editing_).store().next_grapheme_boundary(position);
                     cursor = following.value();
                     line.offsets.push_back(cursor);
                     line.positions.push_back(x);
@@ -632,7 +523,7 @@ void TextBox::rebuild_multiline_rows(const double width) {
                 std::size_t run_end = cursor;
                 while (cursor < range.end.value() && source[cursor] != '\t') {
                     const Utf8Offset position(cursor);
-                    const Utf8Offset following = store_.next_grapheme_boundary(position);
+                    const Utf8Offset following = (*editing_).store().next_grapheme_boundary(position);
                     const std::size_t next = following.value();
                     const std::size_t prefix_bytes = next - run_start;
                     const std::string_view prefix = source.substr(run_start, prefix_bytes);
@@ -646,7 +537,7 @@ void TextBox::rebuild_multiline_rows(const double width) {
                     run_end = next;
                     line.offsets.push_back(next);
                     line.positions.push_back(x);
-                    const char32_t scalar = store_.scalar_at(position);
+                    const char32_t scalar = (*editing_).store().scalar_at(position);
                     if (scalar == U' ' || scalar == U'\t') last_space = line.offsets.size() - 1;
                 }
                 if (run_end != run_start) line.runs.push_back({run_start, run_end, run_x});
@@ -668,7 +559,7 @@ void TextBox::rebuild_multiline_rows(const double width) {
         } while (cursor < range.end.value());
     }
     visual_lines_.resize(row_count);
-    multiline_revision_ = store_.revision();
+    multiline_revision_ = (*editing_).store().revision();
     multiline_font_ = font;
     multiline_width_ = width;
     multiline_provider_ = provider;
@@ -693,9 +584,9 @@ std::size_t TextBox::caret_line() const {
     };
     const std::span<const VisualLine> rows(visual_lines_);
     const BeforeVisualLine before{};
-    const std::size_t found = detail::upper_bound_index(rows, selection_.caret.value(), before);
+    const std::size_t found = detail::upper_bound_index(rows, (*editing_).selection().caret.value(), before);
     std::size_t row = found == 0U ? 0U : found - 1U;
-    if (caret_upstream_ && row > 0 && visual_lines_[row - 1].offsets.back() == selection_.caret.value()) --row;
+    if (caret_upstream_ && row > 0 && visual_lines_[row - 1].offsets.back() == (*editing_).selection().caret.value()) --row;
     return row;
 }
 
@@ -738,7 +629,7 @@ void TextBox::reveal_multiline_caret() {
     Point offset = scroll_offset();
     if (reveal_pending_) {
         const std::size_t row = caret_line();
-        const double x = multiline_boundary_x(row, selection_.caret);
+        const double x = multiline_boundary_x(row, (*editing_).selection().caret);
         const double y = static_cast<double>(row) * line_height_;
         if (y < offset.y) offset.y = y;
         if (y + line_height_ > offset.y + height) offset.y = y + line_height_ - height;
@@ -773,30 +664,44 @@ Rect TextBox::paint_multiline(Painter& painter) {
         const VisualLine& row = visual_lines_[i];
         const double y = 4.0 + static_cast<double>(i) * line_height_ - offset.y;
         const double origin = text_left_ - offset.x;
-        const bool selected = focused_ && !selection_.empty() &&
-            selection_.start().value() <= row.offsets.back() &&
-            selection_.end().value() > row.offsets.front();
+        const bool selected = focused_ && !(*editing_).selection().empty() &&
+            (*editing_).selection().start().value() <= row.offsets.back() &&
+            (*editing_).selection().end().value() > row.offsets.front();
         Rect selection_bounds{};
         if (selected) {
-            const double left = multiline_boundary_x(i, selection_.start());
-            double right = multiline_boundary_x(i, selection_.end());
-            if (selection_.end().value() > row.offsets.back()) right += std::max(3.0, font.size * 0.35);
+            const double left = multiline_boundary_x(i, (*editing_).selection().start());
+            double right = multiline_boundary_x(i, (*editing_).selection().end());
+            if ((*editing_).selection().end().value() > row.offsets.back()) right += std::max(3.0, font.size * 0.35);
             selection_bounds = {origin + left, y, std::max(0.0, right - left), line_height_};
             if (themed) paint_surface_material(painter, selection_bounds, highlight.material);
             else painter.fill_rect(selection_bounds, style().accent);
         }
-        for (const VisualRun& run : row.runs) {
-            const Point baseline{origin + run.x, y + line_ascent_};
-            const std::string_view source = text();
-            const std::size_t run_bytes = run.end - run.start;
-            const std::string_view value = source.substr(run.start, run_bytes);
-            painter.draw_text_utf8(baseline, value, font, foreground);
-            if (selected) {
-                painter.save();
-                painter.clip_rect(selection_bounds);
-                painter.draw_text_utf8(baseline, value, font, selected_text);
-                painter.restore();
+        const std::string_view source = text();
+        if (!selected) {
+            for (const VisualRun& run : row.runs) {
+                const Point baseline{origin + run.x, y + line_ascent_};
+                painter.draw_text_utf8(baseline, source.substr(run.start, run.end - run.start), font, foreground);
             }
+            continue;
+        }
+        // Each glyph is drawn once: in the selection's ink inside the band,
+        // in the text's ink to either side.
+        const double band_right = selection_bounds.x + selection_bounds.width;
+        const std::array<Rect, 3> spans{{
+            {text_left_, y, std::max(0.0, selection_bounds.x - text_left_), line_height_},
+            selection_bounds,
+            {band_right, y, std::max(0.0, text_left_ + width - band_right), line_height_},
+        }};
+        for (std::size_t span = 0U; span < spans.size(); ++span) {
+            if (spans[span].width <= 0.0) continue;
+            painter.save();
+            painter.clip_rect(spans[span]);
+            const Color ink = span == 1U ? selected_text : foreground;
+            for (const VisualRun& run : row.runs) {
+                const Point baseline{origin + run.x, y + line_ascent_};
+                painter.draw_text_utf8(baseline, source.substr(run.start, run.end - run.start), font, ink);
+            }
+            painter.restore();
         }
     }
     if (text().empty() && !placeholder_.empty()) painter.draw_text_utf8(
@@ -804,7 +709,7 @@ Rect TextBox::paint_multiline(Painter& painter) {
     Rect caret_bounds{};
     if (focused_) {
         const std::size_t row = caret_line();
-        const double x = text_left_ - offset.x + multiline_boundary_x(row, selection_.caret);
+        const double x = text_left_ - offset.x + multiline_boundary_x(row, (*editing_).selection().caret);
         const double y = 4.0 + static_cast<double>(row) * line_height_ - offset.y;
         caret_bounds = {x, y, 0.0, line_height_};
         if (caret_visible_) {
@@ -825,9 +730,9 @@ Utf8Offset TextBox::position_at(double local_x) const noexcept {
         const std::size_t grapheme = std::min(
             static_cast<std::size_t>(std::lround(content_x /
                                                   (font.size * 0.55))),
-            store_.grapheme_count().value());
+            (*editing_).store().grapheme_count().value());
         const GraphemeIndex index(grapheme);
-        const Utf8Offset position = store_.utf8_offset(index);
+        const Utf8Offset position = (*editing_).store().utf8_offset(index);
         return position;
     }
     const std::size_t index = detail::lower_bound_index(
@@ -876,13 +781,13 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
     layout_positions_.clear();
     layout_offsets_.clear();
     layout_text_scale_ = effective_text_scale();
-    const std::size_t count = store_.grapheme_count().value();
+    const std::size_t count = (*editing_).store().grapheme_count().value();
     layout_positions_.reserve(count + 1U);
     layout_offsets_.reserve(count + 1U);
     const bool masked = password_protected();
     const std::string_view presentation(presented);
     for (std::size_t index = 0U; index <= count; ++index) {
-        const Utf8Offset offset = store_.utf8_offset(GraphemeIndex(index));
+        const Utf8Offset offset = (*editing_).store().utf8_offset(GraphemeIndex(index));
         layout_offsets_.push_back(offset.value());
         const std::size_t presentation_offset = masked
             ? index * mask.size() : offset.value();
@@ -890,7 +795,7 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
         const Size prefix_size = painter.measure_text_utf8(prefix, font);
         layout_positions_.push_back(prefix_size.width);
     }
-    const double caret_content_x = boundary_x(selection_.caret);
+    const double caret_content_x = boundary_x((*editing_).selection().caret);
     if (caret_content_x < horizontal_offset_) {
         horizontal_offset_ = caret_content_x;
     } else if (caret_content_x > horizontal_offset_ + viewport) {
@@ -900,14 +805,14 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
         std::max(0.0, layout_positions_.back() - viewport));
 
     const double origin_x = text_left_ - horizontal_offset_;
-    const double selection_x = origin_x + boundary_x(selection_.start());
-    const double selection_end_x = origin_x + boundary_x(selection_.end());
+    const double selection_x = origin_x + boundary_x((*editing_).selection().start());
+    const double selection_end_x = origin_x + boundary_x((*editing_).selection().end());
     const double baseline = std::max(font.size,
         (bounds.height + font.size) * 0.5 - 1.0);
     painter.save();
     painter.clip_rect({text_left_, 2.0, viewport,
                        std::max(0.0, bounds.height - 4.0)});
-    if (focused_ && !selection_.empty()) {
+    if (focused_ && !(*editing_).selection().empty()) {
         const Rect selection_bounds{
             selection_x, 3.0,
             std::max(0.0, selection_end_x - selection_x),
@@ -922,23 +827,30 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
             painter.fill_rect(selection_bounds, style().accent);
         }
     }
-    if (!store_.utf8().empty()) {
-        painter.draw_text_utf8(
-            {origin_x, baseline}, presented, font,
-            themed ? editor_recipe.text
-                   : enabled() ? style().text : style().disabled_text);
-        if (focused_ && !selection_.empty()) {
+    const Color text_ink = themed ? editor_recipe.text : enabled() ? style().text : style().disabled_text;
+    if (!(*editing_).store().utf8().empty() && (!focused_ || (*editing_).selection().empty())) {
+        painter.draw_text_utf8({origin_x, baseline}, presented, font, text_ink);
+    } else if (!(*editing_).store().utf8().empty()) {
+        // Each glyph is drawn once: in the selection's ink inside the band,
+        // in the text's ink to either side.
+        const Color selected_text = themed
+            ? effective_theme().resolve(
+                  ControlVisualRole::selection,
+                  visual_context(false, false, true, true)).text
+            : style().highlight;
+        const double band_width = std::max(0.0, selection_end_x - selection_x);
+        const double band_right = selection_x + band_width;
+        const double height = std::max(0.0, bounds.height - 4.0);
+        const std::array<Rect, 3> spans{{
+            {text_left_, 2.0, std::max(0.0, selection_x - text_left_), height},
+            {selection_x, 2.0, band_width, height},
+            {band_right, 2.0, std::max(0.0, text_left_ + viewport - band_right), height},
+        }};
+        for (std::size_t span = 0U; span < spans.size(); ++span) {
+            if (spans[span].width <= 0.0) continue;
             painter.save();
-            painter.clip_rect({selection_x, 3.0,
-                               std::max(0.0, selection_end_x - selection_x),
-                               std::max(0.0, bounds.height - 6.0)});
-            const Color selected_text = themed
-                ? effective_theme().resolve(
-                      ControlVisualRole::selection,
-                      visual_context(false, false, true, true)).text
-                : style().highlight;
-            painter.draw_text_utf8({origin_x, baseline}, presented, font,
-                                   selected_text);
+            painter.clip_rect(spans[span]);
+            painter.draw_text_utf8({origin_x, baseline}, presented, font, span == 1U ? selected_text : text_ink);
             painter.restore();
         }
     } else if (!placeholder_.empty()) {
@@ -946,7 +858,7 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
             {text_left_, baseline}, placeholder_, font,
             themed ? editor_recipe.muted_text : style().disabled_text);
     }
-    if (focused_ && caret_visible_ && selection_.empty()) {
+    if (focused_ && caret_visible_ && (*editing_).selection().empty()) {
         const double caret_x = origin_x + caret_content_x;
         painter.draw_line({caret_x, 4.0},
                           {caret_x, std::max(4.0, bounds.height - 4.0)},
@@ -964,7 +876,7 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
             painter.stroke_rect(ring, style().accent, 1.0);
         }
     }
-    if (selection_.empty()) {
+    if ((*editing_).selection().empty()) {
         const double caret_x = origin_x + caret_content_x;
         const Rect caret_bounds{caret_x, 4.0, 0.0,
                                 std::max(0.0, bounds.height - 8.0)};
@@ -1007,7 +919,7 @@ void TextBox::on_pointer(PointerEvent& event) {
         end_auto_complete(false);
         const Utf8Offset position = multiline_ ? multiline_position_at(local_x, local_y) : position_at(local_x);
         const bool extend = includes(event.modifiers, Modifier::shift);
-        set_selection(extend ? TextSelection{selection_.anchor, position}
+        set_selection(extend ? TextSelection{(*editing_).selection().anchor, position}
                              : TextSelection{position, position});
         selecting_ = true;
         set_pointer_capture(true);
@@ -1015,13 +927,13 @@ void TextBox::on_pointer(PointerEvent& event) {
     } else if (event.action == PointerAction::move && selecting_ &&
                has_pointer_capture()) {
         const Utf8Offset position = multiline_ ? multiline_position_at(local_x, local_y) : position_at(local_x);
-        const TextSelection selected{.anchor = selection_.anchor, .caret = position};
+        const TextSelection selected{.anchor = (*editing_).selection().anchor, .caret = position};
         set_selection(selected);
         event.handled = true;
     } else if (event.action == PointerAction::up &&
                event.button == PointerButton::primary && selecting_) {
         const Utf8Offset position = multiline_ ? multiline_position_at(local_x, local_y) : position_at(local_x);
-        const TextSelection selected{.anchor = selection_.anchor, .caret = position};
+        const TextSelection selected{.anchor = (*editing_).selection().anchor, .caret = position};
         set_selection(selected);
         selecting_ = false;
         set_pointer_capture(false);
@@ -1040,7 +952,7 @@ void TextBox::on_key(KeyEvent& event) {
     const bool extend = includes(event.modifiers, Modifier::shift);
     const bool command = command_modifier(event.modifiers);
     if (multiline_ && accepts_tab_ && event.physical_key == PhysicalKey::tab && !command) {
-        if (!read_only_) static_cast<void>(replace_selection("\t"));
+        if (!(*editing_).read_only()) static_cast<void>(replace_selection("\t"));
         event.handled = true;
         return;
     }
@@ -1058,12 +970,12 @@ void TextBox::on_key(KeyEvent& event) {
         double goal = preferred_x_;
         if (home_end) {
             const bool first = event.physical_key == PhysicalKey::home;
-            next = command ? (first ? Utf8Offset(0) : store_.utf8_size())
+            next = command ? (first ? Utf8Offset(0) : (*editing_).store().utf8_size())
                 : Utf8Offset(first ? visual_lines_[row].offsets.front()
                                    : visual_lines_[row].offsets.back());
             next_upstream_ = !command && !first;
         } else {
-            if (goal < 0.0) goal = multiline_boundary_x(row, selection_.caret);
+            if (goal < 0.0) goal = multiline_boundary_x(row, (*editing_).selection().caret);
             const bool up = event.physical_key == PhysicalKey::up ||
                             event.physical_key == PhysicalKey::page_up;
             const bool page = event.physical_key == PhysicalKey::page_up ||
@@ -1075,21 +987,21 @@ void TextBox::on_key(KeyEvent& event) {
             next = position_in_line(target, goal);
             next_upstream_ = next.value() == visual_lines_[target].offsets.back();
         }
-        set_selection(extend ? TextSelection{selection_.anchor, next} : TextSelection{next, next});
+        set_selection(extend ? TextSelection{(*editing_).selection().anchor, next} : TextSelection{next, next});
         if (!home_end) preferred_x_ = goal;
         event.handled = true;
         return;
     }
     if (event.physical_key == PhysicalKey::enter) {
         // An open suggestion list or appended completion took Enter above.
-        if (composing_) {
+        if ((*editing_).composing()) {
             // The composition is the input method's to commit; the box keeps
             // the key from reaching the containers or the accept button.
             event.handled = true;
             return;
         }
         if (multiline_) {
-            if (!read_only_) static_cast<void>(replace_selection(newline_));
+            if (!(*editing_).read_only()) static_cast<void>(replace_selection(newline_));
             event.handled = true;
             return;
         }
@@ -1103,7 +1015,7 @@ void TextBox::on_key(KeyEvent& event) {
     }
     if (event.physical_key == PhysicalKey::escape) {
         // An open suggestion list or appended completion took Escape above.
-        if (composing_) {
+        if ((*editing_).composing()) {
             // The composition is the input method's to cancel; the box keeps
             // the key from reaching the containers or the cancel button.
             event.handled = true;
@@ -1123,136 +1035,16 @@ void TextBox::on_key(KeyEvent& event) {
         // Otherwise nothing here to cancel: the key goes on unhandled.
         return;
     }
-    if (command && event.physical_key == PhysicalKey::a) {
-        end_auto_complete(false);
-        select_all();
-        event.handled = true;
-        return;
-    }
-    if (command && event.physical_key == PhysicalKey::c) {
-        static_cast<void>(copy());
-        event.handled = true;
-        return;
-    }
-    if (command && event.physical_key == PhysicalKey::x) {
-        const bool cut_done = cut();
-        if (cut_done) auto_complete_after_edit(TextEditKind::deletion, false);
-        event.handled = true;
-        return;
-    }
-    if (command && event.physical_key == PhysicalKey::v) {
-        const bool pasted = paste();
-        if (pasted) auto_complete_after_edit(TextEditKind::paste, false);
-        event.handled = true;
-        return;
-    }
-    if (command && event.physical_key == PhysicalKey::z) {
-        const bool redo_requested = includes(event.modifiers, Modifier::shift);
-        if (redo_requested) {
-            event.handled = redo();
-        } else {
-            event.handled = undo();
-        }
-        return;
-    }
-    if (command && event.physical_key == PhysicalKey::y) {
-        event.handled = redo();
-        return;
-    }
-    if (event.physical_key == PhysicalKey::left ||
-        event.physical_key == PhysicalKey::right) {
-        // Moving the caret ends a completion and keeps the text.
-        end_auto_complete(false);
-        const bool line_navigation = includes(event.modifiers, Modifier::meta);
-        const bool word_navigation = !line_navigation &&
-            (includes(event.modifiers, Modifier::control) ||
-             includes(event.modifiers, Modifier::alt));
-        Utf8Offset next = selection_.caret;
-        if (!extend && !selection_.empty()) {
-            next = event.physical_key == PhysicalKey::left
-                ? selection_.start() : selection_.end();
-        } else if (line_navigation) {
-            next = event.physical_key == PhysicalKey::left
-                ? Utf8Offset(0U) : store_.utf8_size();
-        } else if (word_navigation) {
-            next = event.physical_key == PhysicalKey::left
-                ? previous_word_boundary(selection_.caret)
-                : next_word_boundary(selection_.caret);
-        } else {
-            next = event.physical_key == PhysicalKey::left
-                ? store_.previous_grapheme_boundary(selection_.caret)
-                : store_.next_grapheme_boundary(selection_.caret);
-        }
-        set_selection(extend ? TextSelection{selection_.anchor, next}
-                             : TextSelection{next, next});
-        event.handled = true;
-        return;
-    }
-    if (event.physical_key == PhysicalKey::home ||
-        event.physical_key == PhysicalKey::end) {
-        end_auto_complete(false);
-        const Utf8Offset next = event.physical_key == PhysicalKey::home
-            ? Utf8Offset(0U) : store_.utf8_size();
-        set_selection(extend ? TextSelection{selection_.anchor, next}
-                             : TextSelection{next, next});
-        event.handled = true;
-        return;
-    }
-    if (!read_only_ && (event.physical_key == PhysicalKey::backspace ||
-                        event.physical_key == PhysicalKey::delete_forward)) {
-        if (!selection_.empty()) {
-            event.handled = delete_selection();
-        } else {
-            const bool line_deletion = includes(event.modifiers, Modifier::meta);
-            const bool word_deletion = !line_deletion &&
-                (includes(event.modifiers, Modifier::control) ||
-                 includes(event.modifiers, Modifier::alt));
-            Utf8Offset other{};
-            if (line_deletion) {
-                other = event.physical_key == PhysicalKey::backspace
-                    ? Utf8Offset(0U) : store_.utf8_size();
-            } else if (word_deletion) {
-                other = event.physical_key == PhysicalKey::backspace
-                    ? previous_word_boundary(selection_.caret)
-                    : next_word_boundary(selection_.caret);
-            } else {
-                other = event.physical_key == PhysicalKey::backspace
-                    ? store_.previous_grapheme_boundary(selection_.caret)
-                    : store_.next_grapheme_boundary(selection_.caret);
-            }
-            event.handled = replace(std::min(other, selection_.caret),
-                                    std::max(other, selection_.caret), {}, TextEditKind::deletion);
-        }
-        if (event.handled) auto_complete_after_edit(TextEditKind::deletion, false);
-    }
+    // The editing keys: select all, the clipboard, undo and redo, Left and
+    // Right, Home and End of the text, Backspace and Delete.
+    (*editing_).handle_key(event);
 }
 
 void TextBox::on_text_input(TextInputEvent& event) {
-    if (!focused_ || !enabled() || read_only_ ||
-        !validate_utf8(event.text_utf8).valid()) {
+    if (!focused_ || !enabled()) {
         return;
     }
-    Utf8Offset start = selection_.start();
-    Utf8Offset end = selection_.end();
-    if (event.replacement_start >= 0 && event.replacement_length >= 0) {
-        try {
-            // Widen validated nonnegative host units before summation; never
-            // add two signed 32-bit offsets at the foreign-input boundary.
-            const std::size_t first_unit = static_cast<std::size_t>(event.replacement_start);
-            const std::size_t unit_count = static_cast<std::size_t>(event.replacement_length);
-            const std::size_t last_unit = first_unit + unit_count;
-            const Utf16Offset first(first_unit);
-            const Utf16Offset last(last_unit);
-            start = store_.utf8_offset(first);
-            end = store_.utf8_offset(last);
-        } catch (const std::out_of_range&) {
-            return;
-        }
-    }
-    // An empty composition is the input method cancelling one.
-    composing_ = event.composing && !event.text_utf8.empty();
-    event.handled = replace(start, end, event.text_utf8, TextEditKind::typing);
-    if (event.handled) auto_complete_after_edit(TextEditKind::typing, event.composing);
+    (*editing_).handle_text_input(event);
 }
 
 void TextBox::reset_caret_blink() {
@@ -1280,7 +1072,7 @@ void TextBox::on_focus_changed(bool focused) {
     caret_damage_.valid = false;
     focused_ = focused;
     selecting_ = false;
-    composing_ = false;
+    (*editing_).end_composition();
     if (focused_) {
         reset_caret_blink();
     } else {
@@ -1323,10 +1115,10 @@ void TextBox::retain_caret_damage(const Rect line_bounds, const Rect clip) {
     candidate.rectangle = damage;
     candidate.bounds = local_bounds();
     candidate.font = effective_font(font_);
-    candidate.selection = selection_;
+    candidate.selection = (*editing_).selection();
     candidate.scroll = scroll_offset();
     candidate.provider = (*owner).text_metrics_provider();
-    candidate.revision = store_.revision();
+    candidate.revision = (*editing_).store().revision();
     candidate.scale = scale;
     candidate.valid = true;
     caret_damage_ = candidate;
@@ -1339,9 +1131,9 @@ bool TextBox::caret_damage_current() const {
     const Point scroll = scroll_offset();
     const bool current = caret_damage_.bounds == local_bounds() &&
         caret_damage_.font == effective_font(font_) &&
-        caret_damage_.selection == selection_ && caret_damage_.scroll == scroll &&
+        caret_damage_.selection == (*editing_).selection() && caret_damage_.scroll == scroll &&
         caret_damage_.provider == (*owner).text_metrics_provider() &&
-        caret_damage_.revision == store_.revision() && caret_damage_.scale == (*owner).scale();
+        caret_damage_.revision == (*editing_).store().revision() && caret_damage_.scale == (*owner).scale();
     return current;
 }
 
@@ -1352,16 +1144,16 @@ SemanticDescriptor TextBox::semantic_descriptor() const {
     descriptor.value = password_protected() ? std::string{} : std::string(text());
     descriptor.description = accessible_description().empty()
         ? placeholder_ : accessible_description();
-    if (read_only_) descriptor.states |= SemanticState::read_only;
+    if ((*editing_).read_only()) descriptor.states |= SemanticState::read_only;
     if (password_protected()) descriptor.states |= SemanticState::protected_content;
     // The selection and caret index the value (A-T1, 12.13); a password box
     // publishes neither its text nor where in it the caret is.
     if (!password_protected()) {
-        descriptor.text_selection = SemanticTextSelection{.anchor = selection_.anchor, .caret = selection_.caret};
+        descriptor.text_selection = SemanticTextSelection{.anchor = (*editing_).selection().anchor, .caret = (*editing_).selection().caret};
     }
     descriptor.multiline = multiline_;
     descriptor.actions = {SemanticAction::focus};
-    if (!read_only_) descriptor.actions.push_back(SemanticAction::set_value);
+    if (!(*editing_).read_only()) descriptor.actions.push_back(SemanticAction::set_value);
     // A suggesting box opens a list; it is expanded while the list is open.
     const bool suggesting = auto_complete_mode_ == AutoCompleteMode::suggest ||
                             auto_complete_mode_ == AutoCompleteMode::suggest_append;
@@ -1372,11 +1164,11 @@ SemanticDescriptor TextBox::semantic_descriptor() const {
 }
 
 bool TextBox::on_semantic_action(SemanticAction action, std::string_view value) {
-    if (action == SemanticAction::set_value && !read_only_) {
+    if (action == SemanticAction::set_value && !(*editing_).read_only()) {
         end_auto_complete(false);
         const Utf8Offset start(0U);
-        const Utf8Offset end = store_.utf8_size();
-        const bool replaced = replace(start, end, value, TextEditKind::value);
+        const Utf8Offset end = (*editing_).store().utf8_size();
+        const bool replaced = (*editing_).replace(start, end, value, TextEditKind::value);
         return replaced;
     }
     const bool handled = Panel::on_semantic_action(action, value);
@@ -1387,7 +1179,7 @@ bool TextBox::on_semantic_action(SemanticAction action, std::string_view value) 
 
 SemanticTextResult TextBox::on_semantic_text_layout(SemanticTextLayout& layout) {
     if (password_protected()) return SemanticTextResult::no_text;
-    const std::size_t graphemes = store_.grapheme_count().value();
+    const std::size_t graphemes = (*editing_).store().grapheme_count().value();
     layout.graphemes.reserve(graphemes);
     if (multiline_) {
         // Builds the visual rows as painting would, when they are stale.
@@ -1396,7 +1188,7 @@ SemanticTextResult TextBox::on_semantic_text_layout(SemanticTextLayout& layout) 
     } else {
         fill_single_line_text_layout(layout);
     }
-    fill_word_starts(layout);
+    (*editing_).fill_word_starts(layout);
     return SemanticTextResult::done;
 }
 
@@ -1404,7 +1196,8 @@ SemanticTextResult TextBox::on_set_semantic_text_selection(SemanticTextSelection
     if (password_protected()) return SemanticTextResult::no_text;
     // A boundary lies within the text; one inside a combining sequence is
     // not a boundary.
-    if (!store_.is_grapheme_boundary(selection.anchor) || !store_.is_grapheme_boundary(selection.caret)) {
+    const TextStore& store = (*editing_).store();
+    if (!store.is_grapheme_boundary(selection.anchor) || !store.is_grapheme_boundary(selection.caret)) {
         return SemanticTextResult::off_boundary;
     }
     set_selection({selection.anchor, selection.caret});
@@ -1419,13 +1212,13 @@ void TextBox::fill_single_line_text_layout(SemanticTextLayout& layout) const {
     const double origin = text_left_ - horizontal_offset_;
     const double top = 3.0;
     const double height = std::max(0.0, bounds.height - 6.0);
-    const Utf8Offset end = store_.utf8_size();
+    const Utf8Offset end = (*editing_).store().utf8_size();
     const double right = boundary_x(end);
     const Rect line_box{origin, top, right, height};
     layout.lines.push_back({.range = {Utf8Offset(0U), end}, .bounds = rectangle_to_window(line_box)});
     Utf8Offset cursor(0U);
     while (cursor != end) {
-        const Utf8Offset next = store_.next_grapheme_boundary(cursor);
+        const Utf8Offset next = (*editing_).store().next_grapheme_boundary(cursor);
         const double left = boundary_x(cursor);
         const double following = boundary_x(next);
         const Rect box{origin + left, top, std::max(0.0, following - left), height};
@@ -1460,26 +1253,13 @@ void TextBox::fill_multiline_text_layout(SemanticTextLayout& layout) const {
     }
 }
 
-// Ctrl+Left stops at 0 and at each word start; Ctrl+Right at each later
-// word start and at the end. Empty text has no words.
-void TextBox::fill_word_starts(SemanticTextLayout& layout) const {
-    const Utf8Offset end = store_.utf8_size();
-    if (end.value() == 0U) return;
-    Utf8Offset cursor(0U);
-    layout.word_starts.push_back(cursor);
-    while (cursor != end) {
-        cursor = next_word_boundary(cursor);
-        layout.word_starts.push_back(cursor);
-    }
-}
-
 void TextBox::on_detached_from_window() noexcept {
     discard_auto_complete_list();
     caret_damage_.valid = false;
     caret_frame_.disconnect();
     focused_ = false;
     selecting_ = false;
-    composing_ = false;
+    (*editing_).end_composition();
 }
 
 
@@ -1566,9 +1346,9 @@ void TextBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
         record.content = PartGeometry::from_bounds(viewport);
         if (!visual_lines_.empty()) {
             const Point offset = scroll_offset();
-            if (selection_.empty()) {
+            if ((*editing_).selection().empty()) {
                 const std::size_t row = caret_line();
-                const double x = text_left_ - offset.x + multiline_boundary_x(row, selection_.caret);
+                const double x = text_left_ - offset.x + multiline_boundary_x(row, (*editing_).selection().caret);
                 const double y = 4.0 + static_cast<double>(row) * line_height_ - offset.y;
                 // The one-unit caret stroke is centred on its boundary.
                 const Rect caret{x - 0.5, y, 1.0, line_height_};
@@ -1580,14 +1360,14 @@ void TextBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
                 bool any = false;
                 for (std::size_t index = 0; index < visual_lines_.size(); ++index) {
                     const VisualLine& row = visual_lines_[index];
-                    const bool selected = selection_.start().value() <= row.offsets.back() &&
-                                          selection_.end().value() > row.offsets.front();
+                    const bool selected = (*editing_).selection().start().value() <= row.offsets.back() &&
+                                          (*editing_).selection().end().value() > row.offsets.front();
                     if (!selected) continue;
                     const double y = 4.0 + static_cast<double>(index) * line_height_ - offset.y;
                     const double origin = text_left_ - offset.x;
-                    const double left = multiline_boundary_x(index, selection_.start());
-                    double right = multiline_boundary_x(index, selection_.end());
-                    if (selection_.end().value() > row.offsets.back()) {
+                    const double left = multiline_boundary_x(index, (*editing_).selection().start());
+                    double right = multiline_boundary_x(index, (*editing_).selection().end());
+                    if ((*editing_).selection().end().value() > row.offsets.back()) {
                         right += std::max(3.0, font.size * 0.35);
                     }
                     const Rect highlight{origin + left, y, std::max(0.0, right - left), line_height_};
@@ -1605,13 +1385,13 @@ void TextBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
         const Rect content{text_left_, 2.0, viewport_width, std::max(0.0, bounds.height - 4.0)};
         record.content = PartGeometry::from_bounds(content);
         const double origin_x = text_left_ - horizontal_offset_;
-        if (selection_.empty()) {
-            const double caret_x = origin_x + boundary_x(selection_.caret);
+        if ((*editing_).selection().empty()) {
+            const double caret_x = origin_x + boundary_x((*editing_).selection().caret);
             const Rect caret{caret_x - 0.5, 4.0, 1.0, std::max(0.0, bounds.height - 8.0)};
             record.caret = PartGeometry::from_bounds(Rect::intersection(caret, content));
         } else {
-            const double start_x = origin_x + boundary_x(selection_.start());
-            const double end_x = origin_x + boundary_x(selection_.end());
+            const double start_x = origin_x + boundary_x((*editing_).selection().start());
+            const double end_x = origin_x + boundary_x((*editing_).selection().end());
             const Rect highlight{start_x, 3.0, std::max(0.0, end_x - start_x),
                                  std::max(0.0, bounds.height - 6.0)};
             record.selection = PartGeometry::from_bounds(Rect::intersection(highlight, content));
@@ -1623,7 +1403,7 @@ void TextBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
 
 AnatomyStateSet TextBox::anatomy_states() const {
     AnatomyStateSet states = ScrollableControl::anatomy_states();
-    if (read_only_) {
+    if ((*editing_).read_only()) {
         states.insert(AnatomyState::read_only);
     }
     if (visual_status() == ControlVisualStatus::invalid) {

@@ -3,6 +3,27 @@
 namespace gui_forms::gallery::pages {
 namespace {
 
+// A gallery item's ID from its style name, as StableId segments: ASCII
+// letters lowercased, digits kept, and every other run one '-' between
+// them ("Heading 1" is "style.heading-1").
+std::string style_id(std::string_view name) {
+    std::string identity("style.");
+    bool pending_separator = false;
+    for (const char character : name) {
+        const bool lower = character >= 'a' && character <= 'z';
+        const bool upper = character >= 'A' && character <= 'Z';
+        const bool digit = character >= '0' && character <= '9';
+        if (!lower && !upper && !digit) {
+            pending_separator = true;
+            continue;
+        }
+        if (pending_separator && identity.back() != '.') identity.push_back('-');
+        pending_separator = false;
+        identity.push_back(upper ? static_cast<char>(character - 'A' + 'a') : character);
+    }
+    return identity;
+}
+
 // CommandBar item ids; the bar names its buttons "gallery.commands.bar.item.<id>".
 constexpr int bar_new = 1;
 constexpr int bar_save = 2;
@@ -322,9 +343,9 @@ private:
         const std::array<const char*, 4> heading_names{"Title", "Heading 1", "Heading 2", "Heading 3"};
         const std::array<const char*, 4> body_names{"Normal", "Compact", "Emphasis", "Strong"};
         const std::array<const char*, 3> quote_names{"Quote", "Intense", "Reference"};
-        for (const char* name : heading_names) items.push_back({std::string("style.") + name, name, {}, "headings"});
-        for (const char* name : body_names) items.push_back({std::string("style.") + name, name, {}, "body"});
-        for (const char* name : quote_names) items.push_back({std::string("style.") + name, name, {}, "quotes"});
+        for (const char* name : heading_names) items.push_back({style_id(name), name, {}, "headings"});
+        for (const char* name : body_names) items.push_back({style_id(name), name, {}, "body"});
+        for (const char* name : quote_names) items.push_back({style_id(name), name, {}, "quotes"});
         std::shared_ptr<RibbonGallery> in_ribbon = make_control<RibbonGallery>(StableId("gallery.commands.styles"));
         (*in_ribbon).set_accessible_name("Styles");
         (*in_ribbon).set_item_size({72.0, 24.0});
@@ -404,7 +425,7 @@ private:
         (*gallery).set_columns(5U);
         std::vector<RibbonGalleryItem> items;
         const std::array<const char*, 6> names{"Title", "Heading", "Normal", "Compact", "Quote", "Strong"};
-        for (const char* name : names) items.push_back({std::string("style.") + name, name, {}, {}});
+        for (const char* name : names) items.push_back({style_id(name), name, {}, {}});
         (*gallery).set_items({}, std::move(items));
         (*gallery).set_command(styles_);
         return gallery;

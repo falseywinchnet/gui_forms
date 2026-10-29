@@ -7,6 +7,7 @@
 #include "gui_forms/controls/panel/text_box/text_box.hpp"
 
 #include "text_box_auto_complete_session.hpp"
+#include "../text_editing/text_editing_engine.hpp"
 #include "gui_forms/host.hpp"
 #include "gui_forms/window.hpp"
 
@@ -16,16 +17,6 @@
 #include <utility>
 
 namespace gui_forms {
-
-TextBox::~TextBox() {
-    // The window may close the list after this box is gone; its revocation
-    // and collection callbacks must not reach a destroyed box.
-    if (auto_complete_session_) {
-        detail::TextBoxAutoCompleteSession& session = *auto_complete_session_;
-        session.revocation.disconnect();
-        session.collection_change.disconnect();
-    }
-}
 
 namespace {
 
@@ -181,7 +172,7 @@ void TextBox::close_auto_complete() {
 bool TextBox::auto_complete_active() const noexcept {
     const bool result = auto_complete_mode_ != AutoCompleteMode::none &&
         auto_complete_source_ != AutoCompleteSource::none && !multiline_ &&
-        !password_protected() && !read_only_ && !edit_filter_;
+        !password_protected() && !(*editing_).read_only() && !(*editing_).has_edit_filter();
     return result;
 }
 
@@ -225,13 +216,14 @@ void TextBox::auto_complete_after_edit(TextEditKind kind, bool composing) {
     }
     detail::TextBoxAutoCompleteSession& session = auto_complete_session();
     session.typed = std::string(text());
-    session.typed_selection = selection_;
+    session.typed_selection = (*editing_).selection();
     session.highlighted.reset();
     session.shown = false;
     session.appended = false;
     collect_auto_complete_candidates(session.typed, session.suggestions);
 
-    const bool caret_at_end = selection_.empty() && selection_.caret == store_.utf8_size();
+    const TextSelection typed_selection = (*editing_).selection();
+    const bool caret_at_end = typed_selection.empty() && typed_selection.caret == (*editing_).store().utf8_size();
     if (appends(auto_complete_mode_) && kind == TextEditKind::typing && caret_at_end) {
         const std::size_t typed_size = session.typed.size();
         for (const std::string& candidate : session.suggestions) {
@@ -243,11 +235,12 @@ void TextBox::auto_complete_after_edit(TextEditKind kind, bool composing) {
             const TextStore probe(completed);
             const Utf8Offset typed_end(typed_size);
             if (!probe.is_grapheme_boundary(typed_end)) continue;
-            if (maximum_length_ != 0U && probe.scalar_count().value() > maximum_length_) break;
+            const std::size_t maximum_length = (*editing_).maximum_length();
+            if (maximum_length != 0U && probe.scalar_count().value() > maximum_length) break;
             const Utf8Offset completed_end(completed.size());
             show_completion_text(completed, TextSelection{.anchor = typed_end, .caret = completed_end});
             session.appended = true;
-            session.completion_selection = selection_;
+            session.completion_selection = (*editing_).selection();
             break;
         }
     }
@@ -262,7 +255,8 @@ bool TextBox::auto_complete_completion_pending() const noexcept {
     if (!auto_complete_session_) return false;
     const detail::TextBoxAutoCompleteSession& session = *auto_complete_session_;
     const bool result = session.appended && session.shown &&
-        session.shown_revision == store_.revision() && selection_ == session.completion_selection;
+        session.shown_revision == (*editing_).store().revision() &&
+        (*editing_).selection() == session.completion_selection;
     return result;
 }
 
@@ -319,21 +313,14 @@ bool TextBox::auto_complete_key(const KeyEvent& event) {
 
 void TextBox::show_completion_text(std::string_view shown_text, TextSelection selection) {
     detail::TextBoxAutoCompleteSession& session = auto_complete_session();
-    if (shown_text != store_.utf8()) {
-        store_.set_text(shown_text);
-        layout_positions_.clear();
-        layout_offsets_.clear();
-        selection_ = selection;
-        reset_caret_blink();
-        invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-        const std::string value(store_.utf8());
-        publish_change(text_changed_, value);
-        publish_change(selection_changed_, selection_);
+    const bool changed = (*editing_).show_text(shown_text, selection);
+    if (changed) {
+        text_edited();
     } else {
         set_selection(selection);
     }
     session.shown = true;
-    session.shown_revision = store_.revision();
+    session.shown_revision = (*editing_).store().revision();
 }
 
 void TextBox::highlight_auto_complete(std::optional<std::size_t> index) {
@@ -361,7 +348,7 @@ void TextBox::highlight_auto_complete(std::optional<std::size_t> index) {
 
 void TextBox::restore_auto_complete_typed_text() {
     detail::TextBoxAutoCompleteSession& session = auto_complete_session();
-    if (!session.shown || session.shown_revision != store_.revision()) return;
+    if (!session.shown || session.shown_revision != (*editing_).store().revision()) return;
     // The text is still the completion the box showed: put back what the
     // user typed, with the caret where it was.
     const std::string typed = session.typed;
@@ -411,8 +398,8 @@ void TextBox::open_auto_complete_list() {
     if (!anchor || !contains_or_is(*anchor, *this)) anchor = shared_from_this();
     const std::string prefix(stable_id().value());
     std::shared_ptr<AnchoredPopupLayer> layer =
-        make_control<AnchoredPopupLayer>(StableId(prefix + ".auto_complete"), anchor);
-    std::shared_ptr<DropDownList> list = make_control<DropDownList>(StableId(prefix + ".auto_complete.list"));
+        make_control<AnchoredPopupLayer>(StableId(prefix + ".auto-complete"), anchor);
+    std::shared_ptr<DropDownList> list = make_control<DropDownList>(StableId(prefix + ".auto-complete.list"));
     // The list never takes focus: typing stays in this box.
     (*list).set_focusable(false);
     (*list).set_paint_plane(PaintPlane::overlay);

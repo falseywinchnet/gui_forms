@@ -103,7 +103,7 @@ struct DockSite::CaptureCheck final {
 };
 
 void DockSite::create_drag_layer() {
-    const std::string identity = std::string(stable_id().value()) + ".drag_layer";
+    const std::string identity = std::string(stable_id().value()) + ".drag-layer";
     drag_layer_ = make_control<DragLayer>(StableId(identity), *this);
     add_child(drag_layer_);
 }

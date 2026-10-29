@@ -131,7 +131,7 @@ gui_forms::RibbonColorPicker
       std::shared_ptr<gf::ColorCommand> command =
           std::make_shared<gf::ColorCommand>(std::make_shared<gf::Command>("doc.colour", "Font colour"));
       std::shared_ptr<gf::RibbonColorPicker> picker =
-          gf::make_control<gf::RibbonColorPicker>(gf::StableId("doc.colour_picker"));
+          gf::make_control<gf::RibbonColorPicker>(gf::StableId("doc.colour-picker"));
       (*picker).set_text("Font &colour");
       (*picker).set_command(command);
 

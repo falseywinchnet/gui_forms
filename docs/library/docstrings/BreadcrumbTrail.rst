@@ -35,8 +35,8 @@ segments
     The path, from the root to the current location. Empty by default. Each
     `BreadcrumbSegment` has an ID, text, a description of at most 4096
     bytes used as its accessible description, and an `enabled` flag. IDs
-    must be nonempty, unique, valid UTF-8 and different from the overflow
-    and edit IDs, or `set_segments` throws `std::invalid_argument`.
+    must be unique, follow the `StableId` segment rule and differ from the
+    overflow and edit IDs, or `set_segments` throws `std::invalid_argument`.
 hidden_segment_ids
     The IDs of the middle segments hidden behind the overflow item, in path
     order; empty when every segment fits. Show them, for example in a menu,

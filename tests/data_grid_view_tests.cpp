@@ -161,7 +161,7 @@ bool has_action(const SemanticNode& node, SemanticAction action) {
 }
 
 std::shared_ptr<DataGridView> make_grid(const char* identity) {
-    std::shared_ptr<DataGridView> grid = make_control<DataGridView>(StableId(identity));
+    std::shared_ptr<DataGridView> grid = make_control<DataGridView>(StableId(std::string(identity)));
     (*grid).set_columns(sample_columns());
     (*grid).add_row({.stable_id = {"alpha"}, .cells = {BindingValue{std::string("Alpha")}, BindingValue{true},
                                                       BindingValue{std::string("FM")}}});
@@ -1321,7 +1321,7 @@ void semantics() {
                 row.row_index == 1U && row.children[3].row_index == 1U && row.children[3].column_index == 3U,
             "each row holds its header and its cells, and each cell carries its row and column");
     const SemanticNode& header = row.children[0];
-    require(header.role == SemanticRole::row_header && header.stable_id == "grid.semantics.row_header.alpha" &&
+    require(header.role == SemanticRole::row_header && header.stable_id == "grid.semantics.row-header.alpha" &&
                 header.row_index == 1U && !header.column_index && header.name == row.name &&
                 header.actions == std::vector<SemanticAction>{SemanticAction::press},
             "a drawn row header comes first in its row, carrying its row only");
@@ -1351,11 +1351,11 @@ void semantics() {
     require((*grid).on_semantic_child_action("bravo", SemanticAction::select, {}) &&
                 (*grid).current_row_id() == id("bravo"),
             "selecting a row node by its ID makes its row current");
-    require((*grid).on_semantic_child_action("grid.semantics.row_header.charlie", SemanticAction::press, {}) &&
+    require((*grid).on_semantic_child_action("grid.semantics.row-header.charlie", SemanticAction::press, {}) &&
                 (*grid).current_row_id() == id("charlie"),
             "pressing a row header makes its row current");
-    require(!(*grid).on_semantic_child_action("grid.semantics.row_header.zulu", SemanticAction::press, {}) &&
-                !(*grid).on_semantic_child_action("grid.semantics.row_header.alpha", SemanticAction::select, {}),
+    require(!(*grid).on_semantic_child_action("grid.semantics.row-header.zulu", SemanticAction::press, {}) &&
+                !(*grid).on_semantic_child_action("grid.semantics.row-header.alpha", SemanticAction::select, {}),
             "a row header of no row, or an action other than press, is refused");
     (*grid).set_row_headers_visible(false);
     window.perform_layout();

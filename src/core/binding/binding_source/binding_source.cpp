@@ -51,8 +51,10 @@ void BindingSource::require_access(std::string_view operation) const {
 }
 
 void BindingSource::normalize_record(BindingRecord& record) {
-    if (record.stable_id.empty()) {
-        throw std::invalid_argument("GUI.Forms binding record stable ID may not be empty");
+    // A record's ID names its row's semantic node in a bound grid, so it
+    // follows the StableId segment rule.
+    if (!valid_stable_id(record.stable_id)) {
+        throw std::invalid_argument("GUI.Forms binding record stable ID must follow the StableId segment rule");
     }
     std::map<std::string, BindingValue> normalized;
     for (std::pair<const std::string, BindingValue>& field : record.fields) {

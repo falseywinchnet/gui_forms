@@ -97,13 +97,13 @@ ThemeCompileOptions options() {
 
 bool has(const ThemeCompileResult& result, std::string_view code, std::string_view file, std::uint32_t line,
          std::string_view detail) {
-    for (const ThemeCompileDiagnostic& diagnostic : result.diagnostics) {
+    for (const ThemeCompileDiagnostic& diagnostic : result.diagnostics()) {
         if (diagnostic.code == code && diagnostic.file == file && diagnostic.line == line &&
             (detail.empty() || diagnostic.detail == detail)) {
             return true;
         }
     }
-    for (const ThemeCompileDiagnostic& diagnostic : result.diagnostics) {
+    for (const ThemeCompileDiagnostic& diagnostic : result.diagnostics()) {
         std::cerr << "  got " << diagnostic.code << " " << diagnostic.name << " in " << diagnostic.file << ":"
                   << diagnostic.line << ":" << diagnostic.column << " (" << diagnostic.detail << ")\n";
     }
@@ -124,25 +124,27 @@ void test_one_package() {
     const ThemeLibrary library{};
     const ThemeCompileResult solo = compile_theme_package(package("solo", "#pad { outline: 3px solid }"), library,
                                                           images, options());
-    require(solo && solo.diagnostics.empty() && (*solo.theme).id() == "solo", "a package compiles to a theme");
+    require(solo.succeeded() && solo.diagnostics().empty() && (*solo.theme()).id() == "solo",
+            "a package compiles to a theme");
     const std::shared_ptr<Pad> pad = make_control<Pad>(StableId("pad"));
-    if (solo) {
-        const ResolvedControlRecipe recipe = resolved(*solo.theme, *pad);
+    if (solo.succeeded()) {
+        const ResolvedControlRecipe recipe = resolved(*solo.theme(), *pad);
         require(recipe.recipe().focus_width == 3.0, "its rules apply");
     }
     const ThemeCompileResult refused =
         compile_theme_package(package("solo", "#pad {}\n#pad { opacity: 2 }"), library, images, options());
-    require(!refused && has(refused, "E403", "solo/theme.theme.css", 2U, ""),
+    require(!refused.succeeded() && has(refused, "E403", "solo/theme.theme.css", 2U, ""),
             "a refusal names the sheet and line");
     ThemePackage edited = package("solo", "#pad { opacity: 1 }");
     edited.files[0].bytes += " ";
     const ThemeCompileResult tampered = compile_theme_package(edited, library, images, options());
-    require(!tampered && has(tampered, "E602", "theme.theme.css", 0U, "theme.theme.css"),
+    require(!tampered.succeeded() && has(tampered, "E602", "theme.theme.css", 0U, "theme.theme.css"),
             "a file whose hash fails is E602");
     const ThemeCompileResult covered = compile_theme_package(
         package("solo", "#pad { opacity: 1 }", Extras{.coverage = "[\"button\", \"rocket\"]"}), library, images,
         options());
-    require(covered && covered.diagnostics.size() == 1U && has(covered, "W106", "solo/theme.json", 0U, "rocket"),
+    require(covered.succeeded() && covered.diagnostics().size() == 1U &&
+                has(covered, "W106", "solo/theme.json", 0U, "rocket"),
             "coverage of an unknown control type is W106, and the theme compiles");
 }
 
@@ -151,12 +153,12 @@ void test_published_values() {
     const ThemeLibrary library{};
     const ThemePackage reading = package("solo", "#pad { opacity: 1 }", Extras{.published = "progress"});
     const ThemeCompileResult unknown = compile_theme_package(reading, library, images, options());
-    require(!unknown && has(unknown, "E606", "solo/theme.json", 0U, "progress"),
+    require(!unknown.succeeded() && has(unknown, "E606", "solo/theme.json", 0U, "progress"),
             "a published value the application does not publish is E606");
     const std::array<std::string, 1> offered{"progress"};
     ThemeCompileOptions publishing = options();
     publishing.published_values = offered;
-    require(static_cast<bool>(compile_theme_package(reading, library, images, publishing)),
+    require(compile_theme_package(reading, library, images, publishing).succeeded(),
             "one it publishes compiles");
 }
 
@@ -166,16 +168,16 @@ void test_resources() {
     const std::string sheet = "#pad::part(face) { background-image: url(\"resource:icon.check\") }";
     const ThemeCompileResult drawn =
         compile_theme_package(package("solo", sheet, Extras{.resource = tiny_png}), library, images, options());
-    require(drawn && images.image_ids().size() == 1U, "a resource is loaded as an image");
+    require(drawn.succeeded() && images.image_ids().size() == 1U, "a resource is loaded as an image");
     ImageRegistry untouched{};
     const ThemeCompileResult bad = compile_theme_package(
         package("solo", sheet + "\n#pad { opacity: 2 }", Extras{.resource = tiny_png}), library, untouched,
         options());
-    require(!bad && untouched.image_ids().empty(), "a refused compilation leaves no image behind");
+    require(!bad.succeeded() && untouched.image_ids().empty(), "a refused compilation leaves no image behind");
     const ThemeCompileResult broken =
         compile_theme_package(package("solo", sheet, Extras{.resource = "not a png"}), library, untouched, options());
-    require(!broken && untouched.image_ids().empty() && !broken.diagnostics.empty() &&
-                broken.diagnostics[0].code == "E601" && broken.diagnostics[0].file == "solo/theme.json",
+    require(!broken.succeeded() && untouched.image_ids().empty() && !broken.diagnostics().empty() &&
+                broken.diagnostics()[0].code == "E601" && broken.diagnostics()[0].file == "solo/theme.json",
             "a resource that is not an image is E601");
 }
 
@@ -193,12 +195,12 @@ void test_closure() {
                                      ":root { signal-on-paper: #10a010 on #ffffff }",
                                      Extras{.pins = {{"base", hex_of(base.manifest)}}});
     const ThemeCompileResult cascade = compile_theme_package(top, library, images, options());
-    require(static_cast<bool>(cascade), "a closure compiles");
+    require(cascade.succeeded(), "a closure compiles");
     require(has(cascade, "W101", "base/theme.theme.css", 3U, "frobnicate"),
             "a warning names the imported sheet and its own line");
     const std::shared_ptr<Pad> pad = make_control<Pad>(StableId("pad"));
-    if (cascade) {
-        const ResolvedControlRecipe recipe = resolved(*cascade.theme, *pad);
+    if (cascade.succeeded()) {
+        const ResolvedControlRecipe recipe = resolved(*cascade.theme(), *pad);
         require(recipe.recipe().focus_width == 1.0, "the imported sheet's rules apply");
         require(recipe.recipe().text == Color::rgba(0x10U, 0xA0U, 0x10U, 255U),
                 "the importing sheet's later role definition wins");
@@ -206,11 +208,12 @@ void test_closure() {
     const ThemeCompileResult stale = compile_theme_package(
         package("top", "@import \"base\";", Extras{.pins = {{"base", hex_of("an older base")}}}), library, images,
         options());
-    require(!stale && has(stale, "E604", "top/theme.theme.css", 1U, "base"), "an import other than its pin is E604");
-    require(static_cast<bool>(compile_installed_theme("base", library, images, options())),
+    require(!stale.succeeded() && has(stale, "E604", "top/theme.theme.css", 1U, "base"),
+            "an import other than its pin is E604");
+    require(compile_installed_theme("base", library, images, options()).succeeded(),
             "an installed package compiles by name");
     const ThemeCompileResult nameless = compile_installed_theme("nothing", library, images, options());
-    require(!nameless && !nameless.diagnostics.empty() && nameless.diagnostics[0].code == "E603",
+    require(!nameless.succeeded() && !nameless.diagnostics().empty() && nameless.diagnostics()[0].code == "E603",
             "an unknown name is E603");
     ThemePackage broken = base;
     broken.manifest = "{}";
@@ -228,19 +231,22 @@ void test_image_ownership() {
     const std::string sheet = "#pad::part(face) { background-image: url(\"resource:icon.check\") }";
     const ThemeLibrary library{};
     ImageRegistry images{};
-    ThemeCompileResult first =
-        compile_theme_package(package("first", sheet, Extras{.resource = tiny_png}), library, images, options());
-    ThemeCompileResult same =
-        compile_theme_package(package("same", sheet, Extras{.resource = tiny_png}), library, images, options());
-    ThemeCompileResult other =
-        compile_theme_package(package("other", sheet, Extras{.resource = green_png}), library, images, options());
-    require(first && same && other && images.image_ids().size() == 2U,
+    std::shared_ptr<const Theme> first =
+        compile_theme_package(package("first", sheet, Extras{.resource = tiny_png}), library, images, options())
+            .theme();
+    std::shared_ptr<const Theme> same =
+        compile_theme_package(package("same", sheet, Extras{.resource = tiny_png}), library, images, options())
+            .theme();
+    std::shared_ptr<const Theme> other =
+        compile_theme_package(package("other", sheet, Extras{.resource = green_png}), library, images, options())
+            .theme();
+    require(first != nullptr && same != nullptr && other != nullptr && images.image_ids().size() == 2U,
             "two themes loading the same bytes share one image");
-    first = ThemeCompileResult{};
+    first.reset();
     require(images.image_ids().size() == 2U, "an image stays while a theme holds it");
-    same = ThemeCompileResult{};
+    same.reset();
     require(images.image_ids().size() == 1U, "and goes with the last");
-    other = ThemeCompileResult{};
+    other.reset();
     require(images.image_ids().empty(), "a released theme leaves no image");
 
     const std::shared_ptr<Panel> root = make_control<Panel>(StableId("root"));
@@ -249,33 +255,36 @@ void test_image_ownership() {
     Window window(root, Size{200.0, 100.0});
     for (std::size_t swap = 0U; swap < 24U; ++swap) {
         const bool green = swap % 2U == 1U;
-        ThemeCompileResult next =
+        std::shared_ptr<const Theme> next =
             compile_theme_package(package("swap", sheet, Extras{.resource = green ? green_png : tiny_png}), library,
-                                  images, options());
-        require(static_cast<bool>(next), "each swap compiles");
-        if (next) window.set_theme(next.theme);
-        next = ThemeCompileResult{};
+                                  images, options())
+                .theme();
+        require(next != nullptr, "each swap compiles");
+        if (next != nullptr) window.set_theme(next);
+        next.reset();
         require(images.image_ids().size() == 1U, "each swap leaves the registry one image");
     }
     window.set_theme(default_theme());
     require(images.image_ids().empty(), "and none once the window drops the theme");
 
     ImageRegistry moved_from{};
-    ThemeCompileResult travelling =
-        compile_theme_package(package("moved", sheet, Extras{.resource = tiny_png}), library, moved_from, options());
+    std::shared_ptr<const Theme> travelling =
+        compile_theme_package(package("moved", sheet, Extras{.resource = tiny_png}), library, moved_from, options())
+            .theme();
     ImageRegistry moved_to(std::move(moved_from));
-    require(travelling && moved_to.image_ids().size() == 1U, "the image moves with its registry");
-    travelling = ThemeCompileResult{};
+    require(travelling != nullptr && moved_to.image_ids().size() == 1U, "the image moves with its registry");
+    travelling.reset();
     require(moved_to.image_ids().empty(), "and is removed from where it went");
 
-    ThemeCompileResult outliving{};
+    std::shared_ptr<const Theme> outliving{};
     {
         ImageRegistry brief{};
         outliving =
-            compile_theme_package(package("brief", sheet, Extras{.resource = tiny_png}), library, brief, options());
-        require(static_cast<bool>(outliving), "a theme may outlive its registry");
+            compile_theme_package(package("brief", sheet, Extras{.resource = tiny_png}), library, brief, options())
+                .theme();
+        require(outliving != nullptr, "a theme may outlive its registry");
     }
-    outliving = ThemeCompileResult{};
+    outliving.reset();
 }
 
 // RC003: a refused theme changes nothing; a good swap keeps the window's
@@ -285,8 +294,8 @@ void test_atomic_swap() {
     const ThemeLibrary library{};
     const ThemeCompileResult first =
         compile_theme_package(package("first", "#pad { outline: 1px solid }"), library, images, options());
-    require(static_cast<bool>(first), "the first theme compiles");
-    if (!first) return;
+    require(first.succeeded(), "the first theme compiles");
+    if (!first.succeeded()) return;
 
     const std::shared_ptr<Panel> root = make_control<Panel>(StableId("root"));
     const std::shared_ptr<TextBox> edit = make_control<TextBox>(StableId("edit"), "hello world");
@@ -294,7 +303,7 @@ void test_atomic_swap() {
     (*root).add_child(edit);
     (*root).add_child(pad);
     Window window(root, Size{400.0, 300.0});
-    window.set_theme(first.theme);
+    window.set_theme(first.theme());
     require(window.request_focus(edit), "the edit takes focus");
     (*edit).select(Utf8Offset{6U}, Utf8Offset{11U});
     window.capture_pointer(pad);
@@ -302,8 +311,8 @@ void test_atomic_swap() {
 
     const ThemeCompileResult refused =
         compile_theme_package(package("second", "#pad { opacity: 2 }"), library, images, options());
-    require(!refused && refused.theme == nullptr, "the second theme is refused");
-    if (refused) window.set_theme(refused.theme);
+    require(!refused.succeeded() && refused.theme() == nullptr, "the second theme is refused");
+    if (refused.succeeded()) window.set_theme(refused.theme());
     require(&window.theme() == running, "a refused theme leaves the running theme");
     require(window.focused_control() == edit && window.captured_control() == pad &&
                 (*edit).selected_text() == "world" && (*edit).text() == "hello world",
@@ -311,8 +320,8 @@ void test_atomic_swap() {
 
     const ThemeCompileResult good =
         compile_theme_package(package("second", "#pad { outline: 4px solid }"), library, images, options());
-    require(static_cast<bool>(good), "the corrected theme compiles");
-    if (good) window.set_theme(good.theme);
+    require(good.succeeded(), "the corrected theme compiles");
+    if (good.succeeded()) window.set_theme(good.theme());
     require(window.theme().id() == "second", "a good theme replaces it");
     require(window.focused_control() == edit && window.captured_control() == pad &&
                 (*edit).selected_text() == "world" && (*edit).text() == "hello world",

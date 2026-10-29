@@ -28,7 +28,7 @@ bool contains(const std::string& text, const char* fragment) {
 }
 
 std::unique_ptr<Window> make_model(const char* root_id, Size size = {320.0, 240.0}) {
-    const std::shared_ptr<Control> root = make_control<Control>(StableId(root_id));
+    const std::shared_ptr<Control> root = make_control<Control>(StableId(std::string(root_id)));
     std::unique_ptr<Window> model = std::make_unique<Window>(root, size);
     return model;
 }

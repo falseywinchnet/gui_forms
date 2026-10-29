@@ -280,8 +280,8 @@ std::shared_ptr<Ribbon> make_ribbon(const std::shared_ptr<RibbonFontControl>& fo
                                      const std::shared_ptr<RibbonColorPicker>& colour) {
     std::shared_ptr<Ribbon> ribbon = make_control<Ribbon>(StableId("ribbon"));
     RibbonTabSpec home{.stable_id = "home", .text = "&Home"};
-    RibbonGroupSpec group{.stable_id = "font_group", .caption = "Font"};
-    group.commands.push_back({.stable_id = "font_control", .kind = RibbonCommandKind::font_control,
+    RibbonGroupSpec group{.stable_id = "font-group", .caption = "Font"};
+    group.commands.push_back({.stable_id = "font-control", .kind = RibbonCommandKind::font_control,
                               .text = "Font", .font_control = font});
     group.commands.push_back({.stable_id = "colour", .kind = RibbonCommandKind::color_picker, .text = "Colour",
                               .color_picker = colour});
@@ -291,7 +291,7 @@ std::shared_ptr<Ribbon> make_ribbon(const std::shared_ptr<RibbonFontControl>& fo
     home.groups.push_back(std::move(group));
     RibbonTabSpec view{.stable_id = "view", .text = "&View"};
     RibbonGroupSpec zoom{.stable_id = "zoom", .caption = "Zoom"};
-    zoom.commands.push_back({.stable_id = "zoom_in", .command = std::make_shared<Command>("zoom_in", "Zoom in")});
+    zoom.commands.push_back({.stable_id = "zoom-in", .command = std::make_shared<Command>("zoom-in", "Zoom in")});
     view.groups.push_back(std::move(zoom));
     (*ribbon).set_tabs({std::move(home), std::move(view)});
     return ribbon;
@@ -313,7 +313,7 @@ void hosted_in_ribbon() {
     const std::vector<RibbonLadderEntry> ladder = (*ribbon).reduction_ladder(0U);
     window.resize({ladder.back().width, 300.0});
     window.perform_layout();
-    require((*ribbon).show_group_popup("font_group"), "the group collapses and opens in its popup");
+    require((*ribbon).show_group_popup("font-group"), "the group collapses and opens in its popup");
     window.perform_layout();
     require((*font).parent() == (*ribbon).group_popup() && (*colour).parent() == (*ribbon).group_popup() &&
                 (*font).effectively_visible() && (*colour).effectively_visible(),

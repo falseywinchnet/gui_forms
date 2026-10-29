@@ -44,7 +44,7 @@ constexpr std::chrono::milliseconds tile_fade_duration{100};
 
 
 constexpr std::array<std::string_view, 7> position_names{
-    "float", "dock", "dock_as_document", "auto_hide", "hide", "close", "move",
+    "float", "dock", "dock-as-document", "auto-hide", "hide", "close", "move",
 };
 constexpr std::array<std::string_view, 7> position_texts{
     "Float", "Dock", "Dock as Tabbed Document", "Auto Hide", "Hide", "Close", "Move",
@@ -98,7 +98,7 @@ DockSite::DockSite(StableId stable_id, DockWorkspace& workspace, DockSiteId floa
     tile_fade_.set_listener(MotionListener::bind<DockSite, &DockSite::on_drag_motion>(*this));
     flyout_slide_.set_listener(MotionListener::bind<DockSite, &DockSite::on_slide_motion>(*this));
     const std::string prefix((*this).stable_id().value());
-    menu_ = std::make_unique<ContextMenu>(prefix + ".position_menu");
+    menu_ = std::make_unique<ContextMenu>(prefix + ".position-menu");
     menu_invoked_ = (*menu_).item_invoked().subscribe(
         *this, Delegate<const MenuItemInvocation&>::bind<DockSite, &DockSite::on_menu_item_invoked>(*this));
     menu_changed_ = (*menu_).open_changed().subscribe(

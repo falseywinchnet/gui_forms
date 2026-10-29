@@ -8,6 +8,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -985,6 +986,35 @@ void test_stable_ids_and_detached_lifetime() {
     require(!(*fixture.window).find("child"), "detached stable ID must leave window registry");
 }
 
+// Stable IDs are '.'-separated segments of lowercase ASCII letters and digits
+// joined by single dashes. A literal is checked when the program is compiled
+// (these static_asserts and every StableId("...") in the tree); a runtime
+// string throws when it is constructed.
+static_assert(valid_stable_id("root") && valid_stable_id("paint.editor") && valid_stable_id("list-view.item.0") &&
+              valid_stable_id("a1-b2.c3"));
+static_assert(!valid_stable_id("") && !valid_stable_id("list_view") && !valid_stable_id("List") &&
+              !valid_stable_id("a..b") && !valid_stable_id(".a") && !valid_stable_id("a.") &&
+              !valid_stable_id("-a") && !valid_stable_id("a-") && !valid_stable_id("a--b") &&
+              !valid_stable_id("a.-b") && !valid_stable_id("a b") && !valid_stable_id("caf\xc3\xa9"));
+
+void test_stable_id_rule() {
+    require(StableId(std::string("list-view.item.7")).value() == "list-view.item.7",
+            "a valid runtime stable ID keeps its spelling");
+    require(StableId("paint.editor") == StableId(std::string("paint.editor")),
+            "a literal and a runtime string with one spelling are one stable ID");
+    require(StableId(std::string_view("tab-page.panel")).value() == "tab-page.panel",
+            "a runtime std::string_view is checked like a std::string");
+    for (const char* invalid : {"", "list_view", "Upper", "a..b", "trailing.", "a--b", "tab\tid"}) {
+        bool refused = false;
+        try {
+            static_cast<void>(StableId(std::string(invalid)));
+        } catch (const std::invalid_argument& error) {
+            refused = std::string_view(error.what()).find("stable ID") != std::string_view::npos;
+        }
+        require(refused, "an invalid runtime stable ID throws std::invalid_argument");
+    }
+}
+
 void test_static_tree_factory() {
     ControlFactory factory;
     factory.register_type("probe", make_probe_control);
@@ -1377,6 +1407,7 @@ int main() {
         test_capture_released_before_release_callback();
         test_disabled_control_is_ineligible();
         test_stable_ids_and_detached_lifetime();
+        test_stable_id_rule();
         test_static_tree_factory();
         test_cursor_inheritance_and_override();
         test_control_identity_geometry_constraints_and_z_order();

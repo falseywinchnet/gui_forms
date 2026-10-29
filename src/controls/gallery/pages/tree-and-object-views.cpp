@@ -31,7 +31,7 @@ constexpr std::array<ProjectNode, 15> project{{
     {"src", "src", 0, true, ObjectGlyph::folder, "Folder", "", "2026-10-11", "Sources"},
     {"controls", "controls", 1, true, ObjectGlyph::folder, "Folder", "", "2026-10-10", "Retained controls"},
     {"button.cpp", "button.cpp", 2, false, ObjectGlyph::code, "C++ source", "18 KB", "2026-10-09", "Dialog results and the four visual styles"},
-    {"tree_view.cpp", "tree_view.cpp", 2, false, ObjectGlyph::code, "C++ source", "42 KB", "2026-10-10", "Visible-row virtualization and type-select"},
+    {"tree-view.cpp", "tree_view.cpp", 2, false, ObjectGlyph::code, "C++ source", "42 KB", "2026-10-10", "Visible-row virtualization and type-select"},
     {"core", "core", 1, true, ObjectGlyph::folder, "Folder", "", "2026-10-08", "Window and scheduler"},
     {"window.cpp", "window.cpp", 5, false, ObjectGlyph::code, "C++ source", "96 KB", "2026-10-08", "Popup leases and focus scopes"},
     {"docs", "docs", 0, true, ObjectGlyph::folder, "Folder", "", "2026-10-07", "Atlas and manual"},
@@ -41,7 +41,7 @@ constexpr std::array<ProjectNode, 15> project{{
     {"logo.png", "logo.png", 10, false, ObjectGlyph::image, "PNG image", "12 KB", "2026-10-05", "The only admitted codec"},
     {"fonts", "fonts", 10, true, ObjectGlyph::folder, "Folder", "", "2026-10-04", "Bundled faces"},
     {"carlito.ttf", "carlito.ttf", 12, false, ObjectGlyph::archive, "Font", "612 KB", "2026-10-04", "Body face"},
-    {"README.md", "README.md", 0, false, ObjectGlyph::document, "Markdown", "3 KB", "2026-10-11", "Start here"},
+    {"readme.md", "README.md", 0, false, ObjectGlyph::document, "Markdown", "3 KB", "2026-10-11", "Start here"},
 }};
 
 constexpr std::string_view column_name = "name";

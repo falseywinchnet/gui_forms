@@ -67,7 +67,7 @@ void standard_items_and_states() {
                 (*navigator).anatomy().control_id == "binding_navigator",
             "BindingNavigator publishes a valid anatomy");
     const std::vector<ToolStrip::Item> items = (*navigator).realized_items();
-    require(find_item(items, "move_first") != nullptr && find_item(items, "position") != nullptr &&
+    require(find_item(items, "move-first") != nullptr && find_item(items, "position") != nullptr &&
                 find_item(items, "count") != nullptr && find_item(items, "delete") != nullptr &&
                 (*navigator).overflow_item_ids().empty(),
             "the navigator lays out its standard items");
@@ -90,7 +90,7 @@ void standard_items_and_states() {
             "the next command moves the source and the states follow");
 
     const std::vector<ToolStrip::Item> moved_items = (*navigator).realized_items();
-    const ToolStrip::Item* last = find_item(moved_items, "move_last");
+    const ToolStrip::Item* last = find_item(moved_items, "move-last");
     const Point at{(*last).parts.item_face.bounds.x + 4.0, (*last).parts.item_face.bounds.y + 4.0};
     static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, at}));
     static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, at}));

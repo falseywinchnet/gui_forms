@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui_forms/control/stable_id/stable_id.hpp"
 #include "gui_forms/text.hpp"
 
 #include <algorithm>
@@ -35,12 +36,13 @@ inline bool starts_with_folded(std::string_view text, std::string_view folded_pr
     return true;
 }
 
+// An item's identity names its semantic node, so it follows the StableId
+// segment rule; its text is valid UTF-8.
 inline void validate_identity_text(std::string_view id,
                                    std::string_view text) {
-    if (id.empty() || !validate_utf8(id).valid() ||
-        !validate_utf8(text).valid()) {
+    if (!valid_stable_id(id) || !validate_utf8(text).valid()) {
         throw std::invalid_argument(
-            "collection item identity and text must be valid UTF-8");
+            "collection item identity must follow the StableId segment rule and its text must be valid UTF-8");
     }
 }
 

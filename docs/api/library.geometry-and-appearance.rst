@@ -263,7 +263,7 @@ Types
    * - :cpp:class:`ThemeCompileOptions <gui_forms::ThemeCompileOptions>`
      - What a compilation reads besides the package.
    * - :cpp:class:`ThemeCompileResult <gui_forms::ThemeCompileResult>`
-     - A theme, or the refusal's diagnostics.
+     - What compiling a theme package gave: compiled, a theme with any warnings, or refused with its diagnostics.
    * - :cpp:class:`ThemeDefinition <gui_forms::ThemeDefinition>`
      - ThemeDefinition is one named, complete compatibility palette, role/state material matrix, and structural-token set.
    * - :cpp:class:`ThemeEngine <gui_forms::ThemeEngine>`
@@ -3807,15 +3807,31 @@ Types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: ThemeCompileResult final
+.. cpp:class:: ThemeCompileResult final
 
    ``#include <gui_forms/theme/theme_compiler/theme_compiler.hpp>``
 
-   A theme, or the refusal's diagnostics. Warnings come with a theme too.
+   What compiling a theme package gave: compiled, a theme with any warnings, or refused with its diagnostics.
 
-   .. cpp:member:: std::shared_ptr<const Theme> theme
 
-   .. cpp:member:: std::vector<ThemeCompileDiagnostic> diagnostics
+   .. rubric:: Properties
+
+   .. cpp:function:: bool succeeded() const noexcept
+
+   .. cpp:function:: std::shared_ptr<const Theme> theme() const noexcept
+
+      The theme of a compilation that succeeded; null for a refusal.
+
+   .. cpp:function:: std::span<const ThemeCompileDiagnostic> diagnostics() const noexcept
+
+      The warnings of a compilation that succeeded, or the diagnostics of one refused.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static ThemeCompileResult compiled(std::shared_ptr<const Theme> theme, std::vector<ThemeCompileDiagnostic> warnings) noexcept
+
+   .. cpp:function:: static ThemeCompileResult refused(std::vector<ThemeCompileDiagnostic> diagnostics) noexcept
 
 .. cpp:namespace:: gui_forms
 

@@ -21,8 +21,10 @@ commands
     Each has its `Command`, an optional image (a command with an image shows
     only its icon, one without its text) and whether the toolbar shows it
     before the user customizes. Setting them shows those marked shown and
-    replaces any customization; a missing command, an empty or repeated
-    command ID, or more than 20 commands throws `std::invalid_argument`.
+    replaces any customization; a missing command, a repeated command ID or
+    one that breaks the `StableId` segment rule (its toolbar item and
+    customize row are named after it), or more than 20 commands throws
+    `std::invalid_argument`.
 shown_command_ids
     The IDs of the commands the toolbar shows, in toolbar order.
     `set_shown_command_ids` shows exactly the given IDs in the given order,

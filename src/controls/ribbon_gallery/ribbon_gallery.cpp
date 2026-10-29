@@ -92,18 +92,21 @@ void RibbonGallery::set_items(std::vector<RibbonGalleryCategory> categories, std
     std::unordered_map<std::string, std::size_t> category_index{};
     for (std::size_t index = 0; index < categories.size(); ++index) {
         const RibbonGalleryCategory& category = categories[index];
-        if (category.stable_id.empty() || !valid_text(category.stable_id) || !valid_text(category.caption) ||
+        if (!valid_stable_id(category.stable_id) || !valid_text(category.caption) ||
             !category_index.emplace(category.stable_id, index).second) {
-            throw std::invalid_argument("RibbonGallery categories require unique IDs and valid UTF-8");
+            throw std::invalid_argument(
+                "RibbonGallery categories require unique IDs of '.'-separated lowercase dash segments and valid "
+                "UTF-8");
         }
     }
     std::unordered_map<std::string, std::size_t> item_ids{};
     std::vector<std::size_t> item_category(items.size(), no_category);
     for (std::size_t index = 0; index < items.size(); ++index) {
         const RibbonGalleryItem& item = items[index];
-        if (item.stable_id.empty() || !valid_text(item.stable_id) || !valid_text(item.label) ||
+        if (!valid_stable_id(item.stable_id) || !valid_text(item.label) ||
             !item_ids.emplace(item.stable_id, index).second) {
-            throw std::invalid_argument("RibbonGallery items require unique IDs and valid UTF-8");
+            throw std::invalid_argument(
+                "RibbonGallery items require unique IDs of '.'-separated lowercase dash segments and valid UTF-8");
         }
         if (item.category.empty()) continue;
         const std::unordered_map<std::string, std::size_t>::const_iterator found = category_index.find(item.category);
@@ -735,7 +738,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
     const Parts placed = gallery_parts(layout);
     if (placed.scroll_up.present) {
         SemanticNode up{};
-        up.stable_id = prefix + ".scroll_up";
+        up.stable_id = prefix + ".scroll-up";
         up.runtime_id = virtual_semantic_runtime_id(up.stable_id);
         up.role = SemanticRole::button;
         up.name = "Scroll up";
@@ -746,7 +749,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
         up.actions = {SemanticAction::press};
         nodes.push_back(std::move(up));
         SemanticNode down{};
-        down.stable_id = prefix + ".scroll_down";
+        down.stable_id = prefix + ".scroll-down";
         down.runtime_id = virtual_semantic_runtime_id(down.stable_id);
         down.role = SemanticRole::button;
         down.name = "Scroll down";
@@ -759,7 +762,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
     }
     if (placed.more_button.present) {
         SemanticNode more{};
-        more.stable_id = prefix + ".more_button";
+        more.stable_id = prefix + ".more-button";
         more.runtime_id = virtual_semantic_runtime_id(more.stable_id);
         more.role = SemanticRole::menu_button;
         more.name = "More";
@@ -776,14 +779,14 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
 
 bool RibbonGallery::on_semantic_child_action(std::string_view id, SemanticAction action, std::string_view) {
     const std::string prefix(stable_id().value());
-    if (id == prefix + ".more_button") {
+    if (id == prefix + ".more-button") {
         if (action != SemanticAction::press && action != SemanticAction::expand) return false;
         const bool opened = show_more();
         return opened;
     }
-    if (id == prefix + ".scroll_up" || id == prefix + ".scroll_down") {
+    if (id == prefix + ".scroll-up" || id == prefix + ".scroll-down") {
         if (action != SemanticAction::press) return false;
-        const bool up = id == prefix + ".scroll_up";
+        const bool up = id == prefix + ".scroll-up";
         if (up && can_scroll_up()) scroll_to_line(first_line_ - 1U);
         if (!up && can_scroll_down()) scroll_to_line(first_line_ + 1U);
         return true;

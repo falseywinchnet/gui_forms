@@ -32,7 +32,7 @@ gui_forms::DockSite
          ``<stable_id>.stack.<node id>``, its caption buttons
          ``<view id>.menu``, ``.pin`` and ``.close``, each seam
          ``<stable_id>.seam.<split id>``, the navigator ``<stable_id>.navigator``,
-         the position menu ``<stable_id>.position_menu``, each side strip
+         the position menu ``<stable_id>.position-menu``, each side strip
          ``<stable_id>.side.left`` (``top``, ``right``, ``bottom``) and the
          flyout ``<stable_id>.flyout``.
 

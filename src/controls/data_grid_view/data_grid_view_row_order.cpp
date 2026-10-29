@@ -1,5 +1,6 @@
 #include "gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp"
 
+#include "gui_forms/control/stable_id/stable_id.hpp"
 #include "gui_forms/text.hpp"
 
 #include <algorithm>
@@ -17,7 +18,8 @@ constexpr std::size_t merge_below = DataGridViewRowOrder::chunk_capacity / 4U;
 constexpr std::size_t split_above = DataGridViewRowOrder::chunk_capacity * 2U;
 
 [[nodiscard]] bool valid_id(std::string_view id) {
-    const bool valid = !id.empty() && validate_utf8(id).valid();
+    // A row's ID names its semantic node, so it follows the StableId rule.
+    const bool valid = valid_stable_id(id);
     return valid;
 }
 
@@ -125,7 +127,7 @@ void DataGridViewRowOrder::reset(std::span<const DataGridViewRowId> order) {
     seen.reserve(order.size());
     for (const DataGridViewRowId& id : order) {
         if (!valid_id(id.value)) {
-            throw std::invalid_argument("DataGridView virtual row IDs must be valid UTF-8 and not empty");
+            throw std::invalid_argument("DataGridView virtual row IDs must follow the StableId segment rule");
         }
         if (!seen.insert(id.value).second) throw std::invalid_argument("DataGridView virtual row IDs must be unique");
     }
@@ -317,7 +319,7 @@ void DataGridViewRowOrder::validate_new_ids(std::span<const DataGridViewRowId> i
     seen.reserve(ids.size());
     for (const DataGridViewRowId& id : ids) {
         if (!valid_id(id.value)) {
-            throw std::invalid_argument("DataGridView virtual row IDs must be valid UTF-8 and not empty");
+            throw std::invalid_argument("DataGridView virtual row IDs must follow the StableId segment rule");
         }
         if (!seen.insert(id.value).second || chunk_of_.contains(id.value)) {
             throw std::invalid_argument("DataGridView virtual row IDs must be unique");
