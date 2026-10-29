@@ -15,6 +15,7 @@
 
 #include "gui_forms/gui_forms.hpp"
 #include "support/theme_definition_heap.hpp"
+#include "support/rgba_order.hpp"
 
 #include "../src/core/engine/primitives/material/material_primitive.hpp"
 #include "../src/core/engine/primitives/light/sheen_primitive.hpp"
@@ -57,7 +58,7 @@ bool print_mode(int argc, char** argv) {
 // FNV-1a over bytes, 64 bits.
 std::uint64_t hash_bytes(std::span<const std::uint8_t> bytes) {
     std::uint64_t hash = 0xcbf29ce484222325ULL;
-    for (const std::uint8_t byte : bytes) {
+    for (const std::uint8_t byte : gui_forms::test_support::rgba_order(bytes)) {
         hash = hash ^ byte;
         hash = hash * 0x100000001b3ULL;
     }

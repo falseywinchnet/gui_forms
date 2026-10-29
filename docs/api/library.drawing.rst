@@ -1548,7 +1548,7 @@ Types
 
    ``#include <gui_forms/paint_framebuffer.hpp>``
 
-   UI-thread-owned offscreen instance of the host's renderer. Pixels are premultiplied sRGB, with native channel order explicitly reported. The buffer survives begin/end; callers may restore cached pixels before drawing damage. A painter and pixel span are borrowed only for this object's lifetime.
+   UI-thread-owned offscreen instance of the host's renderer. Pixels are premultiplied sRGB BGRA8 on every host: blue, green, red and alpha bytes in memory order, the one format of every surface and raster. The buffer survives begin/end; callers may restore cached pixels before drawing damage. A painter and pixel span are borrowed only for this object's lifetime.
 
 
    .. rubric:: Extension points
@@ -1566,8 +1566,6 @@ Types
    .. cpp:function:: virtual std::uint32_t width() const noexcept = 0
 
    .. cpp:function:: virtual std::uint32_t height() const noexcept = 0
-
-   .. cpp:function:: virtual FramebufferChannelOrder channel_order() const noexcept = 0
 
 .. cpp:namespace:: gui_drawing
 
@@ -2418,16 +2416,6 @@ Enumerations
 
    .. cpp:enumerator:: strikeout
 
-.. cpp:namespace:: gui_forms
-
-.. cpp:enum-class:: FramebufferChannelOrder
-
-   ``#include <gui_forms/paint_framebuffer.hpp>``
-
-   .. cpp:enumerator:: bgra
-
-   .. cpp:enumerator:: rgba
-
 .. cpp:namespace:: gui_drawing
 
 .. cpp:enum-class:: GraphicsUnit
@@ -2496,8 +2484,6 @@ Enumerations
 
    .. cpp:enumerator:: bgra32_premultiplied_srgb
 
-   .. cpp:enumerator:: rgba32_premultiplied_srgb
-
 .. cpp:namespace:: gui_drawing
 
 .. cpp:enum-class:: ObjectState
@@ -2539,8 +2525,6 @@ Enumerations
    ``#include <gui_forms/drawing/types/pixel_format/pixel_format.hpp>``
 
    .. cpp:enumerator:: bgra32_premultiplied
-
-   .. cpp:enumerator:: rgba32_premultiplied
 
 .. cpp:namespace:: gui_drawing
 
@@ -2691,7 +2675,7 @@ Functions, constants and aliases
 
 .. cpp:function:: LiveSurfacePixelFormat native_live_surface_pixel_format() noexcept
 
-   Valid before attachment. Native-order opaque pixels allow a straight copy for pixel-aligned, unscaled presentation at full opacity: Windows DIBs use BGRA; macOS and Linux Skia rasters use RGBA. Other formats remain supported.
+   Valid before attachment: bgra32_premultiplied_srgb on every host. Opaque pixels allow a straight copy for pixel-aligned, unscaled presentation at full opacity.
 
 .. cpp:var:: constexpr std::size_t default_live_surface_buffer_count
 

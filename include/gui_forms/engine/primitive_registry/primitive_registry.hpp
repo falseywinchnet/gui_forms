@@ -483,7 +483,7 @@ public:
 
     // Validates the destination, the target, the parameters and the
     // preparation once, then fills every pixel of the destination with
-    // premultiplied RGBA8. Anything but `painted` leaves the destination's
+    // premultiplied BGRA8. Anything but `painted` leaves the destination's
     // bytes unchanged.
     [[nodiscard]] RasterOutcome rasterize(const PrimitiveParameterBlock& parameters,
                                           const PrimitiveTarget& target,

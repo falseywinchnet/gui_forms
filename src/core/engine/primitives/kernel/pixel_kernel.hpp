@@ -44,7 +44,7 @@ void blend_screen(Unit& target, Unit source) noexcept;
 // One channel quantized once: floor(clamp(v, 0, 1) × 255 + 0.5).
 [[nodiscard]] std::uint8_t to_byte(double value) noexcept;
 
-// Writes `unit` as RGBA8 at byte `offset` of `destination`, which the
+// Writes `unit` as BGRA8 at byte `offset` of `destination`, which the
 // caller has validated.
 void store(const PartRasterView& destination, std::size_t offset, const Unit& unit) noexcept;
 

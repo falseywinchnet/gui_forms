@@ -1,4 +1,5 @@
 #include "x11_tray_icons.hpp"
+#include "../../../core/host/image/host_image_pixels.hpp"
 
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
@@ -184,10 +185,14 @@ void X11TrayIcons::draw(const Icon& icon) const {
         const std::byte* const source = image.pixels.data() + static_cast<std::size_t>(row) * image.row_bytes;
         for (unsigned column = 0; column < width; ++column) {
             const std::size_t offset = static_cast<std::size_t>(column) * 4U;
-            const unsigned red = std::to_integer<unsigned>(source[offset + 0U]);
-            const unsigned green = std::to_integer<unsigned>(source[offset + 1U]);
-            const unsigned blue = std::to_integer<unsigned>(source[offset + 2U]);
-            const unsigned alpha = std::to_integer<unsigned>(source[offset + 3U]);
+            // Premultiplied BGRA8: the drawn colour is the straight one.
+            const std::uint8_t alpha = std::to_integer<std::uint8_t>(source[offset + 3U]);
+            const unsigned blue =
+                gui_forms::detail::straight_channel(std::to_integer<std::uint8_t>(source[offset + 0U]), alpha);
+            const unsigned green =
+                gui_forms::detail::straight_channel(std::to_integer<std::uint8_t>(source[offset + 1U]), alpha);
+            const unsigned red =
+                gui_forms::detail::straight_channel(std::to_integer<std::uint8_t>(source[offset + 2U]), alpha);
             const unsigned long pixel = channel(red, (*visual).red_mask) | channel(green, (*visual).green_mask) |
                                         channel(blue, (*visual).blue_mask);
             XPutPixel(colour, static_cast<int>(column), static_cast<int>(row), pixel);

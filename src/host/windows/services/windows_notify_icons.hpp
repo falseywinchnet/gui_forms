@@ -66,8 +66,9 @@ private:
     UINT taskbar_created_{};
 };
 
-// An icon handle from straight-alpha RGBA images: the one nearest
-// `wanted_side` pixels, as a 32-bit colour bitmap with an empty mask. Returns
+// An icon handle from premultiplied BGRA8 host images: the one nearest
+// `wanted_side` pixels, unpremultiplied into a 32-bit colour bitmap (icons
+// take straight alpha) with an empty mask. Returns
 // null on failure. The caller destroys the handle with DestroyIcon.
 [[nodiscard]] HICON create_notify_icon_handle(std::span<const HostImage> images, int wanted_side) noexcept;
 

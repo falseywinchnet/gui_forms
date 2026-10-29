@@ -233,7 +233,8 @@ void HostServicesPage::on_font_applied(const FontSpec& font) {
 
 namespace {
 
-// A round icon of `side` pixels in the page's accent colour, straight alpha.
+// A round icon of `side` pixels in the page's accent colour (red 39, green
+// 116, blue 184), opaque premultiplied BGRA8.
 HostImage round_icon(std::uint32_t side) {
     HostImage image;
     image.width = side;
@@ -248,9 +249,9 @@ HostImage round_icon(std::uint32_t side) {
             const double dy = static_cast<double>(row) + 0.5 - centre;
             if (dx * dx + dy * dy > radius * radius) continue;
             const std::size_t offset = static_cast<std::size_t>(row) * image.row_bytes + column * 4U;
-            image.pixels[offset + 0U] = std::byte{39};
+            image.pixels[offset + 0U] = std::byte{184};
             image.pixels[offset + 1U] = std::byte{116};
-            image.pixels[offset + 2U] = std::byte{184};
+            image.pixels[offset + 2U] = std::byte{39};
             image.pixels[offset + 3U] = std::byte{255};
         }
     }

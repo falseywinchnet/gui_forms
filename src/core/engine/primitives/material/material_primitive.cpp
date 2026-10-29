@@ -946,8 +946,8 @@ Unit fill_colour(const ResolvedFill& fill, const MaterialImages& images, std::si
         const std::size_t at = layer.rows[y] + layer.columns[x];
         // The variant's bytes to [0, 1], weighted by coverage and opacity.
         const double weight = coverage * fill.opacity / 255.0;
-        const Unit image{static_cast<double>(pixels[at]) * weight, static_cast<double>(pixels[at + 1U]) * weight,
-                         static_cast<double>(pixels[at + 2U]) * weight, static_cast<double>(pixels[at + 3U]) * weight};
+        const Unit image{static_cast<double>(pixels[at + 2U]) * weight, static_cast<double>(pixels[at + 1U]) * weight,
+                         static_cast<double>(pixels[at]) * weight, static_cast<double>(pixels[at + 3U]) * weight};
         return image;
     }
     case MaterialFillKind::procedural: {
@@ -960,8 +960,8 @@ Unit fill_colour(const ResolvedFill& fill, const MaterialImages& images, std::si
         const std::span<const std::uint8_t> pixels = (*layer.variant).pixels();
         const std::size_t at = layer.rows[y] + layer.columns[x];
         const double weight = coverage * fill.opacity / 255.0;
-        const Unit pattern{static_cast<double>(pixels[at]) * weight, static_cast<double>(pixels[at + 1U]) * weight,
-                           static_cast<double>(pixels[at + 2U]) * weight,
+        const Unit pattern{static_cast<double>(pixels[at + 2U]) * weight, static_cast<double>(pixels[at + 1U]) * weight,
+                           static_cast<double>(pixels[at]) * weight,
                            static_cast<double>(pixels[at + 3U]) * weight};
         return pattern;
     }
@@ -1288,9 +1288,9 @@ void add_drop_shadow(const PartFilters& filters, const PartRasterView& destinati
             const double coverage = static_cast<double>(first[at]) / 255.0;
             if (coverage <= 0.0) continue;
             const std::size_t offset = start + static_cast<std::size_t>(column) * part_raster_bytes_per_pixel;
-            const Unit drawn{static_cast<double>(destination.pixels[offset]) / 255.0,
+            const Unit drawn{static_cast<double>(destination.pixels[offset + 2U]) / 255.0,
                              static_cast<double>(destination.pixels[offset + 1U]) / 255.0,
-                             static_cast<double>(destination.pixels[offset + 2U]) / 255.0,
+                             static_cast<double>(destination.pixels[offset]) / 255.0,
                              static_cast<double>(destination.pixels[offset + 3U]) / 255.0};
             // The raster over its shadow.
             Unit shadowed = premultiply(filters.shadow_colour, coverage);
@@ -1364,9 +1364,9 @@ void apply_mask(const MaterialLook& look, const MaterialImages& images, const Pa
             // The mask's alpha over 255: a byte times it is the masked unit.
             const double weight = mask_alpha(look, images, static_cast<std::int64_t>(column),
                                            static_cast<std::int64_t>(row)) / 255.0;
-            const Unit masked{static_cast<double>(destination.pixels[offset]) * weight,
+            const Unit masked{static_cast<double>(destination.pixels[offset + 2U]) * weight,
                               static_cast<double>(destination.pixels[offset + 1U]) * weight,
-                              static_cast<double>(destination.pixels[offset + 2U]) * weight,
+                              static_cast<double>(destination.pixels[offset]) * weight,
                               static_cast<double>(destination.pixels[offset + 3U]) * weight};
             store(destination, offset, masked);
         }

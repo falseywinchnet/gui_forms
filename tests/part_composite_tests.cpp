@@ -27,7 +27,6 @@ using detail::PartRasterSource;
 using detail::TextCompositeClip;
 using detail::TextCompositeStatus;
 using detail::TextCompositeTarget;
-using detail::TextPixelOrder;
 
 void require(bool condition, const char* message) {
     if (condition) return;
@@ -35,9 +34,9 @@ void require(bool condition, const char* message) {
     std::exit(1);
 }
 
-// A 32-bit pixel from four channels in the target's memory order.
-std::uint32_t pack(TextPixelOrder order, unsigned red, unsigned green, unsigned blue, unsigned alpha) {
-    if (order == TextPixelOrder::rgba) return red | (green << 8U) | (blue << 16U) | (alpha << 24U);
+// A 32-bit BGRA8 pixel from four channels: blue in the low byte, red at
+// bit 16.
+std::uint32_t pack(unsigned red, unsigned green, unsigned blue, unsigned alpha) {
     return blue | (green << 8U) | (red << 16U) | (alpha << 24U);
 }
 
@@ -47,15 +46,13 @@ struct TestTarget final {
     TextCompositeTarget target{};
 };
 
-TestTarget make_target(std::uint32_t width, std::uint32_t height, std::uint32_t fill, TextPixelOrder order,
-                       bool opaque) {
+TestTarget make_target(std::uint32_t width, std::uint32_t height, std::uint32_t fill, bool opaque) {
     TestTarget made{};
     made.pixels.assign(static_cast<std::size_t>(width) * height, fill);
     made.target.pixels = std::span<std::uint32_t>(made.pixels.data(), made.pixels.size());
     made.target.width = width;
     made.target.height = height;
     made.target.stride = width;
-    made.target.order = order;
     made.target.opaque = opaque;
     return made;
 }
@@ -66,14 +63,15 @@ TextCompositeClip whole(std::uint32_t width, std::uint32_t height) {
     return clip;
 }
 
-// One premultiplied RGBA source pixel repeated over `width` x `height`.
+// One premultiplied source pixel, given as red, green, blue and alpha,
+// repeated over `width` x `height` as a part raster's BGRA bytes.
 std::vector<std::uint8_t> solid_source(std::uint32_t width, std::uint32_t height, std::array<std::uint8_t, 4> pixel) {
     std::vector<std::uint8_t> bytes{};
     bytes.reserve(static_cast<std::size_t>(width) * height * 4U);
     for (std::size_t index = 0U; index < static_cast<std::size_t>(width) * height; ++index) {
-        bytes.push_back(pixel[0]);
-        bytes.push_back(pixel[1]);
         bytes.push_back(pixel[2]);
+        bytes.push_back(pixel[1]);
+        bytes.push_back(pixel[0]);
         bytes.push_back(pixel[3]);
     }
     return bytes;
@@ -96,44 +94,41 @@ void test_opacity_quantization() {
 }
 
 void test_blend_arithmetic() {
-    const TextPixelOrder orders[] = {TextPixelOrder::rgba, TextPixelOrder::bgra};
-    for (const TextPixelOrder order : orders) {
-        // An opaque source at full opacity and coverage is copied exactly.
-        TestTarget copied = make_target(2U, 1U, pack(order, 0U, 0U, 255U, 255U), order, false);
-        const std::vector<std::uint8_t> opaque = solid_source(2U, 1U, {200, 100, 50, 255});
-        require(detail::composite_part_raster(source_of(opaque, 2U, 1U, 0, 0), copied.target, whole(2U, 1U), 255U) ==
-                    TextCompositeStatus::success,
-                "the composite succeeds");
-        require(copied.pixels[0] == pack(order, 200U, 100U, 50U, 255U) && copied.pixels[1] == copied.pixels[0],
-                "an opaque raster is copied exactly");
+    // An opaque source at full opacity and coverage is copied exactly.
+    TestTarget copied = make_target(2U, 1U, pack(0U, 0U, 255U, 255U), false);
+    const std::vector<std::uint8_t> opaque = solid_source(2U, 1U, {200, 100, 50, 255});
+    require(detail::composite_part_raster(source_of(opaque, 2U, 1U, 0, 0), copied.target, whole(2U, 1U), 255U) ==
+                TextCompositeStatus::success,
+            "the composite succeeds");
+    require(copied.pixels[0] == pack(200U, 100U, 50U, 255U) && copied.pixels[1] == copied.pixels[0],
+            "an opaque raster is copied exactly");
 
-        // A half-transparent premultiplied source over opaque blue:
-        // out = s + d * (255 - 128) / 255, rounded once.
-        TestTarget half = make_target(1U, 1U, pack(order, 0U, 0U, 255U, 255U), order, false);
-        const std::vector<std::uint8_t> translucent = solid_source(1U, 1U, {128, 64, 0, 128});
-        require(detail::composite_part_raster(source_of(translucent, 1U, 1U, 0, 0), half.target, whole(1U, 1U), 255U) ==
-                    TextCompositeStatus::success,
-                "the translucent composite succeeds");
-        require(half.pixels[0] == pack(order, 128U, 64U, 127U, 255U), "premultiplied source-over, rounded once");
+    // A half-transparent premultiplied source over opaque blue:
+    // out = s + d * (255 - 128) / 255, rounded once.
+    TestTarget half = make_target(1U, 1U, pack(0U, 0U, 255U, 255U), false);
+    const std::vector<std::uint8_t> translucent = solid_source(1U, 1U, {128, 64, 0, 128});
+    require(detail::composite_part_raster(source_of(translucent, 1U, 1U, 0, 0), half.target, whole(1U, 1U), 255U) ==
+                TextCompositeStatus::success,
+            "the translucent composite succeeds");
+    require(half.pixels[0] == pack(128U, 64U, 127U, 255U), "premultiplied source-over, rounded once");
 
-        // Opacity 128 weights every channel by 128 * 256 / 65280, rounded.
-        TestTarget faded = make_target(1U, 1U, pack(order, 0U, 0U, 0U, 255U), order, false);
-        require(detail::composite_part_raster(source_of(opaque, 1U, 1U, 0, 0), faded.target, whole(1U, 1U), 128U) ==
-                    TextCompositeStatus::success,
-                "the faded composite succeeds");
-        require(faded.pixels[0] == pack(order, 100U, 50U, 25U, 255U), "opacity weights each premultiplied channel");
+    // Opacity 128 weights every channel by 128 * 256 / 65280, rounded.
+    TestTarget faded = make_target(1U, 1U, pack(0U, 0U, 0U, 255U), false);
+    require(detail::composite_part_raster(source_of(opaque, 1U, 1U, 0, 0), faded.target, whole(1U, 1U), 128U) ==
+                TextCompositeStatus::success,
+            "the faded composite succeeds");
+    require(faded.pixels[0] == pack(100U, 50U, 25U, 255U), "opacity weights each premultiplied channel");
 
-        // An opaque target keeps alpha 255 whatever the blend gives.
-        TestTarget dib = make_target(1U, 1U, pack(order, 0U, 0U, 0U, 0U), order, true);
-        require(detail::composite_part_raster(source_of(translucent, 1U, 1U, 0, 0), dib.target, whole(1U, 1U), 255U) ==
-                    TextCompositeStatus::success,
-                "the opaque-target composite succeeds");
-        require((dib.pixels[0] >> 24U) == 255U, "an opaque target is written with alpha 255");
-    }
+    // An opaque target keeps alpha 255 whatever the blend gives.
+    TestTarget dib = make_target(1U, 1U, pack(0U, 0U, 0U, 0U), true);
+    require(detail::composite_part_raster(source_of(translucent, 1U, 1U, 0, 0), dib.target, whole(1U, 1U), 255U) ==
+                TextCompositeStatus::success,
+            "the opaque-target composite succeeds");
+    require((dib.pixels[0] >> 24U) == 255U, "an opaque target is written with alpha 255");
 }
 
 void test_transparency_and_zero_opacity_write_nothing() {
-    TestTarget target = make_target(3U, 3U, 0x11223344U, TextPixelOrder::rgba, false);
+    TestTarget target = make_target(3U, 3U, 0x11223344U, false);
     const std::vector<std::uint32_t> before = target.pixels;
     const std::vector<std::uint8_t> clear = solid_source(3U, 3U, {0, 0, 0, 0});
     require(detail::composite_part_raster(source_of(clear, 3U, 3U, 0, 0), target.target, whole(3U, 3U), 255U) ==
@@ -148,12 +143,12 @@ void test_transparency_and_zero_opacity_write_nothing() {
 }
 
 void test_placement_and_clip() {
-    const std::uint32_t background = pack(TextPixelOrder::rgba, 10U, 20U, 30U, 255U);
-    const std::uint32_t white = pack(TextPixelOrder::rgba, 255U, 255U, 255U, 255U);
+    const std::uint32_t background = pack(10U, 20U, 30U, 255U);
+    const std::uint32_t white = pack(255U, 255U, 255U, 255U);
     const std::vector<std::uint8_t> opaque = solid_source(3U, 3U, {255, 255, 255, 255});
 
     // Placed partly outside the target: only the overlap is written.
-    TestTarget shifted = make_target(4U, 4U, background, TextPixelOrder::rgba, false);
+    TestTarget shifted = make_target(4U, 4U, background, false);
     require(detail::composite_part_raster(source_of(opaque, 3U, 3U, -1, 2), shifted.target, whole(4U, 4U), 255U) ==
                 TextCompositeStatus::success,
             "a raster partly outside the target composites");
@@ -167,7 +162,7 @@ void test_placement_and_clip() {
 
     // A clip edge through the middle of a pixel blends that pixel partly;
     // pixels outside the clip are untouched.
-    TestTarget clipped = make_target(3U, 1U, background, TextPixelOrder::rgba, false);
+    TestTarget clipped = make_target(3U, 1U, background, false);
     TextCompositeClip clip{};
     clip.rect = {0.0, 0.0, 1.5, 1.0};
     require(detail::composite_part_raster(source_of(opaque, 3U, 1U, 0, 0), clipped.target, clip, 255U) ==
@@ -180,7 +175,7 @@ void test_placement_and_clip() {
 }
 
 void test_refusals_write_nothing() {
-    TestTarget target = make_target(2U, 2U, 0x01020304U, TextPixelOrder::rgba, false);
+    TestTarget target = make_target(2U, 2U, 0x01020304U, false);
     const std::vector<std::uint32_t> before = target.pixels;
     const std::vector<std::uint8_t> bytes = solid_source(2U, 2U, {50, 50, 50, 255});
     PartRasterSource short_buffer = source_of(bytes, 2U, 2U, 0, 0);
@@ -208,7 +203,7 @@ void test_premultiplied_sources_never_overflow() {
     const std::array<std::uint8_t, 5> opacities{1U, 64U, 128U, 200U, 255U};
     for (const unsigned alpha : alphas) {
         for (const std::uint8_t opacity : opacities) {
-            TestTarget target = make_target(1U, 1U, 0xFFFFFFFFU, TextPixelOrder::rgba, false);
+            TestTarget target = make_target(1U, 1U, 0xFFFFFFFFU, false);
             const std::uint8_t channel = static_cast<std::uint8_t>(alpha);
             const std::vector<std::uint8_t> bytes = solid_source(1U, 1U, {channel, channel, channel, channel});
             require(detail::composite_part_raster(source_of(bytes, 1U, 1U, 0, 0), target.target, whole(1U, 1U),
@@ -225,27 +220,28 @@ void test_premultiplied_sources_never_overflow() {
 // texels about its centre with 8-bit weights, transparent beyond the edges.
 void test_scaled_sampling() {
     // Red then blue, opaque, shown twice as wide.
-    const std::vector<std::uint8_t> pair{255U, 0U, 0U, 255U, 0U, 0U, 255U, 255U};
+    // Red then blue, as BGRA bytes.
+    const std::vector<std::uint8_t> pair{0U, 0U, 255U, 255U, 255U, 0U, 0U, 255U};
     PartRasterSource stretched = source_of(pair, 2U, 1U, 0, 0);
     stretched.shown_width = 4U;
     stretched.shown_height = 1U;
-    TestTarget wide = make_target(4U, 1U, 0U, TextPixelOrder::rgba, false);
+    TestTarget wide = make_target(4U, 1U, 0U, false);
     require(detail::composite_part_raster(stretched, wide.target, whole(4U, 1U), 255U) ==
                 detail::TextCompositeStatus::success,
             "a stretched raster composites");
     // Pixel 0 samples -1/4 of a texel: three quarters red over nothing;
     // pixel 1 a quarter of the way from red to blue; the rest mirror them.
-    require(wide.pixels[0] == pack(TextPixelOrder::rgba, 191U, 0U, 0U, 191U), "the edge fades out");
-    require(wide.pixels[1] == pack(TextPixelOrder::rgba, 191U, 0U, 64U, 255U), "red leans toward blue");
-    require(wide.pixels[2] == pack(TextPixelOrder::rgba, 64U, 0U, 191U, 255U), "blue leans toward red");
-    require(wide.pixels[3] == pack(TextPixelOrder::rgba, 0U, 0U, 191U, 191U), "the far edge fades out");
+    require(wide.pixels[0] == pack(191U, 0U, 0U, 191U), "the edge fades out");
+    require(wide.pixels[1] == pack(191U, 0U, 64U, 255U), "red leans toward blue");
+    require(wide.pixels[2] == pack(64U, 0U, 191U, 255U), "blue leans toward red");
+    require(wide.pixels[3] == pack(0U, 0U, 191U, 191U), "the far edge fades out");
 
     // Shown at its own size, the scaled path is the unscaled one.
     const std::vector<std::uint8_t> grey = solid_source(3U, 2U, {40U, 50U, 60U, 128U});
     PartRasterSource same = source_of(grey, 3U, 2U, 1, 1);
     same.shown_width = 3U;
     same.shown_height = 2U;
-    TestTarget shown = make_target(5U, 4U, pack(TextPixelOrder::bgra, 9U, 8U, 7U, 255U), TextPixelOrder::bgra, true);
+    TestTarget shown = make_target(5U, 4U, pack(9U, 8U, 7U, 255U), true);
     TestTarget plain = shown;
     plain.target.pixels = std::span<std::uint32_t>(plain.pixels.data(), plain.pixels.size());
     static_cast<void>(detail::composite_part_raster(same, shown.target, whole(5U, 4U), 200U));
@@ -257,17 +253,17 @@ void test_scaled_sampling() {
     PartRasterSource grown = source_of(solid, 4U, 4U, 0, 0);
     grown.shown_width = 6U;
     grown.shown_height = 6U;
-    TestTarget large = make_target(8U, 8U, 0U, TextPixelOrder::rgba, false);
+    TestTarget large = make_target(8U, 8U, 0U, false);
     TextCompositeClip clip{};
     clip.rect = {0.0, 0.0, 5.0, 8.0};
     static_cast<void>(detail::composite_part_raster(grown, large.target, clip, 255U));
-    require(large.pixels[2U * 8U + 2U] == pack(TextPixelOrder::rgba, 10U, 20U, 30U, 255U), "the inside is solid");
+    require(large.pixels[2U * 8U + 2U] == pack(10U, 20U, 30U, 255U), "the inside is solid");
     require(large.pixels[2U * 8U + 5U] == 0U && large.pixels[6U * 8U + 2U] == 0U,
             "nothing is written beyond the clip or the shown size");
 
     PartRasterSource huge = source_of(solid, 4U, 4U, 0, 0);
     huge.shown_width = 0xffffffffU;
-    TestTarget untouched = make_target(2U, 2U, 0U, TextPixelOrder::rgba, false);
+    TestTarget untouched = make_target(2U, 2U, 0U, false);
     require(detail::composite_part_raster(huge, untouched.target, whole(2U, 2U), 255U) ==
                 detail::TextCompositeStatus::invalid_geometry,
             "an unbounded shown size is refused");
@@ -282,25 +278,27 @@ PartRasterSource added_face(const std::vector<std::uint8_t>& bytes) {
 // The plus blend (E7r cross-fade): each weighted channel added, clamped.
 // An old face at 1 - t and a new one added at t sum to one face.
 void test_plus_blend() {
-    const std::vector<std::uint8_t> half{100U, 50U, 0U, 128U};
+    // Red 100, green 50, blue 0, alpha 128, as BGRA bytes.
+    const std::vector<std::uint8_t> half{0U, 50U, 100U, 128U};
     PartRasterSource added = source_of(half, 1U, 1U, 0, 0);
     added.blend = detail::PartCompositeBlend::plus;
-    TestTarget sum = make_target(1U, 1U, pack(TextPixelOrder::rgba, 200U, 10U, 5U, 200U), TextPixelOrder::rgba, false);
+    TestTarget sum = make_target(1U, 1U, pack(200U, 10U, 5U, 200U), false);
     require(detail::composite_part_raster(added, sum.target, whole(1U, 1U), 255U) ==
                 detail::TextCompositeStatus::success,
             "a plus source composites");
-    require(sum.pixels[0] == pack(TextPixelOrder::rgba, 255U, 60U, 5U, 255U), "channels add and clamp at 255");
+    require(sum.pixels[0] == pack(255U, 60U, 5U, 255U), "channels add and clamp at 255");
 
     // The same opaque face faded out and in sums to itself within a step.
-    const std::vector<std::uint8_t> face{90U, 140U, 200U, 255U};
+    // Red 90, green 140, blue 200, opaque, as BGRA bytes.
+    const std::vector<std::uint8_t> face{200U, 140U, 90U, 255U};
     for (unsigned share = 0U; share <= 255U; share = share + 15U) {
-        TestTarget group = make_target(1U, 1U, 0U, TextPixelOrder::rgba, false);
+        TestTarget group = make_target(1U, 1U, 0U, false);
         static_cast<void>(detail::composite_part_raster(source_of(face, 1U, 1U, 0, 0), group.target, whole(1U, 1U),
                                                         static_cast<std::uint8_t>(255U - share)));
         static_cast<void>(detail::composite_part_raster(added_face(face), group.target, whole(1U, 1U),
                                                         static_cast<std::uint8_t>(share)));
         const std::uint32_t pixel = group.pixels[0];
-        const unsigned red = pixel & 255U;
+        const unsigned red = (pixel >> 16U) & 255U;
         const unsigned alpha = pixel >> 24U;
         require(red + 1U >= 90U && red <= 91U && alpha + 1U >= 255U, "a face faded into itself stays itself");
     }
@@ -309,37 +307,38 @@ void test_plus_blend() {
 // Multiply and screen (E9.6): CSS's separable blend modes in bytes, each
 // product rounded once.
 void test_separable_blends() {
-    const std::vector<std::uint8_t> half{100U, 50U, 0U, 128U};
-    const std::uint32_t beneath = pack(TextPixelOrder::rgba, 200U, 10U, 5U, 200U);
+    // Red 100, green 50, blue 0, alpha 128, as BGRA bytes.
+    const std::vector<std::uint8_t> half{0U, 50U, 100U, 128U};
+    const std::uint32_t beneath = pack(200U, 10U, 5U, 200U);
     PartRasterSource multiplied = source_of(half, 1U, 1U, 0, 0);
     multiplied.blend = detail::PartCompositeBlend::multiply;
-    TestTarget product = make_target(1U, 1U, beneath, TextPixelOrder::rgba, false);
+    TestTarget product = make_target(1U, 1U, beneath, false);
     require(detail::composite_part_raster(multiplied, product.target, whole(1U, 1U), 255U) ==
                 detail::TextCompositeStatus::success,
             "a multiply source composites");
     // (s(255 − αd) + d(255 − αs) + sd + 127) / 255; alpha αs + αd − αsαd.
-    require(product.pixels[0] == pack(TextPixelOrder::rgba, 200U, 18U, 2U, 228U), "multiply in bytes");
+    require(product.pixels[0] == pack(200U, 18U, 2U, 228U), "multiply in bytes");
     PartRasterSource screened = source_of(half, 1U, 1U, 0, 0);
     screened.blend = detail::PartCompositeBlend::screen;
-    TestTarget lifted = make_target(1U, 1U, beneath, TextPixelOrder::rgba, false);
+    TestTarget lifted = make_target(1U, 1U, beneath, false);
     static_cast<void>(detail::composite_part_raster(screened, lifted.target, whole(1U, 1U), 255U));
     // s + d − (sd + 127) / 255.
-    require(lifted.pixels[0] == pack(TextPixelOrder::rgba, 222U, 58U, 5U, 228U), "screen in bytes");
+    require(lifted.pixels[0] == pack(222U, 58U, 5U, 228U), "screen in bytes");
 
     // Multiply over opaque white, and screen over opaque black, are the
     // source; an opaque target stays opaque.
-    const std::vector<std::uint8_t> face{90U, 140U, 200U, 255U};
+    // Red 90, green 140, blue 200, opaque, as BGRA bytes.
+    const std::vector<std::uint8_t> face{200U, 140U, 90U, 255U};
     PartRasterSource over_white = source_of(face, 1U, 1U, 0, 0);
     over_white.blend = detail::PartCompositeBlend::multiply;
-    TestTarget white = make_target(1U, 1U, pack(TextPixelOrder::bgra, 255U, 255U, 255U, 255U), TextPixelOrder::bgra,
-                                   true);
+    TestTarget white = make_target(1U, 1U, pack(255U, 255U, 255U, 255U), true);
     static_cast<void>(detail::composite_part_raster(over_white, white.target, whole(1U, 1U), 255U));
-    require(white.pixels[0] == pack(TextPixelOrder::bgra, 90U, 140U, 200U, 255U), "multiply over white is the source");
+    require(white.pixels[0] == pack(90U, 140U, 200U, 255U), "multiply over white is the source");
     PartRasterSource over_black = source_of(face, 1U, 1U, 0, 0);
     over_black.blend = detail::PartCompositeBlend::screen;
-    TestTarget black = make_target(1U, 1U, pack(TextPixelOrder::bgra, 0U, 0U, 0U, 255U), TextPixelOrder::bgra, true);
+    TestTarget black = make_target(1U, 1U, pack(0U, 0U, 0U, 255U), true);
     static_cast<void>(detail::composite_part_raster(over_black, black.target, whole(1U, 1U), 255U));
-    require(black.pixels[0] == pack(TextPixelOrder::bgra, 90U, 140U, 200U, 255U), "screen over black is the source");
+    require(black.pixels[0] == pack(90U, 140U, 200U, 255U), "screen over black is the source");
 
     require(detail::part_composite_blend(PaintGroupComposite::source_over) == detail::PartCompositeBlend::source_over &&
                 detail::part_composite_blend(PaintGroupComposite::plus) == detail::PartCompositeBlend::plus &&
@@ -486,23 +485,24 @@ void test_command_is_recorded_replayed_and_inspected() {
 // source pixels included; full weight writes it exactly, and a partly
 // covered pixel keeps the rest of the target.
 void test_copy_blend() {
-    const std::uint32_t beneath = pack(TextPixelOrder::rgba, 200U, 10U, 5U, 200U);
-    const std::vector<std::uint8_t> half{100U, 50U, 0U, 128U};
+    const std::uint32_t beneath = pack(200U, 10U, 5U, 200U);
+    // Red 100, green 50, blue 0, alpha 128, as BGRA bytes.
+    const std::vector<std::uint8_t> half{0U, 50U, 100U, 128U};
     PartRasterSource copied = source_of(half, 1U, 1U, 0, 0);
     copied.blend = detail::PartCompositeBlend::copy;
-    TestTarget replaced = make_target(1U, 1U, beneath, TextPixelOrder::rgba, false);
+    TestTarget replaced = make_target(1U, 1U, beneath, false);
     require(detail::composite_part_raster(copied, replaced.target, whole(1U, 1U), 255U) ==
                 detail::TextCompositeStatus::success,
             "a copy source composites");
-    require(replaced.pixels[0] == pack(TextPixelOrder::rgba, 100U, 50U, 0U, 128U), "copy writes the source exactly");
+    require(replaced.pixels[0] == pack(100U, 50U, 0U, 128U), "copy writes the source exactly");
 
     const std::vector<std::uint8_t> clear{0U, 0U, 0U, 0U};
     PartRasterSource cleared = source_of(clear, 1U, 1U, 0, 0);
     cleared.blend = detail::PartCompositeBlend::copy;
-    TestTarget emptied = make_target(1U, 1U, beneath, TextPixelOrder::rgba, false);
+    TestTarget emptied = make_target(1U, 1U, beneath, false);
     static_cast<void>(detail::composite_part_raster(cleared, emptied.target, whole(1U, 1U), 255U));
     require(emptied.pixels[0] == 0U, "copying a transparent pixel clears the target");
-    TestTarget scaled_target = make_target(4U, 4U, beneath, TextPixelOrder::bgra, false);
+    TestTarget scaled_target = make_target(4U, 4U, beneath, false);
     const std::vector<std::uint8_t> scaled_bytes = solid_source(2U, 2U, {0U, 0U, 0U, 0U});
     PartRasterSource scaled_clear = source_of(scaled_bytes, 2U, 2U, 0, 0);
     scaled_clear.shown_width = 4U;
@@ -514,22 +514,22 @@ void test_copy_blend() {
 
     // Half weight (opacity 255, clip coverage 128): each channel half the
     // source plus half the target, rounded once each.
-    TestTarget edge = make_target(1U, 1U, beneath, TextPixelOrder::rgba, false);
+    TestTarget edge = make_target(1U, 1U, beneath, false);
     TextCompositeClip half_column{};
     half_column.rect = {0.0, 0.0, 0.5, 1.0};
     static_cast<void>(detail::composite_part_raster(copied, edge.target, half_column, 255U));
-    require(edge.pixels[0] == pack(TextPixelOrder::rgba, 150U, 30U, 3U, 164U), "a partly covered pixel keeps the rest");
+    require(edge.pixels[0] == pack(150U, 30U, 3U, 164U), "a partly covered pixel keeps the rest");
 
     // An opaque target stays opaque; outside the clip nothing is written.
-    TestTarget opaque = make_target(2U, 1U, pack(TextPixelOrder::bgra, 9U, 9U, 9U, 255U), TextPixelOrder::bgra, true);
+    TestTarget opaque = make_target(2U, 1U, pack(9U, 9U, 9U, 255U), true);
     const std::vector<std::uint8_t> wide_bytes = solid_source(2U, 1U, {0U, 0U, 0U, 0U});
     PartRasterSource wide = source_of(wide_bytes, 2U, 1U, 0, 0);
     wide.blend = detail::PartCompositeBlend::copy;
     TextCompositeClip first_column{};
     first_column.rect = {0.0, 0.0, 1.0, 1.0};
     static_cast<void>(detail::composite_part_raster(wide, opaque.target, first_column, 255U));
-    require(opaque.pixels[0] == pack(TextPixelOrder::bgra, 0U, 0U, 0U, 255U) &&
-                opaque.pixels[1] == pack(TextPixelOrder::bgra, 9U, 9U, 9U, 255U),
+    require(opaque.pixels[0] == pack(0U, 0U, 0U, 255U) &&
+                opaque.pixels[1] == pack(9U, 9U, 9U, 255U),
             "copy onto an opaque target writes alpha 255 within the clip only");
 
     require(detail::part_composite_blend(PaintGroupComposite::copy) == detail::PartCompositeBlend::copy,

@@ -159,11 +159,9 @@ struct ChannelShifts final {
     unsigned alpha{};
 };
 
-ChannelShifts channel_shifts(const TextPixelOrder order) noexcept {
-    ChannelShifts shifts{16U, 8U, 0U, 24U};
-    if (order == TextPixelOrder::rgba) shifts = {0U, 8U, 16U, 24U};
-    return shifts;
-}
+// Targets are premultiplied BGRA8: as a little-endian word, blue is the low
+// byte and red is at bit 16.
+constexpr ChannelShifts bgra_shifts{16U, 8U, 0U, 24U};
 
 unsigned blend_channel(const unsigned source, const unsigned destination, const unsigned alpha) noexcept {
     const unsigned blended = (source * alpha + destination * (255U - alpha) + 127U) / 255U;
@@ -208,7 +206,7 @@ TextCompositeStatus composite_text_coverage(const TextCoverage coverage, const T
                                                        coverage.left + static_cast<std::int64_t>(coverage.width)});
     const std::int64_t bottom = std::min<std::int64_t>({static_cast<std::int64_t>(target.height), ceil_pixel(limit.bottom),
                                                         coverage.top + static_cast<std::int64_t>(coverage.height)});
-    const ChannelShifts shifts = channel_shifts(target.order);
+    constexpr ChannelShifts shifts = bgra_shifts;
     // source_over weights coverage by the colour's alpha; source carries the
     // alpha in the premultiplied colour instead.
     const std::uint64_t colour_alpha = source ? 255U : color.alpha;
@@ -307,19 +305,19 @@ std::uint32_t separable_pixel(const std::uint32_t previous, const std::array<uns
 // each channel s × w + d × (unit − w), rounded once each and clamped, so
 // that full weight writes the source exactly, transparent included, and a
 // partly covered edge pixel keeps the rest of the target.
-std::uint32_t copied_pixel(const std::uint32_t previous, const std::array<std::uint64_t, 4>& rgba,
+std::uint32_t copied_pixel(const std::uint32_t previous, const std::array<std::uint64_t, 4>& colour,
                            const std::uint64_t weight, const ChannelShifts shifts, const bool opaque) noexcept {
     const std::uint64_t kept = 65280U - weight;
     const unsigned out_red =
-        std::min(255U, weighted_channel(rgba[0], weight) + weighted_channel((previous >> shifts.red) & 255U, kept));
+        std::min(255U, weighted_channel(colour[0], weight) + weighted_channel((previous >> shifts.red) & 255U, kept));
     const unsigned out_green = std::min(
-        255U, weighted_channel(rgba[1], weight) + weighted_channel((previous >> shifts.green) & 255U, kept));
+        255U, weighted_channel(colour[1], weight) + weighted_channel((previous >> shifts.green) & 255U, kept));
     const unsigned out_blue =
-        std::min(255U, weighted_channel(rgba[2], weight) + weighted_channel((previous >> shifts.blue) & 255U, kept));
+        std::min(255U, weighted_channel(colour[2], weight) + weighted_channel((previous >> shifts.blue) & 255U, kept));
     unsigned out_alpha = 255U;
     if (!opaque) {
         out_alpha = std::min(
-            255U, weighted_channel(rgba[3], weight) + weighted_channel((previous >> shifts.alpha) & 255U, kept));
+            255U, weighted_channel(colour[3], weight) + weighted_channel((previous >> shifts.alpha) & 255U, kept));
     }
     const std::uint32_t copied = (out_red << shifts.red) | (out_green << shifts.green) | (out_blue << shifts.blue) |
                                  (out_alpha << shifts.alpha);
@@ -328,17 +326,17 @@ std::uint32_t copied_pixel(const std::uint32_t previous, const std::array<std::u
 
 // One premultiplied source pixel blended over a target pixel at `weight`
 // (opacity 0..255 times clip coverage 0..256): see composite_part_raster.
-void blend_part_pixel(std::uint32_t& pixel, const std::array<std::uint64_t, 4>& rgba, const std::uint64_t weight,
+void blend_part_pixel(std::uint32_t& pixel, const std::array<std::uint64_t, 4>& colour, const std::uint64_t weight,
                       const ChannelShifts shifts, const bool opaque, const PartCompositeBlend blend) noexcept {
     if (blend == PartCompositeBlend::copy) {
-        pixel = copied_pixel(pixel, rgba, weight, shifts, opaque);
+        pixel = copied_pixel(pixel, colour, weight, shifts, opaque);
         return;
     }
-    const unsigned alpha = weighted_channel(rgba[3], weight);
+    const unsigned alpha = weighted_channel(colour[3], weight);
     if (alpha == 0) return;
-    const unsigned red = weighted_channel(rgba[0], weight);
-    const unsigned green = weighted_channel(rgba[1], weight);
-    const unsigned blue = weighted_channel(rgba[2], weight);
+    const unsigned red = weighted_channel(colour[0], weight);
+    const unsigned green = weighted_channel(colour[1], weight);
+    const unsigned blue = weighted_channel(colour[2], weight);
     const std::uint32_t previous = pixel;
     if (blend == PartCompositeBlend::multiply || blend == PartCompositeBlend::screen) {
         const std::array<unsigned, 4> source{red, green, blue, alpha};
@@ -434,12 +432,11 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
                                                        source.left + static_cast<std::int64_t>(shown_width)});
     const std::int64_t bottom = std::min<std::int64_t>({static_cast<std::int64_t>(target.height), ceil_pixel(limit.bottom),
                                                         source.top + static_cast<std::int64_t>(shown_height)});
-    const ChannelShifts shifts = channel_shifts(target.order);
-    // The source's red and blue bytes within a pixel; green and alpha are
-    // the same in both orders.
-    const std::size_t red_byte = source.order == TextPixelOrder::rgba ? 0U : 2U;
-    const std::size_t blue_byte = source.order == TextPixelOrder::rgba ? 2U : 0U;
-    const std::array<std::size_t, 4> bytes{red_byte, 1U, blue_byte, 3U};
+    constexpr ChannelShifts shifts = bgra_shifts;
+    // The source's red and blue bytes within a BGRA pixel.
+    constexpr std::size_t red_byte = 2U;
+    constexpr std::size_t blue_byte = 0U;
+    constexpr std::array<std::size_t, 4> bytes{red_byte, 1U, blue_byte, 3U};
     const std::uint64_t opacity_weight = opacity;
     // Every other blend leaves the target as it is under a transparent
     // source pixel; copy writes it.
@@ -456,9 +453,9 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
                 if (clipped == 0) continue;
                 // One weight for opacity x clip (unit = 256), applied to
                 // every premultiplied channel with one rounding each.
-                const std::array<std::uint64_t, 4> rgba{source.pixels[offset + red_byte], source.pixels[offset + 1U],
+                const std::array<std::uint64_t, 4> colour{source.pixels[offset + red_byte], source.pixels[offset + 1U],
                                                         source.pixels[offset + blue_byte], source_alpha};
-                blend_part_pixel(target.pixels[target_row + static_cast<std::size_t>(x)], rgba,
+                blend_part_pixel(target.pixels[target_row + static_cast<std::size_t>(x)], colour,
                                  opacity_weight * clipped, shifts, target.opaque, source.blend);
             }
         }
@@ -478,17 +475,17 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
             const std::int64_t texel_x = across >> 8;
             const std::uint64_t after = static_cast<std::uint64_t>(across & 255);
             const std::uint64_t before = 256U - after;
-            std::array<std::uint64_t, 4> rgba{};
+            std::array<std::uint64_t, 4> colour{};
             for (std::size_t channel = 0U; channel < 4U; ++channel) {
                 const std::size_t byte = bytes[channel];
                 const std::uint64_t upper = texel_channel(source, texel_x, texel_y, byte) * before +
                                             texel_channel(source, texel_x + 1, texel_y, byte) * after;
                 const std::uint64_t lower = texel_channel(source, texel_x, texel_y + 1, byte) * before +
                                             texel_channel(source, texel_x + 1, texel_y + 1, byte) * after;
-                rgba[channel] = (upper * above + lower * below + 32768U) >> 16U;
+                colour[channel] = (upper * above + lower * below + 32768U) >> 16U;
             }
-            if (skip_transparent && rgba[3] == 0U) continue;
-            blend_part_pixel(target.pixels[target_row + static_cast<std::size_t>(x)], rgba, opacity_weight * clipped,
+            if (skip_transparent && colour[3] == 0U) continue;
+            blend_part_pixel(target.pixels[target_row + static_cast<std::size_t>(x)], colour, opacity_weight * clipped,
                              shifts, target.opaque, source.blend);
         }
     }

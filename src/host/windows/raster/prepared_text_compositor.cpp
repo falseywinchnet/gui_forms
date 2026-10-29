@@ -11,7 +11,6 @@ using gui_forms::detail::TextCompositeClip;
 using gui_forms::detail::TextCompositeStatus;
 using gui_forms::detail::TextCompositeTarget;
 using gui_forms::detail::TextCoverage;
-using gui_forms::detail::TextPixelOrder;
 
 namespace {
 
@@ -48,7 +47,7 @@ PreparedTextStatus composite_prepared_mask(const GrayTextMask& mask, const Prepa
                                 .left = std::llround(baseline.x * scale) + mask.left(),
                                 .top = std::llround(baseline.y * scale) + mask.top()};
     const TextCompositeTarget shared_target{.pixels = target.pixels, .width = target.width, .height = target.height,
-                                            .stride = target.stride, .order = TextPixelOrder::bgra, .opaque = true};
+                                            .stride = target.stride, .opaque = true};
     TextCompositeClip device_clip{};
     device_clip.rect = {clip.rect.x * scale, clip.rect.y * scale, clip.rect.width * scale, clip.rect.height * scale};
     if (clip.rounded) {

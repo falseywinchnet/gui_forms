@@ -75,12 +75,11 @@ gui_forms::LiveSurface
    damage. Destroying a lease without publishing abandons the frame, as does
    ``abandon()``.
 
-   Pixels are premultiplied sRGB, in BGRA or RGBA order. Setting ``opaque`` in the
+   Pixels are premultiplied sRGB BGRA8 (blue, green, red, alpha in memory), the
+   one format of every surface and raster on every host. Setting ``opaque`` in the
    description promises that every pixel has alpha 255, so the presenter may copy
    instead of blend and skip painting what lies beneath.
-   ``native_live_surface_pixel_format()`` gives the host's own order (BGRA on
-   Windows, RGBA on macOS and Linux); an opaque surface in that order can be
-   presented without conversion.
+   ``native_live_surface_pixel_format()`` returns that format.
 
    Every member may be called from any thread; an internal lock serializes
    them. The usual split is a producer on a :cpp:class:`Worker <gui_forms::Worker>` that acquires and

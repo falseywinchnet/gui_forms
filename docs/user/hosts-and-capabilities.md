@@ -28,7 +28,7 @@ whole record for logs.
 | `text_composition` | input-method composition bridged to the window | yes | yes | no |
 | `pointer_capture` | synchronous capture routed to one control | yes | yes | yes |
 | `cursor` | portable cursor kinds applied natively | yes | yes | yes |
-| `clipboard`, `clipboard_images` | bounded UTF-8 text and straight-alpha RGBA8 images | yes | yes | yes |
+| `clipboard`, `clipboard_images` | bounded UTF-8 text and premultiplied BGRA8 images | yes | yes | yes |
 | `typed_drag_destination` | inbound text, file-list and media-typed drops | yes | no | yes |
 | `dialogs` | the five portable common-dialog request/result families | yes | yes | yes |
 | `sound_cues` | system alert sounds | yes | yes | yes |

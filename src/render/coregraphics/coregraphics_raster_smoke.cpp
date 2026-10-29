@@ -17,6 +17,12 @@ const std::uint8_t* pixel_at(const std::uint8_t* pixels,
            static_cast<std::size_t>(x * scale) * 4U;
 }
 
+// Byte offsets of the channels in a premultiplied BGRA8 pixel.
+constexpr std::size_t blue = 0U;
+constexpr std::size_t green = 1U;
+constexpr std::size_t red = 2U;
+constexpr std::size_t alpha = 3U;
+
 unsigned channel_distance(std::uint8_t first, std::uint8_t second) noexcept {
     return first > second ? first - second : second - first;
 }
@@ -100,9 +106,9 @@ int main() {
 
     const std::uint8_t* pixels = static_cast<const std::uint8_t*>(raster.pixels());
     if (pixels == nullptr || raster.byte_size() == 0 ||
-        pixels[0] != 241U || pixels[1] != 238U || pixels[2] != 226U ||
-        pixels[3] != 255U) {
-        std::fputs("CoreGraphics RGBA surface contract failed\n", stderr);
+        pixels[red] != 241U || pixels[green] != 238U || pixels[blue] != 226U ||
+        pixels[alpha] != 255U) {
+        std::fputs("CoreGraphics BGRA surface contract failed\n", stderr);
         return 6;
     }
     const std::uint8_t* repeat_first = pixel_at(
@@ -122,28 +128,28 @@ int main() {
     if (channel_distance(repeat_first[0], repeat_second[0]) > 2U ||
         channel_distance(repeat_first[1], repeat_second[1]) > 2U ||
         channel_distance(repeat_first[2], repeat_second[2]) > 2U ||
-        repeat_contrast[0] <= repeat_first[0] + 45U) {
+        repeat_contrast[red] <= repeat_first[red] + 45U) {
         std::fprintf(stderr,
                      "CoreGraphics repeating-gradient period contract changed: "
                      "first=%u,%u,%u second=%u,%u,%u contrast=%u,%u,%u\n",
-                     repeat_first[0], repeat_first[1], repeat_first[2],
-                     repeat_second[0], repeat_second[1], repeat_second[2],
-                     repeat_contrast[0], repeat_contrast[1], repeat_contrast[2]);
+                     repeat_first[red], repeat_first[green], repeat_first[blue],
+                     repeat_second[red], repeat_second[green], repeat_second[blue],
+                     repeat_contrast[red], repeat_contrast[green], repeat_contrast[blue]);
         return 8;
     }
-    if (cropped_green[0] > 8U || cropped_green[1] < 240U ||
-        cropped_green[2] > 8U || cropped_green[3] != 255U) {
+    if (cropped_green[red] > 8U || cropped_green[green] < 240U ||
+        cropped_green[blue] > 8U || cropped_green[alpha] != 255U) {
         std::fputs("CoreGraphics source-region image crop contract changed\n", stderr);
         return 9;
     }
-    if (pattern_red[0] < 220U || pattern_red[1] > 24U ||
-        pattern_green[0] > 24U || pattern_green[1] < 220U ||
-        pattern_repeat[0] < 220U || pattern_repeat[1] > 24U) {
+    if (pattern_red[red] < 220U || pattern_red[green] > 24U ||
+        pattern_green[red] > 24U || pattern_green[green] < 220U ||
+        pattern_repeat[red] < 220U || pattern_repeat[green] > 24U) {
         std::fprintf(stderr,
                      "CoreGraphics exact image-pattern period changed: "
                      "red=%u,%u green=%u,%u repeat=%u,%u\n",
-                     pattern_red[0], pattern_red[1], pattern_green[0],
-                     pattern_green[1], pattern_repeat[0], pattern_repeat[1]);
+                     pattern_red[red], pattern_red[green], pattern_green[red],
+                     pattern_green[green], pattern_repeat[red], pattern_repeat[green]);
         return 10;
     }
     std::uint64_t checksum = 1469598103934665603ULL;

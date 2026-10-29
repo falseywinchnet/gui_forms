@@ -48,7 +48,7 @@ void snapshots() {
     (*card).add_child(button);
     (*root).add_child(card);
     // Declared before the window that borrows it, so it outlives the window.
-    test_support::FakeRaster raster(FramebufferChannelOrder::rgba);
+    test_support::FakeRaster raster{};
     Window window(root, {200.0, 120.0});
     window.perform_layout();
     require(!window.snapshot_control(card, 1.0), "without a framebuffer painter there is no snapshot");
@@ -65,9 +65,9 @@ void snapshots() {
     const std::optional<ImageResourceView> view = window.image_resources().find((*snapshot).image);
     require(view.has_value() && (*view).row_bytes == 51U * 4U && (*view).encoded.size() == 51U * 30U * 4U,
             "the pixels are registered as one image of the window");
-    require((*view).encoded[0] == std::byte{3} && (*view).encoded[1] == std::byte{2} &&
-                (*view).encoded[2] == std::byte{1} && (*view).encoded[3] == std::byte{4},
-            "an RGBA raster's pixels are stored as BGRA");
+    require((*view).encoded[0] == std::byte{1} && (*view).encoded[1] == std::byte{2} &&
+                (*view).encoded[2] == std::byte{3} && (*view).encoded[3] == std::byte{4},
+            "the framebuffer's BGRA pixels are stored as they are");
     require(window.image_resources().snapshot().resource_count == images + 1U, "one image was added");
 
     require(!window.snapshot_control(card, 0.0) && !window.snapshot_control(card, 9.0),

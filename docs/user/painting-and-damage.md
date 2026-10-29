@@ -128,12 +128,11 @@ scheduler awake, and it should be zero in a resting window.
 
 A live surface (`LiveSurfaceDescription`, `LiveSurfaceFrame`) lets a producer (an audio visualizer, a video decoder, a
 game board) write pixels directly into a pooled frame and have the window
-composite it. Frames are premultiplied BGRA or RGBA; the surface can promise
+composite it. Frames are premultiplied BGRA8, the format of every raster; the surface can promise
 `opaque`, which lets the presenter copy instead of blend and skip painting
 what lies beneath. On macOS a live-only redraw can omit retained painting
 entirely when the existing raster is valid and opaque clips cover every
-damaged device pixel. `native_live_surface_pixel_format()` reports the
-host's native order so a producer can avoid a conversion.
+damaged device pixel. Presents copy that format to the screen as it is.
 
 ## Reading the counters
 

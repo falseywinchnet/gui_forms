@@ -6,7 +6,6 @@
 #include <windows.h>
 
 #include "gui_forms/c_api.h"
-#include "stx_skia/swizzle.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -28,11 +27,10 @@ struct HdcLease final {
     HDC device{};
     HBITMAP dib{};
     HGDIOBJ previous{};
-    // The DIB's BGRA pixels, byte_count bytes, owned by dib.
+    // The DIB's BGRA pixels, byte_count bytes, owned by dib: the bitmap's
+    // own format, so acquire and release copy them as they are.
     void* pixels{};
     std::size_t byte_count{};
-    // The leased bitmap's format; release converts the DIB back into it.
-    PixelFormat pixel_format{PixelFormat::bgra32_premultiplied};
 };
 
 std::mutex lease_mutex;
@@ -147,34 +145,6 @@ BITMAPINFO bitmap_info(std::uint32_t width, std::uint32_t height) {
     return info;
 }
 
-// Writes the snapshot's pixels as BGRA to destination, which holds at least as many bytes and
-// does not overlap them. False only if the swap rejects the buffers; nothing is then written.
-[[nodiscard]] bool copy_as_bgra(const ImageSnapshot& snapshot, void* destination) {
-    const std::span<const std::byte> source = snapshot.pixels();
-    const std::span<std::byte> output(static_cast<std::byte*>(destination), source.size());
-    if (snapshot.pixel_format != PixelFormat::rgba32_premultiplied) {
-        std::copy(source.begin(), source.end(), output.begin());
-        return true;
-    }
-    const stx_skia::SwizzleResult swapped = stx_skia::swap_red_blue(output, source);
-    return swapped == stx_skia::SwizzleResult::ok;
-}
-
-// Writes a lease's BGRA pixels back in the leased bitmap's format: a copy for
-// BGRA, a red/blue swap for RGBA. destination holds lease.byte_count bytes and
-// does not overlap the lease's pixels. False only if the swap rejects the
-// buffers; nothing is then written.
-[[nodiscard]] bool copy_from_bgra(const HdcLease& lease, std::byte* destination) {
-    const std::span<const std::byte> source(static_cast<const std::byte*>(lease.pixels), lease.byte_count);
-    const std::span<std::byte> output(destination, lease.byte_count);
-    if (lease.pixel_format != PixelFormat::rgba32_premultiplied) {
-        std::memcpy(output.data(), source.data(), source.size());
-        return true;
-    }
-    const stx_skia::SwizzleResult swapped = stx_skia::swap_red_blue(output, source);
-    return swapped == stx_skia::SwizzleResult::ok;
-}
-
 } // namespace
 
 gd_result export_hbitmap(Bitmap& bitmap, Color background, std::uintptr_t& output) {
@@ -193,13 +163,10 @@ gd_result export_hbitmap(Bitmap& bitmap, Color background, std::uintptr_t& outpu
     const std::span<const std::byte> source = snapshot.pixels();
     std::uint8_t* destination = static_cast<std::uint8_t*>(pixels);
     for (std::size_t offset = 0; offset < source.size(); offset += 4U) {
-        const bool bgra = snapshot.pixel_format == PixelFormat::bgra32_premultiplied;
-        const std::uint8_t blue = std::to_integer<std::uint8_t>(
-            source[offset + (bgra ? 0U : 2U)]);
+        const std::uint8_t blue = std::to_integer<std::uint8_t>(source[offset]);
         const std::uint8_t green =
             std::to_integer<std::uint8_t>(source[offset + 1U]);
-        const std::uint8_t red = std::to_integer<std::uint8_t>(
-            source[offset + (bgra ? 2U : 0U)]);
+        const std::uint8_t red = std::to_integer<std::uint8_t>(source[offset + 2U]);
         const std::uint8_t alpha =
             std::to_integer<std::uint8_t>(source[offset + 3U]);
         destination[offset] = composite_channel(blue, bb, alpha);
@@ -399,9 +366,6 @@ gd_result publish_retained_surface(std::uintptr_t destination,
         forms, "gf_windows_paint_endpoint_submit_bgra_v1"));
     if (submit == nullptr) return GD_ERROR_UNSUPPORTED_VERSION;
     const ImageSnapshot snapshot = bitmap.snapshot();
-    if (snapshot.pixel_format != PixelFormat::bgra32_premultiplied) {
-        return GD_ERROR_UNSUPPORTED_VERSION;
-    }
     return submit(reinterpret_cast<std::uintptr_t>(window),
                   snapshot.width, snapshot.height, snapshot.row_bytes(),
                   snapshot.pixels().data()) == GF_OK
@@ -411,15 +375,8 @@ gd_result publish_retained_surface(std::uintptr_t destination,
 gd_result present_surface(std::uintptr_t destination, std::uint32_t kind,
                           Bitmap& bitmap) {
     const ImageSnapshot snapshot = bitmap.snapshot();
-    std::vector<std::byte> converted;
-    const void* pixels = snapshot.pixels().data();
-    if (snapshot.pixel_format == PixelFormat::rgba32_premultiplied) {
-        converted.resize(snapshot.pixels().size());
-        if (!copy_as_bgra(snapshot, converted.data())) {
-            throw std::runtime_error("surface pixel conversion failed");
-        }
-        pixels = converted.data();
-    }
+    // The bitmap is BGRA8, the DIB's own order.
+    const void* const pixels = snapshot.pixels().data();
     const bool window_surface = kind == GD_NATIVE_SURFACE_HWND;
     const HWND window = window_surface ? reinterpret_cast<HWND>(destination) : nullptr;
     CompatibilityUser32& compatibility = compatibility_user32();
@@ -461,12 +418,7 @@ gd_result acquire_hdc(Bitmap& bitmap, std::uintptr_t& output,
         if (dib != nullptr) DeleteObject(dib);
         throw std::runtime_error("bitmap-backed HDC creation failed");
     }
-    if (!copy_as_bgra(snapshot, pixels)) {
-        SelectObject(device, previous);
-        DeleteDC(device);
-        DeleteObject(dib);
-        throw std::runtime_error("bitmap-backed HDC pixel conversion failed");
-    }
+    std::memcpy(pixels, snapshot.pixels().data(), snapshot.pixels().size());
     std::scoped_lock lock(lease_mutex);
     const std::uint64_t token = next_lease++;
     if (token == 0U) {
@@ -482,8 +434,7 @@ gd_result acquire_hdc(Bitmap& bitmap, std::uintptr_t& output,
                              .dib = dib,
                              .previous = previous,
                              .pixels = pixels,
-                             .byte_count = snapshot.pixels().size(),
-                             .pixel_format = snapshot.pixel_format};
+                             .byte_count = snapshot.pixels().size()};
         leases.emplace(token, lease);
     } catch (...) {
         SelectObject(device, previous);
@@ -526,14 +477,10 @@ gd_result release_hdc(Bitmap& bitmap, std::uint64_t lease_token) {
             (pixels[offset] != 0U || pixels[offset + 1U] != 0U ||
              pixels[offset + 2U] != 0U)) pixels[offset + 3U] = 255U;
     }
-    // The DIB is BGRA whatever the bitmap's format (acquire_hdc converted an
-    // RGBA bitmap with copy_as_bgra), so an RGBA bitmap is swapped back.
-    // The bitmap is unlocked before a rejected swap is reported, so a failure
-    // leaves its pixels unchanged and the bitmap unlocked.
+    // The DIB and the bitmap are both BGRA8.
     BitmapLockView lock = bitmap.lock(BitmapLockMode::write);
-    const bool copied = copy_from_bgra(lease, lock.writable_data);
+    std::memcpy(lock.writable_data, lease.pixels, lease.byte_count);
     bitmap.unlock(lock.token);
-    if (!copied) throw std::runtime_error("HDC lease pixel conversion failed");
     return GD_OK;
 }
 

@@ -16,6 +16,7 @@
 
 #include "gui_forms/gui_forms.hpp"
 #include "support/theme_definition_heap.hpp"
+#include "support/rgba_order.hpp"
 
 #include <array>
 #include <cstddef>
@@ -41,7 +42,7 @@ void require(bool condition, const char* message) {
 
 std::uint64_t hash_bytes(std::span<const std::uint8_t> bytes) {
     std::uint64_t hash = 0xcbf29ce484222325ULL;
-    for (const std::uint8_t byte : bytes) {
+    for (const std::uint8_t byte : gui_forms::test_support::rgba_order(bytes)) {
         hash = hash ^ byte;
         hash = hash * 0x100000001b3ULL;
     }
@@ -55,7 +56,11 @@ std::shared_ptr<PartRaster> solid_raster(DeviceExtent extent, std::array<std::ui
     for (std::size_t row = 0U; row < extent.height; ++row) {
         for (std::size_t column = 0U; column < extent.width; ++column) {
             const std::size_t at = row * view.row_bytes + column * 4U;
-            for (std::size_t lane = 0U; lane < 4U; ++lane) view.pixels[at + lane] = colour[lane];
+            // `colour` is red, green, blue, alpha; the raster is BGRA8.
+            view.pixels[at] = colour[2];
+            view.pixels[at + 1U] = colour[1];
+            view.pixels[at + 2U] = colour[0];
+            view.pixels[at + 3U] = colour[3];
         }
     }
     return raster;
@@ -64,7 +69,8 @@ std::shared_ptr<PartRaster> solid_raster(DeviceExtent extent, std::array<std::ui
 std::array<std::uint8_t, 4> pixel_of(const PartRaster& raster, std::size_t column, std::size_t row) {
     const std::size_t at = row * raster.row_bytes() + column * 4U;
     const std::span<const std::uint8_t> pixels = raster.pixels();
-    const std::array<std::uint8_t, 4> value{pixels[at], pixels[at + 1U], pixels[at + 2U], pixels[at + 3U]};
+    // The raster is BGRA8; the value is red, green, blue, alpha.
+    const std::array<std::uint8_t, 4> value{pixels[at + 2U], pixels[at + 1U], pixels[at], pixels[at + 3U]};
     return value;
 }
 

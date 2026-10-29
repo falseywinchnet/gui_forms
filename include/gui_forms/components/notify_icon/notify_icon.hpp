@@ -39,7 +39,7 @@ public:
     // Removes the icon from the notification area.
     ~NotifyIcon() override;
 
-    // The icon at one or more sizes, straight-alpha RGBA. Throws
+    // The icon at one or more sizes, premultiplied BGRA8 (HostImage). Throws
     // std::invalid_argument for more than 8 images or an image that is
     // malformed or larger than 256 pixels a side. A shown icon is updated.
     [[nodiscard]] const std::vector<HostImage>& icon() const noexcept { return images_; }

@@ -13,6 +13,7 @@
 
 #include "gui_forms/engine.hpp"
 #include "gui_forms/theme.hpp"
+#include "support/rgba_order.hpp"
 
 #include <array>
 #include <cmath>
@@ -54,7 +55,7 @@ const EnginePrimitive& primitive_named(std::string_view name) {
     return *primitive;
 }
 
-// A raster the tests own: tightly packed rows of RGBA bytes.
+// A raster the tests own: tightly packed rows of BGRA8 bytes.
 struct TestRaster final {
     std::vector<std::uint8_t> bytes;
     DeviceExtent extent{};
@@ -62,7 +63,8 @@ struct TestRaster final {
 
     [[nodiscard]] std::array<std::uint8_t, 4> pixel(std::uint32_t column, std::uint32_t row) const {
         const std::size_t offset = static_cast<std::size_t>(row) * row_bytes + static_cast<std::size_t>(column) * 4U;
-        const std::array<std::uint8_t, 4> value{bytes[offset], bytes[offset + 1U], bytes[offset + 2U],
+        // The raster is BGRA8; the value is red, green, blue, alpha.
+        const std::array<std::uint8_t, 4> value{bytes[offset + 2U], bytes[offset + 1U], bytes[offset],
                                                 bytes[offset + 3U]};
         return value;
     }
@@ -70,7 +72,7 @@ struct TestRaster final {
 
 std::uint64_t raster_hash(const TestRaster& raster) {
     std::uint64_t hash = 14695981039346656037ULL;
-    for (const std::uint8_t byte : raster.bytes) {
+    for (const std::uint8_t byte : gui_forms::test_support::rgba_order(raster.bytes)) {
         hash = hash ^ byte;
         hash = hash * 1099511628211ULL;
     }
@@ -320,9 +322,10 @@ void glass_recipe() {
     require(backplane != nullptr, "the backplane is made");
     const PartRasterView plane = (*backplane).view();
     for (std::size_t at = 0U; at < plane.pixels.size(); at = at + 4U) {
-        plane.pixels[at] = 200U;
+        // BGRA8: red 200, green 100, blue 50.
+        plane.pixels[at] = 50U;
         plane.pixels[at + 1U] = 100U;
-        plane.pixels[at + 2U] = 50U;
+        plane.pixels[at + 2U] = 200U;
         plane.pixels[at + 3U] = 255U;
     }
     SurfaceMaterial recipe = filled_with(brick);

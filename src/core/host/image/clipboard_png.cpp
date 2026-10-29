@@ -12,7 +12,7 @@ HostClipboardImageResult decode_clipboard_png(std::span<const std::byte> bytes, 
     if (bytes.empty()) return HostClipboardImageResult::failed(HostServiceError::invalid_argument);
     image::PngPixelRequest request{};
     request.limits = image::png_limits_for_pixels(HostImage::maximum_pixels, bytes.size());
-    request.target = {image::PixelOrder::rgba, image::PixelAlpha::straight};
+    request.target = {image::PixelOrder::bgra, image::PixelAlpha::premultiplied};
     request.purpose = image::PngPixelPurpose::clipboard;
     image::PngPixelDecoder decoder{};
     const image::PngPixelResult inspected = decoder.inspect(bytes, request);
@@ -53,8 +53,8 @@ std::vector<std::byte> encode_clipboard_png(HostImageView source) {
     input.height = source.height;
     input.row_bytes = source.row_bytes;
     input.pixels = source.pixels;
-    input.order = image::PngChannelOrder::rgba;
-    input.alpha = image::PngSourceAlpha::straight;
+    input.order = image::PngChannelOrder::bgra;
+    input.alpha = image::PngSourceAlpha::premultiplied;
     if (!image::encode_png(input, png)) png.clear();
     return png;
 }

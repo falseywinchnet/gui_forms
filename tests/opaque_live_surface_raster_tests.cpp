@@ -36,20 +36,21 @@ void require(const bool condition, const char* message) {
         pixels[index + 2U] = std::byte{0};
         pixels[index + 3U] = alpha;
     }
-    const std::size_t blue_channel = format == LiveSurfacePixelFormat::rgba32_premultiplied_srgb ? 2U : 0U;
-    for (std::size_t index = blue_channel; index < pixels.size(); index += 4U) pixels[index] = alpha;
+    // Blue at full coverage: byte 0 of each BGRA pixel.
+    for (std::size_t index = 0U; index < pixels.size(); index += 4U) pixels[index] = alpha;
     require(write.publish() != 0U, "frame published");
     return surface;
 }
 
+// The raster's pixel at (x, y), premultiplied BGRA8 in memory, as red,
+// green, blue and alpha.
 [[nodiscard]] std::array<unsigned, 4> pixel(const render::SkiaRaster& raster, const std::size_t x, const std::size_t y) {
     const std::byte* const bytes = static_cast<const std::byte*>(raster.pixels());
     require(bytes != nullptr, "raster readable");
     const std::size_t offset = y * raster.row_bytes() + x * 4U;
-    std::array<unsigned, 4> result{};
-    for (std::size_t channel = 0; channel < result.size(); ++channel) {
-        result[channel] = std::to_integer<unsigned>(bytes[offset + channel]);
-    }
+    const std::array<unsigned, 4> result{
+        std::to_integer<unsigned>(bytes[offset + 2U]), std::to_integer<unsigned>(bytes[offset + 1U]),
+        std::to_integer<unsigned>(bytes[offset]), std::to_integer<unsigned>(bytes[offset + 3U])};
     return result;
 }
 
@@ -123,18 +124,14 @@ void image_failure(const LiveSurfacePixelFormat format) {
     require(static_cast<bool>(surface), "pattern allocated");
     LiveSurfaceWriteLease write = (*surface).try_acquire_write();
     require(static_cast<bool>(write), "pattern write acquired");
-    const std::array<std::byte, 16> rgba{
-        std::byte{255}, std::byte{0}, std::byte{0}, std::byte{255},
+    // Red, blue, (17, 63, 129) and (211, 151, 31), opaque, as BGRA bytes.
+    const std::array<std::byte, 16> bgra{
         std::byte{0}, std::byte{0}, std::byte{255}, std::byte{255},
-        std::byte{17}, std::byte{63}, std::byte{129}, std::byte{255},
-        std::byte{211}, std::byte{151}, std::byte{31}, std::byte{255}};
+        std::byte{255}, std::byte{0}, std::byte{0}, std::byte{255},
+        std::byte{129}, std::byte{63}, std::byte{17}, std::byte{255},
+        std::byte{31}, std::byte{151}, std::byte{211}, std::byte{255}};
     const std::span<std::byte> bytes = write.pixels();
-    std::copy(rgba.begin(), rgba.end(), bytes.begin());
-    if (format == LiveSurfacePixelFormat::bgra32_premultiplied_srgb) {
-        for (std::size_t offset = 0U; offset < bytes.size(); offset += 4U) {
-            std::swap(bytes[offset], bytes[offset + 2U]);
-        }
-    }
+    std::copy(bgra.begin(), bgra.end(), bytes.begin());
     require(write.publish() != 0U, "pattern published");
     return surface;
 }
@@ -142,9 +139,7 @@ void image_failure(const LiveSurfacePixelFormat format) {
 void geometry_and_lease_cases(const LiveSurfacePixelFormat format) {
     const std::shared_ptr<LiveSurface> surface = make_pattern(format);
     const LiveSurfaceFrame frame = (*surface).acquire_latest();
-    const LiveSurfacePixelFormat replacement = format == LiveSurfacePixelFormat::rgba32_premultiplied_srgb
-        ? LiveSurfacePixelFormat::bgra32_premultiplied_srgb : LiveSurfacePixelFormat::rgba32_premultiplied_srgb;
-    require((*surface).reconfigure({.width = 2U, .height = 2U, .pixel_format = replacement}), "reconfigure before old lease draw");
+    require((*surface).reconfigure({.width = 2U, .height = 2U, .pixel_format = format}), "reconfigure before old lease draw");
     render::SkiaRaster raster{};
     require(raster.resize({4.0, 3.0}, 2.0), "device-scaled raster allocated");
     DamageRegion damage{};
@@ -161,7 +156,7 @@ void geometry_and_lease_cases(const LiveSurfacePixelFormat format) {
     for (std::size_t y = 0U; y < 6U; ++y) {
         for (std::size_t x = 0U; x < 8U; ++x) {
             const bool inside = x >= 2U && x < 4U && y >= 1U && y < 3U;
-            if (inside) require(pixel(raster, x, y) == expected[(y - 1U) * 2U + x - 2U], "all RGBA bytes exact after transform and reconfigure");
+            if (inside) require(pixel(raster, x, y) == expected[(y - 1U) * 2U + x - 2U], "all channels exact after transform and reconfigure");
             else require(pixel(raster, x, y) == green, "copy stays inside destination");
         }
     }
@@ -264,15 +259,11 @@ void retained_overlay(const LiveSurfacePixelFormat format) {
 } // namespace
 
 int main() {
-    const std::array<LiveSurfacePixelFormat, 2> formats{
-        LiveSurfacePixelFormat::bgra32_premultiplied_srgb,
-        LiveSurfacePixelFormat::rgba32_premultiplied_srgb};
-    for (const LiveSurfacePixelFormat format : formats) {
-        geometry_and_lease_cases(format);
-        filtering_and_rounded_clip(format);
-        blend_cases(format);
-        image_failure(format);
-        retained_overlay(format);
-    }
+    constexpr LiveSurfacePixelFormat format = LiveSurfacePixelFormat::bgra32_premultiplied_srgb;
+    geometry_and_lease_cases(format);
+    filtering_and_rounded_clip(format);
+    blend_cases(format);
+    image_failure(format);
+    retained_overlay(format);
     return 0;
 }

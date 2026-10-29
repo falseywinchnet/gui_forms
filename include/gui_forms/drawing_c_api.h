@@ -158,9 +158,10 @@ typedef enum gd_fill_mode {
     GD_FILL_WINDING = 1
 } gd_fill_mode;
 
+/* Bitmaps and images are premultiplied BGRA8 (blue, green, red, alpha in
+   memory) on every host. */
 typedef enum gd_pixel_format {
-    GD_PIXEL_BGRA32_PREMULTIPLIED = 0,
-    GD_PIXEL_RGBA32_PREMULTIPLIED = 1
+    GD_PIXEL_BGRA32_PREMULTIPLIED = 0
 } gd_pixel_format;
 
 typedef enum gd_bitmap_lock_mode {

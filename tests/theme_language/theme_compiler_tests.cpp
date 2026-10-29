@@ -7,6 +7,7 @@
 // sheet the compiler accepts, with no diagnostic of its own.
 
 #include "../../src/core/theme_language/compiler/theme_compiler.hpp"
+#include "../support/rgba_order.hpp"
 #include "../support/theme_definition_heap.hpp"
 #include "gui_forms/gui_forms.hpp"
 
@@ -220,7 +221,7 @@ ThemeRuleSheet reference_sheet() {
 
 std::uint64_t hash_bytes(std::span<const std::uint8_t> bytes) {
     std::uint64_t hash = 0xcbf29ce484222325ULL;
-    for (const std::uint8_t byte : bytes) {
+    for (const std::uint8_t byte : gui_forms::test_support::rgba_order(bytes)) {
         hash = hash ^ byte;
         hash = hash * 0x100000001b3ULL;
     }

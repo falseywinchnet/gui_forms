@@ -1,10 +1,10 @@
 #import <AppKit/AppKit.h>
 
 #include "appkit_status_items.hpp"
+#include "appkit_clipboard_image.hpp"
 
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <string>
 #include <vector>
 
@@ -71,25 +71,9 @@ NSImage* status_image(const HostTrayIconRequest& request) {
     const CGFloat scale = NSScreen.mainScreen != nil ? NSScreen.mainScreen.backingScaleFactor : 1.0;
     const std::uint32_t wanted = static_cast<std::uint32_t>(std::lround(status_icon_points * scale));
     const HostImage& image = request.images[select_tray_icon_image(request.images, wanted)];
-    NSBitmapImageRep* representation = [[NSBitmapImageRep alloc]
-        initWithBitmapDataPlanes:nullptr
-                      pixelsWide:static_cast<NSInteger>(image.width)
-                      pixelsHigh:static_cast<NSInteger>(image.height)
-                   bitsPerSample:8
-                 samplesPerPixel:4
-                        hasAlpha:YES
-                        isPlanar:NO
-                  colorSpaceName:NSDeviceRGBColorSpace
-                    bitmapFormat:NSBitmapFormatAlphaNonpremultiplied
-                     bytesPerRow:static_cast<NSInteger>(image.width) * 4
-                    bitsPerPixel:32];
-    if (representation == nil || representation.bitmapData == nullptr) return nil;
-    unsigned char* const destination = representation.bitmapData;
-    const std::size_t row_length = static_cast<std::size_t>(image.width) * 4U;
-    for (std::uint32_t row = 0; row < image.height; ++row) {
-        const std::byte* const source = image.pixels.data() + static_cast<std::size_t>(row) * image.row_bytes;
-        std::memcpy(destination + static_cast<std::size_t>(row) * row_length, source, row_length);
-    }
+    // A copy of the premultiplied BGRA8 pixels, as they are.
+    NSBitmapImageRep* representation = host_image_representation(image.view());
+    if (representation == nil) return nil;
     // The image keeps its pixels and shows at the status bar's point size.
     const CGFloat side = status_icon_points;
     const CGFloat aspect = image.height == 0U ? 1.0 : static_cast<CGFloat>(image.width) / image.height;

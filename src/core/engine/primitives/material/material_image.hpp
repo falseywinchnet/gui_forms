@@ -22,7 +22,7 @@ namespace gui_forms::engine_primitives {
 // tile (MaterialImageMode::single).
 inline constexpr std::uint32_t outside_image = std::numeric_limits<std::uint32_t>::max();
 
-// An image's pixels as premultiplied RGBA8, rows packed: `width` × `height`
+// An image's pixels as premultiplied BGRA8, rows packed: `width` × `height`
 // × 4 live bytes.
 struct MaterialImagePixels final {
     std::vector<std::uint8_t> bytes;

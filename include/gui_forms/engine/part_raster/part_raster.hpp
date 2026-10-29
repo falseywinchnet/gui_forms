@@ -11,7 +11,7 @@
 namespace gui_forms {
 
 // One part's pixels as the engine keeps them (T2 plan, PartRaster):
-// premultiplied RGBA8 in device pixels, in PartRasterView's layout, made for
+// premultiplied BGRA8 in device pixels, in PartRasterView's layout, made for
 // one display scale. Rows are tight: row_bytes is width * 4.
 //
 // Lifetime: create() makes a raster with every pixel transparent; its maker

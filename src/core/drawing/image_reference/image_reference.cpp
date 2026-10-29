@@ -3,7 +3,7 @@
 ImageReference::ImageReference(std::uint64_t stable_id, std::uint32_t width,
                                std::uint32_t height, PixelFormat pixel_format,
                                std::uint64_t generation) {
-    require_enum(pixel_format, 1U, "image pixel format");
+    require_enum(pixel_format, 0U, "image pixel format");
     if (stable_id == 0U || generation == 0U || width == 0U || height == 0U ||
         width > 32768U || height > 32768U) {
         throw std::invalid_argument(

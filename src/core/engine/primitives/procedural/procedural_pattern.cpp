@@ -238,12 +238,12 @@ Channels mix_channels(const Channels& ground, const Channels& figure, std::int32
     return mixed;
 }
 
-// Writes straight `colour` premultiplied, each channel rounded once.
+// Writes straight `colour` premultiplied as BGRA8, each channel rounded once.
 void store_channels(std::uint8_t* pixel, const Channels& colour) noexcept {
     const std::int32_t alpha = colour.alpha;
-    pixel[0] = static_cast<std::uint8_t>((colour.red * alpha + 127) / 255);
+    pixel[0] = static_cast<std::uint8_t>((colour.blue * alpha + 127) / 255);
     pixel[1] = static_cast<std::uint8_t>((colour.green * alpha + 127) / 255);
-    pixel[2] = static_cast<std::uint8_t>((colour.blue * alpha + 127) / 255);
+    pixel[2] = static_cast<std::uint8_t>((colour.red * alpha + 127) / 255);
     pixel[3] = static_cast<std::uint8_t>(alpha);
 }
 

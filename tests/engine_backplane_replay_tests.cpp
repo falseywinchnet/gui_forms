@@ -15,6 +15,7 @@
 #include "gui_forms/gui_forms.hpp"
 #include "gui_forms/paint_framebuffer.hpp"
 #include "support/theme_definition_heap.hpp"
+#include "support/rgba_order.hpp"
 
 #include <algorithm>
 #include <array>
@@ -45,7 +46,7 @@ bool print_mode(int argc, char** argv) {
 
 std::uint64_t hash_bytes(std::span<const std::uint8_t> bytes) {
     std::uint64_t hash = 0xcbf29ce484222325ULL;
-    for (const std::uint8_t byte : bytes) {
+    for (const std::uint8_t byte : gui_forms::test_support::rgba_order(bytes)) {
         hash = hash ^ byte;
         hash = hash * 0x100000001b3ULL;
     }
@@ -55,7 +56,8 @@ std::uint64_t hash_bytes(std::span<const std::uint8_t> bytes) {
 std::array<std::uint8_t, 4> pixel_of(const PartRaster& raster, std::size_t column, std::size_t row) {
     const std::size_t at = row * raster.row_bytes() + column * 4U;
     const std::span<const std::uint8_t> pixels = raster.pixels();
-    const std::array<std::uint8_t, 4> value{pixels[at], pixels[at + 1U], pixels[at + 2U], pixels[at + 3U]};
+    // The raster is BGRA8; the value is red, green, blue, alpha.
+    const std::array<std::uint8_t, 4> value{pixels[at + 2U], pixels[at + 1U], pixels[at], pixels[at + 3U]};
     return value;
 }
 
@@ -66,7 +68,11 @@ std::shared_ptr<PartRaster> solid_raster(DeviceExtent extent, std::array<std::ui
     for (std::size_t row = 0U; row < extent.height; ++row) {
         for (std::size_t column = 0U; column < extent.width; ++column) {
             const std::size_t at = row * view.row_bytes + column * 4U;
-            for (std::size_t lane = 0U; lane < 4U; ++lane) view.pixels[at + lane] = colour[lane];
+            // `colour` is red, green, blue, alpha; the raster is BGRA8.
+            view.pixels[at] = colour[2];
+            view.pixels[at + 1U] = colour[1];
+            view.pixels[at + 2U] = colour[0];
+            view.pixels[at + 3U] = colour[3];
         }
     }
     return raster;
@@ -81,8 +87,8 @@ struct FillState final {
     Rect clip{};
 };
 
-// Draws into premultiplied RGBA rows at scale 1: opaque fills, part
-// rasters copied source-over by their nearest pixel, and each text run as
+// Draws into premultiplied BGRA rows at scale 1, the framebuffer format:
+// opaque fills, part rasters copied source-over by their nearest pixel, and each text run as
 // a block 6 units wide per byte and 8 high, its baseline at the origin.
 // Every other command is counted and not drawn.
 class FillPainter final : public Painter {
@@ -110,9 +116,9 @@ public:
     void clip_rect(Rect rect) override { state_.clip = Rect::intersection(state_.clip, placed(rect)); }
     void fill_rect(Rect rect, Color colour) override {
         const Rect area = Rect::intersection(placed(rect), state_.clip);
-        const std::array<std::uint8_t, 4> premultiplied{premultiply(colour.red, colour.alpha),
+        const std::array<std::uint8_t, 4> premultiplied{premultiply(colour.blue, colour.alpha),
                                                         premultiply(colour.green, colour.alpha),
-                                                        premultiply(colour.blue, colour.alpha), colour.alpha};
+                                                        premultiply(colour.red, colour.alpha), colour.alpha};
         for_each_pixel(area, premultiplied, nullptr, Point{0.0, 0.0});
     }
     void stroke_rect(Rect, Color, double) override { ++others; }
@@ -170,8 +176,9 @@ private:
                         from_row >= static_cast<std::int64_t>((*raster).extent().height)) {
                         continue;
                     }
-                    source = pixel_of(*raster, static_cast<std::size_t>(from_column),
-                                      static_cast<std::size_t>(from_row));
+                    const std::array<std::uint8_t, 4> rgba = pixel_of(
+                        *raster, static_cast<std::size_t>(from_column), static_cast<std::size_t>(from_row));
+                    source = {rgba[2], rgba[1], rgba[0], rgba[3]};
                 }
                 const std::size_t at = (static_cast<std::size_t>(row) * width_ + static_cast<std::size_t>(column)) * 4U;
                 const std::uint32_t keep = 255U - source[3];
@@ -208,7 +215,6 @@ public:
     std::size_t row_bytes() const noexcept override { return static_cast<std::size_t>(painter_.width()) * 4U; }
     std::uint32_t width() const noexcept override { return painter_.width(); }
     std::uint32_t height() const noexcept override { return painter_.height(); }
-    FramebufferChannelOrder channel_order() const noexcept override { return FramebufferChannelOrder::rgba; }
 
     std::size_t begun{};
     std::size_t ended{};

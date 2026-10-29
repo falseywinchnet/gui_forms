@@ -100,7 +100,7 @@ struct ProceduralScratch final {
 };
 
 // Generates `fill`'s pattern at `scale` into every pixel of `destination`
-// (premultiplied RGBA8), whose extent is procedural_extent's. The caller
+// (premultiplied BGRA8), whose extent is procedural_extent's. The caller
 // has validated the destination (validate_raster_view) and the fill
 // (valid_surface_material). `scratch` is reset-size; storage that cannot be
 // allocated throws std::bad_alloc before any pixel is written.

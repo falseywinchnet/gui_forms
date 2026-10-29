@@ -109,14 +109,11 @@ void mark_hatch_pixel(std::array<SkColor, Count>& pixels,
     std::vector<std::byte> result(image.pixels().begin(), image.pixels().end());
     if (attributes.remap_table.empty()) return result;
     for (std::size_t offset = 0; offset + 3U < result.size(); offset += 4U) {
-        const std::uint8_t first = std::to_integer<std::uint8_t>(result[offset]);
+        // The image is BGRA8.
+        const std::uint8_t blue = std::to_integer<std::uint8_t>(result[offset]);
         const std::uint8_t green = std::to_integer<std::uint8_t>(result[offset + 1U]);
-        const std::uint8_t third = std::to_integer<std::uint8_t>(result[offset + 2U]);
+        const std::uint8_t red = std::to_integer<std::uint8_t>(result[offset + 2U]);
         const std::uint8_t alpha = std::to_integer<std::uint8_t>(result[offset + 3U]);
-        const std::uint8_t red = image.pixel_format == PixelFormat::bgra32_premultiplied
-            ? third : first;
-        const std::uint8_t blue = image.pixel_format == PixelFormat::bgra32_premultiplied
-            ? first : third;
         const Color source = Color::from_argb(
             alpha, unpremultiply(red, alpha), unpremultiply(green, alpha),
             unpremultiply(blue, alpha));
@@ -132,14 +129,9 @@ void mark_hatch_pixel(std::array<SkColor, Count>& pixels,
         const std::uint8_t out_red = premultiply(replacement.red(), out_alpha);
         const std::uint8_t out_green = premultiply(replacement.green(), out_alpha);
         const std::uint8_t out_blue = premultiply(replacement.blue(), out_alpha);
-        if (image.pixel_format == PixelFormat::bgra32_premultiplied) {
-            result[offset] = static_cast<std::byte>(out_blue);
-            result[offset + 2U] = static_cast<std::byte>(out_red);
-        } else {
-            result[offset] = static_cast<std::byte>(out_red);
-            result[offset + 2U] = static_cast<std::byte>(out_blue);
-        }
+        result[offset] = static_cast<std::byte>(out_blue);
         result[offset + 1U] = static_cast<std::byte>(out_green);
+        result[offset + 2U] = static_cast<std::byte>(out_red);
         result[offset + 3U] = static_cast<std::byte>(out_alpha);
     }
     return result;
@@ -152,12 +144,10 @@ void mark_hatch_pixel(std::array<SkColor, Count>& pixels,
                             static_cast<SkScalar>(rectangle.height));
 }
 
-[[nodiscard]] SkImageInfo image_info(std::uint32_t width, std::uint32_t height,
-                                     PixelFormat format) {
+// Bitmaps and images are premultiplied BGRA8 in sRGB.
+[[nodiscard]] SkImageInfo image_info(std::uint32_t width, std::uint32_t height) {
     return SkImageInfo::Make(
-        static_cast<int>(width), static_cast<int>(height),
-        format == PixelFormat::bgra32_premultiplied ?
-            kBGRA_8888_SkColorType : kRGBA_8888_SkColorType,
+        static_cast<int>(width), static_cast<int>(height), kBGRA_8888_SkColorType,
         kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
 }
 
@@ -421,8 +411,7 @@ std::vector<SkScalar> preset_dash_pattern(DashStyle style, SkScalar width) {
             paint.setColor(SK_ColorTRANSPARENT);
             return true;
         }
-        const SkImageInfo info = image_info(
-            brush.image.width, brush.image.height, brush.image.pixel_format);
+        const SkImageInfo info = image_info(brush.image.width, brush.image.height);
         sk_sp<SkData> data = SkData::MakeWithCopy(
             brush.image.pixels().data(), brush.image.pixels().size());
         sk_sp<SkImage> image = SkImages::RasterFromData(
@@ -953,8 +942,7 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                                       static_cast<std::int32_t>(target.height())});
         const BitmapLockView scratch_lock = (*scratch).lock(BitmapLockMode::write);
         BitmapUnlock unlock_scratch(*scratch, scratch_lock.token);
-        const SkImageInfo info = image_info(scratch_lock.width, scratch_lock.height,
-                                            scratch_lock.pixel_format);
+        const SkImageInfo info = image_info(scratch_lock.width, scratch_lock.height);
         sk_sp<SkSurface> surface = SkSurfaces::WrapPixels(
             info, scratch_lock.writable_data, scratch_lock.row_bytes);
         if (!surface) return {RasterError::target_unavailable};
@@ -969,8 +957,6 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
         text_target.width = scratch_lock.width;
         text_target.height = scratch_lock.height;
         text_target.stride = text_stride;
-        text_target.order = scratch_lock.pixel_format == PixelFormat::bgra32_premultiplied ?
-            gui_forms::detail::TextPixelOrder::bgra : gui_forms::detail::TextPixelOrder::rgba;
         std::size_t executed{};
         for (const DrawingCommand& command : commands.subspan(first_command)) {
             (*canvas).restoreAll();
@@ -1068,9 +1054,7 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 if (!command.image.has_pixels()) {
                     return {RasterError::missing_image_pixels, executed};
                 }
-                const SkImageInfo source_info = image_info(
-                    command.image.width, command.image.height,
-                    command.image.pixel_format);
+                const SkImageInfo source_info = image_info(command.image.width, command.image.height);
                 const std::vector<std::byte> pixels = remapped_pixels(
                     command.image, command.image_attributes);
                 sk_sp<SkData> data = SkData::MakeWithCopy(
@@ -1184,8 +1168,7 @@ std::vector<std::byte> SkiaExecutor::encode_png(
         input.height = snapshot.height;
         input.row_bytes = snapshot.row_bytes();
         input.pixels = snapshot.pixels();
-        input.order = snapshot.pixel_format == PixelFormat::bgra32_premultiplied
-            ? gui_forms::image::PngChannelOrder::bgra : gui_forms::image::PngChannelOrder::rgba;
+        input.order = gui_forms::image::PngChannelOrder::bgra;
         input.alpha = gui_forms::image::PngSourceAlpha::premultiplied;
         input.compression_level = gui_forms::image::default_png_compression_level;
         std::vector<std::byte> result;

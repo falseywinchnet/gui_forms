@@ -69,9 +69,9 @@ std::uint8_t to_byte(double value) noexcept {
 }
 
 void store(const PartRasterView& destination, std::size_t offset, const Unit& unit) noexcept {
-    destination.pixels[offset] = to_byte(unit.red);
+    destination.pixels[offset] = to_byte(unit.blue);
     destination.pixels[offset + 1U] = to_byte(unit.green);
-    destination.pixels[offset + 2U] = to_byte(unit.blue);
+    destination.pixels[offset + 2U] = to_byte(unit.red);
     destination.pixels[offset + 3U] = to_byte(unit.alpha);
 }
 

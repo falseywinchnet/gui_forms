@@ -24,7 +24,6 @@
 #include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
-#include "stx_skia/swizzle.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
 #include "../../../render/text/glyph_run/glyph_run_raster.hpp"
 #include "../../../render/text/harfbuzz/harfbuzz_font_engine.hpp"
@@ -1559,16 +1558,8 @@ public:
             frame.pixels().empty()) {
             return;
         }
-        const std::byte* source = frame.pixels().data();
-        if (frame.pixel_format() == LiveSurfacePixelFormat::rgba32_premultiplied_srgb) {
-            // The raster owns reusable conversion storage. Convert before any
-            // DC mutation; allocation failure leaves the active frame intact.
-            live_bgra_scratch_.resize(frame.pixels().size());
-            const stx_skia::SwizzleResult swapped =
-                stx_skia::swap_red_blue(live_bgra_scratch_, frame.pixels());
-            if (swapped != stx_skia::SwizzleResult::ok) return;
-            source = live_bgra_scratch_.data();
-        }
+        // Live frames are premultiplied BGRA8, the DIB's own order.
+        const std::byte* const source = frame.pixels().data();
         const int saved = SaveDC(memory_dc_);
         IntersectClipRect(memory_dc_, area.left, area.top, area.right, area.bottom);
         SetStretchBltMode(memory_dc_, COLORONCOLOR);
@@ -2322,7 +2313,6 @@ private:
         target.width = static_cast<std::uint32_t>(width_);
         target.height = static_cast<std::uint32_t>(rows);
         target.stride = static_cast<std::size_t>(width_);
-        target.order = gui_forms::detail::TextPixelOrder::bgra;
         target.opaque = !maintain_alpha_;
         return target;
     }
@@ -2496,7 +2486,7 @@ public:
         const gui_forms::detail::PartRasterSource source{.pixels = bytes,
             .width = static_cast<std::uint32_t>(columns), .height = static_cast<std::uint32_t>(rows),
             .row_bytes = static_cast<std::size_t>(width_) * 4U, .left = area.left,
-            .top = area.top - row_origin_, .order = gui_forms::detail::TextPixelOrder::bgra,
+            .top = area.top - row_origin_,
             .blend = part_blend(level.composite)};
         const gui_forms::detail::TextCompositeTarget target = shared_composite_target();
         const gui_forms::detail::TextCompositeClip clip = shared_composite_clip();
@@ -2566,7 +2556,6 @@ private:
     HBITMAP bitmap_{};
     HGDIOBJ old_bitmap_{};
     std::uint32_t* pixels_{};
-    std::vector<std::byte> live_bgra_scratch_{};
 #if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT) && defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
     // Finite host frame profile: at most 64 distinct session authorities. A
     // repeated command shares its entry; ordering gives one global lock order.
@@ -2681,7 +2670,6 @@ public:
     std::size_t row_bytes() const noexcept override { return width() * 4U; }
     std::uint32_t width() const noexcept override { return static_cast<std::uint32_t>(raster.width_); }
     std::uint32_t height() const noexcept override { return static_cast<std::uint32_t>(raster.height_); }
-    FramebufferChannelOrder channel_order() const noexcept override { return FramebufferChannelOrder::bgra; }
 };
 std::unique_ptr<PaintFramebuffer> DibPainter::create_framebuffer(Size logical_size, double scale) {
     if (!std::isfinite(scale) || scale <= 0 || !std::isfinite(logical_size.width) ||

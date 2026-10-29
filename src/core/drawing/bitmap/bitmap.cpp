@@ -2,7 +2,7 @@
 
 Bitmap::Bitmap(std::uint32_t width, std::uint32_t height,
                PixelFormat pixel_format) {
-    require_enum(pixel_format, 1U, "bitmap pixel format");
+    require_enum(pixel_format, 0U, "bitmap pixel format");
     if (width == 0U || height == 0U || width > maximum_dimension ||
         height > maximum_dimension) {
         throw std::invalid_argument("bitmap dimensions must be nonzero and bounded");

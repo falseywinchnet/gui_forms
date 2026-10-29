@@ -77,8 +77,8 @@ Rect live_change_in_window(const LiveSurface& surface,
     return changed;
 }
 // Replaces `bgra` with the framebuffer's pixels as tightly packed
-// premultiplied BGRA rows of width * 4 bytes, the image registry's layout;
-// an RGBA raster has red and blue swapped as it is copied. False, leaving
+// premultiplied BGRA rows of width * 4 bytes, the image registry's layout,
+// row by row: the framebuffer is BGRA already. False, leaving
 // `bgra` empty, for an empty framebuffer or one whose pixel span is shorter
 // than its rows. The framebuffer is only read.
 bool copy_framebuffer_bgra(PaintFramebuffer& framebuffer, std::vector<std::byte>& bgra) {
@@ -90,19 +90,9 @@ bool copy_framebuffer_bgra(PaintFramebuffer& framebuffer, std::vector<std::byte>
     const std::size_t row = width * 4U;
     if (width == 0U || height == 0U || source_row < row || pixels.size() < source_row * height) return false;
     bgra.resize(row * height);
-    const bool swap = framebuffer.channel_order() == FramebufferChannelOrder::rgba;
-    if (!swap) {
-        for (std::size_t y = 0; y < height; ++y) {
-            const std::byte* const from = pixels.data() + y * source_row;
-            std::copy(from, from + row, bgra.data() + y * row);
-        }
-        return true;
-    }
     for (std::size_t y = 0; y < height; ++y) {
         const std::byte* const from = pixels.data() + y * source_row;
-        std::byte* const to = bgra.data() + y * row;
-        std::copy(from, from + row, to);
-        for (std::size_t x = 0; x < width; ++x) std::swap(to[x * 4U], to[x * 4U + 2U]);
+        std::copy(from, from + row, bgra.data() + y * row);
     }
     return true;
 }

@@ -2012,7 +2012,7 @@ void post_perform_close(NSWindow* window) {
         return;
     }
     _frameCaptureCompleted = YES;
-    // The front raster is the presented framebuffer: premultiplied RGBA8 that
+    // The front raster is the presented framebuffer: premultiplied BGRA8 that
     // CGContextDrawImage copied above. Encode it through the private Skia
     // adapter seam and report through the shared portable contract.
     const std::vector<std::byte> encoded = _raster.encode_png();
@@ -3032,10 +3032,13 @@ void post_perform_close(NSWindow* window) {
         // backdrop is granted (stage T5).
         const bool windowOpaque = self.window == nil || self.window.opaque == YES;
         const CGImageAlphaInfo alphaInfo =
-            windowOpaque ? kCGImageAlphaNoneSkipLast : kCGImageAlphaPremultipliedLast;
+            windowOpaque ? kCGImageAlphaNoneSkipFirst : kCGImageAlphaPremultipliedFirst;
+        // The raster is premultiplied BGRA8 (SK2): read as 32-bit
+        // little-endian words with alpha first, the window server's own
+        // order, so the copy into the backing store needs no swizzle.
         const CGBitmapInfo bitmapInfo = static_cast<CGBitmapInfo>(
             static_cast<CGBitmapInfo>(alphaInfo) |
-            static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Big));
+            static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Little));
         CGImageRef image = CGImageCreate(
             _raster.pixel_width(), _raster.pixel_height(), 8, 32,
             _raster.row_bytes(), colorSpace, bitmapInfo, provider,

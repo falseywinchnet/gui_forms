@@ -7,8 +7,10 @@
 
 namespace gui_forms {
 
-/// A borrowed, top-to-bottom, straight-alpha RGBA8 sRGB image.
-/// Row padding is permitted; the final row does not require trailing padding.
+/// A borrowed, top-to-bottom, premultiplied BGRA8 sRGB image: blue, green,
+/// red, alpha in memory, each colour channel at most its alpha, as every
+/// framebuffer and raster holds pixels. Row padding is permitted; the final
+/// row does not require trailing padding.
 /// The producer retains ownership and keeps the bytes alive for the whole call.
 struct HostImageView final {
     std::uint32_t width{};
@@ -17,9 +19,11 @@ struct HostImageView final {
     std::span<const std::byte> pixels;
 };
 
-/// An owned host-service image. Color channels are not premultiplied.
-/// Clipboard reads return independent storage, including RGB under zero alpha
-/// when the source representation preserves those channels.
+/// An owned host-service image, premultiplied BGRA8 like HostImageView.
+/// Clipboard reads return independent storage. A GUI.Forms clipboard image is
+/// read back byte for byte; straight-alpha native formats (PNG, DIB, icons)
+/// are converted only where they meet the host, and a valid premultiplied
+/// image survives that conversion unchanged.
 struct HostImage final {
     static constexpr std::uint64_t maximum_pixels = 100'000'000U;
     static constexpr std::uint64_t maximum_bytes = maximum_pixels * 4U;

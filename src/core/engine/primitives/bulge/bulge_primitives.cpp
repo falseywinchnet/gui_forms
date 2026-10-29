@@ -101,9 +101,9 @@ PremultipliedPixel premultiplied(Color colour) noexcept {
 }
 
 void write_pixel(const PartRasterView& destination, std::size_t offset, PremultipliedPixel pixel) noexcept {
-    destination.pixels[offset] = pixel.red;
+    destination.pixels[offset] = pixel.blue;
     destination.pixels[offset + 1U] = pixel.green;
-    destination.pixels[offset + 2U] = pixel.blue;
+    destination.pixels[offset + 2U] = pixel.red;
     destination.pixels[offset + 3U] = pixel.alpha;
 }
 

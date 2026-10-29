@@ -109,9 +109,9 @@ the window. When the upload on attachment fails, attaching throws
 `set_bitmap` does not throw: the canvas stays empty and `last_resource_error`
 says why.
 
-Bitmaps in `gui_drawing::PixelFormat::bgra32_premultiplied` and
-`gui_drawing::PixelFormat::rgba32_premultiplied` are both accepted. RGBA
-pixels are converted for upload; the bitmap itself is never modified.
+Bitmaps are premultiplied BGRA8 (`gui_drawing::PixelFormat::bgra32_premultiplied`),
+the window's own order, so their pixels are uploaded as they are; the bitmap
+itself is never modified.
 
 The canvas takes keyboard focus, is a tab stop and shows a crosshair cursor.
 It has no tools of its own: pointer input reaches `on_pointer` in a derived

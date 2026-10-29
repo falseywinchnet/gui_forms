@@ -23,6 +23,12 @@
 
 namespace {
 
+// Byte offsets of the channels in a premultiplied BGRA8 pixel.
+constexpr std::size_t blue = 0U;
+constexpr std::size_t green = 1U;
+constexpr std::size_t red = 2U;
+constexpr std::size_t alpha = 3U;
+
 std::uint32_t crc32(std::span<const std::byte> bytes) {
     std::uint32_t crc = 0xffffffffU;
     for (const std::byte value : bytes) {
@@ -60,7 +66,7 @@ std::size_t ink_pixels(const std::uint8_t* pixels, std::size_t row_bytes,
         const std::uint8_t* row = pixels + static_cast<std::size_t>(y) * row_bytes;
         for (int x = left * scale; x < right * scale; ++x) {
             const std::uint8_t* pixel = row + static_cast<std::size_t>(x) * 4U;
-            if (pixel[0] != 241U || pixel[1] != 238U || pixel[2] != 226U) {
+            if (pixel[red] != 241U || pixel[green] != 238U || pixel[blue] != 226U) {
                 ++count;
             }
         }
@@ -364,9 +370,9 @@ int main() {
         std::fputs("Skia raster surface exposed no pixels\n", stderr);
         return 7;
     }
-    if (pixels[0] != 241U || pixels[1] != 238U || pixels[2] != 226U ||
-        pixels[3] != 255U) {
-        std::fputs("Skia raster RGBA byte-order contract changed\n", stderr);
+    if (pixels[red] != 241U || pixels[green] != 238U || pixels[blue] != 226U ||
+        pixels[alpha] != 255U) {
+        std::fputs("Skia raster BGRA byte-order contract changed\n", stderr);
         return 8;
     }
     const std::size_t cjk_ink = ink_pixels(
@@ -409,40 +415,40 @@ int main() {
         pixels, raster.row_bytes(), 2, 180, 97);
     const std::uint8_t* inset_center = pixel_at(
         pixels, raster.row_bytes(), 2, 180, 105);
-    if (rounded_corner[0] != 241U || rounded_corner[1] != 238U ||
-        rounded_corner[2] != 226U || title_left[2] <= title_left[0] ||
-        title_right[0] <= title_right[2] || glow_center[0] <= glow_edge[0] ||
-        glow_center[1] <= glow_edge[1]) {
+    if (rounded_corner[red] != 241U || rounded_corner[green] != 238U ||
+        rounded_corner[blue] != 226U || title_left[blue] <= title_left[red] ||
+        title_right[red] <= title_right[blue] || glow_center[red] <= glow_edge[red] ||
+        glow_center[green] <= glow_edge[green]) {
         std::fputs("retained material raster contract changed\n", stderr);
         return 11;
     }
-    if (cropped_green[0] > 8U || cropped_green[1] < 240U ||
-        cropped_green[2] > 8U || cropped_green[3] != 255U) {
+    if (cropped_green[red] > 8U || cropped_green[green] < 240U ||
+        cropped_green[blue] > 8U || cropped_green[alpha] != 255U) {
         std::fputs("Skia source-region image crop contract changed\n", stderr);
         return 13;
     }
-    if (pattern_red[0] < 220U || pattern_red[1] > 24U ||
-        pattern_green[0] > 24U || pattern_green[1] < 220U ||
-        pattern_repeat[0] < 220U || pattern_repeat[1] > 24U) {
+    if (pattern_red[red] < 220U || pattern_red[green] > 24U ||
+        pattern_green[red] > 24U || pattern_green[green] < 220U ||
+        pattern_repeat[red] < 220U || pattern_repeat[green] > 24U) {
         std::fputs("Skia exact image-pattern period contract changed\n", stderr);
         return 14;
     }
-    if (inset_outside[0] != 241U || inset_outside[1] != 238U ||
-        inset_outside[2] != 226U ||
-        inset_edge[0] >= inset_center[0] ||
-        inset_edge[1] >= inset_center[1] ||
-        inset_edge[2] >= inset_center[2]) {
+    if (inset_outside[red] != 241U || inset_outside[green] != 238U ||
+        inset_outside[blue] != 226U ||
+        inset_edge[red] >= inset_center[red] ||
+        inset_edge[green] >= inset_center[green] ||
+        inset_edge[blue] >= inset_center[blue]) {
         std::fputs("Skia inset shadow clipping/gradient contract changed\n", stderr);
         std::fprintf(stderr, "inset outside %u %u %u %u, edge %u %u %u %u, centre %u %u %u %u\n",
-                     inset_outside[0], inset_outside[1], inset_outside[2], inset_outside[3], inset_edge[0],
-                     inset_edge[1], inset_edge[2], inset_edge[3], inset_center[0], inset_center[1],
-                     inset_center[2], inset_center[3]);
+                     inset_outside[red], inset_outside[green], inset_outside[blue], inset_outside[alpha],
+                     inset_edge[red], inset_edge[green], inset_edge[blue], inset_edge[alpha],
+                     inset_center[red], inset_center[green], inset_center[blue], inset_center[alpha]);
         return 15;
     }
-    if (repeat_first[0] != repeat_second[0] ||
-        repeat_first[1] != repeat_second[1] ||
-        repeat_first[2] != repeat_second[2] ||
-        repeat_contrast[0] <= repeat_first[0] + 50U) {
+    if (repeat_first[red] != repeat_second[red] ||
+        repeat_first[green] != repeat_second[green] ||
+        repeat_first[blue] != repeat_second[blue] ||
+        repeat_contrast[red] <= repeat_first[red] + 50U) {
         std::fputs("Skia repeating-gradient period contract changed\n", stderr);
         return 12;
     }

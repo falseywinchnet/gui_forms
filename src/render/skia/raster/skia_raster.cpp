@@ -51,6 +51,10 @@
 namespace gui_forms::render {
 namespace {
 
+// Every raster is premultiplied BGRA8 (SK2), which stx_skia's build makes
+// Skia's native order on every host so that fills take its N32 blitters.
+static_assert(kN32_SkColorType == kBGRA_8888_SkColorType, "stx_skia must be built with SK_R32_SHIFT=16");
+
 SkColor to_sk_color(Color color) noexcept {
     return SkColorSetARGB(color.alpha, color.red, color.green, color.blue);
 }
@@ -380,8 +384,8 @@ public:
         detail::TextCompositeTarget target{};
         detail::TextCompositeClip clip{};
     };
-    // None when the canvas cannot be addressed as premultiplied 8-bit RGBA
-    // or BGRA, or its clips are unknown.
+    // None when the canvas cannot be addressed as premultiplied BGRA8, or its
+    // clips are unknown.
     [[nodiscard]] std::optional<SharedComposite> shared_composite(SkCanvas& target);
 
     // A part raster into the canvas pixels under the recorded clips. False
@@ -599,7 +603,6 @@ public:
     std::size_t row_bytes() const noexcept override { return raster.row_bytes(); }
     std::uint32_t width() const noexcept override { return raster.pixel_width(); }
     std::uint32_t height() const noexcept override { return raster.pixel_height(); }
-    FramebufferChannelOrder channel_order() const noexcept override { return FramebufferChannelOrder::rgba; }
 };
 std::unique_ptr<PaintFramebuffer> SkiaRaster::create_framebuffer(Size logical_size, double scale) {
     if (!std::isfinite(scale) || scale <= 0 || !std::isfinite(logical_size.width) ||
@@ -644,12 +647,12 @@ bool SkiaRaster::resize(Size logical_size, double scale) {
         return false;
     }
 
-    // The host-facing surface contract is premultiplied RGBA8 on every target.
-    // Skia's N32 alias follows the build's native channel order (RGBA on the
-    // macOS archive, BGRA on the MinGW archive), which makes identical renderer
-    // commands expose different bytes across hosts.
+    // The host-facing surface contract is premultiplied BGRA8 on every target
+    // (SK2), named explicitly: Skia's N32 alias follows the build's native
+    // channel order, which would make identical renderer commands expose
+    // different bytes across hosts.
     const SkImageInfo info = SkImageInfo::Make(
-        width, height, kRGBA_8888_SkColorType, kPremul_SkAlphaType,
+        width, height, kBGRA_8888_SkColorType, kPremul_SkAlphaType,
         SkColorSpace::MakeSRGB());
     sk_sp<SkSurface> replacement = SkSurfaces::Raster(info);
     if (!replacement) {
@@ -814,8 +817,7 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
         const SkImageInfo output_info = SkImageInfo::Make(
             static_cast<int>((*resource).metadata.width),
             static_cast<int>((*resource).metadata.height),
-            (*resource).encoding == ImageResourceEncoding::bgra32_premultiplied
-                ? kBGRA_8888_SkColorType : kRGBA_8888_SkColorType,
+            kBGRA_8888_SkColorType,
             kPremul_SkAlphaType,
             SkColorSpace::MakeSRGB());
         const std::size_t row_bytes = output_info.minRowBytes();
@@ -838,7 +840,7 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
             pixel_data = SkData::MakeWithCopy(
                 (*resource).encoded.data(), (*resource).encoded.size());
         } else {
-            const gui_forms::image::PixelTarget target{gui_forms::image::PixelOrder::rgba,
+            const gui_forms::image::PixelTarget target{gui_forms::image::PixelOrder::bgra,
                                                        gui_forms::image::PixelAlpha::premultiplied};
             pixels.resize((*resource).metadata.decoded_byte_count);
             const gui_forms::image::ResourcePixelResult decoded =
@@ -918,12 +920,9 @@ std::vector<std::byte> SkiaRaster::encode_png() const {
     const std::optional<SkPixmap> peeked = (*surface).peekPixels();
     if (!peeked || (*peeked).width() <= 0 || (*peeked).height() <= 0) return result;
     const SkPixmap& pixmap = *peeked;
-    // The front surface is premultiplied 8-bit RGBA or BGRA; the shared owned
-    // encoder unpremultiplies so the file carries straight alpha, as on
-    // every host.
-    const bool rgba = pixmap.colorType() == kRGBA_8888_SkColorType;
-    const bool bgra = pixmap.colorType() == kBGRA_8888_SkColorType;
-    if ((!rgba && !bgra) || pixmap.alphaType() != kPremul_SkAlphaType) return result;
+    // The front surface is premultiplied BGRA8; the shared owned encoder
+    // unpremultiplies so the file carries straight alpha, as on every host.
+    if (pixmap.colorType() != kBGRA_8888_SkColorType || pixmap.alphaType() != kPremul_SkAlphaType) return result;
     const std::optional<std::size_t> pixel_bytes = pixmap.checkedByteSize();
     if (!pixel_bytes) return result;
     gui_forms::image::PngEncodeInput input{};
@@ -932,8 +931,7 @@ std::vector<std::byte> SkiaRaster::encode_png() const {
     input.row_bytes = pixmap.rowBytes();
     input.pixels = std::span<const std::byte>(static_cast<const std::byte*>(pixmap.addr()),
                                               *pixel_bytes);
-    input.order = rgba ? gui_forms::image::PngChannelOrder::rgba
-                       : gui_forms::image::PngChannelOrder::bgra;
+    input.order = gui_forms::image::PngChannelOrder::bgra;
     input.alpha = gui_forms::image::PngSourceAlpha::premultiplied;
     if (!gui_forms::image::encode_png(input, result)) result.clear();
     return result;
@@ -1445,7 +1443,7 @@ bool SkiaRaster::Impl::composite_run(SkCanvas& target, const text::ShapedText& s
     if (!peeked) return false;
     const SkPixmap& pixmap = *peeked;
     if (pixmap.alphaType() != kPremul_SkAlphaType ||
-        (pixmap.colorType() != kRGBA_8888_SkColorType && pixmap.colorType() != kBGRA_8888_SkColorType) ||
+        pixmap.colorType() != kBGRA_8888_SkColorType ||
         pixmap.rowBytes() % 4U != 0U) {
         return false;
     }
@@ -1485,7 +1483,7 @@ std::optional<SkiaRaster::Impl::SharedComposite> SkiaRaster::Impl::shared_compos
     if (!peeked) return std::nullopt;
     const SkPixmap& pixmap = *peeked;
     if (pixmap.alphaType() != kPremul_SkAlphaType ||
-        (pixmap.colorType() != kRGBA_8888_SkColorType && pixmap.colorType() != kBGRA_8888_SkColorType) ||
+        pixmap.colorType() != kBGRA_8888_SkColorType ||
         pixmap.rowBytes() % 4U != 0U) {
         return std::nullopt;
     }
@@ -1496,8 +1494,6 @@ std::optional<SkiaRaster::Impl::SharedComposite> SkiaRaster::Impl::shared_compos
     composite_target.width = static_cast<std::uint32_t>(pixmap.width());
     composite_target.height = static_cast<std::uint32_t>(pixmap.height());
     composite_target.stride = stride;
-    composite_target.order = pixmap.colorType() == kRGBA_8888_SkColorType ? detail::TextPixelOrder::rgba
-                                                                          : detail::TextPixelOrder::bgra;
     composite_target.opaque = false;
     detail::TextCompositeClip clip{};
     clip.rect = {static_cast<double>((*state).rect.left()), static_cast<double>((*state).rect.top()),
@@ -1706,7 +1702,7 @@ void SkiaRaster::begin_group(const PaintGroup& group) {
     if (!level.surface || (*level.surface).width() < width || (*level.surface).height() < height) {
         const int grown_width = level.surface ? std::max(width, (*level.surface).width()) : width;
         const int grown_height = level.surface ? std::max(height, (*level.surface).height()) : height;
-        const SkImageInfo info = SkImageInfo::Make(grown_width, grown_height, kRGBA_8888_SkColorType,
+        const SkImageInfo info = SkImageInfo::Make(grown_width, grown_height, kBGRA_8888_SkColorType,
                                                    kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
         sk_sp<SkSurface> grown = SkSurfaces::Raster(info);
         if (!grown) return;
@@ -1771,7 +1767,7 @@ void SkiaRaster::end_group() {
     const detail::PartRasterSource source{.pixels = bytes, .width = static_cast<std::uint32_t>(width),
                                           .height = static_cast<std::uint32_t>(height),
                                           .row_bytes = pixmap.rowBytes(), .left = level.device.left(),
-                                          .top = level.device.top(), .order = detail::TextPixelOrder::rgba,
+                                          .top = level.device.top(),
                                           .blend = detail::part_composite_blend(level.composite)};
     static_cast<void>(impl.composite_source(*parent, source, level.opacity));
 }
@@ -1815,23 +1811,14 @@ bool SkiaRaster::draw_live_surface_frame(const LiveSurfaceFrame& frame,
     }
     const bool copy = frame.opaque() && opacity >= 1.0;
     const SkAlphaType alpha = copy ? kOpaque_SkAlphaType : kPremul_SkAlphaType;
-    SkColorType color_type = kUnknown_SkColorType;
-    switch (frame.pixel_format()) {
-    case LiveSurfacePixelFormat::bgra32_premultiplied_srgb:
-        color_type = kBGRA_8888_SkColorType;
-        break;
-    case LiveSurfacePixelFormat::rgba32_premultiplied_srgb:
-        color_type = kRGBA_8888_SkColorType;
-        break;
-    default: return false;
-    }
+    if (frame.pixel_format() != LiveSurfacePixelFormat::bgra32_premultiplied_srgb) return false;
     if (fail_next_live_image_) {
         fail_next_live_image_ = false;
         return false;
     }
     const SkImageInfo info = SkImageInfo::Make(
         static_cast<int>(frame.width()), static_cast<int>(frame.height()),
-        color_type, alpha,
+        kBGRA_8888_SkColorType, alpha,
         SkColorSpace::MakeSRGB());
     SkIRect device{};
     const bool pixel_exact = live_surface_device_rect(*canvas, destination, frame, device);

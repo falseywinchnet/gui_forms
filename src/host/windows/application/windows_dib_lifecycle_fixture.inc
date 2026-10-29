@@ -26,10 +26,8 @@ struct DibHostFixture final {
         if (!condition) throw std::runtime_error(message);
     }
     static void live_format_pixels() {
-        const std::array<LiveSurfacePixelFormat, 2> formats{
-            LiveSurfacePixelFormat::bgra32_premultiplied_srgb,
-            LiveSurfacePixelFormat::rgba32_premultiplied_srgb};
-        for (const LiveSurfacePixelFormat format : formats) {
+        {
+            constexpr LiveSurfacePixelFormat format = LiveSurfacePixelFormat::bgra32_premultiplied_srgb;
             DibPainter raster{};
             require(raster.resize({6.0, 4.0}, 1.0), "format DIB allocated");
             require(raster.begin_frame(), "format DIB begun");
@@ -39,13 +37,10 @@ struct DibHostFixture final {
             LiveSurfaceWriteLease write = (*surface).try_acquire_write();
             require(static_cast<bool>(write), "format write acquired");
             const std::span<std::byte> bytes = write.pixels();
-            const bool rgba = format == LiveSurfacePixelFormat::rgba32_premultiplied_srgb;
-            const std::byte first = rgba ? std::byte{0xd3} : std::byte{0x25};
-            const std::byte third = rgba ? std::byte{0x25} : std::byte{0xd3};
             for (std::size_t index = 0U; index < bytes.size(); index += 4U) {
-                bytes[index] = first;
+                bytes[index] = std::byte{0x25};
                 bytes[index + 1U] = std::byte{0x67};
-                bytes[index + 2U] = third;
+                bytes[index + 2U] = std::byte{0xd3};
                 bytes[index + 3U] = std::byte{0xff};
             }
             require(write.publish() != 0U, "format frame published");
@@ -57,11 +52,10 @@ struct DibHostFixture final {
             require(raster.pixels_[8] == 0xffd36725U && raster.pixels_[14] == 0xffd36725U,
                     "1:1 DIB copy preserves exact BGRA color and alpha");
             require((raster.pixels_[7] & 0x00ffffffU) == 0x0000ff00U, "DIB copy respects clip");
-            require(rgba || raster.live_bgra_scratch_.empty(), "BGRA memcpy does not allocate conversion storage");
             raster.draw_live_surface(surface, {0.0, 0.0, 6.0, 4.0}, 1.0);
             require(GdiFlush() != FALSE, "scaled DIB draw flushed");
             for (std::size_t index = 0U; index < 24U; ++index) {
-                require((raster.pixels_[index] & 0x00ffffffU) == 0x00d36725U, "StretchDIBits preserves both formats' colors");
+                require((raster.pixels_[index] & 0x00ffffffU) == 0x00d36725U, "StretchDIBits preserves the colour");
             }
         }
     }
@@ -262,10 +256,8 @@ struct DibHostFixture final {
             native_class.lpszClassName = L"GUIForms.DibFixture.v1";
             const ATOM registered_class = RegisterClassExW(&native_class);
             require(registered_class != 0, "fixture class registration");
-            const std::array<LiveSurfacePixelFormat, 2> formats{
-                LiveSurfacePixelFormat::bgra32_premultiplied_srgb,
-                LiveSurfacePixelFormat::rgba32_premultiplied_srgb};
-            for (const LiveSurfacePixelFormat format : formats) {
+            {
+                constexpr LiveSurfacePixelFormat format = LiveSurfacePixelFormat::bgra32_premultiplied_srgb;
                 std::shared_ptr<DibFixtureControl> control = std::make_shared<DibFixtureControl>();
                 std::unique_ptr<Window> model = std::make_unique<Window>(control, Size{80, 60});
                 WindowsHostOptions options{};

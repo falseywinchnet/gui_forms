@@ -30,17 +30,15 @@ namespace {
 // The month calendars show "today", which the system clock supplies; the
 // test pins it so that the trace does not depend on the date.
 //
-// Two pages show values that the page's own content does not fix:
-// - live-surfaces reports its surface's pixel format, which is the
-//   platform's native one (native_live_surface_pixel_format: BGRA on
-//   Windows, RGBA elsewhere), so it has one digest for Windows and one for
-//   the other platforms, which differ only in that word;
-// - typography-and-inspection's inspector shows the inspected control's
-//   RuntimeId, a process-wide counter of every control made so far. The
-//   test therefore runs alone in a process of its own, its own ctest entry
-//   (gui_forms_gallery_display_trace_tests, running
-//   gui_forms_gallery_pages_tests --display-trace), so the counter has the
-//   same value on every run and host whatever other tests do.
+// live-surfaces reports its surface's pixel format, BGRA on every platform
+// since SK2 (it had a second digest, for RGBA, before), so every page has one
+// digest. One page shows a value that its own content does not fix:
+// typography-and-inspection's inspector shows the inspected control's
+// RuntimeId, a process-wide counter of every control made so far. The test
+// therefore runs alone in a process of its own, its own ctest entry
+// (gui_forms_gallery_display_trace_tests, running
+// gui_forms_gallery_pages_tests --display-trace), so the counter has the
+// same value on every run and host whatever other tests do.
 
 class TracePainter final : public Painter {
 public:
@@ -406,15 +404,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"semantic-feedback", 0x4967c806108d9f5eULL},
 }};
 
-// live-surfaces names the platform's native live-surface pixel format.
-#if defined(_WIN32)
-constexpr std::uint64_t live_surfaces_digest = 0x124e6a48b13ec2d9ULL;
-#else
-constexpr std::uint64_t live_surfaces_digest = 0xd7b956affbfa2d59ULL;
-#endif
-
 std::uint64_t expected_digest(std::string_view page) {
-    if (page == "live-surfaces") return live_surfaces_digest;
     for (const PageDigest& digest : expected_digests) {
         if (digest.page == page) return digest.hash;
     }

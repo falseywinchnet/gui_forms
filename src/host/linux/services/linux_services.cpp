@@ -222,9 +222,14 @@ HostClipboardFilesResult Services::read_clipboard_files_impl() {
 }
 HostClipboardImageResult Services::read_clipboard_image_impl() {
   Runtime &runtime = window_.runtime;
+  // The private target offered (GFIM version 2, premultiplied BGRA8), then
+  // the one offered before SK2 (version 1, straight RGBA8), then PNG.
   std::vector<std::byte> bytes =
       runtime.read_selection(window_, runtime.atom("CLIPBOARD"),
-                             runtime.atom("application/x-gui-forms-rgba"));
+                             runtime.atom("application/x-gui-forms-bgra"));
+  if (bytes.empty())
+    bytes = runtime.read_selection(window_, runtime.atom("CLIPBOARD"),
+                                   runtime.atom("application/x-gui-forms-rgba"));
   if (!bytes.empty())
     return detail::decode_clipboard_image(bytes, runtime.clipboard_generation,
                                           false);
@@ -278,7 +283,7 @@ void Runtime::selection_request(const XSelectionRequestEvent &request) {
       std::vector<Atom> targets{atom("TARGETS")};
       if (clipboard_image.width != 0) {
         targets.push_back(atom("image/png"));
-        targets.push_back(atom("application/x-gui-forms-rgba"));
+        targets.push_back(atom("application/x-gui-forms-bgra"));
       } else {
         targets.push_back(atom("UTF8_STRING"));
         targets.push_back(XA_STRING);
@@ -296,7 +301,7 @@ void Runtime::selection_request(const XSelectionRequestEvent &request) {
         std::memcpy(bytes.data(), clipboard_text.data(), bytes.size());
       } else if (request.target == atom("image/png"))
         bytes = clipboard_png;
-      else if (request.target == atom("application/x-gui-forms-rgba") &&
+      else if (request.target == atom("application/x-gui-forms-bgra") &&
                clipboard_image.width != 0)
         bytes = detail::encode_clipboard_image(clipboard_image.view());
       if (!bytes.empty()) {
@@ -379,7 +384,7 @@ std::vector<std::byte> Runtime::read_selection(NativeWindow &window,
       XGetSelectionOwner(display, selection) == clipboard_owner) {
     if (target == atom("image/png"))
       return clipboard_png;
-    if (target == atom("application/x-gui-forms-rgba") &&
+    if (target == atom("application/x-gui-forms-bgra") &&
         clipboard_image.width != 0)
       return detail::encode_clipboard_image(clipboard_image.view());
     if (target == atom("UTF8_STRING")) {

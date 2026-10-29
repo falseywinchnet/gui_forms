@@ -174,6 +174,72 @@ void clipboard_files() {
     require(services.read_clipboard_files().paths_utf8.empty());
     require(DestroyWindow(owner));
 }
+// Publishes `bytes` as `format` on the open clipboard.
+void publish_clipboard(UINT format, const std::vector<std::byte>& bytes) {
+    HGLOBAL allocation = GlobalAlloc(GMEM_MOVEABLE, bytes.size());
+    require(allocation != nullptr);
+    void* memory = GlobalLock(allocation);
+    require(memory != nullptr);
+    std::memcpy(memory, bytes.data(), bytes.size());
+    GlobalUnlock(allocation);
+    require(SetClipboardData(format, allocation) != nullptr);
+}
+
+// A host image (premultiplied BGRA8) round-trips exactly through the private
+// format; through CF_DIBV5 alone (straight alpha) a valid premultiplied image
+// is read back exactly too; a version 1 private image (straight RGBA8, written
+// before SK2) is premultiplied into BGRA8.
+void clipboard_images() {
+    const ClipboardTestLock lock;
+    const std::shared_ptr<Panel> root = make_control<Panel>(StableId("clipboard-image-root"));
+    Window model(root, {1, 1});
+    const HWND owner = CreateWindowExW(0, L"STATIC", L"Clipboard image fixture", 0,
+                                        0, 0, 1, 1, HWND_MESSAGE, nullptr, nullptr, nullptr);
+    require(owner != nullptr);
+    host::WindowsHostServices services;
+    services.bind_owner(owner, model);
+    // Opaque blue, then red 200, green 100, blue 50 at alpha 128.
+    const std::vector<std::byte> pixels{std::byte{255}, std::byte{0}, std::byte{0}, std::byte{255},
+                                        std::byte{25}, std::byte{50}, std::byte{100}, std::byte{128}};
+    require(services.write_clipboard_image({2, 1, 8, pixels}).accepted());
+    HostClipboardImageResult read = services.read_clipboard_image();
+    require(read.status().accepted() && read.image() != nullptr && (*read.image()).pixels == pixels);
+
+    require(host::detail::open_clipboard_with_retry(owner));
+    require(IsClipboardFormatAvailable(RegisterClipboardFormatW(L"GUI.Forms.BGRA8.v2")) != FALSE);
+    const HANDLE dib = GetClipboardData(CF_DIBV5);
+    require(dib != nullptr);
+    const SIZE_T dib_size = GlobalSize(dib);
+    const std::byte* const dib_bytes = static_cast<const std::byte*>(GlobalLock(dib));
+    require(dib_bytes != nullptr && dib_size >= 132U);
+    const std::vector<std::byte> dib_copy(dib_bytes, dib_bytes + dib_size);
+    GlobalUnlock(dib);
+    // The DIB holds straight alpha: 25, 50 and 100 at alpha 128 unpremultiply.
+    require(dib_copy[128] == std::byte{50} && dib_copy[129] == std::byte{100} && dib_copy[130] == std::byte{199} &&
+            dib_copy[131] == std::byte{128});
+    require(EmptyClipboard());
+    publish_clipboard(CF_DIBV5, dib_copy);
+    CloseClipboard();
+    read = services.read_clipboard_image();
+    require(read.status().accepted() && read.image() != nullptr && (*read.image()).pixels == pixels);
+
+    const std::vector<std::byte> version_one{
+        std::byte{'G'}, std::byte{'F'}, std::byte{'I'}, std::byte{'M'}, std::byte{1}, std::byte{0}, std::byte{0},
+        std::byte{0}, std::byte{2}, std::byte{0}, std::byte{0}, std::byte{0}, std::byte{1}, std::byte{0},
+        std::byte{0}, std::byte{0}, std::byte{0}, std::byte{0}, std::byte{255}, std::byte{255}, std::byte{200},
+        std::byte{100}, std::byte{50}, std::byte{128}};
+    require(host::detail::open_clipboard_with_retry(owner));
+    require(EmptyClipboard());
+    publish_clipboard(RegisterClipboardFormatW(L"GUI.Forms.RGBA8.v1"), version_one);
+    CloseClipboard();
+    read = services.read_clipboard_image();
+    require(read.status().accepted() && read.image() != nullptr && (*read.image()).pixels == pixels);
+    require(host::detail::open_clipboard_with_retry(owner));
+    require(EmptyClipboard());
+    CloseClipboard();
+    require(DestroyWindow(owner));
+}
+
 #include "support/windows_shape_reference.hpp"
 #include "support/edge_snapping_scene.hpp"
 
@@ -206,6 +272,7 @@ int main() {
     shape_scanline_equivalence();
     edge_snapping_scene();
     clipboard_files();
+    clipboard_images();
     disclosure_render();
     for (ImageSampling sampling : {ImageSampling::nearest, ImageSampling::linear})
         for (double zoom : {1.0 / 64, 0.1, 0.25, 1.0, 1.25, 3.1})

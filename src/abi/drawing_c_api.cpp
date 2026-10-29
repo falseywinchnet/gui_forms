@@ -1463,7 +1463,7 @@ gd_result api_image_reference_create(std::uint64_t stable_id,
                                      std::uint32_t pixel_format,
                                      std::uint64_t generation,
                                      gd_handle* output) {
-    if (pixel_format > 1U) {
+    if (pixel_format != GD_PIXEL_BGRA32_PREMULTIPLIED) {
         return fail(GD_ERROR_INVALID_ARGUMENT, "image pixel format is outside the declared enum");
     }
     return registry().create<gui_drawing::ImageReference>(
@@ -1547,7 +1547,7 @@ gd_result api_recorder_draw_image(gd_handle recorder, gd_handle image,
 
 gd_result api_bitmap_create(std::uint32_t width, std::uint32_t height,
                             std::uint32_t pixel_format, gd_handle* output) {
-    if (pixel_format > GD_PIXEL_RGBA32_PREMULTIPLIED) {
+    if (pixel_format != GD_PIXEL_BGRA32_PREMULTIPLIED) {
         return fail(GD_ERROR_INVALID_ARGUMENT,
                     "bitmap pixel format is outside the declared enum");
     }

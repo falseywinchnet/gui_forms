@@ -22,7 +22,7 @@ window
 Properties
 ----------
 icon
-    The icon's images, straight-alpha RGBA, up to 8 sizes of at most 256
+    The icon's images, premultiplied BGRA8, up to 8 sizes of at most 256
     pixels a side. `set_icon` replaces them and updates a shown icon; more
     images, or a malformed or larger image, throw `std::invalid_argument`.
 text

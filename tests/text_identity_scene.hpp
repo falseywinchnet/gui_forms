@@ -21,9 +21,9 @@ inline constexpr std::array<const char*, 5> case_names{"plain", "translucent", "
                                                        "damage_region"};
 inline constexpr Size scene_size{160.0, 48.0};
 
-// Memory order of a raster's 8-bit channels. Hashes and dumps are taken in
-// RGBA order, so a BGRA raster's red and blue are exchanged first.
-enum class Order : std::uint8_t { rgba, bgra };
+// Rasters are premultiplied BGRA8 on every host (SK2). Hashes and dumps are
+// taken in RGBA order, as they were recorded, so each pixel's red and blue are
+// exchanged first.
 
 // Expected FNV-1a hashes of the raster's rows in RGBA order,
 // [case][scale]: identical on macOS arm64 (Apple SDK) and Alpine aarch64 musl
@@ -53,23 +53,23 @@ inline void paint_scene(Painter& painter, const Case kind) {
     painter.restore();
 }
 
-// Byte of an RGBA-ordered pixel stream at index.
-inline std::uint8_t rgba_byte(const std::uint8_t* const line, const std::size_t index, const Order order) noexcept {
+// Byte at index of a BGRA row read as an RGBA-ordered pixel stream.
+inline std::uint8_t rgba_byte(const std::uint8_t* const line, const std::size_t index) noexcept {
     const std::size_t channel = index % 4U;
     std::size_t source = index;
-    if (order == Order::bgra && channel != 1U && channel != 3U) source = index - channel + (2U - channel);
+    if (channel != 1U && channel != 3U) source = index - channel + (2U - channel);
     return line[source];
 }
 
 // FNV-1a over rows of width * 4 bytes, in RGBA order.
 inline std::uint64_t pixel_hash(const std::uint8_t* const bytes, const std::uint32_t width, const std::uint32_t height,
-                                const std::size_t row_bytes, const Order order = Order::rgba) {
+                                const std::size_t row_bytes) {
     std::uint64_t value = 1469598103934665603ULL;
     const std::size_t width_bytes = static_cast<std::size_t>(width) * 4U;
     for (std::uint32_t row = 0; row < height; ++row) {
         const std::uint8_t* const line = bytes + static_cast<std::size_t>(row) * row_bytes;
         for (std::size_t column = 0; column < width_bytes; ++column) {
-            value ^= rgba_byte(line, column, order);
+            value ^= rgba_byte(line, column);
             value *= 1099511628211ULL;
         }
     }
@@ -79,8 +79,7 @@ inline std::uint64_t pixel_hash(const std::uint8_t* const bytes, const std::uint
 // With GUI_FORMS_TEXT_IDENTITY_DUMP=<directory>, writes the raw rows of each
 // case to <directory>/<case>-<scale x 10>.raw for byte comparison.
 inline void dump_pixels(const std::uint8_t* const bytes, const std::uint32_t width, const std::uint32_t height,
-                        const std::size_t row_bytes, const std::size_t kind, const std::size_t scale,
-                        const Order order = Order::rgba) {
+                        const std::size_t row_bytes, const std::size_t kind, const std::size_t scale) {
     const char* const directory = std::getenv("GUI_FORMS_TEXT_IDENTITY_DUMP");
     if (directory == nullptr) return;
     const std::string path = std::string(directory) + "/" + case_names[kind] + "-" +
@@ -89,7 +88,7 @@ inline void dump_pixels(const std::uint8_t* const bytes, const std::uint32_t wid
     for (std::uint32_t row = 0; row < height; ++row) {
         const std::uint8_t* const line = bytes + static_cast<std::size_t>(row) * row_bytes;
         for (std::size_t column = 0; column < static_cast<std::size_t>(width) * 4U; ++column) {
-            output.put(static_cast<char>(rgba_byte(line, column, order)));
+            output.put(static_cast<char>(rgba_byte(line, column)));
         }
     }
 }

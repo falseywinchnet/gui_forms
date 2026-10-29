@@ -1,5 +1,7 @@
 #include "clipboard_image_wire.hpp"
 
+#include "host_image_pixels.hpp"
+
 #include <algorithm>
 #include <array>
 #include <stdexcept>
@@ -7,6 +9,10 @@
 namespace gui_forms::detail {
 namespace {
 constexpr std::array<std::byte, 4> magic{std::byte{'G'}, std::byte{'F'}, std::byte{'I'}, std::byte{'M'}};
+// Tight premultiplied BGRA8 rows, the host image's own pixels.
+constexpr std::uint32_t premultiplied_bgra_version = 2U;
+// Tight straight RGBA8 rows, read only.
+constexpr std::uint32_t straight_rgba_version = 1U;
 void write_u32(std::span<std::byte> bytes, std::size_t offset, std::uint32_t value) noexcept {
     for (unsigned index = 0; index < 4U; ++index) {
         bytes[offset + index] = static_cast<std::byte>((value >> (8U * index)) & 255U);
@@ -45,7 +51,7 @@ std::vector<std::byte> encode_clipboard_image(HostImageView image) {
     }
     std::vector<std::byte> bytes(16U + static_cast<std::size_t>(image.width) * image.height * 4U);
     std::copy(magic.begin(), magic.end(), bytes.begin());
-    write_u32(bytes, 4, 1U);
+    write_u32(bytes, 4, premultiplied_bgra_version);
     write_u32(bytes, 8, image.width);
     write_u32(bytes, 12, image.height);
     copy_rows(image, std::span<std::byte>(bytes).subspan(16));
@@ -53,8 +59,11 @@ std::vector<std::byte> encode_clipboard_image(HostImageView image) {
 }
 HostClipboardImageResult decode_clipboard_image(
     std::span<const std::byte> bytes, std::uint64_t generation, bool allow_allocation_padding) {
-    if (bytes.size() < 16U || !std::equal(magic.begin(), magic.end(), bytes.begin()) ||
-        read_u32(bytes, 4) != 1U) {
+    if (bytes.size() < 16U || !std::equal(magic.begin(), magic.end(), bytes.begin())) {
+        return HostClipboardImageResult::failed(HostServiceError::backend_failure);
+    }
+    const std::uint32_t version = read_u32(bytes, 4);
+    if (version != premultiplied_bgra_version && version != straight_rgba_version) {
         return HostClipboardImageResult::failed(HostServiceError::backend_failure);
     }
     const std::uint32_t width = read_u32(bytes, 8);
@@ -73,6 +82,14 @@ HostClipboardImageResult decode_clipboard_image(
     if (validate_host_image(view) != HostImageError::none) {
         return HostClipboardImageResult::failed(HostServiceError::backend_failure);
     }
-    return HostClipboardImageResult::image_read(copy_host_image(view), generation);
+    HostImage image = copy_host_image(view);
+    if (version == straight_rgba_version) {
+        const std::size_t row = static_cast<std::size_t>(image.row_bytes);
+        for (std::uint32_t y = 0; y < image.height; ++y) {
+            const std::span<std::byte> pixels = std::span<std::byte>(image.pixels).subspan(row * y, row);
+            straight_rgba_to_premultiplied_bgra(pixels, pixels, image.width);
+        }
+    }
+    return HostClipboardImageResult::image_read(std::move(image), generation);
 }
 } // namespace gui_forms::detail

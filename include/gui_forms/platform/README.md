@@ -31,7 +31,7 @@ Every options struct carries the same two fields with identical semantics:
 Hosts that implement the contract set `HostCapability::frame_capture` in their
 capability report. What differs between hosts is only how the adapter reaches
 its framebuffer: the AppKit host and the X11 host encode the private Skia CPU
-front raster (premultiplied RGBA8, written with straight alpha); the Win32
+front raster (premultiplied BGRA8, written with straight alpha); the Win32
 host encodes its presented 32-bit DIB through the renderer-neutral core PNG
 writer as an opaque image, because GDI leaves the DIB alpha byte undefined.
 Captured pixels are device pixels, so a 2x display yields a 2x image.

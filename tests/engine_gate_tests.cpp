@@ -42,6 +42,7 @@
 #include "../src/core/engine/feature_samples/engine_feature_samples.hpp"
 #include "../src/core/image/png_writer.hpp"
 #include "../src/core/text/composite/text_composite.hpp"
+#include "support/rgba_order.hpp"
 
 #include <algorithm>
 #include <array>
@@ -232,7 +233,7 @@ private:
         const DeviceExtent extent = raster.extent();
         hash.add_word(extent.width);
         hash.add_word(extent.height);
-        hash.add_bytes(raster.pixels());
+        hash.add_bytes(gui_forms::test_support::rgba_order(raster.pixels()));
         rasters = rasters + 1U;
     }
 };
@@ -1172,7 +1173,7 @@ void write_manifest() {
 // hosts' painters do. Text, box shadows and lines are not drawn: no sample
 // draws them, and the built-in recipe's are the hosts' own.
 
-// A painter compositing into premultiplied RGBA pixels at the window's
+// A painter compositing into premultiplied BGRA pixels at the window's
 // scale: part rasters and paint groups through the engine's blend, solid
 // fills by premultiplied source-over, clips as rectangles (rounded where
 // asked).
@@ -1256,7 +1257,7 @@ public:
         composite(*raster, destination, true, opacity);
     }
 
-    // The composited image: premultiplied RGBA bytes, row after row.
+    // The composited image: premultiplied BGRA bytes, row after row.
     [[nodiscard]] std::span<const std::byte> image_bytes() const {
         const std::vector<std::uint32_t>& pixels = layers_.front().pixels;
         return std::as_bytes(std::span<const std::uint32_t>(pixels.data(), pixels.size()));
@@ -1288,12 +1289,13 @@ private:
     }
     static std::uint32_t over(std::uint32_t pixel, std::uint32_t red, std::uint32_t green, std::uint32_t blue,
                               std::uint32_t alpha) {
+        // BGRA in memory: blue is the word's low byte, red its third.
         const std::uint32_t keep = 255U - alpha;
-        const std::uint32_t r = red + ((pixel & 0xFFU) * keep + 127U) / 255U;
+        const std::uint32_t b = blue + ((pixel & 0xFFU) * keep + 127U) / 255U;
         const std::uint32_t g = green + (((pixel >> 8U) & 0xFFU) * keep + 127U) / 255U;
-        const std::uint32_t b = blue + (((pixel >> 16U) & 0xFFU) * keep + 127U) / 255U;
+        const std::uint32_t r = red + (((pixel >> 16U) & 0xFFU) * keep + 127U) / 255U;
         const std::uint32_t a = alpha + ((pixel >> 24U) * keep + 127U) / 255U;
-        const std::uint32_t joined = std::min(r, 255U) | (std::min(g, 255U) << 8U) | (std::min(b, 255U) << 16U) |
+        const std::uint32_t joined = std::min(b, 255U) | (std::min(g, 255U) << 8U) | (std::min(r, 255U) << 16U) |
                                      (std::min(a, 255U) << 24U);
         return joined;
     }
@@ -1319,7 +1321,6 @@ private:
         made.width = width_;
         made.height = height_;
         made.stride = width_;
-        made.order = detail::TextPixelOrder::rgba;
         return made;
     }
     void composite(const PartRaster& raster, Rect destination, bool scaled, double opacity) {
@@ -1393,7 +1394,7 @@ void write_tile(SpecimenSink& sink, Window& window, const std::string& group, co
     input.height = height;
     input.row_bytes = static_cast<std::uint64_t>(width) * 4U;
     input.pixels = painter.image_bytes();
-    input.order = image::PngChannelOrder::rgba;
+    input.order = image::PngChannelOrder::bgra;
     input.alpha = image::PngSourceAlpha::premultiplied;
     std::vector<std::byte> encoded{};
     require(image::encode_png(input, encoded), name + ": the specimen tile encodes");

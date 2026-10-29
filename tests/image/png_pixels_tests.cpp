@@ -290,7 +290,7 @@ void metadata_is_validated_not_stored() {
 
 // Owner decision D1, option 2, on the clipboard side: every host's clipboard
 // read decodes a profile-tagged PNG, treating its samples as sRGB, into the
-// straight-alpha RGBA8 host-service contract.
+// premultiplied BGRA8 host-service contract.
 void clipboard_reads_ignore_profile() {
     const Format rgba{6, 8, 4};
     const Bytes plain = png_file(9, 7, rgba, false, {});
@@ -303,14 +303,17 @@ void clipboard_reads_ignore_profile() {
     require((*read.image()).width == 9U && (*read.image()).height == 7U && (*read.image()).row_bytes == 36U,
             "clipboard image shape");
     require((*read.image()).pixels == (*reference.image()).pixels, "clipboard iCCP changed samples");
-    // Straight alpha, as the host contract states.
+    // Premultiplied BGRA8, as the host contract states: round(c * a / 255).
     for (std::uint32_t y = 0; y < 7U; ++y) {
         for (std::uint32_t x = 0; x < 9U; ++x) {
             const std::size_t at = (static_cast<std::size_t>(y) * 9U + x) * 4U;
-            for (unsigned channel = 0; channel < 4U; ++channel) {
-                require(std::to_integer<unsigned>((*read.image()).pixels[at + channel]) ==
-                        sample_at(x, y, channel, rgba), "clipboard sample is not straight RGBA8");
+            const unsigned alpha = sample_at(x, y, 3U, rgba);
+            for (unsigned channel = 0; channel < 3U; ++channel) {
+                const unsigned premultiplied = (sample_at(x, y, channel, rgba) * alpha + 127U) / 255U;
+                require(std::to_integer<unsigned>((*read.image()).pixels[at + 2U - channel]) == premultiplied,
+                        "clipboard sample is not premultiplied BGRA8");
             }
+            require(std::to_integer<unsigned>((*read.image()).pixels[at + 3U]) == alpha, "clipboard alpha changed");
         }
     }
     Bytes corrupt = plain;
