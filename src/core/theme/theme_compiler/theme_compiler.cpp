@@ -76,9 +76,9 @@ ThemeCompileDiagnostic public_diagnostic(const ThemeDiagnostic& diagnostic) {
 }
 
 ThemeCompileResult refusal(const ThemeDiagnostic& problem) {
-    ThemeCompileResult result{};
-    result.diagnostics.push_back(public_diagnostic(problem));
-    return result;
+    std::vector<ThemeCompileDiagnostic> diagnostics{};
+    diagnostics.push_back(public_diagnostic(problem));
+    return ThemeCompileResult::refused(std::move(diagnostics));
 }
 
 ThemeDiagnostic problem_of(DiagnosticCode code, std::string file, std::string detail) {
@@ -284,17 +284,17 @@ ThemeCompileResult compile_closure(const VerifiedThemePack& root, const theme_la
     theme_language::ThemeCompiler compiler{};
     theme_language::ThemeDiagnosticList diagnostics{};
     const theme_language::CompileOutcome outcome = compiler.compile(input, (*definition).rules, diagnostics);
-    ThemeCompileResult result{};
-    for (const VerifiedThemePack* const pack : order) check_coverage(*pack, options.controls, result.diagnostics);
+    std::vector<ThemeCompileDiagnostic> found{};
+    for (const VerifiedThemePack* const pack : order) check_coverage(*pack, options.controls, found);
     for (const ThemeDiagnostic& diagnostic : diagnostics.records()) {
         ThemeDiagnostic placed = diagnostic;
         place(placed, segments);
-        result.diagnostics.push_back(public_diagnostic(placed));
+        found.push_back(public_diagnostic(placed));
     }
-    if (outcome != theme_language::CompileOutcome::compiled) return result;
+    if (outcome != theme_language::CompileOutcome::compiled) return ThemeCompileResult::refused(std::move(found));
     (*definition).id = root.manifest.name;
-    result.theme = detail::ThemeAccess::create_holding(*definition, std::move(held));
-    return result;
+    std::shared_ptr<const Theme> theme = detail::ThemeAccess::create_holding(*definition, std::move(held));
+    return ThemeCompileResult::compiled(std::move(theme), std::move(found));
 }
 
 } // namespace
@@ -372,6 +372,33 @@ ThemeCompileResult compile_installed_theme(std::string_view name, const ThemeLib
     }
     return compile_closure(*root, ThemeLibraryAccess::index(library), images, *ThemeLibraryAccess::images(library),
                            options);
+}
+
+ThemeCompileResult::ThemeCompileResult(std::variant<Compiled, Refused> state) noexcept : state_(std::move(state)) {}
+
+ThemeCompileResult ThemeCompileResult::compiled(std::shared_ptr<const Theme> theme,
+                                                std::vector<ThemeCompileDiagnostic> warnings) noexcept {
+    return ThemeCompileResult(Compiled{.theme = std::move(theme), .warnings = std::move(warnings)});
+}
+
+ThemeCompileResult ThemeCompileResult::refused(std::vector<ThemeCompileDiagnostic> diagnostics) noexcept {
+    return ThemeCompileResult(Refused{.diagnostics = std::move(diagnostics)});
+}
+
+bool ThemeCompileResult::succeeded() const noexcept { return std::holds_alternative<Compiled>(state_); }
+
+std::shared_ptr<const Theme> ThemeCompileResult::theme() const noexcept {
+    const Compiled* const compiled = std::get_if<Compiled>(&state_);
+    if (compiled == nullptr) return nullptr;
+    return (*compiled).theme;
+}
+
+std::span<const ThemeCompileDiagnostic> ThemeCompileResult::diagnostics() const noexcept {
+    const Compiled* const compiled = std::get_if<Compiled>(&state_);
+    if (compiled != nullptr) return (*compiled).warnings;
+    const Refused* const refused = std::get_if<Refused>(&state_);
+    if (refused != nullptr) return (*refused).diagnostics;
+    return {};
 }
 
 InlineStyleResult::InlineStyleResult(std::variant<Applied, Refused> state) noexcept : state_(std::move(state)) {}
