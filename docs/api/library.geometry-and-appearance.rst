@@ -185,7 +185,7 @@ Types
    * - :cpp:class:`PartPaint <gui_forms::PartPaint>`
      - One part to paint, in the control's local coordinates.
    * - :cpp:class:`PartRaster <gui_forms::PartRaster>`
-     - One part's pixels as the engine keeps them (T2 plan, PartRaster): premultiplied RGBA8 in device pixels, in PartRasterView's layout, made for one display scale.
+     - One part's pixels as the engine keeps them (T2 plan, PartRaster): premultiplied BGRA8 in device pixels, in PartRasterView's layout, made for one display scale.
    * - :cpp:class:`PartRasterRequest <gui_forms::PartRasterRequest>`
      - What a part needs drawn: the primitive a rule selected, its parameters, the part's target, and the destination extent in device pixels (normally the logical size grown by the primitive's outsets, times the scale, rounded up).
    * - :cpp:class:`PartRasterResult <gui_forms::PartRasterResult>`
@@ -1344,7 +1344,7 @@ Types
 
    .. cpp:function:: RasterOutcome rasterize(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target, const PrimitivePreparation& preparation, const PartRasterView& destination) const noexcept
 
-      Validates the destination, the target, the parameters and the preparation once, then fills every pixel of the destination with premultiplied RGBA8. Anything but ``painted`` leaves the destination's bytes unchanged.
+      Validates the destination, the target, the parameters and the preparation once, then fills every pixel of the destination with premultiplied BGRA8. Anything but ``painted`` leaves the destination's bytes unchanged.
 
 
    .. rubric:: Extension points
@@ -2789,7 +2789,7 @@ Types
 
    ``#include <gui_forms/engine/part_raster/part_raster.hpp>``
 
-   One part's pixels as the engine keeps them (T2 plan, PartRaster): premultiplied RGBA8 in device pixels, in PartRasterView's layout, made for one display scale. Rows are tight: row_bytes is width * 4. Lifetime: create() makes a raster with every pixel transparent; its maker fills it through view() and then shares it read-only, as std::shared_ptr<const PartRaster>, with every recorded command that composites it (Painter::draw_part_raster). Recorded commands keep it alive until their display chunk is rebuilt or retired.
+   One part's pixels as the engine keeps them (T2 plan, PartRaster): premultiplied BGRA8 in device pixels, in PartRasterView's layout, made for one display scale. Rows are tight: row_bytes is width * 4. Lifetime: create() makes a raster with every pixel transparent; its maker fills it through view() and then shares it read-only, as std::shared_ptr<const PartRaster>, with every recorded command that composites it (Painter::draw_part_raster). Recorded commands keep it alive until their display chunk is rebuilt or retired.
 
 
    .. rubric:: Properties
@@ -6036,7 +6036,7 @@ Functions, constants and aliases
 
 .. cpp:var:: constexpr std::size_t part_raster_bytes_per_pixel
 
-   Bytes in one pixel: red, green, blue, alpha in that memory order, each premultiplied by alpha (red, green and blue never exceed alpha). Value: ``4``.
+   Bytes in one pixel: blue, green, red, alpha in that memory order (BGRA8, the one pixel format of every surface and raster), each colour premultiplied by alpha (blue, green and red never exceed alpha). Value: ``4``.
 
 .. cpp:namespace:: gui_forms
 

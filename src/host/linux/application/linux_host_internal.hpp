@@ -11,6 +11,8 @@
 #include <deque>
 #include <mutex>
 #include <memory>
+#include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <thread>
 
@@ -52,6 +54,29 @@ private:
   Runtime &runtime_;
 };
 DragFileListData local_files(const std::vector<std::byte>& data);
+// A present's source: the raster's premultiplied BGRA8 pixels, row_bytes
+// apart, and the window's alpha mask, presented when present_alpha (a
+// non-opaque backdrop is granted) and otherwise set opaque.
+struct NativePresentSource final {
+  const unsigned char* pixels{};
+  std::size_t row_bytes{0};
+  unsigned long alpha_mask{0};
+  bool present_alpha{false};
+};
+// How a present converts pixels for a native image's layout. plain_copy is
+// the common visual (32-bit native byte order, blue, green and red in the low
+// three bytes, alpha presented in the fourth or absent): the raster's rows as
+// they are. The others are the fallback kernels: byte_channels moves 8-bit
+// channels into other byte positions, scaled32 scales channels of other
+// widths into 32-bit pixels, and generic writes each pixel with XPutPixel.
+enum class NativePresentKernel : std::uint8_t { plain_copy, byte_channels, scaled32, generic };
+// Converts the rectangle [left, right) x [top, bottom) of `source` into
+// `image` (whose data holds bytes_per_line * height bytes and covers the
+// rectangle) and returns the kernel used; nullopt, converting nothing, for a
+// mask wider than 32 bits.
+[[nodiscard]] std::optional<NativePresentKernel> convert_present_rectangle(XImage& image,
+                                                                         const NativePresentSource& source,
+                                                                         int left, int top, int right, int bottom);
 class Services final : public HostServices {
 public:
   explicit Services(NativeWindow &window);

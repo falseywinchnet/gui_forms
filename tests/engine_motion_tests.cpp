@@ -15,6 +15,7 @@
 
 #include "gui_forms/gui_forms.hpp"
 #include "support/theme_definition_heap.hpp"
+#include "support/rgba_order.hpp"
 
 #include <array>
 #include <chrono>
@@ -377,7 +378,7 @@ std::size_t run_until_settled(RibbonFixture& fixture, BitHash& hash, std::vector
         amplitudes.push_back(frame.amplitude);
         hash.add_number(frame.amplitude);
         // A flat face draws nothing: its raster is not redrawn.
-        if (frame.amplitude > 0.0) hash.add_bytes(frame.pixels);
+        if (frame.amplitude > 0.0) hash.add_bytes(gui_forms::test_support::rgba_order(frame.pixels));
     }
     return frames;
 }

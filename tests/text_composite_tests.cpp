@@ -13,7 +13,6 @@ using detail::TextCompositeClip;
 using detail::TextCompositeStatus;
 using detail::TextCompositeTarget;
 using detail::TextCoverage;
-using detail::TextPixelOrder;
 
 void require(const bool condition, const char* message) {
     if (condition) return;
@@ -22,12 +21,12 @@ void require(const bool condition, const char* message) {
 }
 
 std::uint32_t composite_one(const std::uint8_t coverage_value, const Color color, const std::uint32_t destination,
-                            const TextPixelOrder order, const bool opaque) {
+                            const bool opaque) {
     std::array<std::uint32_t, 1> pixels{destination};
     const std::array<std::uint8_t, 1> coverage{coverage_value};
     const TextCompositeStatus status = detail::composite_text_coverage(
         {.pixels = coverage, .width = 1, .height = 1, .left = 0, .top = 0},
-        {.pixels = pixels, .width = 1, .height = 1, .stride = 1, .order = order, .opaque = opaque},
+        {.pixels = pixels, .width = 1, .height = 1, .stride = 1, .opaque = opaque},
         {.rect = {0.0, 0.0, 1.0, 1.0}}, color);
     require(status == TextCompositeStatus::success, "single pixel composite");
     return pixels[0];
@@ -44,27 +43,26 @@ void unclipped_alpha_matches_previous_rule() {
         }
     }
     // Black at alpha 128 over white: (255 * 127 + 127) / 255 = 127 per channel.
-    const std::uint32_t grey = composite_one(255U, Color::rgba(0, 0, 0, 128), 0xffffffffU, TextPixelOrder::bgra, true);
+    const std::uint32_t grey = composite_one(255U, Color::rgba(0, 0, 0, 128), 0xffffffffU, true);
     require(grey == 0xff7f7f7fU, "previous Windows alpha/blend contract");
 }
 
-void pixel_orders_agree() {
-    const Color colour = Color::rgba(200, 40, 90, 230);
-    for (unsigned coverage = 0; coverage < 256U; coverage += 15U) {
-        const std::uint32_t bgra_destination = (12U << 16U) | (34U << 8U) | 56U | (200U << 24U);
-        const std::uint32_t rgba_destination = 12U | (34U << 8U) | (56U << 16U) | (200U << 24U);
-        const std::uint32_t bgra = composite_one(static_cast<std::uint8_t>(coverage), colour, bgra_destination, TextPixelOrder::bgra, false);
-        const std::uint32_t rgba = composite_one(static_cast<std::uint8_t>(coverage), colour, rgba_destination, TextPixelOrder::rgba, false);
-        const std::uint32_t swapped = (rgba & 0xff00ff00U) | ((rgba & 0xffU) << 16U) | ((rgba >> 16U) & 0xffU);
-        require(bgra == swapped, "BGRA and RGBA give the same channels");
-    }
+// Targets are BGRA8: as a little-endian word, blue is the low byte and red is
+// at bit 16.
+void pixels_are_bgra() {
+    const std::uint32_t covered = composite_one(255U, Color::rgba(200, 40, 90, 255), 0U, false);
+    require(covered == ((255U << 24U) | (200U << 16U) | (40U << 8U) | 90U), "red at bit 16, blue in the low byte");
+    // Each destination channel blends with its own source channel.
+    const std::uint32_t destination = (200U << 24U) | (12U << 16U) | (34U << 8U) | 56U;
+    const std::uint32_t half = composite_one(128U, Color::rgba(255, 0, 0, 255), destination, false);
+    require(((half >> 16U) & 255U) > 12U && (half & 255U) < 56U, "red rises and blue falls under a red source");
 }
 
 void alpha_channel_modes() {
     const std::uint32_t transparent = 0U;
-    const std::uint32_t premultiplied = composite_one(255U, Color::rgba(255, 255, 255, 128), transparent, TextPixelOrder::rgba, false);
+    const std::uint32_t premultiplied = composite_one(255U, Color::rgba(255, 255, 255, 128), transparent, false);
     require((premultiplied >> 24U) == 128U, "premultiplied destination gains the source alpha");
-    const std::uint32_t opaque = composite_one(255U, Color::rgba(255, 255, 255, 128), transparent, TextPixelOrder::bgra, true);
+    const std::uint32_t opaque = composite_one(255U, Color::rgba(255, 255, 255, 128), transparent, true);
     require((opaque >> 24U) == 255U, "opaque destinations stay opaque");
 }
 
@@ -129,7 +127,7 @@ void clipped_composite_blends_partially() {
     const std::array<std::uint8_t, 4> coverage{255U, 255U, 255U, 255U};
     const TextCompositeStatus status = detail::composite_text_coverage(
         {.pixels = coverage, .width = 4, .height = 1},
-        {.pixels = pixels, .width = 4, .height = 1, .stride = 4, .order = TextPixelOrder::bgra, .opaque = true},
+        {.pixels = pixels, .width = 4, .height = 1, .stride = 4, .opaque = true},
         {.rect = {0.5, 0.0, 3.0, 1.0}}, Color::rgba(0, 0, 0, 255));
     require(status == TextCompositeStatus::success, "clipped composite succeeds");
     // Half-covered edge pixels blend half way; covered pixels are black.
@@ -144,7 +142,7 @@ void clipped_composite_blends_partially() {
 void source_mode_replaces() {
     std::array<std::uint32_t, 1> pixels{0xff00ff00U};
     const std::array<std::uint8_t, 1> full{255U};
-    const TextCompositeTarget target{.pixels = pixels, .width = 1, .height = 1, .stride = 1, .order = TextPixelOrder::bgra};
+    const TextCompositeTarget target{.pixels = pixels, .width = 1, .height = 1, .stride = 1};
     const TextCompositeClip clip{.rect = {0.0, 0.0, 1.0, 1.0}};
     TextCompositeStatus status = detail::composite_text_coverage({.pixels = full, .width = 1, .height = 1}, target, clip,
                                                                  Color::rgba(255, 0, 0, 128), detail::TextCompositeMode::source);
@@ -172,7 +170,7 @@ void source_mode_replaces() {
 
 int main() {
     unclipped_alpha_matches_previous_rule();
-    pixel_orders_agree();
+    pixels_are_bgra();
     alpha_channel_modes();
     fractional_rect_edges_are_area_coverage();
     rounded_corners_are_antialiased();

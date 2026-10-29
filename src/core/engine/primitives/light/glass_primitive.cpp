@@ -90,7 +90,7 @@ double unit_lane(std::uint32_t value) noexcept {
 Unit backplane_pixel(const PartRaster& backplane, std::size_t margin, std::size_t column, std::size_t row) noexcept {
     const std::span<const std::uint8_t> bytes = backplane.pixels();
     const std::size_t at = (row + margin) * backplane.row_bytes() + (column + margin) * lanes;
-    const Unit pixel{unit_lane(bytes[at]), unit_lane(bytes[at + 1U]), unit_lane(bytes[at + 2U]),
+    const Unit pixel{unit_lane(bytes[at + 2U]), unit_lane(bytes[at + 1U]), unit_lane(bytes[at]),
                      unit_lane(bytes[at + 3U])};
     return pixel;
 }
@@ -189,8 +189,8 @@ void GlassPrimitive::fill(const PrimitiveParameterBlock& parameters, const Primi
             Unit pixel{};
             if (sampled) {
                 const std::size_t at = row * blurred.stride + column * lanes;
-                pixel = Unit{unit_lane(blurred.pixels[at]), unit_lane(blurred.pixels[at + 1U]),
-                             unit_lane(blurred.pixels[at + 2U]), unit_lane(blurred.pixels[at + 3U])};
+                pixel = Unit{unit_lane(blurred.pixels[at + 2U]), unit_lane(blurred.pixels[at + 1U]),
+                             unit_lane(blurred.pixels[at]), unit_lane(blurred.pixels[at + 3U])};
                 if (filtered) pixel = colour_filtered(filter, pixel);
             }
             if (flattened_over_backplane) {

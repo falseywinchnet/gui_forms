@@ -12,6 +12,7 @@
 // observed table instead of checking it.
 
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
+#include "support/rgba_order.hpp"
 
 #include <algorithm>
 #include <array>
@@ -64,7 +65,8 @@ struct TestRaster final {
     }
     [[nodiscard]] std::array<std::uint8_t, 4> pixel(std::uint32_t column, std::uint32_t row) const {
         const std::size_t offset = static_cast<std::size_t>(row) * row_bytes + static_cast<std::size_t>(column) * 4U;
-        const std::array<std::uint8_t, 4> value{bytes[offset], bytes[offset + 1U], bytes[offset + 2U],
+        // The raster is BGRA8; the value is red, green, blue, alpha.
+        const std::array<std::uint8_t, 4> value{bytes[offset + 2U], bytes[offset + 1U], bytes[offset],
                                                 bytes[offset + 3U]};
         return value;
     }
@@ -87,8 +89,10 @@ std::uint64_t raster_hash(const TestRaster& raster) {
     for (std::uint32_t row = 0U; row < raster.extent.height; ++row) {
         const std::size_t start = static_cast<std::size_t>(row) * raster.row_bytes;
         const std::size_t end = start + static_cast<std::size_t>(raster.extent.width) * 4U;
-        for (std::size_t index = start; index < end; ++index) {
-            hash = hash ^ raster.bytes[index];
+        const std::span<const std::uint8_t> row_pixels =
+            std::span<const std::uint8_t>(raster.bytes).subspan(start, end - start);
+        for (const std::uint8_t byte : gui_forms::test_support::rgba_order(row_pixels)) {
+            hash = hash ^ byte;
             hash = hash * 1099511628211ULL;
         }
     }
@@ -866,8 +870,11 @@ void dump_raster(const TestRaster& raster, const char* primitive, const char* va
     std::ofstream file(path, std::ios::binary);
     for (std::uint32_t row = 0U; row < raster.extent.height; ++row) {
         const std::size_t start = static_cast<std::size_t>(row) * raster.row_bytes;
-        const char* const bytes = reinterpret_cast<const char*>(raster.bytes.data() + start);
-        file.write(bytes, static_cast<std::streamsize>(raster.extent.width) * 4);
+        const std::size_t width_bytes = static_cast<std::size_t>(raster.extent.width) * 4U;
+        const std::span<const std::uint8_t> row_pixels =
+            std::span<const std::uint8_t>(raster.bytes).subspan(start, width_bytes);
+        const std::vector<std::uint8_t> rgba = gui_forms::test_support::rgba_order(row_pixels);
+        file.write(reinterpret_cast<const char*>(rgba.data()), static_cast<std::streamsize>(rgba.size()));
     }
 }
 

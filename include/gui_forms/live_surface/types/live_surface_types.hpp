@@ -7,14 +7,15 @@
 
 namespace gui_forms {
 
+// Premultiplied sRGB BGRA8, the one pixel format of every surface and raster
+// (SK2): blue, green, red and alpha bytes in memory order.
 enum class LiveSurfacePixelFormat : std::uint8_t {
     bgra32_premultiplied_srgb,
-    rgba32_premultiplied_srgb,
 };
 
-// Valid before attachment. Native-order opaque pixels allow a straight copy
-// for pixel-aligned, unscaled presentation at full opacity: Windows DIBs use
-// BGRA; macOS and Linux Skia rasters use RGBA. Other formats remain supported.
+// Valid before attachment: bgra32_premultiplied_srgb on every host. Opaque
+// pixels allow a straight copy for pixel-aligned, unscaled presentation at
+// full opacity.
 [[nodiscard]] LiveSurfacePixelFormat native_live_surface_pixel_format() noexcept;
 
 inline constexpr std::size_t default_live_surface_buffer_count = 3U;

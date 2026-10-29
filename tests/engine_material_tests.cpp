@@ -24,6 +24,7 @@
 
 #include "gui_forms/control.hpp"
 #include "support/theme_definition_heap.hpp"
+#include "support/rgba_order.hpp"
 #include "gui_forms/controls/panel/panel.hpp"
 #include "gui_forms/engine.hpp"
 #include "gui_forms/surface_material/presets/material_presets.hpp"
@@ -99,7 +100,8 @@ struct TestRaster final {
     }
     [[nodiscard]] std::array<std::uint8_t, 4> pixel(std::uint32_t column, std::uint32_t row) const {
         const std::size_t offset = static_cast<std::size_t>(row) * row_bytes + static_cast<std::size_t>(column) * 4U;
-        const std::array<std::uint8_t, 4> value{bytes[offset], bytes[offset + 1U], bytes[offset + 2U],
+        // The raster is BGRA8; the value is red, green, blue, alpha.
+        const std::array<std::uint8_t, 4> value{bytes[offset + 2U], bytes[offset + 1U], bytes[offset],
                                                 bytes[offset + 3U]};
         return value;
     }
@@ -122,8 +124,10 @@ std::uint64_t raster_hash(const TestRaster& raster) {
     for (std::uint32_t row = 0U; row < raster.extent.height; ++row) {
         const std::size_t start = static_cast<std::size_t>(row) * raster.row_bytes;
         const std::size_t end = start + static_cast<std::size_t>(raster.extent.width) * 4U;
-        for (std::size_t index = start; index < end; ++index) {
-            hash = hash ^ raster.bytes[index];
+        const std::span<const std::uint8_t> row_pixels =
+            std::span<const std::uint8_t>(raster.bytes).subspan(start, end - start);
+        for (const std::uint8_t byte : gui_forms::test_support::rgba_order(row_pixels)) {
+            hash = hash ^ byte;
             hash = hash * 1099511628211ULL;
         }
     }
@@ -516,7 +520,8 @@ constexpr std::uint64_t expected_placement_hashes[] = {
 // premultiplied colour plus the background times one less its alpha.
 TestRaster over_background(const TestRaster& raster, Color background) {
     TestRaster composite = raster;
-    const std::array<std::uint32_t, 3> under{background.red, background.green, background.blue};
+    // BGRA8: blue, green, red.
+    const std::array<std::uint32_t, 3> under{background.blue, background.green, background.red};
     for (std::uint32_t row = 0U; row < raster.extent.height; ++row) {
         for (std::uint32_t column = 0U; column < raster.extent.width; ++column) {
             const std::size_t offset =
@@ -1134,7 +1139,7 @@ std::uint64_t bakes(const Window& window) {
 
 std::uint64_t pixels_hash(const PartRaster& raster) {
     std::uint64_t hash = 14695981039346656037ULL;
-    for (const std::uint8_t byte : raster.pixels()) {
+    for (const std::uint8_t byte : gui_forms::test_support::rgba_order(raster.pixels())) {
         hash = hash ^ byte;
         hash = hash * 1099511628211ULL;
     }

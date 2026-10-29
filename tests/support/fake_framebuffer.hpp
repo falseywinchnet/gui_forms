@@ -38,14 +38,13 @@ public:
     std::size_t images{};
 };
 
-// Every pixel is {1, 2, 3, 4} in the framebuffer's own channel order. The
+// Every pixel is the bytes {1, 2, 3, 4}, premultiplied BGRA8. The
 // commands replayed into it go to `painter`, borrowed from its FakeRaster,
 // which outlives it.
 class FakeFramebuffer final : public gui_forms::PaintFramebuffer {
 public:
-    FakeFramebuffer(std::uint32_t width, std::uint32_t height, gui_forms::FramebufferChannelOrder order,
-                    CountingPainter& painter)
-        : width_(width), height_(height), order_(order), pixels_(static_cast<std::size_t>(width) * height * 4U),
+    FakeFramebuffer(std::uint32_t width, std::uint32_t height, CountingPainter& painter)
+        : width_(width), height_(height), pixels_(static_cast<std::size_t>(width) * height * 4U),
           painter_(&painter) {
         for (std::size_t index = 0; index < pixels_.size(); ++index) {
             pixels_[index] = static_cast<std::byte>(1U + index % 4U);
@@ -61,7 +60,6 @@ public:
     std::size_t row_bytes() const noexcept override { return static_cast<std::size_t>(width_) * 4U; }
     std::uint32_t width() const noexcept override { return width_; }
     std::uint32_t height() const noexcept override { return height_; }
-    gui_forms::FramebufferChannelOrder channel_order() const noexcept override { return order_; }
 
     std::size_t begun{};
     std::size_t ended{};
@@ -69,7 +67,6 @@ public:
 private:
     std::uint32_t width_{};
     std::uint32_t height_{};
-    gui_forms::FramebufferChannelOrder order_{gui_forms::FramebufferChannelOrder::bgra};
     std::vector<std::byte> pixels_;
     CountingPainter* painter_{};
 };
@@ -79,9 +76,6 @@ private:
 // and gathers every framebuffer's replayed commands in `replayed`.
 class FakeRaster final : public gui_forms::Painter {
 public:
-    explicit FakeRaster(gui_forms::FramebufferChannelOrder order = gui_forms::FramebufferChannelOrder::rgba)
-        : order_(order) {}
-
     std::unique_ptr<gui_forms::PaintFramebuffer> create_framebuffer(gui_forms::Size logical_size,
                                                                    double scale) override {
         ++made;
@@ -90,7 +84,7 @@ public:
         last_width = width;
         last_height = height;
         std::unique_ptr<FakeFramebuffer> framebuffer =
-            std::make_unique<FakeFramebuffer>(width, height, order_, replayed);
+            std::make_unique<FakeFramebuffer>(width, height, replayed);
         return framebuffer;
     }
 
@@ -108,9 +102,6 @@ public:
     std::size_t made{};
     std::uint32_t last_width{};
     std::uint32_t last_height{};
-
-private:
-    gui_forms::FramebufferChannelOrder order_{gui_forms::FramebufferChannelOrder::rgba};
 };
 
 } // namespace test_support

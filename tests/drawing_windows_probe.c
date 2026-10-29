@@ -25,7 +25,7 @@ int main(void) {
     gd_handle imported = {0};
     gd_handle captured = {0};
     gd_handle presented = {0};
-    gd_handle rgba = {0};
+    gd_handle rejected = {0};
     gd_color pixel = {0};
     uintptr_t hbitmap = 0;
     BITMAP details;
@@ -70,21 +70,9 @@ int main(void) {
     CHECK(api.bitmap_get_pixel(imported, 2, 1, &pixel) == GD_OK);
     CHECK((pixel.argb & UINT32_C(0x00ffffff)) == UINT32_C(0x000000ff));
 
-    /* An RGBA bitmap's lease is a BGRA DIB: GDI sees the bitmap's colours, and
-       release converts the DIB back, so red stays red and GDI's blue is blue. */
-    CHECK(api.bitmap_create(2, 1, GD_PIXEL_RGBA32_PREMULTIPLIED, &rgba) == GD_OK);
-    CHECK(api.bitmap_set_pixel(rgba, 0, 0,
-                               (gd_color){UINT32_C(0xffff0000), 0}) == GD_OK);
-    CHECK(api.bitmap_acquire_hdc(rgba, &leased_hdc, &lease_token) == GD_OK);
-    CHECK(GetPixel((HDC)leased_hdc, 0, 0) == RGB(255, 0, 0));
-    CHECK(SetPixel((HDC)leased_hdc, 1, 0, RGB(0, 0, 255)) != CLR_INVALID);
-    CHECK(api.bitmap_release_hdc(rgba, lease_token) == GD_OK);
-    CHECK(api.bitmap_get_pixel(rgba, 0, 0, &pixel) == GD_OK);
-    CHECK(pixel.argb == UINT32_C(0xffff0000));
-    CHECK(api.bitmap_get_pixel(rgba, 1, 0, &pixel) == GD_OK);
-    CHECK(pixel.argb == UINT32_C(0xff0000ff));
-    CHECK(api.release(rgba) == GD_OK);
-    puts("drawing-windows-rgba-lease=pass");
+    /* Bitmaps are BGRA8 only: the value RGBA had (1) is outside the enum. */
+    CHECK(api.bitmap_create(2, 1, UINT32_C(1), &rejected) == GD_ERROR_INVALID_ARGUMENT);
+    puts("drawing-windows-bgra-only=pass");
 
     memory = CreateCompatibleDC(NULL);
     CHECK(memory != NULL);

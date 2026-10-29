@@ -1,6 +1,7 @@
 #include "gui_forms/canvas.hpp"
 #include "gui_forms/window.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -154,13 +155,13 @@ void canvas_projects_bitmap_changes_as_local_window_damage() {
     CHECK(window.image_resource_snapshot().resource_count == 0U);
 }
 
-void canvas_converts_rgba_storage_without_changing_document_truth() {
-    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("canvas.rgba.root"));
-    std::shared_ptr<gui_forms::RasterCanvas> canvas = make_control<RasterCanvas>(StableId("canvas.rgba"));
+// The canvas uploads its BGRA8 bitmap as it is, without changing it.
+void canvas_uploads_bgra_storage_without_changing_document_truth() {
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("canvas.bgra.root"));
+    std::shared_ptr<gui_forms::RasterCanvas> canvas = make_control<RasterCanvas>(StableId("canvas.bgra"));
     (*root).set_requested_bounds({0, 0, 20, 20});
     (*canvas).set_requested_bounds({0, 0, 20, 20});
-    std::shared_ptr<gui_drawing::Bitmap> bitmap = std::make_shared<gui_drawing::Bitmap>(
-        1, 1, gui_drawing::PixelFormat::rgba32_premultiplied);
+    std::shared_ptr<gui_drawing::Bitmap> bitmap = std::make_shared<gui_drawing::Bitmap>(1, 1);
     (*bitmap).set_pixel(0, 0, gui_drawing::Color::from_rgb(255, 0, 0));
     (*canvas).set_bitmap(bitmap);
     (*root).add_child(canvas);
@@ -184,81 +185,86 @@ void canvas_converts_rgba_storage_without_changing_document_truth() {
     CHECK(window.image_resource_snapshot().resource_count == 1U);
 }
 
-// Every tile resource of an RGBA canvas equals the BGRA canvas's for the same picture,
-// after publication and after strided edits that cross tile gutters.
-bool same_tile_resources(Window& first, Window& second) {
-    const std::vector<ImageId> first_ids = first.image_resources().image_ids();
-    const std::vector<ImageId> second_ids = second.image_resources().image_ids();
-    if (first_ids.size() != second_ids.size()) return false;
-    for (std::size_t index = 0; index < first_ids.size(); ++index) {
-        const std::optional<ImageResourceView> a = first.image_resources().find(first_ids[index]);
-        const std::optional<ImageResourceView> b = second.image_resources().find(second_ids[index]);
-        if (!a || !b) return false;
-        if ((*a).metadata.width != (*b).metadata.width ||
-            (*a).metadata.height != (*b).metadata.height ||
-            (*a).encoded.size() != (*b).encoded.size()) return false;
-        for (std::size_t byte = 0; byte < (*a).encoded.size(); ++byte) {
-            if ((*a).encoded[byte] != (*b).encoded[byte]) return false;
-        }
+// A tile resource's size and bytes.
+struct TileContent final {
+    std::uint32_t width{};
+    std::uint32_t height{};
+    std::vector<std::byte> bytes{};
+
+    [[nodiscard]] bool operator<(const TileContent& other) const {
+        if (width != other.width) return width < other.width;
+        if (height != other.height) return height < other.height;
+        return bytes < other.bytes;
     }
-    return true;
+    [[nodiscard]] bool operator==(const TileContent& other) const {
+        return width == other.width && height == other.height && bytes == other.bytes;
+    }
+};
+
+// A window's tile resources, in an order independent of their ids.
+std::vector<TileContent> tile_contents(Window& window) {
+    std::vector<TileContent> contents{};
+    for (const ImageId id : window.image_resources().image_ids()) {
+        const std::optional<ImageResourceView> resource = window.image_resources().find(id);
+        CHECK(resource.has_value());
+        TileContent content{};
+        content.width = (*resource).metadata.width;
+        content.height = (*resource).metadata.height;
+        content.bytes.assign((*resource).encoded.begin(), (*resource).encoded.end());
+        contents.push_back(std::move(content));
+    }
+    std::sort(contents.begin(), contents.end());
+    return contents;
 }
 
-void edit_both(gui_drawing::Bitmap& rgba, gui_drawing::Bitmap& bgra, gui_drawing::RectI area,
+// Writes the same seeded opaque BGRA8 pixels over `area` of both bitmaps.
+void edit_both(gui_drawing::Bitmap& first, gui_drawing::Bitmap& second, gui_drawing::RectI area,
                std::uint32_t seed) {
-    gui_drawing::BitmapEditView rgba_edit = rgba.begin_edit(area);
-    gui_drawing::BitmapEditView bgra_edit = bgra.begin_edit(area);
+    gui_drawing::BitmapEditView first_edit = first.begin_edit(area);
+    gui_drawing::BitmapEditView second_edit = second.begin_edit(area);
     std::uint32_t state = seed;
     for (std::int32_t row = 0; row < area.height; ++row) {
         for (std::int32_t column = 0; column < area.width; ++column) {
             state = state * 1664525U + 1013904223U;
-            const std::byte red{static_cast<unsigned char>(state >> 24)};
-            const std::byte green{static_cast<unsigned char>(state >> 16)};
-            const std::byte blue{static_cast<unsigned char>(state >> 8)};
-            const std::size_t rgba_at = static_cast<std::size_t>(row) * rgba_edit.row_bytes +
+            const std::array<std::byte, 4> pixel{std::byte{static_cast<unsigned char>(state >> 8)},
+                                                 std::byte{static_cast<unsigned char>(state >> 16)},
+                                                 std::byte{static_cast<unsigned char>(state >> 24)},
+                                                 std::byte{255}};
+            const std::size_t first_at = static_cast<std::size_t>(row) * first_edit.row_bytes +
                 static_cast<std::size_t>(column) * 4U;
-            const std::size_t bgra_at = static_cast<std::size_t>(row) * bgra_edit.row_bytes +
+            const std::size_t second_at = static_cast<std::size_t>(row) * second_edit.row_bytes +
                 static_cast<std::size_t>(column) * 4U;
-            rgba_edit.writable_data[rgba_at] = red;
-            rgba_edit.writable_data[rgba_at + 1U] = green;
-            rgba_edit.writable_data[rgba_at + 2U] = blue;
-            rgba_edit.writable_data[rgba_at + 3U] = std::byte{255};
-            bgra_edit.writable_data[bgra_at] = blue;
-            bgra_edit.writable_data[bgra_at + 1U] = green;
-            bgra_edit.writable_data[bgra_at + 2U] = red;
-            bgra_edit.writable_data[bgra_at + 3U] = std::byte{255};
+            for (std::size_t lane = 0U; lane < 4U; ++lane) {
+                first_edit.writable_data[first_at + lane] = pixel[lane];
+                second_edit.writable_data[second_at + lane] = pixel[lane];
+            }
         }
     }
-    CHECK(rgba.commit_edit(rgba_edit.token) != 0U);
-    CHECK(bgra.commit_edit(bgra_edit.token) != 0U);
+    CHECK(first.commit_edit(first_edit.token) != 0U);
+    CHECK(second.commit_edit(second_edit.token) != 0U);
 }
 
-void rgba_tiles_match_bgra_tiles() {
+// Strided edits that cross the tile gutters leave the tile resources equal to
+// a fresh publication of the same picture.
+void strided_edits_match_a_fresh_publication() {
     constexpr std::uint32_t width = 1100;
     constexpr std::uint32_t height = 600;
-    const std::shared_ptr<gui_drawing::Bitmap> rgba = std::make_shared<gui_drawing::Bitmap>(
-        width, height, gui_drawing::PixelFormat::rgba32_premultiplied);
-    const std::shared_ptr<gui_drawing::Bitmap> bgra =
-        std::make_shared<gui_drawing::Bitmap>(width, height);
+    const std::shared_ptr<gui_drawing::Bitmap> edited = std::make_shared<gui_drawing::Bitmap>(width, height);
+    const std::shared_ptr<gui_drawing::Bitmap> mirror = std::make_shared<gui_drawing::Bitmap>(width, height);
     std::uint32_t state = 0x9e3779b9U;
     for (std::uint32_t y = 0; y < height; y += 7) {
         for (std::uint32_t x = 0; x < width; x += 5) {
             state = state * 1664525U + 1013904223U;
             const gui_drawing::Color color = gui_drawing::Color::from_argb(state | 0xff000000U);
-            (*rgba).set_pixel(x, y, color);
-            (*bgra).set_pixel(x, y, color);
+            (*edited).set_pixel(x, y, color);
+            (*mirror).set_pixel(x, y, color);
         }
     }
-    const std::shared_ptr<RasterCanvas> rgba_canvas = make_control<RasterCanvas>(StableId("rgba.tiles"));
-    const std::shared_ptr<RasterCanvas> bgra_canvas = make_control<RasterCanvas>(StableId("bgra.tiles"));
-    (*rgba_canvas).set_bitmap(rgba);
-    (*bgra_canvas).set_bitmap(bgra);
-    Window rgba_window(rgba_canvas, {200, 200});
-    Window bgra_window(bgra_canvas, {200, 200});
-    rgba_window.perform_layout();
-    bgra_window.perform_layout();
-    CHECK(rgba_window.image_resources().image_ids().size() == 6U);
-    CHECK(same_tile_resources(rgba_window, bgra_window));
+    const std::shared_ptr<RasterCanvas> canvas = make_control<RasterCanvas>(StableId("edited.tiles"));
+    (*canvas).set_bitmap(edited);
+    Window window(canvas, {200, 200});
+    window.perform_layout();
+    CHECK(window.image_resources().image_ids().size() == 6U);
 
     // Across the vertical and horizontal tile boundaries, one column, one row, and a
     // bottom-right edge tile.
@@ -268,11 +274,14 @@ void rgba_tiles_match_bgra_tiles() {
                                                   gui_drawing::RectI{1030, 590, 70, 10}};
     std::uint32_t seed = 7U;
     for (const gui_drawing::RectI area : edits) {
-        edit_both(*rgba, *bgra, area, seed);
+        edit_both(*edited, *mirror, area, seed);
         seed += 101U;
-        CHECK((*rgba_canvas).synchronize_bitmap());
-        CHECK((*bgra_canvas).synchronize_bitmap());
-        CHECK(same_tile_resources(rgba_window, bgra_window));
+        CHECK((*canvas).synchronize_bitmap());
+        const std::shared_ptr<RasterCanvas> fresh = make_control<RasterCanvas>(StableId("fresh.tiles"));
+        (*fresh).set_bitmap(mirror);
+        Window fresh_window(fresh, {200, 200});
+        fresh_window.perform_layout();
+        CHECK(tile_contents(window) == tile_contents(fresh_window));
     }
 }
 
@@ -378,8 +387,8 @@ void hundred_megapixel_publication_probe() {
 int main(int argc, char** argv) {
     derived_canvas_keeps_routing_presentation_and_resource_lifetime();
     canvas_projects_bitmap_changes_as_local_window_damage();
-    canvas_converts_rgba_storage_without_changing_document_truth();
-    rgba_tiles_match_bgra_tiles();
+    canvas_uploads_bgra_storage_without_changing_document_truth();
+    strided_edits_match_a_fresh_publication();
     tiled_updates_include_sampling_gutters_and_recover_resources();
     explicit_window_quota_rolls_back_partial_tile_publication();
     if (argc > 1 && std::string_view(argv[1]) == "--large") hundred_megapixel_publication_probe();

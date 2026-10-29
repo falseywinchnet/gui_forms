@@ -54,7 +54,7 @@ std::uint64_t draw_group_case(const std::size_t kind_index, const std::size_t sc
     const std::uint8_t* const bytes = static_cast<const std::uint8_t*>(raster.pixels());
     require(bytes != nullptr, "raster readable");
     if (kind == scene::GroupCase::overlap) {
-        require(scene::overlap_is_one_image(bytes, raster.row_bytes(), text_identity::Order::rgba, scale),
+        require(scene::overlap_is_one_image(bytes, raster.row_bytes(), scale),
                 "a group's overlapping commands composite as one image");
     }
     require((kind == scene::GroupCase::refused) == (raster.group_refusals() == 1U),
@@ -101,8 +101,7 @@ int main() {
         raster.end_frame();
         const std::uint8_t* const bytes = static_cast<const std::uint8_t*>(raster.pixels());
         require(bytes != nullptr, "raster readable");
-        require(scene::copy_scene_holds(bytes, raster.row_bytes(), text_identity::Order::rgba, scene::scales[scale],
-                                        true),
+        require(scene::copy_scene_holds(bytes, raster.row_bytes(), scene::scales[scale], true),
                 "a copy group replaces what lies beneath it");
     }
     // A window's presented frame by its backdrop grant (stage T5, C1).

@@ -22,7 +22,7 @@
 namespace gui_forms::engine_primitives {
 namespace {
 
-// Premultiplied RGBA: four lanes per pixel.
+// Premultiplied BGRA: four lanes per pixel.
 constexpr std::size_t lanes = 4U;
 
 // One region of an axis: source pixels [source_start, source_end) resampled

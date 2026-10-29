@@ -80,7 +80,7 @@ public:
     [[nodiscard]] std::uint32_t pixel_width() const noexcept;
     [[nodiscard]] std::uint32_t pixel_height() const noexcept;
     [[nodiscard]] std::size_t byte_size() const noexcept;
-    // Encodes the presented (front) raster as a straight-alpha RGBA8 PNG.
+    // Encodes the presented (front) raster as a straight-alpha PNG.
     // Returns an empty vector when no front surface exists or encoding fails.
     // Private adapter seam for host frame capture; no Skia type escapes.
     [[nodiscard]] std::vector<std::byte> encode_png() const;
@@ -161,7 +161,7 @@ public:
                             Rect destination, Size logical_tile_size,
                             ImagePatternWrap wrap, double opacity) override;
     // Paint groups (Painter::begin_group). An isolated group draws into its
-    // level's scratch surface (premultiplied RGBA, grown to the largest
+    // level's scratch surface (premultiplied BGRA, grown to the largest
     // clipped bounds met and reused), then composites it once into the
     // parent canvas through the shared blend at the group's opacity, under
     // the clip in force when it began, as part rasters are composited.

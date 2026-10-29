@@ -1,4 +1,5 @@
 #include "clipboard_dib.hpp"
+#include "host_image_pixels.hpp"
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
@@ -43,16 +44,12 @@ std::vector<std::byte> encode_clipboard_dib(HostImageView image) {
     put32(bytes, 52, 0xff000000U);
     put32(bytes, 56, 0x73524742U); // LCS_sRGB
     put32(bytes, 108, 4U); // LCS_GM_IMAGES
+    // The masks above give BGRA memory order; a DIB's alpha is straight.
     for (std::uint32_t y = 0; y < image.height; ++y) {
-        const std::byte* source = image.pixels.data() + static_cast<std::size_t>(image.row_bytes) * y;
-        std::byte* target = bytes.data() + 124U + stride * y;
-        for (std::uint32_t x = 0; x < image.width; ++x) {
-            const std::size_t offset = static_cast<std::size_t>(x) * 4U;
-            target[offset] = source[offset + 2];
-            target[offset + 1] = source[offset + 1];
-            target[offset + 2] = source[offset];
-            target[offset + 3] = source[offset + 3];
-        }
+        const std::span<const std::byte> source =
+            image.pixels.subspan(static_cast<std::size_t>(image.row_bytes) * y, stride);
+        premultiplied_bgra_to_straight_bgra(source, std::span<std::byte>(bytes).subspan(124U + stride * y, stride),
+                                            image.width);
     }
     return bytes;
 }
@@ -127,15 +124,16 @@ HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes, 
             for (std::uint32_t x = 0; x < width; ++x) {
                 const std::size_t dest = static_cast<std::size_t>(x) * 4U;
                 const std::size_t offset = static_cast<std::size_t>(x) * 3U;
-                target[dest] = source[offset + 2U]; target[dest + 1U] = source[offset + 1U];
-                target[dest + 2U] = source[offset]; target[dest + 3U] = std::byte{255};
+                target[dest] = source[offset]; target[dest + 1U] = source[offset + 1U];
+                target[dest + 2U] = source[offset + 2U]; target[dest + 3U] = std::byte{255};
             }
         }
         return HostClipboardImageResult::image_read(std::move(image), generation);
     }
     // 32 bits: every mask is one whole byte of the pixel (checked above), read
     // at its shift. Without an alpha mask the alpha reads as zero and the
-    // fill makes it opaque.
+    // fill makes it opaque. The DIB's straight red, green and blue are
+    // premultiplied into the host image's blue, green, red order.
     unsigned shifts[4]{};
     for (std::size_t channel = 0; channel < 4U; ++channel) shifts[channel] = shift_for(masks[channel]);
     const std::byte alpha_fill = masks[3] == 0U ? std::byte{255} : std::byte{0};
@@ -145,10 +143,13 @@ HostClipboardImageResult decode_clipboard_dib(std::span<const std::byte> bytes, 
         for (std::uint32_t x = 0; x < width; ++x) {
             const std::size_t dest = static_cast<std::size_t>(x) * 4U;
             const std::uint32_t pixel = u32({source + dest, 4U}, 0);
+            const std::uint8_t alpha =
+                static_cast<std::uint8_t>(((pixel & masks[3]) >> shifts[3]) | std::to_integer<std::uint32_t>(alpha_fill));
             for (std::size_t channel = 0; channel < 3U; ++channel) {
-                target[dest + channel] = static_cast<std::byte>((pixel & masks[channel]) >> shifts[channel]);
+                const std::uint8_t straight = static_cast<std::uint8_t>((pixel & masks[channel]) >> shifts[channel]);
+                target[dest + 2U - channel] = std::byte{premultiplied_channel(straight, alpha)};
             }
-            target[dest + 3U] = static_cast<std::byte>((pixel & masks[3]) >> shifts[3]) | alpha_fill;
+            target[dest + 3U] = std::byte{alpha};
         }
     }
     return HostClipboardImageResult::image_read(std::move(image), generation);

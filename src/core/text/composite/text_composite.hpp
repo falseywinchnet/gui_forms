@@ -17,17 +17,14 @@ namespace gui_forms::detail {
 // this one integer arithmetic, so the same coverage, colour, clip and
 // destination give the same bytes on every platform and architecture.
 
-// Memory order of the four 8-bit channels of each 32-bit pixel. Pixels are
-// premultiplied; the hosts are little-endian.
-enum class TextPixelOrder : std::uint8_t { bgra, rgba };
-
+// A target's pixels are premultiplied BGRA8 (blue, green, red, alpha in
+// memory); the hosts are little-endian.
 struct TextCompositeTarget final {
     std::span<std::uint32_t> pixels{};
     std::uint32_t width{};
     std::uint32_t height{};
     // Pixels per row, at least width.
     std::size_t stride{};
-    TextPixelOrder order{TextPixelOrder::bgra};
     // True for surfaces whose alpha channel is not maintained (GDI DIBs):
     // the result is written fully opaque, as before ADR-004.
     bool opaque{};
@@ -89,8 +86,9 @@ enum class TextCompositeMode : std::uint8_t { source_over, source };
 enum class PartCompositeBlend : std::uint8_t { source_over, plus, multiply, screen, copy };
 
 // The same blend for the theme engine's part rasters (T2 plan, "One blend";
-// GIVEN A2-2 and C1-1). A part raster is premultiplied RGBA8, memory order
-// red, green, blue, alpha (PartRasterView), placed with its top-left pixel
+// GIVEN A2-2 and C1-1). A part raster is premultiplied BGRA8, memory order
+// blue, green, red, alpha (PartRasterView), as is a paint group's image
+// (Painter::begin_group), placed with its top-left pixel
 // at (left, top) in the target's device pixels, one raster pixel per device
 // pixel.
 struct PartRasterSource final {
@@ -101,9 +99,6 @@ struct PartRasterSource final {
     std::size_t row_bytes{};
     std::int64_t left{};
     std::int64_t top{};
-    // The source's memory order: red first for a part raster, the target's
-    // own order for a paint group's image (Painter::begin_group).
-    TextPixelOrder order{TextPixelOrder::rgba};
     // The device pixels the source is shown across and down, from (left,
     // top): zero for its own width and height, one raster pixel per device
     // pixel. Another size shows it scaled (Painter::draw_part_raster_scaled,

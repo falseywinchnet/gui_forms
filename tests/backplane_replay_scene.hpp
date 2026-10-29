@@ -3,6 +3,7 @@
 #include "gui_forms/gui_forms.hpp"
 #include "gui_forms/paint_framebuffer.hpp"
 #include "support/theme_definition_heap.hpp"
+#include "support/rgba_order.hpp"
 
 #include <array>
 #include <cstddef>
@@ -169,8 +170,8 @@ inline std::uint64_t glass_hash(const PartRaster& raster) {
     const std::size_t width_bytes = static_cast<std::size_t>(raster.extent().width) * 4U;
     for (std::uint32_t row = 0U; row < raster.extent().height; ++row) {
         const std::size_t start = static_cast<std::size_t>(row) * raster.row_bytes();
-        for (std::size_t column = 0U; column < width_bytes; ++column) {
-            value ^= pixels[start + column];
+        for (const std::uint8_t byte : gui_forms::test_support::rgba_order(pixels.subspan(start, width_bytes))) {
+            value ^= byte;
             value *= 1099511628211ULL;
         }
     }

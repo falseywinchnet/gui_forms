@@ -37,7 +37,7 @@ gui_forms::NotifyIcon
    :Properties:
 
       **icon** : ``std::vector<HostImage>``
-         The icon's images, straight-alpha RGBA, up to 8 sizes of at most 256
+         The icon's images, premultiplied BGRA8, up to 8 sizes of at most 256
          pixels a side. :cpp:func:`set_icon <gui_forms::NotifyIcon::set_icon>` replaces them and updates a shown icon; more
          images, or a malformed or larger image, throw ``std::invalid_argument``.
 
@@ -171,7 +171,7 @@ gui_forms::NotifyIcon
 
    .. cpp:function:: const std::vector<HostImage>& icon() const noexcept
 
-      The icon's images, straight-alpha RGBA, up to 8 sizes of at most 256
+      The icon's images, premultiplied BGRA8, up to 8 sizes of at most 256
       pixels a side. :cpp:func:`set_icon <gui_forms::NotifyIcon::set_icon>` replaces them and updates a shown icon; more
       images, or a malformed or larger image, throw ``std::invalid_argument``.
 

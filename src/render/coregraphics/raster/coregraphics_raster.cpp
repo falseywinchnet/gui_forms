@@ -1,7 +1,6 @@
 #include "coregraphics_raster.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
 #include "../../../core/image/resource_pixels.hpp"
-#include "stx_skia/swizzle.hpp"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
@@ -269,8 +268,8 @@ bool CoreGraphicsRaster::resize(Size logical_size, double scale) {
     }
     (*impl_).storage.assign(row_bytes * height, std::byte{});
     constexpr CGBitmapInfo bitmap_info =
-        static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) |
-        static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Big);
+        static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedFirst) |
+        static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Little);
     (*impl_).context = CGBitmapContextCreate(
         (*impl_).storage.data(), width, height, 8, row_bytes,
         (*impl_).color_space, bitmap_info);
@@ -388,42 +387,41 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
             continue;
         }
 
-        // Premultiplied RGBA source rows: swizzled from a BGRA resource, or
+        // Premultiplied BGRA source rows: a BGRA resource as it is, or
         // decoded by the shared owned resource path (as on every host).
         CGImageRef source_image = nullptr;
         const std::size_t tight_row_bytes =
             static_cast<std::size_t>((*resource).metadata.width) * 4U;
-        std::vector<std::byte> rgba;
-        bool have_rgba = false;
+        std::vector<std::byte> bgra;
+        bool have_bgra = false;
         if ((*resource).encoding == ImageResourceEncoding::bgra32_premultiplied) {
             if ((*resource).row_bytes == tight_row_bytes &&
                 (*resource).encoded.size() ==
                     tight_row_bytes * (*resource).metadata.height) {
-                rgba.resize((*resource).encoded.size());
-                have_rgba = stx_skia::swap_red_blue(rgba, (*resource).encoded) ==
-                            stx_skia::SwizzleResult::ok;
+                bgra.assign((*resource).encoded.begin(), (*resource).encoded.end());
+                have_bgra = true;
             }
         } else if ((*resource).metadata.decoded_byte_count <=
                    std::numeric_limits<std::size_t>::max()) {
-            const gui_forms::image::PixelTarget target{gui_forms::image::PixelOrder::rgba,
+            const gui_forms::image::PixelTarget target{gui_forms::image::PixelOrder::bgra,
                                                        gui_forms::image::PixelAlpha::premultiplied};
-            rgba.resize(static_cast<std::size_t>((*resource).metadata.decoded_byte_count));
+            bgra.resize(static_cast<std::size_t>((*resource).metadata.decoded_byte_count));
             const gui_forms::image::ResourcePixelResult decoded =
-                decoder.decode(*resource, target, rgba, tight_row_bytes);
-            have_rgba = decoded.error == gui_forms::image::ResourcePixelError::none &&
+                decoder.decode(*resource, target, bgra, tight_row_bytes);
+            have_bgra = decoded.error == gui_forms::image::ResourcePixelError::none &&
                         decoded.width == (*resource).metadata.width &&
                         decoded.height == (*resource).metadata.height;
         }
-        if (have_rgba) {
+        if (have_bgra) {
             CFDataRef data = CFDataCreate(
                 kCFAllocatorDefault,
-                reinterpret_cast<const UInt8*>(rgba.data()),
-                static_cast<CFIndex>(rgba.size()));
+                reinterpret_cast<const UInt8*>(bgra.data()),
+                static_cast<CFIndex>(bgra.size()));
             CGDataProviderRef provider = data == nullptr
                 ? nullptr : CGDataProviderCreateWithCFData(data);
             constexpr CGBitmapInfo source_info =
-                static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) |
-                static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Big);
+                static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedFirst) |
+                static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Little);
             source_image = provider == nullptr ? nullptr : CGImageCreate(
                 (*resource).metadata.width, (*resource).metadata.height, 8, 32,
                 tight_row_bytes, (*impl_).color_space, source_info, provider,
@@ -453,8 +451,8 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
         }
         std::vector<std::byte> pixels(row_bytes * (*resource).metadata.height);
         constexpr CGBitmapInfo bitmap_info =
-            static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) |
-            static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Big);
+            static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedFirst) |
+            static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Little);
         CGContextRef decode_context = CGBitmapContextCreate(
             pixels.data(), (*resource).metadata.width, (*resource).metadata.height,
             8, row_bytes, (*impl_).color_space, bitmap_info);

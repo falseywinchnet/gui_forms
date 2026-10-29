@@ -7,14 +7,14 @@
 
 // The engine's integer blur (T2 plan, E9.3, shared by E9.6): three box
 // passes across and three down, an approximation of a Gaussian, over
-// 8-bit lanes held as 32-bit sums: four (premultiplied RGBA) or one (an
+// 8-bit lanes held as 32-bit sums: four (premultiplied BGRA) or one (an
 // alpha). Glass blurs the backplane with it; a material blurs its own
 // raster and its drop shadow's alpha with it. Defined in box_blur.cpp;
 // integer arithmetic, so every host gives the same bytes.
 
 namespace gui_forms::engine_primitives {
 
-// Four lanes, premultiplied RGBA, per pixel.
+// Four lanes, premultiplied BGRA, per pixel.
 inline constexpr std::size_t box_blur_lanes = 4U;
 
 // The half width h of the box filter for a blur of `blur` logical units at

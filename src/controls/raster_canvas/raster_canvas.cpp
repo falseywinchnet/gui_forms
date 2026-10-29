@@ -1,12 +1,12 @@
 #include "gui_forms/controls/raster_canvas/raster_canvas.hpp"
 
 #include "gui_forms/window.hpp"
-#include "stx_skia/swizzle.hpp"
 
 #include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <span>
 #include <stdexcept>
 #include <vector>
 
@@ -17,21 +17,6 @@ namespace {
     constexpr double limit = 1'000'000'000.0;
     return std::isfinite(origin.x) && std::isfinite(origin.y) &&
         std::abs(origin.x) <= limit && std::abs(origin.y) <= limit;
-}
-
-// Fills result with width x height pixels of source rows, source_row_bytes apart, as
-// tightly packed BGRA rows, reusing result's storage. False if the rows do not fit source
-// (reported as dimension_limit_exceeded, as the registry reports a pixel span of the wrong
-// shape).
-[[nodiscard]] bool rgba_to_bgra(
-    std::span<const std::byte> source, std::size_t source_row_bytes,
-    std::uint32_t width, std::uint32_t height, std::vector<std::byte>& result) {
-    const std::size_t tight_row = static_cast<std::size_t>(width) * 4U;
-    result.resize(tight_row * static_cast<std::size_t>(height));
-    const stx_skia::SwizzleResult swapped = stx_skia::swap_red_blue_rows(
-        result, stx_skia::RowBytes(tight_row), source, stx_skia::RowBytes(source_row_bytes),
-        stx_skia::PixelCount(width), stx_skia::RowCount(height));
-    return swapped == stx_skia::SwizzleResult::ok;
 }
 
 } // namespace
@@ -133,7 +118,7 @@ bool RasterCanvas::publish_full_bitmap() {
     const std::size_t count = static_cast<std::size_t>((width + side - 1) / side) *
                               static_cast<std::size_t>((height + side - 1) / side);
     tiles_.reserve(count);
-    std::vector<std::byte> converted;
+    std::vector<std::byte> packed;
     try {
         for (std::int32_t y = 0; y < height; y += side) {
             for (std::int32_t x = 0; x < width; x += side) {
@@ -150,25 +135,15 @@ bool RasterCanvas::publish_full_bitmap() {
                     static_cast<std::size_t>(storage.width) * 4U;
                 std::span<const std::byte> pixels(snapshot.pixels().data() + offset, bytes);
                 std::uint64_t stride = snapshot.row_bytes();
-                if (snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied) {
-                    if (!rgba_to_bgra(pixels, static_cast<std::size_t>(snapshot.row_bytes()),
-                            static_cast<std::uint32_t>(storage.width),
-                            static_cast<std::uint32_t>(storage.height), converted)) {
-                        last_resource_error_ = ImageResourceError::dimension_limit_exceeded;
-                        release_tiles(*owner);
-                        return false;
-                    }
-                } else {
-                    // A load owns complete, tightly packed rows. The source is
-                    // a subrectangle of the document with its larger stride.
-                    const std::size_t tight_row = static_cast<std::size_t>(storage.width) * 4U;
-                    converted.resize(tight_row * static_cast<std::size_t>(storage.height));
-                    for (std::int32_t row = 0; row < storage.height; ++row) {
-                        std::copy_n(pixels.data() + static_cast<std::size_t>(row) * snapshot.row_bytes(),
-                                    tight_row, converted.data() + static_cast<std::size_t>(row) * tight_row);
-                    }
+                // A load owns complete, tightly packed rows. The source is a
+                // subrectangle of the document with its larger stride.
+                const std::size_t tight_row = static_cast<std::size_t>(storage.width) * 4U;
+                packed.resize(tight_row * static_cast<std::size_t>(storage.height));
+                for (std::int32_t row = 0; row < storage.height; ++row) {
+                    std::copy_n(pixels.data() + static_cast<std::size_t>(row) * snapshot.row_bytes(),
+                                tight_row, packed.data() + static_cast<std::size_t>(row) * tight_row);
                 }
-                pixels = converted;
+                pixels = packed;
                 stride = static_cast<std::uint64_t>(storage.width) * 4U;
                 const ImageLoadResult loaded = (*owner).load_bgra32_premultiplied(
                     static_cast<std::uint32_t>(storage.width), static_cast<std::uint32_t>(storage.height),
@@ -218,7 +193,6 @@ bool RasterCanvas::synchronize_bitmap() {
     const gui_drawing::BitmapDamageSnapshot changes = (*bitmap_).changes_since(presented_generation_);
     if (changes.empty()) return true;
     const gui_drawing::ImageSnapshot snapshot = (*bitmap_).snapshot();
-    std::vector<std::byte> converted;
     for (std::size_t change = 0; change < changes.rectangles.size(); ++change) {
         const gui_drawing::RectI dirty = changes.rectangles[change];
         for (std::size_t index = 0; index < tiles_.size(); ++index) {
@@ -229,18 +203,8 @@ bool RasterCanvas::synchronize_bitmap() {
                 static_cast<std::size_t>(rect.x) * 4U;
             const std::size_t required = static_cast<std::size_t>(rect.height - 1) * snapshot.row_bytes() +
                 static_cast<std::size_t>(rect.width) * 4U;
-            std::span<const std::byte> patch(snapshot.pixels().data() + source_offset, required);
-            std::uint64_t source_row_bytes = snapshot.row_bytes();
-            if (snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied) {
-                if (!rgba_to_bgra(patch, static_cast<std::size_t>(snapshot.row_bytes()),
-                        static_cast<std::uint32_t>(rect.width),
-                        static_cast<std::uint32_t>(rect.height), converted)) {
-                    last_resource_error_ = ImageResourceError::dimension_limit_exceeded;
-                    return false;
-                }
-                patch = converted;
-                source_row_bytes = static_cast<std::uint64_t>(rect.width) * 4U;
-            }
+            const std::span<const std::byte> patch(snapshot.pixels().data() + source_offset, required);
+            const std::uint64_t source_row_bytes = snapshot.row_bytes();
             const ImageLoadResult updated = (*owner).patch_bgra32_premultiplied(
                 tile.image, static_cast<std::uint32_t>(rect.x - tile.storage.x),
                 static_cast<std::uint32_t>(rect.y - tile.storage.y),

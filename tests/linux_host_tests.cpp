@@ -1,15 +1,18 @@
 #include "../src/host/linux/application/linux_host_internal.hpp"
+#include "../src/core/host/image/host_image_pixels.hpp"
 #include "gui_forms/live_surface.hpp"
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <array>
+#include <bit>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <functional>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <poll.h>
 #include <span>
 #include <stdexcept>
@@ -246,8 +249,10 @@ std::vector<std::byte> patterned(std::size_t count) {
     bytes[i] = static_cast<std::byte>('a' + i % 26);
   return bytes;
 }
+// With `expected_pixels`, an image read must give exactly those pixels.
 void incoming(Runtime &runtime, NativeWindow &window, const char *type,
-              const std::vector<std::byte> &bytes, bool image) {
+              const std::vector<std::byte> &bytes, bool image,
+              const std::vector<std::byte> *expected_pixels = nullptr) {
   int ready[2];
   require(pipe(ready) == 0, "Cannot create peer pipe");
   const pid_t child = fork();
@@ -273,6 +278,9 @@ void incoming(Runtime &runtime, NativeWindow &window, const char *type,
     require(result.image() != nullptr && (*result.image()).width == 256 &&
                 (*result.image()).height == 256,
             "External PNG clipboard decode failed");
+    require(expected_pixels == nullptr ||
+                (*result.image()).pixels == *expected_pixels,
+            "External clipboard image was not read exactly");
   } else if (std::string_view(type) == "text/uri-list" ||
              std::string_view(type) == "x-special/gnome-copied-files") {
     const HostClipboardFilesResult result = (*window.services).read_clipboard_files();
@@ -384,7 +392,7 @@ public:
 private:
   std::shared_ptr<LiveSurface> surface_;
 };
-// Fills `area` of a 100 x 80 RGBA frame with `color` and publishes it as
+// Fills `area` of a 100 x 80 BGRA frame with `color` and publishes it as
 // the frame's damage; the rest of the frame keeps its published pixels.
 void publish_color(LiveSurface &surface, const Rect area, const Color color) {
   LiveSurfaceWriteLease write = surface.try_acquire_write(true);
@@ -394,19 +402,19 @@ void publish_color(LiveSurface &surface, const Rect area, const Color color) {
   for (int y = static_cast<int>(area.y); y < static_cast<int>(area.bottom()); ++y) {
     for (int x = static_cast<int>(area.x); x < static_cast<int>(area.right()); ++x) {
       const std::size_t offset = static_cast<std::size_t>(y) * stride + static_cast<std::size_t>(x) * 4U;
-      pixels[offset] = static_cast<std::byte>(color.red);
+      pixels[offset] = static_cast<std::byte>(color.blue);
       pixels[offset + 1U] = static_cast<std::byte>(color.green);
-      pixels[offset + 2U] = static_cast<std::byte>(color.blue);
+      pixels[offset + 2U] = static_cast<std::byte>(color.red);
       pixels[offset + 3U] = std::byte{255};
     }
   }
   require(write.publish(area) != 0U, "Live frame not published");
 }
-// Reads one pixel of the window's raster (RGBA).
+// Reads one pixel of the window's raster (premultiplied BGRA8).
 Color raster_pixel(const NativeWindow &window, const std::size_t x, const std::size_t y) {
   const unsigned char *row = static_cast<const unsigned char *>(window.raster.pixels()) +
                              y * window.raster.row_bytes();
-  return Color::rgba(row[x * 4U], row[x * 4U + 1U], row[x * 4U + 2U], row[x * 4U + 3U]);
+  return Color::rgba(row[x * 4U + 2U], row[x * 4U + 1U], row[x * 4U], row[x * 4U + 3U]);
 }
 void live_frame_sequence(Runtime &runtime) {
   const Color red = Color::rgba(255, 0, 0);
@@ -416,7 +424,7 @@ void live_frame_sequence(Runtime &runtime) {
   const Color yellow = Color::rgba(255, 255, 0);
   const std::shared_ptr<LiveSurface> surface = LiveSurface::create(
       {.width = 100U, .height = 80U,
-       .pixel_format = LiveSurfacePixelFormat::rgba32_premultiplied_srgb, .opaque = true});
+       .pixel_format = LiveSurfacePixelFormat::bgra32_premultiplied_srgb, .opaque = true});
   require(static_cast<bool>(surface), "Live surface not created");
   publish_color(*surface, {0.0, 0.0, 100.0, 80.0}, blue);
   const std::shared_ptr<SolidControl> root = make_control<SolidControl>(StableId("live.root"), red);
@@ -521,7 +529,7 @@ ChangedPixels changed_pixels(const std::vector<Pixel> &before, const std::vector
   }
   return changed;
 }
-// The raster's first `width` x `height` pixels, each RGBA pixel in one word.
+// The raster's first `width` x `height` pixels, each BGRA pixel in one word.
 std::vector<std::uint32_t> raster_copy(const NativeWindow &window, const std::size_t width, const std::size_t height) {
   require(window.raster.pixel_width() >= width && window.raster.pixel_height() >= height,
           "Raster smaller than the window");
@@ -647,11 +655,80 @@ void client_size_request(Runtime &runtime) {
   require(request({300.0, 200.0}).error == HostServiceError::after_shutdown,
           "Size request outlived the window");
 }
+// One native image layout for present_kernels: a visual's masks, its depth,
+// and the window's alpha mask and grant.
+struct PresentLayout final {
+  unsigned long red_mask;
+  unsigned long green_mask;
+  unsigned long blue_mask;
+  int depth;
+  unsigned long alpha_mask;
+  bool present_alpha;
+  NativePresentKernel kernel;
+};
+
+// SK2: the present copies the raster's BGRA8 rows as they are for the common
+// visual, and the fallback kernels give the same colours for other layouts.
+// The images are client-side, so every layout is checked whatever the
+// server's own visual.
+void present_kernels(Display *display) {
+  // Three premultiplied BGRA8 pixels: red 200, green 100, blue 50 at alpha
+  // 255; red 255, green 0, blue 0 at alpha 255; red 64, green 32, blue 16 at
+  // alpha 128.
+  const std::array<unsigned char, 12> source{50, 100, 200, 255, 0, 0, 255, 255, 16, 32, 64, 128};
+  const NativePresentSource bgra{source.data(), source.size(), 0UL, false};
+  const std::array<PresentLayout, 6> layouts{{
+      {0xff0000UL, 0xff00UL, 0xffUL, 24, 0UL, false, NativePresentKernel::plain_copy},
+      {0xff0000UL, 0xff00UL, 0xffUL, 32, 0xff000000UL, true, NativePresentKernel::plain_copy},
+      {0xff0000UL, 0xff00UL, 0xffUL, 32, 0xff000000UL, false, NativePresentKernel::byte_channels},
+      {0xffUL, 0xff00UL, 0xff0000UL, 24, 0UL, false, NativePresentKernel::byte_channels},
+      {0x3ff00000UL, 0xffc00UL, 0x3ffUL, 30, 0UL, false, NativePresentKernel::scaled32},
+      {0xf800UL, 0x7e0UL, 0x1fUL, 16, 0UL, false, NativePresentKernel::generic},
+  }};
+  for (const PresentLayout &layout : layouts) {
+    Visual visual{};
+    visual.c_class = TrueColor;
+    visual.red_mask = layout.red_mask;
+    visual.green_mask = layout.green_mask;
+    visual.blue_mask = layout.blue_mask;
+    visual.bits_per_rgb = 8;
+    XImage *const image = XCreateImage(display, &visual, static_cast<unsigned>(layout.depth), ZPixmap, 0,
+                                       nullptr, 3, 1, 32, 0);
+    require(image != nullptr, "Cannot make a present image");
+    std::vector<char> data(static_cast<std::size_t>((*image).bytes_per_line), 0);
+    (*image).data = data.data();
+    NativePresentSource present = bgra;
+    present.alpha_mask = layout.alpha_mask;
+    present.present_alpha = layout.present_alpha;
+    const std::optional<NativePresentKernel> kernel = convert_present_rectangle(*image, present, 0, 0, 3, 1);
+    require(kernel == layout.kernel, "The present chose the wrong kernel");
+    for (int column = 0; column < 3; ++column) {
+      const unsigned char *const pixel = source.data() + static_cast<std::size_t>(column) * 4U;
+      const unsigned long value = XGetPixel(image, column, 0);
+      const std::array<unsigned long, 3> masks{layout.red_mask, layout.green_mask, layout.blue_mask};
+      const std::array<unsigned, 3> channels{pixel[2], pixel[1], pixel[0]};
+      for (std::size_t channel = 0; channel < masks.size(); ++channel) {
+        const unsigned shift = static_cast<unsigned>(std::countr_zero(masks[channel]));
+        const unsigned long maximum = masks[channel] >> shift;
+        const unsigned long expected = (channels[channel] * maximum + 127U) / 255U;
+        require(((value & masks[channel]) >> shift) == expected, "A present changed a colour channel");
+      }
+      if (layout.alpha_mask != 0) {
+        const unsigned long alpha = (value & layout.alpha_mask) >> 24U;
+        require(alpha == (layout.present_alpha ? pixel[3] : 255U), "A present changed alpha");
+      }
+    }
+    (*image).data = nullptr;
+    XDestroyImage(image);
+  }
+}
+
 int main() {
   try {
     require(host::linux_capabilities().supports(HostCapability::accessibility),
             "the Linux host advertises accessibility");
     Runtime runtime;
+    present_kernels(runtime.display);
     const std::shared_ptr<Root> root =
         make_control<Root>(StableId("linux.services"));
     host::LinuxApplicationWindow entry;
@@ -690,14 +767,25 @@ int main() {
     image.height = 256;
     image.row_bytes = 1024;
     image.pixels.resize(256 * 256 * 4);
+    // Random valid premultiplied BGRA8: each colour channel at most alpha.
     std::uint32_t random = 91;
-    for (std::size_t i = 0; i < image.pixels.size(); ++i) {
+    for (std::size_t i = 0; i < image.pixels.size(); i += 4U) {
       random = random * 1664525U + 1013904223U;
-      image.pixels[i] = static_cast<std::byte>(random >> 24U);
+      const unsigned alpha = random >> 24U;
+      for (std::size_t channel = 0; channel < 3U; ++channel) {
+        random = random * 1664525U + 1013904223U;
+        image.pixels[i + channel] =
+            static_cast<std::byte>((random >> 16U) % (alpha + 1U));
+      }
+      image.pixels[i + 3U] = static_cast<std::byte>(alpha);
     }
     require(
         (*(*window).services).write_clipboard_image(image.view()).accepted(),
         "Cannot own image clipboard");
+    const HostClipboardImageResult owned =
+        (*(*window).services).read_clipboard_image();
+    require(owned.image() != nullptr && (*owned.image()).pixels == image.pixels,
+            "Owned clipboard image did not round-trip exactly");
     const std::vector<std::byte> png = runtime.clipboard_png;
     require(png.size() > 65536, "PNG workload does not cover INCR");
     child = fork();
@@ -713,7 +801,27 @@ int main() {
       }
     }
     wait_child(runtime, child);
-    incoming(runtime, *window, "image/png", png, true);
+    // A valid premultiplied image survives PNG's straight alpha exactly.
+    incoming(runtime, *window, "image/png", png, true, &image.pixels);
+    // A version-1 private image (straight RGBA8) from an older GUI.Forms
+    // peer is read through the input kernel into the same pixels.
+    std::vector<std::byte> version_one(16U + image.pixels.size());
+    const std::array<unsigned char, 16> header{'G', 'F', 'I', 'M', 1, 0, 0, 0,
+                                               0, 1, 0, 0, 0, 1, 0, 0};
+    for (std::size_t i = 0; i < header.size(); ++i)
+      version_one[i] = static_cast<std::byte>(header[i]);
+    for (std::size_t i = 0; i < image.pixels.size(); i += 4U) {
+      const std::uint8_t alpha = std::to_integer<std::uint8_t>(image.pixels[i + 3U]);
+      for (std::size_t channel = 0; channel < 3U; ++channel) {
+        const std::uint8_t premultiplied =
+            std::to_integer<std::uint8_t>(image.pixels[i + 2U - channel]);
+        version_one[16U + i + channel] =
+            std::byte{detail::straight_channel(premultiplied, alpha)};
+      }
+      version_one[16U + i + 3U] = std::byte{alpha};
+    }
+    incoming(runtime, *window, "application/x-gui-forms-rgba", version_one, true,
+             &image.pixels);
     const std::string file_uri = "file:///tmp/Rainstar%20copied%20%CE%A9.png\r\n";
     const std::span<const std::byte> uri_bytes = std::as_bytes(std::span(file_uri));
     incoming(runtime, *window, "text/uri-list",

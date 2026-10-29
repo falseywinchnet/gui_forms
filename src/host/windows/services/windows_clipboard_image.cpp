@@ -6,7 +6,11 @@
 
 namespace gui_forms::host::detail {
 namespace {
-UINT raw_format() { return RegisterClipboardFormatW(L"GUI.Forms.RGBA8.v1"); }
+// The private format written: GFIM version 2, premultiplied BGRA8.
+UINT raw_format() { return RegisterClipboardFormatW(L"GUI.Forms.BGRA8.v2"); }
+// The private format written before SK2 (GFIM version 1, straight RGBA8),
+// still read.
+UINT version_one_format() { return RegisterClipboardFormatW(L"GUI.Forms.RGBA8.v1"); }
 class ClipboardLease final {
 public:
     explicit ClipboardLease(HWND owner) noexcept : opened_(open_clipboard_with_retry(owner)) {}
@@ -54,10 +58,14 @@ private:
 }
 HostClipboardImageResult read_windows_clipboard_image(HWND owner) {
     const UINT exact = raw_format();
+    const UINT version_one = version_one_format();
     const ClipboardLease lease(owner);
-    if (!lease.opened() || exact == 0U) return HostClipboardImageResult::failed(HostServiceError::backend_failure);
+    if (!lease.opened() || exact == 0U || version_one == 0U) {
+        return HostClipboardImageResult::failed(HostServiceError::backend_failure);
+    }
     const std::uint64_t generation = GetClipboardSequenceNumber();
     const UINT format = IsClipboardFormatAvailable(exact) ? exact :
+        IsClipboardFormatAvailable(version_one) ? version_one :
         IsClipboardFormatAvailable(CF_DIBV5) ? CF_DIBV5 :
         IsClipboardFormatAvailable(CF_DIB) ? CF_DIB : 0U;
     if (format == 0U) return HostClipboardImageResult::nothing_read(generation);
@@ -70,7 +78,9 @@ HostClipboardImageResult read_windows_clipboard_image(HWND owner) {
     if (size > HostImage::maximum_bytes + 4096U) return HostClipboardImageResult::failed(HostServiceError::too_large);
     const std::span<const std::byte> bytes(static_cast<const std::byte*>(locked.data()), size);
     // A global allocation may be rounded up past the private format's pixels.
-    if (format == exact) return gui_forms::detail::decode_clipboard_image(bytes, generation, true);
+    if (format == exact || format == version_one) {
+        return gui_forms::detail::decode_clipboard_image(bytes, generation, true);
+    }
     return gui_forms::detail::decode_clipboard_dib(bytes, generation);
 }
 HostServiceStatus write_windows_clipboard_image(HWND owner, HostImageView image) {

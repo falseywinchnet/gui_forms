@@ -75,7 +75,6 @@ struct Surface final {
         result.width = surface_width;
         result.height = surface_height;
         result.stride = surface_width;
-        result.order = detail::TextPixelOrder::bgra;
         result.opaque = true;
         return result;
     }

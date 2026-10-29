@@ -10,6 +10,7 @@
 #include <sys/utsname.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -210,16 +211,20 @@ void write_ppm(const std::filesystem::path& path,
                std::uint32_t width,
                std::uint32_t height,
                std::size_t row_bytes) {
-    const auto* rgba = static_cast<const std::uint8_t*>(pixels);
-    if (rgba == nullptr) {
+    const auto* bgra = static_cast<const std::uint8_t*>(pixels);
+    if (bgra == nullptr) {
         throw std::runtime_error("renderer exposed no pixels for artifact");
     }
     std::ofstream output(path, std::ios::binary);
     output << "P6\n" << width << ' ' << height << "\n255\n";
     for (std::uint32_t y = 0; y < height; ++y) {
-        const std::uint8_t* row = rgba + static_cast<std::size_t>(y) * row_bytes;
+        const std::uint8_t* row = bgra + static_cast<std::size_t>(y) * row_bytes;
         for (std::uint32_t x = 0; x < width; ++x) {
-            output.write(reinterpret_cast<const char*>(row + x * 4U), 3);
+            // PPM is red, green, blue; the raster is blue, green, red, alpha.
+            const std::uint8_t* const pixel = row + static_cast<std::size_t>(x) * 4U;
+            const std::array<char, 3> colour{static_cast<char>(pixel[2]), static_cast<char>(pixel[1]),
+                                             static_cast<char>(pixel[0])};
+            output.write(colour.data(), 3);
         }
     }
 }
@@ -546,7 +551,7 @@ int main(int argc, char** argv) {
                     << "\",\"cpu\":\"" << json_escape(sysctl_string("machdep.cpu.brand_string"))
                     << "\",\"memory_bytes\":" << sysctl_u64("hw.memsize")
                     << ",\"power_state\":\"AC power; not independently pinned\","
-                    "\"profile\":\"sRGB RGBA8 premultiplied\","
+                    "\"profile\":\"sRGB BGRA8 premultiplied\","
                     "\"samples_per_damage_case\":" << measured_frames
                     << ",\"warmups_per_damage_case\":" << warmup_frames
                     << ",\"allocation_metric\":\"unavailable; RSS before/after only\","

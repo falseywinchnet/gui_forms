@@ -139,7 +139,8 @@ struct NativeChannel final {
   unsigned long maximum{0};
   unsigned shift{0};
 };
-// The channels in the raster's byte order: red, green, blue, then alpha.
+// The channels in the raster's byte order (premultiplied BGRA8): blue,
+// green, red, then alpha.
 // Alpha's mask is 0 (and the channel contributes nothing) unless the
 // window has the ARGB visual (stage T5, C4), whose pixel carries the
 // raster's premultiplied alpha unchanged.
@@ -152,7 +153,8 @@ struct NativePixels final {
   int top{0};
   int right{0};
   int bottom{0};
-  std::array<NativeChannel, 4> channels{};
+  using Channels = std::array<NativeChannel, 4>;
+  Channels channels{};
   // The alpha bits set in every pixel: the ARGB window's alpha mask while
   // its grant is opaque (alpha 255), else 0.
   std::uint32_t opaque_bits{0};
@@ -184,13 +186,29 @@ void convert_native_pixels32(XImage& image, const NativePixels& pixels) {
     }
   }
 }
-// The common visual: 32-bit pixels in native byte order with 8-bit channels
-// (Xvfb and most TrueColor servers). Each channel is a byte moved into place;
-// no scaling. Without an alpha channel the alpha term is masked to 0.
+// The common visual: 32-bit pixels in native byte order with blue, green and
+// red in the low three bytes (Xvfb and most TrueColor servers). That is the
+// raster's own layout, so each row is copied as it is: a depth-24 window
+// ignores the fourth byte, and the ARGB window presenting alpha takes the
+// raster's premultiplied alpha there.
+void copy_native_pixels32_bgra(XImage& image, const NativePixels& pixels) {
+  const std::size_t row_length = static_cast<std::size_t>(pixels.right - pixels.left) * 4U;
+  for (int row = pixels.top; row < pixels.bottom; ++row) {
+    const unsigned char* const source = pixels.source + static_cast<std::size_t>(row) * pixels.source_stride +
+                                        static_cast<std::size_t>(pixels.left) * 4U;
+    unsigned char* const destination = reinterpret_cast<unsigned char*>(image.data) +
+                                       static_cast<std::size_t>(row) * pixels.destination_stride +
+                                       static_cast<std::size_t>(pixels.left) * 4U;
+    std::memcpy(destination, source, row_length);
+  }
+}
+// The fallback for other 32-bit visuals in native byte order with 8-bit
+// channels: each channel is a byte moved into place; no scaling. Without an
+// alpha channel the alpha term is masked to 0.
 void convert_native_pixels32_bytes(XImage& image, const NativePixels& pixels) {
-  const unsigned red = pixels.channels[0].shift;
+  const unsigned blue = pixels.channels[0].shift;
   const unsigned green = pixels.channels[1].shift;
-  const unsigned blue = pixels.channels[2].shift;
+  const unsigned red = pixels.channels[2].shift;
   const NativeChannel alpha_channel = pixels.channels[native_alpha_channel];
   const unsigned alpha = alpha_channel.shift;
   const std::uint32_t alpha_keep = alpha_channel.mask != 0 ? 0xFFFFFFFFU : 0U;
@@ -201,9 +219,9 @@ void convert_native_pixels32_bytes(XImage& image, const NativePixels& pixels) {
                                  static_cast<std::size_t>(row) * pixels.destination_stride +
                                  static_cast<std::size_t>(pixels.left) * 4U;
     for (int column = pixels.left; column < pixels.right; ++column) {
-      const std::uint32_t packed = (static_cast<std::uint32_t>(source[0]) << red) |
+      const std::uint32_t packed = (static_cast<std::uint32_t>(source[0]) << blue) |
                                    (static_cast<std::uint32_t>(source[1]) << green) |
-                                   (static_cast<std::uint32_t>(source[2]) << blue) |
+                                   (static_cast<std::uint32_t>(source[2]) << red) |
                                    ((static_cast<std::uint32_t>(source[3]) << alpha) & alpha_keep) |
                                    pixels.opaque_bits;
       std::memcpy(destination, &packed, sizeof(packed));
@@ -222,6 +240,66 @@ void convert_native_pixels_generic(XImage& image, const NativePixels& pixels) {
     }
   }
 }
+} // namespace
+
+std::optional<NativePresentKernel> convert_present_rectangle(XImage& image, const NativePresentSource& source,
+                                                             const int left, const int top, const int right,
+                                                             const int bottom) {
+  NativePixels pixels{};
+  pixels.source = source.pixels;
+  pixels.source_stride = source.row_bytes;
+  pixels.destination_stride = static_cast<std::size_t>(image.bytes_per_line);
+  pixels.left = left;
+  pixels.top = top;
+  pixels.right = right;
+  pixels.bottom = bottom;
+  // The raster's alpha is presented only while a non-opaque backdrop is
+  // granted; an ARGB window under an opaque grant presents alpha 255.
+  const unsigned long presented_alpha_mask = source.present_alpha ? source.alpha_mask : 0UL;
+  const std::array<unsigned long, 4> masks{image.blue_mask, image.green_mask, image.red_mask, presented_alpha_mask};
+  if (source.alpha_mask > std::numeric_limits<std::uint32_t>::max()) return std::nullopt;
+  pixels.opaque_bits = source.present_alpha ? 0U : static_cast<std::uint32_t>(source.alpha_mask);
+  for (std::size_t channel = 0; channel < masks.size(); ++channel) {
+    if (masks[channel] > std::numeric_limits<std::uint32_t>::max()) return std::nullopt;
+    pixels.channels[channel].mask = masks[channel];
+    if (masks[channel] != 0) {
+      pixels.channels[channel].shift = static_cast<unsigned>(std::countr_zero(masks[channel]));
+      pixels.channels[channel].maximum = masks[channel] >> pixels.channels[channel].shift;
+    }
+  }
+  const bool native32 = image.bits_per_pixel == 32 &&
+      (image.byte_order == LSBFirst) == (std::endian::native == std::endian::little);
+  bool byte_channels = native32;
+  for (std::size_t channel = 0; channel < pixels.channels.size(); ++channel) {
+    // An absent alpha channel (mask 0) does not stop the byte path.
+    if (channel == native_alpha_channel && pixels.channels[channel].mask == 0) continue;
+    if (pixels.channels[channel].maximum != 255U || pixels.channels[channel].shift % 8U != 0U ||
+        pixels.channels[channel].shift > 24U) byte_channels = false;
+  }
+  // The raster's own layout: blue, green, red at bytes 0, 1, 2, and alpha
+  // either at byte 3 (presented) or absent, with no opaque bits to set.
+  const NativePixels::Channels& channels = pixels.channels;
+  const bool alpha_as_is = channels[native_alpha_channel].mask == 0
+      ? pixels.opaque_bits == 0U
+      : channels[native_alpha_channel].shift == 24U;
+  if (byte_channels && channels[0].shift == 0U && channels[1].shift == 8U && channels[2].shift == 16U &&
+      alpha_as_is) {
+    copy_native_pixels32_bgra(image, pixels);
+    return NativePresentKernel::plain_copy;
+  }
+  if (byte_channels) {
+    convert_native_pixels32_bytes(image, pixels);
+    return NativePresentKernel::byte_channels;
+  }
+  if (native32) {
+    convert_native_pixels32(image, pixels);
+    return NativePresentKernel::scaled32;
+  }
+  convert_native_pixels_generic(image, pixels);
+  return NativePresentKernel::generic;
+}
+
+namespace {
 
 // Copies each rectangle of the raster's pixels to the window (stage DP partial
 // present): one native image for the raster, converted and submitted rectangle
@@ -242,9 +320,11 @@ bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect>
   const double visible_width = std::min(static_cast<double>(width), window.size.width);
   const double visible_height = std::min(static_cast<double>(height), window.size.height);
   const Rect extent{0.0, 0.0, visible_width, visible_height};
-  NativePixels pixels{};
-  pixels.source = source;
-  pixels.source_stride = raster.row_bytes();
+  NativePresentSource present{};
+  present.pixels = source;
+  present.row_bytes = raster.row_bytes();
+  present.alpha_mask = window.alpha_mask;
+  present.present_alpha = window.present_alpha;
   PresentationImage owner{};
   Display* const display = window.runtime.display;
   // The window's own visual and depth: the ARGB visual's for a window
@@ -255,35 +335,11 @@ bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect>
   XImage& image = *owner.value;
   const std::size_t maximum_row = static_cast<std::size_t>(width) * 4U;
   if (image.bytes_per_line <= 0 || image.bits_per_pixel <= 0 || image.bits_per_pixel > 32 ||
-      static_cast<std::size_t>(image.bytes_per_line) > maximum_row || pixels.source_stride < maximum_row) return false;
-  pixels.destination_stride = static_cast<std::size_t>(image.bytes_per_line);
-  const std::size_t bytes = pixels.destination_stride * static_cast<std::size_t>(height);
+      static_cast<std::size_t>(image.bytes_per_line) > maximum_row || present.row_bytes < maximum_row) return false;
+  const std::size_t bytes = static_cast<std::size_t>(image.bytes_per_line) * static_cast<std::size_t>(height);
   if (bytes > 64U * 1024U * 1024U) return false;
   window.presentation.resize(bytes);
   image.data = window.presentation.data();
-  // The raster's alpha is presented only while a non-opaque backdrop is
-  // granted; an ARGB window under an opaque grant presents alpha 255.
-  const unsigned long presented_alpha_mask = window.present_alpha ? window.alpha_mask : 0UL;
-  const std::array<unsigned long, 4> masks{image.red_mask, image.green_mask, image.blue_mask, presented_alpha_mask};
-  if (window.alpha_mask > std::numeric_limits<std::uint32_t>::max()) return false;
-  pixels.opaque_bits = window.present_alpha ? 0U : static_cast<std::uint32_t>(window.alpha_mask);
-  for (std::size_t channel = 0; channel < masks.size(); ++channel) {
-    if (masks[channel] > std::numeric_limits<std::uint32_t>::max()) return false;
-    pixels.channels[channel].mask = masks[channel];
-    if (masks[channel] != 0) {
-      pixels.channels[channel].shift = static_cast<unsigned>(std::countr_zero(masks[channel]));
-      pixels.channels[channel].maximum = masks[channel] >> pixels.channels[channel].shift;
-    }
-  }
-  const bool native32 = image.bits_per_pixel == 32 &&
-      (image.byte_order == LSBFirst) == (std::endian::native == std::endian::little);
-  bool byte_channels = native32;
-  for (std::size_t channel = 0; channel < pixels.channels.size(); ++channel) {
-    // An absent alpha channel (mask 0) does not stop the byte path.
-    if (channel == native_alpha_channel && pixels.channels[channel].mask == 0) continue;
-    if (pixels.channels[channel].maximum != 255U || pixels.channels[channel].shift % 8U != 0U ||
-        pixels.channels[channel].shift > 24U) byte_channels = false;
-  }
   // The copy alone is timed: conversion, XPutImage and the flush.
   const std::chrono::steady_clock::time_point copy_started = std::chrono::steady_clock::now();
   for (std::size_t index = 0; index < requested.size(); ++index) {
@@ -291,17 +347,15 @@ bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect>
     if (!rectangle.finite()) continue;
     const Rect clipped = Rect::intersection(rectangle, extent);
     if (clipped.empty()) continue;
-    pixels.left = static_cast<int>(std::floor(clipped.x));
-    pixels.top = static_cast<int>(std::floor(clipped.y));
-    pixels.right = static_cast<int>(std::ceil(clipped.right()));
-    pixels.bottom = static_cast<int>(std::ceil(clipped.bottom()));
-    if (byte_channels) convert_native_pixels32_bytes(image, pixels);
-    else if (native32) convert_native_pixels32(image, pixels);
-    else convert_native_pixels_generic(image, pixels);
-    const unsigned columns = static_cast<unsigned>(pixels.right - pixels.left);
-    const unsigned rows = static_cast<unsigned>(pixels.bottom - pixels.top);
-    XPutImage(display, window.xid, window.gc, &image, pixels.left, pixels.top,
-              pixels.left, pixels.top, columns, rows);
+    const int left = static_cast<int>(std::floor(clipped.x));
+    const int top = static_cast<int>(std::floor(clipped.y));
+    const int right = static_cast<int>(std::ceil(clipped.right()));
+    const int bottom = static_cast<int>(std::ceil(clipped.bottom()));
+    // Fails only for masks wider than 32 bits, so before any rectangle.
+    if (!convert_present_rectangle(image, present, left, top, right, bottom)) return false;
+    const unsigned columns = static_cast<unsigned>(right - left);
+    const unsigned rows = static_cast<unsigned>(bottom - top);
+    XPutImage(display, window.xid, window.gc, &image, left, top, left, top, columns, rows);
     copied.device_pixels += static_cast<std::uint64_t>(columns) * static_cast<std::uint64_t>(rows);
     ++copied.rectangles;
   }

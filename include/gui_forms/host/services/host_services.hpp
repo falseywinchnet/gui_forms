@@ -53,7 +53,7 @@ public:
     [[nodiscard]] HostClipboardTextResult read_clipboard_text();
     [[nodiscard]] HostServiceStatus write_clipboard_text(
         std::string_view text_utf8);
-    /// Reads an owned straight-alpha RGBA8 image on the creating UI thread.
+    /// Reads an owned premultiplied BGRA8 image on the creating UI thread.
     /// Successful absence is distinguished by an absent image.
     [[nodiscard]] HostClipboardImageResult read_clipboard_image();
     /// Reads local file references without opening or decoding their contents.

@@ -90,10 +90,9 @@ static void check_cross_platform_identity() {
             (*framebuffer).end();
             const std::uint8_t* const bytes = reinterpret_cast<const std::uint8_t*>((*framebuffer).pixels().data());
             text_identity::dump_pixels(bytes, (*framebuffer).width(), (*framebuffer).height(), (*framebuffer).row_bytes(),
-                                       kind, scale, text_identity::Order::bgra);
+                                       kind, scale);
             const std::uint64_t observed = text_identity::pixel_hash(
-                bytes, (*framebuffer).width(), (*framebuffer).height(), (*framebuffer).row_bytes(),
-                text_identity::Order::bgra);
+                bytes, (*framebuffer).width(), (*framebuffer).height(), (*framebuffer).row_bytes());
             std::printf("text-identity %s %.1f 0x%016llxULL\n", text_identity::case_names[kind],
                         text_identity::scales[scale], static_cast<unsigned long long>(observed));
             if (observed != text_identity::expected[kind][scale]) mismatch = true;

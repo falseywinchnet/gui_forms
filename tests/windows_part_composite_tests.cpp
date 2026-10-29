@@ -33,7 +33,7 @@ int main() {
             const std::uint8_t* const bytes = reinterpret_cast<const std::uint8_t*>((*framebuffer).pixels().data());
             const std::uint64_t observed =
                 text_identity::pixel_hash(bytes, (*framebuffer).width(), (*framebuffer).height(),
-                                          (*framebuffer).row_bytes(), text_identity::Order::bgra);
+                                          (*framebuffer).row_bytes());
             std::printf("part-composite %s %.1f 0x%016llxULL\n", scene::case_names[kind], scene::scales[scale],
                         static_cast<unsigned long long>(observed));
             if (observed != scene::expected[kind][scale]) mismatch = true;
@@ -57,7 +57,7 @@ int main() {
             const std::uint8_t* const bytes = reinterpret_cast<const std::uint8_t*>((*framebuffer).pixels().data());
             const std::uint64_t observed =
                 text_identity::pixel_hash(bytes, (*framebuffer).width(), (*framebuffer).height(),
-                                          (*framebuffer).row_bytes(), text_identity::Order::bgra);
+                                          (*framebuffer).row_bytes());
             std::printf("paint-group %s %.1f 0x%016llxULL\n", scene::group_case_names[kind], scene::scales[scale],
                         static_cast<unsigned long long>(observed));
             if (observed != scene::expected_groups[kind][scale]) mismatch = true;
@@ -66,8 +66,7 @@ int main() {
                 return 1;
             }
             if (group_case == scene::GroupCase::overlap &&
-                !scene::overlap_is_one_image(bytes, (*framebuffer).row_bytes(), text_identity::Order::bgra,
-                                             scene::scales[scale])) {
+                !scene::overlap_is_one_image(bytes, (*framebuffer).row_bytes(), scene::scales[scale])) {
                 std::cerr << "a group's overlapping commands show through one another\n";
                 return 1;
             }
@@ -92,8 +91,7 @@ int main() {
         scene::paint_copy_scene((*framebuffer).painter());
         (*framebuffer).end();
         const std::uint8_t* const bytes = reinterpret_cast<const std::uint8_t*>((*framebuffer).pixels().data());
-        if (!scene::copy_scene_holds(bytes, (*framebuffer).row_bytes(), text_identity::Order::bgra,
-                                     scene::scales[scale], false)) {
+        if (!scene::copy_scene_holds(bytes, (*framebuffer).row_bytes(), scene::scales[scale], false)) {
             std::cerr << "a copy group replaces what lies beneath it\n";
             return 1;
         }

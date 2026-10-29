@@ -104,9 +104,9 @@ Related types
    * - :cpp:class:`HostFolderDialogRequest <gui_forms::HostFolderDialogRequest>`
      - HostFolderDialogRequest declares portable title and initial directory for one folder selection.
    * - :cpp:class:`HostImage <gui_forms::HostImage>`
-     - An owned host-service image.
+     - An owned host-service image, premultiplied BGRA8 like HostImageView.
    * - :cpp:class:`HostImageView <gui_forms::HostImageView>`
-     - A borrowed, top-to-bottom, straight-alpha RGBA8 sRGB image.
+     - A borrowed, top-to-bottom, premultiplied BGRA8 sRGB image: blue, green, red, alpha in memory, each colour channel at most its alpha, as every framebuffer and raster holds pixels.
    * - :cpp:class:`HostInputSettingsEvent <gui_forms::HostInputSettingsEvent>`
      - The platform's input settings that controls read (stage W, ListView label editing): reported after attach and again whenever the system setting changes.
    * - :cpp:class:`HostMessageDialogRequest <gui_forms::HostMessageDialogRequest>`
@@ -810,7 +810,7 @@ Related types
 
    ``#include <gui_forms/host/image/host_image.hpp>``
 
-   An owned host-service image. Color channels are not premultiplied. Clipboard reads return independent storage, including RGB under zero alpha when the source representation preserves those channels.
+   An owned host-service image, premultiplied BGRA8 like HostImageView. Clipboard reads return independent storage. A GUI.Forms clipboard image is read back byte for byte; straight-alpha native formats (PNG, DIB, icons) are converted only where they meet the host, and a valid premultiplied image survives that conversion unchanged.
 
 
    .. rubric:: Properties
@@ -839,7 +839,7 @@ Related types
 
    ``#include <gui_forms/host/image/host_image.hpp>``
 
-   A borrowed, top-to-bottom, straight-alpha RGBA8 sRGB image. Row padding is permitted; the final row does not require trailing padding. The producer retains ownership and keeps the bytes alive for the whole call.
+   A borrowed, top-to-bottom, premultiplied BGRA8 sRGB image: blue, green, red, alpha in memory, each colour channel at most its alpha, as every framebuffer and raster holds pixels. Row padding is permitted; the final row does not require trailing padding. The producer retains ownership and keeps the bytes alive for the whole call.
 
    .. cpp:member:: std::uint32_t width
 
@@ -1131,7 +1131,7 @@ Related types
 
    .. cpp:function:: HostClipboardImageResult read_clipboard_image()
 
-      Reads an owned straight-alpha RGBA8 image on the creating UI thread. Successful absence is distinguished by an absent image.
+      Reads an owned premultiplied BGRA8 image on the creating UI thread. Successful absence is distinguished by an absent image.
 
    .. cpp:function:: HostClipboardFilesResult read_clipboard_files()
 

@@ -341,15 +341,9 @@ void store_color(PixelStorage& storage, std::uint32_t x, std::uint32_t y,
     const std::uint8_t red = premultiply(color.red(), alpha);
     const std::uint8_t green = premultiply(color.green(), alpha);
     const std::uint8_t blue = premultiply(color.blue(), alpha);
-    if (storage.pixel_format == PixelFormat::bgra32_premultiplied) {
-        storage.bytes[offset] = static_cast<std::byte>(blue);
-        storage.bytes[offset + 1U] = static_cast<std::byte>(green);
-        storage.bytes[offset + 2U] = static_cast<std::byte>(red);
-    } else {
-        storage.bytes[offset] = static_cast<std::byte>(red);
-        storage.bytes[offset + 1U] = static_cast<std::byte>(green);
-        storage.bytes[offset + 2U] = static_cast<std::byte>(blue);
-    }
+    storage.bytes[offset] = static_cast<std::byte>(blue);
+    storage.bytes[offset + 1U] = static_cast<std::byte>(green);
+    storage.bytes[offset + 2U] = static_cast<std::byte>(red);
     storage.bytes[offset + 3U] = static_cast<std::byte>(alpha);
 }
 
@@ -357,17 +351,13 @@ void store_color(PixelStorage& storage, std::uint32_t x, std::uint32_t y,
                                std::uint32_t x,
                                std::uint32_t y) noexcept {
     const std::size_t offset = pixel_offset(storage, x, y);
-    const std::uint8_t first = std::to_integer<std::uint8_t>(storage.bytes[offset]);
+    const std::uint8_t blue = std::to_integer<std::uint8_t>(storage.bytes[offset]);
     const std::uint8_t green =
         std::to_integer<std::uint8_t>(storage.bytes[offset + 1U]);
-    const std::uint8_t third =
+    const std::uint8_t red =
         std::to_integer<std::uint8_t>(storage.bytes[offset + 2U]);
     const std::uint8_t alpha =
         std::to_integer<std::uint8_t>(storage.bytes[offset + 3U]);
-    const std::uint8_t red = storage.pixel_format == PixelFormat::bgra32_premultiplied
-        ? third : first;
-    const std::uint8_t blue = storage.pixel_format == PixelFormat::bgra32_premultiplied
-        ? first : third;
     return Color::from_argb(alpha, unpremultiply(red, alpha),
                             unpremultiply(green, alpha), unpremultiply(blue, alpha));
 }
@@ -380,13 +370,9 @@ void store_color(PixelStorage& storage, std::uint32_t x, std::uint32_t y,
     const std::uint8_t red = premultiply(color.red(), alpha);
     const std::uint8_t green = premultiply(color.green(), alpha);
     const std::uint8_t blue = premultiply(color.blue(), alpha);
-    const std::uint8_t first = storage.pixel_format ==
-            PixelFormat::bgra32_premultiplied ? blue : red;
-    const std::uint8_t third = storage.pixel_format ==
-            PixelFormat::bgra32_premultiplied ? red : blue;
-    return std::to_integer<std::uint8_t>(storage.bytes[offset]) == first &&
+    return std::to_integer<std::uint8_t>(storage.bytes[offset]) == blue &&
         std::to_integer<std::uint8_t>(storage.bytes[offset + 1U]) == green &&
-        std::to_integer<std::uint8_t>(storage.bytes[offset + 2U]) == third &&
+        std::to_integer<std::uint8_t>(storage.bytes[offset + 2U]) == red &&
         std::to_integer<std::uint8_t>(storage.bytes[offset + 3U]) == alpha;
 }
 

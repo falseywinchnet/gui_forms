@@ -1,4 +1,5 @@
 #include "windows_notify_icons.hpp"
+#include "../../../core/host/image/host_image_pixels.hpp"
 
 #include <shellapi.h>
 
@@ -66,18 +67,14 @@ HICON create_notify_icon_handle(std::span<const HostImage> images, int wanted_si
         if (colour != nullptr) DeleteObject(colour);
         return nullptr;
     }
-    // RGBA rows to BGRA rows; icons take straight alpha.
+    // Premultiplied BGRA rows to straight BGRA rows: icons take straight alpha.
     std::byte* const destination = static_cast<std::byte*>(bits);
+    const std::size_t row_length = static_cast<std::size_t>(width) * 4U;
     for (int row = 0; row < height; ++row) {
-        const std::byte* const source = image.pixels.data() + static_cast<std::size_t>(row) * image.row_bytes;
-        std::byte* const target = destination + static_cast<std::size_t>(row) * static_cast<std::size_t>(width) * 4U;
-        for (int column = 0; column < width; ++column) {
-            const std::size_t offset = static_cast<std::size_t>(column) * 4U;
-            target[offset + 0U] = source[offset + 2U];
-            target[offset + 1U] = source[offset + 1U];
-            target[offset + 2U] = source[offset + 0U];
-            target[offset + 3U] = source[offset + 3U];
-        }
+        const std::span<const std::byte> source(
+            image.pixels.data() + static_cast<std::size_t>(row) * image.row_bytes, row_length);
+        const std::span<std::byte> target(destination + static_cast<std::size_t>(row) * row_length, row_length);
+        gui_forms::detail::premultiplied_bgra_to_straight_bgra(source, target, static_cast<std::uint32_t>(width));
     }
     HBITMAP mask = CreateBitmap(width, height, 1, 1, nullptr);
     if (mask == nullptr) {

@@ -85,10 +85,8 @@ inline FramePixel present_once(Painter& factory, Window& window) {
     const std::array<std::uint8_t, 4> stored{
         static_cast<std::uint8_t>(bytes[offset]), static_cast<std::uint8_t>(bytes[offset + 1U]),
         static_cast<std::uint8_t>(bytes[offset + 2U]), static_cast<std::uint8_t>(bytes[offset + 3U])};
-    result.rgba = stored;
-    if ((*framebuffer).channel_order() == FramebufferChannelOrder::bgra) {
-        result.rgba = {stored[2], stored[1], stored[0], stored[3]};
-    }
+    // The framebuffer is premultiplied BGRA8.
+    result.rgba = {stored[2], stored[1], stored[0], stored[3]};
     result.painted = true;
     return result;
 }

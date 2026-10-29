@@ -492,20 +492,6 @@
       "reason": "a few ticks; one orientation select per tick"
     },
     {
-      "path": "src/controls/raster_canvas/raster_canvas.cpp",
-      "function": "gui_forms::publish_full_bitmap",
-      "condition": "snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied",
-      "decision": "keep",
-      "reason": "one conversion choice per tile, not per pixel; the tile walk is shared"
-    },
-    {
-      "path": "src/controls/raster_canvas/raster_canvas.cpp",
-      "function": "gui_forms::synchronize_bitmap",
-      "condition": "snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied",
-      "decision": "keep",
-      "reason": "one conversion choice per tile, not per pixel; the tile walk is shared"
-    },
-    {
       "path": "src/controls/ribbon/ribbon.cpp",
       "function": "gui_forms::append_group_node",
       "condition": "focused_ && stop_",

@@ -247,10 +247,9 @@ void LiveSurfacesPage::paint_band(LiveSurfaceWriteLease& lease,
     const std::uint32_t band_width = width / band_count;
     const std::uint32_t x0 = band * band_width;
     const std::uint32_t x1 = band + 1U == band_count ? width : x0 + band_width;
-    const bool bgra = (*surface_).snapshot().description.pixel_format ==
-                      LiveSurfacePixelFormat::bgra32_premultiplied_srgb;
-    const std::byte first = std::byte{bgra ? color.blue : color.red};
-    const std::byte third = std::byte{bgra ? color.red : color.blue};
+    // Premultiplied BGRA8, the one live-surface format.
+    const std::byte first = std::byte{color.blue};
+    const std::byte third = std::byte{color.red};
     const std::span<std::byte> pixels = lease.pixels();
     const std::uint64_t row_bytes = lease.row_bytes();
     for (std::uint32_t y = 0U; y < height; ++y) {
@@ -317,11 +316,7 @@ void LiveSurfacesPage::refresh_status(const std::string_view event, const Rect d
     (*status_).set_text(std::string(event) + " · damage " + damage_text);
     (*telemetry_).set_text(
         std::to_string(snapshot.description.width) + "×" +
-        std::to_string(snapshot.description.height) + " " +
-        (snapshot.description.pixel_format ==
-                 LiveSurfacePixelFormat::bgra32_premultiplied_srgb
-             ? "BGRA" : "RGBA") +
-        " · " + std::to_string(snapshot.description.buffer_count) + " buffers" +
+        std::to_string(snapshot.description.height) + " BGRA · " + std::to_string(snapshot.description.buffer_count) + " buffers" +
         "\nepoch " + std::to_string(snapshot.epoch) +
         " · generation " + std::to_string(snapshot.published_generation) +
         " · publishes " + std::to_string(snapshot.publishes) +

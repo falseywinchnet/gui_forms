@@ -14,7 +14,7 @@
 // part rasters drawn by the engine's own primitives, composited through each
 // host's painter with Painter::draw_part_raster. The same painter calls must
 // produce the same bytes on every platform. Hashes and dumps use the text
-// identity scene's helpers (RGBA order).
+// identity scene's helpers (hashed in RGBA order).
 namespace gui_forms::part_composite_identity {
 
 enum class Case : std::uint8_t { plain, faded, translated, fractional_clip, rounded_clip };
@@ -212,24 +212,23 @@ inline void paint_group_scene(Painter& painter, const GroupCase kind, const doub
 }
 
 // The pixel at logical (x, y) of a scene raster at `scale`, as RGBA.
-inline std::array<std::uint8_t, 4> scene_pixel(const std::uint8_t* bytes, std::size_t row_bytes,
-                                               text_identity::Order order, double scale, double x, double y) {
+inline std::array<std::uint8_t, 4> scene_pixel(const std::uint8_t* bytes, std::size_t row_bytes, double scale,
+                                               double x, double y) {
     const std::size_t column = static_cast<std::size_t>(std::floor(x * scale));
     const std::size_t row = static_cast<std::size_t>(std::floor(y * scale));
     const std::uint8_t* const pixel = bytes + row * row_bytes + column * 4U;
-    std::array<std::uint8_t, 4> rgba{pixel[0], pixel[1], pixel[2], pixel[3]};
-    if (order == text_identity::Order::bgra) rgba = {pixel[2], pixel[1], pixel[0], pixel[3]};
+    // The raster is premultiplied BGRA8.
+    const std::array<std::uint8_t, 4> rgba{pixel[2], pixel[1], pixel[0], pixel[3]};
     return rgba;
 }
 
 // The overlap case composites as one image: where blue covers red inside
 // the group, the result is blue over the plane at half opacity, exactly as
 // where blue is alone; red shows nowhere under it.
-inline bool overlap_is_one_image(const std::uint8_t* bytes, std::size_t row_bytes, text_identity::Order order,
-                                 double scale) {
-    const std::array<std::uint8_t, 4> both = scene_pixel(bytes, row_bytes, order, scale, 40.5, 18.5);
-    const std::array<std::uint8_t, 4> blue = scene_pixel(bytes, row_bytes, order, scale, 60.5, 18.5);
-    const std::array<std::uint8_t, 4> red = scene_pixel(bytes, row_bytes, order, scale, 20.5, 18.5);
+inline bool overlap_is_one_image(const std::uint8_t* bytes, std::size_t row_bytes, double scale) {
+    const std::array<std::uint8_t, 4> both = scene_pixel(bytes, row_bytes, scale, 40.5, 18.5);
+    const std::array<std::uint8_t, 4> blue = scene_pixel(bytes, row_bytes, scale, 60.5, 18.5);
+    const std::array<std::uint8_t, 4> red = scene_pixel(bytes, row_bytes, scale, 20.5, 18.5);
     const bool one_image = both == blue && both != red;
     return one_image;
 }
@@ -263,17 +262,17 @@ inline bool near_channel(std::uint8_t observed, unsigned wanted) {
 // the target holds alpha (Skia's raster) or is opaque (the Windows DIB
 // before stage T5's C2), where alpha is 255 and the colour is the
 // premultiplied one. The tint premultiplied is (100, 50, 20) at alpha 128.
-inline bool copy_scene_holds(const std::uint8_t* bytes, std::size_t row_bytes, text_identity::Order order,
-                             double scale, bool keeps_alpha) {
+inline bool copy_scene_holds(const std::uint8_t* bytes, std::size_t row_bytes, double scale,
+                             bool keeps_alpha) {
     const unsigned clear_alpha = keeps_alpha ? 0U : 255U;
     const unsigned tint_alpha = keeps_alpha ? 128U : 255U;
-    const std::array<std::uint8_t, 4> tinted = scene_pixel(bytes, row_bytes, order, scale, 30.5, 16.5);
+    const std::array<std::uint8_t, 4> tinted = scene_pixel(bytes, row_bytes, scale, 30.5, 16.5);
     const bool tint_copied = near_channel(tinted[0], 100U) && near_channel(tinted[1], 50U) &&
                              near_channel(tinted[2], 20U) && near_channel(tinted[3], tint_alpha);
-    const std::array<std::uint8_t, 4> cleared = scene_pixel(bytes, row_bytes, order, scale, 60.5, 30.5);
+    const std::array<std::uint8_t, 4> cleared = scene_pixel(bytes, row_bytes, scale, 60.5, 30.5);
     const std::array<std::uint8_t, 4> clear{0U, 0U, 0U, static_cast<std::uint8_t>(clear_alpha)};
     const bool rest_cleared = cleared == clear;
-    const std::array<std::uint8_t, 4> outside = scene_pixel(bytes, row_bytes, order, scale, 90.5, 12.5);
+    const std::array<std::uint8_t, 4> outside = scene_pixel(bytes, row_bytes, scale, 90.5, 12.5);
     // The background's colour; its alpha is the painter's own outside a
     // group on a target that keeps none.
     const bool outside_kept = outside[0] == 222U && outside[1] == 232U && outside[2] == 246U &&

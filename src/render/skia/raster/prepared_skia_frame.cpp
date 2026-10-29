@@ -111,7 +111,7 @@ PreparedTextStatus PreparedSkiaFrame::begin(const Size size, const double scale,
                 fail_next_allocation_ = false;
                 return PreparedTextStatus::resource_failure;
             }
-            const SkImageInfo info = SkImageInfo::Make(width, height, kRGBA_8888_SkColorType,
+            const SkImageInfo info = SkImageInfo::Make(width, height, kBGRA_8888_SkColorType,
                 kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
             candidate_ = SkSurfaces::Raster(info);
         }

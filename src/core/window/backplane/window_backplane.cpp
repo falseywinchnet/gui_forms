@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <span>
 #include <vector>
@@ -19,27 +20,21 @@
 namespace gui_forms {
 namespace {
 
-// The direction of a copy between a part raster's rows (premultiplied
-// RGBA) and a framebuffer's (premultiplied, in its own channel order).
+// The direction of a copy between a part raster's rows and a framebuffer's,
+// both premultiplied BGRA8.
 enum class FramebufferCopy : std::uint8_t {
     into_framebuffer,
     from_framebuffer,
 };
 
-// Copies `rows` rows of `width` pixels between `image` and `framebuffer`,
-// swapping red and blue for a BGRA framebuffer. The caller has checked
-// that both hold at least that many rows of that many pixels; the two
-// buffers never overlap.
+// Copies `rows` rows of `width` pixels between `image` and `framebuffer`, as
+// they are. The caller has checked that both hold at least that many rows of
+// that many pixels; the two buffers never overlap.
 void copy_framebuffer_rows(const PartRasterView& image, PaintFramebuffer& framebuffer, std::uint32_t width,
                            std::uint32_t rows, FramebufferCopy direction) noexcept {
     const std::span<std::byte> pixels = framebuffer.pixels();
     const std::size_t framebuffer_row = framebuffer.row_bytes();
-    const bool swap = framebuffer.channel_order() == FramebufferChannelOrder::bgra;
     const std::size_t row_length = static_cast<std::size_t>(width) * 4U;
-    // The lanes of a source pixel that hold the destination's red and blue:
-    // exchanged for a BGRA framebuffer.
-    const std::size_t red_lane = swap ? 2U : 0U;
-    const std::size_t blue_lane = swap ? 0U : 2U;
     // The direction picks which buffer is written, and each buffer's row pitch.
     std::uint8_t* const raster_start = image.pixels.data();
     std::uint8_t* const native_start = reinterpret_cast<std::uint8_t*>(pixels.data());
@@ -49,16 +44,7 @@ void copy_framebuffer_rows(const PartRasterView& image, PaintFramebuffer& frameb
     const std::size_t to_row_bytes = into_framebuffer ? framebuffer_row : image.row_bytes;
     const std::size_t from_row_bytes = into_framebuffer ? image.row_bytes : framebuffer_row;
     for (std::size_t row = 0U; row < rows; ++row) {
-        std::uint8_t* const to = to_start + row * to_row_bytes;
-        const std::uint8_t* const from = from_start + row * from_row_bytes;
-        for (std::size_t lane = 0U; lane < row_length; lane += 4U) {
-            const std::uint8_t red = from[lane + red_lane];
-            const std::uint8_t blue = from[lane + blue_lane];
-            to[lane] = red;
-            to[lane + 1U] = from[lane + 1U];
-            to[lane + 2U] = blue;
-            to[lane + 3U] = from[lane + 3U];
-        }
+        std::memcpy(to_start + row * to_row_bytes, from_start + row * from_row_bytes, row_length);
     }
 }
 

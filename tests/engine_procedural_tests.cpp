@@ -31,6 +31,7 @@
 
 #include "../src/core/engine/primitives/material/material_bake_policy.hpp"
 #include "../src/core/engine/primitives/procedural/procedural_pattern.hpp"
+#include "support/rgba_order.hpp"
 
 #include <algorithm>
 #include <array>
@@ -69,8 +70,8 @@ std::uint64_t pattern_hash(const PartRaster& raster) {
     const std::size_t live = static_cast<std::size_t>(raster.extent().width) * 4U;
     for (std::uint32_t row = 0U; row < raster.extent().height; ++row) {
         const std::size_t start = static_cast<std::size_t>(row) * raster.row_bytes();
-        for (std::size_t index = start; index < start + live; ++index) {
-            hash = hash ^ pixels[index];
+        for (const std::uint8_t byte : gui_forms::test_support::rgba_order(pixels.subspan(start, live))) {
+            hash = hash ^ byte;
             hash = hash * 1099511628211ULL;
         }
     }
@@ -80,7 +81,8 @@ std::uint64_t pattern_hash(const PartRaster& raster) {
 std::array<std::uint8_t, 4> pixel_of(const PartRaster& raster, std::uint32_t column, std::uint32_t row) {
     const std::size_t at = static_cast<std::size_t>(row) * raster.row_bytes() + static_cast<std::size_t>(column) * 4U;
     const std::span<const std::uint8_t> pixels = raster.pixels();
-    const std::array<std::uint8_t, 4> value{pixels[at], pixels[at + 1U], pixels[at + 2U], pixels[at + 3U]};
+    // The raster is BGRA8; the value is red, green, blue, alpha.
+    const std::array<std::uint8_t, 4> value{pixels[at + 2U], pixels[at + 1U], pixels[at], pixels[at + 3U]};
     return value;
 }
 

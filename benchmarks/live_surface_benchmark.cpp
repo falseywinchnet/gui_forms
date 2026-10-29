@@ -58,32 +58,21 @@ void report(const char* label, std::array<double, batch_count> samples) {
 }
 } // namespace
 
-int main(const int argc, const char* const* argv) {
-    const bool bgra_only = argc > 1 && std::string_view(argv[1]) == "--bgra-only";
+int main() {
     render::SkiaRaster raster{};
     require(raster.resize({1060.0, 618.0}, 1.0));
     const std::shared_ptr<LiveSurface> bgra = make_surface(LiveSurfacePixelFormat::bgra32_premultiplied_srgb);
-    const std::shared_ptr<LiveSurface> rgba = make_surface(LiveSurfacePixelFormat::rgba32_premultiplied_srgb);
     const LiveSurfaceFrame bgra_frame = (*bgra).acquire_latest();
-    const LiveSurfaceFrame rgba_frame = (*rgba).acquire_latest();
     DamageRegion damage{};
     damage.add(destination);
     raster.begin_frame(damage);
     static_cast<void>(measure(raster, bgra_frame));
-    if (!bgra_only) static_cast<void>(measure(raster, rgba_frame));
     std::array<double, batch_count> bgra_samples{};
-    std::array<double, batch_count> rgba_samples{};
-    for (std::size_t batch = 0U; batch < batch_count; ++batch) {
-        // Alternate order to reduce a systematic warmup/thermal bias.
-        if (!bgra_only && batch % 2U != 0U) rgba_samples[batch] = measure(raster, rgba_frame);
-        bgra_samples[batch] = measure(raster, bgra_frame);
-        if (!bgra_only && batch % 2U == 0U) rgba_samples[batch] = measure(raster, rgba_frame);
-    }
+    for (std::size_t batch = 0U; batch < batch_count; ++batch) bgra_samples[batch] = measure(raster, bgra_frame);
     raster.end_frame();
     std::cout << std::fixed << std::setprecision(6)
               << "opaque 1060x618, scale 1, full rectangular clip; " << batch_count
               << " batches of " << draws_per_batch << " synchronous lease draws\n";
     report("BGRA", bgra_samples);
-    if (!bgra_only) report("RGBA", rgba_samples);
     return 0;
 }

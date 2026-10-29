@@ -96,6 +96,15 @@
       "reviewed": "2026-10-27"
     },
     {
+      "path": "src/core/window/backplane/window_backplane.cpp",
+      "rule": "I06",
+      "evidence": "std::memcpy(to_start + row * to_row_bytes, from_start + row * from_row_bytes, row_length);",
+      "decision": "guarded",
+      "guard": "dominating_validation",
+      "reason": "the one caller (Window::replay_backplane) returns before copying unless both buffers' row pitches cover row_length and both spans hold row pitch times rows bytes; extents are PartRaster extents, bounded by maximum_part_raster_side",
+      "reviewed": "2026-10-28"
+    },
+    {
       "path": "src/host/linux/accessibility/linux_accessibility.cpp",
       "rule": "I05",
       "evidence": "count = g_main_context_query(context, priority, &timeout, native.data(), static_cast<int>(native.size()));",

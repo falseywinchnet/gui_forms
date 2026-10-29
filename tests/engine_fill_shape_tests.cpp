@@ -11,6 +11,7 @@
 
 #include "gui_forms/engine.hpp"
 #include "gui_forms/theme.hpp"
+#include "support/rgba_order.hpp"
 
 #include <array>
 #include <cmath>
@@ -57,22 +58,24 @@ PrimitiveParameterBlock shaped(std::string_view shape) {
     return parameters;
 }
 
-// A raster the tests own: tightly packed rows of RGBA bytes.
+// A raster the tests own: tightly packed rows of BGRA8 bytes.
 struct TestRaster final {
     std::vector<std::uint8_t> bytes;
     DeviceExtent extent{};
     std::size_t row_bytes{};
 
+    // Channel `index` of a pixel: 0 red, 1 green, 2 blue, 3 alpha.
     [[nodiscard]] std::uint8_t channel(std::uint32_t column, std::uint32_t row, std::size_t index) const {
+        constexpr std::array<std::size_t, 4> byte_of{2U, 1U, 0U, 3U};
         const std::size_t offset =
-            static_cast<std::size_t>(row) * row_bytes + static_cast<std::size_t>(column) * 4U + index;
+            static_cast<std::size_t>(row) * row_bytes + static_cast<std::size_t>(column) * 4U + byte_of[index];
         return bytes[offset];
     }
 };
 
 std::uint64_t raster_hash(const TestRaster& raster) {
     std::uint64_t hash = 14695981039346656037ULL;
-    for (const std::uint8_t byte : raster.bytes) {
+    for (const std::uint8_t byte : gui_forms::test_support::rgba_order(raster.bytes)) {
         hash = hash ^ byte;
         hash = hash * 1099511628211ULL;
     }
