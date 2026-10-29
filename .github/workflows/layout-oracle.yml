@@ -12,13 +12,6 @@ on:
       - 'tools/layout_oracle/**'
       - 'assets/fonts/**'
       - '.github/workflows/layout-oracle.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'tests/layout_corpus/**'
-      - 'tools/layout_oracle/**'
-      - 'assets/fonts/**'
-      - '.github/workflows/layout-oracle.yml'
   workflow_dispatch:
 permissions:
   contents: read
