@@ -470,8 +470,9 @@ struct Refusal final {
 };
 
 void test_refusals() {
-    const std::array<Refusal, 35> refusals{{
-        {"#a { opacity: 0.5 !important }", DiagnosticCode::not_yet_built, "opacity"},
+    const std::array<Refusal, 36> refusals{{
+        {"#a { --x: 1px !important }", DiagnosticCode::not_yet_built, "--x"},
+        {"#a { primitive: bulge; amplitude: 0.5 !important }", DiagnosticCode::value_form_not_admitted, "amplitude"},
         {"@import \"x\"; #a { opacity: 1 }", DiagnosticCode::import_not_installed, "\"x\""},
         {"#a { opacity: 1 } @media print { #a { opacity: 1 } }", DiagnosticCode::value_form_not_admitted, "print"},
         {"@keyframes k { from { color: red } }", DiagnosticCode::value_form_not_admitted, "color"},
@@ -670,7 +671,7 @@ struct CodeLabel final {
 };
 
 void test_codes() {
-    const std::array<CodeLabel, 15> codes{{
+    const std::array<CodeLabel, 16> codes{{
         {DiagnosticCode::manifest_invalid, "E601"},
         {DiagnosticCode::file_hash_mismatch, "E602"},
         {DiagnosticCode::import_not_installed, "E603"},
@@ -686,6 +687,7 @@ void test_codes() {
         {DiagnosticCode::primitive_cost_unbounded, "W109"},
         {DiagnosticCode::needs_newer_engine, "W301"},
         {DiagnosticCode::keyword_from_newer_engine, "W302"},
+        {DiagnosticCode::inline_with_theme, "W401"},
     }};
     for (const CodeLabel& entry : codes) {
         require(diagnostic_code_label(entry.code) == entry.label, entry.label);

@@ -6,6 +6,7 @@
 #include "gui_forms/theme/theme/theme.hpp"
 #include "gui_forms/window/window.hpp"
 #include "../../theme/part_painting/built_in_recipe.hpp"
+#include "../../theme/theme/forced_high_contrast.hpp"
 
 #include <algorithm>
 #include <array>
@@ -687,7 +688,8 @@ constexpr double built_in_group_margin = 4.0;
 bool same_assembly(const AssembledPartMaterial& assembled, std::uint64_t rules_serial, const SurfaceMaterial& floor,
                    Size box, MaterialAssemblyContext context,
                    const CompiledThemeRules::Resolution& resolution) noexcept {
-    if (assembled.rules_serial != rules_serial || assembled.fields != resolution.materials) return false;
+    if (assembled.rules_serial != rules_serial || assembled.inline_serial != resolution.inline_serial) return false;
+    if (assembled.fields != resolution.materials) return false;
     if (!(assembled.box == box) || assembled.em != context.em) return false;
     if (!(assembled.current_colour == context.current_colour)) return false;
     const bool same_floor = assembled.floor == floor;
@@ -718,6 +720,7 @@ const SurfaceMaterial& authored_material(EnginePartRecord* kept, std::uint64_t r
     }
     if (held == nullptr) held = std::make_unique<AssembledPartMaterial>();
     (*held).rules_serial = rules_serial;
+    (*held).inline_serial = resolution.inline_serial;
     (*held).fields = resolution.materials;
     (*held).box = keyed;
     (*held).em = context.em;
@@ -768,6 +771,7 @@ TextRole resolved_text_role(const Control& control, FontDeclaration font) {
         facts.control_type = above.anatomy().control_id;
         facts.stable_id = above.stable_id().value();
         facts.classes = above.classes();
+        facts.inline_rules = above.inline_style_rules();
         facts.states = above.anatomy_states();
         const Window* const window = above.attached_window();
         if (window != nullptr) facts.media = window_media_facts(*window);
@@ -812,16 +816,24 @@ ThemeEngine::PartPlan ThemeEngine::plan(const Control& control, const PartPaint&
     facts.control_type = control.anatomy().control_id;
     facts.stable_id = control.stable_id().value();
     facts.classes = control.classes();
+    facts.inline_rules = control.inline_style_rules();
     if (part.key) facts.part = (*part.key).part;
     facts.role = part.role;
     facts.states = part.states;
     facts.media = window_media_facts(*window);
+    // Forced high contrast's pass (E1): only an important inline style's
+    // drawing stands over it.
+    const ControlVisualContext context = part_visual_context(control, part.states);
+    facts.forced_high_contrast = context.high_contrast;
     result.resolution = rules_.resolve(facts);
     if (result.resolution.outcome == CompiledThemeRules::Outcome::role_mismatch) {
         result.drawing = PartDrawing::role_mismatch;
         return result;
     }
-    if (result.resolution.outcome != CompiledThemeRules::Outcome::primitive) return result;
+    if (result.resolution.outcome != CompiledThemeRules::Outcome::primitive) {
+        if (context.high_contrast) result.drawing = PartDrawing::forced_high_contrast;
+        return result;
+    }
     if (result.resolution.parameters_read_em) {
         // A number parameter in em, at the part's em within its range (P8c).
         const double em = text_role_em(control, resolved_text_role(control, result.resolution.font));
@@ -835,11 +847,18 @@ ThemeEngine::PartPlan ThemeEngine::plan(const Control& control, const PartPaint&
             value.number = std::min(std::max(taken, declared.minimum), declared.maximum);
         }
     }
-    // The engine's own last pass (CascadeLevel::forced_high_contrast).
-    const ControlVisualContext context = part_visual_context(control, part.states);
     if (context.high_contrast) {
-        result.drawing = PartDrawing::forced_high_contrast;
-        return result;
+        // The pass's colours stand over every declaration's: each colour
+        // parameter takes the high-contrast colour of its origin, drawn as
+        // a fill.
+        const PrimitiveDescriptor& described = (*result.resolution.primitive).descriptor();
+        for (std::size_t index = 0; index < result.resolution.parameters.count; ++index) {
+            if (index >= described.parameters.size()) break;
+            if (described.parameters[index].kind != PrimitiveParameterKind::colour) continue;
+            result.resolution.parameters.values[index].colour =
+                high_contrast_colour(result.resolution.parameter_origins[index], ColourPosition::fill,
+                                     context.surface, context.selected);
+        }
     }
     const double scale = (*window).scale();
     result.scale = DeviceScale{scale};
@@ -918,6 +937,11 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
 void ThemeEngine::paint_planned(Painter& painter, const Control& control, const PartPaint& part,
                                 const PartPlan& decided) const {
     Window* const window = control.attached_window();
+    // A program drawing both a theme and an inline style (E1, W401).
+    const bool themed = rules_.rule_count() > rules_.built_in_rule_count();
+    if (window != nullptr && themed && control.inline_style_rules() != nullptr) {
+        (*window).note_inline_with_theme(control);
+    }
     std::optional<PartRecordHandle> record{};
     if (part.key && part_bounds_paintable(part.bounds) && window != nullptr) {
         record = (*window).note_engine_part(control, *part.key, part.states);
@@ -1087,7 +1111,20 @@ void ThemeEngine::paint_planned(Painter& painter, const Control& control, const 
         const ControlVisualContext context = part_visual_context(control, part.states);
         const ControlVisualRecipe& recipe = control.effective_theme().resolve(*material_role, context);
         request.target.material = &recipe.material;
-        if (resolution.materials_authored) {
+        if (resolution.materials_authored && context.high_contrast) {
+            // Forced high contrast's material fields, for this paint only.
+            detail::ForcedMaterialFields forced{};
+            detail::forced_material_fields(resolution.materials, context.surface, context.selected, forced);
+            MaterialAssemblyContext relative{};
+            if (material_fields_read_em(forced.fields)) {
+                relative.em = text_role_em(control, resolved_text_role(control, resolution.font));
+            }
+            unkept_material.emplace();
+            assemble_material(recipe.material, forced.fields, Size{part.bounds.width, part.bounds.height}, relative,
+                              *unkept_material);
+            (*window).metrics().record_engine_material_assembly();
+            request.target.material = &*unkept_material;
+        } else if (resolution.materials_authored) {
             // The part's em and text colour, where a field reads them (P8c).
             MaterialAssemblyContext relative{};
             if (material_fields_read_em(resolution.materials)) {

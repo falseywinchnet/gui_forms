@@ -194,6 +194,10 @@ enum class DiagnosticCode : std::uint16_t {
     // forced high contrast can only replace by its position. The
     // declaration still applies.
     literal_colour_unremappable = 1201,
+    // W4xx inline (P9, E1): a window drawing a control's inline style
+    // under a theme with rules of its own, reported once per window; the
+    // file names the control (`inline:<control>`).
+    inline_with_theme = 1401,
 };
 
 [[nodiscard]] DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept;

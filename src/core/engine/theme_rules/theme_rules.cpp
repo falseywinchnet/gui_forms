@@ -18,6 +18,9 @@ namespace gui_forms {
 namespace {
 
 constexpr std::size_t maximum_style_class_length = 64U;
+// Where an inline style's machines are numbered from
+// (CompiledTransition::machine), so that none is a theme's.
+constexpr std::size_t inline_machine_base = std::size_t{1} << 30U;
 
 bool lowercase_letter(char character) noexcept {
     const bool letter = character >= 'a' && character <= 'z';
@@ -32,7 +35,9 @@ bool class_character(char character) noexcept {
 
 bool authored(CascadeLevel level) noexcept {
     const bool authored_level = level == CascadeLevel::theme_sheet || level == CascadeLevel::class_rule ||
-                                level == CascadeLevel::stable_id_rule || level == CascadeLevel::inline_style;
+                                level == CascadeLevel::stable_id_rule || level == CascadeLevel::inline_style ||
+                                level == CascadeLevel::important_theme_sheet ||
+                                level == CascadeLevel::important_inline_style;
     return authored_level;
 }
 
@@ -54,7 +59,8 @@ RuleDiagnostic diagnostic(RuleDiagnosticKind kind, std::size_t rule, const Theme
 }
 
 // The diagnostic for a selector that cannot be used at its level, or none.
-std::optional<RuleDiagnosticKind> selector_defect(const ThemeRule& rule) noexcept {
+// A control's own inline style (`owned`) needs no stable ID.
+std::optional<RuleDiagnosticKind> selector_defect(const ThemeRule& rule, bool owned) noexcept {
     const RuleSelector& selector = rule.selector;
     for (const std::string& name : selector.classes) {
         if (!valid_style_class_name(name)) return RuleDiagnosticKind::selector_invalid;
@@ -73,7 +79,9 @@ std::optional<RuleDiagnosticKind> selector_defect(const ThemeRule& rule) noexcep
     if (rule.level == CascadeLevel::stable_id_rule && specificity.ids == 0U) {
         return RuleDiagnosticKind::selector_missing_level_field;
     }
-    if (rule.level == CascadeLevel::inline_style && selector.stable_id.empty()) {
+    const bool inline_level =
+        rule.level == CascadeLevel::inline_style || rule.level == CascadeLevel::important_inline_style;
+    if (inline_level && !owned && selector.stable_id.empty()) {
         return RuleDiagnosticKind::selector_missing_level_field;
     }
     return std::nullopt;
@@ -153,7 +161,9 @@ std::string_view cascade_level_name(CascadeLevel level) noexcept {
     case CascadeLevel::class_rule: return "class_rule";
     case CascadeLevel::stable_id_rule: return "stable_id_rule";
     case CascadeLevel::inline_style: return "inline_style";
+    case CascadeLevel::important_theme_sheet: return "important_theme_sheet";
     case CascadeLevel::forced_high_contrast: return "forced_high_contrast";
+    case CascadeLevel::important_inline_style: return "important_inline_style";
     case CascadeLevel::count: return {};
     }
     return {};
@@ -1222,13 +1232,17 @@ void CompiledThemeRules::add_rules(CompiledThemeRules& result, const ThemeRuleSh
             continue;
         }
         // The engine's own table is all built_in; a theme authors only the
-        // four authored levels.
-        const bool level_allowed = engine_table ? rule.level == CascadeLevel::built_in : authored(rule.level);
+        // authored levels, and an inline style only the inline ones.
+        const bool inline_level =
+            rule.level == CascadeLevel::inline_style || rule.level == CascadeLevel::important_inline_style;
+        bool level_allowed = authored(rule.level);
+        if (engine_table) level_allowed = rule.level == CascadeLevel::built_in;
+        if (result.inline_style_) level_allowed = inline_level;
         if (!level_allowed) {
             result.diagnostics_.push_back(diagnostic(RuleDiagnosticKind::level_not_authored, index, rule, {}));
             continue;
         }
-        const std::optional<RuleDiagnosticKind> selector = selector_defect(rule);
+        const std::optional<RuleDiagnosticKind> selector = selector_defect(rule, result.inline_style_);
         if (selector) {
             result.diagnostics_.push_back(diagnostic(*selector, index, rule, {}));
             continue;
@@ -1344,6 +1358,7 @@ void CompiledThemeRules::add_rules(CompiledThemeRules& result, const ThemeRuleSh
             } else {
                 value.value.kind = PrimitiveParameterKind::colour;
                 value.value.colour = declaration.colour;
+                value.origin = declaration.origin;
             }
             compiled.parameters.push_back(value);
         }
@@ -1732,7 +1747,8 @@ CompiledThemeRules::CompiledThemeRules(const CompiledThemeRules& other)
       published_values_(other.published_values_),
       built_in_rules_(other.built_in_rules_),
       serial_(next_rules_serial()),
-      recipe_fields_set_(other.recipe_fields_set_) {}
+      recipe_fields_set_(other.recipe_fields_set_),
+      inline_style_(other.inline_style_) {}
 
 CompiledThemeRules& CompiledThemeRules::operator=(const CompiledThemeRules& other) {
     if (this == &other) return *this;
@@ -1742,6 +1758,7 @@ CompiledThemeRules& CompiledThemeRules::operator=(const CompiledThemeRules& othe
     built_in_rules_ = other.built_in_rules_;
     serial_ = next_rules_serial();
     recipe_fields_set_ = other.recipe_fields_set_;
+    inline_style_ = other.inline_style_;
     return *this;
 }
 
@@ -1787,8 +1804,26 @@ CompiledThemeRules CompiledThemeRules::compile_with_built_in(const ThemeRuleShee
     return result;
 }
 
+CompiledThemeRules CompiledThemeRules::compile_inline(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry) {
+    CompiledThemeRules result{};
+    result.inline_style_ = true;
+    // An inline style's expressions read the engine's inputs only: the
+    // published values are the theme's.
+    for (const std::string& name : sheet.published_values) {
+        RuleDiagnostic invalid{};
+        invalid.kind = RuleDiagnosticKind::published_value_invalid;
+        invalid.rule = sheet_diagnostic;
+        invalid.property = name;
+        result.diagnostics_.push_back(std::move(invalid));
+    }
+    add_rules(result, sheet, registry, false);
+    std::sort(result.rules_.begin(), result.rules_.end(), LowerPrecedence{});
+    result.number_machines();
+    return result;
+}
+
 void CompiledThemeRules::number_machines() noexcept {
-    std::size_t next = 0U;
+    std::size_t next = inline_style_ ? inline_machine_base : 0U;
     for (CompiledRule& rule : rules_) {
         for (CompiledTransition& transition : rule.transitions) {
             transition.machine = next;
@@ -1818,20 +1853,68 @@ bool CompiledThemeRules::matches(const CompiledRule& rule, const PartFacts& fact
     return true;
 }
 
+// The rules of a compilation and of a part's inline style, merged in
+// ascending precedence: by level, then specificity; at equal level and
+// specificity the compilation's come first, each set in its own order.
+// A walk for the part's drawing under forced high contrast
+// (PartFacts::forced_high_contrast) passes over every rule below
+// important_inline_style.
+class CompiledThemeRules::RuleWalk final {
+public:
+    RuleWalk(const CompiledThemeRules& rules, const PartFacts& facts, bool drawing) noexcept
+        : theme_(rules.rules_),
+          inline_(facts.inline_rules == nullptr ? std::span<const CompiledRule>{}
+                                                : std::span<const CompiledRule>((*facts.inline_rules).rules_)),
+          forced_(drawing && facts.forced_high_contrast) {}
+
+    // The next rule, or null after the last.
+    [[nodiscard]] const CompiledRule* next() noexcept {
+        const CompiledRule* taken = merged();
+        while (forced_ && taken != nullptr && (*taken).level < CascadeLevel::important_inline_style) taken = merged();
+        return taken;
+    }
+
+private:
+    // The next rule of the merge, or null after the last.
+    [[nodiscard]] const CompiledRule* merged() noexcept {
+        const bool theme_left = theme_next_ < theme_.size();
+        const bool inline_left = inline_next_ < inline_.size();
+        if (theme_left && (!inline_left || !precedes(inline_[inline_next_], theme_[theme_next_]))) {
+            const CompiledRule* const taken = &theme_[theme_next_];
+            theme_next_ = theme_next_ + 1U;
+            return taken;
+        }
+        if (!inline_left) return nullptr;
+        const CompiledRule* const taken = &inline_[inline_next_];
+        inline_next_ = inline_next_ + 1U;
+        return taken;
+    }
+
+    [[nodiscard]] static bool precedes(const CompiledRule& left, const CompiledRule& right) noexcept {
+        if (left.level != right.level) return left.level < right.level;
+        return left.specificity < right.specificity;
+    }
+
+    std::span<const CompiledRule> theme_;
+    std::span<const CompiledRule> inline_;
+    std::size_t theme_next_{};
+    std::size_t inline_next_{};
+    bool forced_{};
+};
+
 CompiledThemeRules::Resolution CompiledThemeRules::resolve(const PartFacts& facts) const noexcept {
     Resolution result{};
-    if (rules_.empty()) return result;
+    const bool inline_rules = facts.inline_rules != nullptr && !(*facts.inline_rules).rules_.empty();
+    if (inline_rules) result.inline_serial = (*facts.inline_rules).serial_;
+    if (rules_.empty() && !inline_rules) return result;
     // The winner is the last matching rule that selects, rules being in
     // ascending precedence.
-    std::size_t winner = rules_.size();
-    for (std::size_t index = rules_.size(); index > 0U; --index) {
-        const CompiledRule& rule = rules_[index - 1U];
-        if (rule.selects && matches(rule, facts)) {
-            winner = index - 1U;
-            break;
-        }
+    const CompiledRule* winner = nullptr;
+    RuleWalk walk(*this, facts, true);
+    for (const CompiledRule* rule = walk.next(); rule != nullptr; rule = walk.next()) {
+        if ((*rule).selects && matches(*rule, facts)) winner = rule;
     }
-    if (winner != rules_.size()) resolve_primitive(facts, rules_[winner], result);
+    if (winner != nullptr) resolve_primitive(facts, *winner, result);
     resolve_transitions(facts, result);
     resolve_materials(facts, result);
     return result;
@@ -1840,7 +1923,9 @@ CompiledThemeRules::Resolution CompiledThemeRules::resolve(const PartFacts& fact
 void CompiledThemeRules::resolve_materials(const PartFacts& facts, Resolution& result) const noexcept {
     // The last matching declaration of each field wins, rules being in
     // ascending precedence; a rule declares each field at most once.
-    for (const CompiledRule& rule : rules_) {
+    RuleWalk walk(*this, facts, true);
+    for (const CompiledRule* next = walk.next(); next != nullptr; next = walk.next()) {
+        const CompiledRule& rule = *next;
         if (rule.materials.empty() || !matches(rule, facts)) continue;
         for (const MaterialDeclaration& declaration : rule.materials) {
             result.materials[static_cast<std::size_t>(declaration.field)] = &declaration;
@@ -1851,10 +1936,13 @@ void CompiledThemeRules::resolve_materials(const PartFacts& facts, Resolution& r
 
 CompiledThemeRules::RecipeResolution CompiledThemeRules::resolve_recipe_fields(const PartFacts& facts) const noexcept {
     RecipeResolution result{};
-    if (!recipe_fields_set_) return result;
+    const bool inline_fields = facts.inline_rules != nullptr && (*facts.inline_rules).recipe_fields_set_;
+    if (!recipe_fields_set_ && !inline_fields) return result;
     // As for the material fields: the last matching declaration of each
     // field wins, and a rule declares each field at most once.
-    for (const CompiledRule& rule : rules_) {
+    RuleWalk walk(*this, facts, true);
+    for (const CompiledRule* next = walk.next(); next != nullptr; next = walk.next()) {
+        const CompiledRule& rule = *next;
         if (rule.recipe_fields.empty() || !matches(rule, facts)) continue;
         for (const RecipeDeclaration& declaration : rule.recipe_fields) {
             result.fields[static_cast<std::size_t>(declaration.field)] = &declaration;
@@ -1881,12 +1969,15 @@ void CompiledThemeRules::resolve_primitive(const PartFacts& facts, const Compile
     // precedence, so the last write of each parameter is its winner. A
     // winning expression keeps its fallback as the parameter's value until
     // the engine evaluates it.
-    for (const CompiledRule& rule : rules_) {
+    RuleWalk walk(*this, facts, true);
+    for (const CompiledRule* next = walk.next(); next != nullptr; next = walk.next()) {
+        const CompiledRule& rule = *next;
         if (rule.primitive != chosen.primitive || !matches(rule, facts)) continue;
         for (const CompiledDeclaration& declaration : rule.parameters) {
             result.parameters.values[declaration.parameter] = declaration.value;
             result.expressions[declaration.parameter] = declaration.expression ? &declaration.program : nullptr;
             result.parameter_em[declaration.parameter] = declaration.em;
+            result.parameter_origins[declaration.parameter] = declaration.origin;
         }
     }
     result.inputs_read = declared_input_bits(descriptor);
@@ -1910,7 +2001,9 @@ void CompiledThemeRules::resolve_transitions(const PartFacts& facts, Resolution&
     const CompiledTransition* down = nullptr;
     std::array<const CompiledTransition*, maximum_primitive_parameters> parameters{};
     const bool primitive = result.outcome == Outcome::primitive;
-    for (const CompiledRule& rule : rules_) {
+    RuleWalk walk(*this, facts, false);
+    for (const CompiledRule* next = walk.next(); next != nullptr; next = walk.next()) {
+        const CompiledRule& rule = *next;
         const bool presents = !rule.transitions.empty() || rule.ambient || rule.blend || rule.font;
         if (!presents || !matches(rule, facts)) continue;
         if (rule.ambient) result.ambient = &*rule.ambient;

@@ -233,6 +233,27 @@ struct PrimitiveSelection final {
     bool dropped{};
 };
 
+// One rule a style rule lowers to (P9): at its selector's level, or, for
+// its `!important` declarations, at the important level. It selects
+// `selection`'s primitive where that selects one, else the material
+// primitive where `implicit_material`. A `borrowed` selection is the
+// important sibling's, carried for the ordinary rule's parameters: alone,
+// it is not emitted.
+struct EmittedRule final {
+    PrimitiveSelection selection{};
+    bool implicit_material{};
+    bool important{};
+    bool borrowed{};
+};
+
+// Whether the property `folded` (folded to lowercase) is a parameter of
+// the primitive `descriptor` describes.
+[[nodiscard]] bool names_parameter(const PrimitiveDescriptor& descriptor, std::string_view folded) {
+    const std::string registered = registered_name_from_kebab(folded);
+    const bool named = !registered.empty() && find_parameter(descriptor, registered).has_value();
+    return named;
+}
+
 // The join of one optional flag of two media conditions into `joined`:
 // false where they name opposite values.
 [[nodiscard]] bool join_flag(std::optional<bool> left, std::optional<bool> right,
@@ -345,6 +366,11 @@ private:
     // of the roles it reads (P8b).
     [[nodiscard]] bool lower_rule(std::size_t rule_index);
     [[nodiscard]] bool lower_rule_once(std::size_t rule_index);
+    // The rule's ordinary or its `!important` declarations (P9) into
+    // declarations_, materials_, recipe_fields_ and motion_, parameters
+    // being `selection`'s; `other` is the rule's other selection.
+    [[nodiscard]] bool lower_declarations(std::size_t rule_index, bool important,
+                                          const PrimitiveSelection& selection, const PrimitiveSelection& other);
     [[nodiscard]] bool select_primitive(const SyntaxNode& node, PrimitiveSelection& selection);
     [[nodiscard]] bool lower_declaration(const SyntaxNode& node, PropertyClass kind,
                                          const PrimitiveSelection& selection);
@@ -400,7 +426,8 @@ private:
     // Whether a selector of the rule names a part or a role: the recipe's
     // fields are the control's (P6f).
     [[nodiscard]] bool rule_selects_part() const noexcept;
-    [[nodiscard]] bool emit_rule(const PrimitiveSelection& selection, std::uint32_t at);
+    // The lowered declarations as a rule for each selector (EmittedRule).
+    [[nodiscard]] bool emit_rule(const EmittedRule& emitted, std::uint32_t at);
 
     // Substitutes and reads the declaration's value into value_, the
     // parameters being parameter_names_; false after an error.
@@ -492,7 +519,7 @@ CompilePass::CompilePass(const ThemeCompileInput& input, ThemeRuleSheet& sheet, 
 CompileOutcome CompilePass::run() {
     const TokenizeOutcome tokenized = tokenize_theme_sheet(input_.source, tokens_, lines_, diagnostics_);
     if (tokenized != TokenizeOutcome::tokens_cover_sheet) return CompileOutcome::refused;
-    const ParseOutcome parsed = parse_theme_sheet(input_.source, tokens_, lines_, tree_, diagnostics_);
+    const ParseOutcome parsed = parse_theme_sheet(input_.source, tokens_, lines_, tree_, diagnostics_, input_.form);
     if (parsed != ParseOutcome::tree_complete) return CompileOutcome::refused;
     newer_engine_ = current_engine_version < input_.requires_engine;
     motion_.keyframes.clear();
@@ -666,6 +693,8 @@ bool CompilePass::next_palette_choice() noexcept {
 }
 
 bool CompilePass::selects_root(std::size_t rule_index) const noexcept {
+    // An inline style has no palette: `:root` there is a selector.
+    if (input_.form == ThemeSheetForm::inline_style) return false;
     const TokenRange range = tree_.nodes[rule_index].content;
     std::size_t written = 0U;
     bool root = false;
@@ -789,26 +818,103 @@ bool CompilePass::lower_rule_once(std::size_t rule_index) {
                                        .selectors = rule.content,
                                        .rule_label = written,
                                        .cursor = cursor_};
-    const SelectorOutcome selected =
-        selectors_.lower(selector_input, input_.vocabulary, budget_, lowered_selectors_, diagnostics_);
-    if (selected == SelectorOutcome::refused) return false;
-    // A dropped rule (an unknown name, reported) declares nothing.
-    if (selected == SelectorOutcome::dropped) return true;
+    const bool inline_style = input_.form == ThemeSheetForm::inline_style;
+    if (inline_style && rule.content.first.value == rule.content.end.value) {
+        // An inline style's own declarations: the control itself.
+        lowered_selectors_.push_back(LoweredSelector{.selector = {}, .specificity = {}, .level = {}});
+    } else {
+        const SelectorOutcome selected =
+            selectors_.lower(selector_input, input_.vocabulary, budget_, lowered_selectors_, diagnostics_);
+        if (selected == SelectorOutcome::refused) return false;
+        // A dropped rule (an unknown name, reported) declares nothing.
+        if (selected == SelectorOutcome::dropped) return true;
+    }
+    for (const LoweredSelector& lowered : lowered_selectors_) {
+        const RuleSelector& named = lowered.selector;
+        const bool other = !named.control_type.empty() || !named.stable_id.empty() || !named.classes.empty();
+        if (inline_style && other) {
+            // An inline style's blocks name its control's parts and states.
+            report(DiagnosticCode::selector_syntax, rule.content.first.value, "a selector of its own control only");
+            return false;
+        }
+    }
 
+    // The rule's primitive, from its ordinary and its `!important`
+    // `primitive` declarations, each the last of its kind (P9, EC6).
     const std::size_t end = rule.subtree_end.value;
-    PrimitiveSelection selection{};
+    PrimitiveSelection ordinary{};
+    PrimitiveSelection important{};
+    bool any_important = false;
     for (std::size_t child = rule_index + 1U; child < end; child = tree_.nodes[child].subtree_end.value) {
         const SyntaxNode& node = tree_.nodes[child];
         const std::uint32_t property = node.tokens.first.value;
         property_ = clipped_theme_detail(token_text(property));
-        if ((node.flags & syntax_flag_important) != 0U) {
-            // P9 builds the important levels.
-            report(DiagnosticCode::not_yet_built, property, "!important");
+        const bool flagged = (node.flags & syntax_flag_important) != 0U;
+        any_important = any_important || flagged;
+        fold_ascii(token_text(property), folded_);
+        const PropertyClass kind = classify(folded_);
+        if (kind == PropertyClass::custom && flagged) {
+            // P12 builds custom properties through the cascade.
+            report(DiagnosticCode::not_yet_built, property, "!important on a custom property");
             return false;
         }
-        fold_ascii(token_text(property), folded_);
-        if (classify(folded_) == PropertyClass::primitive && !select_primitive(node, selection)) return false;
+        if (kind == PropertyClass::custom && input_.form == ThemeSheetForm::inline_style) {
+            // P12 builds custom properties through the cascade, inline
+            // definitions reaching the theme's declarations.
+            report(DiagnosticCode::not_yet_built, property, "a custom property in an inline style");
+            return false;
+        }
+        if (kind != PropertyClass::primitive) continue;
+        PrimitiveSelection one{};
+        if (!select_primitive(node, one)) return false;
+        PrimitiveSelection& into = flagged ? important : ordinary;
+        if (one.selects) {
+            into.selects = true;
+            into.primitive = one.primitive;
+        }
+        into.dropped = into.dropped || one.dropped;
     }
+    // The ordinary declarations are a rule at the selector's level, the
+    // `!important` ones a sibling rule at the important level, with the
+    // same selector, label and media condition. The sibling selects the
+    // primitive only where its own `primitive` declaration is important;
+    // the ordinary rule's parameters belong to its own selection, else to
+    // the important one. The levels differ, so the order of the two in the
+    // sheet changes nothing; the sibling goes first, so the ordinary rule
+    // knows whether the rule has material fields (C7).
+    const bool undeclared = !ordinary.selects && !important.selects && !ordinary.dropped && !important.dropped &&
+                            input_.registry.find(material_primitive_name) != nullptr;
+    bool important_materials = false;
+    if (any_important) {
+        PrimitiveSelection sibling = important;
+        sibling.dropped = important.dropped || ordinary.dropped;
+        if (!lower_declarations(rule_index, true, sibling, ordinary)) return false;
+        important_materials = !materials_.empty();
+        // A rule of material fields and no `primitive` selects the material
+        // primitive (owner C7, 2026-10-26), as if it were declared with
+        // them: with the `!important` ones where there are any, so that
+        // the selection stands where they do, even under forced high
+        // contrast (E1).
+        const EmittedRule sibling_rule{.selection = important,
+                                       .implicit_material = undeclared && important_materials,
+                                       .important = true};
+        if (!emit_rule(sibling_rule, rule.content.first.value)) return false;
+    }
+    PrimitiveSelection own = ordinary.selects ? ordinary : important;
+    own.dropped = ordinary.dropped || important.dropped;
+    if (!lower_declarations(rule_index, false, own, important)) return false;
+    // Without `!important` material fields, the ordinary rule's own select
+    // the material primitive at its level; with them, the ordinary rule
+    // borrows the sibling's selection.
+    const bool implicit_material = undeclared && (!materials_.empty() || important_materials);
+    const bool borrowed = (!ordinary.selects && important.selects) || (undeclared && important_materials);
+    const EmittedRule emitted{.selection = own, .implicit_material = implicit_material, .borrowed = borrowed};
+    return emit_rule(emitted, rule.content.first.value);
+}
+
+bool CompilePass::lower_declarations(std::size_t rule_index, bool important, const PrimitiveSelection& selection,
+                                     const PrimitiveSelection& other) {
+    const std::size_t end = tree_.nodes[rule_index].subtree_end.value;
     declarations_.clear();
     materials_.clear();
     recipe_fields_.clear();
@@ -816,15 +922,24 @@ bool CompilePass::lower_rule_once(std::size_t rule_index) {
     clear_written_animations(motion_.animations_written);
     for (std::size_t child = rule_index + 1U; child < end; child = tree_.nodes[child].subtree_end.value) {
         const SyntaxNode& node = tree_.nodes[child];
+        if (((node.flags & syntax_flag_important) != 0U) != important) continue;
         const std::uint32_t property = node.tokens.first.value;
         property_ = clipped_theme_detail(token_text(property));
         fold_ascii(token_text(property), folded_);
         const PropertyClass kind = classify(folded_);
         if (kind == PropertyClass::custom || kind == PropertyClass::primitive) continue;
+        if (important && !selection.selects && other.primitive != nullptr &&
+            names_parameter((*other.primitive).descriptor(), folded_)) {
+            // The parameter would select its primitive at the important
+            // level, which its rule did not write.
+            report(DiagnosticCode::value_form_not_admitted, property,
+                   "!important on a parameter of a primitive selected without it");
+            return false;
+        }
         if (!lower_declaration(node, kind, selection)) return false;
     }
     property_.clear();
-    return emit_rule(selection, rule.content.first.value);
+    return true;
 }
 
 bool CompilePass::select_primitive(const SyntaxNode& node, PrimitiveSelection& selection) {
@@ -1895,7 +2010,8 @@ void CompilePass::add_material(MaterialDeclaration declaration) {
     materials_.push_back(std::move(declaration));
 }
 
-bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t at) {
+bool CompilePass::emit_rule(const EmittedRule& emitted, std::uint32_t at) {
+    const PrimitiveSelection& selection = emitted.selection;
     ThemeRule lowered{};
     lowered.label = rule_;
     lowered.media = media_;
@@ -1903,11 +2019,10 @@ bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t a
         const std::string_view name =
             selection.primitive == nullptr ? built_in_primitive_name : (*selection.primitive).descriptor().name;
         lowered.declarations.push_back(RuleDeclaration::primitive(name));
-    } else if (!selection.dropped && !materials_.empty() && input_.registry.find(material_primitive_name) != nullptr) {
-        // A rule of material fields and no `primitive` selects the
-        // material primitive (owner C7, 2026-10-26).
+    } else if (emitted.implicit_material) {
         lowered.declarations.push_back(RuleDeclaration::primitive(material_primitive_name));
     }
+    const std::size_t selections = lowered.declarations.size();
     for (LoweredDeclaration& declaration : declarations_) {
         const bool declared = declaration.kind == LoweredKind::parameter || declaration.kind == LoweredKind::blend ||
                               declaration.kind == LoweredKind::font;
@@ -1923,7 +2038,9 @@ bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t a
     if (!apply_animations(selection, lowered)) return false;
     lowered.materials = materials_;
     lowered.recipe_fields = recipe_fields_;
-    if (lowered.declarations.empty() && lowered.transitions.empty() && lowered.materials.empty() &&
+    // A borrowed selection alone declares nothing of the rule's own.
+    const std::size_t owned = emitted.borrowed ? selections : 0U;
+    if (lowered.declarations.size() == owned && lowered.transitions.empty() && lowered.materials.empty() &&
         lowered.recipe_fields.empty() && !lowered.ambient) {
         return true;
     }
@@ -1941,7 +2058,10 @@ bool CompilePass::emit_rule(const PrimitiveSelection& selection, std::uint32_t a
         sheet_.rules.push_back(lowered);
         ThemeRule& rule = sheet_.rules.back();
         rule.selector = selector.selector;
-        rule.level = selector.level;
+        rule.level = emitted.important ? CascadeLevel::important_theme_sheet : selector.level;
+        if (input_.form == ThemeSheetForm::inline_style) {
+            rule.level = emitted.important ? CascadeLevel::important_inline_style : CascadeLevel::inline_style;
+        }
         // A given specificity only where CSS's differs from the engine's
         // own count of the selector (EC2: an `:is()` argument's).
         if (!(selector.specificity == rule_specificity(selector.selector))) rule.specificity = selector.specificity;

@@ -46,7 +46,12 @@ namespace gui_forms::theme_language {
 // - `images`: those that are images, bound to the engine's images (P10's
 //   loader binds them; until then the caller does);
 // - `requires_engine`: the engine version the manifest declares (P9
-//   supplies it; until then the caller does).
+//   supplies it; until then the caller does);
+// - `form`: a theme sheet, or a control's inline style (P9, R2-10), whose
+//   rules are at the inline levels with the control's selector implied
+//   and whose blocks may name only the control's own parts and states (the
+//   vocabulary is the control's anatomy alone). An inline style has no
+//   palette, custom properties (E999 until P12), at-rules or resources.
 struct ThemeCompileInput final {
     const ThemeSource& source;
     const PrimitiveRegistry& registry;
@@ -55,6 +60,7 @@ struct ThemeCompileInput final {
     std::span<const std::string_view> resources{};
     std::span<const ThemeImageResource> images{};
     EngineVersion requires_engine{current_engine_version};
+    ThemeSheetForm form{ThemeSheetForm::sheet};
 };
 
 enum class CompileOutcome : std::uint8_t {

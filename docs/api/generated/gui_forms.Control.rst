@@ -236,6 +236,12 @@ gui_forms::Control
          name; :cpp:func:`add_class <gui_forms::Control::add_class>` and :cpp:func:`remove_class <gui_forms::Control::remove_class>` change one. A change repaints
          the control.
 
+      **inline_style** : ``std::string_view``
+         The inline style's text in force; empty without one.
+
+      **inline_style_rules** : ``CompiledThemeRules*``, read-only
+         Its compiled rules (CompiledThemeRules::compile_inline), or null without one; the cascade reads them for this control alone.
+
       **ceremonial** : ``bool``, default ``false``
          Whether the application marks the control's surface ceremonial, as an
          installer's or a first run's world (T2, decision B3-1). On it and its
@@ -960,6 +966,18 @@ gui_forms::Control
    .. cpp:function:: void set_classes(std::vector<std::string> classes)
 
       Sets :cpp:func:`classes <gui_forms::Control::classes>`; see the property's description above.
+
+   .. cpp:function:: std::string_view inline_style() const noexcept
+
+      The inline style's text in force; empty without one.
+
+   .. cpp:function:: InlineStyleResult set_inline_style(std::string_view text)
+
+      The control's inline style (T3, R2-10): declarations for the control, then blocks for its own parts and states with its selector implied, as ``opacity: 0.9; border-radius: 6px !important; ::part(face):hover { scale: 1.04 }``. The control owns it: it styles this control alone, whatever its stable ID, and it survives theme replacement. In the cascade (the owner's rule E1) an ``!important`` declaration wins whichever side it is on, and where neither or both are important the inline style wins; under forced high contrast only the inline ``!important`` declarations that are not colours stand. A refused style changes nothing: the control keeps its previous one, and the result holds the diagnostics. Empty text clears the style. Its diagnostics name the file ``inline:<stable ID>``.
+
+   .. cpp:function:: const CompiledThemeRules* inline_style_rules() const noexcept
+
+      Its compiled rules (CompiledThemeRules::compile_inline), or null without one; the cascade reads them for this control alone.
 
    .. cpp:function:: bool ceremonial() const noexcept
 

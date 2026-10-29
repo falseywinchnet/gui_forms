@@ -70,6 +70,9 @@ gui_forms::Window
       **theme_ptr** : ``std::shared_ptr<const Theme>``, read-only
          Returns shared ownership of the active immutable theme.
 
+      **inline_with_theme_reported** : ``bool``, read-only
+         Whether the window has drawn a control's inline style under a theme with rules of its own: the warning W401 ``inline_with_theme`` (T3, the owner's rule E1), written to the log once per window.
+
       **resources** : ``std::shared_ptr<ApplicationResources>``, read-only
          The :cpp:class:`ApplicationResources <gui_forms::ApplicationResources>` this window uses, its own unless it was
          constructed with shared ones. Pass it to another window's constructor to
@@ -637,6 +640,10 @@ gui_forms::Window
       Sets :cpp:func:`theme <gui_forms::Window::theme>`; see the property's description above.
 
    .. cpp:function:: std::shared_ptr<const Theme> theme_ptr() const noexcept
+
+   .. cpp:function:: bool inline_with_theme_reported() const noexcept
+
+      Whether the window has drawn a control's inline style under a theme with rules of its own: the warning W401 ``inline_with_theme`` (T3, the owner's rule E1), written to the log once per window.
 
    .. cpp:function:: std::shared_ptr<ApplicationResources> resources() const noexcept
 

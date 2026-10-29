@@ -51,6 +51,7 @@ struct HelpRequestEvent;
 namespace detail {
 class DisplayChunk;
 struct DispatcherState;
+struct ControlInlineStyle;
 
 template <typename EventType, typename... Values>
 class DeferredEventPublication final {
@@ -577,6 +578,24 @@ public:
     bool add_class(std::string_view name);
     bool remove_class(std::string_view name);
     [[nodiscard]] bool has_class(std::string_view name) const noexcept;
+    // The control's inline style (T3, R2-10): declarations for the control,
+    // then blocks for its own parts and states with its selector implied,
+    // as `opacity: 0.9; border-radius: 6px !important; ::part(face):hover
+    // { scale: 1.04 }`. The control owns it: it styles this control alone,
+    // whatever its stable ID, and it survives theme replacement. In the
+    // cascade (the owner's rule E1) an `!important` declaration wins
+    // whichever side it is on, and where neither or both are important the
+    // inline style wins; under forced high contrast only the inline
+    // `!important` declarations that are not colours stand. A refused style
+    // changes nothing: the control keeps its previous one, and the result
+    // holds the diagnostics. Empty text clears the style. Its diagnostics
+    // name the file `inline:<stable ID>`.
+    [[nodiscard]] InlineStyleResult set_inline_style(std::string_view text);
+    // The inline style's text in force; empty without one.
+    [[nodiscard]] std::string_view inline_style() const noexcept;
+    // Its compiled rules (CompiledThemeRules::compile_inline), or null
+    // without one; the cascade reads them for this control alone.
+    [[nodiscard]] const CompiledThemeRules* inline_style_rules() const noexcept;
     // Whether the application marks this control's surface ceremonial (T2
     // GIVEN B3-1; design language §10): an installer's or a first run's
     // world. On it, and on its descendants, the theme engine's ambient
@@ -1086,6 +1105,7 @@ private:
                           ControlStyles::all_painting_in_one_pass};
     std::optional<CursorKind> cursor_;
     std::vector<std::string> classes_;
+    std::shared_ptr<const detail::ControlInlineStyle> inline_style_;
     bool ceremonial_{};
     CursorImagesPtr cursor_images_;
     std::shared_ptr<const Theme> theme_override_;

@@ -61,13 +61,16 @@ struct OpenGroup final {
 class SheetParser final {
 public:
     SheetParser(const ThemeSource& source, const ThemeTokenBuffer& tokens, const LineStartTable& lines,
-                ThemeSyntaxTree& tree, ThemeDiagnosticList& diagnostics) noexcept;
+                ThemeSyntaxTree& tree, ThemeDiagnosticList& diagnostics, ThemeSheetForm form) noexcept;
 
     [[nodiscard]] ParseOutcome run();
 
 private:
     // The levels of the grammar, each starting at next_.
     void parse_top_level_item();
+    // An inline style (P9): its leading declarations, as a style rule with
+    // no selector, then its blocks.
+    void parse_inline_style();
     void parse_at_rule();
     void parse_import(std::uint32_t at);
     void parse_block_at_rule(std::uint32_t at, SyntaxNodeKind kind);
@@ -119,13 +122,17 @@ private:
     std::size_t imports_{};
     // Whether an item other than @import has been read.
     bool seen_other_item_{};
+    ThemeSheetForm form_{ThemeSheetForm::sheet};
+    // Whether the declarations being read are an inline style's leading
+    // ones, which the end of the text may end.
+    bool inline_declarations_{};
     ParseOutcome outcome_{ParseOutcome::tree_complete};
 };
 
 SheetParser::SheetParser(const ThemeSource& source, const ThemeTokenBuffer& tokens, const LineStartTable& lines,
-                         ThemeSyntaxTree& tree, ThemeDiagnosticList& diagnostics) noexcept
+                         ThemeSyntaxTree& tree, ThemeDiagnosticList& diagnostics, ThemeSheetForm form) noexcept
     : source_(source), text_(source.text), tokens_(tokens.tokens), tree_(tree), diagnostics_(diagnostics),
-      cursor_(lines, source.text) {}
+      cursor_(lines, source.text), form_(form) {}
 
 ParseOutcome SheetParser::run() {
     tree_.nodes.clear();
@@ -144,10 +151,14 @@ ParseOutcome SheetParser::run() {
     tree_.nodes.reserve(significant / 2U + 1U + open_levels);
 
     const std::uint32_t root = open_node(SyntaxNodeKind::sheet, 0U);
-    while (!stopped()) {
-        skip_trivia();
-        if (at_end()) break;
-        parse_top_level_item();
+    if (form_ == ThemeSheetForm::inline_style) {
+        parse_inline_style();
+    } else {
+        while (!stopped()) {
+            skip_trivia();
+            if (at_end()) break;
+            parse_top_level_item();
+        }
     }
     if (outcome_ == ParseOutcome::tree_complete && limit_ < count) outcome_ = ParseOutcome::stopped_at_lexical_error;
     // The sheet spans every token, whatever stopped the parse.
@@ -167,6 +178,63 @@ void SheetParser::parse_top_level_item() {
     }
     seen_other_item_ = true;
     parse_rule(SyntaxNodeKind::style_rule, true);
+}
+
+void SheetParser::parse_inline_style() {
+    // Empty declarations before the first, as CSS admits.
+    skip_trivia();
+    while (!at_end() && tokens_[next_].kind == TokenKind::semicolon) {
+        ++next_;
+        skip_trivia();
+    }
+    if (!at_end() && tokens_[next_].kind == TokenKind::ident) {
+        // The control's own declarations: a rule whose selector, empty, is
+        // the control.
+        ++rules_;
+        const std::uint32_t node = open_node(SyntaxNodeKind::style_rule, next_);
+        tree_.nodes[node].content = TokenRange{TokenIndex{next_}, TokenIndex{next_}};
+        inline_declarations_ = true;
+        std::size_t declarations = 0U;
+        while (!stopped()) {
+            skip_trivia();
+            if (at_end()) break;
+            const TokenKind kind = tokens_[next_].kind;
+            if (kind == TokenKind::semicolon) {
+                ++next_;
+                continue;
+            }
+            if (kind != TokenKind::ident) break;
+            ++declarations;
+            if (declarations > maximum_declarations_per_rule) {
+                fail_at_token(DiagnosticCode::too_many_declarations, next_,
+                              std::to_string(maximum_declarations_per_rule));
+                break;
+            }
+            parse_declaration(false);
+        }
+        inline_declarations_ = false;
+        close_node(node, trimmed(tree_.nodes[node].tokens.first.value, next_).end.value);
+    }
+    // Then the part and state blocks, the control's selector implied.
+    while (!stopped()) {
+        skip_trivia();
+        if (at_end()) return;
+        const TokenKind kind = tokens_[next_].kind;
+        if (kind == TokenKind::at_keyword) {
+            fail_at_token(DiagnosticCode::nesting_not_admitted, next_, clipped_theme_detail(token_text(next_)));
+            return;
+        }
+        if (kind == TokenKind::ident) {
+            // A declaration after a block.
+            fail_at_token(DiagnosticCode::declaration_outside_rule, next_, {});
+            return;
+        }
+        if (kind == TokenKind::right_brace || closes_group(kind)) {
+            fail_at_token(DiagnosticCode::unbalanced_block, next_, "no opening");
+            return;
+        }
+        parse_rule(SyntaxNodeKind::style_rule, true);
+    }
 }
 
 void SheetParser::parse_at_rule() {
@@ -378,7 +446,11 @@ void SheetParser::parse_declaration(bool in_keyframes) {
     ++next_;
     skip_trivia();
     if (at_end()) {
-        fail_at_end(DiagnosticCode::unbalanced_block, open_[depth_ - 1U].opener, "not closed");
+        if (inline_declarations_) {
+            fail_at_end_of_sheet();
+        } else {
+            fail_at_end(DiagnosticCode::unbalanced_block, open_[depth_ - 1U].opener, "not closed");
+        }
         close_node(node, next_);
         return;
     }
@@ -401,8 +473,13 @@ void SheetParser::parse_declaration(bool in_keyframes) {
         close_node(node, next_);
         return;
     }
-    if (end == ItemEnd::end_of_sheet) {
+    if (end == ItemEnd::end_of_sheet && !inline_declarations_) {
         fail_at_end(DiagnosticCode::unbalanced_block, open_[depth_ - 1U].opener, "not closed");
+        close_node(node, next_);
+        return;
+    }
+    if (end == ItemEnd::right_brace && inline_declarations_) {
+        fail_at_token(DiagnosticCode::unbalanced_block, next_, "no opening");
         close_node(node, next_);
         return;
     }
@@ -438,8 +515,9 @@ void SheetParser::parse_declaration(bool in_keyframes) {
         close_node(node, next_);
         return;
     }
-    // Ended by the block's '}': the declaration ends at its last written
-    // token, and the whitespace before the '}' is the rule's.
+    // Ended by the block's '}', or an inline style's by the end of its
+    // text: the declaration ends at its last written token, and the
+    // whitespace after it is the rule's.
     const TokenRange spanned = trimmed(first, next_);
     close_node(node, spanned.end.value);
 }
@@ -633,8 +711,8 @@ bool SheetParser::stopped() const noexcept {
 } // namespace
 
 ParseOutcome parse_theme_sheet(const ThemeSource& source, const ThemeTokenBuffer& tokens, const LineStartTable& lines,
-                               ThemeSyntaxTree& tree, ThemeDiagnosticList& diagnostics) {
-    SheetParser parser(source, tokens, lines, tree, diagnostics);
+                               ThemeSyntaxTree& tree, ThemeDiagnosticList& diagnostics, ThemeSheetForm form) {
+    SheetParser parser(source, tokens, lines, tree, diagnostics, form);
     const ParseOutcome outcome = parser.run();
     return outcome;
 }

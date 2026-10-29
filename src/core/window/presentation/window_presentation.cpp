@@ -7,6 +7,7 @@
 #include "../../display/chunk/display_chunk.hpp"
 #include "../../display/recording_painter/recording_painter.hpp"
 #include "../../display/replay/replay_display_chunk.hpp"
+#include "../../theme_language/diagnostics/theme_diagnostics.hpp"
 #include "../popup/popup_attachment.hpp"
 
 #include <algorithm>
@@ -14,9 +15,12 @@
 #include <cmath>
 #include <atomic>
 #include <cstddef>
+#include <cstdio>
 #include <optional>
 #include <span>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -296,6 +300,17 @@ bool covered_by(Rect pending, std::span<const Rect> painted) noexcept {
 }
 
 } // namespace
+
+void Window::note_inline_with_theme(const Control& control) {
+    if (inline_with_theme_reported_) return;
+    inline_with_theme_reported_ = true;
+    theme_language::ThemeDiagnostic warning{};
+    warning.code = theme_language::DiagnosticCode::inline_with_theme;
+    warning.file = "inline:" + std::string(control.stable_id().value());
+    theme_language::ThemeDiagnosticList list{};
+    list.add(std::move(warning));
+    theme_language::write_theme_diagnostics(list, stderr);
+}
 
 std::optional<PartRecordHandle> Window::note_engine_part(const Control& control, const PartKey& key,
                                                          AnatomyStateSet states) {

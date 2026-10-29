@@ -617,7 +617,7 @@ int run_macos_application(std::vector<MacApplicationWindow> windows,
     @autoreleasepool {
         NSApplication* nativeApplication = [NSApplication sharedApplication];
         [nativeApplication setActivationPolicy:NSApplicationActivationPolicyRegular];
-        install_application_menu();
+        detail::install_application_menu();
 
         MacApplicationRun run;
         GUIFormsActivationObserver* activation = [[GUIFormsActivationObserver alloc] initWithRun:&run];

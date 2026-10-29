@@ -1092,6 +1092,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     find_library(GUI_FORMS_UNIFORMTYPEIDENTIFIERS UniformTypeIdentifiers REQUIRED)
     add_library(gui_forms_host_macos STATIC
         src/host/macos/application/macos_host.mm
+        src/host/macos/application/application_menu.mm
         src/host/macos/services/appkit_host_services.mm
         src/host/macos/services/appkit_clipboard_image.mm
         src/host/macos/services/appkit_status_items.mm
@@ -1926,6 +1927,13 @@ if(GUI_FORMS_BUILD_PAINT_PROFILE)
     target_link_libraries(gui_forms_paint_profile_workload PRIVATE gui_forms_gallery_model gui_forms_skia)
 endif()
 
+# SK2: the time each host spends presenting a frame, which the native jobs
+# measure (.github/workflows/native-platform.yml). Built only when asked for.
+if(TARGET gui_forms_application)
+    add_executable(gui_forms_present_profile_workload EXCLUDE_FROM_ALL benchmarks/present_profile_workload.cpp)
+    target_link_libraries(gui_forms_present_profile_workload PRIVATE gui_forms_application)
+endif()
+
 if(GUI_FORMS_BUILD_BENCHMARKS)
     if(NOT APPLE OR NOT TARGET gui_forms_skia OR NOT TARGET gui_forms_coregraphics OR
        NOT TARGET gui_forms_gallery_model)
@@ -2721,6 +2729,14 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_media_css_tests tests/theme_language/theme_media_css_tests.cpp)
     target_link_libraries(gui_forms_theme_media_css_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_theme_media_css_tests COMMAND gui_forms_theme_media_css_tests)
+
+    add_executable(gui_forms_theme_important_css_tests tests/theme_language/theme_important_css_tests.cpp)
+    target_link_libraries(gui_forms_theme_important_css_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_important_css_tests COMMAND gui_forms_theme_important_css_tests)
+
+    add_executable(gui_forms_theme_inline_style_tests tests/theme_language/theme_inline_style_tests.cpp)
+    target_link_libraries(gui_forms_theme_inline_style_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_inline_style_tests COMMAND gui_forms_theme_inline_style_tests)
     add_executable(gui_forms_theme_colour_role_css_tests tests/theme_language/theme_colour_role_css_tests.cpp)
     target_link_libraries(gui_forms_theme_colour_role_css_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_theme_colour_role_css_tests COMMAND gui_forms_theme_colour_role_css_tests)
@@ -3742,6 +3758,14 @@ if(GUI_FORMS_BUILD_TESTS)
     target_compile_options(gui_forms_macos_clipboard_image_tests PRIVATE -fobjc-arc)
     target_link_libraries(gui_forms_macos_clipboard_image_tests PRIVATE gui_forms_host_macos)
     add_test(NAME gui_forms_macos_clipboard_image_tests COMMAND gui_forms_macos_clipboard_image_tests)
+
+    # The application menu names the running program, not the Gallery.
+    add_executable(gui_forms_macos_application_menu_tests tests/macos_application_menu_tests.mm)
+    target_compile_options(gui_forms_macos_application_menu_tests PRIVATE -fobjc-arc)
+    target_link_libraries(gui_forms_macos_application_menu_tests PRIVATE gui_forms_host_macos)
+    target_include_directories(gui_forms_macos_application_menu_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/host/macos/application)
+    add_test(NAME gui_forms_macos_application_menu_tests COMMAND gui_forms_macos_application_menu_tests)
 
         # Stage T5, C3's measurement: what the window server composes from a
         # non-opaque window and a behind-window effect view, AppKit only.

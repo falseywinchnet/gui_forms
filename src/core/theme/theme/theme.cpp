@@ -2,6 +2,7 @@
 #include "gui_forms/control/control/control.hpp"
 #include "gui_forms/surface_material/presets/material_presets.hpp"
 
+#include "forced_high_contrast.hpp"
 #include "theme_access.hpp"
 
 #include <algorithm>
@@ -1110,6 +1111,79 @@ Color high_contrast_colour(ColourOrigin origin, ColourPosition position, Control
     }
 }
 
+namespace detail {
+
+void forced_material_fields(const std::array<const MaterialDeclaration*, material_field_count>& resolved,
+                            ControlSurfaceState state, bool selected, ForcedMaterialFields& result) {
+    result.fields = {};
+    result.remapped.clear();
+    // Every remapped copy fits, so `fields` never points into storage the
+    // vector moved.
+    result.remapped.reserve(material_field_count);
+    result.any = false;
+    for (std::size_t index = 0; index < material_field_count; ++index) {
+        const MaterialDeclaration* const declaration = resolved[index];
+        if (declaration == nullptr) continue;
+        const MaterialField field = static_cast<MaterialField>(index);
+        bool kept = false;
+        bool remapped = false;
+        switch (field) {
+        case MaterialField::border_top_style:
+        case MaterialField::border_top_width:
+        case MaterialField::border_right_style:
+        case MaterialField::border_right_width:
+        case MaterialField::border_bottom_style:
+        case MaterialField::border_bottom_width:
+        case MaterialField::border_left_style:
+        case MaterialField::border_left_width:
+        case MaterialField::corner_top_left:
+        case MaterialField::corner_top_right:
+        case MaterialField::corner_bottom_right:
+        case MaterialField::corner_bottom_left: kept = true; break;
+        case MaterialField::background_colour:
+        case MaterialField::border_top_colour:
+        case MaterialField::border_right_colour:
+        case MaterialField::border_bottom_colour:
+        case MaterialField::border_left_colour:
+        case MaterialField::keylines: remapped = true; break;
+        case MaterialField::fills:
+        case MaterialField::fill_blend_modes:
+        case MaterialField::fill_positions:
+        case MaterialField::fill_sizes:
+        case MaterialField::fill_repeats:
+        case MaterialField::shadows:
+        case MaterialField::glows:
+        case MaterialField::glow_placements:
+        case MaterialField::border_image:
+        case MaterialField::colour_filter:
+        case MaterialField::drop_shadow:
+        case MaterialField::filter_blur:
+        case MaterialField::finish:
+        case MaterialField::mask:
+        case MaterialField::count:
+        default: break; // Not drawn under the pass.
+        }
+        if (kept) {
+            result.fields[index] = declaration;
+            result.any = true;
+            continue;
+        }
+        if (!remapped) continue;
+        const Color colour =
+            high_contrast_colour((*declaration).origin, material_field_colour_position(field), state, selected);
+        result.remapped.push_back(*declaration);
+        MaterialDeclaration& copy = result.remapped.back();
+        copy.colour = colour;
+        for (MaterialKeyline& line : copy.keylines) line.color = colour;
+        // The colours are the pass's, not the part's text colour.
+        copy.current_colours.clear();
+        result.fields[index] = &copy;
+        result.any = true;
+    }
+}
+
+} // namespace detail
+
 ControlRoleRecipes derive_high_contrast_recipes(ControlRoleRecipes recipes) {
     for (std::size_t index = 0; index < control_surface_state_count; ++index) {
         const ControlSurfaceState state = static_cast<ControlSurfaceState>(index);
@@ -1263,6 +1337,7 @@ Color inherited_text(const Control& control, Color fallback) {
         facts.control_type = above.anatomy().control_id;
         facts.stable_id = above.stable_id().value();
         facts.classes = above.classes();
+        facts.inline_rules = above.inline_style_rules();
         facts.states = above.anatomy_states();
         const Window* const window = above.attached_window();
         if (window != nullptr) facts.media = window_media_facts(*window);
@@ -1328,17 +1403,31 @@ ResolvedControlRecipe Theme::resolve(const Control& control, ControlVisualRole r
 ResolvedControlRecipe Theme::resolve(const Control& control, ControlVisualRole role, ControlVisualContext context,
                                      AnatomyStateSet states) const {
     const ControlVisualRecipe& floor = resolve(role, context);
-    // Forced high contrast is the engine's own last pass: the built-in
-    // recipe draws it.
-    if (context.high_contrast) return ResolvedControlRecipe(floor);
+    // Forced high contrast is the engine's own pass (E1): the built-in
+    // recipe's high-contrast records draw the part, under the non-colour
+    // fields of an important inline style alone.
+    const bool forced = context.high_contrast;
+    if (forced && control.inline_style_rules() == nullptr) return ResolvedControlRecipe(floor);
     CompiledThemeRules::PartFacts facts{};
     facts.control_type = control.anatomy().control_id;
     facts.stable_id = control.stable_id().value();
     facts.classes = control.classes();
+    facts.inline_rules = control.inline_style_rules();
     facts.states = states;
+    facts.forced_high_contrast = forced;
     const Window* const window = control.attached_window();
     if (window != nullptr) facts.media = window_media_facts(*window);
     CompiledThemeRules::RecipeResolution fields = engine_.rules().resolve_recipe_fields(facts);
+    if (forced) {
+        // The pass's colours stand over every declaration's, and it draws
+        // no text shadow.
+        fields.fields[static_cast<std::size_t>(RecipeField::text)] = nullptr;
+        fields.fields[static_cast<std::size_t>(RecipeField::outline_colour)] = nullptr;
+        fields.fields[static_cast<std::size_t>(RecipeField::text_shadow)] = nullptr;
+        bool any = false;
+        for (const RecipeDeclaration* field : fields.fields) any = any || field != nullptr;
+        fields.authored = any;
+    }
     if (!fields.authored) return ResolvedControlRecipe(floor);
     // The text colour first (T3 P8c): an inherited one is the parent
     // control's, and currentcolor names the result.

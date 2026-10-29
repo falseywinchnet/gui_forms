@@ -31,13 +31,23 @@ namespace gui_forms {
 // `forced_high_contrast` are not authored: the built-in recipe is what a
 // part falls back to when no rule selects a primitive, and forced high
 // contrast is the engine's own pass over the result.
+//
+// The important levels (T3 engine change EC6) hold a sheet's `!important`
+// declarations: a theme's above every inline style's ordinary ones, and an
+// inline style's above all. So an important declaration wins whichever side
+// it is on, and where neither or both are important the inline style wins
+// (the owner's rule E1). Forced high contrast sits between them: under it,
+// only the `important_inline_style` declarations that are not colours
+// stand, and every colour is the high-contrast pass's.
 enum class CascadeLevel : std::uint8_t {
     built_in,
     theme_sheet,
     class_rule,
     stable_id_rule,
     inline_style,
+    important_theme_sheet,
     forced_high_contrast,
+    important_inline_style,
     count,
 };
 
@@ -940,8 +950,8 @@ enum class RuleDiagnosticKind : std::uint8_t {
     needs_newer_engine,
     // The rule's level cannot be authored (built_in, forced_high_contrast).
     level_not_authored,
-    // A class rule names no class, or a stable-ID rule or inline style no
-    // stable ID; the rule is dropped.
+    // A class rule names no class, or a stable-ID rule or inline style
+    // (either level) no stable ID; the rule is dropped.
     selector_missing_level_field,
     // A selector's class or state is invalid; the rule is dropped.
     selector_invalid,
@@ -1045,6 +1055,14 @@ public:
     // sheet's rules by their positions in `sheet`.
     [[nodiscard]] static CompiledThemeRules compile_with_built_in(const ThemeRuleSheet& sheet,
                                                                   const PrimitiveRegistry& registry);
+    // Compiles one control's inline style (T3 P9, R2-10): rules at
+    // `inline_style` and `important_inline_style` only, each without a
+    // stable ID, since the control owns them and consults them for itself
+    // alone (PartFacts::inline_rules). The sheet publishes no values.
+    [[nodiscard]] static CompiledThemeRules compile_inline(const ThemeRuleSheet& sheet,
+                                                           const PrimitiveRegistry& registry);
+    // Whether the rules are a control's inline style (compile_inline).
+    [[nodiscard]] bool inline_style() const noexcept { return inline_style_; }
     // How many of the rules are the engine's built-in rules.
     [[nodiscard]] std::size_t built_in_rule_count() const noexcept { return built_in_rules_; }
 
@@ -1078,6 +1096,16 @@ public:
         // The part's window (EC3): a rule matches only where its media
         // condition holds.
         MediaFacts media{};
+        // The part's control's inline style (compile_inline), or null: its
+        // rules join the cascade at their levels, after the theme's rules
+        // of the same level and specificity. Borrowed for the call.
+        const CompiledThemeRules* inline_rules{};
+        // Forced high contrast's pass (E1): the part's drawing (its
+        // primitive and parameters, its material and recipe fields) comes
+        // from the important_inline_style rules alone, every lower level
+        // lying under the pass; its presentation (transitions, ambient
+        // effect, blend and font) from every matching rule.
+        bool forced_high_contrast{};
     };
 
     // Why a part resolved as it did.
@@ -1132,6 +1160,9 @@ public:
         // parameter's range. `parameters_read_em` is whether any is not 0.
         std::array<double, maximum_primitive_parameters> parameter_em{};
         bool parameters_read_em{};
+        // Where each colour parameter's winning declaration took its colour
+        // (EC4), by the parameter's position; none for a default.
+        std::array<ColourOrigin, maximum_primitive_parameters> parameter_origins{};
         // The inputs the part reads (E6): the primitive's declared inputs
         // and every input its expressions read, as expression input bits.
         std::uint64_t inputs_read{};
@@ -1154,6 +1185,9 @@ public:
         // is set.
         std::array<const MaterialDeclaration*, material_field_count> materials{};
         bool materials_authored{};
+        // The serial of the part's inline style (PartFacts::inline_rules),
+        // or 0: the declarations above may belong to it.
+        std::uint64_t inline_serial{};
     };
 
     // The winning declaration of each recipe field (RecipeField) of the
@@ -1199,6 +1233,8 @@ private:
         EngineExpression program{};
         // A number value's em coefficient (P8c).
         double em{};
+        // A colour value's origin (EC4).
+        ColourOrigin origin{};
     };
 
     struct CompiledRule final {
@@ -1262,6 +1298,9 @@ private:
                                   CompiledRule& compiled);
 
     [[nodiscard]] static bool matches(const CompiledRule& rule, const PartFacts& facts) noexcept;
+    // These rules and a part's inline style's, merged in ascending
+    // precedence.
+    class RuleWalk;
 
     // Sorted by precedence, lowest first: level, then specificity, then
     // order. The cascade's winner for a property is the last match.
@@ -1272,6 +1311,8 @@ private:
     std::uint64_t serial_{};
     // Whether any rule sets a recipe field (resolve_recipe_fields).
     bool recipe_fields_set_{};
+    // Whether the rules are a control's inline style.
+    bool inline_style_{};
 };
 
 // The engine's built-in rules (E7), compiled below every theme's: the

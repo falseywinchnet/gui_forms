@@ -114,6 +114,8 @@ Types
      - ImageId is the nonzero renderer-neutral identity returned by a Window image registry.
    * - :cpp:class:`ImageVariantRequest <gui_forms::ImageVariantRequest>`
      - One sized variant of an image resource: the image resampled to ``extent`` device pixels, for display ``scale``.
+   * - :cpp:class:`InlineStyleResult <gui_forms::InlineStyleResult>`
+     - What setting a control's inline style gave (Control::set_inline_style): applied, with any warnings (none for empty text, which clears the style), or refused with its diagnostics, the control keeping its previous inline style.
    * - :cpp:class:`Insets <gui_forms::Insets>`
      - Insets stores independent logical left, top, right, and bottom extents for margin, padding, damage, and visual outsets.
    * - :cpp:class:`ItemContentPaint <gui_forms::ItemContentPaint>`
@@ -314,6 +316,10 @@ Types
    A part's assembled material (T3 EC1): its recipe's material, the floor, with the winning material fields of the theme's rules in place, and what it was assembled from. It is assembled again only when that changes: - ``rules_serial`` and ``fields``: the compiled rules' serial (CompiledThemeRules::serial) and the winning declaration of each field, by address within those rules (null for none); - ``floor``: a copy of the recipe material, compared by value, since the theme's recipe may be replaced and another may occupy its address; - ``box``: the part's box size, for fields that read it (material_fields_read_box), else empty.
 
    .. cpp:member:: std::uint64_t rules_serial
+
+   .. cpp:member:: std::uint64_t inline_serial
+
+      The serial of the part's inline style, or 0 (T3 P9).
 
    .. cpp:member:: std::array<const MaterialDeclaration*, material_field_count> fields
 
@@ -564,6 +570,10 @@ Types
 
    .. rubric:: Properties
 
+   .. cpp:function:: bool inline_style() const noexcept
+
+      Whether the rules are a control's inline style (compile_inline).
+
    .. cpp:function:: std::size_t built_in_rule_count() const noexcept
 
       How many of the rules are the engine's built-in rules.
@@ -596,6 +606,10 @@ Types
    .. cpp:function:: static CompiledThemeRules compile_with_built_in(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry)
 
       Compiles the engine's built-in rules (built_in_theme_rules, at CascadeLevel::built_in, below every authored rule) and then ``sheet``. The theme engine's rules are made this way. Diagnostics name the sheet's rules by their positions in ``sheet``.
+
+   .. cpp:function:: static CompiledThemeRules compile_inline(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry)
+
+      Compiles one control's inline style (T3 P9, R2-10): rules at :cpp:func:`inline_style <gui_forms::CompiledThemeRules::inline_style>` and ``important_inline_style`` only, each without a stable ID, since the control owns them and consults them for itself alone (PartFacts::inline_rules). The sheet publishes no values.
 
    .. cpp:function:: std::optional<ExpressionInputIndex> published_value_input(std::string_view name) const noexcept
 
@@ -681,6 +695,14 @@ Types
 
       The part's window (EC3): a rule matches only where its media condition holds.
 
+   .. cpp:member:: const CompiledThemeRules* inline_rules
+
+      The part's control's inline style (compile_inline), or null: its rules join the cascade at their levels, after the theme's rules of the same level and specificity. Borrowed for the call.
+
+   .. cpp:member:: bool forced_high_contrast
+
+      Forced high contrast's pass (E1): the part's drawing (its primitive and parameters, its material and recipe fields) comes from the important_inline_style rules alone, every lower level lying under the pass; its presentation (transitions, ambient effect, blend and font) from every matching rule.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: CompiledThemeRules::RecipeResolution final
@@ -721,6 +743,10 @@ Types
 
    .. cpp:member:: bool parameters_read_em
 
+   .. cpp:member:: std::array<ColourOrigin, maximum_primitive_parameters> parameter_origins
+
+      Where each colour parameter's winning declaration took its colour (EC4), by the parameter's position; none for a default.
+
    .. cpp:member:: std::uint64_t inputs_read
 
       The inputs the part reads (E6): the primitive's declared inputs and every input its expressions read, as expression input bits.
@@ -748,6 +774,10 @@ Types
       The winning declaration of each material field (EC1), by the field's position, or null where no matching rule sets it; they belong to the compiled rules. ``materials_authored`` is whether any is set.
 
    .. cpp:member:: bool materials_authored
+
+   .. cpp:member:: std::uint64_t inline_serial
+
+      The serial of the part's inline style (PartFacts::inline_rules), or 0: the declarations above may belong to it.
 
 .. cpp:namespace:: gui_forms
 
@@ -1628,6 +1658,30 @@ Types
    .. cpp:member:: DeviceScale scale
 
    .. cpp:member:: std::optional<ProceduralFill> procedural
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: InlineStyleResult final
+
+   ``#include <gui_forms/theme/theme_compiler/theme_compiler.hpp>``
+
+   What setting a control's inline style gave (Control::set_inline_style): applied, with any warnings (none for empty text, which clears the style), or refused with its diagnostics, the control keeping its previous inline style.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool succeeded() const noexcept
+
+   .. cpp:function:: std::span<const ThemeCompileDiagnostic> diagnostics() const noexcept
+
+      The warnings of a style applied, or the diagnostics of one refused.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static InlineStyleResult applied(std::vector<ThemeCompileDiagnostic> warnings) noexcept
+
+   .. cpp:function:: static InlineStyleResult refused(std::vector<ThemeCompileDiagnostic> diagnostics) noexcept
 
 .. cpp:namespace:: gui_forms
 
@@ -4171,7 +4225,11 @@ Enumerations
 
    .. cpp:enumerator:: inline_style
 
+   .. cpp:enumerator:: important_theme_sheet
+
    .. cpp:enumerator:: forced_high_contrast
+
+   .. cpp:enumerator:: important_inline_style
 
    .. cpp:enumerator:: count
 

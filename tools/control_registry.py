@@ -35,7 +35,7 @@ GENERATED_DIR: Path = ROOT / "docs" / "controls" / "generated"
 BY_FUNCTION_NAME: str = "by-function.md"
 ALPHABETICAL_NAME: str = "alphabetical.md"
 # The published documentation site; the README links each control to its page there.
-SITE_URL: str = "https://gui-forms.readthedocs.io/en/latest/"
+SITE_URL: str = "https://gui-forms.readthedocs.io/"
 README_START: str = "<!-- controls:start -->"
 README_END: str = "<!-- controls:end -->"
 GALLERY_CATALOG_PATH: Path = ROOT / "demo" / "gallery_catalog.inc"
