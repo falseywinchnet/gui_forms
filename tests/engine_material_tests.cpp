@@ -31,6 +31,7 @@
 #include "gui_forms/theme.hpp"
 #include "gui_forms/window.hpp"
 
+#include "../src/core/types/restrict/restrict.hpp"
 #include "../src/core/engine/primitives/material/image_variant.hpp"
 #include "../src/core/engine/primitives/material/material_bake_policy.hpp"
 #include "../src/core/engine/primitives/material/material_primitive.hpp"
@@ -1525,11 +1526,32 @@ void surface_mask() {
 
 } // namespace
 
+// The overlap test behind the kernels' restricted pointers (box blur, image
+// variant): adjacent and empty ranges are disjoint, any shared element is not.
+void kernel_overlap_rule() {
+    namespace primitives = gui_forms::detail;
+    std::array<std::uint32_t, 8> buffer{};
+    const std::span<std::uint32_t> whole(buffer);
+    const std::span<std::uint32_t> front = whole.first(4U);
+    const std::span<std::uint32_t> back = whole.subspan(4U);
+    const std::span<const std::uint32_t> middle = whole.subspan(3U, 2U);
+    require(primitives::spans_disjoint(front, back), "adjacent halves are disjoint");
+    require(primitives::spans_disjoint(back, front), "adjacent halves are disjoint either way round");
+    require(!primitives::spans_disjoint(front, middle), "a range sharing the last element overlaps");
+    require(!primitives::spans_disjoint(middle, back), "a range sharing the first element overlaps");
+    require(!primitives::spans_disjoint(whole, front), "a range overlaps its own part");
+    require(primitives::spans_disjoint(whole.first(0U), whole), "an empty range overlaps nothing");
+    std::array<double, 4> other{};
+    require(primitives::spans_disjoint(std::span<const double>(other), whole), "separate buffers are disjoint");
+    primitives::require_disjoint(front, back);
+}
+
 int main(int argc, char** argv) {
     if (argc > 1 && std::strcmp(argv[1], "--measure") == 0) {
         measure();
         return 0;
     }
+    kernel_overlap_rule();
     choices_are_the_recipe_roles();
     refusals();
     solid_and_border();

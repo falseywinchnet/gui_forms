@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <new>
+#include <optional>
 
 namespace gui_forms::render {
 namespace {
@@ -131,11 +132,13 @@ PreparedTextStatus PreparedSkiaFrame::begin(const Size size, const double scale,
         target.restoreAll();
         target.resetMatrix();
         if (reuse) {
-            SkPixmap source{};
-            SkPixmap destination{};
-            if (!(*front_).peekPixels(&source) || !(*candidate_).peekPixels(&destination)) return PreparedTextStatus::native_failure;
+            const std::optional<SkPixmap> source = (*front_).peekPixels();
+            const std::optional<SkPixmap> destination = (*candidate_).peekPixels();
+            if (!source || !destination) return PreparedTextStatus::native_failure;
             const std::size_t row_bytes = static_cast<std::size_t>(width) * 4U;
-            for (int row = 0; row < height; ++row) std::memcpy(destination.writable_addr(0, row), source.addr(0, row), row_bytes);
+            for (int row = 0; row < height; ++row) {
+                std::memcpy((*destination).writable_addr(0, row), (*source).addr(0, row), row_bytes);
+            }
             candidate_authorities_ = front_authorities_;
         } else {
             target.clear(SK_ColorTRANSPARENT);

@@ -68,6 +68,36 @@ double bounded_visual_outset(double value) noexcept {
     return std::isfinite(value) ? std::clamp(value, 0.0, 16384.0) : 0.0;
 }
 
+// Along one axis at `scale`: whether every device pixel that painting
+// clipped to [from, to) can touch lies among the pixels an opaque fill of
+// [cover_from, cover_to) paints. Painting rounds each edge to the nearest
+// device pixel, halves upward (owner decision L-Q8, detail::snap_device_edge);
+// an edge within a 64th of a pixel of a half is taken both ways, which
+// absorbs the rounding of translated coordinates. No pixel lies beyond
+// `extent`.
+bool cover_spans_axis(const double cover_from, const double cover_to, const double from, const double to,
+                      const double scale, const double extent) noexcept {
+    constexpr double tolerance = 1.0 / 64.0;
+    const double first = std::max(0.0, std::floor(from * scale + 0.5 - tolerance));
+    const double end = std::min(std::ceil(extent * scale), std::floor(to * scale + 0.5 + tolerance));
+    if (end <= first) return true;
+    const double covered_first = std::floor(cover_from * scale + 0.5 + tolerance);
+    const double covered_end = std::floor(cover_to * scale + 0.5 - tolerance);
+    const bool spans = covered_first <= first && end <= covered_end;
+    return spans;
+}
+
+// Whether an opaque fill of `cover` paints every device pixel that painting
+// clipped to `damage` can touch, in a client area of `client` at `scale`.
+bool cover_spans(const Rect cover, const Rect damage, const double scale, const Size client) noexcept {
+    if (!cover.finite() || !damage.finite() || !std::isfinite(scale) || scale <= 0.0) return false;
+    const bool across = cover_spans_axis(cover.left(), cover.right(), damage.left(), damage.right(), scale,
+                                         client.width);
+    const bool down = cover_spans_axis(cover.top(), cover.bottom(), damage.top(), damage.bottom(), scale,
+                                       client.height);
+    return across && down;
+}
+
 [[nodiscard]] bool current_semantic_identity(
     const Control::Ptr& control, const Control* expected_parent,
     const Window* owner) noexcept {
@@ -248,9 +278,9 @@ bool regions_nest(const Control& first, const Control& second) noexcept {
 // found on every exit. It borrows the window's two mark fields.
 struct RecordingMark final {
     const Control*& control;
-    const detail::RecordingPainter*& painter;
+    detail::RecordingPainter*& painter;
     const Control* previous_control{};
-    const detail::RecordingPainter* previous_painter{};
+    detail::RecordingPainter* previous_painter{};
 
     ~RecordingMark() {
         control = previous_control;
@@ -3178,6 +3208,111 @@ void Window::clear_paint_dirty_subtree(const Control::Ptr& control) noexcept {
     }
 }
 
+bool Window::find_paint_cover(const Control::Ptr& control, const Rect damage, const PaintPlane plane,
+                              std::vector<Control::Ptr>& path) const {
+    if (!(*control).is_alive() || (*control).window_ != this || !(*control).visible_ ||
+        (*control).layout_collapsed_) {
+        return false;
+    }
+    // A child paints all of `damage` only inside the child viewport. Later
+    // children paint later, and a control's subtree after the control.
+    if (absolute_child_viewport_of(*control).contains(damage)) {
+        const std::vector<Control::Ptr>& children = (*control).children_;
+        for (std::size_t index = children.size(); index > 0U; --index) {
+            const Control::Ptr& child = children[index - 1U];
+            if (!child || !(*child).is_alive() || (*child).parent_.lock().get() != control.get() ||
+                (*child).window_ != this) {
+                continue;
+            }
+            const std::size_t depth = path.size();
+            if (find_paint_cover(child, damage, plane, path)) {
+                path.insert(path.begin() + static_cast<std::ptrdiff_t>(depth), control);
+                return true;
+            }
+        }
+    }
+    // Only a current chunk: one paint_recursive replays without rebuilding.
+    const Rect bounds = absolute_bounds_of(*control);
+    const Rect logical_bounds{0.0, 0.0, bounds.width, bounds.height};
+    const std::shared_ptr<const detail::DisplayChunk>& chunk = (*control).display_chunk_;
+    if ((*control).paint_plane_ != plane || has_dirty((*control).dirty_, Dirty::paint) || !chunk ||
+        (*chunk).plane() != plane || (*chunk).logical_bounds() != logical_bounds) {
+        return false;
+    }
+    const std::optional<Rect> cover = (*chunk).opaque_cover();
+    if (!cover) return false;
+    // It paints nothing outside its visual bounds, which hold its bounds.
+    const Rect covered = Rect::intersection({bounds.x + (*cover).x, bounds.y + (*cover).y, (*cover).width,
+                                             (*cover).height}, bounds);
+    if (covered.empty() || !cover_spans(covered, damage, scale_, client_size_)) return false;
+    path.push_back(control);
+    return true;
+}
+
+void Window::paint_from_cover(const std::span<const Control::Ptr> path,
+                              Painter& painter,
+                              const Rect damage,
+                              const PaintPlane plane,
+                              std::uint64_t& visited_nodes,
+                              std::uint64_t& painted_controls,
+                              std::uint64_t& consumed_invalidations,
+                              std::uint64_t& chunks_rebuilt,
+                              std::uint64_t& chunks_reused,
+                              std::uint64_t& commands_replayed) {
+    // Each level as paint_recursive(path.front()) reaches it, before any
+    // callback runs: the damage it passes down, each ancestor's children
+    // and parent.
+    std::vector<Rect> level_damage{damage};
+    std::vector<std::vector<Control::Ptr>> siblings;
+    std::vector<const Control*> retained_parents;
+    level_damage.reserve(path.size());
+    siblings.reserve(path.size());
+    retained_parents.reserve(path.size());
+    for (std::size_t level = 0; level + 1U < path.size(); ++level) {
+        const Control& ancestor = *path[level];
+        level_damage.push_back(Rect::intersection(absolute_child_viewport_of(ancestor), level_damage.back()));
+        siblings.push_back(ancestor.children_);
+        retained_parents.push_back(ancestor.parent_.lock().get());
+    }
+    paint_recursive(path.back(), painter, level_damage.back(), plane, visited_nodes, painted_controls,
+                    consumed_invalidations, chunks_rebuilt, chunks_reused, commands_replayed);
+    // Then what follows on each level up, as each ancestor's loop goes on.
+    for (std::size_t level = path.size() - 1U; level > 0U; --level) {
+        const Control::Ptr& ancestor = path[level - 1U];
+        const std::vector<Control::Ptr>& children = siblings[level - 1U];
+        std::vector<Control::Ptr>::const_iterator child = std::find(children.begin(), children.end(), path[level]);
+        if (child != children.end()) ++child;
+        for (; child != children.end(); ++child) {
+            if (!*child || !(**child).is_alive() || (**child).parent_.lock().get() != ancestor.get() ||
+                (**child).window_ != this) {
+                continue;
+            }
+            paint_recursive(*child, painter, level_damage[level], plane, visited_nodes, painted_controls,
+                            consumed_invalidations, chunks_rebuilt, chunks_reused, commands_replayed);
+        }
+        if (!(*ancestor).is_alive() || (*ancestor).window_ != this ||
+            (*ancestor).parent_.lock().get() != retained_parents[level - 1U]) {
+            continue;
+        }
+        summarize_subtree_paint(*ancestor);
+    }
+}
+
+Rect Window::absolute_child_viewport_of(const Control& control) const {
+    const Rect bounds = absolute_bounds_of(control);
+    const Rect local = control.child_viewport_rectangle();
+    const Rect viewport{bounds.x + local.x, bounds.y + local.y, local.width, local.height};
+    return viewport;
+}
+
+void Window::summarize_subtree_paint(Control& control) const noexcept {
+    Dirty paint_summary = control.dirty_ & Dirty::paint;
+    for (const std::shared_ptr<gui_forms::Control>& child : control.children_) {
+        paint_summary |= (*child).subtree_dirty_ & Dirty::paint;
+    }
+    control.subtree_dirty_ = without_dirty(control.subtree_dirty_, Dirty::paint) | paint_summary;
+}
+
 void Window::paint_recursive(const Control::Ptr& control,
                              Painter& painter,
                              Rect window_damage,
@@ -3292,12 +3427,7 @@ void Window::paint_recursive(const Control::Ptr& control,
         return;
     }
 
-    Dirty paint_summary = (*control).dirty_ & Dirty::paint;
-    for (const std::shared_ptr<gui_forms::Control>& child : (*control).children_) {
-        paint_summary |= (*child).subtree_dirty_ & Dirty::paint;
-    }
-    (*control).subtree_dirty_ = without_dirty((*control).subtree_dirty_, Dirty::paint) |
-                              paint_summary;
+    summarize_subtree_paint(*control);
 }
 
 std::uint64_t Window::display_cache_entries(const Control::Ptr& control) const noexcept {

@@ -53,6 +53,32 @@ struct TabSelectionChange final {
     std::optional<std::size_t> new_index;
 };
 
+// Which step of a change of page an event reports (Windows Forms'
+// TabControlAction).
+enum class TabControlAction : std::uint8_t {
+    deselecting,
+    selecting,
+    deselected,
+    selected,
+};
+
+// A page about to be left or chosen (Windows Forms'
+// TabControlCancelEventArgs): `page` at `index`. A handler sets `cancel` to
+// keep the selected page.
+struct TabControlCancelEvent final {
+    std::shared_ptr<TabPage> page{};
+    std::size_t index{};
+    TabControlAction action{TabControlAction::selecting};
+    bool cancel{};
+};
+
+// A page left or chosen (Windows Forms' TabControlEventArgs).
+struct TabControlEvent final {
+    std::shared_ptr<TabPage> page{};
+    std::size_t index{};
+    TabControlAction action{TabControlAction::selected};
+};
+
 // A set of TabPages shown one at a time, chosen from a row of tabs (the
 // Windows Forms surface). The tabs are a PageStrip (owner decision DK-14,
 // phase P8): the control keeps one record per page in a PageSet the strip
@@ -115,6 +141,18 @@ public:
     [[nodiscard]] Event<const TabSelectionChange&>& selected_index_changed() noexcept {
         return selected_index_changed_;
     }
+    // A change of page, by the user (a click, a key, the strip's list) or by
+    // set_selected_index, raises deselecting for the selected page and then
+    // selecting for the new one, before anything changes; either handler
+    // may cancel it. Once the page has changed, deselected and selected
+    // follow, then selected_index_changed. The first page added, and the
+    // page that replaces a removed selected page, raise only
+    // selected_index_changed. A handler that disposes the control, or
+    // removes the new page, ends the change.
+    [[nodiscard]] Event<TabControlCancelEvent&>& deselecting() noexcept { return deselecting_; }
+    [[nodiscard]] Event<TabControlCancelEvent&>& selecting() noexcept { return selecting_; }
+    [[nodiscard]] Event<const TabControlEvent&>& deselected() noexcept { return deselected_; }
+    [[nodiscard]] Event<const TabControlEvent&>& selected() noexcept { return selected_; }
 
     [[nodiscard]] Size measure(Size available) override;
     void arrange(Rect final_bounds) override;
@@ -173,6 +211,9 @@ private:
     [[nodiscard]] std::optional<std::size_t> index_of(
         const std::shared_ptr<TabPage>& page) const;
     void select_relative(int delta);
+    // Raises deselecting and selecting for a change to `target`; false when
+    // a handler cancelled it, disposed the control or removed the page.
+    [[nodiscard]] bool selection_allowed(const std::shared_ptr<TabPage>& target);
     void show_selected(std::size_t index, const std::vector<std::shared_ptr<TabPage>>& live);
     void remember_page_focus(const std::shared_ptr<TabPage>& page);
     void restore_page_focus(const std::shared_ptr<TabPage>& page,
@@ -221,6 +262,10 @@ private:
     // The list's changes move the keys image_index names.
     SubscriptionToken image_list_token_;
     Event<const TabSelectionChange&> selected_index_changed_;
+    Event<TabControlCancelEvent&> deselecting_;
+    Event<TabControlCancelEvent&> selecting_;
+    Event<const TabControlEvent&> deselected_;
+    Event<const TabControlEvent&> selected_;
     Event<ItemContentPaint&> draw_item_content_;
 };
 

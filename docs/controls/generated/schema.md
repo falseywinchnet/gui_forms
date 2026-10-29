@@ -663,6 +663,16 @@ Item system `column`:
 
 Item states: `hot`, `pressed`, `captured`. Application-defined: `sorted_ascending`, `sorted_descending`.
 
+Item system `group`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `group_band` | region |  |  |
+| `group_caption` | caption |  |  |
+| `group_divider` | divider |  |  |
+
+Item states: `disabled`.
+
 Properties beyond every control's: none.
 
 | Interaction | Payload |
@@ -1612,6 +1622,10 @@ Properties beyond every control's: none.
 | `auto_validate_changed` | `AutoValidate` |
 | `draw_item_content` | `ItemContentPaint`, by reference |
 | `selected_index_changed` | `TabSelectionChange` |
+| `deselecting` | `TabControlCancelEvent`, by reference |
+| `selecting` | `TabControlCancelEvent`, by reference |
+| `deselected` | `TabControlEvent` |
+| `selected` | `TabControlEvent` |
 
 ## `page_strip` (PageStrip, control)
 

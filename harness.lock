@@ -4,4 +4,4 @@
 # and `lock.py bump [--to REF]` moves the pin. docs/building/template-harness.md.
 [harness]
 repository = "malkuth-software/template_harness"
-commit = "523c2a7a7f36d1ae06e82fa031f56599e25d3e18"
+commit = "53af66c78813af25a9f8f5cf87a410cdc065992d"

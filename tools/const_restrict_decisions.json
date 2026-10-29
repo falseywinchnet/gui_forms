@@ -1,0 +1,245 @@
+{
+  "about": "Decisions on the restrict and restrict_span candidates that harness/check_const_restrict.py (E3) reports, matched by path, function, outputs and kind. apply: GUI_FORMS_RESTRICT (or the package's STX_<PKG>_RESTRICT) is on the parameters of an internal kernel, under a written overlap rule checked by an overlap assertion in debug and sanitizer builds. keep: restrict stays out, for the reason given.",
+  "decisions": [
+    {
+      "path": "fuzz/deflate_fuzz.cpp",
+      "function": "encode",
+      "variable": "output",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "Fuzz harness: the buffers are only passed on to DeflateStream; the stream's own process entries carry the decision."
+    },
+    {
+      "path": "include/gui_forms/anatomy/types/anatomy_types.hpp",
+      "function": "gui_forms::write_declared_parts",
+      "variable": "geometry",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "Public header (include/gui_forms/anatomy): restrict stays out of public signatures until reviewed."
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.cpp",
+      "function": "gui_forms::distribute_remaining",
+      "variable": "tracks",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal distribute_remaining_parts; the wrapper asserts the caller's specs and the result's tracks disjoint."
+    },
+    {
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel_compat/table_layout_panel_compat.cpp",
+      "function": "gui_forms::resolve_tracks",
+      "variable": "minimum,actual",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "Declared in a public header (TableLayoutPanelCompat::resolve_tracks): restrict stays out of public signatures until reviewed."
+    },
+    {
+      "path": "src/core/engine/primitives/kernel/box_blur.cpp",
+      "function": "gui_forms::engine_primitives::box_across",
+      "variable": "to",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal across_rows; box_across asserts from and to disjoint (work.first and work.second are separate vectors)."
+    },
+    {
+      "path": "src/core/engine/primitives/kernel/box_blur.cpp",
+      "function": "gui_forms::engine_primitives::box_down",
+      "variable": "to,sums",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal down_rows; box_down asserts from, to and the column sums pairwise disjoint (three separate vectors)."
+    },
+    {
+      "path": "src/core/engine/primitives/material/image_variant.cpp",
+      "function": "gui_forms::engine_primitives::resample_one_line",
+      "variable": "to",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal copy_line; resample_one_line asserts to disjoint from from and positions (separate VariantWork vectors). The interpolation seam takes spans unchanged."
+    },
+    {
+      "path": "src/core/text/unicode/unicode_grapheme.cpp",
+      "function": "gui_forms::detail::fill_grapheme_arrays",
+      "variable": "scalars,boundaries",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal fill_grapheme_parts; the wrapper asserts text, scalars and boundaries pairwise disjoint (separate allocations and the caller's text)."
+    },
+    {
+      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
+      "function": "gui_forms::render::text::Impl::fill_bounded_runs",
+      "variable": "candidates,scalar_scratch,segments,directions,visual",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on Impl::fill_bounded_parts; the wrapper asserts the four scratch arrays disjoint from each other and from the text and edges (separate allocations). candidates stays a span of const face pointers."
+    },
+    {
+      "path": "src/abi/drawing_c_api.cpp",
+      "function": "query_bitmap_changes",
+      "variable": "rectangles,required_count,summary",
+      "kind": "restrict",
+      "decision": "keep",
+      "reason": "Public C ABI entry point: the signature is fixed by the C API, and restrict stays out of public signatures until reviewed."
+    },
+    {
+      "path": "src/abi/drawing_c_api.cpp",
+      "function": "read_path_points",
+      "variable": "points,required_count",
+      "kind": "restrict",
+      "decision": "keep",
+      "reason": "Public C ABI entry point: the signature is fixed by the C API, and restrict stays out of public signatures until reviewed."
+    },
+    {
+      "path": "stx_vorbis/src/c_adapter.cpp",
+      "function": "stb_vorbis_open_pushdata",
+      "variable": "consumed",
+      "kind": "restrict",
+      "decision": "keep",
+      "reason": "Public stb_vorbis-compatible C entry point: the signature is fixed by that API, and restrict stays out of public signatures until reviewed."
+    },
+    {
+      "path": "stx_png/src/decoder.cpp",
+      "function": "stx_png::unfilter_up",
+      "variable": "row",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal unfilter_up_bytes; unfilter_up asserts row and previous disjoint (two separate rows of decode_image's storage)."
+    },
+    {
+      "path": "stx_png/src/decoder.cpp",
+      "function": "stx_png::unfilter_left",
+      "variable": "row",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal unfilter_left_bytes; unfilter_left asserts row and previous disjoint (previous is empty for filter 1)."
+    },
+    {
+      "path": "stx_png/src/decoder.cpp",
+      "function": "stx_png::scatter",
+      "variable": "rgba",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal scatter_samples; scatter asserts the filtered row and RGBA samples disjoint (prepare_decode rejects overlapping caller buffers)."
+    },
+    {
+      "path": "stx_png/src/decoder.cpp",
+      "function": "stx_png::read_image_bytes",
+      "variable": "output",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "It reaches its buffers through InflateStream::process (stx_zlib, compiled separately), whose stream keeps its own state across calls; a restricted parameter here would also bind the stream's accesses, which this function's overlap rule cannot show. The byte loops it drives (unfilter_up, unfilter_left, scatter) carry restricted parameters."
+    },
+    {
+      "path": "stx_png/src/decoder.cpp",
+      "function": "stx_png::decode_metadata",
+      "variable": "output,records",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "It reaches its buffers through InflateStream::process (stx_zlib, compiled separately), whose stream keeps its own state across calls; a restricted parameter here would also bind the stream's accesses, which this function's overlap rule cannot show. The byte loops it drives (unfilter_up, unfilter_left, scatter) carry restricted parameters."
+    },
+    {
+      "path": "stx_png/src/decoder.cpp",
+      "function": "stx_png::measure_metadata",
+      "variable": "scratch",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "It reaches its buffers through InflateStream::process (stx_zlib, compiled separately), whose stream keeps its own state across calls; a restricted parameter here would also bind the stream's accesses, which this function's overlap rule cannot show. The byte loops it drives (unfilter_up, unfilter_left, scatter) carry restricted parameters."
+    },
+    {
+      "path": "stx_png/src/decoder.cpp",
+      "function": "stx_png::decode_image",
+      "variable": "rows,rgba",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "It reaches its buffers through InflateStream::process (stx_zlib, compiled separately), whose stream keeps its own state across calls; a restricted parameter here would also bind the stream's accesses, which this function's overlap rule cannot show. The byte loops it drives (unfilter_up, unfilter_left, scatter) carry restricted parameters."
+    },
+    {
+      "path": "stx_png/src/decoder.cpp",
+      "function": "stx_png::list_metadata",
+      "variable": "records",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal list_metadata_records; list_metadata asserts encoded and records disjoint (prepare_decode rejects overlapping caller buffers)."
+    },
+    {
+      "path": "stx_png/src/encoder.cpp",
+      "function": "stx_png::filter_row",
+      "variable": "output",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal filter_row_bytes; filter_row asserts output disjoint from line and above (the encoder's lines and candidates vectors)."
+    },
+    {
+      "path": "stx_png/src/pixels.cpp",
+      "function": "stx_png::convert_rows",
+      "variable": "pixels",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal convert_samples; convert_rgba16_samples rejects overlap first and convert_rows asserts it."
+    },
+    {
+      "path": "stx_vorbis/src/bfft_imdct.hpp",
+      "function": "stx_vorbis::detail::BfftWorkspace::execute",
+      "variable": "output",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the private member execute_parts; execute asserts input and output disjoint from each other and from the workspace's spectrum, samples and DCT storage."
+    },
+    {
+      "path": "stx_vorbis/src/packet.cpp",
+      "function": "stx_vorbis::detail::inverse_couple",
+      "variable": "magnitudes,angles",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal inverse_couple_bins; inverse_couple asserts the channels disjoint (setup requires distinct coupled channels, each its own stride)."
+    },
+    {
+      "path": "stx_vorbis/src/synthesis.cpp",
+      "function": "stx_vorbis::detail::inverse_mdct",
+      "variable": "time,real,imaginary",
+      "kind": "restrict_span",
+      "decision": "apply",
+      "reason": "Restricted parameters on the internal inverse_mdct_parts; inverse_mdct asserts time, real, imaginary and spectrum pairwise disjoint where one is written (separate workspace vectors)."
+    },
+    {
+      "path": "stx_zlib/src/deflate.cpp",
+      "function": "stx_zlib::rebase_links",
+      "variable": "destination",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "The promise does not hold: rebase_links moves links in place (destination is identical to source or starts before it)."
+    },
+    {
+      "path": "stx_zlib/src/deflate.cpp",
+      "function": "stx_zlib::build_tree",
+      "variable": "lengths,codes",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "A DeflateStream member declared in the public header; its buffers are members of the same stream, which the body also reaches through this (sorted_, nodes_). A restricted form needs a new private member in the public header (out until reviewed) or moving the tree state out of the stream."
+    },
+    {
+      "path": "stx_zlib/src/deflate.cpp",
+      "function": "stx_zlib::process",
+      "variable": "output",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "Public stream entry point declared in the public header; the stream also keeps state across calls that this function's overlap rule cannot cover."
+    },
+    {
+      "path": "stx_zlib/src/inflate.cpp",
+      "function": "stx_zlib::process",
+      "variable": "output",
+      "kind": "restrict_span",
+      "decision": "keep",
+      "reason": "Public stream entry point declared in the public header; the stream also keeps state across calls that this function's overlap rule cannot cover."
+    },
+    {
+      "path": "stx_vorbis/src/synthesis.cpp",
+      "function": "stx_vorbis::detail::scalar_butterfly",
+      "variable": "real,imaginary",
+      "kind": "restrict",
+      "decision": "apply",
+      "reason": "The function pointer's signature stays; restricted parameters on the internal butterfly_pass, and scalar_butterfly asserts real, imaginary and the cosine and sine tables disjoint."
+    }
+  ]
+}

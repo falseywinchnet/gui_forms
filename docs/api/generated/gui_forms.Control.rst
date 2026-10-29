@@ -1555,6 +1555,12 @@ gui_forms::Control
 
       *Protected.*
 
+   .. cpp:function:: void report_opaque_cover(const Painter& painter, Rect local) const noexcept
+
+      *Protected.*
+
+      The opaque cover hint (owner, 2026-10-28). Called from a paint callback right after drawing an opaque solid fill of ``local``, in this control's coordinates, with nothing translated, clipped or grouped: the control's display chunk then leaves ``local`` opaque whatever lay beneath, and the window skips painting what lies under it (the backplane and the controls painted before this one). Ignored unless the window is recording this control into ``painter``, and dropped if the recording later begins a copy group.
+
    .. cpp:function:: virtual Size measure_intrinsic(const LayoutConstraint& constraint)
 
       *Protected.*

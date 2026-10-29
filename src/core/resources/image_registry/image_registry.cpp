@@ -1,5 +1,7 @@
 #include "gui_forms/resources.hpp"
 
+#include "image_registry_access.hpp"
+
 #include "stx_zlib/checksum.hpp"
 
 #include <algorithm>
@@ -386,7 +388,9 @@ ImageRegistry::~ImageRegistry() = default;
 ImageRegistry::ImageRegistry(ImageRegistry&& other) noexcept
     : limits_(other.limits_), slots_(std::move(other.slots_)), revision_(other.revision_ + 1U),
       resource_count_(other.resource_count_), encoded_bytes_(other.encoded_bytes_),
-      decoded_bytes_(other.decoded_bytes_) {
+      decoded_bytes_(other.decoded_bytes_), liveness_(std::move(other.liveness_)) {
+    // The images, and so the owners holding the handle, move here.
+    if (liveness_ != nullptr) (*liveness_).registry = this;
     other.release_moved_contents();
 }
 
@@ -400,8 +404,20 @@ ImageRegistry& ImageRegistry::operator=(ImageRegistry&& other) noexcept {
     resource_count_ = other.resource_count_;
     encoded_bytes_ = other.encoded_bytes_;
     decoded_bytes_ = other.decoded_bytes_;
+    // This registry's own images are gone: the handle on them expires, and
+    // the moved images' handle names this registry.
+    liveness_ = std::move(other.liveness_);
+    if (liveness_ != nullptr) (*liveness_).registry = this;
     other.release_moved_contents();
     return *this;
+}
+
+std::weak_ptr<detail::ImageRegistryLiveness> detail::ImageRegistryAccess::liveness(ImageRegistry& registry) {
+    if (registry.liveness_ == nullptr) {
+        registry.liveness_ = std::make_shared<ImageRegistryLiveness>(ImageRegistryLiveness{&registry});
+    }
+    std::weak_ptr<ImageRegistryLiveness> handle(registry.liveness_);
+    return handle;
 }
 
 void ImageRegistry::release_moved_contents() noexcept {

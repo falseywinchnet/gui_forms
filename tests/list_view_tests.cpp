@@ -199,9 +199,10 @@ void details_parts_and_paint() {
     window.perform_layout();
     const ControlAnatomy& anatomy = (*view).anatomy();
     require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none && anatomy.control_id == "list_view" &&
-                anatomy.item_systems.size() == 3U && find_item_system(anatomy, "column").has_value() &&
-                find_item_part(anatomy.item_systems[2], "sort_glyph").has_value(),
-            "ListView publishes a valid anatomy with item, sub-item and column systems");
+                anatomy.item_systems.size() == 4U && find_item_system(anatomy, "column").has_value() &&
+                find_item_part(anatomy.item_systems[2], "sort_glyph").has_value() &&
+                find_item_part(anatomy.item_systems[3], "group_caption").has_value(),
+            "ListView publishes a valid anatomy with item, sub-item, column and group systems");
     const ListView::Parts parts = (*view).parts();
     require(parts.well.present && parts.header.present && !parts.vertical_scroll_bar.present,
             "a short details view shows its well and header and no scroll bar");
@@ -418,6 +419,214 @@ void views_lay_out_items() {
             "the large-icon label sits under the icon's place");
 }
 
+// The tile view (Windows Forms' View.Tile with TileSize): tiles filled left
+// to right, each with the item's text over one line per non-empty sub-item,
+// as far as the tile's height allows.
+void tile_view() {
+    std::shared_ptr<ListView> view = details_view(12U);
+    std::vector<ListViewItem> items_with_gap = sample_items(12U);
+    items_with_gap[1].sub_items[0].clear();
+    (*view).set_items(std::move(items_with_gap));
+    Window window(view, {600.0, 260.0});
+    require((*view).tile_size() == Size{}, "tiles are sized automatically by default");
+    (*view).set_view(ListViewView::tile);
+    window.perform_layout();
+    std::vector<ListView::Item> items = (*view).realized_items();
+    const Rect tile = items[0].parts.cell.bounds;
+    require(items.size() > 2U && items[1].parts.cell.bounds.x > tile.x && items[1].parts.cell.bounds.y == tile.y,
+            "the tile view fills a row left to right");
+    require(tile.width > 200.0 && items[0].parts.text.present && items[0].parts.text.bounds.y > tile.y &&
+                !items[0].parts.icon.present,
+            "a default tile is wide, with its text centred and no icon without a large image list");
+    require(!(*view).parts().header.present && (*view).realized_sub_items().empty(),
+            "the tile view has no headers or sub-item cells");
+    RecordingPainter painter;
+    static_cast<void>(window.paint(painter, {0.0, 0.0, 600.0, 260.0}));
+    require(painted(painter, "Delta 0") && painted(painter, "1 KB") && painted(painter, "Image") &&
+                painted(painter, "Text"),
+            "a tile shows its text over its sub-items");
+    require(!painted(painter, "2 KB") && items[1].parts.text.bounds.y > items[0].parts.text.bounds.y,
+            "an empty sub-item takes no line, and a tile with fewer lines centres them lower");
+
+    std::size_t per_row = 0U;
+    for (const ListView::Item& item : items) {
+        if (item.parts.cell.bounds.y == tile.y) ++per_row;
+    }
+    require(window.request_focus(view), "the view takes focus");
+    (*view).set_focused_index(std::size_t{0U});
+    require(key(window, PhysicalKey::down) && (*view).focused_index() == std::optional<std::size_t>(per_row),
+            "Down moves to the tile below");
+
+    (*view).set_tile_size({300.0, 24.0});
+    window.perform_layout();
+    items = (*view).realized_items();
+    require(items[0].parts.cell.bounds.width == 300.0 && items[0].parts.cell.bounds.height == 24.0,
+            "a set tile size sizes every tile");
+    RecordingPainter short_tiles;
+    static_cast<void>(window.paint(short_tiles, {0.0, 0.0, 600.0, 260.0}));
+    require(painted(short_tiles, "Delta 0") && !painted(short_tiles, "1 KB"),
+            "a tile shows only the lines its height has room for");
+
+    bool refused = false;
+    try {
+        (*view).set_tile_size({10.0, 10.0});
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    bool half_refused = false;
+    try {
+        (*view).set_tile_size({0.0, 50.0});
+    } catch (const std::invalid_argument&) {
+        half_refused = true;
+    }
+    require(refused && half_refused && (*view).tile_size() == Size{300.0, 24.0},
+            "a tile side outside the bounds, or one automatic side, is refused");
+    (*view).set_tile_size({});
+    require((*view).tile_size() == Size{}, "an empty size returns to automatic tiles");
+}
+
+std::vector<ListViewGroup> sample_groups() {
+    std::vector<ListViewGroup> groups;
+    groups.push_back({.stable_id = "a", .header = "Alpha"});
+    groups.push_back({.stable_id = "b", .header = "Beta", .header_alignment = ListViewAlignment::right});
+    groups.push_back({.stable_id = "c", .header = "Empty"});
+    return groups;
+}
+
+// Six items over two groups and the default group: items 0 and 3 in b, 1
+// and 4 in a, 2 in none and 5 in a group that does not exist.
+std::shared_ptr<ListView> grouped_view() {
+    std::shared_ptr<ListView> view = make_control<ListView>(StableId("list"));
+    (*view).set_columns(sample_columns());
+    std::vector<ListViewItem> items = sample_items(6U);
+    items[0].group = "b";
+    items[3].group = "b";
+    items[1].group = "a";
+    items[4].group = "a";
+    items[5].group = "missing";
+    (*view).set_items(std::move(items));
+    (*view).set_groups(sample_groups());
+    return view;
+}
+
+// Groups (Windows Forms' Groups and ShowGroups): a header line per group
+// that holds items, the default group first, items in model order within
+// a group; keys, ranges and accessibility follow the shown order.
+void groups() {
+    std::shared_ptr<ListView> view = grouped_view();
+    Window window(view, {400.0, 320.0});
+    window.perform_layout();
+    require((*view).show_groups() && (*view).grouped() && (*view).default_group_header() == "Default",
+            "a view with groups shows them by default");
+    const std::vector<ListView::Group> groups = (*view).realized_groups();
+    require(groups.size() == 3U && groups[0].index == 3U && groups[0].stable_id == "list.default_group" &&
+                groups[1].index == 0U && groups[1].stable_id == "list.group.a" && groups[2].index == 1U &&
+                groups[2].stable_id == "list.group.b",
+            "the default group comes first, then the groups that hold items, in order");
+    const std::vector<ListView::Item> items = (*view).realized_items();
+    const std::vector<std::size_t> shown{2U, 5U, 1U, 4U, 0U, 3U};
+    bool ordered = items.size() == shown.size();
+    for (std::size_t position = 0; ordered && position < shown.size(); ++position) {
+        ordered = items[position].index == shown[position] &&
+                  (position == 0U || items[position].parts.cell.bounds.y > items[position - 1U].parts.cell.bounds.y);
+    }
+    require(ordered, "items are shown group by group, in model order within a group");
+    require(groups[1].parts.group_caption.present && groups[1].parts.group_divider.present &&
+                groups[1].parts.group_band.bounds.y >= items[1].parts.cell.bounds.y + items[1].parts.cell.bounds.height &&
+                items[2].parts.cell.bounds.y >= groups[1].parts.group_band.bounds.y +
+                                                    groups[1].parts.group_band.bounds.height - 0.001,
+            "a group's header line stands between the groups, above its items");
+    RecordingPainter painter;
+    static_cast<void>(window.paint(painter, {0.0, 0.0, 400.0, 320.0}));
+    require(painted(painter, "Default") && painted(painter, "Alpha") && painted(painter, "Beta") &&
+                !painted(painter, "Empty"),
+            "headers are painted; a group without items is not shown");
+    require(!(*view).item_index_at(to_window(*view, centre(groups[1].parts.group_caption.bounds))) &&
+                (*view).item_index_at(to_window(*view, centre(items[2].parts.cell.bounds))) ==
+                    std::optional<std::size_t>(1U),
+            "a header is not an item; an item under the point is");
+
+    require(window.request_focus(view), "the view takes focus");
+    (*view).set_focused_index(std::size_t{2U});
+    require(key(window, PhysicalKey::down) && (*view).focused_index() == std::optional<std::size_t>(5U) &&
+                key(window, PhysicalKey::down) && (*view).focused_index() == std::optional<std::size_t>(1U),
+            "Down follows the shown order across a header");
+    require(key(window, PhysicalKey::end) && (*view).focused_index() == std::optional<std::size_t>(3U) &&
+                key(window, PhysicalKey::home) && (*view).focused_index() == std::optional<std::size_t>(2U),
+            "Home and End go to the first and last shown items");
+    click(window, to_window(*view, centre(items[1].parts.text.bounds)));
+    click(window, to_window(*view, centre(items[3].parts.text.bounds)), Modifier::shift);
+    require((*view).selected_count() == 3U && (*view).is_selected(5U) && (*view).is_selected(1U) &&
+                (*view).is_selected(4U) && !(*view).is_selected(2U) && !(*view).is_selected(0U),
+            "a Shift range runs through the shown order");
+
+    const std::vector<SemanticNode> children = (*view).semantic_virtual_children();
+    require(children.size() == 3U + 3U && children[3].role == SemanticRole::group &&
+                children[3].name == "Default" && children[3].children.size() == 2U &&
+                children[3].children[0].name == "Charlie 2" && children[3].children[0].row_index == 1U &&
+                children[4].name == "Alpha" && children[4].children[0].row_index == 3U &&
+                children[5].stable_id == "list.group.b",
+            "each shown group is a group node of its items, rows counted in the shown order");
+
+    (*view).set_view(ListViewView::small_icon);
+    window.perform_layout();
+    const std::vector<ListView::Item> icons = (*view).realized_items();
+    require(icons.size() == 6U && icons[1].parts.cell.bounds.y == icons[0].parts.cell.bounds.y &&
+                icons[2].parts.cell.bounds.y > icons[1].parts.cell.bounds.y &&
+                icons[2].parts.cell.bounds.x == icons[0].parts.cell.bounds.x,
+            "an icon view starts each group on a new row");
+    (*view).set_view(ListViewView::list);
+    window.perform_layout();
+    require(!(*view).grouped() && (*view).realized_groups().empty(), "the list view does not show groups");
+    (*view).set_view(ListViewView::details);
+    (*view).set_show_groups(false);
+    window.perform_layout();
+    require(!(*view).grouped() && (*view).realized_items()[0].index == 0U, "show_groups off shows the model order");
+    (*view).set_show_groups(true);
+    (*view).set_default_group_header("Other");
+    window.perform_layout();
+    require((*view).realized_groups().size() == 3U, "groups show again");
+    RecordingPainter renamed;
+    static_cast<void>(window.paint(renamed, {0.0, 0.0, 400.0, 320.0}));
+    require(painted(renamed, "Other"), "the default group's header can be renamed");
+
+    bool refused = false;
+    try {
+        std::vector<ListViewGroup> repeated = sample_groups();
+        repeated[1].stable_id = "a";
+        (*view).set_groups(std::move(repeated));
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused && (*view).groups().size() == 3U, "a repeated group ID is refused");
+}
+
+// A long grouped view scrolls by lines of two extents.
+void grouped_scrolling() {
+    std::shared_ptr<ListView> view = make_control<ListView>(StableId("list"));
+    (*view).set_columns(sample_columns());
+    std::vector<ListViewItem> items = sample_items(90U);
+    for (std::size_t index = 0; index < items.size(); ++index) items[index].group = index % 3U == 0U ? "a" : "b";
+    (*view).set_items(std::move(items));
+    (*view).set_groups(sample_groups());
+    Window window(view, {400.0, 200.0});
+    window.perform_layout();
+    require((*view).parts().vertical_scroll_bar.present, "a long grouped view scrolls");
+    (*view).ensure_visible(89U);
+    window.perform_layout();
+    std::vector<ListView::Item> items_shown = (*view).realized_items();
+    const Rect viewport = (*view).parts().well.bounds;
+    require(!items_shown.empty() && items_shown.back().index == 89U &&
+                items_shown.back().parts.cell.bounds.y + items_shown.back().parts.cell.bounds.height <=
+                    viewport.y + viewport.height,
+            "ensure_visible scrolls the last shown item fully into view");
+    (*view).ensure_visible(0U);
+    window.perform_layout();
+    const std::vector<ListView::Group> groups = (*view).realized_groups();
+    require(!groups.empty() && groups[0].stable_id == "list.group.a" && (*view).top_index() == 0U,
+            "scrolling back to a group's first item shows its header");
+}
+
 // One owner-draw call as a handler saw it.
 struct ContentCall final {
     std::size_t index{};
@@ -502,6 +711,19 @@ void owner_draw() {
     require(painted(both, "owner") && painted(both, "Delta 0") && painted(both, "1 KB"),
             "draw_default adds the default content after the handler's");
     with_default.disconnect();
+
+    calls.clear();
+    (*view).set_view(ListViewView::tile);
+    SubscriptionToken tiles = (*view).draw_item_content().subscribe(DrawContent{&calls, false});
+    repaint_owner_drawn(*view);
+    window.perform_layout();
+    RecordingPainter tiled;
+    static_cast<void>(window.paint(tiled, {0.0, 0.0, 400.0, 240.0}));
+    require(calls.size() == 9U && calls[0].column == 0U && calls[1].column == 1U && calls[2].column == 2U &&
+                calls[1].content.y > calls[0].content.y && !painted(tiled, "1 KB"),
+            "a tile raises its content, then each sub-item line");
+    tiles.disconnect();
+    (*view).set_view(ListViewView::details);
 
     std::size_t replaced = 0U;
     SubscriptionToken replacing = (*view).draw_item_content().subscribe(ReplaceItems{view.get(), &replaced});
@@ -943,6 +1165,9 @@ int main() {
     check_boxes();
     columns_click_sort_and_resize();
     views_lay_out_items();
+    tile_view();
+    groups();
+    grouped_scrolling();
     owner_draw();
     insertion_mark();
     label_editing();

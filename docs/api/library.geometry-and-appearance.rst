@@ -256,6 +256,12 @@ Types
      - Theme is an immutable validated role/state recipe table plus structural spacing, geometry, typography, and motion tokens; it resolves logical visual context without exposing renderer or platform objects.
    * - :cpp:class:`ThemeBackdropBase <gui_forms::ThemeBackdropBase>`
      - One backplane base: the material a window's backplane is drawn from while it is granted ``backdrop`` (ThemeWindowBackdrop).
+   * - :cpp:class:`ThemeCompileDiagnostic <gui_forms::ThemeCompileDiagnostic>`
+     - One finding of an install or a compilation.
+   * - :cpp:class:`ThemeCompileOptions <gui_forms::ThemeCompileOptions>`
+     - What a compilation reads besides the package.
+   * - :cpp:class:`ThemeCompileResult <gui_forms::ThemeCompileResult>`
+     - A theme, or the refusal's diagnostics.
    * - :cpp:class:`ThemeDefinition <gui_forms::ThemeDefinition>`
      - ThemeDefinition is one named, complete compatibility palette, role/state material matrix, and structural-token set.
    * - :cpp:class:`ThemeEngine <gui_forms::ThemeEngine>`
@@ -264,8 +270,14 @@ Types
      -  
    * - :cpp:class:`ThemeGeometryTokens <gui_forms::ThemeGeometryTokens>`
      - ThemeGeometryTokens centralizes control heights, touch targets, splitter geometry, navigation extents, and compact breakpoint.
+   * - :cpp:class:`ThemeLibrary <gui_forms::ThemeLibrary>`
+     - The installed theme packages an ``@import`` may name (D2): each verified whole when installed (its manifest, every file's hash, and every ``@import`` of its sheet listed in its manifest), and found by its name.
    * - :cpp:class:`ThemeMotionTokens <gui_forms::ThemeMotionTokens>`
      - ThemeMotionTokens defines quick, standard, emphasized, and busy-cycle durations without prescribing an animation engine.
+   * - :cpp:class:`ThemePackage <gui_forms::ThemePackage>`
+     - A theme package: its manifest's bytes and its files.
+   * - :cpp:class:`ThemePackageFile <gui_forms::ThemePackageFile>`
+     - One file of a theme package: its path inside the package, as the manifest lists it, and its bytes.
    * - :cpp:class:`ThemeRule <gui_forms::ThemeRule>`
      - One rule.
    * - :cpp:class:`ThemeRuleSheet <gui_forms::ThemeRuleSheet>`
@@ -3687,6 +3699,72 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ThemeCompileDiagnostic final
+
+   ``#include <gui_forms/theme/theme_compiler/theme_compiler.hpp>``
+
+   One finding of an install or a compilation.
+
+   .. cpp:member:: std::string code
+
+      As ``E601`` or ``W106``.
+
+   .. cpp:member:: std::string name
+
+      As ``manifest_invalid``.
+
+   .. cpp:member:: ThemeDiagnosticSeverity severity
+
+      Default: ``{ThemeDiagnosticSeverity::error}``.
+
+   .. cpp:member:: std::string file
+
+      The file at fault: ``theme.json``, or a sheet as ``<theme>/<path>``.
+
+   .. cpp:member:: std::uint32_t line
+
+      Counting from 1; 0 where the finding has no place in a file.
+
+   .. cpp:member:: std::uint32_t column
+
+   .. cpp:member:: std::string rule
+
+      The rule and property, where the finding is inside one.
+
+   .. cpp:member:: std::string property
+
+   .. cpp:member:: std::string detail
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemeCompileOptions final
+
+   ``#include <gui_forms/theme/theme_compiler/theme_compiler.hpp>``
+
+   What a compilation reads besides the package.
+
+   .. cpp:member:: std::span<const ControlAnatomy> controls
+
+      The control types a selector may name (the stock ones and the application's own); a name outside them is a warning that drops its rule.
+
+   .. cpp:member:: std::span<const std::string> published_values
+
+      The application values the application publishes; a package listing another is refused (E606).
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemeCompileResult final
+
+   ``#include <gui_forms/theme/theme_compiler/theme_compiler.hpp>``
+
+   A theme, or the refusal's diagnostics. Warnings come with a theme too.
+
+   .. cpp:member:: std::shared_ptr<const Theme> theme
+
+   .. cpp:member:: std::vector<ThemeCompileDiagnostic> diagnostics
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ThemeDefinition final
 
    ``#include <gui_forms/theme/types/theme_types.hpp>``
@@ -3838,6 +3916,39 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: ThemeLibrary final
+
+   ``#include <gui_forms/theme/theme_compiler/theme_compiler.hpp>``
+
+   The installed theme packages an ``@import`` may name (D2): each verified whole when installed (its manifest, every file's hash, and every ``@import`` of its sheet listed in its manifest), and found by its name.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: ThemeLibrary()
+
+   .. cpp:function:: ThemeLibrary(ThemeLibrary&&) noexcept
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::size_t size() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: std::vector<ThemeCompileDiagnostic> install(const ThemePackage& package)
+
+      Verifies ``package`` and installs it, replacing an installed package of its name. Returns the refusal's diagnostics, or none when installed; a refused package changes nothing. A library holds at most 256 packages.
+
+   .. cpp:function:: bool remove(std::string_view name) noexcept
+
+      Removes the package named ``name``; whether there was one.
+
+   .. cpp:function:: bool contains(std::string_view name) const noexcept
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ThemeMotionTokens final
 
    ``#include <gui_forms/theme/types/theme_types.hpp>``
@@ -3859,6 +3970,30 @@ Types
    .. cpp:member:: std::chrono::milliseconds busy_cycle
 
       Default: ``{1400}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemePackage final
+
+   ``#include <gui_forms/theme/theme_compiler/theme_compiler.hpp>``
+
+   A theme package: its manifest's bytes and its files.
+
+   .. cpp:member:: std::string manifest
+
+   .. cpp:member:: std::vector<ThemePackageFile> files
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemePackageFile final
+
+   ``#include <gui_forms/theme/theme_compiler/theme_compiler.hpp>``
+
+   One file of a theme package: its path inside the package, as the manifest lists it, and its bytes.
+
+   .. cpp:member:: std::string path
+
+   .. cpp:member:: std::string bytes
 
 .. cpp:namespace:: gui_forms
 
@@ -5214,6 +5349,16 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: ThemeDiagnosticSeverity
+
+   ``#include <gui_forms/theme/theme_compiler/theme_compiler.hpp>``
+
+   .. cpp:enumerator:: error
+
+   .. cpp:enumerator:: warning
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: ThemeEngine::PartDrawing
 
    ``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
@@ -5837,6 +5982,10 @@ Functions, constants and aliases
 
 .. cpp:function:: Insets surface_material_visual_outsets(const SurfaceMaterial& material) noexcept
 
+.. cpp:function:: bool surface_material_opaque(const SurfaceMaterial& material) noexcept
+
+   Whether paint_surface_material leaves the whole of its bounds opaque, whatever lay beneath: a valid, unfinished material with square corners, no visual outsets, filter or mask, and an opaque solid fill drawn normally, over which everything else it draws composites.
+
 .. cpp:function:: Insets box_shadow_visual_outsets(std::span<const MaterialShadow> shadows) noexcept
 
    How far the outer (not inset) shadows among ``shadows`` reach outside the rect that casts them: three blur radii plus any positive spread, shifted by each offset.
@@ -5932,6 +6081,18 @@ Functions, constants and aliases
 .. cpp:function:: ThemeDefinition windows_professional_theme_definition()
 
 .. cpp:function:: std::shared_ptr<const Theme> default_theme()
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/theme/theme_compiler/theme_compiler.hpp>``
+
+.. cpp:function:: ThemeCompileResult compile_theme_package(const ThemePackage& package, const ThemeLibrary& library, ImageRegistry& images, const ThemeCompileOptions& options)
+
+   Compiles ``package`` with its ``@import`` closure among ``library``'s packages (one cascade: imported sheets first, and the later definition of a colour role or ``@keyframes`` wins) onto the built-in professional theme. Its image resources are loaded into ``images`` and owned by the compiled theme: each is removed from ``images`` when the last theme holding it is released, so replacing or dropping a theme removes its images. Themes compiled through one library that load the same bytes into one registry share one image. A refusal leaves none of its own. The package itself need not be installed. Compiles through one library, and the release of their themes, are not safe to run concurrently.
+
+.. cpp:function:: ThemeCompileResult compile_installed_theme(std::string_view name, const ThemeLibrary& library, ImageRegistry& images, const ThemeCompileOptions& options)
+
+   As compile_theme_package, for the installed package named ``name``; an unknown name is refused (E603).
 
 .. cpp:namespace:: gui_forms
 

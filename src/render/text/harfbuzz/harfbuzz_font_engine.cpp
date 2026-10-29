@@ -1,6 +1,7 @@
 #include "harfbuzz_font_engine.hpp"
 #include "bounded_shape_workspace.hpp"
 #include "../../../core/text/unicode/unicode_grapheme.hpp"
+#include "../../../core/types/restrict/restrict.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -676,11 +677,40 @@ public:
     // borrow this engine's unchanged face table. Scratch arrays are disjoint,
     // scalar/segment/direction extents cover the validated scalar count and
     // visual covers twice that count. No array grows; native owners stay local.
+    // Overlap rule: the text, edges and the four scratch arrays share no
+    // element (asserted in debug and sanitizer builds), the promise
+    // fill_bounded_parts's restricted parameters make.
     void fill_bounded_runs(const std::string_view utf8, const FontSpec font,
         const std::span<Face* const> candidates, const std::span<const std::size_t> edges,
         const std::span<char32_t> scalar_scratch, const std::span<WorkspaceFontSegment> segments,
         const std::span<WorkspaceDirectionRun> directions, const std::span<WorkspaceVisualSegment> visual,
         BoundedShapedText& output) {
+        namespace overlap = gui_forms::detail;
+        const std::array<overlap::ByteRange, 4> written{overlap::byte_range(scalar_scratch),
+            overlap::byte_range(segments), overlap::byte_range(directions), overlap::byte_range(visual)};
+        const std::array<overlap::ByteRange, 2> read{
+            overlap::ByteRange{utf8.data(), utf8.size()}, overlap::byte_range(edges)};
+        overlap::require_disjoint_writes(written, read);
+        fill_bounded_parts(utf8.data(), utf8.size(), font, candidates, edges.data(), edges.size(),
+            scalar_scratch.data(), scalar_scratch.size(), segments.data(), segments.size(), directions.data(),
+            directions.size(), visual.data(), visual.size(), output);
+    }
+
+    // fill_bounded_runs's work. Restricted parameters: no element is reached
+    // through two of them (fill_bounded_runs checks it).
+    void fill_bounded_parts(const char* GUI_FORMS_RESTRICT text, const std::size_t text_size, const FontSpec font,
+        const std::span<Face* const> candidates, const std::size_t* GUI_FORMS_RESTRICT edge_data,
+        const std::size_t edge_count, char32_t* GUI_FORMS_RESTRICT scalar_data, const std::size_t scalar_size,
+        WorkspaceFontSegment* GUI_FORMS_RESTRICT segment_data, const std::size_t segment_size,
+        WorkspaceDirectionRun* GUI_FORMS_RESTRICT direction_data, const std::size_t direction_size,
+        WorkspaceVisualSegment* GUI_FORMS_RESTRICT visual_data, const std::size_t visual_size,
+        BoundedShapedText& output) {
+        const std::string_view utf8(text, text_size);
+        const std::span<const std::size_t> edges(edge_data, edge_count);
+        const std::span<char32_t> scalar_scratch(scalar_data, scalar_size);
+        const std::span<WorkspaceFontSegment> segments(segment_data, segment_size);
+        const std::span<WorkspaceDirectionRun> directions(direction_data, direction_size);
+        const std::span<WorkspaceVisualSegment> visual(visual_data, visual_size);
         const std::size_t candidate_count = candidates.size();
         const std::size_t scalar_capacity = scalar_scratch.size();
         const std::size_t visual_capacity = visual.size();

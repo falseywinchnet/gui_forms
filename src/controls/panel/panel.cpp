@@ -156,7 +156,15 @@ Insets Panel::visual_outsets() const noexcept {
 }
 
 void Panel::on_paint(Painter& painter, Rect) {
-    paint_panel(painter, local_bounds());
+    const Rect bounds = local_bounds();
+    paint_panel(painter, bounds);
+    // The face paint_panel drew first: an opaque background colour, or an
+    // opaque material without outsets. The border draws over it.
+    const bool overridden = background_override_ || style_override_;
+    const bool opaque = overridden
+        ? background().alpha == 255U
+        : surface_material_opaque(effective_theme().resolve(visual_role_, visual_context()).material);
+    if (opaque) report_opaque_cover(painter, bounds);
 }
 
 SemanticDescriptor Panel::semantic_descriptor() const {

@@ -10,6 +10,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <optional>
 
 namespace gui_forms::render {
 struct PreparedSkiaFrameTestAccess final {
@@ -20,9 +21,8 @@ struct PreparedSkiaFrameTestAccess final {
         image.reset();
         PreparedTextBudgetSnapshot usage = service.budget_snapshot();
         prepared_test::require(usage.mask_owners == 1 && usage.mask_bytes != 0, "native image retention holds mask charge");
-        SkPixmap pixels{};
-        const bool readable = (*retained).peekPixels(&pixels);
-        prepared_test::require(readable && pixels.addr() != nullptr, "retained image pixels survive original mask release");
+        const std::optional<SkPixmap> pixels = (*retained).peekPixels();
+        prepared_test::require(pixels && (*pixels).addr() != nullptr, "retained image pixels survive original mask release");
         retained.reset();
         usage = service.budget_snapshot();
         prepared_test::require(usage.mask_owners == 0 && usage.mask_bytes == 0, "release callback retires mask charge");

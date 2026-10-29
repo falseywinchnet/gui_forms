@@ -176,6 +176,7 @@ add_library(gui_forms_core STATIC
     src/core/types/painter/painter.cpp
     src/core/types/rect/rect.cpp
     src/core/theme/theme/theme.cpp
+    src/core/theme/theme_compiler/theme_compiler.cpp
     src/core/theme/part_painting/part_painting.cpp
     src/core/theme/owner_draw/owner_draw.cpp
     src/core/engine/types/engine_types.cpp
@@ -264,6 +265,9 @@ add_library(gui_forms_core STATIC
     src/core/theme_language/motion/theme_motion_lowering.cpp
     src/core/theme_language/media/theme_media_query.cpp
     src/core/theme_language/compiler/theme_compiler.cpp
+    src/core/theme_language/package/theme_manifest.cpp
+    src/core/theme_language/package/theme_package.cpp
+    src/core/json/json_reader/json_reader.cpp
     src/core/docking/types/dock_types.cpp
     src/core/docking/dock_split_solver/dock_split_solver.cpp
     src/core/docking/dock_layout/dock_layout.cpp
@@ -2672,6 +2676,13 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_xml_tests tests/xml_tests.cpp)
     target_link_libraries(gui_forms_xml_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_xml_tests COMMAND gui_forms_xml_tests)
+    add_executable(gui_forms_json_reader_tests tests/json_reader_tests.cpp)
+    target_link_libraries(gui_forms_json_reader_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_json_reader_tests COMMAND gui_forms_json_reader_tests)
+    add_executable(gui_forms_json_reader_fuzz_tests fuzz/json_reader_fuzz.cpp)
+    target_link_libraries(gui_forms_json_reader_fuzz_tests PRIVATE gui_forms_core)
+    target_compile_definitions(gui_forms_json_reader_fuzz_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    add_test(NAME gui_forms_json_reader_fuzz_tests COMMAND gui_forms_json_reader_fuzz_tests)
 
     # The theme language (stage T3): numbers, tokens, diagnostics, the syntax
     # tree, selectors, values, the compiler, and the deterministic mutation
@@ -2716,6 +2727,15 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_theme_em_font_css_tests tests/theme_language/theme_em_font_css_tests.cpp)
     target_link_libraries(gui_forms_theme_em_font_css_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_theme_em_font_css_tests COMMAND gui_forms_theme_em_font_css_tests)
+    add_executable(gui_forms_theme_manifest_tests tests/theme_language/theme_manifest_tests.cpp)
+    target_link_libraries(gui_forms_theme_manifest_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_theme_manifest_tests COMMAND gui_forms_theme_manifest_tests)
+    add_executable(gui_forms_theme_package_tests tests/theme_language/theme_package_tests.cpp)
+    target_link_libraries(gui_forms_theme_package_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_theme_package_tests COMMAND gui_forms_theme_package_tests)
+    add_executable(gui_forms_theme_package_compile_tests tests/theme_language/theme_package_compile_tests.cpp)
+    target_link_libraries(gui_forms_theme_package_compile_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_package_compile_tests COMMAND gui_forms_theme_package_compile_tests)
 
     add_executable(gui_forms_theme_sheet_fuzz_tests fuzz/theme_sheet_fuzz.cpp)
     target_link_libraries(gui_forms_theme_sheet_fuzz_tests PRIVATE gui_forms_core)
@@ -3301,7 +3321,7 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_display_chunk_tests
         tests/display_chunk_tests.cpp
     )
-    target_link_libraries(gui_forms_display_chunk_tests PRIVATE gui_forms_core)
+    target_link_libraries(gui_forms_display_chunk_tests PRIVATE gui_forms_controls gui_forms_core)
     add_test(NAME gui_forms_display_chunk_tests COMMAND gui_forms_display_chunk_tests)
 
     add_executable(gui_forms_frame_scheduler_tests
@@ -4204,6 +4224,36 @@ if(GUI_FORMS_BUILD_FUZZERS)
             -fno-omit-frame-pointer
         )
         target_link_options(gui_forms_xml_reader_fuzz PRIVATE
+            -fsanitize=address,undefined
+        )
+    endif()
+
+    # The theme manifest's JSON reader (stage T3, P10), from its own source.
+    add_executable(gui_forms_json_reader_fuzz
+        fuzz/json_reader_fuzz.cpp
+        src/core/json/json_reader/json_reader.cpp
+    )
+    target_include_directories(gui_forms_json_reader_fuzz PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_compile_features(gui_forms_json_reader_fuzz PRIVATE cxx_std_20)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_json_reader_fuzz PRIVATE
+            -fsanitize=fuzzer,address,undefined
+            -fno-omit-frame-pointer
+        )
+        target_link_options(gui_forms_json_reader_fuzz PRIVATE
+            -fsanitize=fuzzer,address,undefined
+        )
+    else()
+        target_compile_definitions(gui_forms_json_reader_fuzz PRIVATE
+            GUI_FORMS_FUZZ_STANDALONE=1
+        )
+        target_compile_options(gui_forms_json_reader_fuzz PRIVATE
+            -fsanitize=address,undefined
+            -fno-omit-frame-pointer
+        )
+        target_link_options(gui_forms_json_reader_fuzz PRIVATE
             -fsanitize=address,undefined
         )
     endif()

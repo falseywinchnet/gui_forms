@@ -848,6 +848,15 @@ public:
 
 protected:
     void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
+    // The opaque cover hint (owner, 2026-10-28). Called from a paint
+    // callback right after drawing an opaque solid fill of `local`, in this
+    // control's coordinates, with nothing translated, clipped or grouped:
+    // the control's display chunk then leaves `local` opaque whatever lay
+    // beneath, and the window skips painting what lies under it (the
+    // backplane and the controls painted before this one). Ignored unless
+    // the window is recording this control into `painter`, and dropped if
+    // the recording later begins a copy group.
+    void report_opaque_cover(const Painter& painter, Rect local) const noexcept;
     // Answers one measure_for_layout miss; `constraint` is already valid.
     // The default maps the query onto measure(Size) through
     // measure_available_size: a definite or at-most axis passes its extent

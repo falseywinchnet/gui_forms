@@ -533,9 +533,13 @@ CompileOutcome CompilePass::run() {
             continue;
         }
         if (node.kind == SyntaxNodeKind::import_rule) {
-            // P10 builds @import.
-            const std::uint32_t keyword = node.tokens.first.value;
-            report(DiagnosticCode::not_yet_built, keyword, clipped_theme_detail(token_text(keyword)));
+            // An @import resolves only among installed packs (P10, D2): a
+            // package's closure is compiled with its imports in place
+            // (compile_theme_package), so a sheet compiled alone has none.
+            const std::uint32_t name = node.content.first.value;
+            const std::string_view quoted = token_text(name);
+            report(DiagnosticCode::import_not_installed, name,
+                   clipped_theme_detail(quoted.substr(1U, quoted.size() - 2U)));
             return CompileOutcome::refused;
         }
         if (node.kind == SyntaxNodeKind::style_rule && !lower_rule(index)) return CompileOutcome::refused;

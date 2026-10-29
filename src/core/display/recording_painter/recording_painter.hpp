@@ -89,10 +89,21 @@ public:
     // the engine knows where a part it draws lands).
     [[nodiscard]] Point origin() const noexcept { return origin_; }
 
+    // Records that the commands so far leave `rect` opaque, whatever lay
+    // beneath: an opaque solid fill of it was just drawn. The chunk keeps
+    // it (DisplayChunk::opaque_cover) only if the fill was drawn untranslated
+    // and unclipped, outside any save and group, and no later group replaces
+    // pixels (PaintGroupComposite::copy); anything else drawn after it
+    // composites over it and leaves it opaque.
+    void mark_opaque_cover(Rect rect) noexcept;
+
 private:
     std::vector<DisplayCommand> commands_;
     std::uint64_t save_depth_{};
     Point origin_{};
+    // A clip outside any save, which stays in force to the end.
+    bool clipped_{};
+    std::optional<Rect> opaque_cover_;
     // Each open group's kind (isolated or refused) and the save depth at
     // its beginning, innermost last; `group_depth_` counts the recorded
     // (not refused) ones.

@@ -878,18 +878,18 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
 }
 
 const void* SkiaRaster::pixels() const noexcept {
-    SkPixmap pixmap{};
     SkSurface* const surface = (*impl_).front_surface();
-    const void* result = nullptr;
-    if (surface != nullptr && (*surface).peekPixels(&pixmap)) result = pixmap.addr();
+    if (surface == nullptr) return nullptr;
+    const std::optional<SkPixmap> pixmap = (*surface).peekPixels();
+    const void* result = pixmap ? (*pixmap).addr() : nullptr;
     return result;
 }
 
 std::size_t SkiaRaster::row_bytes() const noexcept {
-    SkPixmap pixmap{};
     SkSurface* const surface = (*impl_).front_surface();
-    std::size_t result = 0;
-    if (surface != nullptr && (*surface).peekPixels(&pixmap)) result = pixmap.rowBytes();
+    if (surface == nullptr) return 0;
+    const std::optional<SkPixmap> pixmap = (*surface).peekPixels();
+    const std::size_t result = pixmap ? (*pixmap).rowBytes() : 0;
     return result;
 }
 
@@ -913,12 +913,11 @@ std::size_t SkiaRaster::byte_size() const noexcept {
 
 std::vector<std::byte> SkiaRaster::encode_png() const {
     std::vector<std::byte> result;
-    SkPixmap pixmap{};
     SkSurface* const surface = (*impl_).front_surface();
-    if (surface == nullptr || !(*surface).peekPixels(&pixmap) ||
-        pixmap.width() <= 0 || pixmap.height() <= 0) {
-        return result;
-    }
+    if (surface == nullptr) return result;
+    const std::optional<SkPixmap> peeked = (*surface).peekPixels();
+    if (!peeked || (*peeked).width() <= 0 || (*peeked).height() <= 0) return result;
+    const SkPixmap& pixmap = *peeked;
     // The front surface is premultiplied 8-bit RGBA or BGRA; the shared owned
     // encoder unpremultiplies so the file carries straight alpha, as on
     // every host.
@@ -1442,8 +1441,10 @@ bool SkiaRaster::Impl::composite_run(SkCanvas& target, const text::ShapedText& s
                                      double* const kept_scale, std::int32_t* const kept_phase) {
     TextClipState* const state = current_text_clip(target);
     if (state == nullptr) return false;
-    SkPixmap pixmap{};
-    if (!target.peekPixels(&pixmap) || pixmap.alphaType() != kPremul_SkAlphaType ||
+    const std::optional<SkPixmap> peeked = target.peekPixels();
+    if (!peeked) return false;
+    const SkPixmap& pixmap = *peeked;
+    if (pixmap.alphaType() != kPremul_SkAlphaType ||
         (pixmap.colorType() != kRGBA_8888_SkColorType && pixmap.colorType() != kBGRA_8888_SkColorType) ||
         pixmap.rowBytes() % 4U != 0U) {
         return false;
@@ -1480,8 +1481,10 @@ bool SkiaRaster::Impl::composite_run(SkCanvas& target, const text::ShapedText& s
 std::optional<SkiaRaster::Impl::SharedComposite> SkiaRaster::Impl::shared_composite(SkCanvas& target) {
     TextClipState* const state = current_text_clip(target);
     if (state == nullptr) return std::nullopt;
-    SkPixmap pixmap{};
-    if (!target.peekPixels(&pixmap) || pixmap.alphaType() != kPremul_SkAlphaType ||
+    const std::optional<SkPixmap> peeked = target.peekPixels();
+    if (!peeked) return std::nullopt;
+    const SkPixmap& pixmap = *peeked;
+    if (pixmap.alphaType() != kPremul_SkAlphaType ||
         (pixmap.colorType() != kRGBA_8888_SkColorType && pixmap.colorType() != kBGRA_8888_SkColorType) ||
         pixmap.rowBytes() % 4U != 0U) {
         return std::nullopt;
@@ -1692,8 +1695,10 @@ void SkiaRaster::begin_group(const PaintGroup& group) {
     // the parent's device pixels. A parent whose clips or pixels are unknown
     // draws the group directly.
     const Impl::TextClipState* const state = impl.current_text_clip(*parent);
-    SkPixmap parent_pixels{};
-    if (state == nullptr || !(*parent).peekPixels(&parent_pixels)) return;
+    if (state == nullptr) return;
+    const std::optional<SkPixmap> parent_view = (*parent).peekPixels();
+    if (!parent_view) return;
+    const SkPixmap& parent_pixels = *parent_view;
     SkIRect device = (*state).rect.roundOut();
     if (!device.intersect(SkIRect::MakeWH(parent_pixels.width(), parent_pixels.height()))) return;
     const int width = device.width();
@@ -1755,8 +1760,10 @@ void SkiaRaster::end_group() {
     // Back on the parent: its clip as the group began, then the composite.
     restore();
     SkCanvas* const parent = impl.canvas();
-    SkPixmap pixmap{};
-    if (parent == nullptr || !(*level.surface).peekPixels(&pixmap)) return;
+    if (parent == nullptr) return;
+    const std::optional<SkPixmap> peeked = (*level.surface).peekPixels();
+    if (!peeked) return;
+    const SkPixmap& pixmap = *peeked;
     const std::size_t width = static_cast<std::size_t>(level.device.width());
     const std::size_t height = static_cast<std::size_t>(level.device.height());
     const std::size_t length = (height - 1U) * pixmap.rowBytes() + width * 4U;
