@@ -2,6 +2,7 @@
 #include "gui_forms/window.hpp"
 #include "headless_host.hpp"
 #include "support/typography_painter.hpp"
+#include "support/clip_tracking_painter.hpp"
 #include "support/named_callbacks.hpp"
 
 #include <array>
@@ -726,6 +727,35 @@ void caret_geometry_fallbacks() {
 }
 }
 
+// A selected line draws each glyph once: the text's ink beside the band and
+// the selection's ink inside it, under clips that do not overlap (a glyph
+// drawn twice antialiases heavier than its neighbours).
+void selected_text_drawn_once() {
+    Fixture f;
+    f.editor.set_text("abc def");
+    f.window.perform_layout();
+    f.editor.select(Utf8Offset(2U), Utf8Offset(5U));
+    test_support::ClipTrackingPainter multiline{};
+    f.editor.on_paint(multiline, {0, 0, 110, 68});
+    require(multiline.texts.size() >= 3U && !multiline.overdraws(), "a multiline row draws each glyph once");
+
+    std::shared_ptr<TextBox> line = make_control<TextBox>(StableId("single"));
+    (*line).set_requested_bounds({0, 0, 200, 28});
+    (*line).set_text("hello world");
+    Window window(line, {200.0, 28.0});
+    window.perform_layout();
+    require(window.request_focus(line), "the single-line box takes focus");
+    (*line).select(Utf8Offset(2U), Utf8Offset(7U));
+    test_support::ClipTrackingPainter single{};
+    (*line).on_paint(single, {0, 0, 200, 28});
+    require(single.count("hello world") == 3U && !single.overdraws(),
+            "a single-line box draws each selected glyph once, in three clips");
+    (*line).select(Utf8Offset(0U), Utf8Offset(0U));
+    test_support::ClipTrackingPainter unselected{};
+    (*line).on_paint(unselected, {0, 0, 200, 28});
+    require(unselected.count("hello world") == 1U, "without a selection the line is one draw");
+}
+
 int main() {
     try {
         exact_editing();
@@ -740,6 +770,7 @@ int main() {
         clear_history_establishes_save_boundary();
         localized_caret_blinks();
         caret_geometry_fallbacks();
+        selected_text_drawn_once();
         bounded_workload();
         std::cout << "gui_forms_multiline_text_box_tests: passed\n";
         return 0;

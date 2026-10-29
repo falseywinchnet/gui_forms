@@ -2161,6 +2161,16 @@ void example() {
 }
 }  // namespace doc_example_LiveSurface_2
 
+namespace doc_example_MarkdownDocument_1 {
+void example() {
+    gf::MarkdownDocument document;
+    const gf::MarkdownParseResult parsed = gf::parse_markdown("# Plan for **May**\n", document);
+    const gf::MarkdownSpan& month = document.spans[1];   // "May", bold, source bytes 13 to 16
+    std::string plain;
+    gf::markdown_plain_text(document, plain);   // "Plan for May"
+}
+}  // namespace doc_example_MarkdownDocument_1
+
 namespace doc_example_MaskedTextBox_1 {
 void example() {
     std::shared_ptr<gf::MaskedTextBox> phone =
@@ -3065,6 +3075,35 @@ void example() {
     tips.hide();
 }
 }  // namespace doc_example_RibbonToolTip_1
+
+namespace doc_example_RichTextBox_1 {
+void example() {
+    std::shared_ptr<gf::RichTextBox> note =
+        gf::make_control<gf::RichTextBox>(gf::StableId("note"), "Draft notes for [review](https://example.org)\n");
+    (*note).select(gf::Utf8Offset(0U), gf::Utf8Offset(5U));
+    (*note).toggle_bold();
+    std::vector<std::byte> rtf;
+    const gf::RtfConversionResult saved = (*note).rtf(rtf);
+    // (*note).markdown() starts "**Draft** notes"; (*note).text() starts "Draft notes"
+}
+}  // namespace doc_example_RichTextBox_1
+
+namespace doc_example_RtfConversionResult_1 {
+void example() {
+    const std::string_view text = "{\\rtf1\\ansi {\\b Bold} text\\par}";
+    const std::span<const std::byte> rtf(reinterpret_cast<const std::byte*>(text.data()), text.size());
+    std::string markdown;
+    const gf::RtfConversionResult imported = gf::import_rtf(rtf, markdown);   // "**Bold** text\n"
+    std::string summary;
+    if (imported.succeeded()) {
+        const gf::MarkdownLossReport losses = *imported.losses();
+        for (std::size_t kind = 0; kind < gf::markdown_loss_kind_count; ++kind) {
+            const gf::MarkdownLoss loss = static_cast<gf::MarkdownLoss>(kind);
+            summary += gf::describe_loss(loss, losses.count(loss));
+        }
+    }
+}
+}  // namespace doc_example_RtfConversionResult_1
 
 namespace doc_example_SaveFileDialog_1 {
 void example() {
@@ -4332,6 +4371,7 @@ int main() {
     failures += run("ListView example 1", &doc_example_ListView_1::example);
     failures += run("LiveSurface example 1", &doc_example_LiveSurface_1::example);
     failures += run("LiveSurface example 2", &doc_example_LiveSurface_2::example);
+    failures += run("MarkdownDocument example 1", &doc_example_MarkdownDocument_1::example);
     failures += run("MaskedTextBox example 1", &doc_example_MaskedTextBox_1::example);
     failures += run("MaskedTextProvider example 1", &doc_example_MaskedTextProvider_1::example);
     failures += run("MasterDetailView example 1", &doc_example_MasterDetailView_1::example);
@@ -4376,6 +4416,8 @@ int main() {
     failures += run("RibbonFontControl example 1", &doc_example_RibbonFontControl_1::example);
     failures += run("RibbonGallery example 1", &doc_example_RibbonGallery_1::example);
     failures += run("RibbonToolTip example 1", &doc_example_RibbonToolTip_1::example);
+    failures += run("RichTextBox example 1", &doc_example_RichTextBox_1::example);
+    failures += run("RtfConversionResult example 1", &doc_example_RtfConversionResult_1::example);
     failures += run("SaveFileDialog example 1", &doc_example_SaveFileDialog_1::example);
     failures += run("ScaledGroupBox example 1", &doc_example_ScaledGroupBox_1::example);
     failures += run("ScaledPanel example 1", &doc_example_ScaledPanel_1::example);

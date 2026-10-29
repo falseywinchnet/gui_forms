@@ -96,6 +96,17 @@
       "doc": "api/generated/gui_forms.MaskedTextBox.rst"
     },
     {
+      "id": "rich_text_box",
+      "type": "RichTextBox",
+      "header": "gui_forms/controls/panel/rich_text_box/rich_text_box.hpp",
+      "category": "Text editing",
+      "purpose": "Rich text field whose document is markdown, shown styled in place with its markup dimmed, edited like a multiline text box, formatted from a control bar, and read and written as RTF.",
+      "winforms": "RichTextBox",
+      "status": "provisional",
+      "gallery_page": "text-and-input",
+      "doc": "api/generated/gui_forms.RichTextBox.rst"
+    },
+    {
       "id": "label",
       "type": "Label",
       "header": "gui_forms/controls/label/label.hpp",

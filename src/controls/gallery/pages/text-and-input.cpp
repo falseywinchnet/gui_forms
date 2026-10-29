@@ -28,6 +28,7 @@ public:
         build_masked(body);
         build_auto_complete(body);
         build_tokens(body);
+        build_rich_text(body);
         refresh_state();
     }
 
@@ -201,6 +202,33 @@ private:
         on((*recipients_).token_removed(), *this, &TextAndInputPage::token_removed);
     }
 
+    // A RichTextBox over markdown: a heading, emphasis, a link, a list and a
+    // code block, shown styled with their markup dimmed. Ctrl+click on the
+    // link reports its target.
+    void build_rich_text(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> rich = group("gallery.text.rich",
+                                                  "RichTextBox · markdown shown styled", {930.0, 270.0});
+        (*body).add_at(rich, {24.0, 1114.0, 930.0, 270.0});
+        (*rich).add_at(label("gallery.text.rich.caption", "Note", 11.0, 600, muted),
+                       {24.0, 42.0, 130.0, 24.0});
+        note_ = make_control<RichTextBox>(StableId("gallery.text.rich.note"),
+                                          "## Release notes\n\n"
+                                          "Text may be **bold**, *italic* or `code`. "
+                                          "See [the guide](https://example.org/guide).\n\n"
+                                          "- Ctrl+B and Ctrl+I format the selection\n"
+                                          "- Ctrl+K makes a link\n\n"
+                                          "```\nsave_rtf(document);\n```\n");
+        (*note_).set_accessible_name("Note");
+        (*rich).add_at(note_, {154.0, 36.0, 700.0, 184.0});
+        rich_status_ = label("gallery.text.rich.status", "Ctrl+click a link to open it", 11.0, 600, green);
+        (*rich).add_at(rich_status_, {154.0, 228.0, 700.0, 26.0});
+        on((*note_).link_clicked(), *this, &TextAndInputPage::rich_link_clicked);
+    }
+
+    void rich_link_clicked(const std::string& target) {
+        (*rich_status_).set_text("Link clicked: " + target);
+    }
+
     void token_added(const Token& token) {
         (*tokens_status_).set_text("Added \"" + token.text + "\" · recipients: " +
                                    std::to_string((*recipients_).tokens().size()));
@@ -279,6 +307,8 @@ private:
     std::shared_ptr<Label> complete_status_;
     std::shared_ptr<TokenBox> recipients_;
     std::shared_ptr<Label> tokens_status_;
+    std::shared_ptr<RichTextBox> note_;
+    std::shared_ptr<Label> rich_status_;
     Command undo_{"gallery.text.command.undo", "Undo"};
     Command redo_{"gallery.text.command.redo", "Redo"};
 };

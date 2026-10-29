@@ -106,6 +106,16 @@ void test_text_and_input(gui_forms::Window& window,
                 (*recipients).tokens().size() == 1U &&
                 (*tokens_status).text() == "Removed \"Alan Turing\" · recipients: 1",
             "Backspace selects and then removes the last token");
+
+    const std::shared_ptr<gui_forms::RichTextBox> note = std::dynamic_pointer_cast<RichTextBox>(
+        window.find("gallery.text.rich.note"));
+    require(note && (*note).document().blocks.size() == 5U &&
+                (*note).document().blocks[0].kind == MarkdownBlockKind::heading &&
+                (*note).document().blocks[4].kind == MarkdownBlockKind::code_block &&
+                (*note).document().links.size() == 1U,
+            "the rich text specimen shows its heading, paragraph, list and code block");
+    require((*note).text().starts_with("Release notes\nText may be bold, italic or code."),
+            "the rich text specimen's plain text has no markup");
 }
 
 } // namespace gallery_pages_tests

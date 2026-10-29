@@ -1,4 +1,6 @@
 #include "gui_forms/controls/panel/text_box/text_box.hpp"
+
+#include "../text_editing/text_editing_engine.hpp"
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
@@ -63,7 +65,7 @@ void TextBox::ensure_multiline_layout() {
     const double scale = owner == nullptr ? 1.0 : (*owner).scale();
     const TextMetricsProvider* provider = owner == nullptr ? nullptr : (*owner).text_metrics_provider();
     if (!visual_lines_.empty() && multiline_width_ >= 0.0 &&
-        multiline_revision_ == store_.revision() && multiline_font_ == font &&
+        multiline_revision_ == (*editing_).store().revision() && multiline_font_ == font &&
         multiline_provider_ == provider && multiline_device_scale_ == scale &&
         multiline_client_size_ == client && multiline_scroll_enabled_ == auto_scroll()) return;
 

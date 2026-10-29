@@ -89,6 +89,8 @@ enum class PopupDismissReason : std::uint8_t;
 namespace detail {
 // TextBox's auto-complete state (src/controls/panel/text_box).
 struct TextBoxAutoCompleteSession;
+// The text editing engine TextBox edits through (src/controls/panel/text_editing).
+class TextEditingEngine;
 } // namespace detail
 
 class TextBox final : public Panel {
@@ -96,16 +98,13 @@ public:
     explicit TextBox(StableId stable_id, std::string text = {});
     ~TextBox() override;
 
-    [[nodiscard]] std::string_view text() const noexcept {
-        const std::string_view result = store_.utf8();
-        return result;
-    }
+    [[nodiscard]] std::string_view text() const noexcept;
     void set_text(std::string text);
     [[nodiscard]] std::string_view placeholder_text() const noexcept {
         return placeholder_;
     }
     void set_placeholder_text(std::string text);
-    [[nodiscard]] bool read_only() const noexcept { return read_only_; }
+    [[nodiscard]] bool read_only() const noexcept;
     void set_read_only(bool read_only);
     // Opt-in plain-text document editing. Existing single-line behavior remains
     // the default. Stored line endings are preserved; Enter uses newline_sequence
@@ -155,9 +154,7 @@ public:
         const Point result{.x = horizontal_offset_, .y = vertical_offset_};
         return result;
     }
-    [[nodiscard]] std::size_t maximum_length() const noexcept {
-        return maximum_length_;
-    }
+    [[nodiscard]] std::size_t maximum_length() const noexcept;
     // Zero admits any text that fits the TextStore. A positive limit applies
     // to user edits, paste, and semantic set-value without truncating a value
     // assigned programmatically through set_text().
@@ -176,18 +173,12 @@ public:
     }
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
-    [[nodiscard]] TextSelection selection() const noexcept { return selection_; }
+    [[nodiscard]] TextSelection selection() const noexcept;
     void select(Utf8Offset anchor, Utf8Offset caret);
     void select_all();
     [[nodiscard]] std::string selected_text() const;
-    [[nodiscard]] bool can_undo() const noexcept {
-        const bool result = !undo_.empty();
-        return result;
-    }
-    [[nodiscard]] bool can_redo() const noexcept {
-        const bool result = !redo_.empty();
-        return result;
-    }
+    [[nodiscard]] bool can_undo() const noexcept;
+    [[nodiscard]] bool can_redo() const noexcept;
     bool undo();
     bool redo();
     // Establish a new history boundary without replacing text, moving the
@@ -209,7 +200,7 @@ public:
     // and is still subject to maximum_length and the multiline limits. The
     // delegate does not own its target; clear it (an empty Delegate) before
     // the target goes away.
-    void set_edit_filter(Delegate<TextEdit&> filter) noexcept { edit_filter_ = filter; }
+    void set_edit_filter(Delegate<TextEdit&> filter) noexcept;
 
     // Auto-complete, as Windows Forms' AutoCompleteMode, AutoCompleteSource
     // and AutoCompleteCustomSource. It acts only in a single-line, unmasked,
@@ -344,11 +335,11 @@ private:
     };
     void ensure_multiline_layout();
     void rebuild_multiline_rows(double width);
-    // Fill the lines and graphemes, or the word starts, of a host's text
-    // layout query (A-T1); the multiline form needs current visual rows.
+    // Fill the lines and graphemes of a host's text layout query (A-T1);
+    // the multiline form needs current visual rows. The editing engine adds
+    // the word starts.
     void fill_single_line_text_layout(SemanticTextLayout& layout) const;
     void fill_multiline_text_layout(SemanticTextLayout& layout) const;
-    void fill_word_starts(SemanticTextLayout& layout) const;
     [[nodiscard]] Rect multiline_text_rectangle() const noexcept;
     void set_multiline_scroll(Point position);
     [[nodiscard]] Rect paint_multiline(Painter& painter);
@@ -392,34 +383,26 @@ private:
     void auto_complete_popup_revoked();
     void auto_complete_collection_changed();
 
-    struct Snapshot final {
-        std::string text{};
-        TextSelection selection{};
-    };
+    // How the editing engine reaches this box (text_box.cpp).
+    class EditingHost;
 
-    [[nodiscard]] Snapshot snapshot() const;
-    void apply_snapshot(Snapshot snapshot);
     void set_selection(TextSelection selection, bool reveal_caret = true);
-    bool replace(Utf8Offset start, Utf8Offset end,
-                 std::string_view replacement, TextEditKind kind);
-    // Replaces the whole text with a filter's rewrite, as one history step.
-    bool apply_rewrite(std::string_view rewritten, Utf8Offset caret);
+    // The engine changed the text and the selection together.
+    void text_edited();
     [[nodiscard]] Utf8Offset position_at(double local_x) const noexcept;
     [[nodiscard]] double boundary_x(Utf8Offset offset) const noexcept;
-    [[nodiscard]] Utf8Offset previous_word_boundary(Utf8Offset offset) const;
-    [[nodiscard]] Utf8Offset next_word_boundary(Utf8Offset offset) const;
     [[nodiscard]] std::string display_text() const;
     void reset_caret_blink();
     void schedule_caret_blink();
     void retain_caret_damage(const Rect line_bounds, const Rect clip);
     [[nodiscard]] bool caret_damage_current() const;
-    void push_history(std::deque<Snapshot>& history, Snapshot snapshot);
-    void clear_redo() noexcept;
 
-    TextStore store_{};
+    // The engine borrows the host, so the host is declared first and
+    // destroyed last. Neither is ever null.
+    std::unique_ptr<EditingHost> editing_host_;
+    std::unique_ptr<detail::TextEditingEngine> editing_;
     std::string placeholder_{};
     FontSpec font_{FontRole::content, 12.0, 400, false};
-    TextSelection selection_{};
     std::vector<double> layout_positions_{};
     std::vector<std::uint64_t> layout_offsets_{};
     double layout_text_scale_{};
@@ -446,15 +429,10 @@ private:
     bool multiline_scroll_enabled_{};
     double multiline_device_scale_{};
     const TextMetricsProvider* multiline_provider_{};
-    std::size_t maximum_length_{};
-    bool read_only_{};
     char32_t password_character_{};
     bool use_system_password_character_{};
     bool focused_{};
     bool selecting_{};
-    // The last text input was an unfinished input-method composition with
-    // text. Committed input, set_text, a focus change and detaching clear it.
-    bool composing_{};
     bool caret_visible_{true};
     // Last successfully recorded geometry, including the invisible blink phase.
     // Dirty state rejects other pending visual changes before this is reused.
@@ -471,10 +449,6 @@ private:
     };
     CaretDamage caret_damage_{};
     FrameRequestToken caret_frame_{};
-    std::deque<Snapshot> undo_{};
-    std::deque<Snapshot> redo_{};
-    std::size_t history_bytes_{};
-    Delegate<TextEdit&> edit_filter_{};
     AutoCompleteMode auto_complete_mode_{AutoCompleteMode::none};
     AutoCompleteSource auto_complete_source_{AutoCompleteSource::none};
     std::shared_ptr<AutoCompleteStringCollection> auto_complete_custom_source_;
@@ -489,8 +463,6 @@ private:
     Event<const std::string&> auto_complete_accepted_{};
 
     static constexpr double text_left_ = 6.0;
-    static constexpr std::size_t maximum_history_entries_ = 128U;
-    static constexpr std::size_t maximum_history_bytes_ = 8U * 1024U * 1024U;
     static constexpr std::size_t maximum_configured_length_ = 16U * 1024U * 1024U;
 };
 

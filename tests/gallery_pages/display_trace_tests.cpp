@@ -352,6 +352,10 @@ struct PageDigest final {
 // Splitter entry), states-and-diagnostics (1295 controls) and
 // typography-and-inspection (#1328 and one layout generation) differ and
 // were recorded again; no other page moved.
+// W's RichTextBox specimen on text-and-input adds five more: that page
+// (the new group below the TokenBox group), states-and-diagnostics (1300
+// controls) and typography-and-inspection (#1333) differ and were recorded
+// again; no other page moved.
 //
 // Each later phase, rebased onto those main pages, recorded again the
 // pages whose digests the combination moved: the counts on
@@ -378,8 +382,8 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"ranges-and-progress", 0x0845245fa3b2aec3ULL},
     {"containers-and-focus", 0xf95d5ff60e4c2575ULL},
     {"animation-laboratory", 0xb963a539e95cacffULL},
-    {"states-and-diagnostics", 0x444ea671aa96645aULL},
-    {"text-and-input", 0x6b4e47cb68ba8892ULL},
+    {"states-and-diagnostics", 0x9714ea3dd4f5beedULL},
+    {"text-and-input", 0xe6fb680f7424950eULL},
     {"collections-and-popups", 0xdbe4ac4c284ef5b4ULL},
     {"values-and-spinners", 0x5eab32dd1533af06ULL},
     {"images-and-drawing", 0x5b839082cf98aff9ULL},
@@ -398,7 +402,7 @@ constexpr std::array<PageDigest, 30> expected_digests{{
     {"responsive-layouts", 0xe093a43b924bb130ULL},
     {"anchored-popups", 0xac8247262e33fd7cULL},
     {"live-surfaces", 0x124e6a48b13ec2d9ULL},
-    {"typography-and-inspection", 0x32bd98381afec401ULL},
+    {"typography-and-inspection", 0x6a952bfe1afec2c7ULL},
     {"semantic-feedback", 0x4967c806108d9f5eULL},
 }};
 

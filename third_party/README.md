@@ -29,3 +29,8 @@ README and PROVENANCE.md record what it keeps and why. No Skia type may leave
 `src/render/skia/`.
 
 SheenBidi 2.9.0 is vendored under `sheenbidi/` for Unicode bidirectional ordering in the private text adapter. Its Headers and Source are unchanged from the pinned commit in PROVENANCE.md; Apache License 2.0 is included. Linux accessibility dynamically links the system ATK/AT-SPI bridge (LGPL 2.1 or later); it does not use GTK widgets.
+
+MD4C 0.6.0 is vendored under `md4c/` for the markdown framework
+(`gui_forms/text/markdown/`), the owner's decision of 2026-10-28. Its files are
+unchanged from the pinned commit in `md4c/PROVENANCE.md`; MIT License included.
+The intake record is [`MD4C_INTAKE_2026-10-28.md`](MD4C_INTAKE_2026-10-28.md).
