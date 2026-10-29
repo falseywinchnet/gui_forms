@@ -9,18 +9,11 @@ name: Codec differential
 # Our deflate into upstream inflate is the stx_zlib_deflate_oracle test of the
 # normal suite. The references are hash-verified and never shipped.
 on:
-  pull_request:
-    paths:
-      - 'stx_zlib/**'
-      - 'stx_png/**'
-      - 'tests/compression/**'
-      - 'tests/image/**'
-      - 'fuzz/**'
-      - 'tools/validate_inflate.py'
-      - 'tools/validate_png.py'
-      - '.github/workflows/codec-differential.yml'
-  push:
-    branches: [main]
+  # Weekly backstop and manual runs only (owner, 2026-10-29): the owned codecs passed their
+  # differential and fuzz gates long ago, and the normal suite and the sanitizer job carry
+  # the deterministic malformed-input sweeps on every change.
+  schedule:
+    - cron: '7 5 * * 6'
   workflow_dispatch:
 permissions:
   contents: read
