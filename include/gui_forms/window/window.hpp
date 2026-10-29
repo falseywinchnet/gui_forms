@@ -351,6 +351,10 @@ public:
     // Sets the theme of this window and of every window sharing its
     // resources (ApplicationResources::set_theme).
     void set_theme(std::shared_ptr<const Theme> theme);
+    // Whether the window has drawn a control's inline style under a theme
+    // with rules of its own: the warning W401 `inline_with_theme` (T3, the
+    // owner's rule E1), written to the log once per window.
+    [[nodiscard]] bool inline_with_theme_reported() const noexcept { return inline_with_theme_reported_; }
     // The image registry and theme this window shares; pass it to another
     // Window's constructor to share them with that window too.
     [[nodiscard]] std::shared_ptr<ApplicationResources> resources() const noexcept {
@@ -862,6 +866,10 @@ private:
     friend class BindingContext;
     friend class detail::PopupAttachment;
     friend class ThemeEngine;
+    // Called by ThemeEngine::paint for a part of `control`, which has an
+    // inline style, under a theme with rules of its own: the first time,
+    // writes W401 to the log and notes it (inline_with_theme_reported).
+    void note_inline_with_theme(const Control& control);
     // Called by ThemeEngine::paint for a part painted with a key: makes or
     // updates its record and counts a new record's index fallback. Returns
     // the record's handle, or none when the table has no record for it.
@@ -1452,6 +1460,7 @@ private:
     std::vector<LayoutDiagnostic> layout_diagnostics_{};
     std::uint64_t dropped_layout_diagnostics_{};
     bool in_paint_{};
+    bool inline_with_theme_reported_{};
     std::uint64_t content_revision_{1U};
     std::uint64_t rendered_revision_{};
     std::uint64_t presented_revision_{};

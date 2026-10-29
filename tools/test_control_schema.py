@@ -123,7 +123,7 @@ public:
         schema = cs.load_schema()
         engine = schema["engine"]
         self.assertEqual(engine["cascade_levels"][0], "built_in")
-        self.assertEqual(engine["cascade_levels"][-1], "forced_high_contrast")
+        self.assertEqual(engine["cascade_levels"][-1], "important_inline_style")
         self.assertEqual(engine["budgets"]["operations_per_device_pixel"], 512)
         names = [primitive["name"] for primitive in engine["primitives"]]
         self.assertEqual(names, ["bulge", "dithered_bulge", "pill_plate", "gold_plate", "inset_well", "etched_divider",

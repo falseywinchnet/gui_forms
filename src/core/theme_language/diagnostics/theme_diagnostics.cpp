@@ -93,6 +93,7 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::needs_newer_engine:
     case DiagnosticCode::keyword_from_newer_engine:
     case DiagnosticCode::literal_colour_unremappable:
+    case DiagnosticCode::inline_with_theme:
         return DiagnosticSeverity::warning;
     }
     // A value outside the enumeration is treated as the stricter class.
@@ -167,6 +168,7 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
     case DiagnosticCode::needs_newer_engine: return "needs_newer_engine";
     case DiagnosticCode::keyword_from_newer_engine: return "keyword_from_newer_engine";
     case DiagnosticCode::literal_colour_unremappable: return "literal_colour_unremappable";
+    case DiagnosticCode::inline_with_theme: return "inline_with_theme";
     }
     return "unknown";
 }

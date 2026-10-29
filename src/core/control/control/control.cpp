@@ -4,6 +4,7 @@
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 #include "../../display/chunk/display_chunk.hpp"
+#include "../../theme/theme_compiler/control_inline_style.hpp"
 
 #include <algorithm>
 #include <array>
@@ -2014,6 +2015,35 @@ bool Control::has_class(std::string_view name) const noexcept {
         if (present == name) return true;
     }
     return false;
+}
+
+InlineStyleResult Control::set_inline_style(std::string_view text) {
+    require_mutable();
+    if (text.empty()) {
+        if (inline_style_ == nullptr) return InlineStyleResult::applied({});
+        inline_style_.reset();
+        invalidate(Dirty::style | Dirty::paint);
+        return InlineStyleResult::applied({});
+    }
+    const std::string file = "inline:" + std::string(stable_id().value());
+    std::vector<ThemeCompileDiagnostic> diagnostics{};
+    std::shared_ptr<const detail::ControlInlineStyle> compiled =
+        detail::compile_inline_style(text, anatomy(), file, diagnostics);
+    // A refused style changes nothing (B2).
+    if (compiled == nullptr) return InlineStyleResult::refused(std::move(diagnostics));
+    inline_style_ = std::move(compiled);
+    invalidate(Dirty::style | Dirty::paint);
+    return InlineStyleResult::applied(std::move(diagnostics));
+}
+
+std::string_view Control::inline_style() const noexcept {
+    if (inline_style_ == nullptr) return {};
+    return (*inline_style_).text;
+}
+
+const CompiledThemeRules* Control::inline_style_rules() const noexcept {
+    if (inline_style_ == nullptr) return nullptr;
+    return &(*inline_style_).rules;
 }
 
 void Control::set_custom_cursor(CursorImagesPtr images, CursorKind fallback) {

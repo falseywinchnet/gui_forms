@@ -65,6 +65,9 @@ enum class SyntaxNodeKind : std::uint8_t {
 [[nodiscard]] std::string_view syntax_node_kind_name(SyntaxNodeKind kind) noexcept;
 
 // Node flags.
+// What a text is: a theme sheet, or a control's inline style (P9).
+enum class ThemeSheetForm : std::uint8_t { sheet, inline_style };
+
 // A declaration followed by `!important`.
 inline constexpr std::uint8_t syntax_flag_important = 0x01U;
 
@@ -121,9 +124,17 @@ enum class ParseOutcome : std::uint8_t {
 // the call. The parser is iterative: the explicit stack of open blocks and
 // groups holds at most maximum_nesting_depth entries, and no recursion
 // depth follows the input.
+//
+// An inline style (ThemeSheetForm::inline_style, P9, R2-10) is a list of
+// declarations for its control, then blocks whose selectors name the
+// control's parts and states with the control's own selector implied
+// (`::part(face):hover { ... }`). The declarations become a style rule
+// whose selector is empty; the end of the text may end the last one. No
+// at-rule is admitted (E206), and a declaration after a block is E203.
 [[nodiscard]] ParseOutcome parse_theme_sheet(const ThemeSource& source, const ThemeTokenBuffer& tokens,
                                              const LineStartTable& lines, ThemeSyntaxTree& tree,
-                                             ThemeDiagnosticList& diagnostics);
+                                             ThemeDiagnosticList& diagnostics,
+                                             ThemeSheetForm form = ThemeSheetForm::sheet);
 
 enum class WriteOutcome : std::uint8_t {
     written,

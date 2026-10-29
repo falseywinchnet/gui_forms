@@ -17,6 +17,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 namespace gui_forms {
@@ -96,6 +97,31 @@ struct ThemeCompileOptions final {
     // The application values the application publishes; a package listing
     // another is refused (E606).
     std::span<const std::string> published_values{};
+};
+
+// What setting a control's inline style gave (Control::set_inline_style):
+// applied, with any warnings (none for empty text, which clears the
+// style), or refused with its diagnostics, the control keeping its
+// previous inline style.
+class InlineStyleResult final {
+public:
+    [[nodiscard]] static InlineStyleResult applied(std::vector<ThemeCompileDiagnostic> warnings) noexcept;
+    [[nodiscard]] static InlineStyleResult refused(std::vector<ThemeCompileDiagnostic> diagnostics) noexcept;
+
+    [[nodiscard]] bool succeeded() const noexcept;
+    // The warnings of a style applied, or the diagnostics of one refused.
+    [[nodiscard]] std::span<const ThemeCompileDiagnostic> diagnostics() const noexcept;
+
+private:
+    struct Applied final {
+        std::vector<ThemeCompileDiagnostic> warnings{};
+    };
+    struct Refused final {
+        std::vector<ThemeCompileDiagnostic> diagnostics{};
+    };
+    explicit InlineStyleResult(std::variant<Applied, Refused> state) noexcept;
+
+    std::variant<Applied, Refused> state_;
 };
 
 // A theme, or the refusal's diagnostics. Warnings come with a theme too.

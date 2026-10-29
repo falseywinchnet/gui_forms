@@ -6,13 +6,18 @@
 #include "../../theme_language/compiler/theme_compiler.hpp"
 #include "../../theme_language/package/theme_package.hpp"
 #include "../theme/theme_access.hpp"
+#include "control_inline_style.hpp"
 #include "theme_image_lease.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <span>
+#include <string>
 #include <utility>
+#include <variant>
+#include <vector>
 
 namespace gui_forms {
 
@@ -367,6 +372,53 @@ ThemeCompileResult compile_installed_theme(std::string_view name, const ThemeLib
     }
     return compile_closure(*root, ThemeLibraryAccess::index(library), images, *ThemeLibraryAccess::images(library),
                            options);
+}
+
+InlineStyleResult::InlineStyleResult(std::variant<Applied, Refused> state) noexcept : state_(std::move(state)) {}
+
+InlineStyleResult InlineStyleResult::applied(std::vector<ThemeCompileDiagnostic> warnings) noexcept {
+    return InlineStyleResult(Applied{.warnings = std::move(warnings)});
+}
+
+InlineStyleResult InlineStyleResult::refused(std::vector<ThemeCompileDiagnostic> diagnostics) noexcept {
+    return InlineStyleResult(Refused{.diagnostics = std::move(diagnostics)});
+}
+
+bool InlineStyleResult::succeeded() const noexcept { return std::holds_alternative<Applied>(state_); }
+
+std::span<const ThemeCompileDiagnostic> InlineStyleResult::diagnostics() const noexcept {
+    const Applied* const applied = std::get_if<Applied>(&state_);
+    if (applied != nullptr) return (*applied).warnings;
+    const Refused* const refused = std::get_if<Refused>(&state_);
+    if (refused != nullptr) return (*refused).diagnostics;
+    return {};
+}
+
+std::shared_ptr<const detail::ControlInlineStyle> detail::compile_inline_style(
+    std::string_view text, const ControlAnatomy& anatomy, std::string_view file,
+    std::vector<ThemeCompileDiagnostic>& diagnostics) {
+    const theme_language::ThemeSource source{.file = file, .text = text};
+    const PrimitiveRegistry& registry = builtin_primitive_registry();
+    const theme_language::ThemeCompileInput input{
+        .source = source,
+        .registry = registry,
+        .vocabulary = theme_language::SelectorVocabulary{std::span<const ControlAnatomy>(&anatomy, 1U)},
+        .published_values = {},
+        .resources = {},
+        .images = {},
+        .requires_engine = current_engine_version,
+        .form = theme_language::ThemeSheetForm::inline_style};
+    ThemeRuleSheet sheet{};
+    theme_language::ThemeCompiler compiler{};
+    theme_language::ThemeDiagnosticList found{};
+    const theme_language::CompileOutcome outcome = compiler.compile(input, sheet, found);
+    for (const ThemeDiagnostic& diagnostic : found.records()) diagnostics.push_back(public_diagnostic(diagnostic));
+    if (outcome != theme_language::CompileOutcome::compiled) return nullptr;
+    std::shared_ptr<ControlInlineStyle> style = std::make_shared<ControlInlineStyle>();
+    (*style).text = std::string(text);
+    (*style).rules = CompiledThemeRules::compile_inline(sheet, registry);
+    std::shared_ptr<const ControlInlineStyle> result(std::move(style));
+    return result;
 }
 
 } // namespace gui_forms

@@ -128,6 +128,8 @@ struct CachedPartRaster final {
 //   (material_fields_read_box), else empty.
 struct AssembledPartMaterial final {
     std::uint64_t rules_serial{};
+    // The serial of the part's inline style, or 0 (T3 P9).
+    std::uint64_t inline_serial{};
     std::array<const MaterialDeclaration*, material_field_count> fields{};
     Size box{};
     // The part's em and text colour, where a field reads them (T3 P8c);

@@ -76,9 +76,13 @@ public:
         // No rule selects a primitive, or the winning rule selects built_in.
         built_in_recipe,
         // Forced high contrast (CascadeLevel::forced_high_contrast): the
-        // engine's own pass draws every part with the built-in recipe, whose
+        // engine's own pass draws the part with the built-in recipe, whose
         // high-contrast records keep geometry and state composition and draw
-        // no gradient, texture, glow or cast shadow.
+        // no gradient, texture, glow or cast shadow. Only an important
+        // inline style's primitive draws a part under the pass, with its
+        // colours the pass's (high_contrast_colour); its material keeps the
+        // border's styles and widths and the corners, its colours remapped
+        // and its images, shadows, glows and filters dropped.
         forced_high_contrast,
         // The selected primitive does not paint the part's role.
         role_mismatch,
