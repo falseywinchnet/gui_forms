@@ -126,5 +126,20 @@ class AreaTests(unittest.TestCase):
         self.assertNotIn('too few to rank', profile_hot_paths.markdown_table('paint', rows, 10, 13000))
 
 
+class ConfigureTests(unittest.TestCase):
+    def test_profile_flags_keep_the_toolchain_language_flags(self) -> None:
+        # CMAKE_<LANG>_FLAGS would replace cmake/llvm22.cmake's _INIT flags
+        # (the macOS libc++ runtime); the build-type flags carry the profile flags.
+        options: list[str] = profile_hot_paths.profile_flag_options()
+        option: str
+        for option in options:
+            self.assertNotRegex(option, r'^-DCMAKE_[A-Z]+_FLAGS=')
+        self.assertEqual(options, [
+            '-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG ' + profile_hot_paths.PROFILE_FLAGS,
+            '-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG ' + profile_hot_paths.PROFILE_FLAGS,
+            '-DCMAKE_OBJCXX_FLAGS_RELEASE=-O3 -DNDEBUG ' + profile_hot_paths.PROFILE_FLAGS,
+        ])
+
+
 if __name__ == '__main__':
     unittest.main()

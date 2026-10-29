@@ -43,6 +43,12 @@ SEPARATOR: str = '\t'
 # tables name the functions. stx_skia/ is built in this tree, so it takes
 # the same flags and its frames reach their GUI.Forms callers.
 PROFILE_FLAGS: str = '-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -gline-tables-only'
+# CMake's own Release flags for clang, which a CMAKE_<LANG>_FLAGS_RELEASE
+# option replaces, so profile_flag_options repeats them.
+RELEASE_FLAGS: str = '-O3 -DNDEBUG'
+# The languages the toolkit compiles: C and C++, and Objective-C++ in the
+# macOS host.
+PROFILE_LANGUAGES: tuple[str, ...] = ('C', 'CXX', 'OBJCXX')
 DEFAULT_TOP: int = 40
 # Below this many samples a workload's shares are listed but not ranked:
 # one sample is more than a tenth of a percent.
@@ -299,14 +305,28 @@ def run_command(command: list[str], output: Path | None = None) -> None:
         subprocess.run(command, check=True, stdout=stream)
 
 
+def profile_flag_options() -> list[str]:
+    """The configure options that add PROFILE_FLAGS to the Release build.
+
+    They go in the build-type flags, not CMAKE_<LANG>_FLAGS: an option for
+    the latter replaces the toolchain's CMAKE_<LANG>_FLAGS_INIT, which
+    cmake/llvm22.cmake uses on macOS to select the pinned libc++ runtime
+    (without it the build compiles against the SDK's headers and fails).
+    """
+    options: list[str] = []
+    language: str
+    for language in PROFILE_LANGUAGES:
+        options.append(f'-DCMAKE_{language}_FLAGS_RELEASE={RELEASE_FLAGS} {PROFILE_FLAGS}')
+    return options
+
+
 def build_workloads(build: Path, jobs: int) -> Path:
     """Configure and build the workloads; returns the build tree."""
     tree: Path = build / 'gui-forms-profile'
     prepare_host(SOURCE, True)
     configure: list[str] = ['cmake', '-S', str(SOURCE), '-B', str(tree), '-G', 'Ninja',
                             *toolkit_options(SOURCE, build / 'gui-forms-profile-sdk', True, False),
-                            *host_options('linux'), *WORKLOAD_OPTIONS,
-                            f'-DCMAKE_C_FLAGS={PROFILE_FLAGS}', f'-DCMAKE_CXX_FLAGS={PROFILE_FLAGS}']
+                            *host_options('linux'), *WORKLOAD_OPTIONS, *profile_flag_options()]
     # The miniaudio source the native jobs' dependency cache restores, as
     # tools/ci_build.py uses it; Audio.cmake checks its digest either way.
     miniaudio: Path = build / 'gui-forms' / '_deps' / 'gui_forms_miniaudio-src'
