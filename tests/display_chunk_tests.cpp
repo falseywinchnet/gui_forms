@@ -1,9 +1,13 @@
 #include "gui_forms/gui_forms.hpp"
+#include "../src/core/display/recording_painter/recording_painter.hpp"
 
+#include <array>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -196,6 +200,219 @@ void test_disposal_removes_cache_entry_and_returns_idle() {
             "completed disposal paint must return the window to idle");
 }
 
+// Records every fill with its rectangle and colour, in replay order.
+class FillPainter final : public Painter {
+public:
+    struct Fill final {
+        Rect rect;
+        Color color;
+    };
+
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect rect, Color color) override { fills.push_back({rect, color}); }
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point, Point, Color, double) override {}
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId, Rect, double) override {}
+
+    // Fills of the whole window in a colour other than `face`: the backplane's.
+    [[nodiscard]] std::size_t backplane_fills(Rect window, Color face) const {
+        std::size_t count = 0;
+        for (const Fill& fill : fills) {
+            if (fill.rect == window && !(fill.color == face)) ++count;
+        }
+        return count;
+    }
+
+    std::vector<Fill> fills;
+};
+
+// Paints only text: it never reports a cover, though Panel's background is set.
+class TextPanel final : public Panel {
+public:
+    using Panel::Panel;
+    void on_paint(Painter& painter, Rect) override {
+        painter.draw_text_utf8({2.0, 12.0}, "text", {}, Color::rgba(20, 30, 40));
+    }
+};
+
+// Invalidates `target` from its first paint callback. Observing: the
+// target is its ancestor, which owns it.
+class InvalidatingControl final : public Control {
+public:
+    using Control::Control;
+    void on_paint(Painter&, Rect) override {
+        const Control::Ptr observed = target.lock();
+        if (observed && !invalidated) {
+            invalidated = true;
+            (*observed).invalidate(invalidation::paint_only);
+        }
+    }
+    std::weak_ptr<Control> target;
+    bool invalidated{};
+};
+
+constexpr Color face_color = Color::rgba(1, 2, 3);
+constexpr Rect window_rect{0.0, 0.0, 200.0, 120.0};
+
+struct PanelFixture {
+    explicit PanelFixture(std::shared_ptr<Panel> panel) : root(std::move(panel)) {
+        (*root).set_requested_bounds(window_rect);
+        window = std::make_unique<Window>(root, Size{window_rect.width, window_rect.height});
+        (*window).perform_layout();
+        static_cast<void>((*window).take_damage());
+    }
+
+    // Paints the whole window twice: the second replays current chunks,
+    // which is when a cover is known.
+    FillPainter paint_twice() {
+        FillPainter first;
+        (*window).paint(first, window_rect);
+        FillPainter second;
+        (*window).paint(second, window_rect);
+        return second;
+    }
+
+    std::shared_ptr<Panel> root;
+    std::unique_ptr<Window> window;
+};
+
+void test_opaque_root_panel_skips_the_backplane() {
+    PanelFixture fixture(make_control<Panel>(StableId("cover.root")));
+    (*fixture.root).set_background(face_color);
+    const FillPainter painted = fixture.paint_twice();
+    require(painted.backplane_fills(window_rect, face_color) == 0U && !painted.fills.empty() &&
+                painted.fills.front().color == face_color,
+            "an opaque root panel must start the paint at its own face");
+}
+
+void test_translucent_or_overridden_panels_keep_the_backplane() {
+    PanelFixture translucent(make_control<Panel>(StableId("cover.translucent")));
+    (*translucent.root).set_background(Color::rgba(1, 2, 3, 128));
+    require(translucent.paint_twice().backplane_fills(window_rect, Color::rgba(1, 2, 3, 128)) == 1U,
+            "a translucent panel must keep the backplane beneath it");
+    PanelFixture text(make_control<TextPanel>(StableId("cover.text")));
+    (*text.root).set_background(face_color);
+    require(text.paint_twice().backplane_fills(window_rect, face_color) == 1U,
+            "a panel subclass that paints its own way must keep the backplane");
+}
+
+void test_a_cover_lost_during_paint_restores_what_it_skipped() {
+    PanelFixture fixture(make_control<Panel>(StableId("cover.lost")));
+    (*fixture.root).set_background(face_color);
+    const std::shared_ptr<InvalidatingControl> child =
+        make_control<InvalidatingControl>(StableId("cover.lost.child"));
+    (*child).set_requested_bounds({0.0, 0.0, 40.0, 40.0});
+    // In the root panel's plane, so that it paints between the rectangles' checks.
+    (*child).set_paint_plane((*fixture.root).paint_plane());
+    (*fixture.root).add_child(child);
+    (*fixture.window).perform_layout();
+    static_cast<void>(fixture.paint_twice());
+    // The child paints in the first rectangle and invalidates the root, so
+    // the second rectangle's cover is gone when its plane is reached.
+    (*child).target = fixture.root;
+    (*child).invalidate(invalidation::paint_only);
+    const std::array<Rect, 2> rectangles{Rect{0.0, 0.0, 40.0, 40.0}, Rect{100.0, 60.0, 50.0, 40.0}};
+    FillPainter painted;
+    (*fixture.window).paint(painted, rectangles);
+    std::size_t backplane = 0;
+    for (const FillPainter::Fill& fill : painted.fills) {
+        if (fill.rect == window_rect && !(fill.color == face_color)) ++backplane;
+    }
+    require((*child).invalidated && backplane == 1U,
+            "a rectangle whose cover is lost before its plane must get its backplane back");
+}
+
+// The opaque cover the chunk `recorder` finishes keeps.
+std::optional<Rect> finished_cover(detail::RecordingPainter& recorder, const Rect bounds) {
+    const std::shared_ptr<const detail::DisplayChunk> chunk = recorder.finish(1U, PaintPlane::control, bounds);
+    const std::optional<Rect> cover = (*chunk).opaque_cover();
+    return cover;
+}
+
+// Records fills and text in replay order.
+class SequencePainter final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect, Color color) override {
+        sequence.push_back("fill " + std::to_string(color.red) + "," + std::to_string(color.green));
+    }
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point, Point, Color, double) override {}
+    void draw_text_utf8(Point, std::string_view text, FontSpec, Color) override { sequence.emplace_back(text); }
+    void draw_image(ImageId, Rect, double) override {}
+
+    std::vector<std::string> sequence;
+};
+
+void test_a_nested_cover_starts_the_paint_and_later_siblings_follow() {
+    PanelFixture fixture(make_control<Panel>(StableId("nested.root")));
+    (*fixture.root).set_background(Color::rgba(10, 11, 12));
+    const std::shared_ptr<ChunkControl> before = make_control<ChunkControl>(StableId("nested.before"), "before");
+    const std::shared_ptr<Panel> face = make_control<Panel>(StableId("nested.face"));
+    const std::shared_ptr<ChunkControl> after = make_control<ChunkControl>(StableId("nested.after"), "after");
+    (*before).set_requested_bounds({20.0, 20.0, 60.0, 30.0});
+    (*face).set_requested_bounds({10.0, 10.0, 120.0, 80.0});
+    (*face).set_background(Color::rgba(20, 21, 22));
+    (*after).set_requested_bounds({30.0, 30.0, 60.0, 30.0});
+    // All in the root panel's plane, so that tree order alone decides.
+    (*before).set_paint_plane((*fixture.root).paint_plane());
+    (*face).set_paint_plane((*fixture.root).paint_plane());
+    (*after).set_paint_plane((*fixture.root).paint_plane());
+    (*fixture.root).add_child(before);
+    (*fixture.root).add_child(face);
+    (*fixture.root).add_child(after);
+    (*fixture.window).perform_layout();
+    static_cast<void>(fixture.paint_twice());
+    SequencePainter painted;
+    (*fixture.window).paint(painted, Rect{40.0, 40.0, 20.0, 10.0});
+    require(painted.sequence == std::vector<std::string>{"fill 20,21", "after"},
+            "a covered rectangle must start at the covering panel and still paint what follows it");
+    SequencePainter outside;
+    (*fixture.window).paint(outside, Rect{140.0, 95.0, 20.0, 10.0});
+    require(outside.sequence == std::vector<std::string>{"fill 10,11"},
+            "a rectangle outside the nested panel must start at the root");
+}
+
+void test_recorded_covers_follow_the_painter_state() {
+    using detail::RecordingPainter;
+    const Rect face{0.0, 0.0, 20.0, 10.0};
+    RecordingPainter plain;
+    plain.fill_rect(face, face_color);
+    plain.mark_opaque_cover(face);
+    PaintGroup over{};
+    over.bounds = face;
+    plain.begin_group(over);
+    plain.end_group();
+    require(finished_cover(plain, face) == std::optional<Rect>{face}, "a top-level mark must be kept");
+
+    RecordingPainter saved;
+    saved.save();
+    saved.mark_opaque_cover(face);
+    saved.restore();
+    RecordingPainter clipped;
+    clipped.clip_rect(face);
+    clipped.mark_opaque_cover(face);
+    RecordingPainter moved;
+    moved.translate({1.0, 0.0});
+    moved.mark_opaque_cover(face);
+    RecordingPainter copied;
+    copied.mark_opaque_cover(face);
+    PaintGroup copy{};
+    copy.bounds = face;
+    copy.composite = PaintGroupComposite::copy;
+    copied.begin_group(copy);
+    copied.end_group();
+    require(!finished_cover(saved, face) && !finished_cover(clipped, face) && !finished_cover(moved, face) && !finished_cover(copied, face),
+            "a mark inside a save, under a clip or translation, or before a copy group must be dropped");
+}
+
 } // namespace
 
 int main() {
@@ -206,6 +423,11 @@ int main() {
         test_arrangement_recomposes_every_plane();
         test_invalid_plane_rejection_preserves_state();
         test_disposal_removes_cache_entry_and_returns_idle();
+        test_opaque_root_panel_skips_the_backplane();
+        test_translucent_or_overridden_panels_keep_the_backplane();
+        test_a_cover_lost_during_paint_restores_what_it_skipped();
+        test_a_nested_cover_starts_the_paint_and_later_siblings_follow();
+        test_recorded_covers_follow_the_painter_state();
         std::cout << "gui_forms_display_chunk_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

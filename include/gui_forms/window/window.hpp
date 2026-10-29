@@ -867,6 +867,10 @@ private:
     // the record's handle, or none when the table has no record for it.
     std::optional<PartRecordHandle> note_engine_part(const Control& control, const PartKey& key,
                                                      AnatomyStateSet states);
+    // Called by Control::report_opaque_cover: marks the cover on the
+    // display chunk being recorded, when `control` is recording it into
+    // `painter` (RecordingPainter::mark_opaque_cover).
+    void note_opaque_cover(const Control& control, const Painter& painter, Rect local) noexcept;
     // Called by ThemeEngine::paint: the part's raster from its record's
     // cache (EnginePartTable::raster_for), on the paint in progress.
     [[nodiscard]] PartRasterResult engine_part_raster(PartRecordHandle handle, const PartRasterRequest& request);
@@ -1136,6 +1140,46 @@ private:
                                                 DragEvent event);
     [[nodiscard]] Control::Ptr hit_test_recursive(const Control::Ptr& control,
                                                   Point window_position) const;
+    // Paints the window's backplane into one painted rectangle of the
+    // candidate, in a copy group when the window starts clear.
+    void paint_backplane_rectangle(detail::RecordingPainter& candidate, Rect rectangle,
+                                   const SurfaceMaterial& backplane, bool starts_clear);
+    // The last plane in which a control covers the whole of `rectangle`
+    // (find_paint_cover, `path` its scratch), or paint_plane_count.
+    [[nodiscard]] std::size_t covering_plane(Rect rectangle, bool explicit_request,
+                                             std::vector<Control::Ptr>& path) const;
+    // Paints plane `index` of one painted rectangle (plane_paint_bounds),
+    // from the control that covers it there when one does; `path` is
+    // scratch.
+    void paint_plane_rectangle(Painter& candidate, std::size_t index, Rect rectangle, bool explicit_request,
+                               std::vector<Control::Ptr>& path, std::uint64_t& visited_nodes,
+                               std::uint64_t& painted_controls, std::uint64_t& consumed_invalidations,
+                               std::uint64_t& chunks_rebuilt, std::uint64_t& chunks_reused,
+                               std::uint64_t& commands_replayed);
+    // The control painted last in `plane` whose current display chunk
+    // leaves every device pixel of `damage` opaque (its opaque cover hint),
+    // looking in `control`'s subtree as paint_recursive(control) paints it.
+    // When there is one, appends the path to it, `control` first.
+    [[nodiscard]] bool find_paint_cover(const Control::Ptr& control, Rect damage, PaintPlane plane,
+                                        std::vector<Control::Ptr>& path) const;
+    // Paints `damage` in `plane` as paint_recursive(path.front()) would,
+    // from path.back() on: what it paints before path.back() lies beneath
+    // that control's opaque cover (find_paint_cover).
+    void paint_from_cover(std::span<const Control::Ptr> path,
+                          Painter& painter,
+                          Rect damage,
+                          PaintPlane plane,
+                          std::uint64_t& visited_nodes,
+                          std::uint64_t& painted_controls,
+                          std::uint64_t& consumed_invalidations,
+                          std::uint64_t& chunks_rebuilt,
+                          std::uint64_t& chunks_reused,
+                          std::uint64_t& commands_replayed);
+    // Recomputes `control`'s subtree paint-dirty summary from its own flag
+    // and its children's summaries, after painting it.
+    void summarize_subtree_paint(Control& control) const noexcept;
+    // `control`'s child viewport in window coordinates.
+    [[nodiscard]] Rect absolute_child_viewport_of(const Control& control) const;
     void paint_recursive(const Control::Ptr& control,
                          Painter& painter,
                          Rect window_damage,
@@ -1364,7 +1408,7 @@ private:
     // while one is (E6); null otherwise. Observing: both live on the stack
     // of the paint that records.
     const Control* recording_control_{};
-    const detail::RecordingPainter* recording_painter_{};
+    detail::RecordingPainter* recording_painter_{};
     // Shared with every window constructed with the same resources; this
     // window is registered with them from construction to destruction.
     std::shared_ptr<ApplicationResources> resources_;

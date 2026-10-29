@@ -344,6 +344,64 @@ PartRasterResult Window::engine_unkeyed_raster(const PartRasterRequest& request)
     return result;
 }
 
+void Window::paint_backplane_rectangle(detail::RecordingPainter& candidate, const Rect rectangle,
+                                       const SurfaceMaterial& backplane, const bool starts_clear) {
+    const Rect window_bounds{0.0, 0.0, client_size_.width, client_size_.height};
+    candidate.save();
+    candidate.clip_rect(rectangle);
+    if (starts_clear) {
+        PaintGroup cleared{};
+        cleared.bounds = rectangle;
+        cleared.composite = PaintGroupComposite::copy;
+        cleared.isolated = true;
+        candidate.begin_group(cleared);
+        paint_surface_material(candidate, window_bounds, backplane);
+        candidate.end_group();
+    } else {
+        paint_surface_material(candidate, window_bounds, backplane);
+    }
+    candidate.restore();
+}
+
+std::size_t Window::covering_plane(const Rect rectangle, const bool explicit_request,
+                                   std::vector<Control::Ptr>& path) const {
+    for (std::size_t index = paint_plane_count; index > 0U; --index) {
+        const std::size_t plane_index = index - 1U;
+        // A plane paints the whole rectangle when asked to or when its
+        // damage holds it (plane_paint_bounds).
+        const bool whole = explicit_request || plane_damage_[plane_index].bounds().contains(rectangle);
+        if (!whole) continue;
+        path.clear();
+        if (find_paint_cover(root_, rectangle, static_cast<PaintPlane>(plane_index), path)) return plane_index;
+    }
+    return paint_plane_count;
+}
+
+void Window::paint_plane_rectangle(Painter& candidate, const std::size_t index, const Rect rectangle,
+                                   const bool explicit_request, std::vector<Control::Ptr>& path,
+                                   std::uint64_t& visited_nodes, std::uint64_t& painted_controls,
+                                   std::uint64_t& consumed_invalidations, std::uint64_t& chunks_rebuilt,
+                                   std::uint64_t& chunks_reused, std::uint64_t& commands_replayed) {
+    const Rect plane_bounds = plane_paint_bounds(index, rectangle, explicit_request);
+    if (plane_bounds.empty()) return;
+    const PaintPlane plane = static_cast<PaintPlane>(index);
+    // From the control that covers what the plane paints here, when one does.
+    path.clear();
+    if (find_paint_cover(root_, plane_bounds, plane, path)) {
+        paint_from_cover(path, candidate, plane_bounds, plane, visited_nodes, painted_controls,
+                         consumed_invalidations, chunks_rebuilt, chunks_reused, commands_replayed);
+        return;
+    }
+    paint_recursive(root_, candidate, plane_bounds, plane, visited_nodes, painted_controls,
+                    consumed_invalidations, chunks_rebuilt, chunks_reused, commands_replayed);
+}
+
+void Window::note_opaque_cover(const Control& control, const Painter& painter, const Rect local) noexcept {
+    const Painter* const recorder = recording_painter_;
+    if (recording_control_ != &control || recorder != &painter) return;
+    (*recording_painter_).mark_opaque_cover(local);
+}
+
 std::optional<PaintReceipt> Window::paint(Painter& painter,
                                           Rect requested_damage) {
     // One rectangle: the request, or else the bounds of all damage.
@@ -449,21 +507,19 @@ std::optional<PaintReceipt> Window::paint_rectangles(
         // instead of blending over them. An opaque window draws exactly as
         // before, so its presented bytes are unchanged.
         const bool starts_clear = backdrop_grant_.granted != WindowBackdrop::opaque;
+        // The opaque cover hint (owner, 2026-10-28). Where a control's
+        // current display chunk leaves a whole painted rectangle opaque in a
+        // plane that paints all of it, the backplane and the earlier planes
+        // lie beneath it there: that rectangle starts at that plane, its
+        // `first_plane`, and paint_plane_count means none covers it. Only
+        // an opaque window: a clear one starts each rectangle transparent.
+        std::vector<std::size_t> first_plane(painted.size(), paint_plane_count);
+        std::vector<Control::Ptr> cover_path;
         for (std::size_t index = 0; index < painted.size(); ++index) {
-            candidate.save();
-            candidate.clip_rect(painted[index]);
-            if (starts_clear) {
-                PaintGroup cleared{};
-                cleared.bounds = painted[index];
-                cleared.composite = PaintGroupComposite::copy;
-                cleared.isolated = true;
-                candidate.begin_group(cleared);
-                paint_surface_material(candidate, window_bounds, backplane);
-                candidate.end_group();
-            } else {
-                paint_surface_material(candidate, window_bounds, backplane);
+            if (!starts_clear) first_plane[index] = covering_plane(painted[index], explicit_request, cover_path);
+            if (first_plane[index] == paint_plane_count) {
+                paint_backplane_rectangle(candidate, painted[index], backplane, starts_clear);
             }
-            candidate.restore();
         }
         std::vector<Control::Ptr> popup_roots;
         popup_roots.reserve(popups_.size());
@@ -478,12 +534,25 @@ std::optional<PaintReceipt> Window::paint_rectangles(
         for (std::size_t index = 0; index < paint_plane_count; ++index) {
             const PaintPlane plane = static_cast<PaintPlane>(index);
             for (std::size_t rectangle = 0; rectangle < painted.size(); ++rectangle) {
-                const Rect plane_bounds =
-                    plane_paint_bounds(index, painted[rectangle], explicit_request);
-                if (plane_bounds.empty()) continue;
-                paint_recursive(root_, candidate, plane_bounds, plane, visited_nodes,
-                                painted_controls, consumed_invalidations, chunks_rebuilt,
-                                chunks_reused, commands_replayed);
+                const std::size_t first = first_plane[rectangle];
+                if (first != paint_plane_count && index < first) continue;
+                if (index == first) {
+                    // A callback since may have changed the cover: then
+                    // what it skipped is painted first.
+                    cover_path.clear();
+                    if (!find_paint_cover(root_, painted[rectangle], plane, cover_path)) {
+                        paint_backplane_rectangle(candidate, painted[rectangle], backplane, starts_clear);
+                        for (std::size_t earlier = 0; earlier < index; ++earlier) {
+                            paint_plane_rectangle(candidate, earlier, painted[rectangle], explicit_request,
+                                                  cover_path, visited_nodes, painted_controls,
+                                                  consumed_invalidations, chunks_rebuilt, chunks_reused,
+                                                  commands_replayed);
+                        }
+                    }
+                }
+                paint_plane_rectangle(candidate, index, painted[rectangle], explicit_request, cover_path,
+                                      visited_nodes, painted_controls, consumed_invalidations, chunks_rebuilt,
+                                      chunks_reused, commands_replayed);
             }
         }
         // Window-owned popup roots are composited after all application

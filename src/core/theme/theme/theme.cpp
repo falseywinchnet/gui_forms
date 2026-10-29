@@ -1013,6 +1013,19 @@ Insets surface_material_visual_outsets(const SurfaceMaterial& material) noexcept
     return result;
 }
 
+bool surface_material_opaque(const SurfaceMaterial& material) noexcept {
+    if (!valid_surface_material(material) || material.finish != 0.0) return false;
+    if (material.corner_radius != 0.0 || material.corner_radii) return false;
+    if (!(surface_material_visual_outsets(material) == Insets{})) return false;
+    if (material.colour_filter || material.filter_blur != 0.0 || material.drop_shadow || material.mask) return false;
+    for (const MaterialFillLayer& fill : material.fills) {
+        const bool opaque = fill.kind == MaterialFillKind::solid && fill.color.alpha == 255U &&
+            fill.opacity == 1.0 && fill.blend == MaterialBlendMode::normal;
+        if (opaque) return true;
+    }
+    return false;
+}
+
 Insets box_shadow_visual_outsets(std::span<const MaterialShadow> shadows) noexcept {
     Insets result{};
     for (const MaterialShadow& shadow : shadows) {

@@ -68,6 +68,7 @@ void RecordingPainter::translate(Point offset) {
 }
 
 void RecordingPainter::clip_rect(Rect rect) {
+    if (save_depth_ == 0U) clipped_ = true;
     DisplayCommand command;
     command.operation = DisplayOperation::clip_rect;
     command.rect = rect;
@@ -75,6 +76,7 @@ void RecordingPainter::clip_rect(Rect rect) {
 }
 
 void RecordingPainter::clip_rounded_rect(Rect rect, double radius) {
+    if (save_depth_ == 0U) clipped_ = true;
     DisplayCommand command;
     command.operation = DisplayOperation::clip_rounded_rect;
     command.rect = rect;
@@ -375,6 +377,8 @@ void RecordingPainter::fill_image_pattern(
 }
 
 void RecordingPainter::begin_group(const PaintGroup& group) {
+    // A copy group replaces what lies beneath it, transparent included.
+    if (group.composite == PaintGroupComposite::copy) opaque_cover_.reset();
     OpenGroup opened{};
     opened.save_depth = save_depth_;
     if (group_depth_ >= maximum_paint_group_depth) {
@@ -431,7 +435,13 @@ std::shared_ptr<const DisplayChunk> RecordingPainter::finish(
         throw std::logic_error("GUI.Forms display chunk leaves a paint group open");
     }
     return std::make_shared<const DisplayChunk>(generation, plane, logical_bounds,
-                                                std::move(commands_));
+                                                std::move(commands_), opaque_cover_);
+}
+
+void RecordingPainter::mark_opaque_cover(const Rect rect) noexcept {
+    const bool top_level = save_depth_ == 0U && open_groups_.empty() && !clipped_ && origin_ == Point{};
+    if (!top_level || rect.empty() || !rect.finite()) return;
+    opaque_cover_ = rect;
 }
 
 } // namespace gui_forms::detail

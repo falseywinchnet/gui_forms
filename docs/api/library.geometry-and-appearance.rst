@@ -5982,6 +5982,10 @@ Functions, constants and aliases
 
 .. cpp:function:: Insets surface_material_visual_outsets(const SurfaceMaterial& material) noexcept
 
+.. cpp:function:: bool surface_material_opaque(const SurfaceMaterial& material) noexcept
+
+   Whether paint_surface_material leaves the whole of its bounds opaque, whatever lay beneath: a valid, unfinished material with square corners, no visual outsets, filter or mask, and an opaque solid fill drawn normally, over which everything else it draws composites.
+
 .. cpp:function:: Insets box_shadow_visual_outsets(std::span<const MaterialShadow> shadows) noexcept
 
    How far the outer (not inset) shadows among ``shadows`` reach outside the rect that casts them: three blur radii plus any positive spread, shifted by each offset.

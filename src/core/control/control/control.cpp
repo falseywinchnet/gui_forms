@@ -2584,6 +2584,10 @@ void Control::set_child_layout_collapsed(const Ptr& child, bool collapsed) {
 void Control::on_paint(Painter&, Rect) {}
 void Control::on_paint_overlay(Painter&, Rect) {}
 
+void Control::report_opaque_cover(const Painter& painter, const Rect local) const noexcept {
+    if (window_ != nullptr) (*window_).note_opaque_cover(*this, painter, local);
+}
+
 void Control::paint_authored_surface(Painter& painter, Rect bounds) const {
     if (authored_surface_material_) {
         paint_surface_material(painter, bounds, *authored_surface_material_);

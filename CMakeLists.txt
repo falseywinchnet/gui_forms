@@ -3321,7 +3321,7 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_display_chunk_tests
         tests/display_chunk_tests.cpp
     )
-    target_link_libraries(gui_forms_display_chunk_tests PRIVATE gui_forms_core)
+    target_link_libraries(gui_forms_display_chunk_tests PRIVATE gui_forms_controls gui_forms_core)
     add_test(NAME gui_forms_display_chunk_tests COMMAND gui_forms_display_chunk_tests)
 
     add_executable(gui_forms_frame_scheduler_tests

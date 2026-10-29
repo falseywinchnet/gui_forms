@@ -358,47 +358,55 @@ struct PageDigest final {
 // states-and-diagnostics and the RuntimeId on typography-and-inspection,
 // and, where the phase had recorded every page, the two main pages too.
 //
+// The opaque cover hint (hot paths, owner 2026-10-28) leaves out the
+// window's backplane where the root panel's current chunk covers it: on
+// every page but basics, whose first paint rebuilds the root's chunk, the
+// trace lost those five commands (save, clip_rect, fill_rect,
+// stroke_rounded_rect, restore) and nothing else, and the paint workload's
+// pixels did not change. The Windows live-surfaces digest is that trace
+// with its pixel format word changed, which reproduces the previous one.
+//
 // typography-and-inspection's entry is the trace with the RuntimeId the
 // specimen has when this test runs first (#1328 since L8a on main); the digest
 // changes whenever a page made before it makes a control more or less.
 constexpr std::array<PageDigest, 30> expected_digests{{
     {"basics", 0x8ad3bd64955e6995ULL},
-    {"values", 0xb658b77505725da9ULL},
-    {"retained-rows", 0x025f72c7edad0514ULL},
-    {"instrument", 0x485187a50551e836ULL},
-    {"control-spectrum", 0xc1b6c7fbf50a9d0cULL},
-    {"ranges-and-progress", 0x2a06ace770e13138ULL},
-    {"containers-and-focus", 0x4bd8a3f439f8078cULL},
-    {"animation-laboratory", 0xd22492f193fdb022ULL},
-    {"states-and-diagnostics", 0x414816db6ff9a681ULL},
-    {"text-and-input", 0x6cea6c153578579dULL},
-    {"collections-and-popups", 0x5b75d7735fed6b79ULL},
-    {"values-and-spinners", 0x53974a1f042eaa19ULL},
-    {"images-and-drawing", 0xec142154440ee5c6ULL},
-    {"tabs-and-pages", 0x3cc40071993be32fULL},
-    {"checked-collections", 0xbcc8dc7a616e1b8fULL},
-    {"timing-and-tooltips", 0x99f306d142ff03deULL},
-    {"dates-and-calendar", 0x6f1eb88a51fed7cfULL},
-    {"dialogs-and-host-services", 0x8dedb342fa21371eULL},
-    {"css-layout-panels", 0x13ab5d90ddefe752ULL},
-    {"retained-layout-panels", 0x9468a4553545fddeULL},
-    {"dock-and-anchor", 0x746764bb743113cfULL},
-    {"commands-and-menus", 0xeefd420533055ee2ULL},
-    {"tree-and-object-views", 0x805651f12056426eULL},
-    {"choices-and-sections", 0x4e79ecf5a4a5e0c8ULL},
-    {"value-editors", 0x389978daaff76da8ULL},
-    {"responsive-layouts", 0x3f60bc621cdf06c9ULL},
-    {"anchored-popups", 0x898b0bfbbfdcc181ULL},
-    {"live-surfaces", 0xf100f9eb79b7356eULL},
-    {"typography-and-inspection", 0x6513f6614af56254ULL},
-    {"semantic-feedback", 0x52902fede7280d09ULL},
+    {"values", 0xbd711b8e809d2a46ULL},
+    {"retained-rows", 0xc9963872eaa82963ULL},
+    {"instrument", 0x8df238b8c4100a0dULL},
+    {"control-spectrum", 0x09c60ca6ad72d9f9ULL},
+    {"ranges-and-progress", 0x0845245fa3b2aec3ULL},
+    {"containers-and-focus", 0xf95d5ff60e4c2575ULL},
+    {"animation-laboratory", 0xb963a539e95cacffULL},
+    {"states-and-diagnostics", 0x444ea671aa96645aULL},
+    {"text-and-input", 0x6b4e47cb68ba8892ULL},
+    {"collections-and-popups", 0xdbe4ac4c284ef5b4ULL},
+    {"values-and-spinners", 0x5eab32dd1533af06ULL},
+    {"images-and-drawing", 0x5b839082cf98aff9ULL},
+    {"tabs-and-pages", 0xbb1be91c5ef45738ULL},
+    {"checked-collections", 0x9d43fb8ad621f7d4ULL},
+    {"timing-and-tooltips", 0xd72e3aee6c005bf3ULL},
+    {"dates-and-calendar", 0x77e1d7b77f2eb5deULL},
+    {"dialogs-and-host-services", 0xfdf1c0b82a22ae37ULL},
+    {"css-layout-panels", 0x92431e3c88c313d3ULL},
+    {"retained-layout-panels", 0x3c72e8bb2cfc39a5ULL},
+    {"dock-and-anchor", 0x6d0427d16dae5d7cULL},
+    {"commands-and-menus", 0x6c25c689c3d2cb5dULL},
+    {"tree-and-object-views", 0xd495e239f142b4ffULL},
+    {"choices-and-sections", 0xa08d8c7f1f7c976fULL},
+    {"value-editors", 0x964758c34df50825ULL},
+    {"responsive-layouts", 0xe093a43b924bb130ULL},
+    {"anchored-popups", 0xac8247262e33fd7cULL},
+    {"live-surfaces", 0x124e6a48b13ec2d9ULL},
+    {"typography-and-inspection", 0x32bd98381afec401ULL},
+    {"semantic-feedback", 0x4967c806108d9f5eULL},
 }};
 
 // live-surfaces names the platform's native live-surface pixel format.
 #if defined(_WIN32)
-constexpr std::uint64_t live_surfaces_digest = 0xf100f9eb79b7356eULL;
+constexpr std::uint64_t live_surfaces_digest = 0x124e6a48b13ec2d9ULL;
 #else
-constexpr std::uint64_t live_surfaces_digest = 0xa14da949c725746eULL;
+constexpr std::uint64_t live_surfaces_digest = 0xd7b956affbfa2d59ULL;
 #endif
 
 std::uint64_t expected_digest(std::string_view page) {
