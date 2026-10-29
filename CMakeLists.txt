@@ -1092,6 +1092,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     find_library(GUI_FORMS_UNIFORMTYPEIDENTIFIERS UniformTypeIdentifiers REQUIRED)
     add_library(gui_forms_host_macos STATIC
         src/host/macos/application/macos_host.mm
+        src/host/macos/application/application_menu.mm
         src/host/macos/services/appkit_host_services.mm
         src/host/macos/services/appkit_clipboard_image.mm
         src/host/macos/services/appkit_status_items.mm
@@ -3742,6 +3743,14 @@ if(GUI_FORMS_BUILD_TESTS)
     target_compile_options(gui_forms_macos_clipboard_image_tests PRIVATE -fobjc-arc)
     target_link_libraries(gui_forms_macos_clipboard_image_tests PRIVATE gui_forms_host_macos)
     add_test(NAME gui_forms_macos_clipboard_image_tests COMMAND gui_forms_macos_clipboard_image_tests)
+
+    # The application menu names the running program, not the Gallery.
+    add_executable(gui_forms_macos_application_menu_tests tests/macos_application_menu_tests.mm)
+    target_compile_options(gui_forms_macos_application_menu_tests PRIVATE -fobjc-arc)
+    target_link_libraries(gui_forms_macos_application_menu_tests PRIVATE gui_forms_host_macos)
+    target_include_directories(gui_forms_macos_application_menu_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/host/macos/application)
+    add_test(NAME gui_forms_macos_application_menu_tests COMMAND gui_forms_macos_application_menu_tests)
 
         # Stage T5, C3's measurement: what the window server composes from a
         # non-opaque window and a behind-window effect view, AppKit only.

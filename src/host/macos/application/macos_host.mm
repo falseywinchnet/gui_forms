@@ -5,6 +5,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "macos_host.hpp"
+#include "application_menu.hpp"
 #include "front_reuse.hpp"
 #include "live_surface_damage.hpp"
 #include "gui_forms/live_surface.hpp"
@@ -3674,20 +3675,6 @@ void mac_run_report_active(MacApplicationRun* run, bool active);
 }
 @end
 
-static void install_application_menu() {
-    NSMenu* menuBar = [[NSMenu alloc] init];
-    NSMenuItem* applicationItem = [[NSMenuItem alloc] init];
-    [menuBar addItem:applicationItem];
-    NSMenu* applicationMenu = [[NSMenu alloc] init];
-    NSString* quitTitle = @"Quit GUI.Forms Gallery";
-    NSMenuItem* quit = [[NSMenuItem alloc] initWithTitle:quitTitle
-                                                  action:@selector(terminate:)
-                                           keyEquivalent:@"q"];
-    [applicationMenu addItem:quit];
-    [applicationItem setSubmenu:applicationMenu];
-    [NSApp setMainMenu:menuBar];
-}
-
 namespace gui_forms::host {
 
 // The macOS convention for the named keyboard commands (owner decision
@@ -4011,7 +3998,7 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
     @autoreleasepool {
         NSApplication* application = [NSApplication sharedApplication];
         [application setActivationPolicy:NSApplicationActivationPolicyRegular];
-        install_application_menu();
+        detail::install_application_menu();
 
         const Size initialSize = options.capture_size.has_value()
             ? *options.capture_size : options.initial_size;
