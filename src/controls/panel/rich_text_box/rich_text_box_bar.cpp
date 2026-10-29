@@ -27,8 +27,8 @@ constexpr std::array<BarButtonText, rich_text_bar_button_count> bar_button_texts
     {.label = "B", .name = "Bold", .id = "bold"},
     {.label = "I", .name = "Italic", .id = "italic"},
     {.label = "Heading", .name = "Heading", .id = "heading"},
-    {.label = "\xE2\x80\xA2 List", .name = "Bulleted list", .id = "bulleted_list"},
-    {.label = "1. List", .name = "Numbered list", .id = "numbered_list"},
+    {.label = "\xE2\x80\xA2 List", .name = "Bulleted list", .id = "bulleted-list"},
+    {.label = "1. List", .name = "Numbered list", .id = "numbered-list"},
     {.label = "Link", .name = "Link", .id = "link"},
     {.label = "Code", .name = "Code", .id = "code"},
 }};
