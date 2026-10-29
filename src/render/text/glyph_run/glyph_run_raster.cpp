@@ -10,6 +10,7 @@
 #include <limits>
 #include <optional>
 #include <stdexcept>
+#include <vector>
 
 namespace gui_forms::render::text {
 namespace {
@@ -24,13 +25,47 @@ std::int64_t floor_div_64(const std::int64_t value) noexcept {
     return quotient;
 }
 
-// One rendered glyph, copied out of FreeType's slot before the next load.
+// One rendered glyph, copied out of FreeType's slot before the next render.
 struct RenderedGlyph final {
     std::int64_t left{};
     std::int64_t top{};
     std::uint32_t width{};
     std::uint32_t height{};
     std::size_t offset{};
+};
+
+// An outline the caller owns (FT_Outline_New), released with its library.
+// A placed copy of a hinted outline is restored from it before each render.
+class OwnedOutline final {
+public:
+    OwnedOutline(const FT_Library library, const FT_Outline& source) : library_(library) {
+        if (FT_Outline_New(library, static_cast<FT_UInt>(source.n_points), source.n_contours, &outline_) != 0) {
+            throw std::runtime_error("Glyph outline copy failed");
+        }
+        if (FT_Outline_Copy(&source, &outline_) != 0) {
+            FT_Outline_Done(library_, &outline_);
+            throw std::runtime_error("Glyph outline copy failed");
+        }
+    }
+    ~OwnedOutline() { FT_Outline_Done(library_, &outline_); }
+    OwnedOutline(const OwnedOutline&) = delete;
+    OwnedOutline& operator=(const OwnedOutline&) = delete;
+
+    const FT_Outline& outline() const noexcept { return outline_; }
+
+private:
+    FT_Library library_{};
+    FT_Outline outline_{};
+};
+
+// Orders a run's glyph indices by glyph ID, so the occurrences of one glyph
+// are adjacent; the sort is stable, so each glyph's occurrences keep their
+// run order.
+struct ByGlyphId final {
+    const std::vector<ShapedGlyph>* glyphs{};
+    bool operator()(const std::size_t left, const std::size_t right) const noexcept {
+        return (*glyphs)[left].glyph.value < (*glyphs)[right].glyph.value;
+    }
 };
 
 } // namespace
@@ -58,6 +93,8 @@ public:
     Impl& operator=(const Impl&) = delete;
 
     // Nullptr when the engine has no source for this ID.
+    FT_Library library() const noexcept { return library_; }
+
     FT_Face face(const FontFaceId id) {
         for (const OpenFace& open : faces_) {
             if (open.id == id) return open.face;
@@ -149,51 +186,81 @@ public:
                 continue;
             }
             if (FT_Set_Char_Size(face, 0, placement.size, 72U, 72U) != 0) throw std::runtime_error("Glyph run size failed");
-            for (const ShapedGlyph& glyph : run.glyphs) {
-                const double x = static_cast<double>(glyph.x);
-                const double y = static_cast<double>(glyph.y);
-                const double mapped_x = placement.linear.xx * x + placement.linear.xy * y;
-                const double mapped_y = placement.linear.yx * x + placement.linear.yy * y;
-                // Integer 26.6 placement relative to the origin pixel.
-                const std::int64_t device_x = placement.offset_x + std::llround(mapped_x * 64.0);
-                const std::int64_t device_y = placement.offset_y + std::llround(mapped_y * 64.0);
-                const std::int64_t pixel_x = floor_div_64(device_x);
-                const std::int64_t pixel_y = floor_div_64(device_y);
-                FT_Vector delta{static_cast<FT_Pos>(device_x - pixel_x * 64), -static_cast<FT_Pos>(device_y - pixel_y * 64)};
-                if (placement.matrix.has_value()) {
-                    FT_Matrix matrix = *placement.matrix;
-                    FT_Set_Transform(face, &matrix, &delta);
-                } else {
-                    FT_Set_Transform(face, nullptr, &delta);
-                }
-                if (FT_Load_Glyph(face, glyph.glyph.value, placement.flags) != 0) throw std::runtime_error("Glyph load failed");
+            // FT_Load_Glyph hints (or, unhinted, scales) a glyph before it
+            // applies the transform matrix and the subpixel delta, so the
+            // loaded outline is the same at every placement. Each distinct
+            // glyph is loaded once, without a transform; every occurrence
+            // then restores that outline into the slot and applies what
+            // FT_Load_Glyph would have applied (matrix, then delta), the
+            // embolding, and the render.
+            FT_Set_Transform(face, nullptr, nullptr);
+            const std::vector<ShapedGlyph>& run_glyphs = run.glyphs;
+            std::vector<std::size_t> order(run_glyphs.size());
+            for (std::size_t index = 0; index < order.size(); ++index) order[index] = index;
+            std::stable_sort(order.begin(), order.end(), ByGlyphId{&run_glyphs});
+            // Rendered glyphs by their run position: compositing below keeps
+            // run order. Empty glyphs stay unset.
+            std::vector<std::optional<RenderedGlyph>> placed(run_glyphs.size());
+            std::size_t next = 0;
+            while (next < order.size()) {
+                const std::uint32_t glyph_id = run_glyphs[order[next]].glyph.value;
+                if (FT_Load_Glyph(face, glyph_id, placement.flags) != 0) throw std::runtime_error("Glyph load failed");
                 const FT_GlyphSlot slot = (*face).glyph;
                 if ((*slot).format != FT_GLYPH_FORMAT_OUTLINE) throw std::runtime_error("Glyph is not an outline");
-                if (placement.embolden != 0 && FT_Outline_EmboldenXY(&(*slot).outline, placement.embolden, placement.embolden) != 0) {
-                    throw std::runtime_error("Glyph embolden failed");
+                const OwnedOutline loaded(impl.library(), (*slot).outline);
+                for (; next < order.size() && run_glyphs[order[next]].glyph.value == glyph_id; ++next) {
+                    const ShapedGlyph& glyph = run_glyphs[order[next]];
+                    const double x = static_cast<double>(glyph.x);
+                    const double y = static_cast<double>(glyph.y);
+                    const double mapped_x = placement.linear.xx * x + placement.linear.xy * y;
+                    const double mapped_y = placement.linear.yx * x + placement.linear.yy * y;
+                    // Integer 26.6 placement relative to the origin pixel.
+                    const std::int64_t device_x = placement.offset_x + std::llround(mapped_x * 64.0);
+                    const std::int64_t device_y = placement.offset_y + std::llround(mapped_y * 64.0);
+                    const std::int64_t pixel_x = floor_div_64(device_x);
+                    const std::int64_t pixel_y = floor_div_64(device_y);
+                    const FT_Pos delta_x = static_cast<FT_Pos>(device_x - pixel_x * 64);
+                    const FT_Pos delta_y = -static_cast<FT_Pos>(device_y - pixel_y * 64);
+                    // The slot still holds this glyph's arrays (same point
+                    // and contour counts); the previous render left them
+                    // placed and the slot marked as a bitmap.
+                    if (FT_Outline_Copy(&loaded.outline(), &(*slot).outline) != 0) {
+                        throw std::runtime_error("Glyph outline restore failed");
+                    }
+                    (*slot).format = FT_GLYPH_FORMAT_OUTLINE;
+                    if (placement.matrix.has_value()) FT_Outline_Transform(&(*slot).outline, &*placement.matrix);
+                    FT_Outline_Translate(&(*slot).outline, delta_x, delta_y);
+                    if (placement.embolden != 0 &&
+                        FT_Outline_EmboldenXY(&(*slot).outline, placement.embolden, placement.embolden) != 0) {
+                        throw std::runtime_error("Glyph embolden failed");
+                    }
+                    if (FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL) != 0) throw std::runtime_error("Glyph render failed");
+                    const FT_Bitmap& bitmap = (*slot).bitmap;
+                    if (bitmap.width == 0 || bitmap.rows == 0) continue;
+                    if (bitmap.pixel_mode != FT_PIXEL_MODE_GRAY || bitmap.num_grays != 256 || bitmap.pitch <= 0 ||
+                        static_cast<unsigned>(bitmap.pitch) < bitmap.width) {
+                        throw std::runtime_error("Unexpected glyph bitmap");
+                    }
+                    RenderedGlyph rendered{};
+                    rendered.left = pixel_x + (*slot).bitmap_left;
+                    rendered.top = pixel_y - (*slot).bitmap_top;
+                    rendered.width = bitmap.width;
+                    rendered.height = bitmap.rows;
+                    rendered.offset = bitmaps.size();
+                    for (unsigned row = 0; row < bitmap.rows; ++row) {
+                        const std::uint8_t* const line = bitmap.buffer + static_cast<std::size_t>(row) * static_cast<std::size_t>(bitmap.pitch);
+                        bitmaps.insert(bitmaps.end(), line, line + bitmap.width);
+                    }
+                    placed[order[next]] = rendered;
                 }
-                if (FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL) != 0) throw std::runtime_error("Glyph render failed");
-                const FT_Bitmap& bitmap = (*slot).bitmap;
-                if (bitmap.width == 0 || bitmap.rows == 0) continue;
-                if (bitmap.pixel_mode != FT_PIXEL_MODE_GRAY || bitmap.num_grays != 256 || bitmap.pitch <= 0 ||
-                    static_cast<unsigned>(bitmap.pitch) < bitmap.width) {
-                    throw std::runtime_error("Unexpected glyph bitmap");
-                }
-                RenderedGlyph rendered{};
-                rendered.left = pixel_x + (*slot).bitmap_left;
-                rendered.top = pixel_y - (*slot).bitmap_top;
-                rendered.width = bitmap.width;
-                rendered.height = bitmap.rows;
-                rendered.offset = bitmaps.size();
-                for (unsigned row = 0; row < bitmap.rows; ++row) {
-                    const std::uint8_t* const line = bitmap.buffer + static_cast<std::size_t>(row) * static_cast<std::size_t>(bitmap.pitch);
-                    bitmaps.insert(bitmaps.end(), line, line + bitmap.width);
-                }
-                left = std::min(left, rendered.left);
-                top = std::min(top, rendered.top);
-                right = std::max(right, rendered.left + static_cast<std::int64_t>(rendered.width));
-                bottom = std::max(bottom, rendered.top + static_cast<std::int64_t>(rendered.height));
-                glyphs.push_back(rendered);
+            }
+            for (const std::optional<RenderedGlyph>& rendered : placed) {
+                if (!rendered.has_value()) continue;
+                left = std::min(left, (*rendered).left);
+                top = std::min(top, (*rendered).top);
+                right = std::max(right, (*rendered).left + static_cast<std::int64_t>((*rendered).width));
+                bottom = std::max(bottom, (*rendered).top + static_cast<std::int64_t>((*rendered).height));
+                glyphs.push_back(*rendered);
             }
         }
         if (glyphs.empty()) return result;

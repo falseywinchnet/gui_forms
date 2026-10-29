@@ -215,6 +215,72 @@ void synthesis_and_transforms(const char* font_path, const std::uint64_t (&expec
     }
 }
 
+bool same_coverage(const GlyphRunCoverage& left, const GlyphRunCoverage& right) {
+    const bool same = left.pixels == right.pixels && left.width == right.width && left.height == right.height &&
+        left.left == right.left && left.top == right.top && left.missing_glyphs == right.missing_glyphs;
+    return same;
+}
+
+// The rasterizer loads each distinct glyph of a run once and places that
+// outline at each occurrence. The run must equal its glyphs rasterized one
+// by one (each loaded afresh) and combined in run order as documented,
+// c + p * (255 - c) / 255, for every synthesis.
+void repeated_glyphs_match_single_glyph_runs(const char* font_path) {
+    HarfBuzzFontEngine engine;
+    require(engine.register_typeface(FontRole::control, 400, false, read_file(font_path)).has_value(), "font registers");
+    const FontSpec font{FontRole::control, 13.0, 400, false};
+    const ShapedText shaped = engine.shape(corpus, font);
+    require(shaped.runs.size() == 1U, "corpus shapes as one run");
+    GlyphRunRasterizer rasterizer(engine);
+    const GlyphRunSynthesis syntheses[4]{{false, false}, {true, false}, {false, true}, {true, true}};
+    for (const GlyphRunSynthesis synthesis : syntheses) {
+        const GlyphRunCoverage whole = rasterizer.rasterize(shaped, font, 1.0, 37, synthesis);
+        std::vector<std::uint8_t> combined(whole.pixels.size(), 0U);
+        for (const ShapedGlyph& glyph : shaped.runs[0].glyphs) {
+            ShapedText single{};
+            ShapedFontRun run{};
+            run.face = shaped.runs[0].face;
+            run.glyphs.push_back(glyph);
+            single.runs.push_back(run);
+            const GlyphRunCoverage part = rasterizer.rasterize(single, font, 1.0, 37, synthesis);
+            for (std::uint32_t row = 0; row < part.height; ++row) {
+                for (std::uint32_t column = 0; column < part.width; ++column) {
+                    const std::int64_t x = static_cast<std::int64_t>(part.left) - whole.left + column;
+                    const std::int64_t y = static_cast<std::int64_t>(part.top) - whole.top + row;
+                    require(x >= 0 && y >= 0 && x < static_cast<std::int64_t>(whole.width) &&
+                            y < static_cast<std::int64_t>(whole.height), "glyph lies inside its run");
+                    const std::size_t target = static_cast<std::size_t>(y) * whole.width + static_cast<std::size_t>(x);
+                    const unsigned coverage = part.pixels[static_cast<std::size_t>(row) * part.width + column];
+                    const unsigned previous = combined[target];
+                    combined[target] = static_cast<std::uint8_t>(coverage + previous * (255U - coverage) / 255U);
+                }
+            }
+        }
+        require(combined == whole.pixels, "a run equals its glyphs rasterized one by one");
+    }
+}
+
+// FT_Render_Glyph refuses a glyph box reaching ten ems from its origin; the
+// run then fails as a whole, and the rasterizer stays usable.
+void glyphs_beyond_ten_ems_are_refused(const char* font_path) {
+    HarfBuzzFontEngine engine;
+    require(engine.register_typeface(FontRole::control, 400, false, read_file(font_path)).has_value(), "font registers");
+    const FontSpec font{FontRole::control, 16.0, 400, false};
+    const ShapedText shaped = engine.shape(corpus, font);
+    GlyphRunRasterizer rasterizer(engine);
+    GlyphRunOrigin origin{};
+    bool refused = false;
+    try {
+        static_cast<void>(rasterizer.rasterize_transformed(shaped, font, {16.0, 0.0, 0.0, 16.0}, 0.0, 0.0, {}, origin));
+    } catch (const std::runtime_error&) {
+        refused = true;
+    }
+    require(refused, "a glyph box beyond ten ems is refused");
+    GlyphRunRasterizer fresh(engine);
+    require(same_coverage(rasterizer.rasterize(shaped, font, 1.0, 9), fresh.rasterize(shaped, font, 1.0, 9)),
+            "a refused run leaves the rasterizer usable");
+}
+
 void unknown_faces_are_reported() {
     HarfBuzzFontEngine engine;
     GlyphRunRasterizer rasterizer(engine);
@@ -234,6 +300,9 @@ int main() {
     rasterization_is_deterministic_and_scales(GUI_FORMS_TEST_RAPIDS_REGULAR);
     rasterization_is_deterministic_and_scales(GUI_FORMS_TEST_CARLITO_REGULAR);
     unknown_faces_are_reported();
+    repeated_glyphs_match_single_glyph_runs(GUI_FORMS_TEST_RAPIDS_REGULAR);
+    repeated_glyphs_match_single_glyph_runs(GUI_FORMS_TEST_CARLITO_REGULAR);
+    glyphs_beyond_ten_ems_are_refused(GUI_FORMS_TEST_CARLITO_REGULAR);
     synthesis_and_transforms(GUI_FORMS_TEST_RAPIDS_REGULAR, {0xa2199bda6d0e05e7ULL, 0xf3fdfff6b1ef2453ULL, 0x3509b246406a7aadULL,
                                                              0xeece270b10c7e4b9ULL, 0xb26a36159298eee6ULL});
     synthesis_and_transforms(GUI_FORMS_TEST_CARLITO_REGULAR, {0x740132e6ee72d463ULL, 0x21207356b2411a38ULL, 0x535dbda7fa2302b1ULL,
