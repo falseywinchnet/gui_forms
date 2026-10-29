@@ -14,6 +14,7 @@
 namespace gui_forms {
 
 class Control;
+namespace detail { class ThemeImageLease; struct ThemeAccess; }
 
 class Theme final {
 public:
@@ -71,8 +72,14 @@ private:
     // The copy is made straight into the theme's heap storage.
     explicit Theme(const ThemeDefinition& definition)
         : definition_(definition), engine_(definition_.rules) {}
+    friend struct detail::ThemeAccess;
+    // Checks `definition` (throwing as create states) and makes the theme.
+    [[nodiscard]] static std::unique_ptr<Theme> validated(const ThemeDefinition& definition);
     ThemeDefinition definition_;
     ThemeEngine engine_;
+    // The images a compiled theme package loaded, each removed from its
+    // registry when the last theme holding it is released.
+    std::vector<std::shared_ptr<const detail::ThemeImageLease>> images_{};
 };
 
 [[nodiscard]] ThemeDefinition windows_professional_theme_definition();

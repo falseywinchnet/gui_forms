@@ -472,7 +472,7 @@ struct Refusal final {
 void test_refusals() {
     const std::array<Refusal, 35> refusals{{
         {"#a { opacity: 0.5 !important }", DiagnosticCode::not_yet_built, "opacity"},
-        {"@import \"x\"; #a { opacity: 1 }", DiagnosticCode::not_yet_built, "@import"},
+        {"@import \"x\"; #a { opacity: 1 }", DiagnosticCode::import_not_installed, "\"x\""},
         {"#a { opacity: 1 } @media print { #a { opacity: 1 } }", DiagnosticCode::value_form_not_admitted, "print"},
         {"@keyframes k { from { color: red } }", DiagnosticCode::value_form_not_admitted, "color"},
         {"#a { backdrop-filter: blur(2px) }", DiagnosticCode::not_yet_built, "backdrop-filter"},
@@ -663,14 +663,21 @@ void test_lowered_size() {
             "2,048 copies pass the lowered size and are refused");
 }
 
-// The codes P5 adds, by number.
+// The codes P5 and P10 add, by number.
 struct CodeLabel final {
     DiagnosticCode code{};
     std::string_view label{};
 };
 
 void test_codes() {
-    const std::array<CodeLabel, 8> codes{{
+    const std::array<CodeLabel, 15> codes{{
+        {DiagnosticCode::manifest_invalid, "E601"},
+        {DiagnosticCode::file_hash_mismatch, "E602"},
+        {DiagnosticCode::import_not_installed, "E603"},
+        {DiagnosticCode::import_hash_mismatch, "E604"},
+        {DiagnosticCode::import_cycle, "E605"},
+        {DiagnosticCode::published_value_invalid, "E606"},
+        {DiagnosticCode::engine_too_old, "E607"},
         {DiagnosticCode::lowered_sheet_too_large, "E513"},
         {DiagnosticCode::too_many_keyframes, "E514"},
         {DiagnosticCode::unknown_primitive, "W102"},

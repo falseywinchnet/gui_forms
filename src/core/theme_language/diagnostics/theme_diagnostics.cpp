@@ -71,6 +71,13 @@ DiagnosticSeverity diagnostic_severity(DiagnosticCode code) noexcept {
     case DiagnosticCode::substitution_too_long:
     case DiagnosticCode::lowered_sheet_too_large:
     case DiagnosticCode::too_many_keyframes:
+    case DiagnosticCode::manifest_invalid:
+    case DiagnosticCode::file_hash_mismatch:
+    case DiagnosticCode::import_not_installed:
+    case DiagnosticCode::import_hash_mismatch:
+    case DiagnosticCode::import_cycle:
+    case DiagnosticCode::published_value_invalid:
+    case DiagnosticCode::engine_too_old:
     case DiagnosticCode::reserved_input_set:
     case DiagnosticCode::not_yet_built:
         return DiagnosticSeverity::error;
@@ -139,6 +146,13 @@ std::string_view diagnostic_code_name(DiagnosticCode code) noexcept {
     case DiagnosticCode::substitution_too_long: return "substitution_too_long";
     case DiagnosticCode::lowered_sheet_too_large: return "lowered_sheet_too_large";
     case DiagnosticCode::too_many_keyframes: return "too_many_keyframes";
+    case DiagnosticCode::manifest_invalid: return "manifest_invalid";
+    case DiagnosticCode::file_hash_mismatch: return "file_hash_mismatch";
+    case DiagnosticCode::import_not_installed: return "import_not_installed";
+    case DiagnosticCode::import_hash_mismatch: return "import_hash_mismatch";
+    case DiagnosticCode::import_cycle: return "import_cycle";
+    case DiagnosticCode::published_value_invalid: return "published_value_invalid";
+    case DiagnosticCode::engine_too_old: return "engine_too_old";
     case DiagnosticCode::reserved_input_set: return "reserved_input_set";
     case DiagnosticCode::not_yet_built: return "not_yet_built";
     case DiagnosticCode::unknown_property: return "unknown_property";

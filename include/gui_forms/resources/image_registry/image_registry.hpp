@@ -2,11 +2,14 @@
 
 #include "gui_forms/resources/types/image_resource_types.hpp"
 
+#include <memory>
 #include <optional>
 #include <span>
 #include <vector>
 
 namespace gui_forms {
+
+namespace detail { struct ImageRegistryAccess; struct ImageRegistryLiveness; }
 
 // Renderer-neutral ownership for validated PNG files and premultiplied
 // BGRA bytes. ImageId values are generational; views expire at
@@ -60,6 +63,7 @@ public:
     [[nodiscard]] const ImageRegistryLimits& limits() const noexcept;
 
 private:
+    friend struct detail::ImageRegistryAccess;
     struct Slot;
     struct EncodedImage;
     [[nodiscard]] EncodedImage validate_encoded(
@@ -85,6 +89,9 @@ private:
     std::uint64_t resource_count_{};
     std::uint64_t encoded_bytes_{};
     std::uint64_t decoded_bytes_{};
+    // Made when an owner of images first asks (ImageRegistryAccess); it
+    // names the registry holding these images.
+    std::shared_ptr<detail::ImageRegistryLiveness> liveness_{};
 };
 
 } // namespace gui_forms

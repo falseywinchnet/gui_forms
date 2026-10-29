@@ -126,6 +126,29 @@ enum class DiagnosticCode : std::uint16_t {
     // More than maximum_keyframes_rules `@keyframes` rules in one sheet
     // (R2-14, P7b).
     too_many_keyframes = 514,
+    // E6xx package (P10, owner decisions of 2026-10-28 on theme.json): the
+    // theme is refused, and the running one stays.
+    // A manifest that is not JSON, or not the schema: a key missing, of
+    // the wrong kind, ill-formed or unknown.
+    manifest_invalid = 601,
+    // A package file, the sheet or a resource, whose bytes do not have the
+    // hash the manifest gives them; the detail is its path (owner decision
+    // 2a of 2026-10-28).
+    file_hash_mismatch = 602,
+    // An `@import` of a theme that is not installed, or that the manifest's
+    // `imports` does not list.
+    import_not_installed = 603,
+    // An installed theme whose manifest's hash is not the one the
+    // importing manifest pins, or whose own files fail their hashes.
+    import_hash_mismatch = 604,
+    // A theme that imports itself, through any chain of imports.
+    import_cycle = 605,
+    // A published value the manifest lists that is ill-formed, listed
+    // twice, or that the application does not publish.
+    published_value_invalid = 606,
+    // A manifest whose engine bound the running engine does not meet; the
+    // detail is the version needed (C8).
+    engine_too_old = 607,
     // E7xx reserved names: a theme that defines an engine input or a
     // published value (R2-06).
     reserved_input_set = 701,

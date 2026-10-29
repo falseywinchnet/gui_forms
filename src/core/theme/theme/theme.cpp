@@ -2,6 +2,8 @@
 #include "gui_forms/control/control/control.hpp"
 #include "gui_forms/surface_material/presets/material_presets.hpp"
 
+#include "theme_access.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <memory>
@@ -1109,6 +1111,19 @@ ControlRoleRecipes derive_high_contrast_recipes(ControlRoleRecipes recipes) {
 }
 
 std::shared_ptr<const Theme> Theme::create(const ThemeDefinition& definition) {
+    std::shared_ptr<const Theme> result(validated(definition));
+    return result;
+}
+
+std::shared_ptr<const Theme> detail::ThemeAccess::create_holding(
+    const ThemeDefinition& definition, std::vector<std::shared_ptr<const ThemeImageLease>> images) {
+    std::unique_ptr<Theme> theme = Theme::validated(definition);
+    (*theme).images_ = std::move(images);
+    std::shared_ptr<const Theme> result(std::move(theme));
+    return result;
+}
+
+std::unique_ptr<Theme> Theme::validated(const ThemeDefinition& definition) {
     if (definition.id.empty() || definition.id.size() > 128U) {
         throw std::invalid_argument("theme id must contain 1 to 128 bytes");
     }
@@ -1143,8 +1158,7 @@ std::shared_ptr<const Theme> Theme::create(const ThemeDefinition& definition) {
     for (ControlRoleRecipes& role : (*theme).definition_.roles) {
         role = derive_high_contrast_recipes(std::move(role));
     }
-    std::shared_ptr<const Theme> result(std::move(theme));
-    return result;
+    return theme;
 }
 
 std::string_view control_visual_role_name(ControlVisualRole role) noexcept {
