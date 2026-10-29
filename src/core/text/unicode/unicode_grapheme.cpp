@@ -3,6 +3,7 @@
 #include "unicode_grapheme_data.hpp"
 #include "gui_forms/detail/algorithm/binary_search.hpp"
 #include "gui_forms/text.hpp"
+#include "../../types/restrict/restrict.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -163,10 +164,15 @@ lookup(char32_t scalar,
 }
 
 // Input is validated; scalars spans the exact decoded count, boundaries has
-// at least scalars.size()+1 elements. The arrays and input are disjoint.
-// Writes only active elements and returns the active boundary count.
-std::size_t fill_grapheme_arrays(const std::string_view utf8,
-    const std::span<Scalar> scalars, const std::span<std::size_t> boundaries) noexcept {
+// at least scalars.size()+1 elements. Writes only active elements and returns
+// the active boundary count. Restricted parameters: no element is reached
+// through two of them (fill_grapheme_arrays checks it).
+std::size_t fill_grapheme_parts(const char* GUI_FORMS_RESTRICT text, const std::size_t text_size,
+    Scalar* GUI_FORMS_RESTRICT scalar_data, const std::size_t scalar_count,
+    std::size_t* GUI_FORMS_RESTRICT boundary_data, const std::size_t boundary_count) noexcept {
+  const std::string_view utf8(text, text_size);
+  const std::span<Scalar> scalars(scalar_data, scalar_count);
+  const std::span<std::size_t> boundaries(boundary_data, boundary_count);
   std::size_t offset = 0U;
   for (std::size_t index = 0U; index < scalars.size(); ++index) {
     const std::size_t byte_offset = offset;
@@ -191,6 +197,19 @@ std::size_t fill_grapheme_arrays(const std::string_view utf8,
     ++count;
   }
   return count;
+}
+
+// Overlap rule: the input text, scalars and boundaries share no element
+// (asserted in debug and sanitizer builds); the callers pass separate
+// allocations and a caller's text.
+std::size_t fill_grapheme_arrays(const std::string_view utf8,
+    const std::span<Scalar> scalars, const std::span<std::size_t> boundaries) noexcept {
+  const std::span<const char> text(utf8.data(), utf8.size());
+  require_disjoint(text, scalars);
+  require_disjoint(text, boundaries);
+  require_disjoint(scalars, boundaries);
+  return fill_grapheme_parts(utf8.data(), utf8.size(), scalars.data(), scalars.size(), boundaries.data(),
+      boundaries.size());
 }
 
 } // namespace

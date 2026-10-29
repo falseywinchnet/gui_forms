@@ -2,6 +2,7 @@
 
 #include "../../../interpolation/interpolation.hpp"
 #include "../kernel/pixel_kernel.hpp"
+#include "../../../types/restrict/restrict.hpp"
 #include "material_image.hpp"
 
 #include <algorithm>
@@ -84,20 +85,32 @@ void centre_positions(std::size_t source, std::size_t target, std::vector<double
     }
 }
 
+// Copies `length` pixels from `source` to `target`, each place's node
+// stride apart. Restricted parameters: no element is reached through both
+// (resample_one_line checks it).
+void copy_line(const double* GUI_FORMS_RESTRICT source, LinePlace from_place, double* GUI_FORMS_RESTRICT target,
+               LinePlace to_place, std::size_t length) noexcept {
+    for (std::size_t node = 0U; node < length; ++node) {
+        const std::size_t read = from_place.offset + node * from_place.node_stride;
+        const std::size_t write = to_place.offset + node * to_place.node_stride;
+        for (std::size_t lane = 0U; lane < lanes; ++lane) target[write + lane] = source[read + lane];
+    }
+}
+
 // Resamples one line of `source_length` pixels in `from` to `target_length`
 // pixels in `to`: copied when the lengths match, pixel-area when it
-// shrinks, at `positions` (centre_positions) when it enlarges. `from` and
-// `to` are distinct buffers.
+// shrinks, at `positions` (centre_positions) when it enlarges. Overlap
+// rule: `from` and `to` share no element, and `to` shares none with
+// `positions` (asserted in debug builds). The copy's restricted parameters
+// rely on it; the interpolation seam takes the spans as they are.
 interpolation::Status resample_one_line(std::span<const double> from, LinePlace from_place,
                                         std::size_t source_length, std::span<double> to, LinePlace to_place,
                                         std::size_t target_length, std::span<const double> positions) noexcept {
+    gui_forms::detail::require_disjoint(from, to);
+    gui_forms::detail::require_disjoint(positions, to);
     const interpolation::ValueRange range{0.0, 1.0};
     if (source_length == target_length) {
-        for (std::size_t node = 0U; node < source_length; ++node) {
-            const std::size_t read = from_place.offset + node * from_place.node_stride;
-            const std::size_t write = to_place.offset + node * to_place.node_stride;
-            for (std::size_t lane = 0U; lane < lanes; ++lane) to[write + lane] = from[read + lane];
-        }
+        copy_line(from.data(), from_place, to.data(), to_place, source_length);
         return interpolation::Status::ok;
     }
     const interpolation::SourceLine source{from.subspan(from_place.offset), source_length, lanes,

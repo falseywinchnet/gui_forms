@@ -1,5 +1,7 @@
 #include "box_blur.hpp"
 
+#include "../../../types/restrict/restrict.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -47,10 +49,11 @@ struct AcrossPass final {
     std::size_t lanes{};
 };
 
-// Runs `pass` from `from` into `to`, distinct buffers holding every
-// element the pass reads or writes.
-void box_across(std::span<const std::uint32_t> from, std::span<std::uint32_t> to, const AcrossPass& pass,
-                const BoxAverage& average) noexcept {
+// Runs `pass` from `source` into `target`. Restricted parameters: no element
+// the pass reads through `source` is reached through `target` (box_across
+// checks it).
+void across_rows(const std::uint32_t* GUI_FORMS_RESTRICT source, std::uint32_t* GUI_FORMS_RESTRICT target,
+                 const AcrossPass& pass, const BoxAverage& average) noexcept {
     const std::size_t width = static_cast<std::size_t>(average.half) * 2U + 1U;
     const std::size_t outputs = pass.length - (width - 1U);
     const std::size_t lanes = pass.lanes;
@@ -59,20 +62,30 @@ void box_across(std::span<const std::uint32_t> from, std::span<std::uint32_t> to
         std::array<std::uint32_t, box_blur_lanes> sums{};
         for (std::size_t node = 0U; node < width; ++node) {
             const std::size_t at = first + node * lanes;
-            for (std::size_t lane = 0U; lane < lanes; ++lane) sums[lane] = sums[lane] + from[at + lane];
+            for (std::size_t lane = 0U; lane < lanes; ++lane) sums[lane] = sums[lane] + source[at + lane];
         }
         for (std::size_t output = 0U; output < outputs; ++output) {
             const std::size_t write = first + output * lanes;
-            for (std::size_t lane = 0U; lane < lanes; ++lane) to[write + lane] = averaged(sums[lane], average);
+            for (std::size_t lane = 0U; lane < lanes; ++lane) target[write + lane] = averaged(sums[lane], average);
             if (output + 1U == outputs) break;
             // Slide the window one pixel: add the next, drop the first.
             const std::size_t entering = first + (output + width) * lanes;
             const std::size_t leaving = first + output * lanes;
             for (std::size_t lane = 0U; lane < lanes; ++lane) {
-                sums[lane] = sums[lane] + from[entering + lane] - from[leaving + lane];
+                sums[lane] = sums[lane] + source[entering + lane] - source[leaving + lane];
             }
         }
     }
+}
+
+// Runs `pass` from `from` into `to`, buffers holding every element the
+// pass reads or writes. Overlap rule: `from` and `to` share no element
+// (asserted in debug builds), the promise across_rows's restricted
+// parameters make.
+void box_across(std::span<const std::uint32_t> from, std::span<std::uint32_t> to, const AcrossPass& pass,
+                const BoxAverage& average) noexcept {
+    gui_forms::detail::require_disjoint(from, to);
+    across_rows(from.data(), to.data(), pass, average);
 }
 
 // One pass down: `length` rows of `elements` elements each (the columns
@@ -86,32 +99,47 @@ struct DownPass final {
     std::size_t stride{};
 };
 
-void box_down(std::span<const std::uint32_t> from, std::span<std::uint32_t> to, std::span<std::uint32_t> sums,
-              const DownPass& pass, const BoxAverage& average) noexcept {
+// Runs `pass` from `source` into `target`, keeping the window sums in
+// `column_sums`. Restricted parameters: no element is reached through two
+// of them (box_down checks it).
+void down_rows(const std::uint32_t* GUI_FORMS_RESTRICT source, std::uint32_t* GUI_FORMS_RESTRICT target,
+               std::uint32_t* GUI_FORMS_RESTRICT column_sums, const DownPass& pass,
+               const BoxAverage& average) noexcept {
     const std::size_t width = static_cast<std::size_t>(average.half) * 2U + 1U;
     const std::size_t outputs = pass.length - (width - 1U);
     const std::size_t elements = pass.elements;
-    const std::span<std::uint32_t> column_sums = sums.first(elements);
-    std::fill(column_sums.begin(), column_sums.end(), 0U);
+    std::fill(column_sums, column_sums + elements, 0U);
     for (std::size_t node = 0U; node < width; ++node) {
         const std::size_t at = node * pass.stride;
         for (std::size_t element = 0U; element < elements; ++element) {
-            column_sums[element] = column_sums[element] + from[at + element];
+            column_sums[element] = column_sums[element] + source[at + element];
         }
     }
     for (std::size_t output = 0U; output < outputs; ++output) {
         const std::size_t write = output * pass.stride;
         for (std::size_t element = 0U; element < elements; ++element) {
-            to[write + element] = averaged(column_sums[element], average);
+            target[write + element] = averaged(column_sums[element], average);
         }
         if (output + 1U == outputs) break;
         // Slide every column's window one row: add the next, drop the first.
         const std::size_t entering = (output + width) * pass.stride;
         const std::size_t leaving = output * pass.stride;
         for (std::size_t element = 0U; element < elements; ++element) {
-            column_sums[element] = column_sums[element] + from[entering + element] - from[leaving + element];
+            column_sums[element] = column_sums[element] + source[entering + element] - source[leaving + element];
         }
     }
+}
+
+// Overlap rule: `from`, `to` and the first pass.elements of `sums` share no
+// element (asserted in debug builds), the promise down_rows's restricted
+// parameters make.
+void box_down(std::span<const std::uint32_t> from, std::span<std::uint32_t> to, std::span<std::uint32_t> sums,
+              const DownPass& pass, const BoxAverage& average) noexcept {
+    const std::span<std::uint32_t> column_sums = sums.first(pass.elements);
+    gui_forms::detail::require_disjoint(from, to);
+    gui_forms::detail::require_disjoint(from, column_sums);
+    gui_forms::detail::require_disjoint(to, column_sums);
+    down_rows(from.data(), to.data(), column_sums.data(), pass, average);
 }
 
 } // namespace

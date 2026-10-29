@@ -3,6 +3,7 @@
 
 #include "../container_layout_utilities.hpp"
 #include "../../scrollable_anatomy.hpp"
+#include "../../../../core/types/restrict/restrict.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -140,11 +141,16 @@ void shrink_to_available(std::span<ResponsiveTrackResult> tracks,
     }
 }
 
-void distribute_remaining(
-    std::span<const ResponsiveTrackSpec> specs,
-    std::span<ResponsiveTrackResult> tracks,
+// Restricted parameters: no element is reached through both (distribute_remaining
+// checks it).
+void distribute_remaining_parts(
+    const ResponsiveTrackSpec* GUI_FORMS_RESTRICT spec_data,
+    ResponsiveTrackResult* GUI_FORMS_RESTRICT track_data,
+    std::size_t count,
     const std::vector<bool>& active,
     double extra) noexcept {
+    const std::span<const ResponsiveTrackSpec> specs(spec_data, count);
+    const std::span<ResponsiveTrackResult> tracks(track_data, count);
     std::vector<std::size_t> open;
     for (std::size_t index = 0U; index < specs.size(); ++index) {
         if (active[index] &&
@@ -174,6 +180,17 @@ void distribute_remaining(
         extra -= consumed;
         open = std::move(next);
     }
+}
+
+// Overlap rule: the caller's specs and the result's tracks, one per spec,
+// share no element (asserted in debug and sanitizer builds).
+void distribute_remaining(
+    std::span<const ResponsiveTrackSpec> specs,
+    std::span<ResponsiveTrackResult> tracks,
+    const std::vector<bool>& active,
+    double extra) noexcept {
+    detail::require_disjoint(specs, tracks);
+    distribute_remaining_parts(specs.data(), tracks.data(), specs.size(), active, extra);
 }
 
 [[nodiscard]] bool contains_track(std::span<const std::size_t> tracks,
